@@ -107,6 +107,18 @@ decisions. Live scheduling policy discovery, durable queueing, provider
 execution, synthesized merge/release, OpenHands, SMA, deployment, migration,
 security isolation, and performance remain unqualified.
 
+**COMPUTED GATE RESULT:** Phase 3 Step 6 `deterministic-validation-join` is
+`PASS`. Its raw race-enabled receipts contain 118 focused
+kernel/application/protocol test cases across 3 packages and 261
+full-regression test cases across 13 packages, with zero test or vet failures.
+Review branches, causal parents, results, and missing branches are canonical;
+`WAIT_ALL` and `FAIL_FAST` have stable outcomes, with `FAIL` deterministically
+preceding `INCONCLUSIVE`. Policy may open a frozen-schema completion review but
+cannot forge validator identity. Resolution-owner, deadline, adjudicator,
+per-branch round-budget, and finding-supersession fields require a later
+contract revision; completion, reopening, escalation, acceptance, release,
+live providers, deployment, migration, and performance remain unqualified.
+
 The frozen contract identity is:
 
 ```text
@@ -222,6 +234,15 @@ go run ./cmd/assignment-readiness-report
 go run ./cmd/assignment-readiness-report -verify OUTPUT/phase-3/step-5-assignment-readiness-gate.json
 ```
 
+The Phase 3 Step 6 runner preserves raw validation-join and full-regression
+receipts, runs `go vet`, and verifies accepted-base, source-tree, and artifact
+digests:
+
+```sh
+go run ./cmd/validation-join-report
+go run ./cmd/validation-join-report -verify OUTPUT/phase-3/step-6-validation-join-gate.json
+```
+
 ## Contract validation
 
 The checked-in reference tools require Node.js and write their reports only to
@@ -290,4 +311,9 @@ go run ./cmd/core-hermetic-report -verify build/reports/core-hermetic.json
 - [Phase 3 Step 5 authority](OUTPUT/phase-3/step-5-authorization.json)
 - [Phase 3 deterministic assignment/readiness boundary](docs/architecture/006-deterministic-assignment-readiness.md)
 - [Phase 3 Step 5 assignment/readiness gate](OUTPUT/phase-3/step-5-assignment-readiness-gate.json)
+- [Phase 3 Step 5 acceptance](OUTPUT/phase-3/step-5-acceptance.json)
+- [Phase 3 Step 5 release receipt](OUTPUT/phase-3/step-5-release-receipt.json)
+- [Phase 3 Step 6 authority](OUTPUT/phase-3/step-6-authorization.json)
+- [Phase 3 deterministic validation-join boundary](docs/architecture/007-deterministic-validation-join.md)
+- [Phase 3 Step 6 validation-join gate](OUTPUT/phase-3/step-6-validation-join-gate.json)
 - [Historical Step 2 `0.1.0` encoding-gap record](OUTPUT/phase-2/step-2-contract-encoding-gaps.md)

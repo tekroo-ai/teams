@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "PRINCIPAL_ACCEPTANCE",
+  "recordedOn": "2026-08-11",
+  "timePrecision": "DAY",
+  "principalStatement": "Accepted. Push and proceed to the next step.",
+  "acceptedPhase": "PHASE_3",
+  "acceptedStep": "STEP_5_DETERMINISTIC_ASSIGNMENT_READINESS",
+  "acceptedCommit": "0f4f046567ce3ac297d907ccc0bc2dd1aa99d0b2",
+  "acceptedTree": "21300a855e97d6c15df594051bcb9edf07229b0d",
+  "gateReport": "OUTPUT/phase-3/step-5-assignment-readiness-gate.json",
+  "gateReportFileSha256": "64fba5640928d122164ee2969109e8a61e949a3df02fb5d5aef2972672426b27",
+  "gateReportSelfSha256": "205429f19e2403d1caac50e52d47c5101c2c9f99f990a3a09f1f368705c99d72",
+  "scope": "Acceptance applies only to the qualified deterministic assignment/readiness slice and not to its excluded profiles."
+}

@@ -1,0 +1,129 @@
+{
+  "schemaVersion": "1.0.0",
+  "reportType": "PHASE_3_DETERMINISTIC_VALIDATION_JOIN",
+  "status": "PASS",
+  "acceptedBaseCommit": "0f4f046567ce3ac297d907ccc0bc2dd1aa99d0b2",
+  "acceptedBaseTree": "21300a855e97d6c15df594051bcb9edf07229b0d",
+  "contractIdentity": "tekroo.kernel.contracts/0.2.0",
+  "manifestSha256": "cd582fb163e17d49a1a0a627f33cdbb184d15ecace3200981738782cca977dae",
+  "sourceTreeSha256": "8e54cf5c7ddd4ba40348ce632cc4ceebfb9eb77205ecaec9480b2edbc2f68e18",
+  "environment": {
+    "goVersion": "go1.26.4",
+    "goos": "darwin",
+    "goarch": "arm64",
+    "locale": "C",
+    "timeZone": "UTC"
+  },
+  "executed": {
+    "focusedTestCases": 118,
+    "focusedTestFailures": 0,
+    "focusedPackagesPassed": 3,
+    "regressionTestCases": 261,
+    "regressionTestFailures": 0,
+    "regressionPackagesPassed": 13,
+    "vetFailures": 0
+  },
+  "assertions": [
+    {
+      "id": "VALIDATE-001-ORDER-INDEPENDENT",
+      "status": "PASS",
+      "tests": [
+        "TestValidationReviewPlanIsInvariantToBranchAndParentOrder",
+        "TestValidationJoinProjectionIsCanonicalAndOrderIndependent",
+        "TestStorePersistsOrderIndependentCompletionReviewJoin"
+      ],
+      "evidenceFloor": "Branch, parent, result-arrival, and map iteration order do not alter the canonical review plan or join."
+    },
+    {
+      "id": "VALIDATE-002-PARTIAL-POLICY",
+      "status": "PASS",
+      "tests": [
+        "TestValidationJoinPartialPoliciesHaveDeterministicFailurePrecedence"
+      ],
+      "evidenceFloor": "WAIT_ALL remains pending until all branches report; FAIL_FAST terminates on a non-pass result, with FAIL deterministically preceding INCONCLUSIVE."
+    },
+    {
+      "id": "VALIDATE-003-REPLAY-CONFLICT",
+      "status": "PASS",
+      "tests": [
+        "TestValidationBranchReplayIsIdempotentAndContradictionConflicts",
+        "TestValidationCoordinatorReplayEmitsIdenticalCommand"
+      ],
+      "evidenceFloor": "Identical branch results and open commands replay idempotently; contradictory branch results conflict instead of overwriting accepted state."
+    },
+    {
+      "id": "VALIDATE-004-AUTHORITY-CONTRACT",
+      "status": "PASS",
+      "tests": [
+        "TestValidationCoordinatorOpensCanonicalPolicyOwnedReview",
+        "TestGatewayCarriesExactAuthenticatedContextToTypedService",
+        "TestGatewayRejectsIdentityFenceAndIdempotencyMismatchBeforeService"
+      ],
+      "evidenceFloor": "The coordinator emits a frozen-schema policy-owned open command without validator identity; validator submissions remain behind exact authenticated gateway context."
+    },
+    {
+      "id": "VALIDATE-005-BOUNDED-NO-EFFECT",
+      "status": "PASS",
+      "tests": [
+        "TestValidationJoinRejectsInvalidAndUnboundedInputs",
+        "TestValidationCoordinatorReturnsInvalidPlanWithoutCommand",
+        "TestValidationCoordinatorPreservesRejectedReceipt"
+      ],
+      "evidenceFloor": "Malformed, duplicate, unknown, or over-bound inputs produce stable conflict/invalid outcomes without hidden command or retry loops."
+    },
+    {
+      "id": "VALIDATE-006-BOUNDARY",
+      "status": "PASS",
+      "tests": [
+        "TestApplicationProductionImportsRemainKernelOnly"
+      ],
+      "evidenceFloor": "Pure join code imports no adapter; application coordination imports no persistence, provider, OpenHands, SMA, or Git implementation."
+    }
+  ],
+  "excludedProfiles": [
+    {
+      "profile": "bounded-review-contract-extension",
+      "reason": "Resolution owner, deadline, adjudicator, per-branch round budget, and finding supersession are not encoded by contract 0.2.0."
+    },
+    {
+      "profile": "completion-reopening-escalation-release",
+      "reason": "Completion, reopening, escalation execution, acceptance, and release coordination remain later slices."
+    },
+    {
+      "profile": "live-validators-providers-sma",
+      "reason": "OpenHands, SMA, and live validators/providers remain separately authorized."
+    },
+    {
+      "profile": "deployment-migration-performance",
+      "reason": "Production deployment, migration, load, latency, and throughput are not exercised."
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "OUTPUT/phase-3/step-6-validation-join-tests.jsonl",
+      "sha256": "06519dc4510719a93b7d05095d3ffa9990afb92c5630e4bba4295b5ab43a1360"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-6-full-regression-tests.jsonl",
+      "sha256": "2e9b7e4bb9093956fb84016575fa5d10df69512463a5632ee22d96e8f3d52383"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-5-acceptance.json",
+      "sha256": "ac024687f2cbfa0b98219ed3ba1d2ec6180414fa3edfac0977fdd6f14ce5c484"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-5-release-receipt.json",
+      "sha256": "9d48a1db04fa6564d741554bb3d007792ab1e831a7d143abc732a39b925d003c"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-6-authorization.json",
+      "sha256": "b1978dbe31392915898979298ff54781b02001d84aa7ea2ce5a4bc32a6ac3859"
+    },
+    {
+      "path": "docs/architecture/007-deterministic-validation-join.md",
+      "sha256": "53315a5d49a6c034623938830eac6f622f83150741ac9b1307fe1abe3c0570d9"
+    }
+  ],
+  "digestMethod": "SHA-256 of compact JSON with reportSha256 set to the empty string",
+  "reportSha256": "d69c099cdf3327e9ab417698c8870a8f610eadb647d986e5e1a7e77afd1def0f"
+}

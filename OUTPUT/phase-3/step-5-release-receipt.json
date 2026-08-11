@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "RELEASE_RECEIPT",
+  "recordedOn": "2026-08-11",
+  "timePrecision": "DAY",
+  "repository": "https://github.com/tekroo-ai/teams.git",
+  "branch": "main",
+  "priorRemoteCommit": "f20672772fbc822a4935c2bf04b87301abb6a92f",
+  "releasedCommit": "0f4f046567ce3ac297d907ccc0bc2dd1aa99d0b2",
+  "releasedTree": "21300a855e97d6c15df594051bcb9edf07229b0d",
+  "observedRemoteCommitAfterPush": "0f4f046567ce3ac297d907ccc0bc2dd1aa99d0b2",
+  "pushRefspec": "0f4f046567ce3ac297d907ccc0bc2dd1aa99d0b2:refs/heads/main",
+  "gateReport": "OUTPUT/phase-3/step-5-assignment-readiness-gate.json",
+  "gateReportFileSha256": "64fba5640928d122164ee2969109e8a61e949a3df02fb5d5aef2972672426b27",
+  "gateReportSelfSha256": "205429f19e2403d1caac50e52d47c5101c2c9f99f990a3a09f1f368705c99d72",
+  "verification": {
+    "worktreeCleanBeforePush": true,
+    "gateSelfVerificationBeforePush": "PASS",
+    "remoteCommitMatchedAfterPush": true,
+    "remoteTreeMatchedAfterPush": true
+  },
+  "qualificationBoundary": "Only the accepted deterministic assignment/readiness tree is released; all excluded profiles remain unqualified."
+}

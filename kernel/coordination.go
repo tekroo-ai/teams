@@ -41,9 +41,15 @@ func EvaluateAllPassJoin(required []string, results []ReviewBranchResult) Review
 }
 
 func EvaluateReviewJoin(required []string, partialResultPolicy string, results []ReviewBranchResult) ReviewJoinResult {
+	if partialResultPolicy != "WAIT_ALL" && partialResultPolicy != "FAIL_FAST" {
+		return ReviewJoinResult{Status: "CONFLICT"}
+	}
 	requiredSet := make(map[string]struct{}, len(required))
+	if len(required) == 0 || len(required) > 32 || len(results) > 64 {
+		return ReviewJoinResult{Status: "CONFLICT"}
+	}
 	for _, branch := range required {
-		if branch == "" {
+		if branch == "" || len(branch) > 4096 {
 			return ReviewJoinResult{Status: "CONFLICT"}
 		}
 		if _, duplicate := requiredSet[branch]; duplicate {
@@ -53,6 +59,9 @@ func EvaluateReviewJoin(required []string, partialResultPolicy string, results [
 	}
 	observed := make(map[string]string, len(results))
 	for _, result := range results {
+		if result.Result != "PASS" && result.Result != "FAIL" && result.Result != "INCONCLUSIVE" {
+			return ReviewJoinResult{Status: "CONFLICT"}
+		}
 		if _, requiredBranch := requiredSet[result.BranchID]; !requiredBranch {
 			return ReviewJoinResult{Status: "CONFLICT"}
 		}
@@ -61,20 +70,31 @@ func EvaluateReviewJoin(required []string, partialResultPolicy string, results [
 		}
 		observed[result.BranchID] = result.Result
 	}
-	for _, result := range observed {
-		if result != "PASS" && partialResultPolicy == "FAIL_FAST" {
-			return ReviewJoinResult{Complete: true, Status: result}
-		}
+	terminal := deterministicReviewFailure(observed)
+	if terminal != "" && partialResultPolicy == "FAIL_FAST" {
+		return ReviewJoinResult{Complete: true, Status: terminal}
 	}
 	if len(observed) != len(requiredSet) {
 		return ReviewJoinResult{Status: "PENDING"}
 	}
-	for _, result := range observed {
-		if result != "PASS" {
-			return ReviewJoinResult{Complete: true, Status: result}
-		}
+	if terminal != "" {
+		return ReviewJoinResult{Complete: true, Status: terminal}
 	}
 	return ReviewJoinResult{Complete: true, Status: "PASS"}
+}
+
+func deterministicReviewFailure(results map[string]string) string {
+	for _, result := range results {
+		if result == "FAIL" {
+			return "FAIL"
+		}
+	}
+	for _, result := range results {
+		if result == "INCONCLUSIVE" {
+			return "INCONCLUSIVE"
+		}
+	}
+	return ""
 }
 
 func CompletionReviewFromPayload(payload json.RawMessage) (CompletionReviewSnapshot, error) {
@@ -91,9 +111,10 @@ func CompletionReviewFromPayload(payload json.RawMessage) (CompletionReviewSnaps
 	if join.Status == "CONFLICT" {
 		return CompletionReviewSnapshot{}, errors.New("invalid completion review branches")
 	}
+	branches, _ := canonicalValidationBranches(value.RequiredBranchIDs)
 	return CompletionReviewSnapshot{
 		BranchPolicyRevision: value.BranchPolicyRevision,
-		RequiredBranchIDs:    append([]string(nil), value.RequiredBranchIDs...),
+		RequiredBranchIDs:    branches,
 		PartialResultPolicy:  value.PartialResultPolicy,
 		Results:              make(map[string]string),
 		Join:                 join,

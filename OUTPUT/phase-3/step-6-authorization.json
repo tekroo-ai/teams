@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "PHASE_STEP_AUTHORIZATION",
+  "recordedOn": "2026-08-11",
+  "timePrecision": "DAY",
+  "principalStatement": "Accepted. Push and proceed to the next step.",
+  "phase": "PHASE_3",
+  "step": "STEP_6_DETERMINISTIC_VALIDATION_JOIN",
+  "authorizedScope": [
+    "order-independent ALL_PASS joins over explicit parallel validation branches",
+    "WAIT_ALL and FAIL_FAST partial-result policies from the frozen completion-review contract",
+    "canonical missing/result branch projections and stable terminal outcomes",
+    "policy-owned review opening without forged validator identity",
+    "authenticated validator result submission through the existing command gateway",
+    "duplicate, contradictory, stale-policy, replay, and bounded-input behavior"
+  ],
+  "excludedScope": [
+    "resolution-owner, deadline, adjudicator, per-branch round-budget, and finding-supersession fields not encoded by contract 0.2.0",
+    "completion, reopening, escalation execution, acceptance, and release coordination",
+    "OpenHands, SMA, live validators/providers, deployment, migration, and performance qualification"
+  ],
+  "acceptedInputCommit": "0f4f046567ce3ac297d907ccc0bc2dd1aa99d0b2",
+  "acceptedInputTree": "21300a855e97d6c15df594051bcb9edf07229b0d"
+}
