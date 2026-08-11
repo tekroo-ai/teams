@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "PRINCIPAL_ACCEPTANCE",
+  "recordedOn": "2026-08-11",
+  "timePrecision": "DAY",
+  "principalStatement": "Accepted. Proceed to the next step.",
+  "acceptedProfile": "synthesized-merge",
+  "acceptedReport": "OUTPUT/phase-2/step-4-synthesized-merge-gate.json",
+  "acceptedReportFileSha256": "a2ee987717546d3885bc39b17505b15cef844e863778c6359d8af428771f991d",
+  "acceptedReportSelfSha256": "431b631f837b999e9c5ff952b1d725c76c0530cc9a4fdf0ed89499fcf83a1ab3",
+  "acceptedCandidateCommit": "e19e3fc647d20e5c487b04bbd08c80d8d9289a6d",
+  "acceptedCandidateTree": "2f5460d4a35d6f6a83de6735dd3b81f8e76917b6",
+  "effect": "Closes Phase 2 Step 4 and authorizes release of only the exact qualified candidate. It does not authorize provider E2E, migration, performance qualification, production topology, deployment, or a different Git tree."
+}

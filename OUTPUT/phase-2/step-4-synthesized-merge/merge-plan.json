@@ -1,0 +1,39 @@
+{
+  "schemaVersion": "1.0.0",
+  "repositoryUrl": "https://github.com/tekroo-ai/teams.git",
+  "baseRef": "refs/remotes/origin/main",
+  "baseCommit": "0365b2cf236abf679afe66ccc1fb56945e0207ce",
+  "orderedHeads": [
+    {
+      "commit": "8a6951534743e2a629f7123f2c6baf63a81d61dc",
+      "role": "core hermetic policy guards"
+    },
+    {
+      "commit": "0d1c77c6281e3cc80984cc0d83600513f6345901",
+      "role": "authorized kernel contract 0.2.0 consumption"
+    },
+    {
+      "commit": "2ec9bb442aaebb2e5e0dd45ae5e7815f9aa2a1cc",
+      "role": "core hermetic mutation closure"
+    },
+    {
+      "commit": "f56ed3e578be001ff4e5464d2525e6063346973b",
+      "role": "mongo integration qualification"
+    },
+    {
+      "commit": "e19e3fc647d20e5c487b04bbd08c80d8d9289a6d",
+      "role": "deterministic synthesized-merge coordinator"
+    }
+  ],
+  "strategy": "FF_ONLY_ORDERED",
+  "gitVersion": "git version 2.54.0",
+  "conflictPolicy": "FAIL_NO_IMPROVISATION",
+  "contractIdentity": "tekroo.kernel.contracts/0.2.0",
+  "manifestSha256": "cd582fb163e17d49a1a0a627f33cdbb184d15ecace3200981738782cca977dae",
+  "requiredProfiles": [
+    "contract-structure",
+    "core-hermetic",
+    "mongo-integration"
+  ],
+  "expectedCandidateTree": "2f5460d4a35d6f6a83de6735dd3b81f8e76917b6"
+}

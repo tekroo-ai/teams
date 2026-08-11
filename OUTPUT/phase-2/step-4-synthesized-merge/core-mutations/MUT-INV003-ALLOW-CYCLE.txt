@@ -1,0 +1,5 @@
+--- FAIL: TestGeneratedDAGsAcceptOnlyAcyclicExistingNodes (<DURATION>)
+    core_hermetic_test.go:322: seed=da6ac1c history=0 cycle accepted: kernel.GraphValidation{Valid:true, Reason:(*string)(nil)}
+FAIL
+FAIL	github.com/tekroo-ai/teams/kernel	<DURATION>
+FAIL

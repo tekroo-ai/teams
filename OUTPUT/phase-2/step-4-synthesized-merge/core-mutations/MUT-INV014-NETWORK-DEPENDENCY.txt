@@ -1,0 +1,5 @@
+--- FAIL: TestKernelProductionImportsRemainProviderNeutral (<DURATION>)
+    boundary_test.go:35: provider-neutral kernel imports forbidden package "net/http" in types.go
+FAIL
+FAIL	github.com/tekroo-ai/teams/internal/conformance	<DURATION>
+FAIL

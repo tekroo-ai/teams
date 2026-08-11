@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "QUALIFIED_CANDIDATE_RELEASE_RECEIPT",
+  "recordedOn": "2026-08-11",
+  "timePrecision": "DAY",
+  "repositoryUrl": "https://github.com/tekroo-ai/teams.git",
+  "remoteRef": "refs/heads/main",
+  "observedRemoteBefore": "0365b2cf236abf679afe66ccc1fb56945e0207ce",
+  "pushedCandidateCommit": "e19e3fc647d20e5c487b04bbd08c80d8d9289a6d",
+  "qualifiedCandidateTree": "2f5460d4a35d6f6a83de6735dd3b81f8e76917b6",
+  "observedRemoteAfter": "e19e3fc647d20e5c487b04bbd08c80d8d9289a6d",
+  "updateKind": "FAST_FORWARD",
+  "gateReport": "OUTPUT/phase-2/step-4-synthesized-merge-gate.json",
+  "gateReportFileSha256": "a2ee987717546d3885bc39b17505b15cef844e863778c6359d8af428771f991d",
+  "evidenceClassification": {
+    "remoteBefore": "OBSERVED_BY_GIT_LS_REMOTE",
+    "pushResult": "OBSERVED_BY_GIT_PUSH",
+    "remoteAfter": "OBSERVED_BY_GIT_LS_REMOTE",
+    "remoteTreeIdentity": "COMPUTED_FROM_CONTENT_ADDRESSED_COMMIT"
+  },
+  "boundary": "This receipt attests only that the exact qualified commit became origin/main. It does not qualify provider E2E, migration, production topology, performance, deployment, or later commits."
+}

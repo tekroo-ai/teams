@@ -1,0 +1,5 @@
+--- FAIL: TestEvidenceReferenceRequiresExactAvailableRegistration (<DURATION>)
+    core_hermetic_test.go:162: unavailable evidence receipt = kernel.CommandReceipt{ContractManifest:"tekroo.kernel.contracts/0.2.0", CommandID:"00000000-0000-7000-8000-000000000001", CommandType:"tekroo.command.story.authorize", Target:kernel.AggregateRef{Kind:"story", ID:"00000000-0000-7000-8000-000000000002"}, OutcomeCode:"APPLIED", ReasonCode:"APPLIED", StateChanged:true, ResultingRevision:(*uint64)(<POINTER>), EventIDs:[]kernel.UUIDv7{"00000000-0000-7000-8000-000000000004"}, ReceivedAt:time.Date(2026, time.August, 11, 12, 0, 0, 0, time.UTC), DecidedAt:time.Date(2026, time.August, 11, 12, 0, 0, 1000000, time.UTC), ProvenanceDigest:"058843d706e9b7c7586bc92e57b67ea0f9e727eec1d30d80168de7708ac9050f"}
+FAIL
+FAIL	github.com/tekroo-ai/teams/kernel	<DURATION>
+FAIL

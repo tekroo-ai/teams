@@ -39,6 +39,23 @@ crash/recovery, and differential state against the accepted in-memory reference.
 This does not qualify an untested production cluster, migration,
 `synthesized-merge`, provider E2E, performance, or deployment.
 
+**OBSERVED RELEASE RECEIPT:** Phase 2 Step 4 qualified candidate commit
+`e19e3fc647d20e5c487b04bbd08c80d8d9289a6d` with tree
+`2f5460d4a35d6f6a83de6735dd3b81f8e76917b6`; that exact commit is now
+`origin/main`. The receipt does not extend qualification beyond the recorded
+synthesized-merge profile.
+
+**COMPUTED GATE RESULT:** Phase 3 Step 1 `thin-adapter-bootstrap` is `PASS`.
+Its raw race-enabled receipts contain 23 focused adapter test cases across 4
+packages and 183 full-regression test cases across 10 packages, with zero test
+or vet failures. The slice adds a provider-neutral typed command gateway,
+strict JSON and newline-delimited stdio framing, a cancellation-aware daemon
+host, and an injectable CLI runner. Its gate distinguishes known no effect
+before dispatch from uncertain outcomes after dispatch, and verifies that the
+production thin adapters do not import persistence. HTTP/MCP, channel
+transports, OpenHands, SMA, provider E2E, deployment, migration, and performance
+remain unqualified.
+
 The frozen contract identity is:
 
 ```text
@@ -88,7 +105,12 @@ packages are deliberately narrow:
 - `adapters/memory` — atomic in-memory state/event/receipt storage;
 - `adapters/mongo` — majority-transaction persistence and change-stream outbox
   delivery with epoch-fenced claims; and
-- `adapters/fake` — deterministic clock, ID source, and execution engine.
+- `adapters/fake` — deterministic clock, ID source, and execution engine;
+- `adapters/protocol` — authenticated transport DTOs and the typed command
+  gateway;
+- `adapters/stdio` and `adapters/daemon` — bounded framing and host lifecycle;
+  and
+- `adapters/cli` — an injectable command/stdio runner with stable exit codes.
 
 `internal/conformance` runs the Go implementation against all 72 frozen fixtures.
 That is corpus coverage, not full `core-hermetic`, MongoDB, synthesized-merge,
@@ -102,6 +124,14 @@ raw Go test JSONL receipt:
 ```sh
 go run ./cmd/mongo-integration-report
 go run ./cmd/mongo-integration-report -verify OUTPUT/phase-2/step-3-mongo-integration-gate.json
+```
+
+The Phase 3 Step 1 runner preserves raw race-enabled adapter and full-regression
+test receipts, runs `go vet`, and writes a self-verifying gate report:
+
+```sh
+go run ./cmd/thin-adapter-report
+go run ./cmd/thin-adapter-report -verify OUTPUT/phase-3/step-1-thin-adapter-gate.json
 ```
 
 ## Contract validation
@@ -147,4 +177,9 @@ go run ./cmd/core-hermetic-report -verify build/reports/core-hermetic.json
 - [Phase 2 Step 2 core-hermetic gate](OUTPUT/phase-2/step-2-core-hermetic-gate.json)
 - [Phase 2 Step 2 principal acceptance](OUTPUT/phase-2/step-2-acceptance.json)
 - [Phase 2 Step 3 Mongo integration gate](OUTPUT/phase-2/step-3-mongo-integration-gate.json)
+- [Phase 2 Step 4 synthesized-merge gate](OUTPUT/phase-2/step-4-synthesized-merge-gate.json)
+- [Phase 2 Step 4 release receipt](OUTPUT/phase-2/step-4-release-receipt.json)
+- [Phase 3 Step 1 authority](OUTPUT/phase-3/step-1-authorization.json)
+- [Phase 3 thin-adapter bootstrap boundary](docs/architecture/002-thin-adapter-bootstrap.md)
+- [Phase 3 Step 1 thin-adapter gate](OUTPUT/phase-3/step-1-thin-adapter-gate.json)
 - [Historical Step 2 `0.1.0` encoding-gap record](OUTPUT/phase-2/step-2-contract-encoding-gaps.md)

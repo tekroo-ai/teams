@@ -1,0 +1,234 @@
+{
+  "schemaVersion": "1.1.0",
+  "reportType": "IMPLEMENTATION_CONFORMANCE",
+  "contractIdentity": "tekroo.kernel.contracts/0.2.0",
+  "manifestSha256": "cd582fb163e17d49a1a0a627f33cdbb184d15ecace3200981738782cca977dae",
+  "profile": "core-hermetic",
+  "status": "PASS",
+  "sourceTreeSha256": "d4b658e7d4d41d53ec25c5d846eacb220a1748f4e15c7cab6b6389c1988a457f",
+  "environment": {
+    "goVersion": "go1.26.4",
+    "goos": "darwin",
+    "goarch": "arm64",
+    "locale": "C",
+    "timeZone": "UTC"
+  },
+  "executed": {
+    "testCases": 160,
+    "failedTests": 0,
+    "passedPackages": 6,
+    "vetFailures": 0,
+    "frozenFixtures": 72,
+    "generatedHistories": 10240,
+    "faultSchedules": 6,
+    "concurrencySchedules": 34,
+    "mutants": 14,
+    "killedMutants": 14
+  },
+  "seeds": [
+    {
+      "suite": "lifecycle-histories",
+      "generator": "xorshift64",
+      "seed": "0x5eedc0de",
+      "executions": 4096
+    },
+    {
+      "suite": "dag-histories",
+      "generator": "xorshift64",
+      "seed": "0x0da6ac1c",
+      "executions": 2048
+    },
+    {
+      "suite": "bounded-attempt-histories",
+      "generator": "xorshift64",
+      "seed": "0x71e5b00d",
+      "executions": 4096
+    }
+  ],
+  "invariantCoverage": [
+    {
+      "invariantId": "INV-001-REVISION-CONTIGUITY",
+      "status": "PASS",
+      "tests": [
+        "TestLifecycleTransitionTableIsExhaustive",
+        "TestFoldAggregateReconstructsAndDetectsCorruption",
+        "TestStoreSystematicAndConcurrentOneWinnerSchedules"
+      ],
+      "evidenceFloor": "Contiguous in-memory aggregate revisions and rejection/no-winner behavior are executed."
+    },
+    {
+      "invariantId": "INV-002-IDEMPOTENT-DECISION",
+      "status": "PASS",
+      "tests": [
+        "TestHandlerCommitsOnceAndReturnsStoredReceiptOnReplay",
+        "TestHandlerReconcilesLostCommitAcknowledgement",
+        "TestStoreSystematicAndConcurrentOneWinnerSchedules"
+      ],
+      "evidenceFloor": "Sequential, scope-equivalent, conflicting, uncertain-ack, systematic, and concurrent in-memory decisions are executed."
+    },
+    {
+      "invariantId": "INV-003-DAG-ACYCLIC",
+      "status": "PASS",
+      "tests": [
+        "TestGeneratedDAGsAcceptOnlyAcyclicExistingNodes",
+        "TestDAGParentsMustExistAndAreCanonicalized"
+      ],
+      "evidenceFloor": "2,048 generated DAG/cycle/missing-parent histories and evaluator parent guards are executed."
+    },
+    {
+      "invariantId": "INV-004-EXACT-OWNERSHIP",
+      "status": "PASS",
+      "tests": [
+        "TestAllFrozenCommandsReachTheirDeclaredEventThroughEvaluator",
+        "TestStoreSystematicAndConcurrentOneWinnerSchedules",
+        "TestFrozenContractCorpus/IDENTITY-CONCRETE-FQN"
+      ],
+      "evidenceFloor": "Exact ActorFQN parsing and versioned one-winner ownership transitions are executed in memory."
+    },
+    {
+      "invariantId": "INV-005-EXECUTION-FENCING",
+      "status": "PASS",
+      "tests": [
+        "TestExecutionFencingRequiresExactCurrentTuple",
+        "TestStoreRechecksExecutionFenceAtCommit"
+      ],
+      "evidenceFloor": "Exact current tuple is checked both at evaluation and commit."
+    },
+    {
+      "invariantId": "INV-006-LIFECYCLE-EPOCHS",
+      "status": "PASS",
+      "tests": [
+        "TestLifecycleTransitionTableIsExhaustive",
+        "TestGeneratedLifecycleHistoriesMatchIndependentModel",
+        "TestFoldAggregateReconstructsAndDetectsCorruption",
+        "TestEvaluatorRejectsStaleCataloguePolicyAndLifecycleContext"
+      ],
+      "evidenceFloor": "All listed forward transitions and 4,096 generated bounded histories are executed; stale lifecycle epochs are rejected before evolution."
+    },
+    {
+      "invariantId": "INV-007-BOUNDED-ITERATION",
+      "status": "PASS",
+      "tests": [
+        "TestAttemptBudgetIsFiniteIdempotentAndRestartStable",
+        "TestGeneratedAttemptBudgetsNeverExceedLimit",
+        "TestEvaluatorConsumesConfiguredDurableAttemptBudget",
+        "TestStorePersistsAttemptBudgetWithTheAtomicDecision"
+      ],
+      "evidenceFloor": "Configured operation budgets execute in the evaluator, reject unchanged/exhausted attempts, and persist atomically across store reloads; 4,096 generated histories remain within their limit."
+    },
+    {
+      "invariantId": "INV-008-UNKNOWN-NO-EFFECT",
+      "status": "PASS",
+      "tests": [
+        "TestUnknownTypeAndUnsupportedVersionHaveDistinctStableReasons",
+        "TestUnknownEventReplayStopsAndQuarantinesLosslessly",
+        "TestFrozenContractCorpus/CAT-UNKNOWN-COMMAND"
+      ],
+      "evidenceFloor": "Unknown commands/versions fail closed and unknown authoritative events stop replay at the last understood revision while preserving the record."
+    },
+    {
+      "invariantId": "INV-009-PROVENANCE-COMPLETE",
+      "status": "PASS",
+      "tests": [
+        "TestAllFrozenCommandsReachTheirDeclaredEventThroughEvaluator/CAT-003-EVIDENCE-REGISTER-VALID",
+        "TestEvidenceReferenceRequiresExactAvailableRegistration",
+        "TestEvidenceRegistryVerifiesBytesWithoutCollapsingOrigins",
+        "TestEvidenceAccessRedactionDeletionAndAuditRebuild",
+        "TestClaimAssessmentRevisionsAreLinkedAndRetainRawSupport",
+        "TestDecisionProvenanceRejectsIdentitySubstitution",
+        "TestStoreRejectsIncompleteOrMismatchedDecisionProvenance"
+      ],
+      "evidenceFloor": "The 1.1.0 evidence-register payload encodes the approved metadata and is accepted through the evaluator; structured evidence, exact access, derived redaction, deletion tombstones, linked assessments, source-through-runtime identities, decision provenance, and deterministic interruption/resume audit rebuild execute in the pure registry."
+    },
+    {
+      "invariantId": "INV-010-NONAUTHORITATIVE-EVIDENCE",
+      "status": "PASS",
+      "tests": [
+        "TestEvidenceReferenceRequiresExactAvailableRegistration",
+        "MUT-INV010-UNREGISTERED-EVIDENCE"
+      ],
+      "evidenceFloor": "The provider-neutral evaluator permits no evidence-origin class to affect a guarded decision without exact registration and availability; bypassing that guard is detected. Live adapters remain outside core-hermetic."
+    },
+    {
+      "invariantId": "INV-011-ATOMIC-MONGO-DECISION",
+      "status": "NOT_RUN",
+      "tests": [
+        "TestStoreFaultScheduleIsAllOrNone",
+        "TestHandlerReconcilesLostCommitAcknowledgement"
+      ],
+      "evidenceFloor": "Six in-memory atomic/fault boundaries pass. MongoDB transaction and change-stream claims belong exclusively to mongo-integration and are not asserted here."
+    },
+    {
+      "invariantId": "INV-012-CONFORMANCE-REPRODUCIBLE",
+      "status": "PASS",
+      "tests": [
+        "TestFrozenContractCorpus",
+        "TestEvaluatorRejectsStaleCataloguePolicyAndLifecycleContext",
+        "TestStorePersistsOrderIndependentCompletionReviewJoin",
+        "TestGeneratedLifecycleHistoriesMatchIndependentModel",
+        "TestGeneratedDAGsAcceptOnlyAcyclicExistingNodes",
+        "TestGeneratedAttemptBudgetsNeverExceedLimit",
+        "MUT-INV012-NONCANONICAL-PRECONDITIONS"
+      ],
+      "evidenceFloor": "The authorized 0.2.0 compatibility rule and 72 fixtures execute with fixed seeds; branch joins persist in arrival-independent form; canonical-order mutation is detected; toolchain, source, manifest, and artifact digests plus self-digesting reports are emitted."
+    },
+    {
+      "invariantId": "INV-013-MERGE-TREE-QUALIFIED",
+      "status": "NOT_RUN",
+      "tests": [],
+      "evidenceFloor": "This invariant belongs to the later synthesized-merge profile."
+    },
+    {
+      "invariantId": "INV-014-PROVIDER-NEUTRAL-KERNEL",
+      "status": "PASS",
+      "tests": [
+        "TestAllFrozenCommandsReachTheirDeclaredEventThroughEvaluator",
+        "TestKernelProductionImportsRemainProviderNeutral",
+        "MUT-INV014-NETWORK-DEPENDENCY"
+      ],
+      "evidenceFloor": "The production kernel imports no provider, network, filesystem, process, MongoDB, model, or SMA dependency; an injected network dependency is detected."
+    }
+  ],
+  "unresolvedGaps": [],
+  "otherProfiles": [
+    {
+      "profile": "mongo-integration",
+      "status": "NOT_RUN",
+      "reason": "Requires the separately qualified MongoDB adapter and pinned topology."
+    },
+    {
+      "profile": "synthesized-merge",
+      "status": "NOT_RUN",
+      "reason": "Requires an exact candidate tree and frozen merge plan."
+    },
+    {
+      "profile": "provider-e2e",
+      "status": "NOT_RUN",
+      "reason": "Optional profile requiring separate principal authorization."
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "build/reports/contract-structure.core-run.json",
+      "sha256": "4bf88317093f576302635c325c5952e18ae3a42052192fbc8b2fc28a7cf0bef5"
+    },
+    {
+      "path": "build/reports/reference-corpus.core-run.json",
+      "sha256": "5e31175da80dc364d78d0932f708d0610c5226f378b2c68a43dfcf0a4a7f18e3"
+    },
+    {
+      "path": "OUTPUT/phase-2/step-2-core-mutations.json",
+      "sha256": "4747073667dfbd0abfaaff87b9619b9d46b3bbe606845c3ec0a0cac27b91c3eb"
+    },
+    {
+      "path": "OUTPUT/phase-2/step-2-contract-revision-authorization.json",
+      "sha256": "5633acecb297d39cb73fc18b60402a92ac505ced45345836d929a47fc96faa00"
+    },
+    {
+      "path": "CONTRACTS/tekroo.kernel.contracts/0.2.0/compatibility/from-0.1.0.json",
+      "sha256": "20a6767616b919601faf1e61929bad8b746ca91340216bc48a99c25fae8ff194"
+    }
+  ],
+  "digestMethod": "SHA-256 of compact JSON with reportSha256 set to the empty string",
+  "reportSha256": "61bedc2829efd7f48103b5724241e8edb01cf17d50b22158080df1178514a6a2"
+}

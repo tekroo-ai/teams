@@ -1,0 +1,5 @@
+--- FAIL: TestDecisionProvenanceRejectsIdentitySubstitution (<DURATION>)
+    evidence_test.go:166: source tree identity substituted for build artifact identity
+FAIL
+FAIL	github.com/tekroo-ai/teams/kernel	<DURATION>
+FAIL

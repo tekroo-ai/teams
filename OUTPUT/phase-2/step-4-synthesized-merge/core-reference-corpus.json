@@ -1,0 +1,1026 @@
+{
+  "cases": [
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.execution.registered"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.execution.registered"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-001-EXECUTION-REGISTER-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-001-EXECUTION-REGISTER-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.execution.replaced"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.execution.replaced"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-002-EXECUTION-REPLACE-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-002-EXECUTION-REPLACE-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.evidence.registered"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.evidence.registered"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-003-EVIDENCE-REGISTER-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-003-EVIDENCE-REGISTER-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.story.created"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.story.created"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-004-STORY-CREATE-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-004-STORY-CREATE-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.story.authorized"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.story.authorized"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-005-STORY-AUTHORIZE-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-005-STORY-AUTHORIZE-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.story.planning-started"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.story.planning-started"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-006-STORY-BEGIN-PLANNING-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-006-STORY-BEGIN-PLANNING-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.story.activated"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.story.activated"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-007-STORY-ACTIVATE-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-007-STORY-ACTIVATE-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.work.blocked"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.work.blocked"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-008-WORK-BLOCK-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-008-WORK-BLOCK-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.work.unblocked"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.work.unblocked"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-009-WORK-UNBLOCK-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-009-WORK-UNBLOCK-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.task.created"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.task.created"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-010-TASK-CREATE-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-010-TASK-CREATE-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.task.readied"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.task.readied"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-011-TASK-MARK-READY-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-011-TASK-MARK-READY-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.task.dispatched"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.task.dispatched"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-012-TASK-DISPATCH-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-012-TASK-DISPATCH-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.task.ownership-acquired"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.task.ownership-acquired"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-013-TASK-ACQUIRE-OWNERSHIP-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-013-TASK-ACQUIRE-OWNERSHIP-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.task.ownership-released"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.task.ownership-released"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-014-TASK-RELEASE-OWNERSHIP-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-014-TASK-RELEASE-OWNERSHIP-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.task.handed-off"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.task.handed-off"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-015-TASK-HANDOFF-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-015-TASK-HANDOFF-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.task.force-reassigned"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.task.force-reassigned"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-016-TASK-FORCE-REASSIGN-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-016-TASK-FORCE-REASSIGN-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.task.activated"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.task.activated"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-017-TASK-ACTIVATE-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-017-TASK-ACTIVATE-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.task.completed"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.task.completed"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-018-TASK-REQUEST-COMPLETION-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-018-TASK-REQUEST-COMPLETION-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.story.completed"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.story.completed"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-019-STORY-REQUEST-COMPLETION-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-019-STORY-REQUEST-COMPLETION-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.story.accepted"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.story.accepted"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-020-STORY-REQUEST-ACCEPTANCE-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-020-STORY-REQUEST-ACCEPTANCE-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.work.reopened"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.work.reopened"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-021-WORK-REOPEN-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-021-WORK-REOPEN-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.work.closed"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.work.closed"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-022-WORK-CLOSE-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-022-WORK-CLOSE-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.work.successor-created"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.work.successor-created"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-023-WORK-CREATE-SUCCESSOR-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-023-WORK-CREATE-SUCCESSOR-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.completion-review.opened"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.completion-review.opened"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-024-COMPLETION-REVIEW-OPEN-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-024-COMPLETION-REVIEW-OPEN-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.completion-review.result-recorded"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.completion-review.result-recorded"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-025-COMPLETION-REVIEW-RECORD-RESULT-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-025-COMPLETION-REVIEW-RECORD-RESULT-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.record.corrected"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.record.corrected"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-026-RECORD-CORRECT-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-026-RECORD-CORRECT-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-UNKNOWN-COMMAND",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "condition": "RUNNABLE",
+        "lifecycleEpoch": 1,
+        "phase": "ACCEPTED",
+        "rejected": null
+      },
+      "expected": {
+        "condition": "RUNNABLE",
+        "lifecycleEpoch": 1,
+        "phase": "ACCEPTED",
+        "rejected": null
+      },
+      "fixtureId": "MODEL-STORY-FORWARD",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "condition": "RUNNABLE",
+        "lifecycleEpoch": 1,
+        "phase": "COMPLETED",
+        "rejected": null
+      },
+      "expected": {
+        "condition": "RUNNABLE",
+        "lifecycleEpoch": 1,
+        "phase": "COMPLETED",
+        "rejected": null
+      },
+      "fixtureId": "MODEL-TASK-FORWARD",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "condition": "RUNNABLE",
+        "lifecycleEpoch": 1,
+        "phase": "ACTIVE",
+        "rejected": null
+      },
+      "expected": {
+        "condition": "RUNNABLE",
+        "lifecycleEpoch": 1,
+        "phase": "ACTIVE",
+        "rejected": null
+      },
+      "fixtureId": "MODEL-BLOCK-ORTHOGONAL",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "condition": "RUNNABLE",
+        "lifecycleEpoch": 1,
+        "phase": "COMPLETED",
+        "rejected": null
+      },
+      "expected": {
+        "condition": "RUNNABLE",
+        "lifecycleEpoch": 1,
+        "phase": "COMPLETED",
+        "rejected": null
+      },
+      "fixtureId": "MODEL-COMPLETION-NO-REQUESTED-PHASE",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "condition": "RUNNABLE",
+        "lifecycleEpoch": 1,
+        "phase": "READY",
+        "rejected": "REJECTED_POLICY"
+      },
+      "expected": {
+        "condition": "RUNNABLE",
+        "lifecycleEpoch": 1,
+        "phase": "READY",
+        "rejected": "REJECTED_POLICY"
+      },
+      "fixtureId": "MODEL-ILLEGAL-COMPLETION",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "condition": "RUNNABLE",
+        "lifecycleEpoch": 2,
+        "phase": "ACTIVE",
+        "rejected": null
+      },
+      "expected": {
+        "condition": "RUNNABLE",
+        "lifecycleEpoch": 2,
+        "phase": "ACTIVE",
+        "rejected": null
+      },
+      "fixtureId": "MODEL-REOPEN-INCREMENTS-EPOCH",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "reason": null,
+        "valid": true
+      },
+      "expected": {
+        "reason": null,
+        "valid": true
+      },
+      "fixtureId": "DAG-VALID-BRANCH-JOIN",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "reason": "CYCLE",
+        "valid": false
+      },
+      "expected": {
+        "reason": "CYCLE",
+        "valid": false
+      },
+      "fixtureId": "DAG-REJECT-CYCLE",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "valid": true
+      },
+      "expected": {
+        "valid": true
+      },
+      "fixtureId": "IDENTITY-CONCRETE-FQN",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "valid": false
+      },
+      "expected": {
+        "valid": false
+      },
+      "fixtureId": "IDENTITY-REJECT-WILDCARD",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "valid": false
+      },
+      "expected": {
+        "valid": false
+      },
+      "fixtureId": "IDENTITY-REJECT-LEADING-ZERO",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "valid": true
+      },
+      "expected": {
+        "valid": true
+      },
+      "fixtureId": "PRECONDITION-EXACT-ALL",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "valid": false
+      },
+      "expected": {
+        "valid": false
+      },
+      "fixtureId": "PRECONDITION-STALE-NONE",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "complete": true,
+        "status": "PASS"
+      },
+      "expected": {
+        "complete": true,
+        "status": "PASS"
+      },
+      "fixtureId": "REVIEW-JOIN-ORDER-INDEPENDENT",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "complete": false,
+        "status": "CONFLICT"
+      },
+      "expected": {
+        "complete": false,
+        "status": "CONFLICT"
+      },
+      "fixtureId": "REVIEW-JOIN-DUPLICATE-CONFLICT",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "valid": true
+      },
+      "expected": {
+        "valid": true
+      },
+      "fixtureId": "SUCCESSOR-SET-CANONICAL",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "valid": false
+      },
+      "expected": {
+        "valid": false
+      },
+      "fixtureId": "SUCCESSOR-SET-REJECT-UNORDERED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "outcome": "MIGRATION_REQUIRED"
+      },
+      "expected": {
+        "outcome": "MIGRATION_REQUIRED"
+      },
+      "fixtureId": "COMPATIBILITY-1.0-MISSING-CONTEXT",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "durableDecisionCount": 1,
+        "receipts": [
+          {
+            "eventCount": 1,
+            "fingerprint": "5d731c4556822547ffc0009f11868f67036020cd2e6c958bec656871037160b4",
+            "outcome": "APPLIED"
+          },
+          {
+            "eventCount": 1,
+            "fingerprint": "5d731c4556822547ffc0009f11868f67036020cd2e6c958bec656871037160b4",
+            "outcome": "APPLIED"
+          },
+          {
+            "eventCount": 0,
+            "outcome": "REJECTED_CONFLICT",
+            "reason": "IDEMPOTENCY_KEY_REUSE"
+          }
+        ]
+      },
+      "expected": {
+        "durableDecisionCount": 1,
+        "receipts": [
+          {
+            "eventCount": 1,
+            "fingerprint": "5d731c4556822547ffc0009f11868f67036020cd2e6c958bec656871037160b4",
+            "outcome": "APPLIED"
+          },
+          {
+            "eventCount": 1,
+            "fingerprint": "5d731c4556822547ffc0009f11868f67036020cd2e6c958bec656871037160b4",
+            "outcome": "APPLIED"
+          },
+          {
+            "eventCount": 0,
+            "outcome": "REJECTED_CONFLICT",
+            "reason": "IDEMPOTENCY_KEY_REUSE"
+          }
+        ]
+      },
+      "fixtureId": "IDEMPOTENCY-DUPLICATE-AND-CONFLICT",
+      "status": "PASS"
+    }
+  ],
+  "contractIdentity": "tekroo.kernel.contracts/0.2.0",
+  "counts": {
+    "failed": 0,
+    "passed": 72,
+    "total": 72
+  },
+  "generatedAt": "2026-08-11T00:00:00Z",
+  "manifestSha256": "cd582fb163e17d49a1a0a627f33cdbb184d15ecace3200981738782cca977dae",
+  "profile": "core-hermetic-reference-model",
+  "qualificationBoundary": "This report validates the reference corpus and model only; it does not qualify a Tekroo implementation or production system.",
+  "reportSha256": "5ced1559ea8a15dd109a81c00372111a66dfe6218d310ff0f988236d9f092edc",
+  "reportType": "REFERENCE_CORPUS",
+  "schemaVersion": "1.0.0",
+  "status": "PASS"
+}

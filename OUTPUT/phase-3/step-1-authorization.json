@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "PHASE_AUTHORIZATION",
+  "recordedOn": "2026-08-11",
+  "timePrecision": "DAY",
+  "principalStatement": "Accepted. Proceed to the next step.",
+  "phase": "PHASE_3",
+  "step": "STEP_1_THIN_ADAPTER_BOOTSTRAP",
+  "authorizedScope": [
+    "provider-neutral command gateway",
+    "daemon host",
+    "stdio adapter",
+    "CLI adapter",
+    "HTTP/MCP and channel contracts",
+    "identity, fencing, idempotency, cancellation, timeout, and provenance conformance"
+  ],
+  "excludedScope": [
+    "live OpenHands adoption",
+    "live SMA adoption",
+    "paid provider E2E",
+    "data migration",
+    "production topology",
+    "production deployment"
+  ],
+  "acceptedInputCommit": "e19e3fc647d20e5c487b04bbd08c80d8d9289a6d",
+  "acceptedInputTree": "2f5460d4a35d6f6a83de6735dd3b81f8e76917b6"
+}

@@ -1,0 +1,15 @@
+--- FAIL: TestStoreFaultScheduleIsAllOrNone (<DURATION>)
+    --- FAIL: TestStoreFaultScheduleIsAllOrNone/BEFORE_STATE (<DURATION>)
+        store_test.go:176: fault error = invalid decision, want ErrInjectedFault
+    --- FAIL: TestStoreFaultScheduleIsAllOrNone/BEFORE_EVENTS (<DURATION>)
+        store_test.go:176: fault error = invalid decision, want ErrInjectedFault
+    --- FAIL: TestStoreFaultScheduleIsAllOrNone/BEFORE_RECEIPT (<DURATION>)
+        store_test.go:176: fault error = invalid decision, want ErrInjectedFault
+    --- FAIL: TestStoreFaultScheduleIsAllOrNone/BEFORE_AUTHORITY (<DURATION>)
+        store_test.go:176: fault error = invalid decision, want ErrInjectedFault
+    --- FAIL: TestStoreFaultScheduleIsAllOrNone/BEFORE_OUTBOX (<DURATION>)
+        store_test.go:176: fault error = invalid decision, want ErrInjectedFault
+    store_test.go:188: post-commit error = invalid decision, want ErrCommitUncertain
+FAIL
+FAIL	github.com/tekroo-ai/teams/adapters/memory	<DURATION>
+FAIL

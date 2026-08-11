@@ -1,0 +1,5 @@
+--- FAIL: TestHandlerCommitsOnceAndReturnsStoredReceiptOnReplay (<DURATION>)
+    handler_test.go:56: replayed handle: allocate event identity: deterministic ID sequence exhausted
+FAIL
+FAIL	github.com/tekroo-ai/teams/application	<DURATION>
+FAIL

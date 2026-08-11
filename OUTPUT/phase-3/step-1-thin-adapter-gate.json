@@ -1,0 +1,122 @@
+{
+  "schemaVersion": "1.0.0",
+  "reportType": "PHASE_3_THIN_ADAPTER_BOOTSTRAP",
+  "status": "PASS",
+  "acceptedBaseCommit": "e19e3fc647d20e5c487b04bbd08c80d8d9289a6d",
+  "acceptedBaseTree": "2f5460d4a35d6f6a83de6735dd3b81f8e76917b6",
+  "contractIdentity": "tekroo.kernel.contracts/0.2.0",
+  "manifestSha256": "cd582fb163e17d49a1a0a627f33cdbb184d15ecace3200981738782cca977dae",
+  "sourceTreeSha256": "438dee9fda60cba02e2ca4be1b351883570714556b8bb557010d47714d92e68c",
+  "environment": {
+    "goVersion": "go1.26.4",
+    "goos": "darwin",
+    "goarch": "arm64",
+    "locale": "C",
+    "timeZone": "UTC"
+  },
+  "executed": {
+    "adapterTestCases": 23,
+    "adapterTestFailures": 0,
+    "adapterPackagesPassed": 4,
+    "regressionTestCases": 183,
+    "regressionTestFailures": 0,
+    "regressionPackagesPassed": 10,
+    "vetFailures": 0
+  },
+  "assertions": [
+    {
+      "id": "ADAPTER-001-TYPED-SERVICE",
+      "status": "PASS",
+      "tests": [
+        "TestGatewayInvokesApplicationHandlerAndPreservesIdempotentReceipt",
+        "TestGatewayCarriesExactAuthenticatedContextToTypedService"
+      ],
+      "evidenceFloor": "The gateway invokes the accepted typed application handler and preserves its idempotent stored receipt."
+    },
+    {
+      "id": "ADAPTER-002-IDENTITY-AND-FENCE",
+      "status": "PASS",
+      "tests": [
+        "TestGatewayRejectsIdentityFenceAndIdempotencyMismatchBeforeService"
+      ],
+      "evidenceFloor": "Mismatched authenticated principal, actor FQN, execution tuple, and missing semantic idempotency are rejected before service dispatch."
+    },
+    {
+      "id": "ADAPTER-003-BOUNDED-COMPLETION",
+      "status": "PASS",
+      "tests": [
+        "TestGatewayTimeoutAfterDispatchRemainsExplicitlyUncertain",
+        "TestGatewayCancellationAfterDispatchRemainsExplicitlyUncertain",
+        "TestGatewayCancellationBeforeDispatchIsKnownNoEffect",
+        "TestGatewayCompletesWhenServiceIgnoresCancellation"
+      ],
+      "evidenceFloor": "Pre-dispatch cancellation reports known no effect; post-dispatch timeout/cancellation reports uncertainty; gateway completion remains bounded when a service ignores cancellation."
+    },
+    {
+      "id": "ADAPTER-004-STRICT-FRAMING",
+      "status": "PASS",
+      "tests": [
+        "TestStrictRequestCodecRejectsUnknownOrMultipleValues",
+        "TestServerProcessesStrictFramesAndPreservesOneResponsePerFrame"
+      ],
+      "evidenceFloor": "Strict JSON and bounded newline framing execute, including malformed-frame recovery with one response per parsed frame."
+    },
+    {
+      "id": "ADAPTER-005-THIN-IMPORT-BOUNDARY",
+      "status": "PASS",
+      "tests": [
+        "TestThinAdapterProductionImportsRemainWithinBoundary"
+      ],
+      "evidenceFloor": "The production protocol, stdio, daemon, and CLI packages import only their explicit internal thin-adapter/kernel allowlist and no persistence or MongoDB package."
+    },
+    {
+      "id": "ADAPTER-006-DAEMON-AND-CLI",
+      "status": "PASS",
+      "tests": [
+        "TestHostCancellationClosesInputAndCompletes",
+        "TestHostShutdownTimeoutKeepsRunFenceUntilServerStops",
+        "TestInvokeReturnsStableExitCodesAndJSONResponse",
+        "TestInvokeRejectsMalformedInputWithoutCallingEndpoint"
+      ],
+      "evidenceFloor": "The daemon exits through closeable-input cancellation, retains its one-run fence while a timed-out server remains alive, and the injectable CLI returns stable success, invocation-failure, operational, and usage codes."
+    }
+  ],
+  "excludedProfiles": [
+    {
+      "profile": "http-mcp",
+      "reason": "Only a semantic endpoint contract is present; no HTTP or MCP transport is implemented or qualified."
+    },
+    {
+      "profile": "channels",
+      "reason": "Only exact directed-recipient semantics are present; no channel transport is implemented or qualified."
+    },
+    {
+      "profile": "openhands-sma-provider-e2e",
+      "reason": "Live providers, credentials, models, OpenHands, and SMA require separate authority and qualification."
+    },
+    {
+      "profile": "deployment-migration-performance",
+      "reason": "Production deployment, historical migration, load, latency, and throughput are not exercised by this gate."
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "OUTPUT/phase-3/step-1-thin-adapter-tests.jsonl",
+      "sha256": "964118490af6ac1691784fdf20e497f028ab35955677db4cb0da00ce806fc12b"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-1-full-regression-tests.jsonl",
+      "sha256": "abb701b534933361abf0db17809bac4587ee3c0181b810dfb4311b01c67474cc"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-1-authorization.json",
+      "sha256": "43d7c52abff5066e489feca1c2e8599e398bfd017ebc40cf7d51bfafd0e5e07d"
+    },
+    {
+      "path": "docs/architecture/002-thin-adapter-bootstrap.md",
+      "sha256": "f2a040ff22f0601a846462785a2ae537ace94f81a54d82aa5b02e25db7651b73"
+    }
+  ],
+  "digestMethod": "SHA-256 of compact JSON with reportSha256 set to the empty string",
+  "reportSha256": "a3c0d6db0a2d6c5173894d45945df2b4162b0ef98290a14904a4a82bb2f0c58e"
+}
