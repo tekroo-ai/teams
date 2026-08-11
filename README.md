@@ -5,12 +5,13 @@ kernel. It is not a port of the Tekroo v3 codebase.
 
 ## Current state
 
-This repository is implementing the pure-kernel bootstrap in Go. It
+This repository is implementing the contract-bound kernel and MongoDB adapter in Go. It
 contains the principal-authorized, content-addressed kernel contract release
 `tekroo.kernel.contracts/0.2.0`, the preserved `0.1.0` release, their exact
 compatibility and gate records, and a
-standard-library-only deterministic kernel foundation. No runtime or production
-system is qualified by this slice.
+standard-library-only deterministic kernel foundation. The MongoDB adapter is
+qualified only against the pinned local integration topology; no production
+runtime or deployment is qualified by this slice.
 
 **COMPUTED GATE RESULT:** The Phase 2 Step 2 `core-hermetic` profile is `PASS`.
 The executable evidence covers all 26 frozen commands, lifecycle and DAG
@@ -20,11 +21,23 @@ provenance/evidence primitives. Authorization/delegation, exact internal
 multi-aggregate guards, lifecycle decision gates, durable attempt budgets, and
 evidence access/redaction/deletion/audit rebuild are also executable. Fourteen
 disposable-copy implementation mutants across all core-hermetic invariant
-families are detected. MongoDB and synthesized-merge remain `NOT_RUN` in their
-own required profiles; optional provider E2E also remains `NOT_RUN`. The four
+families are detected. MongoDB is reported separately below; synthesized-merge
+remains `NOT_RUN`, and optional provider E2E also remains `NOT_RUN`. The four
 previously reported `0.1.0` encoding gaps are resolved by the
 authorized `0.2.0` contract; `1.0.0` commands lacking exact context require an
 explicit migration and are not silently upgraded.
+
+**COMPUTED GATE RESULT:** The Phase 2 Step 3 `mongo-integration` profile is
+`PASS` for MongoDB 8.3.4 on the tested local replica-set topology with official
+Go driver v2.8.0. Its race-enabled raw receipt contains 17 top-level tests and 5
+subtests with zero failures. The suite executes majority transactions, five
+all-or-none fault boundaries, lost-ack reconciliation, 32-writer contention,
+event-fold corruption detection, stream-before-backlog delivery, 24-way claim
+contention, epoch/lease fencing, finite sweep/dead-letter behavior, durable
+resume checkpoints, readdress isolation, application restart, abrupt MongoDB
+crash/recovery, and differential state against the accepted in-memory reference.
+This does not qualify an untested production cluster, migration,
+`synthesized-merge`, provider E2E, performance, or deployment.
 
 The frozen contract identity is:
 
@@ -47,7 +60,8 @@ ownership, authorization, validation, acceptance, completion, reopening,
 escalation, release policy, and provenance.
 
 MongoDB is the approved organizational persistence and change-stream wakeup
-substrate, but it is not part of the first pure-kernel implementation slice.
+substrate. The adapter keeps transaction, index, change-stream, claim, lease,
+resume, readdress, and dead-letter mechanics outside the pure kernel.
 Execution providers and semantic memory remain replaceable behind explicit
 ports. OpenHands and SMA adoption require separate qualification and authority.
 
@@ -57,8 +71,9 @@ ports. OpenHands and SMA adoption require separate qualification and authority.
 2. Implement a pure deterministic kernel with in-memory repositories, fake
    clock and ID sources, and a deterministic fake execution engine.
 3. Qualify that implementation against the normative fixtures and invariants.
-4. Establish the canonical build and synthesized-merge gate.
-5. Add MongoDB and external adapters only in separately qualified slices.
+4. Qualify MongoDB transactions, indexes, change streams, claims, and recovery.
+5. Establish the canonical build and synthesized-merge gate.
+6. Add external adapters only in separately qualified slices.
 
 ## Go implementation
 
@@ -70,12 +85,24 @@ packages are deliberately narrow:
 - `application` — receipt-first orchestration of snapshot load, pure evaluation,
   and one atomic decision commit;
 - `contract` — read-only loading and payload validation for the frozen catalogue;
-- `adapters/memory` — atomic in-memory state/event/receipt storage; and
+- `adapters/memory` — atomic in-memory state/event/receipt storage;
+- `adapters/mongo` — majority-transaction persistence and change-stream outbox
+  delivery with epoch-fenced claims; and
 - `adapters/fake` — deterministic clock, ID source, and execution engine.
 
 `internal/conformance` runs the Go implementation against all 72 frozen fixtures.
 That is corpus coverage, not full `core-hermetic`, MongoDB, synthesized-merge,
 provider, performance, or production qualification.
+
+The Step 3 evidence runner starts disposable MongoDB processes, including a
+standalone negative control, replica-set integration topology, and isolated
+crash/recovery topology. It writes and verifies a self-digesting report plus the
+raw Go test JSONL receipt:
+
+```sh
+go run ./cmd/mongo-integration-report
+go run ./cmd/mongo-integration-report -verify OUTPUT/phase-2/step-3-mongo-integration-gate.json
+```
 
 ## Contract validation
 
@@ -118,4 +145,6 @@ go run ./cmd/core-hermetic-report -verify build/reports/core-hermetic.json
 - [Repository bootstrap authority](docs/architecture/000-bootstrap-authority.md)
 - [Go kernel bootstrap decision](docs/architecture/001-go-kernel-bootstrap.md)
 - [Phase 2 Step 2 core-hermetic gate](OUTPUT/phase-2/step-2-core-hermetic-gate.json)
+- [Phase 2 Step 2 principal acceptance](OUTPUT/phase-2/step-2-acceptance.json)
+- [Phase 2 Step 3 Mongo integration gate](OUTPUT/phase-2/step-3-mongo-integration-gate.json)
 - [Historical Step 2 `0.1.0` encoding-gap record](OUTPUT/phase-2/step-2-contract-encoding-gaps.md)

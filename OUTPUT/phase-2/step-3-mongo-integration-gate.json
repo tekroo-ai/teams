@@ -1,0 +1,183 @@
+{
+  "schemaVersion": "1.0.0",
+  "reportType": "TEKROO_PHASE_2_PROFILE_GATE",
+  "contractIdentity": "tekroo.kernel.contracts/0.2.0",
+  "manifestSha256": "cd582fb163e17d49a1a0a627f33cdbb184d15ecace3200981738782cca977dae",
+  "profile": "mongo-integration",
+  "status": "PASS",
+  "sourceTreeSha256": "e071384c4c04dd5d69c0e1c0ec10bd949ce70f058f44a3e85b9c943bc27f2699",
+  "environment": {
+    "goVersion": "go1.26.4",
+    "goos": "darwin",
+    "goarch": "arm64",
+    "mongoDbVersionLine": "db version v8.3.4",
+    "mongoDriver": "go.mongodb.org/mongo-driver/v2@v2.8.0",
+    "topology": "single-node replica set; standalone negative control; isolated crash/restart replica set",
+    "locale": "C",
+    "timeZone": "UTC"
+  },
+  "executed": {
+    "topLevelTests": 17,
+    "subtests": 5,
+    "failedTests": 0,
+    "passedPackages": 1,
+    "faultPoints": 5,
+    "concurrentWriters": 32,
+    "concurrentClaims": 24
+  },
+  "coverage": [
+    {
+      "obligation": "topology-metadata-indexes",
+      "status": "PASS",
+      "tests": [
+        "TestStartupRejectsUnsupportedTopology",
+        "TestStartupPinsMetadataAndRequiredIndexes"
+      ],
+      "receipt": "A standalone is rejected; contract/manifest/migration and delivery-policy metadata are pinned; the aggregate-revision and idempotency-scope indexes are observed as unique."
+    },
+    {
+      "obligation": "majority-transaction-all-or-none",
+      "status": "PASS",
+      "tests": [
+        "TestTransactionFaultScheduleIsAllOrNone"
+      ],
+      "receipt": "Five injected precommit boundaries leave aggregate, event, receipt, authority, provenance, and outbox collections empty."
+    },
+    {
+      "obligation": "lost-ack-reconciliation",
+      "status": "PASS",
+      "tests": [
+        "TestLostAcknowledgementReconcilesByCommandID"
+      ],
+      "receipt": "An uncertain acknowledgement is reconciled by command ID and exact retry returns the committed sentinel."
+    },
+    {
+      "obligation": "restart-and-crash-recovery",
+      "status": "PASS",
+      "tests": [
+        "TestCommittedStateSurvivesApplicationRestart",
+        "TestCommittedStateSurvivesMongoCrashRecovery"
+      ],
+      "receipt": "The receipt survives client/application restart and abrupt mongod termination followed by recovery on the same data directory."
+    },
+    {
+      "obligation": "concurrent-one-decision",
+      "status": "PASS",
+      "tests": [
+        "TestConcurrentCommitsProduceOneDecision"
+      ],
+      "receipt": "Thirty-two same-aggregate contenders produce one aggregate, event, receipt, and outbox record."
+    },
+    {
+      "obligation": "event-fold-integrity",
+      "status": "PASS",
+      "tests": [
+        "TestAggregateFoldDetectsMaterializedCorruption"
+      ],
+      "receipt": "A valid materialized snapshot matches its ordered event fold; a direct conflicting projection write is detected."
+    },
+    {
+      "obligation": "stream-before-backlog",
+      "status": "PASS",
+      "tests": [
+        "TestChangeStreamOpensBeforeBacklogWithoutGap"
+      ],
+      "receipt": "One backlog intent and one intent committed after feed open are both observed through the converged feed."
+    },
+    {
+      "obligation": "claim-lease-epoch-fencing",
+      "status": "PASS",
+      "tests": [
+        "TestClaimLifecycleIsOneWinnerAndEpochFenced"
+      ],
+      "receipt": "Twenty-four claimants produce one epoch-1 holder; yield/reacquire increments to epoch 2 and stale resolution fails."
+    },
+    {
+      "obligation": "readdress-no-ownership",
+      "status": "PASS",
+      "tests": [
+        "TestReaddressIsEpochPinnedAndCannotMutateOrganizationalState"
+      ],
+      "receipt": "Readdress is holder/epoch pinned and byte-equivalent aggregate state is observed before and after delivery mutation."
+    },
+    {
+      "obligation": "finite-sweep-dead-letter",
+      "status": "PASS",
+      "tests": [
+        "TestSweepReleasesThenDeadLettersAtFiniteAttemptLimit"
+      ],
+      "receipt": "The first expired lease is released and the second reaches a finite dead-letter terminal state."
+    },
+    {
+      "obligation": "durable-resume-checkpoint",
+      "status": "PASS",
+      "tests": [
+        "TestResumeCheckpointSurvivesFeedRestart"
+      ],
+      "receipt": "A change-stream resume token is persisted and a restarted feed observes the later unresolved intent."
+    },
+    {
+      "obligation": "bounded-backlog-resynchronization",
+      "status": "PASS",
+      "tests": [
+        "TestBacklogResynchronizationIsBounded"
+      ],
+      "receipt": "A configured one-intent recovery ceiling exposes ErrBacklogLimit on the second unresolved backlog record instead of silently truncating or scanning without bound."
+    },
+    {
+      "obligation": "resume-failure-classification",
+      "status": "PASS",
+      "tests": [
+        "TestResumeFailureClassificationIsNarrow"
+      ],
+      "receipt": "Change-stream history loss is classified for resynchronization while authorization and ordinary infrastructure failures remain terminal to the operation."
+    },
+    {
+      "obligation": "differential-semantics",
+      "status": "PASS",
+      "tests": [
+        "TestMongoAndMemoryStoresProduceEquivalentSemanticSnapshot"
+      ],
+      "receipt": "Mongo and the accepted hermetic reference expose structurally equal semantic snapshots after the same decision."
+    },
+    {
+      "obligation": "bounded-operations",
+      "status": "PASS",
+      "tests": [
+        "TestOperationsRequireBoundedContexts"
+      ],
+      "receipt": "Unbounded commit and claim operations fail before I/O with ErrDeadlineRequired."
+    }
+  ],
+  "evidenceFloor": [
+    "OBSERVED by executable tests: MongoDB accepts the supported replica-set topology and rejects the standalone negative control.",
+    "COMPUTED from the JSON test receipt: 17 top-level tests, 5 subtests, 0 failures, 32 concurrent writers, and 24 concurrent claimants.",
+    "INFERRED only within the tested local topology: these results support adapter correctness; they do not qualify an untested production cluster, migration, provider, or deployment."
+  ],
+  "unresolvedGaps": [],
+  "otherProfiles": [
+    {
+      "profile": "core-hermetic",
+      "status": "PASS",
+      "reason": "Accepted separately by the principal; not reclassified by this report."
+    },
+    {
+      "profile": "synthesized-merge",
+      "status": "NOT_RUN",
+      "reason": "Later separately authorized profile."
+    },
+    {
+      "profile": "provider-e2e",
+      "status": "NOT_RUN",
+      "reason": "Requires separate principal authorization."
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "OUTPUT/phase-2/step-3-mongo-integration.raw.jsonl",
+      "sha256": "959c9feeccc035ceb50559f6b22cd1b34082073b8c989cc3ae98d27a4be1360a"
+    }
+  ],
+  "digestMethod": "SHA-256 over compact JSON with reportSha256 set to the empty string",
+  "reportSha256": "c617a6ae9c718266691fea71db20aa3f1ef292f40c32b27fc84d97f631975b73"
+}

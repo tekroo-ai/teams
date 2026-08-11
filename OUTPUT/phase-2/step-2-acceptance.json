@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "PRINCIPAL_ACCEPTANCE",
+  "recordedOn": "2026-08-11",
+  "timePrecision": "DAY",
+  "principalStatement": "Accepted. Proceed to the next step.",
+  "acceptedProfile": "core-hermetic",
+  "acceptedReport": "OUTPUT/phase-2/step-2-core-hermetic-gate.json",
+  "acceptedReportFileSha256": "b49b8a973689dd2b4500a29e0353b9d0af38f80bd167e5b378d95815d3e8cb8d",
+  "acceptedReportSelfSha256": "a3a930ed231e22a223d3c20a63a52fc2e33a8ecbcc8010f90adefa313c293daa",
+  "effect": "Closes Phase 2 Step 2 and authorizes work on the next required profile. It does not qualify MongoDB, synthesized merge, provider E2E, migration, performance, or production deployment."
+}
