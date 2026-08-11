@@ -404,7 +404,7 @@ func TestStorePersistsOrderIndependentCompletionReviewJoin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if final.Reviews[target].Join != (kernel.ReviewJoinResult{Complete: true, Status: "PASS"}) {
+	if final.Reviews[target].ReviewID != target.ID || final.Reviews[target].Join != (kernel.ReviewJoinResult{Complete: true, Status: "PASS"}) {
 		t.Fatalf("final join = %#v", final.Reviews[target].Join)
 	}
 	if final.AcceptedEvents[firstResult].Qualification != "PENDING" || final.AcceptedEvents[secondResult].Qualification != "PASS" {

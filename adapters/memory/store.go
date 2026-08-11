@@ -368,6 +368,7 @@ func (s *Store) applyReviewEvent(event kernel.DomainEvent) {
 			s.openReviews[key] = event.Aggregate
 		}
 		if review, err := kernel.CompletionReviewFromPayload(event.Payload); err == nil {
+			review.ReviewID = event.Aggregate.ID
 			s.reviews[event.Aggregate] = review
 		}
 	case "tekroo.event.completion-review.result-recorded":

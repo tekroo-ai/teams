@@ -61,6 +61,7 @@ type ReviewJoinResult struct {
 }
 
 type CompletionReviewSnapshot struct {
+	ReviewID             UUIDv7
 	Subject              AggregateRef
 	LifecycleEpoch       uint64
 	CriteriaRevision     uint64

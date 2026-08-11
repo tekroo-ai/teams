@@ -1,0 +1,151 @@
+{
+  "schemaVersion": "1.0.0",
+  "reportType": "PHASE_3_DETERMINISTIC_COMPLETION_REOPENING",
+  "status": "PASS",
+  "acceptedBaseCommit": "43df1515dfdd77d2d671aab551c383cdf1e5981f",
+  "acceptedBaseTree": "a9166b0d0d87dc03d1c4a6fefb3b0c5b605659d4",
+  "contractIdentity": "tekroo.kernel.contracts/0.3.0",
+  "manifestSha256": "a1831afd5829ce3d020cb65e51644416d6ec39b85dd4c00c82c9bef6f0294c2a",
+  "sourceTreeSha256": "9c1053b3132f855b4f22dde4c8dc1dd163f45560c8b5810cf3b010969ca825f8",
+  "environment": {
+    "goVersion": "go1.26.4",
+    "goos": "darwin",
+    "goarch": "arm64",
+    "locale": "C",
+    "timeZone": "UTC"
+  },
+  "executed": {
+    "contractStructureChecks": 2537,
+    "contractFixtureCases": 82,
+    "focusedTestCases": 146,
+    "focusedTestFailures": 0,
+    "regressionTestCases": 282,
+    "regressionTestFailures": 0,
+    "vetFailures": 0
+  },
+  "assertions": [
+    {
+      "id": "COMPLETE-001-FINALIZED-REVIEW",
+      "status": "PASS",
+      "tests": [
+        "TestCompletionPlanIsCanonicalAndBindsCurrentFinalizedReview",
+        "TestCompletionRequiresExactEvidenceCriteriaValidationAndDependencies",
+        "TestCompletionReviewFinalizationBindsCurrentResultSet"
+      ],
+      "evidenceFloor": "Completion binds the exact current finalized PASS review, its revisions, finalization event, evidence, and lifecycle epoch."
+    },
+    {
+      "id": "COMPLETE-002-TASK-OWNER-FENCE",
+      "status": "PASS",
+      "tests": [
+        "TestCompletionCoordinatorEmitsExactFencedTaskCompletion",
+        "TestEvaluatorRejectsStaleCataloguePolicyAndLifecycleContext",
+        "TestExecutionFencingRequiresExactCurrentTuple"
+      ],
+      "evidenceFloor": "Task completion is submitted only by the exact owner actor with the exact current execution fence."
+    },
+    {
+      "id": "COMPLETE-003-STORY-DEPENDENCIES",
+      "status": "PASS",
+      "tests": [
+        "TestCompletionCoordinatorStoryDependenciesAndReplayAreDeterministic",
+        "TestCompletionRequiresExactEvidenceCriteriaValidationAndDependencies"
+      ],
+      "evidenceFloor": "Story completion carries canonical exact-revision preconditions for every supplied completed task."
+    },
+    {
+      "id": "COMPLETE-004-NO-EFFECT",
+      "status": "PASS",
+      "tests": [
+        "TestCompletionPlanHasNoEffectForNonPassStaleOrClosedWork",
+        "TestCompletionCoordinatorDoesNotCommandForFailedReviewOrWrongTaskAuthority"
+      ],
+      "evidenceFloor": "Failed, stale, unresolved, already-complete, and unauthorized inputs emit no coordination command."
+    },
+    {
+      "id": "REOPEN-001-EXPLICIT-EPOCH",
+      "status": "PASS",
+      "tests": [
+        "TestReopeningPlanIsExplicitCanonicalAndTerminalOnly",
+        "TestCompletionCoordinatorEmitsExplicitReopeningWithoutActorImpersonation",
+        "TestAcceptanceReopenSuccessorAndCorrectionUseExplicitTerminalPaths"
+      ],
+      "evidenceFloor": "Reopening is a separate human/policy command; the kernel increments the epoch and applies the explicit ownership carry-forward choice."
+    },
+    {
+      "id": "COORD-001-REPLAY-DETERMINISM",
+      "status": "PASS",
+      "tests": [
+        "TestCompletionCoordinatorStoryDependenciesAndReplayAreDeterministic",
+        "TestHandlerCommitsOnceAndReturnsStoredReceiptOnReplay"
+      ],
+      "evidenceFloor": "Identical planning inputs emit identical commands, and durable handler idempotency prevents duplicate authoritative transitions."
+    },
+    {
+      "id": "COORD-002-BOUNDARY",
+      "status": "PASS",
+      "tests": [
+        "TestApplicationProductionImportsRemainKernelOnly"
+      ],
+      "evidenceFloor": "The pure planner imports no application or adapter; the coordinator imports only the kernel boundary and performs no provider, Git, OpenHands, or SMA effect."
+    }
+  ],
+  "excludedProfiles": [
+    {
+      "profile": "automatic-failure-policy",
+      "reason": "The slice does not decide whether a failed or inconclusive review should trigger reopening or escalation."
+    },
+    {
+      "profile": "escalation-and-organizational-acceptance",
+      "reason": "Escalation execution and organizational acceptance coordination remain later slices."
+    },
+    {
+      "profile": "release-provider-execution",
+      "reason": "Release plans, synthesized-merge execution, and Git/provider reconciliation remain later slices."
+    },
+    {
+      "profile": "deployment-migration-performance",
+      "reason": "Production deployment, migration execution, load, latency, and throughput are not exercised."
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "OUTPUT/phase-3/step-8-contract-structure.json",
+      "sha256": "50c73b3506cb5c5ff07d1631b73dadc00a6faeb951cb71f9b32cbe1898240b18"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-8-contract-reference.json",
+      "sha256": "e0b7929f6f5acbe5ba3e816f2ef40f5b4f87016b01839bac22a8d026f5e732a7"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-8-completion-reopening-tests.jsonl",
+      "sha256": "2f8cdc617b82cef85808c32f7552c6968fd40782a58e300de07b0193a87a7479"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-8-full-regression-tests.jsonl",
+      "sha256": "28e2b8a1737c5cedc7107c1d2a12e9795f6c61e7a95edeb5301e141817fc30b3"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-7-acceptance.json",
+      "sha256": "43c68e1c700fe2834bf2e6b4b205b7a442dfbac808f4a699f3efc8429eafaa14"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-7-release-receipt.json",
+      "sha256": "e83afb967e220c853adf52b40c487406d07f083a4c2902e61e66d5e229416724"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-8-authorization.json",
+      "sha256": "d1eaafa94f168b26ecb3d5f2aa519a24e98db0827bdb362ee4b91d609c1a9b83"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-7-bounded-validation-gate.json",
+      "sha256": "6811c4198a4d13c467b5723eeee11b62d213d0174cd891576248b9389ce5641c"
+    },
+    {
+      "path": "docs/architecture/009-deterministic-completion-reopening.md",
+      "sha256": "06e988662c770b8dd2ea3360b5696cda805c882a3b4f969dab2e4e9f1091fdef"
+    }
+  ],
+  "digestMethod": "SHA-256 of compact JSON with reportSha256 set to the empty string",
+  "reportSha256": "2c4951d1c1649e1eb1578c2550314aa0bd2bb2391d2b769a66fe9f107922b5bd"
+}

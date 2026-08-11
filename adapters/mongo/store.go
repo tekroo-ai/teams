@@ -726,6 +726,7 @@ func (s *Store) applyRegistryAndReview(ctx context.Context, event kernel.DomainE
 		if err != nil {
 			return "", err
 		}
+		progress.ReviewID = event.Aggregate.ID
 		if err := s.insertValue(ctx, "review_keys", reviewKey(key), struct {
 			Key    kernel.CompletionReviewKey `json:"key"`
 			Review kernel.AggregateRef        `json:"review"`

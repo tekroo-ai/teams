@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "PRINCIPAL_ACCEPTANCE",
+  "recordedOn": "2026-08-11",
+  "timePrecision": "DAY",
+  "principalStatement": "Accept and push.",
+  "acceptedCommit": "43df1515dfdd77d2d671aab551c383cdf1e5981f",
+  "acceptedTree": "a9166b0d0d87dc03d1c4a6fefb3b0c5b605659d4",
+  "acceptedContract": "tekroo.kernel.contracts/0.3.0",
+  "manifestSha256": "a1831afd5829ce3d020cb65e51644416d6ec39b85dd4c00c82c9bef6f0294c2a",
+  "gateReportSha256": "e50e7fbf83b7bf4e4626998629963966df33e453bd7ad4696cf0c8676beee398",
+  "scope": "Acceptance applies to the bounded-validation contract revision, Step 6 forward augmentation, and policy-finalized completion gate qualified by the Step 7 report."
+}
