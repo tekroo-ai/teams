@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "PRINCIPAL_ACCEPTANCE",
+  "recordedOn": "2026-08-11",
+  "timePrecision": "DAY",
+  "principalStatement": "Accepted. Proceed to the next step.",
+  "acceptedProfile": "mongo-integration",
+  "acceptedReport": "OUTPUT/phase-2/step-3-mongo-integration-gate.json",
+  "acceptedReportFileSha256": "61876f7d7bfc5999d6366df5c6a7fd791dc820a2e68ac2b2e8c321a6634583cb",
+  "acceptedReportSelfSha256": "c617a6ae9c718266691fea71db20aa3f1ef292f40c32b27fc84d97f631975b73",
+  "effect": "Closes Phase 2 Step 3 and authorizes work on the next required profile. It does not qualify synthesized merge, provider E2E, migration, performance, production topology, or deployment."
+}

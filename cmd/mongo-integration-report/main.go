@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"io/fs"
 	"os"
@@ -18,10 +19,10 @@ import (
 )
 
 const (
-	contractIdentity = "tekroo.kernel.contracts/0.2.0"
-	manifestPath     = "CONTRACTS/tekroo.kernel.contracts/0.2.0/manifest.json"
-	driverModule     = "go.mongodb.org/mongo-driver/v2"
-	rawReceiptPath   = "OUTPUT/phase-2/step-3-mongo-integration.raw.jsonl"
+	contractIdentity      = "tekroo.kernel.contracts/0.2.0"
+	manifestPath          = "CONTRACTS/tekroo.kernel.contracts/0.2.0/manifest.json"
+	driverModule          = "go.mongodb.org/mongo-driver/v2"
+	defaultRawReceiptPath = "OUTPUT/phase-2/step-3-mongo-integration.raw.jsonl"
 )
 
 type report struct {
@@ -83,24 +84,35 @@ type artifact struct {
 }
 
 func main() {
-	output := "OUTPUT/phase-2/step-3-mongo-integration-gate.json"
-	if len(os.Args) == 3 && os.Args[1] == "-verify" {
-		if err := verify(os.Args[2]); err != nil {
+	if len(os.Args) >= 2 && os.Args[1] == "-verify" {
+		if len(os.Args) != 3 && len(os.Args) != 4 {
+			fatal(errors.New("usage: mongo-integration-report -verify report [artifact-root]"))
+		}
+		artifactRoot := "."
+		if len(os.Args) == 4 {
+			artifactRoot = os.Args[3]
+		}
+		if err := verify(os.Args[2], artifactRoot); err != nil {
 			fatal(err)
 		}
 		return
 	}
-	if len(os.Args) == 3 && os.Args[1] == "-output" {
-		output = os.Args[2]
-	} else if len(os.Args) != 1 {
-		fatal(errors.New("usage: mongo-integration-report [-output path] | -verify path"))
+	flags := flag.NewFlagSet("mongo-integration-report", flag.ContinueOnError)
+	output := flags.String("output", "OUTPUT/phase-2/step-3-mongo-integration-gate.json", "report output path")
+	rawOutput := flags.String("raw-output", defaultRawReceiptPath, "raw JSONL receipt output path")
+	rawArtifactPath := flags.String("raw-artifact-path", defaultRawReceiptPath, "portable artifact path recorded in the report")
+	if err := flags.Parse(os.Args[1:]); err != nil {
+		fatal(err)
 	}
-	if err := run(output); err != nil {
+	if flags.NArg() != 0 || *output == "" || *rawOutput == "" || *rawArtifactPath == "" {
+		fatal(errors.New("usage: mongo-integration-report [-output path] [-raw-output path] [-raw-artifact-path path] | -verify report [artifact-root]"))
+	}
+	if err := run(*output, *rawOutput, *rawArtifactPath); err != nil {
 		fatal(err)
 	}
 }
 
-func run(output string) error {
+func run(output, rawOutput, rawArtifactPath string) error {
 	manifestDigest, err := fileDigest(manifestPath)
 	if err != nil {
 		return err
@@ -118,13 +130,13 @@ func run(output string) error {
 		return err
 	}
 	tests, raw, testErr := runTests()
-	if err := os.MkdirAll(filepath.Dir(rawReceiptPath), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(rawOutput), 0o755); err != nil {
 		return err
 	}
-	if err := os.WriteFile(rawReceiptPath, raw, 0o644); err != nil {
+	if err := os.WriteFile(rawOutput, raw, 0o644); err != nil {
 		return err
 	}
-	rawDigest, err := fileDigest(rawReceiptPath)
+	rawDigest, err := fileDigest(rawOutput)
 	if err != nil {
 		return err
 	}
@@ -171,7 +183,7 @@ func run(output string) error {
 			{Profile: "synthesized-merge", Status: "NOT_RUN", Reason: "Later separately authorized profile."},
 			{Profile: "provider-e2e", Status: "NOT_RUN", Reason: "Requires separate principal authorization."},
 		},
-		Artifacts:    []artifact{{Path: rawReceiptPath, SHA256: rawDigest}},
+		Artifacts:    []artifact{{Path: rawArtifactPath, SHA256: rawDigest}},
 		DigestMethod: "SHA-256 over compact JSON with reportSha256 set to the empty string",
 	}
 	for _, item := range value.Coverage {
@@ -205,7 +217,7 @@ func run(output string) error {
 	return nil
 }
 
-func verify(path string) error {
+func verify(path, artifactRoot string) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return err
@@ -233,7 +245,11 @@ func verify(path string) error {
 		return errors.New("source tree digest mismatch")
 	}
 	for _, artifact := range value.Artifacts {
-		digest, err := fileDigest(artifact.Path)
+		artifactPath := artifact.Path
+		if !filepath.IsAbs(artifactPath) {
+			artifactPath = filepath.Join(artifactRoot, artifactPath)
+		}
+		digest, err := fileDigest(artifactPath)
 		if err != nil || digest != artifact.SHA256 {
 			return fmt.Errorf("artifact digest mismatch: %s", artifact.Path)
 		}
