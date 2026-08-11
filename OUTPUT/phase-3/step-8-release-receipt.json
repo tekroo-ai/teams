@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "RELEASE_RECEIPT",
+  "recordedOn": "2026-08-11",
+  "timePrecision": "DAY",
+  "repository": "https://github.com/tekroo-ai/teams.git",
+  "branch": "main",
+  "releasedCommit": "09dafe11c8113240ce106983e218f3290ab95ccb",
+  "releasedTree": "1ff82ffac9e8124cb384368afe3c3e06b6487494",
+  "remoteObservedCommit": "09dafe11c8113240ce106983e218f3290ab95ccb",
+  "remoteObservedTree": "1ff82ffac9e8124cb384368afe3c3e06b6487494",
+  "verificationMethod": [
+    "git push origin main",
+    "git ls-remote origin refs/heads/main",
+    "git rev-parse origin/main^{tree}"
+  ],
+  "contractIdentity": "tekroo.kernel.contracts/0.3.0",
+  "manifestSha256": "a1831afd5829ce3d020cb65e51644416d6ec39b85dd4c00c82c9bef6f0294c2a",
+  "gateReportSha256": "2c4951d1c1649e1eb1578c2550314aa0bd2bb2391d2b769a66fe9f107922b5bd",
+  "qualificationBoundary": "Only the accepted completion and reopening coordination tree is released; escalation, organizational acceptance, and release-provider execution remain unqualified."
+}

@@ -17,6 +17,7 @@ const (
 	reasonCorrectionTarget         = "CORRECTION_TARGET_NOT_FOUND"
 	reasonReviewAlreadyOpen        = "REVIEW_ALREADY_OPEN"
 	reasonReviewNotFinalized       = "REVIEW_NOT_FINALIZED"
+	reasonEscalationNotImplemented = "ESCALATION_NOT_IMPLEMENTED"
 )
 
 type CompletionReviewKey struct {
@@ -54,6 +55,8 @@ func validateCommandPolicy(command KernelCommand, snapshot Snapshot, context Dec
 		}
 	}
 	switch command.CommandType {
+	case "tekroo.command.escalation.open", "tekroo.command.escalation.resolve":
+		return OutcomeRejectedPolicy, reasonEscalationNotImplemented
 	case "tekroo.command.task.request-completion":
 		if !payloadEvidenceMatches(object, command.EvidenceRefs) {
 			return OutcomeRejectedInvalid, reasonInvalidEvidence

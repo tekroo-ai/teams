@@ -14,7 +14,7 @@ import (
 	"github.com/tekroo-ai/teams/kernel"
 )
 
-func TestAllFrozenCommandsReachTheirDeclaredEventThroughEvaluator(t *testing.T) {
+func TestFrozenCommandsApplyOrFailClosedAtUnqualifiedBoundary(t *testing.T) {
 	type fixture struct {
 		FixtureID string `json:"fixtureId"`
 		When      struct {
@@ -43,11 +43,11 @@ func TestAllFrozenCommandsReachTheirDeclaredEventThroughEvaluator(t *testing.T) 
 	}
 
 	root := testRepositoryRoot(t)
-	fixtureBytes, err := os.ReadFile(filepath.Join(root, "CONTRACTS/tekroo.kernel.contracts/0.3.0/fixtures/catalogue-coverage.json"))
+	fixtureBytes, err := os.ReadFile(filepath.Join(root, "CONTRACTS/tekroo.kernel.contracts/0.4.0/fixtures/catalogue-coverage.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	catalogueBytes, err := os.ReadFile(filepath.Join(root, "CONTRACTS/tekroo.kernel.contracts/0.3.0/catalogue/kernel-catalogue.json"))
+	catalogueBytes, err := os.ReadFile(filepath.Join(root, "CONTRACTS/tekroo.kernel.contracts/0.4.0/catalogue/kernel-catalogue.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,6 +68,8 @@ func TestAllFrozenCommandsReachTheirDeclaredEventThroughEvaluator(t *testing.T) 
 
 	evaluator := kernel.Evaluator{Catalogue: loadCatalogue(t)}
 	executed := 0
+	applied := 0
+	failClosed := 0
 	for _, item := range fixtures.Fixtures {
 		if !strings.HasSuffix(item.FixtureID, "-VALID") {
 			continue
@@ -80,14 +82,25 @@ func TestAllFrozenCommandsReachTheirDeclaredEventThroughEvaluator(t *testing.T) 
 			}
 			command, snapshot := commandCase(t, item.When.CommandType, item.When.Payload, definition.TargetKinds[0], definition.AuthorityKinds[0], definition.ExecutionRequired, definition.RootAllowed)
 			decision := evaluate(t, evaluator, command, snapshot, validDecisionContext(t))
+			if strings.HasPrefix(item.When.CommandType, "tekroo.command.escalation.") {
+				if decision.Receipt.OutcomeCode != kernel.OutcomeRejectedPolicy || decision.Receipt.ReasonCode != "ESCALATION_NOT_IMPLEMENTED" || len(decision.Events) != 0 {
+					t.Fatalf("unqualified escalation decision = %#v", decision)
+				}
+				failClosed++
+				return
+			}
 			if decision.Receipt.OutcomeCode != kernel.OutcomeApplied || len(decision.Events) != 1 || decision.Events[0].EventType != item.Then.Expected.EventTypes[0] {
 				t.Fatalf("decision = %#v", decision)
 			}
+			applied++
 		})
 		executed++
 	}
-	if executed != 27 {
-		t.Fatalf("executed command cases = %d, want 27", executed)
+	if executed != 29 {
+		t.Fatalf("executed command cases = %d, want 29", executed)
+	}
+	if applied != 27 || failClosed != 2 {
+		t.Fatalf("applied = %d, fail-closed = %d, want 27 and 2", applied, failClosed)
 	}
 }
 

@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "PRINCIPAL_ACCEPTANCE",
+  "recordedOn": "2026-08-11",
+  "timePrecision": "DAY",
+  "principalStatement": "accept. Please push and advance to the next step.",
+  "acceptedCommit": "09dafe11c8113240ce106983e218f3290ab95ccb",
+  "acceptedTree": "1ff82ffac9e8124cb384368afe3c3e06b6487494",
+  "acceptedContract": "tekroo.kernel.contracts/0.3.0",
+  "manifestSha256": "a1831afd5829ce3d020cb65e51644416d6ec39b85dd4c00c82c9bef6f0294c2a",
+  "gateReportSha256": "2c4951d1c1649e1eb1578c2550314aa0bd2bb2391d2b769a66fe9f107922b5bd",
+  "scope": "Acceptance applies to the deterministic completion and reopening coordination qualified by the Step 8 report."
+}

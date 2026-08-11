@@ -6,9 +6,9 @@ import (
 )
 
 const (
-	ContractIdentity  = "tekroo.kernel.contracts/0.3.0"
-	SchemaVersion     = "1.2.0"
-	CatalogueRevision = uint64(3)
+	ContractIdentity  = "tekroo.kernel.contracts/0.4.0"
+	SchemaVersion     = "1.3.0"
+	CatalogueRevision = uint64(4)
 )
 
 var (
@@ -56,6 +56,7 @@ const (
 	AggregateStory            AggregateKind = "story"
 	AggregateTask             AggregateKind = "task"
 	AggregateCompletionReview AggregateKind = "completion-review"
+	AggregateEscalation       AggregateKind = "escalation"
 	AggregateEvidence         AggregateKind = "evidence"
 	AggregateExecution        AggregateKind = "execution"
 	AggregateSystem           AggregateKind = "system"
@@ -63,7 +64,7 @@ const (
 
 func (k AggregateKind) Valid() bool {
 	switch k {
-	case AggregateStory, AggregateTask, AggregateCompletionReview, AggregateEvidence, AggregateExecution, AggregateSystem:
+	case AggregateStory, AggregateTask, AggregateCompletionReview, AggregateEscalation, AggregateEvidence, AggregateExecution, AggregateSystem:
 		return true
 	default:
 		return false

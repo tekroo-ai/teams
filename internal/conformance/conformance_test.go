@@ -14,7 +14,7 @@ import (
 	"github.com/tekroo-ai/teams/kernel"
 )
 
-const contractRoot = "CONTRACTS/tekroo.kernel.contracts/0.3.0"
+const contractRoot = "CONTRACTS/tekroo.kernel.contracts/0.4.0"
 
 type fixtureDocument struct {
 	Fixtures []fixture `json:"fixtures"`
@@ -43,8 +43,8 @@ func TestFrozenContractCorpus(t *testing.T) {
 		loadFixtures(t, filepath.Join(repositoryRoot, contractRoot, "fixtures/catalogue-coverage.json")),
 		loadFixtures(t, filepath.Join(repositoryRoot, contractRoot, "fixtures/model-and-invariant-scenarios.json"))...,
 	)
-	if len(fixtures) != 82 {
-		t.Fatalf("fixture count = %d, want 82", len(fixtures))
+	if len(fixtures) != 97 {
+		t.Fatalf("fixture count = %d, want 97", len(fixtures))
 	}
 
 	for _, item := range fixtures {
@@ -217,6 +217,38 @@ func runFixture(t *testing.T, catalogue *contract.Catalogue, item fixture) any {
 			Accepted bool   `json:"accepted"`
 			Reason   string `json:"reason"`
 		}{Accepted: accepted, Reason: reason}
+	case "ESCALATION_MODEL":
+		var given struct {
+			State                 kernel.EscalationState `json:"state"`
+			Adjudicator           kernel.PrincipalRef    `json:"adjudicator"`
+			TimeoutPolicy         kernel.PrincipalRef    `json:"timeoutPolicy"`
+			SubjectLifecycleEpoch uint64                 `json:"subjectLifecycleEpoch"`
+			DeadlineAt            time.Time              `json:"deadlineAt"`
+			ResolutionRoundLimit  uint64                 `json:"resolutionRoundLimit"`
+		}
+		var when struct {
+			Action                kernel.EscalationAction     `json:"action"`
+			Authority             kernel.PrincipalRef         `json:"authority"`
+			SourceRole            kernel.EscalationSourceRole `json:"sourceRole"`
+			SubjectLifecycleEpoch uint64                      `json:"subjectLifecycleEpoch"`
+			DecidedAt             time.Time                   `json:"decidedAt"`
+			Round                 uint64                      `json:"round"`
+			Outcome               string                      `json:"outcome"`
+		}
+		decode(t, item.Given, &given)
+		decode(t, item.When, &when)
+		return kernel.EvaluateEscalation(
+			kernel.EscalationSnapshot{
+				State: given.State, Adjudicator: given.Adjudicator, TimeoutPolicy: given.TimeoutPolicy,
+				SubjectLifecycleEpoch: given.SubjectLifecycleEpoch, DeadlineAt: given.DeadlineAt,
+				ResolutionRoundLimit: given.ResolutionRoundLimit,
+			},
+			kernel.EscalationTransition{
+				Action: when.Action, Authority: when.Authority, SourceRole: when.SourceRole,
+				SubjectLifecycleEpoch: when.SubjectLifecycleEpoch, DecidedAt: when.DecidedAt,
+				Round: when.Round, Outcome: when.Outcome,
+			},
+		)
 	case "SUCCESSOR_SET_MODEL":
 		var when struct {
 			SuccessorIDs []kernel.UUIDv7 `json:"successorIds"`

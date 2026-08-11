@@ -1,0 +1,133 @@
+{
+  "$id": "https://contracts.tekroo.ai/tekroo.kernel.contracts/0.4.0/schemas/kernel-command.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "actor_fqn": {
+      "anyOf": [
+        {
+          "$ref": "./core.schema.json#/$defs/ActorFQN"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "authority": {
+      "$ref": "./core.schema.json#/$defs/PrincipalRef"
+    },
+    "causation": {
+      "items": {
+        "$ref": "./core.schema.json#/$defs/DagParent"
+      },
+      "maxItems": 64,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "command_id": {
+      "$ref": "./core.schema.json#/$defs/UUIDv7"
+    },
+    "command_type": {
+      "pattern": "^tekroo\\.command\\.[a-z0-9]+(?:[.-][a-z0-9]+)*$",
+      "type": "string"
+    },
+    "command_version": {
+      "const": "1.3.0"
+    },
+    "contract_manifest": {
+      "$ref": "./core.schema.json#/$defs/ContractManifestIdentity"
+    },
+    "correlation_id": {
+      "$ref": "./core.schema.json#/$defs/UUIDv7"
+    },
+    "evidence_refs": {
+      "items": {
+        "$ref": "./core.schema.json#/$defs/EvidenceRef"
+      },
+      "maxItems": 64,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "execution": {
+      "anyOf": [
+        {
+          "$ref": "./core.schema.json#/$defs/ExecutionTuple"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "expected_catalogue_revision": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "expected_lifecycle_epoch": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "expected_policy_revision": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "expected_revision": {
+      "$ref": "./core.schema.json#/$defs/ExpectedRevision"
+    },
+    "idempotency_key": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string"
+    },
+    "issued_at": {
+      "format": "date-time",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "payload": {
+      "type": "object"
+    },
+    "preconditions": {
+      "items": {
+        "$ref": "./core.schema.json#/$defs/AggregatePrecondition"
+      },
+      "maxItems": 64,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "target": {
+      "$ref": "./core.schema.json#/$defs/AggregateRef"
+    }
+  },
+  "required": [
+    "contract_manifest",
+    "command_id",
+    "command_type",
+    "command_version",
+    "target",
+    "authority",
+    "actor_fqn",
+    "execution",
+    "expected_revision",
+    "preconditions",
+    "expected_lifecycle_epoch",
+    "expected_policy_revision",
+    "expected_catalogue_revision",
+    "idempotency_key",
+    "correlation_id",
+    "causation",
+    "issued_at",
+    "payload",
+    "evidence_refs"
+  ],
+  "title": "KernelCommand",
+  "type": "object"
+}

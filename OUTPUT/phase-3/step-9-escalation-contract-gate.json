@@ -1,0 +1,159 @@
+{
+  "schemaVersion": "1.0.0",
+  "reportType": "PHASE_3_ESCALATION_CONTRACT_REVISION",
+  "status": "PASS",
+  "acceptedBaseCommit": "09dafe11c8113240ce106983e218f3290ab95ccb",
+  "acceptedBaseTree": "1ff82ffac9e8124cb384368afe3c3e06b6487494",
+  "contractIdentity": "tekroo.kernel.contracts/0.4.0",
+  "manifestSha256": "5ff83483ce43ace2e06f2cc2f57dd552342553fc2389f3cc775b761c0c6d6d7c",
+  "sourceTreeSha256": "8cc037b37f9b6942238cd2a5d4d2a0027bd590c7d6e43c933d981e3cec425760",
+  "environment": {
+    "goVersion": "go1.26.4",
+    "goos": "darwin",
+    "goarch": "arm64",
+    "locale": "C",
+    "timeZone": "UTC"
+  },
+  "executed": {
+    "contractStructureChecks": 2664,
+    "contractFixtureCases": 97,
+    "focusedTestCases": 218,
+    "focusedTestFailures": 0,
+    "regressionTestCases": 306,
+    "regressionTestFailures": 0,
+    "vetFailures": 0
+  },
+  "assertions": [
+    {
+      "id": "ESC-CONTRACT-001-DEDICATED-TYPES",
+      "status": "PASS",
+      "tests": [
+        "TestFrozenContractCorpus/CAT-028-ESCALATION-OPEN-VALID",
+        "TestFrozenContractCorpus/CAT-029-ESCALATION-RESOLVE-VALID"
+      ],
+      "evidenceFloor": "Escalation is a dedicated aggregate with explicit open/opened and resolve/resolved types; block and handoff are not aliases."
+    },
+    {
+      "id": "ESC-CONTRACT-002-EXACT-BOUNDS",
+      "status": "PASS",
+      "tests": [
+        "TestFrozenContractCorpus/ESCALATION-EXACT-ADJUDICATOR",
+        "TestFrozenContractCorpus/ESCALATION-WRONG-ADJUDICATOR",
+        "TestFrozenContractCorpus/ESCALATION-STALE-LIFECYCLE",
+        "TestFrozenContractCorpus/ESCALATION-ROUND-EXHAUSTED"
+      ],
+      "evidenceFloor": "Resolution binds the exact adjudicator, current work lifecycle epoch, and finite resolution-round budget."
+    },
+    {
+      "id": "ESC-CONTRACT-003-TIMEOUT",
+      "status": "PASS",
+      "tests": [
+        "TestFrozenContractCorpus/ESCALATION-ADJUDICATOR-DEADLINE",
+        "TestFrozenContractCorpus/ESCALATION-POLICY-TIMEOUT",
+        "TestFrozenContractCorpus/ESCALATION-TIMEOUT-BEFORE-DEADLINE",
+        "TestFrozenContractCorpus/ESCALATION-TIMEOUT-OUTCOME"
+      ],
+      "evidenceFloor": "After deadline only the exact timeout policy may terminate, and only as BLOCKED or HUMAN_REQUIRED."
+    },
+    {
+      "id": "ESC-CONTRACT-004-ONE-WAY",
+      "status": "PASS",
+      "tests": [
+        "TestFrozenContractCorpus/ESCALATION-ROUTE-ONCE",
+        "TestFrozenContractCorpus/ESCALATION-NO-REROUTE",
+        "TestFrozenContractCorpus/ESCALATION-TERMINAL",
+        "TestTerminalEscalationCannotBeReopened"
+      ],
+      "evidenceFloor": "An escalation routes once and cannot bounce, reroute, or reopen after a terminal decision."
+    },
+    {
+      "id": "ESC-CONTRACT-005-COMPATIBILITY",
+      "status": "PASS",
+      "tests": [
+        "TestFrozenContractCorpus",
+        "TestCatalogueRejectsManifestIdentityMismatch",
+        "TestCompletionCoordinatorStoryDependenciesAndReplayAreDeterministic"
+      ],
+      "evidenceFloor": "Released 0.3.0 remains byte-identical; existing 1.2.0 semantics migrate identically to 1.3.0 and accepted Step 8 behavior remains passing."
+    },
+    {
+      "id": "ESC-CONTRACT-006-BOUNDARY",
+      "status": "PASS",
+      "tests": [
+        "TestFrozenCommandsApplyOrFailClosedAtUnqualifiedBoundary",
+        "TestApplicationProductionImportsRemainKernelOnly"
+      ],
+      "evidenceFloor": "The pure transition model is qualified, but authoritative escalation commands fail closed until coordination, snapshot projection, and repository integration are implemented."
+    }
+  ],
+  "excludedProfiles": [
+    {
+      "profile": "escalation-coordination",
+      "reason": "Automatic trigger selection, command planning, durable coordination, and repository integration remain the next implementation slice."
+    },
+    {
+      "profile": "organizational-acceptance",
+      "reason": "Escalation outcomes do not themselves establish organizational acceptance."
+    },
+    {
+      "profile": "release-provider-execution",
+      "reason": "Release plans, synthesized-merge execution, and Git/provider reconciliation remain later slices."
+    },
+    {
+      "profile": "deployment-migration-performance",
+      "reason": "Production deployment, migration execution, load, latency, and throughput are not exercised."
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "OUTPUT/phase-3/step-9-contract-structure.json",
+      "sha256": "a704f86b9f7cba78c144ba33304a07725f75e41490bbc4d21dfb2116c5f5062f"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-9-contract-reference.json",
+      "sha256": "b886b6bec48ba2d80d63b690a58aaf2f24d8809082be5e0b080953a12565f575"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-9-escalation-contract-tests.jsonl",
+      "sha256": "9ae53829df56295bcaf0990da3a773eaad217eca1e40d91d64c9ab3056ebfd13"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-9-full-regression-tests.jsonl",
+      "sha256": "f57f494022876e25081c8752e4ed7a14e054bd64f62413315bdf8012483cb1fa"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-8-acceptance.json",
+      "sha256": "856848847987b9c22fbc54e0948f63816a9b71f0d518c5bca10462c0ab323f16"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-8-release-receipt.json",
+      "sha256": "90e1d5dee32fe2d1a3127edcf1b600468eed90fe7171b5e50ef6e3a7f33b5161"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-9-authorization.json",
+      "sha256": "2aa6ec6b28b8e8fd231ab3e95cee06221a8688796cd1a2a6454be67fef1422a2"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-9-contract-revision-authorization.json",
+      "sha256": "b11e11c28118484b1ba9f49e03d6e1e93e041e97cf04b27c1864a1eadaf4a64c"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-9-contract-encoding-gaps.md",
+      "sha256": "cf15a6672a3570dd461894e30885f72cb0d81ea8619ec471d1712c6ef413bef3"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-8-completion-reopening-gate.json",
+      "sha256": "fce384b99c5fee9025347ac63b6e93492ed91cc9f439e12e8ef11a87040b5b2b"
+    },
+    {
+      "path": "CONTRACTS/tekroo.kernel.contracts/0.4.0/compatibility/from-0.3.0.json",
+      "sha256": "9f842cef0d879bca4f6a964c5c094d6e01701954d31dfc5cc0e82ec36255f80d"
+    },
+    {
+      "path": "docs/architecture/010-deterministic-escalation-contract-revision.md",
+      "sha256": "9f97472827ca3ada530508bac12709f41f0ca8eedccb2821fcf2661e091b4f21"
+    }
+  ],
+  "digestMethod": "SHA-256 of compact JSON with reportSha256 set to the empty string",
+  "reportSha256": "791f0f1c8484af83377fec482aa07aff010c81f800650e70aa0d884e8b6d0195"
+}
