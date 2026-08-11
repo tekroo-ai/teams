@@ -151,6 +151,19 @@ func TestGatewayCompletesWhenServiceIgnoresCancellation(t *testing.T) {
 	}
 }
 
+func TestGatewayDoesNotExposeServiceErrorDetails(t *testing.T) {
+	gateway := newGateway(t, serviceFunc(func(context.Context, kernel.KernelCommand, kernel.ProvenanceBasis) (kernel.CommandReceipt, error) {
+		return kernel.CommandReceipt{}, errors.New("secret database DSN")
+	}))
+	response := gateway.Invoke(context.Background(), validRequest(t))
+	if response.Failure == nil || response.Failure.Code != protocol.FailureService || !response.Failure.OutcomeUnknown {
+		t.Fatalf("response = %#v", response)
+	}
+	if strings.Contains(response.Failure.Message, "secret") || response.Failure.Message != "command service failed after dispatch" {
+		t.Fatalf("service failure message = %q", response.Failure.Message)
+	}
+}
+
 func TestGatewayRejectsTimeoutOutsideConfiguredBound(t *testing.T) {
 	gateway := newGateway(t, serviceFunc(func(context.Context, kernel.KernelCommand, kernel.ProvenanceBasis) (kernel.CommandReceipt, error) {
 		t.Fatal("service must not be called")

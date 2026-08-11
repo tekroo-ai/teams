@@ -1,0 +1,330 @@
+package mcp
+
+import (
+	"bytes"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"mime"
+	"net/http"
+	"strings"
+
+	"github.com/tekroo-ai/teams/adapters/httpapi"
+	"github.com/tekroo-ai/teams/adapters/protocol"
+)
+
+const (
+	ProtocolVersion        = "2026-07-28"
+	ProtocolVersionHeader  = "MCP-Protocol-Version"
+	MethodHeader           = "Mcp-Method"
+	NameHeader             = "Mcp-Name"
+	CommandToolName        = "tekroo.command.invoke"
+	DefaultMaxBodyBytes    = int64(1 << 20)
+	codeHeaderMismatch     = -32020
+	codeUnsupportedVersion = -32022
+)
+
+var ErrInvalidConfiguration = errors.New("invalid MCP adapter configuration")
+
+type Handler struct {
+	endpoint      protocol.Endpoint
+	authenticator httpapi.Authenticator
+	origins       httpapi.OriginPolicy
+	limiter       httpapi.RateLimiter
+	maxBodyBytes  int64
+}
+
+func NewHandler(endpoint protocol.Endpoint, authenticator httpapi.Authenticator, origins httpapi.OriginPolicy, limiter httpapi.RateLimiter, maxBodyBytes int64) (*Handler, error) {
+	if endpoint == nil || authenticator == nil || origins == nil || limiter == nil || maxBodyBytes <= 0 {
+		return nil, ErrInvalidConfiguration
+	}
+	return &Handler{endpoint: endpoint, authenticator: authenticator, origins: origins, limiter: limiter, maxBodyBytes: maxBodyBytes}, nil
+}
+
+func (handler *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	secureHeaders(writer)
+	origin := request.Header.Get("Origin")
+	if origin != "" && !handler.origins.AllowOrigin(origin) {
+		handler.writeError(writer, http.StatusForbidden, nil, codeInvalidRequest, "origin is not allowed", nil)
+		return
+	}
+	identity, err := handler.authenticator.Authenticate(request)
+	if err != nil || !identity.Valid() {
+		writer.Header().Set("WWW-Authenticate", "Bearer")
+		handler.writeError(writer, http.StatusUnauthorized, nil, codeInvalidRequest, "authentication failed", nil)
+		return
+	}
+	if !handler.limiter.Allow(identity) {
+		handler.writeError(writer, http.StatusTooManyRequests, nil, codeInvalidRequest, "rate limit exceeded", nil)
+		return
+	}
+	if request.Method != http.MethodPost {
+		writer.Header().Set("Allow", http.MethodPost)
+		handler.writeError(writer, http.StatusMethodNotAllowed, nil, codeInvalidRequest, "method must be POST", nil)
+		return
+	}
+	if !hasJSONContentType(request.Header.Get("Content-Type")) {
+		handler.writeError(writer, http.StatusUnsupportedMediaType, nil, codeInvalidRequest, "content type must be application/json", nil)
+		return
+	}
+	if !accepts(request.Header.Get("Accept"), "application/json") || !accepts(request.Header.Get("Accept"), "text/event-stream") {
+		handler.writeError(writer, http.StatusNotAcceptable, nil, codeInvalidRequest, "Accept must include application/json and text/event-stream", nil)
+		return
+	}
+	request.Body = http.MaxBytesReader(writer, request.Body, handler.maxBodyBytes)
+	message, err := decodeMessage(request.Body)
+	if err != nil {
+		var tooLarge *http.MaxBytesError
+		if errors.As(err, &tooLarge) {
+			handler.writeError(writer, http.StatusRequestEntityTooLarge, nil, codeInvalidRequest, "request body exceeds configured bound", nil)
+			return
+		}
+		handler.writeError(writer, http.StatusBadRequest, nil, codeParseError, "invalid JSON-RPC message", nil)
+		return
+	}
+	if message.JSONRPC != "2.0" || message.Method == "" || !validRequestID(message.ID) || len(message.Result) != 0 || len(message.Error) != 0 {
+		handler.writeError(writer, http.StatusBadRequest, message.ID, codeInvalidRequest, "invalid JSON-RPC request", nil)
+		return
+	}
+	metadata, err := parseMetadata(message.Params)
+	if err != nil {
+		handler.writeError(writer, http.StatusBadRequest, message.ID, codeInvalidParams, "missing or invalid per-request MCP metadata", nil)
+		return
+	}
+	if !handler.validateHeaders(writer, request, message, metadata) {
+		return
+	}
+	switch message.Method {
+	case "ping":
+		handler.writeResult(writer, message.ID, completeResult(nil))
+	case "server/discover":
+		handler.discover(writer, message)
+	case "tools/list":
+		handler.listTools(writer, message)
+	case "tools/call":
+		handler.callTool(writer, request, message, identity)
+	default:
+		handler.writeError(writer, http.StatusNotFound, message.ID, codeMethodNotFound, "method not found", nil)
+	}
+}
+
+func (handler *Handler) discover(writer http.ResponseWriter, message message) {
+	var params struct {
+		Meta map[string]any `json:"_meta"`
+	}
+	if err := decodeStrict(message.Params, &params); err != nil {
+		handler.writeError(writer, http.StatusOK, message.ID, codeInvalidParams, "invalid server/discover parameters", nil)
+		return
+	}
+	handler.writeResult(writer, message.ID, completeResult(map[string]any{
+		"supportedVersions": []string{ProtocolVersion},
+		"capabilities":      map[string]any{"tools": map[string]any{}},
+		"instructions":      "Submit authenticated, idempotent Tekroo organizational commands and reconcile uncertain outcomes by command ID.",
+		"cacheScope":        "private",
+	}))
+}
+
+type requestMetadata struct {
+	ProtocolVersion    string
+	ClientCapabilities map[string]any
+}
+
+func parseMetadata(raw json.RawMessage) (requestMetadata, error) {
+	var params map[string]json.RawMessage
+	if len(raw) == 0 || json.Unmarshal(raw, &params) != nil || params == nil {
+		return requestMetadata{}, errors.New("params must be an object")
+	}
+	var metadata map[string]json.RawMessage
+	if json.Unmarshal(params["_meta"], &metadata) != nil || metadata == nil {
+		return requestMetadata{}, errors.New("_meta must be an object")
+	}
+	var result requestMetadata
+	if json.Unmarshal(metadata["io.modelcontextprotocol/protocolVersion"], &result.ProtocolVersion) != nil || result.ProtocolVersion == "" {
+		return requestMetadata{}, errors.New("protocol version is required")
+	}
+	if json.Unmarshal(metadata["io.modelcontextprotocol/clientCapabilities"], &result.ClientCapabilities) != nil || result.ClientCapabilities == nil {
+		return requestMetadata{}, errors.New("client capabilities are required")
+	}
+	return result, nil
+}
+
+func (handler *Handler) validateHeaders(writer http.ResponseWriter, request *http.Request, message message, metadata requestMetadata) bool {
+	headerVersion := request.Header.Get(ProtocolVersionHeader)
+	if headerVersion == "" {
+		handler.writeError(writer, http.StatusBadRequest, message.ID, codeHeaderMismatch, "missing MCP-Protocol-Version header", nil)
+		return false
+	}
+	if headerVersion != ProtocolVersion {
+		handler.writeError(writer, http.StatusBadRequest, message.ID, codeUnsupportedVersion, "unsupported MCP protocol version", map[string]any{"supported": []string{ProtocolVersion}, "requested": headerVersion})
+		return false
+	}
+	if metadata.ProtocolVersion != headerVersion {
+		handler.writeError(writer, http.StatusBadRequest, message.ID, codeHeaderMismatch, "protocol version header does not match request metadata", nil)
+		return false
+	}
+	if request.Header.Get(MethodHeader) != message.Method {
+		handler.writeError(writer, http.StatusBadRequest, message.ID, codeHeaderMismatch, "Mcp-Method header does not match request method", nil)
+		return false
+	}
+	if message.Method == "tools/call" {
+		name, err := toolName(message.Params)
+		if err != nil {
+			handler.writeError(writer, http.StatusBadRequest, message.ID, codeInvalidParams, "invalid tools/call parameters", nil)
+			return false
+		}
+		headerName, err := decodeMirroredHeader(request.Header.Get(NameHeader))
+		if err != nil || headerName != name {
+			handler.writeError(writer, http.StatusBadRequest, message.ID, codeHeaderMismatch, "Mcp-Name header does not match request tool name", nil)
+			return false
+		}
+	} else if request.Header.Get(NameHeader) != "" {
+		handler.writeError(writer, http.StatusBadRequest, message.ID, codeHeaderMismatch, "Mcp-Name header is not valid for this method", nil)
+		return false
+	}
+	return true
+}
+
+func (handler *Handler) listTools(writer http.ResponseWriter, message message) {
+	var params struct {
+		Cursor string         `json:"cursor,omitempty"`
+		Meta   map[string]any `json:"_meta"`
+	}
+	if err := decodeStrict(message.Params, &params); err != nil || params.Cursor != "" {
+		handler.writeError(writer, http.StatusOK, message.ID, codeInvalidParams, "invalid tools/list parameters", nil)
+		return
+	}
+	handler.writeResult(writer, message.ID, completeResult(map[string]any{"tools": []any{commandTool()}, "cacheScope": "private"}))
+}
+
+func (handler *Handler) callTool(writer http.ResponseWriter, request *http.Request, message message, identity protocol.AuthenticatedContext) {
+	var params struct {
+		Name           string                     `json:"name"`
+		Arguments      json.RawMessage            `json:"arguments"`
+		InputResponses map[string]json.RawMessage `json:"inputResponses,omitempty"`
+		RequestState   json.RawMessage            `json:"requestState,omitempty"`
+		Meta           map[string]any             `json:"_meta"`
+	}
+	if err := decodeStrict(message.Params, &params); err != nil || params.Name == "" || len(params.Arguments) == 0 {
+		handler.writeError(writer, http.StatusOK, message.ID, codeInvalidParams, "invalid tools/call parameters", nil)
+		return
+	}
+	if params.Name != CommandToolName {
+		handler.writeError(writer, http.StatusOK, message.ID, codeInvalidParams, "unknown tool", map[string]any{"name": params.Name})
+		return
+	}
+	invocation, err := protocol.DecodeInvocation(bytes.NewReader(params.Arguments))
+	if err != nil {
+		handler.writeError(writer, http.StatusOK, message.ID, codeInvalidParams, "invalid command invocation", nil)
+		return
+	}
+	commandResponse := handler.endpoint.Invoke(request.Context(), invocation.Authenticate(identity))
+	encoded, err := json.Marshal(commandResponse)
+	if err != nil {
+		handler.writeError(writer, http.StatusInternalServerError, message.ID, codeInternalError, "could not encode tool result", nil)
+		return
+	}
+	result := completeResult(map[string]any{
+		"content":           []any{map[string]any{"type": "text", "text": string(encoded)}},
+		"structuredContent": commandResponse,
+		"isError":           commandResponse.Status != protocol.StatusReceipt,
+	})
+	handler.writeResult(writer, message.ID, result)
+}
+
+func completeResult(fields map[string]any) map[string]any {
+	result := map[string]any{
+		"resultType": "complete",
+		"_meta": map[string]any{
+			"io.modelcontextprotocol/serverInfo": map[string]any{"name": "tekroo-teams", "version": "4-phase3"},
+		},
+	}
+	for key, value := range fields {
+		result[key] = value
+	}
+	return result
+}
+
+func toolName(raw json.RawMessage) (string, error) {
+	var params struct {
+		Name string `json:"name"`
+	}
+	if json.Unmarshal(raw, &params) != nil || params.Name == "" {
+		return "", errors.New("tool name is required")
+	}
+	return params.Name, nil
+}
+
+func decodeMirroredHeader(value string) (string, error) {
+	if value == "" {
+		return "", errors.New("header is required")
+	}
+	if strings.HasPrefix(value, "=?base64?") && strings.HasSuffix(value, "?=") {
+		encoded := strings.TrimSuffix(strings.TrimPrefix(value, "=?base64?"), "?=")
+		decoded, err := base64.StdEncoding.DecodeString(encoded)
+		if err != nil {
+			return "", err
+		}
+		return string(decoded), nil
+	}
+	if strings.TrimSpace(value) != value {
+		return "", errors.New("unsafe plain header value")
+	}
+	for _, character := range []byte(value) {
+		if character < 0x21 || character > 0x7e {
+			return "", errors.New("unsafe plain header value")
+		}
+	}
+	return value, nil
+}
+
+func (handler *Handler) writeResult(writer http.ResponseWriter, id json.RawMessage, result any) {
+	writer.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(writer).Encode(response{JSONRPC: "2.0", ID: id, Result: result})
+}
+
+func (handler *Handler) writeError(writer http.ResponseWriter, status int, id json.RawMessage, code int, message string, data any) {
+	writer.WriteHeader(status)
+	_ = json.NewEncoder(writer).Encode(response{JSONRPC: "2.0", ID: id, Error: &responseError{Code: code, Message: message, Data: data}})
+}
+
+func commandTool() map[string]any {
+	return map[string]any{
+		"name":        CommandToolName,
+		"title":       "Invoke Tekroo organizational command",
+		"description": "Submit one authenticated, idempotent command to the Tekroo organizational kernel.",
+		"inputSchema": map[string]any{
+			"$schema":              "https://json-schema.org/draft/2020-12/schema",
+			"type":                 "object",
+			"additionalProperties": false,
+			"required":             []string{"envelope_version", "request_id", "timeout_millis", "command", "provenance"},
+			"properties": map[string]any{
+				"envelope_version": map[string]any{"type": "string", "const": protocol.EnvelopeVersion},
+				"request_id":       map[string]any{"type": "string"},
+				"timeout_millis":   map[string]any{"type": "integer", "minimum": 1},
+				"command":          map[string]any{"type": "object"},
+				"provenance":       map[string]any{"type": "object"},
+			},
+		},
+	}
+}
+
+func hasJSONContentType(value string) bool {
+	mediaType, _, err := mime.ParseMediaType(value)
+	return err == nil && mediaType == "application/json"
+}
+
+func accepts(header, target string) bool {
+	for _, value := range strings.Split(header, ",") {
+		mediaType, _, err := mime.ParseMediaType(strings.TrimSpace(value))
+		if err == nil && mediaType == target {
+			return true
+		}
+	}
+	return false
+}
+
+func secureHeaders(writer http.ResponseWriter) {
+	writer.Header().Set("Cache-Control", "no-store")
+	writer.Header().Set("Content-Type", "application/json")
+	writer.Header().Set("X-Content-Type-Options", "nosniff")
+}

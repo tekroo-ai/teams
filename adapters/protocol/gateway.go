@@ -181,7 +181,7 @@ func (gateway *Gateway) Invoke(parent context.Context, request Request) Response
 		return response
 	}
 	response.Status = StatusInvocationFailure
-	failure := &InvocationFailure{Code: FailureService, Message: err.Error(), OutcomeUnknown: true}
+	failure := &InvocationFailure{Code: FailureService, Message: "command service failed after dispatch", OutcomeUnknown: true}
 	if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
 		failure.Code = FailureTimeout
 	} else if errors.Is(err, context.Canceled) || errors.Is(ctx.Err(), context.Canceled) {

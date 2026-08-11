@@ -56,6 +56,16 @@ production thin adapters do not import persistence. HTTP/MCP, channel
 transports, OpenHands, SMA, provider E2E, deployment, migration, and performance
 remain unqualified.
 
+**COMPUTED GATE RESULT:** Phase 3 Step 2 `http-mcp-adapter` is `PASS`.
+Its raw race-enabled receipts contain 53 focused HTTP/MCP test cases across 3
+packages and 218 full-regression test cases across 12 packages, with zero test
+or vet failures. The MCP adapter targets the current official `2026-07-28`
+stateless protocol: every POST supplies body metadata and matching protocol,
+method, and tool-name headers. The server derives organizational identity from
+trusted authentication rather than MCP client metadata or command JSON.
+Request-scoped SSE, subscriptions, multi-round-trip requests, legacy MCP
+sessions, public deployment, and performance remain unqualified.
+
 The frozen contract identity is:
 
 ```text
@@ -108,6 +118,9 @@ packages are deliberately narrow:
 - `adapters/fake` — deterministic clock, ID source, and execution engine;
 - `adapters/protocol` — authenticated transport DTOs and the typed command
   gateway;
+- `adapters/httpapi` — strict authenticated HTTP command invocation;
+- `adapters/mcp` — stateless MCP `2026-07-28` Streamable HTTP tool discovery
+  and command invocation;
 - `adapters/stdio` and `adapters/daemon` — bounded framing and host lifecycle;
   and
 - `adapters/cli` — an injectable command/stdio runner with stable exit codes.
@@ -132,6 +145,14 @@ test receipts, runs `go vet`, and writes a self-verifying gate report:
 ```sh
 go run ./cmd/thin-adapter-report
 go run ./cmd/thin-adapter-report -verify OUTPUT/phase-3/step-1-thin-adapter-gate.json
+```
+
+The Phase 3 Step 2 runner preserves raw HTTP/MCP and full-regression receipts,
+runs `go vet`, and binds the report to the official MCP wire revision:
+
+```sh
+go run ./cmd/http-mcp-report
+go run ./cmd/http-mcp-report -verify OUTPUT/phase-3/step-2-http-mcp-gate.json
 ```
 
 ## Contract validation
@@ -182,4 +203,9 @@ go run ./cmd/core-hermetic-report -verify build/reports/core-hermetic.json
 - [Phase 3 Step 1 authority](OUTPUT/phase-3/step-1-authorization.json)
 - [Phase 3 thin-adapter bootstrap boundary](docs/architecture/002-thin-adapter-bootstrap.md)
 - [Phase 3 Step 1 thin-adapter gate](OUTPUT/phase-3/step-1-thin-adapter-gate.json)
+- [Phase 3 Step 1 acceptance](OUTPUT/phase-3/step-1-acceptance.json)
+- [Phase 3 Step 1 release receipt](OUTPUT/phase-3/step-1-release-receipt.json)
+- [Phase 3 Step 2 authority](OUTPUT/phase-3/step-2-authorization.json)
+- [Phase 3 HTTP/MCP boundary](docs/architecture/003-http-mcp-adapter.md)
+- [Phase 3 Step 2 HTTP/MCP gate](OUTPUT/phase-3/step-2-http-mcp-gate.json)
 - [Historical Step 2 `0.1.0` encoding-gap record](OUTPUT/phase-2/step-2-contract-encoding-gaps.md)

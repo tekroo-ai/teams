@@ -1,0 +1,143 @@
+{
+  "schemaVersion": "1.0.0",
+  "reportType": "PHASE_3_HTTP_MCP_ADAPTER",
+  "status": "PASS",
+  "acceptedBaseCommit": "b5dcd667471d0d81d8ddb860d8cdf56d0c1119bb",
+  "acceptedBaseTree": "ddb54a5349e8ecf9c7d3e9826cd7b546756b32f1",
+  "contractIdentity": "tekroo.kernel.contracts/0.2.0",
+  "manifestSha256": "cd582fb163e17d49a1a0a627f33cdbb184d15ecace3200981738782cca977dae",
+  "mcpWireBasis": {
+    "protocolVersion": "2026-07-28",
+    "officialSources": [
+      "https://modelcontextprotocol.io/specification/2026-07-28/basic",
+      "https://modelcontextprotocol.io/specification/2026-07-28/server/discover",
+      "https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/streamable-http",
+      "https://modelcontextprotocol.io/specification/2026-07-28/server/tools"
+    ],
+    "observedOn": "2026-08-11"
+  },
+  "sourceTreeSha256": "d566a7e84b2a7cee1be76a9d4ed51774acd87dbbfb4215ba8ecd2c85a48f87f4",
+  "environment": {
+    "goVersion": "go1.26.4",
+    "goos": "darwin",
+    "goarch": "arm64",
+    "locale": "C",
+    "timeZone": "UTC"
+  },
+  "executed": {
+    "focusedTestCases": 53,
+    "focusedTestFailures": 0,
+    "focusedPackagesPassed": 3,
+    "regressionTestCases": 218,
+    "regressionTestFailures": 0,
+    "regressionPackagesPassed": 12,
+    "vetFailures": 0
+  },
+  "assertions": [
+    {
+      "id": "HTTP-MCP-001-TYPED-HTTP",
+      "status": "PASS",
+      "tests": [
+        "TestHTTPHandlerThroughGatewayAndApplicationCommitsOnceOnReplay",
+        "TestHTTPHandlerInjectsServerAuthenticatedIdentity"
+      ],
+      "evidenceFloor": "HTTP invokes the accepted gateway/application path, commits one event across replay, and injects authenticated identity outside client JSON."
+    },
+    {
+      "id": "HTTP-MCP-002-HTTP-FAIL-CLOSED",
+      "status": "PASS",
+      "tests": [
+        "TestHTTPHandlerRejectsClientAssertedIdentityAndSecurityFailuresBeforeDispatch",
+        "TestHTTPHandlerFailsClosedOnAuthenticationRateAndBodyBound",
+        "TestGatewayDoesNotExposeServiceErrorDetails"
+      ],
+      "evidenceFloor": "Client-asserted identity, forbidden origins, authentication failure, rate denial, content-type errors, and oversized bodies do not dispatch; arbitrary internal service error text is not exposed."
+    },
+    {
+      "id": "HTTP-MCP-003-CURRENT-STATELESS-MCP",
+      "status": "PASS",
+      "tests": [
+        "TestMCPStatelessToolsListAndCommandCall",
+        "TestMCPValidatesPerRequestMetadataAndMirroredHeaders",
+        "TestMCPRejectsMissingBodyMetadataAndNonRequestMessages",
+        "TestMCPUnknownMethodUsesHTTP404AndJSONRPCMethodNotFound"
+      ],
+      "evidenceFloor": "The current 2026-07-28 stateless request model, mandatory server discovery, required body metadata, mirrored header checks, resultType, deterministic tool listing, strict request direction, and unknown-method HTTP status execute."
+    },
+    {
+      "id": "HTTP-MCP-004-MCP-FAIL-CLOSED",
+      "status": "PASS",
+      "tests": [
+        "TestMCPFailsClosedOnOriginAuthenticationRateAcceptBodyAndMethod"
+      ],
+      "evidenceFloor": "Origin, authentication, rate, content negotiation, body, and POST-only constraints fail closed before tool dispatch."
+    },
+    {
+      "id": "HTTP-MCP-005-UNCERTAIN-OUTCOME",
+      "status": "PASS",
+      "tests": [
+        "TestHTTPHandlerMapsUncertainOutcomeWithoutClaimingRollback",
+        "TestMCPToolPreservesGatewayTimeoutUncertainty"
+      ],
+      "evidenceFloor": "HTTP and MCP preserve post-dispatch timeout uncertainty and do not translate transport failure into rollback or command failure."
+    },
+    {
+      "id": "HTTP-MCP-006-IMPORT-BOUNDARY",
+      "status": "PASS",
+      "tests": [
+        "TestThinAdapterProductionImportsRemainWithinBoundary"
+      ],
+      "evidenceFloor": "HTTP and MCP production packages import only explicit thin transport/protocol dependencies and no persistence or MongoDB package."
+    }
+  ],
+  "excludedProfiles": [
+    {
+      "profile": "mcp-sse-mrtr-subscriptions",
+      "reason": "Request-scoped SSE progress, subscriptions, and multi-round-trip requests are not implemented or qualified."
+    },
+    {
+      "profile": "legacy-mcp",
+      "reason": "Initialization, protocol sessions, GET streams, server-initiated requests, and resumability from older MCP revisions are deliberately unsupported."
+    },
+    {
+      "profile": "channels",
+      "reason": "Channel transport remains a later separately qualified slice."
+    },
+    {
+      "profile": "openhands-sma-provider-e2e",
+      "reason": "Live providers, credentials, OpenHands, and SMA remain outside this authority."
+    },
+    {
+      "profile": "deployment-migration-performance",
+      "reason": "Public deployment, historical migration, production topology, load, latency, and throughput are not exercised."
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "OUTPUT/phase-3/step-2-http-mcp-tests.jsonl",
+      "sha256": "fe91fd975f5eb979a8df03869986d46063a4a9d6a0b1654fbb5a6e2231128dd2"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-2-full-regression-tests.jsonl",
+      "sha256": "201d796315a4445b2c0eba7cf9b8fb44fe4d6ca4dee664d31d7cc7517c691c11"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-1-acceptance.json",
+      "sha256": "45c306bbc424abeb60c4015d77c1dbea9141897e4490cffb863f3e156b7cd18b"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-1-release-receipt.json",
+      "sha256": "7009b108941bc3a596e750919e7f0e42b5d883aec2000c96e9c89ed9622a865f"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-2-authorization.json",
+      "sha256": "b853fba2d704737d2b04bfd60727014b8212498d8bedcf34f04b3339c2e41e2b"
+    },
+    {
+      "path": "docs/architecture/003-http-mcp-adapter.md",
+      "sha256": "8007ee6b61a8e52d609144f749959be8354595105c16e2c9daa471513df4b59b"
+    }
+  ],
+  "digestMethod": "SHA-256 of compact JSON with reportSha256 set to the empty string",
+  "reportSha256": "5fe72e93c0b0d1946f11c04d5a929252ac79dfb74a5f4f66867eae5f307a50ce"
+}

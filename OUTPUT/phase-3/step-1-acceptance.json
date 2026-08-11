@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "PRINCIPAL_ACCEPTANCE",
+  "recordedOn": "2026-08-11",
+  "timePrecision": "DAY",
+  "principalStatement": "Accepted. Proceed to the next step.",
+  "acceptedPhase": "PHASE_3",
+  "acceptedStep": "STEP_1_THIN_ADAPTER_BOOTSTRAP",
+  "acceptedCommit": "b5dcd667471d0d81d8ddb860d8cdf56d0c1119bb",
+  "acceptedTree": "ddb54a5349e8ecf9c7d3e9826cd7b546756b32f1",
+  "gateReport": "OUTPUT/phase-3/step-1-thin-adapter-gate.json",
+  "gateReportFileSha256": "b1afafac7cbeaa9831be462f792e32d38b9d171c6747cf42a314dd1009ac0260",
+  "gateReportSelfSha256": "a3c0d6db0a2d6c5173894d45945df2b4162b0ef98290a14904a4a82bb2f0c58e",
+  "scope": "Acceptance applies to the qualified Phase 3 Step 1 thin-adapter bootstrap and does not qualify excluded profiles."
+}

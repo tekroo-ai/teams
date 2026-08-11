@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "QUALIFIED_CANDIDATE_RELEASE_RECEIPT",
+  "recordedOn": "2026-08-11",
+  "timePrecision": "DAY",
+  "repositoryUrl": "https://github.com/tekroo-ai/teams.git",
+  "remoteRef": "refs/heads/main",
+  "observedRemoteBefore": "e19e3fc647d20e5c487b04bbd08c80d8d9289a6d",
+  "pushedCandidateCommit": "b5dcd667471d0d81d8ddb860d8cdf56d0c1119bb",
+  "qualifiedCandidateTree": "ddb54a5349e8ecf9c7d3e9826cd7b546756b32f1",
+  "observedRemoteAfter": "b5dcd667471d0d81d8ddb860d8cdf56d0c1119bb",
+  "updateKind": "FAST_FORWARD",
+  "gateReport": "OUTPUT/phase-3/step-1-thin-adapter-gate.json",
+  "gateReportFileSha256": "b1afafac7cbeaa9831be462f792e32d38b9d171c6747cf42a314dd1009ac0260",
+  "gateReportSelfSha256": "a3c0d6db0a2d6c5173894d45945df2b4162b0ef98290a14904a4a82bb2f0c58e",
+  "evidenceClassification": {
+    "remoteBefore": "OBSERVED_BY_GIT_LS_REMOTE",
+    "pushResult": "OBSERVED_BY_GIT_PUSH",
+    "remoteAfter": "OBSERVED_BY_GIT_LS_REMOTE",
+    "remoteTreeIdentity": "COMPUTED_FROM_CONTENT_ADDRESSED_COMMIT"
+  },
+  "boundary": "This receipt attests only that the exact accepted Step 1 commit became origin/main."
+}
