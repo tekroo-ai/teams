@@ -1,0 +1,1625 @@
+{
+  "$defs": {
+    "tekroo_command_completion_review_open_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "criteria_revision": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "evidence_set_digest": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "lifecycle_epoch": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "subject_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "subject_kind": {
+          "enum": [
+            "story",
+            "task"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "subject_kind",
+        "subject_id",
+        "lifecycle_epoch",
+        "criteria_revision",
+        "evidence_set_digest"
+      ],
+      "type": "object"
+    },
+    "tekroo_command_completion_review_record_result_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence_ids": {
+          "items": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "reasons": {
+          "items": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 64,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "result": {
+          "enum": [
+            "PASS",
+            "FAIL",
+            "INCONCLUSIVE"
+          ],
+          "type": "string"
+        },
+        "review_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "review_id",
+        "result",
+        "reasons",
+        "evidence_ids"
+      ],
+      "type": "object"
+    },
+    "tekroo_command_evidence_register_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "byte_length": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "evidence_kind": {
+          "enum": [
+            "SOURCE_SNAPSHOT",
+            "SOURCE_DIFF",
+            "TEST_RESULT",
+            "TOOL_RESULT",
+            "ARTIFACT",
+            "PROVIDER_RECEIPT",
+            "MODEL_OUTPUT",
+            "HUMAN_ATTESTATION",
+            "DECISION_RECORD",
+            "EXTERNAL_OBSERVATION"
+          ],
+          "type": "string"
+        },
+        "locator": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        },
+        "media_type": {
+          "maxLength": 255,
+          "minLength": 1,
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "evidence_kind",
+        "sha256",
+        "byte_length",
+        "media_type",
+        "locator"
+      ],
+      "type": "object"
+    },
+    "tekroo_command_execution_register_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "actor_fqn": {
+          "pattern": "^(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])::(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])-[1-9][0-9]{0,19}$",
+          "type": "string"
+        },
+        "execution_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "fencing_epoch": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "runtime_identity": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "actor_fqn",
+        "execution_id",
+        "fencing_epoch",
+        "runtime_identity"
+      ],
+      "type": "object"
+    },
+    "tekroo_command_execution_replace_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "actor_fqn": {
+          "pattern": "^(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])::(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])-[1-9][0-9]{0,19}$",
+          "type": "string"
+        },
+        "new_execution_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "new_fencing_epoch": {
+          "minimum": 2,
+          "type": "integer"
+        },
+        "prior_execution_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "reason": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "actor_fqn",
+        "prior_execution_id",
+        "new_execution_id",
+        "new_fencing_epoch",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "tekroo_command_record_correct_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "corrected_fields": {
+          "minProperties": 1,
+          "type": "object"
+        },
+        "evidence_ids": {
+          "items": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "reason": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        },
+        "target_event_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "target_event_id",
+        "corrected_fields",
+        "reason",
+        "evidence_ids"
+      ],
+      "type": "object"
+    },
+    "tekroo_command_story_activate_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "plan_digest": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "required_task_ids": {
+          "items": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "type": "array",
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "plan_digest",
+        "required_task_ids"
+      ],
+      "type": "object"
+    },
+    "tekroo_command_story_authorize_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "reason": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        },
+        "scope_revision": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "scope_revision",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "tekroo_command_story_begin_planning_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "accountable_owner_fqn": {
+          "pattern": "^(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])::(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])-[1-9][0-9]{0,19}$",
+          "type": "string"
+        },
+        "planning_budget": {
+          "maximum": 1000,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "planning_budget",
+        "accountable_owner_fqn"
+      ],
+      "type": "object"
+    },
+    "tekroo_command_story_create_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "acceptance_criteria": {
+          "items": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "description": {
+          "maxLength": 65536,
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "description",
+        "acceptance_criteria"
+      ],
+      "type": "object"
+    },
+    "tekroo_command_story_request_acceptance_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "acceptance_policy_revision": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "evidence_ids": {
+          "items": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "qualified_tree_digest": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "acceptance_policy_revision",
+        "evidence_ids"
+      ],
+      "type": "object"
+    },
+    "tekroo_command_story_request_completion_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "criteria_revision": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "evidence_ids": {
+          "items": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "validation_event_ids": {
+          "items": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "criteria_revision",
+        "evidence_ids",
+        "validation_event_ids"
+      ],
+      "type": "object"
+    },
+    "tekroo_command_task_acquire_ownership_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "expected_ownership_version": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "owner_fqn": {
+          "pattern": "^(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])::(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])-[1-9][0-9]{0,19}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner_fqn",
+        "expected_ownership_version"
+      ],
+      "type": "object"
+    },
+    "tekroo_command_task_activate_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "owner_fqn": {
+          "pattern": "^(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])::(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])-[1-9][0-9]{0,19}$",
+          "type": "string"
+        },
+        "ownership_version": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "owner_fqn",
+        "ownership_version"
+      ],
+      "type": "object"
+    },
+    "tekroo_command_task_create_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "acceptance_criteria": {
+          "items": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "depends_on": {
+          "items": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "description": {
+          "maxLength": 65536,
+          "type": "string"
+        },
+        "story_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "story_id",
+        "title",
+        "description",
+        "acceptance_criteria",
+        "depends_on"
+      ],
+      "type": "object"
+    },
+    "tekroo_command_task_dispatch_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "destination": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        },
+        "routing_mode": {
+          "enum": [
+            "EXACT",
+            "ROLE_CLASS",
+            "WILDCARD"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "destination",
+        "routing_mode"
+      ],
+      "type": "object"
+    },
+    "tekroo_command_task_force_reassign_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence_ids": {
+          "items": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "expected_ownership_version": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "new_owner_fqn": {
+          "pattern": "^(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])::(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])-[1-9][0-9]{0,19}$",
+          "type": "string"
+        },
+        "prior_owner_fqn": {
+          "pattern": "^(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])::(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])-[1-9][0-9]{0,19}$",
+          "type": "string"
+        },
+        "reason": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "prior_owner_fqn",
+        "new_owner_fqn",
+        "expected_ownership_version",
+        "reason",
+        "evidence_ids"
+      ],
+      "type": "object"
+    },
+    "tekroo_command_task_handoff_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "expected_ownership_version": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "new_owner_fqn": {
+          "pattern": "^(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])::(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])-[1-9][0-9]{0,19}$",
+          "type": "string"
+        },
+        "prior_owner_fqn": {
+          "pattern": "^(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])::(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])-[1-9][0-9]{0,19}$",
+          "type": "string"
+        },
+        "reason": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "prior_owner_fqn",
+        "new_owner_fqn",
+        "expected_ownership_version",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "tekroo_command_task_mark_ready_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "dependency_event_ids": {
+          "items": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "readiness_policy_revision": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "dependency_event_ids",
+        "readiness_policy_revision"
+      ],
+      "type": "object"
+    },
+    "tekroo_command_task_release_ownership_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "expected_ownership_version": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "owner_fqn": {
+          "pattern": "^(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])::(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])-[1-9][0-9]{0,19}$",
+          "type": "string"
+        },
+        "reason": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner_fqn",
+        "expected_ownership_version",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "tekroo_command_task_request_completion_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_digests": {
+          "items": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "criteria_revision": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "evidence_ids": {
+          "items": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "unresolved_exceptions": {
+          "items": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 64,
+          "type": "array",
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "criteria_revision",
+        "evidence_ids",
+        "artifact_digests",
+        "unresolved_exceptions"
+      ],
+      "type": "object"
+    },
+    "tekroo_command_work_block_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "blocker_refs": {
+          "items": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "reason": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        },
+        "review_policy": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "blocker_refs",
+        "reason",
+        "review_policy"
+      ],
+      "type": "object"
+    },
+    "tekroo_command_work_close_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "disposition": {
+          "enum": [
+            "CANCELLED",
+            "SUPERSEDED",
+            "INVALIDATED"
+          ],
+          "type": "string"
+        },
+        "reason": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        },
+        "successor_ids": {
+          "items": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "type": "array",
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "disposition",
+        "reason",
+        "successor_ids"
+      ],
+      "type": "object"
+    },
+    "tekroo_command_work_create_successor_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "reason": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        },
+        "relation": {
+          "enum": [
+            "DERIVATION",
+            "SUPERSESSION",
+            "SPLIT",
+            "MERGE",
+            "CORRECTION"
+          ],
+          "type": "string"
+        },
+        "successor_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "successor_id",
+        "relation",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "tekroo_command_work_reopen_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence_ids": {
+          "items": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "new_scope_revision": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "owner_carry_forward": {
+          "type": "boolean"
+        },
+        "prior_epoch": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "reason": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "prior_epoch",
+        "new_scope_revision",
+        "reason",
+        "owner_carry_forward",
+        "evidence_ids"
+      ],
+      "type": "object"
+    },
+    "tekroo_command_work_unblock_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence_ids": {
+          "items": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "resolved_blocker_refs": {
+          "items": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "resolved_blocker_refs",
+        "evidence_ids"
+      ],
+      "type": "object"
+    },
+    "tekroo_event_completion_review_opened_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "criteria_revision": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "evidence_set_digest": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "lifecycle_epoch": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "subject_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "subject_kind": {
+          "enum": [
+            "story",
+            "task"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "subject_kind",
+        "subject_id",
+        "lifecycle_epoch",
+        "criteria_revision",
+        "evidence_set_digest"
+      ],
+      "type": "object"
+    },
+    "tekroo_event_completion_review_result_recorded_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence_ids": {
+          "items": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "reasons": {
+          "items": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 64,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "result": {
+          "enum": [
+            "PASS",
+            "FAIL",
+            "INCONCLUSIVE"
+          ],
+          "type": "string"
+        },
+        "review_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "review_id",
+        "result",
+        "reasons",
+        "evidence_ids"
+      ],
+      "type": "object"
+    },
+    "tekroo_event_evidence_registered_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "byte_length": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "evidence_kind": {
+          "enum": [
+            "SOURCE_SNAPSHOT",
+            "SOURCE_DIFF",
+            "TEST_RESULT",
+            "TOOL_RESULT",
+            "ARTIFACT",
+            "PROVIDER_RECEIPT",
+            "MODEL_OUTPUT",
+            "HUMAN_ATTESTATION",
+            "DECISION_RECORD",
+            "EXTERNAL_OBSERVATION"
+          ],
+          "type": "string"
+        },
+        "locator": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        },
+        "media_type": {
+          "maxLength": 255,
+          "minLength": 1,
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "evidence_kind",
+        "sha256",
+        "byte_length",
+        "media_type",
+        "locator"
+      ],
+      "type": "object"
+    },
+    "tekroo_event_execution_registered_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "actor_fqn": {
+          "pattern": "^(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])::(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])-[1-9][0-9]{0,19}$",
+          "type": "string"
+        },
+        "execution_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "fencing_epoch": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "runtime_identity": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "actor_fqn",
+        "execution_id",
+        "fencing_epoch",
+        "runtime_identity"
+      ],
+      "type": "object"
+    },
+    "tekroo_event_execution_replaced_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "actor_fqn": {
+          "pattern": "^(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])::(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])-[1-9][0-9]{0,19}$",
+          "type": "string"
+        },
+        "new_execution_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "new_fencing_epoch": {
+          "minimum": 2,
+          "type": "integer"
+        },
+        "prior_execution_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "reason": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "actor_fqn",
+        "prior_execution_id",
+        "new_execution_id",
+        "new_fencing_epoch",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "tekroo_event_record_corrected_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "corrected_fields": {
+          "minProperties": 1,
+          "type": "object"
+        },
+        "evidence_ids": {
+          "items": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "reason": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        },
+        "target_event_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "target_event_id",
+        "corrected_fields",
+        "reason",
+        "evidence_ids"
+      ],
+      "type": "object"
+    },
+    "tekroo_event_story_accepted_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "acceptance_policy_revision": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "evidence_ids": {
+          "items": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "qualified_tree_digest": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "acceptance_policy_revision",
+        "evidence_ids"
+      ],
+      "type": "object"
+    },
+    "tekroo_event_story_activated_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "plan_digest": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "required_task_ids": {
+          "items": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "type": "array",
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "plan_digest",
+        "required_task_ids"
+      ],
+      "type": "object"
+    },
+    "tekroo_event_story_authorized_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "reason": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        },
+        "scope_revision": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "scope_revision",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "tekroo_event_story_completed_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "criteria_revision": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "evidence_ids": {
+          "items": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "validation_event_ids": {
+          "items": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "criteria_revision",
+        "evidence_ids",
+        "validation_event_ids"
+      ],
+      "type": "object"
+    },
+    "tekroo_event_story_created_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "acceptance_criteria": {
+          "items": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "description": {
+          "maxLength": 65536,
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "description",
+        "acceptance_criteria"
+      ],
+      "type": "object"
+    },
+    "tekroo_event_story_planning_started_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "accountable_owner_fqn": {
+          "pattern": "^(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])::(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])-[1-9][0-9]{0,19}$",
+          "type": "string"
+        },
+        "planning_budget": {
+          "maximum": 1000,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "planning_budget",
+        "accountable_owner_fqn"
+      ],
+      "type": "object"
+    },
+    "tekroo_event_task_activated_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "owner_fqn": {
+          "pattern": "^(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])::(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])-[1-9][0-9]{0,19}$",
+          "type": "string"
+        },
+        "ownership_version": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "owner_fqn",
+        "ownership_version"
+      ],
+      "type": "object"
+    },
+    "tekroo_event_task_completed_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_digests": {
+          "items": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "criteria_revision": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "evidence_ids": {
+          "items": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "unresolved_exceptions": {
+          "items": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 64,
+          "type": "array",
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "criteria_revision",
+        "evidence_ids",
+        "artifact_digests",
+        "unresolved_exceptions"
+      ],
+      "type": "object"
+    },
+    "tekroo_event_task_created_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "acceptance_criteria": {
+          "items": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "depends_on": {
+          "items": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "description": {
+          "maxLength": 65536,
+          "type": "string"
+        },
+        "story_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "story_id",
+        "title",
+        "description",
+        "acceptance_criteria",
+        "depends_on"
+      ],
+      "type": "object"
+    },
+    "tekroo_event_task_dispatched_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "destination": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        },
+        "routing_mode": {
+          "enum": [
+            "EXACT",
+            "ROLE_CLASS",
+            "WILDCARD"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "destination",
+        "routing_mode"
+      ],
+      "type": "object"
+    },
+    "tekroo_event_task_force_reassigned_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence_ids": {
+          "items": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "expected_ownership_version": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "new_owner_fqn": {
+          "pattern": "^(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])::(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])-[1-9][0-9]{0,19}$",
+          "type": "string"
+        },
+        "prior_owner_fqn": {
+          "pattern": "^(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])::(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])-[1-9][0-9]{0,19}$",
+          "type": "string"
+        },
+        "reason": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "prior_owner_fqn",
+        "new_owner_fqn",
+        "expected_ownership_version",
+        "reason",
+        "evidence_ids"
+      ],
+      "type": "object"
+    },
+    "tekroo_event_task_handed_off_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "expected_ownership_version": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "new_owner_fqn": {
+          "pattern": "^(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])::(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])-[1-9][0-9]{0,19}$",
+          "type": "string"
+        },
+        "prior_owner_fqn": {
+          "pattern": "^(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])::(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])-[1-9][0-9]{0,19}$",
+          "type": "string"
+        },
+        "reason": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "prior_owner_fqn",
+        "new_owner_fqn",
+        "expected_ownership_version",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "tekroo_event_task_ownership_acquired_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "expected_ownership_version": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "owner_fqn": {
+          "pattern": "^(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])::(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])-[1-9][0-9]{0,19}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner_fqn",
+        "expected_ownership_version"
+      ],
+      "type": "object"
+    },
+    "tekroo_event_task_ownership_released_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "expected_ownership_version": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "owner_fqn": {
+          "pattern": "^(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])::(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])-[1-9][0-9]{0,19}$",
+          "type": "string"
+        },
+        "reason": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner_fqn",
+        "expected_ownership_version",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "tekroo_event_task_readied_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "dependency_event_ids": {
+          "items": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "readiness_policy_revision": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "dependency_event_ids",
+        "readiness_policy_revision"
+      ],
+      "type": "object"
+    },
+    "tekroo_event_work_blocked_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "blocker_refs": {
+          "items": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "reason": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        },
+        "review_policy": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "blocker_refs",
+        "reason",
+        "review_policy"
+      ],
+      "type": "object"
+    },
+    "tekroo_event_work_closed_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "disposition": {
+          "enum": [
+            "CANCELLED",
+            "SUPERSEDED",
+            "INVALIDATED"
+          ],
+          "type": "string"
+        },
+        "reason": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        },
+        "successor_ids": {
+          "items": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "type": "array",
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "disposition",
+        "reason",
+        "successor_ids"
+      ],
+      "type": "object"
+    },
+    "tekroo_event_work_reopened_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence_ids": {
+          "items": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "new_scope_revision": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "owner_carry_forward": {
+          "type": "boolean"
+        },
+        "prior_epoch": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "reason": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "prior_epoch",
+        "new_scope_revision",
+        "reason",
+        "owner_carry_forward",
+        "evidence_ids"
+      ],
+      "type": "object"
+    },
+    "tekroo_event_work_successor_created_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "reason": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        },
+        "relation": {
+          "enum": [
+            "DERIVATION",
+            "SUPERSESSION",
+            "SPLIT",
+            "MERGE",
+            "CORRECTION"
+          ],
+          "type": "string"
+        },
+        "successor_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "successor_id",
+        "relation",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "tekroo_event_work_unblocked_1_0_0": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence_ids": {
+          "items": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "resolved_blocker_refs": {
+          "items": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "resolved_blocker_refs",
+        "evidence_ids"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://contracts.tekroo.ai/tekroo.kernel.contracts/0.1.0/schemas/payloads.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Tekroo kernel command and event payloads"
+}

@@ -1,0 +1,203 @@
+{
+  "schemaVersion": "1.0.0",
+  "phase": "TEKROO-V4-PHASE-1B",
+  "status": "READY_FOR_FINAL_PRINCIPAL_GATE",
+  "generatedAt": "2026-08-11",
+  "step8Authorization": {
+    "authorizedAt": "2026-08-11",
+    "principalStatement": "Begin"
+  },
+  "authority": {
+    "architectureDecisionAuthority": "Principal",
+    "implementationAuthority": "NONE",
+    "investigationExecutionAuthority": "NONE",
+    "productionAuthority": "NONE"
+  },
+  "baseline": {
+    "snapshotId": "20260808T200912Z",
+    "tekrooV3Commit": "7630ca20ccfa0fc2f4102147b10c3705e9ba0158",
+    "tekrooV3SourceTreeIdentity": "98b37aa617d97a1aac86497e12a0536e43dbffa27a5db5a72bc90b92b494990b",
+    "phase1ASynthesisIdentity": "a3ebc1b506475153bd5b4fcc7af98cf243016e3d8a0daba2b5e733435dda698d",
+    "manifestPath": "OUTPUT/adjudication/phase-1a-baseline.json",
+    "manifestSha256": "43035b7b69553bd4d3988cba43d5525221ccac2eaa7a20859d7bb151e61b0f55",
+    "checksumManifestPath": "OUTPUT/adjudication/phase-1a-baseline.sha256",
+    "checksumManifestSha256": "37c4cfa9858e3c7b7fd7c653d1f4154ae3bfd716578660a8e55b12464fbeef3c",
+    "checksumEntryCount": 29,
+    "allChecksumEntriesMatch": true
+  },
+  "decisionRegisters": [
+    {"step":2,"path":"OUTPUT/adjudication/kernel-decision-proposals.json","sha256":"598acef9cca08f80258a8117174bd50eb5394b6c4055efae142ac17fb92e014e"},
+    {"step":3,"path":"OUTPUT/adjudication/execution-boundary-decisions.json","sha256":"22925c0e97c15784c141216dfceb5b4295e89a27154a62be218df07fd5fdbf22"},
+    {"step":4,"path":"OUTPUT/adjudication/sma-memory-decisions.json","sha256":"4624dc58c0f15092128a0acccc025e12ee4ba7fe4ed4ba3c9042ee996e890334"},
+    {"step":5,"path":"OUTPUT/adjudication/supporting-surface-decisions.json","sha256":"04f384dbdfa2f2f5f35e37200dea359bacecf456300eb1f4ca5a2093627c01d0"},
+    {"step":6,"path":"OUTPUT/adjudication/negative-requirement-decisions.json","sha256":"81b8651050bf5893802fc3fbd575318777be7c8ced65b63081c9ed68a6bba854"},
+    {"step":7,"path":"OUTPUT/adjudication/tension-investigation-decisions.json","sha256":"efda589f46e95d17ab71d60096dc21928cd93a0ed2da6bbcd1a684eac05d2105"}
+  ],
+  "priorGates": [
+    {"step":1,"status":"PASS_PRINCIPAL_CONFIRMED","sha256":"f546075a6327271cd701e60e4cb162b5fc5d2757d9282c8d9185271558e14ad0"},
+    {"step":2,"status":"PASS_PRINCIPAL_CONFIRMED","sha256":"820a5e478ae52c5f0d6765e83a736590121b93404d2bc84b23435fbe361fe45a"},
+    {"step":3,"status":"PASS_PRINCIPAL_CONFIRMED","sha256":"3eb9aee951f2d90da235a0ede54c606c032dc80cc8afbd65332d93e3fc58e923"},
+    {"step":4,"status":"PASS_PRINCIPAL_CONFIRMED","sha256":"439ec55d369924b4e87e52d43055d1b2e3796b9f8eccaf0e29d72d044c277f24"},
+    {"step":5,"status":"PASS_PRINCIPAL_CONFIRMED","sha256":"f2a7fe5e7c6c2865ba99153f426fc411efde167c4931499af0b30facbf2c6c98"},
+    {"step":6,"status":"PASS_PRINCIPAL_CONFIRMED","sha256":"9775c02f0cd43831013497808540f01f09e0910fc72056177b8a2c707e593934"},
+    {"step":7,"status":"PASS_PRINCIPAL_CONFIRMED","sha256":"78dfaf4d32b20b9aabe59a6a1bbccac1604900c410e2a97a05136a21d38d691a"}
+  ],
+  "conclusion": "Semantic salvage plus architectural separation: Tekroo remains the organizational authority; MongoDB remains the approved organizational persistence and change-stream substrate; execution providers and SMA remain replaceable behind explicit ports.",
+  "architecture": {
+    "kernelAuthority": [
+      "durable actor identity",
+      "versioned catalogue and schemas",
+      "directed acyclic organizational work graph",
+      "stories, tasks, assignment, ownership, and reassignment",
+      "authorization, validation, acceptance, completion, reopening, and escalation",
+      "release policy and audit provenance"
+    ],
+    "identity": {
+      "actor": "Durable FQN",
+      "execution": "Provider-neutral ExecutionId plus fencing epoch per runtime incarnation",
+      "providerSession": "Optional execution provenance only",
+      "restartRule": "A new process or provider session for the same FQN is not a new actor and does not reassign work."
+    },
+    "ownershipSeparation": {
+      "dispatch": "Directed routing intent",
+      "taskOwnership": "Exact actor FQN plus versioned append-only history in the task aggregate",
+      "deliveryClaim": "Temporary message claim, epoch, and lease in messaging transport",
+      "executionAuthority": "ExecutionId, registry fencing epoch, and local FQN lock",
+      "standaloneWorkClaimAggregate": false
+    },
+    "workflow": {
+      "model": "Directed acyclic graph",
+      "edgeKinds": ["causal", "response", "retry", "derivation", "supersession"],
+      "rules": [
+        "new forward-linked nodes rather than historical mutation or back-edges",
+        "exact directed recipients preferred",
+        "deterministic joins for independent validation branches",
+        "finite retry, review, planning, fan-out, handoff, and escalation policies",
+        "explicit completion request, authoritative completion, and linked reopening"
+      ]
+    },
+    "catalogue": {
+      "versioned": true,
+      "unknownTypeBehavior": "Lossless raw preservation with no canonical organizational effect",
+      "adoptedHistoricalAliases": [],
+      "historicalUndefinedTypes": ["tekroo-agent-chat", "tekroo-agent-ping", "tekroo-agent-pong"],
+      "futureAliasRequirements": ["semantic evidence", "schema transform", "effective scope", "approval", "deterministic replay", "rollback"]
+    },
+    "persistenceAndDelivery": {
+      "organizationalSystemOfRecord": "MongoDB",
+      "preserve": [
+        "change-stream wakeup",
+        "stream-open-before-backlog ordering",
+        "atomic one-winner delivery claims",
+        "monotonic claim epochs",
+        "leases and bounded resume",
+        "sweep, readdress, dead-letter, and optimized query mechanics"
+      ],
+      "prohibitedDefaultReplacements": ["polling", "generic queue", "generic database abstraction"]
+    },
+    "execution": {
+      "port": "AgentExecutionEngine",
+      "operations": ["start", "stop", "inspect", "reconcile"],
+      "bootstrapReference": "Deterministic fake engine",
+      "openhandsStatus": "INVESTIGATE_FURTHER",
+      "providerEvents": "Execution evidence only",
+      "untrustedIsolation": "Pinned remote or container workspace with external filesystem, network, process, resource, secret, artifact, confirmation-policy, and timeout controls"
+    },
+    "sma": {
+      "purpose": "Semantic memory only",
+      "automaticPath": "Applicable OpenHands model roles -> SMA OpenAI-compatible proxy -> Ollama or configured model provider",
+      "retrieval": "Bounded, partitioned, non-authoritative, current-instruction-subordinate, fail-open for inference",
+      "capture": "Durable idempotent asynchronous raw intake with sensitivity, redaction, retention, size, and provenance policy",
+      "authorityExcluded": ["workflow state", "process control", "task audit", "acceptance", "organizational authority", "outcome measurement"],
+      "documentSystemOfRecord": "MongoDB",
+      "vectorProjection": "Qdrant derived and rebuildable",
+      "advancedStatus": "NOT_PRODUCTION_PROVEN",
+      "level2Training": "DEFER_OUT_OF_SCOPE"
+    },
+    "releaseAndQualification": {
+      "release": "Persisted deterministic release plan with idempotency, serialization, authoritative provider reconciliation, explicit partial outcomes, and acceptance only after verified merge",
+      "canonicalGate": "One versioned manifest shared by local development, CI, synthesized-merge qualification, and release",
+      "qualifiedIdentity": "Exact base/head commits and resulting tree hash",
+      "gateClasses": ["hermetic merge", "deterministic scenario or capstone", "separately authorized paid/provider E2E"]
+    }
+  },
+  "salvage": {
+    "candidateCount": 46,
+    "finalDispositionCounts": {
+      "PRESERVE": 2,
+      "PRESERVE_WITH_WRAPPER": 9,
+      "REFACTOR": 18,
+      "REIMPLEMENT": 9,
+      "DISCARD": 3,
+      "INVESTIGATE_FURTHER": 2,
+      "DEFER_OUT_OF_SCOPE": 3
+    },
+    "finalAdjustments": [
+      {
+        "candidateId": "V3-INTERNAL-CLAIMS",
+        "step2Disposition": "INVESTIGATE_FURTHER",
+        "step7ResolvedDisposition": "DISCARD",
+        "preservedConcept": "Atomic task-domain work acquisition; delivery claims and execution fencing remain separate."
+      }
+    ],
+    "noWholesaleTransplantation": true
+  },
+  "bindingNegativeRequirements": [
+    "NEG-001", "NEG-002", "NEG-003", "NEG-004", "NEG-005", "NEG-006", "NEG-007",
+    "NEG-008", "NEG-009", "NEG-010", "NEG-011", "NEG-012", "NEG-013", "NEG-014"
+  ],
+  "investigations": [
+    {
+      "id": "SMA-Q1-CORE-PROXY-VERTICAL-SLICE",
+      "executionAuthorized": false,
+      "defaultIfInconclusive": "No SMA production-readiness claim; retain the provider-neutral proxy contract and deterministic no-memory or degraded route."
+    },
+    {
+      "id": "SMA-Q2-REPLAY-CONSOLIDATION",
+      "executionAuthorized": false,
+      "prerequisite": "SMA-Q1 establishes reproducible raw capture and retrieval.",
+      "defaultIfInconclusive": "No advanced SMA implementation reuse; basic capture and retrieval remain independently decidable."
+    },
+    {
+      "id": "OPENHANDS-Q1-AGENT-EXECUTION-ENGINE",
+      "executionAuthorized": false,
+      "defaultIfInconclusive": "Do not adopt OpenHands for the bootstrap; retain the deterministic fake engine and separately implemented provider adapter."
+    }
+  ],
+  "deferred": [
+    "V3-INTERNAL-WEBHOOKS",
+    "V3-INTERNAL-DASHBOARD",
+    "SMA-009"
+  ],
+  "discarded": [
+    "V3-INTERNAL-CLAIMS",
+    "V3-SUPPORT-DASHBOARD-UI",
+    "V3-SUPPORT-PREMIUM"
+  ],
+  "acceptedLimitations": [
+    "TASK-002 original mission specification absent",
+    "Phase 1A normalized teams.messages only",
+    "11,872 subjectless events remain unassigned",
+    "4,136 graph nodes remain referenced but not observed",
+    "historical human, review, tool, source-diff, cost, and intrinsic-complexity metrics unavailable",
+    "historical source/runtime attribution requires direct receipts",
+    "SMA committed source, overlay, and runtime snapshot are separate identities",
+    "snapshot non-completion is right-censored rather than abandonment"
+  ],
+  "recommendedBootstrapSequence": [
+    "freeze versioned kernel, identity, catalogue, DAG, lifecycle, outcome, and provenance contracts",
+    "implement deterministic pure kernel with in-memory repositories and fake execution engine",
+    "establish canonical build and synthesized-merge gate",
+    "add MongoDB repositories, immutable event/audit projection, outbox, change streams, delivery claims, and recovery",
+    "add thin daemon, protocol, CLI, and channel adapters",
+    "add DAG assignment, validation joins, completion/reopening, escalation, and deterministic release",
+    "build isolated fixture and layered qualification harness",
+    "seek separate authority and execute SMA-Q1 and OpenHands-Q1",
+    "execute SMA-Q2 only after Q1 prerequisite and separate authority"
+  ],
+  "finalGate": {
+    "coordinatorRecommendation": "PASS",
+    "principalConfirmationRequired": true,
+    "confirmationEffect": "Closes Phase 1B architecture adjudication only; implementation, investigation execution, data migration, code copying, and production deployment remain unauthorized unless separately stated."
+  }
+}

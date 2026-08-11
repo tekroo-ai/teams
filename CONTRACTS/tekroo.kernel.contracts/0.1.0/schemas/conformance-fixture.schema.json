@@ -1,0 +1,58 @@
+{
+  "$id": "https://contracts.tekroo.ai/tekroo.kernel.contracts/0.1.0/schemas/conformance-fixture.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "classification": {
+      "enum": [
+        "NORMATIVE_EXAMPLE",
+        "BOUNDARY_NEGATIVE",
+        "REGRESSION_RECEIPT",
+        "GENERATED_COUNTEREXAMPLE",
+        "FAULT_INJECTION"
+      ]
+    },
+    "fixtureId": {
+      "pattern": "^[A-Z0-9][A-Z0-9._-]+$",
+      "type": "string"
+    },
+    "given": {
+      "type": "object"
+    },
+    "kind": {
+      "enum": [
+        "CATALOGUE_COMMAND",
+        "STATE_MODEL",
+        "DAG_MODEL",
+        "IDENTITY_MODEL",
+        "IDEMPOTENCY_MODEL"
+      ]
+    },
+    "sourceDecisionIds": {
+      "items": {
+        "pattern": "^P2-KCF-[0-9]{3}$",
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "then": {
+      "type": "object"
+    },
+    "when": {
+      "type": "object"
+    }
+  },
+  "required": [
+    "fixtureId",
+    "kind",
+    "classification",
+    "sourceDecisionIds",
+    "given",
+    "when",
+    "then"
+  ],
+  "title": "Conformance fixture",
+  "type": "object"
+}

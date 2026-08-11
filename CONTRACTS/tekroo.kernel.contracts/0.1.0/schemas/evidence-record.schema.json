@@ -1,0 +1,79 @@
+{
+  "$id": "https://contracts.tekroo.ai/tekroo.kernel.contracts/0.1.0/schemas/evidence-record.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "availability": {
+      "enum": [
+        "AVAILABLE",
+        "UNAVAILABLE",
+        "DELETED_WITH_TOMBSTONE"
+      ]
+    },
+    "byte_length": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "evidence_id": {
+      "$ref": "./core.schema.json#/$defs/UUIDv7"
+    },
+    "evidence_kind": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "integrity_state": {
+      "enum": [
+        "UNVERIFIED",
+        "DIGEST_VERIFIED",
+        "MISSING",
+        "MISMATCH"
+      ]
+    },
+    "locator": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "media_type": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "raw_sha256": {
+      "$ref": "./core.schema.json#/$defs/Sha256"
+    },
+    "registered_by": {
+      "$ref": "./core.schema.json#/$defs/PrincipalRef"
+    },
+    "retention_policy": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "sensitivity": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "source_evidence_ids": {
+      "items": {
+        "$ref": "./core.schema.json#/$defs/UUIDv7"
+      },
+      "maxItems": 64,
+      "type": "array",
+      "uniqueItems": true
+    }
+  },
+  "required": [
+    "evidence_id",
+    "evidence_kind",
+    "raw_sha256",
+    "byte_length",
+    "media_type",
+    "locator",
+    "availability",
+    "registered_by",
+    "source_evidence_ids",
+    "sensitivity",
+    "retention_policy",
+    "integrity_state"
+  ],
+  "title": "EvidenceRecord",
+  "type": "object"
+}

@@ -1,0 +1,113 @@
+{
+  "schemaVersion": "1.0.0",
+  "step": "PHASE-1B-ADJUDICATION-STEP-8",
+  "status": "PASS_PRINCIPAL_CONFIRMED",
+  "generatedAt": "2026-08-11",
+  "confirmedAt": "2026-08-11",
+  "principalStatement": "Approved",
+  "coordinatorRecommendation": "PASS",
+  "stepAuthorization": {
+    "authorizedAt": "2026-08-11",
+    "principalStatement": "Begin"
+  },
+  "architectureHandoff": {
+    "markdown": {
+      "path": "PHASE-1B/008-final-architecture-handoff.md",
+      "sha256": "ec0aef90ceab404c6288a0279d47f49ee4c5af1c00577d55b8ffd25882b18fef"
+    },
+    "json": {
+      "path": "OUTPUT/adjudication/phase-1b-architecture-handoff.json",
+      "sha256": "137a1399a70cfc96cf36997e8c2154b1847cdde5ee8a50f7a39f7d06e3c83e20"
+    }
+  },
+  "baseline": {
+    "snapshotId": "20260808T200912Z",
+    "tekrooV3Commit": "7630ca20ccfa0fc2f4102147b10c3705e9ba0158",
+    "tekrooV3SourceTreeIdentity": "98b37aa617d97a1aac86497e12a0536e43dbffa27a5db5a72bc90b92b494990b",
+    "phase1ASynthesisIdentity": "a3ebc1b506475153bd5b4fcc7af98cf243016e3d8a0daba2b5e733435dda698d",
+    "manifest": {
+      "path": "OUTPUT/adjudication/phase-1a-baseline.json",
+      "sha256": "43035b7b69553bd4d3988cba43d5525221ccac2eaa7a20859d7bb151e61b0f55"
+    },
+    "checksumManifest": {
+      "path": "OUTPUT/adjudication/phase-1a-baseline.sha256",
+      "sha256": "37c4cfa9858e3c7b7fd7c653d1f4154ae3bfd716578660a8e55b12464fbeef3c",
+      "entryCount": 29,
+      "allEntriesMatch": true
+    }
+  },
+  "priorGates": [
+    {"step": 1, "status": "PASS_PRINCIPAL_CONFIRMED", "path": "OUTPUT/adjudication/step-1-gate.json", "sha256": "f546075a6327271cd701e60e4cb162b5fc5d2757d9282c8d9185271558e14ad0"},
+    {"step": 2, "status": "PASS_PRINCIPAL_CONFIRMED", "path": "OUTPUT/adjudication/step-2-gate.json", "sha256": "820a5e478ae52c5f0d6765e83a736590121b93404d2bc84b23435fbe361fe45a"},
+    {"step": 3, "status": "PASS_PRINCIPAL_CONFIRMED", "path": "OUTPUT/adjudication/step-3-gate.json", "sha256": "3eb9aee951f2d90da235a0ede54c606c032dc80cc8afbd65332d93e3fc58e923"},
+    {"step": 4, "status": "PASS_PRINCIPAL_CONFIRMED", "path": "OUTPUT/adjudication/step-4-gate.json", "sha256": "439ec55d369924b4e87e52d43055d1b2e3796b9f8eccaf0e29d72d044c277f24"},
+    {"step": 5, "status": "PASS_PRINCIPAL_CONFIRMED", "path": "OUTPUT/adjudication/step-5-gate.json", "sha256": "f2a7fe5e7c6c2865ba99153f426fc411efde167c4931499af0b30facbf2c6c98"},
+    {"step": 6, "status": "PASS_PRINCIPAL_CONFIRMED", "path": "OUTPUT/adjudication/step-6-gate.json", "sha256": "9775c02f0cd43831013497808540f01f09e0910fc72056177b8a2c707e593934"},
+    {"step": 7, "status": "PASS_PRINCIPAL_CONFIRMED", "path": "OUTPUT/adjudication/step-7-gate.json", "sha256": "78dfaf4d32b20b9aabe59a6a1bbccac1604900c410e2a97a05136a21d38d691a"}
+  ],
+  "decisionRegisters": [
+    {"step": 2, "path": "OUTPUT/adjudication/kernel-decision-proposals.json", "sha256": "598acef9cca08f80258a8117174bd50eb5394b6c4055efae142ac17fb92e014e"},
+    {"step": 3, "path": "OUTPUT/adjudication/execution-boundary-decisions.json", "sha256": "22925c0e97c15784c141216dfceb5b4295e89a27154a62be218df07fd5fdbf22"},
+    {"step": 4, "path": "OUTPUT/adjudication/sma-memory-decisions.json", "sha256": "4624dc58c0f15092128a0acccc025e12ee4ba7fe4ed4ba3c9042ee996e890334"},
+    {"step": 5, "path": "OUTPUT/adjudication/supporting-surface-decisions.json", "sha256": "04f384dbdfa2f2f5f35e37200dea359bacecf456300eb1f4ca5a2093627c01d0"},
+    {"step": 6, "path": "OUTPUT/adjudication/negative-requirement-decisions.json", "sha256": "81b8651050bf5893802fc3fbd575318777be7c8ced65b63081c9ed68a6bba854"},
+    {"step": 7, "path": "OUTPUT/adjudication/tension-investigation-decisions.json", "sha256": "efda589f46e95d17ab71d60096dc21928cd93a0ed2da6bbcd1a684eac05d2105"}
+  ],
+  "verification": {
+    "evidenceCalibration": {
+      "observed": [
+        "All 29 Phase 1A checksum-manifest entries match their frozen SHA-256 digests.",
+        "Steps 1 through 7 are principal-confirmed PASS gates and their current file digests match the recorded handoff lineage.",
+        "All six decision-register file digests match the recorded handoff lineage.",
+        "The Step 2 through Step 5 registers contain 46 principal-decided salvage candidates.",
+        "The Step 6 register contains 14 principal-approved ADOPT decisions.",
+        "Step 7 records treatment of all five retained Phase 1A tensions and resolution of the kernel claims ambiguity."
+      ],
+      "computed": [
+        "The Step 2 through Step 5 register distribution is 2 PRESERVE, 9 PRESERVE_WITH_WRAPPER, 18 REFACTOR, 9 REIMPLEMENT, 2 DISCARD, 3 INVESTIGATE_FURTHER, and 3 DEFER_OUT_OF_SCOPE.",
+        "Applying Step 7's principal-approved V3-INTERNAL-CLAIMS override yields 2 PRESERVE, 9 PRESERVE_WITH_WRAPPER, 18 REFACTOR, 9 REIMPLEMENT, 3 DISCARD, 2 INVESTIGATE_FURTHER, and 3 DEFER_OUT_OF_SCOPE."
+      ],
+      "unknownOrUnqualified": [
+        "OpenHands production behavior remains unqualified pending OPENHANDS-Q1.",
+        "Advanced SMA replay, consolidation, retrieval-quality, and training behavior remains unqualified pending the bounded SMA investigations; Level 2 training remains deferred."
+      ]
+    },
+    "candidateCount": 46,
+    "candidateDecisionsComplete": true,
+    "finalDispositionCounts": {
+      "PRESERVE": 2,
+      "PRESERVE_WITH_WRAPPER": 9,
+      "REFACTOR": 18,
+      "REIMPLEMENT": 9,
+      "DISCARD": 3,
+      "INVESTIGATE_FURTHER": 2,
+      "DEFER_OUT_OF_SCOPE": 3
+    },
+    "negativeRequirementCount": 14,
+    "allNegativeRequirementsAdopted": true,
+    "phase1ATensionCount": 5,
+    "allPhase1ATensionsTreated": true,
+    "kernelClaimsAmbiguityResolved": true,
+    "boundedInvestigationCount": 3,
+    "boundedInvestigationsHaveDefaults": true,
+    "boundedInvestigationsExecutionAuthorized": false,
+    "preservedDeferredItemCount": 3,
+    "acceptedLimitationsEnumerated": true,
+    "handoffJsonValid": true,
+    "trackedDiffCheckPassedBeforeGateWrite": true,
+    "implementationAuthorityGranted": false,
+    "investigationExecutionAuthorityGranted": false,
+    "dataMigrationAuthorityGranted": false,
+    "productionAuthorityGranted": false,
+    "tekrooV3OrHistoricalDataModifiedByStep8": false,
+    "smaOrOpenHandsModifiedByStep8": false
+  },
+  "conclusion": "Phase 1B has produced a coherent, evidence-calibrated Tekroo v4 architecture handoff. Tekroo remains the organizational authority; MongoDB remains the approved organizational persistence and change-stream substrate; execution providers and SMA remain replaceable behind explicit ports.",
+  "principalConfirmation": {
+    "status": "CONFIRMED",
+    "confirmedAt": "2026-08-11",
+    "principalStatement": "Approved"
+  },
+  "confirmationEffect": "Closes Phase 1B architecture adjudication only. It does not authorize code copying, implementation, investigation execution, data migration, or production deployment unless the principal states that authority separately.",
+  "nextPhaseAuthorized": false
+}

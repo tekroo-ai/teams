@@ -1,0 +1,167 @@
+{
+  "schemaVersion": "1.0.0",
+  "phase": "TEKROO-V4-PHASE-2",
+  "step": "KERNEL-CONTRACT-FREEZE",
+  "status": "DECISIONS_COMPLETE_CORPUS_GENERATION_IN_PROGRESS",
+  "authorizedAt": "2026-08-11",
+  "principalAuthorizationStatement": "Okay, it's authorized.",
+  "authority": {
+    "decisionAuthority": "Principal",
+    "implementationAuthority": "NONE",
+    "investigationExecutionAuthority": "NONE",
+    "migrationAuthority": "NONE",
+    "productionAuthority": "NONE"
+  },
+  "acceptedInputs": [
+    {
+      "path": "OUTPUT/adjudication/step-8-final-gate.json",
+      "sha256": "6c1859e0580175d58225a60f00a1e7c1d016b1937c6abe14245e4fe89e93bebe"
+    },
+    {
+      "path": "PHASE-1B/008-final-architecture-handoff.md",
+      "sha256": "ec0aef90ceab404c6288a0279d47f49ee4c5af1c00577d55b8ffd25882b18fef"
+    },
+    {
+      "path": "OUTPUT/adjudication/phase-1b-architecture-handoff.json",
+      "sha256": "137a1399a70cfc96cf36997e8c2154b1847cdde5ee8a50f7a39f7d06e3c83e20"
+    }
+  ],
+  "decisionVocabulary": [
+    "APPROVE",
+    "APPROVE_WITH_REVISION",
+    "DEFER",
+    "REJECT"
+  ],
+  "decisionCount": 12,
+  "decisions": [
+    {
+      "order": 1,
+      "id": "P2-KCF-001",
+      "title": "Contract boundary, authority, and versioning",
+      "status": "PRINCIPAL_APPROVED",
+      "coordinatorRecommendation": "APPROVE",
+      "proposedManifestIdentity": "tekroo.kernel.contracts/0.1.0",
+      "principalDisposition": "APPROVE",
+      "decidedAt": "2026-08-11",
+      "principalStatement": "Approve."
+    },
+    {
+      "order": 2,
+      "id": "P2-KCF-002",
+      "title": "Durable actor identity, execution incarnation, and fencing",
+      "status": "PRINCIPAL_APPROVED",
+      "coordinatorRecommendation": "APPROVE",
+      "principalDisposition": "APPROVE",
+      "decidedAt": "2026-08-11",
+      "principalStatement": "Approve."
+    },
+    {
+      "order": 3,
+      "id": "P2-KCF-003",
+      "title": "Command, event, and stable-outcome envelopes",
+      "status": "PRINCIPAL_APPROVED",
+      "coordinatorRecommendation": "APPROVE",
+      "principalDisposition": "APPROVE",
+      "decidedAt": "2026-08-11",
+      "principalStatement": "Approved."
+    },
+    {
+      "order": 4,
+      "id": "P2-KCF-004",
+      "title": "Catalogue, schemas, compatibility, aliases, and unknown messages",
+      "status": "PRINCIPAL_APPROVED",
+      "coordinatorRecommendation": "APPROVE",
+      "principalDisposition": "APPROVE",
+      "decidedAt": "2026-08-11",
+      "principalStatement": "Approve."
+    },
+    {
+      "order": 5,
+      "id": "P2-KCF-005",
+      "title": "Immutable DAG lineage and causal-edge validity",
+      "status": "PRINCIPAL_APPROVED",
+      "coordinatorRecommendation": "APPROVE",
+      "principalDisposition": "APPROVE",
+      "decidedAt": "2026-08-11",
+      "principalStatement": "Approved."
+    },
+    {
+      "order": 6,
+      "id": "P2-KCF-006",
+      "title": "Story, task, ownership, assignment, and reassignment state machines",
+      "status": "PRINCIPAL_APPROVED_WITH_REVISION",
+      "coordinatorRecommendation": "APPROVE",
+      "principalDisposition": "APPROVE_WITH_REVISION",
+      "decidedAt": "2026-08-11",
+      "principalStatement": "Agreed.",
+      "approvedRevision": "Remove COMPLETION_REQUESTED from story and task phases. RequestCompletion remains an idempotent command; synchronous acceptance emits Completed, rejection leaves the subject ACTIVE, and asynchronous validation uses a separate CompletionReview branch."
+    },
+    {
+      "order": 7,
+      "id": "P2-KCF-007",
+      "title": "Authorization, expected revisions, idempotency, and deterministic rejection",
+      "status": "PRINCIPAL_APPROVED",
+      "coordinatorRecommendation": "APPROVE",
+      "principalDisposition": "APPROVE",
+      "decidedAt": "2026-08-11",
+      "principalStatement": "Approved."
+    },
+    {
+      "order": 8,
+      "id": "P2-KCF-008",
+      "title": "Completion request, authoritative completion, reopening, and correction",
+      "status": "PRINCIPAL_APPROVED",
+      "coordinatorRecommendation": "APPROVE",
+      "principalDisposition": "APPROVE",
+      "decidedAt": "2026-08-11",
+      "principalStatement": "Approved."
+    },
+    {
+      "order": 9,
+      "id": "P2-KCF-009",
+      "title": "Evidence, provenance, audit projection, and source/runtime identity",
+      "status": "PRINCIPAL_APPROVED",
+      "coordinatorRecommendation": "APPROVE",
+      "principalDisposition": "APPROVE",
+      "decidedAt": "2026-08-11",
+      "principalStatement": "Approved."
+    },
+    {
+      "order": 10,
+      "id": "P2-KCF-010",
+      "title": "Kernel ports, repository boundaries, and transaction semantics",
+      "status": "PRINCIPAL_APPROVED",
+      "coordinatorRecommendation": "APPROVE",
+      "principalDisposition": "APPROVE",
+      "decidedAt": "2026-08-11",
+      "principalStatement": "Approve."
+    },
+    {
+      "order": 11,
+      "id": "P2-KCF-011",
+      "title": "Executable conformance suites, fixtures, and property invariants",
+      "status": "PRINCIPAL_APPROVED",
+      "coordinatorRecommendation": "APPROVE",
+      "principalDisposition": "APPROVE",
+      "decidedAt": "2026-08-11",
+      "principalStatement": "Approved."
+    },
+    {
+      "order": 12,
+      "id": "P2-KCF-012",
+      "title": "Canonical contract manifest, compatibility gate, and Step 1 closure",
+      "status": "PRINCIPAL_APPROVED",
+      "coordinatorRecommendation": "APPROVE",
+      "principalDisposition": "APPROVE",
+      "decidedAt": "2026-08-11",
+      "principalStatement": "Approve."
+    }
+  ],
+  "counts": {
+    "principalDecisionsRecorded": 12,
+    "awaitingPrincipalDecision": 0,
+    "queued": 0
+  },
+  "nextDecision": null,
+  "nextAction": "Generate and validate tekroo.kernel.contracts/0.1.0, then present the Step 1 closure gate."
+}

@@ -1,0 +1,150 @@
+{
+  "schemaVersion": "1.0.0",
+  "phase": "TEKROO-V4-PHASE-2",
+  "step": "KERNEL-CONTRACT-FREEZE",
+  "status": "PASS_AWAITING_PRINCIPAL_CONFIRMATION",
+  "generatedAt": "2026-08-11",
+  "coordinatorRecommendation": "PASS",
+  "authority": {
+    "decisionAuthority": "Principal",
+    "implementationAuthority": "NONE",
+    "investigationExecutionAuthority": "NONE",
+    "migrationAuthority": "NONE",
+    "productionAuthority": "NONE",
+    "nextStepAuthority": "NONE"
+  },
+  "acceptedInput": {
+    "phase1BFinalGate": {
+      "path": "OUTPUT/adjudication/step-8-final-gate.json",
+      "sha256": "6c1859e0580175d58225a60f00a1e7c1d016b1937c6abe14245e4fe89e93bebe",
+      "status": "PASS_PRINCIPAL_CONFIRMED"
+    }
+  },
+  "decisionPacket": {
+    "path": "PHASE-2/001-kernel-contract-freeze.md",
+    "sha256": "3755d2248ec209acc51d29845c1c4fa53c579e0120ee3a71d3cc292c2573b32a"
+  },
+  "decisionRegister": {
+    "path": "OUTPUT/phase-2/kernel-contract-freeze-decisions.json",
+    "sha256": "2d91856f85c28fc021f6d7dbe6e78a8e92dc9c79c509d07881b7bfa0517b2b67",
+    "decisionCount": 12,
+    "principalDecisionsRecorded": 12,
+    "approved": 11,
+    "approvedWithRevision": 1,
+    "pending": 0,
+    "approvedRevision": {
+      "decisionId": "P2-KCF-006",
+      "summary": "COMPLETION_REQUESTED is not a story/task lifecycle phase. RequestCompletion is an idempotent command; successful validation emits Completed, rejection leaves work ACTIVE, and asynchronous review is a separate DAG branch."
+    }
+  },
+  "contractPackage": {
+    "identity": "tekroo.kernel.contracts/0.1.0",
+    "path": "CONTRACTS/tekroo.kernel.contracts/0.1.0",
+    "manifest": {
+      "path": "CONTRACTS/tekroo.kernel.contracts/0.1.0/manifest.json",
+      "sha256": "db3f38d4794a6993aad0b9ddf6d8f093eebf36b484d99de42dddc21bf3877c2f"
+    },
+    "detachedChecksum": {
+      "path": "CONTRACTS/tekroo.kernel.contracts/0.1.0/manifest.sha256",
+      "sha256": "c1db93af280e9aec39de49aafcf70a71cd9d7eaec838f92bcf179ec4153e88b1",
+      "manifestDigestMatches": true
+    },
+    "generator": {
+      "path": "scripts/generate_phase2_contract.mjs",
+      "sha256": "3db982c6b2b5cfb0f71b35a6ec0c60a63a57a7fda8a8a44ab5ef78a1c172a5a8"
+    },
+    "payloadFileCount": 18,
+    "catalogueEntryCount": 52,
+    "commandTypeCount": 26,
+    "eventTypeCount": 26,
+    "schemaFileCount": 9,
+    "fixtureCount": 65,
+    "invariantCount": 14,
+    "traceabilityRequirementCount": 124,
+    "negativeRequirementCount": 14,
+    "adoptedHistoricalAliasCount": 0
+  },
+  "validation": {
+    "contractStructure": {
+      "path": "OUTPUT/phase-2/contract-structure-report.final.json",
+      "fileSha256": "7b05a72666fe03365a1cfc5b18f055567076b09bce410683683ef365fb21e3cf",
+      "reportSha256": "5030dc5d51782303b39cb7645f89e4ef9dca87ef6c62482222f83d2fd6baa94a",
+      "status": "PASS",
+      "checks": 2347,
+      "passed": 2347,
+      "failed": 0
+    },
+    "referenceCorpus": {
+      "path": "OUTPUT/phase-2/reference-corpus-report.final.json",
+      "fileSha256": "aca87c781ba6060c3a24098d23a7f8b470928213a7f04613d2fbb904db7acf77",
+      "reportSha256": "0ed5f3b665b3b4579e342cd27b30b61feaad2dc577bf9f86b05ff03926923ab1",
+      "status": "PASS",
+      "cases": 65,
+      "passed": 65,
+      "failed": 0
+    },
+    "initialCounterexample": {
+      "path": "OUTPUT/phase-2/reference-corpus-report.json",
+      "fileSha256": "50401307ae8fa83f5e34406b25d8243b7ff1dad5a8ea7c4d6a919d660306fb18",
+      "reportSha256": "86615c7b10a1c6f7a50fc67ed1683c0019a2771790e0565c39b176dabaab57be",
+      "status": "FAIL",
+      "cases": 65,
+      "failed": 1,
+      "failedFixtureId": "MODEL-STORY-FORWARD",
+      "observedCause": "The reference runner routed an untagged story fixture through the task transition model.",
+      "resolution": "Changed the runner default so only an explicit task model selects task transitions; the approved fixture expectation was not weakened.",
+      "candidateManifestBeforeCorrection": "4a97b74f707fc0927f84c34fa99f7943f6fd127b522ff188c7a7b442dcc27849",
+      "candidateManifestAfterCorrection": "db3f38d4794a6993aad0b9ddf6d8f093eebf36b484d99de42dddc21bf3877c2f",
+      "retainedAsEvidence": true
+    },
+    "allFinalPackageDigestsMatch": true,
+    "allCataloguePayloadSchemasResolve": true,
+    "everyActiveCommandHasPositiveAndNegativeFixture": true,
+    "allDecisionNegativeAndProhibitionTraceabilityResolves": true,
+    "allReferenceCasesPass": true,
+    "trackedDiffCheckRequiredBeforeGate": true
+  },
+  "profileStatus": {
+    "contractStructure": "PASS",
+    "referenceCorpusModel": "PASS",
+    "coreHermeticImplementation": "NOT_RUN",
+    "mongoIntegration": "NOT_RUN",
+    "synthesizedMerge": "NOT_RUN",
+    "providerE2E": "NOT_RUN"
+  },
+  "evidenceCalibration": {
+    "observed": [
+      "All twelve Step 1 decisions have principal dispositions, including one explicitly recorded revision.",
+      "The final detached checksum matches the exact manifest bytes.",
+      "The final structural validator passed 2347 of 2347 checks.",
+      "The final reference-corpus runner passed 65 of 65 cases.",
+      "The first reference-corpus run failed one case and its report is retained."
+    ],
+    "computed": [
+      "The final package contains 18 payload files, 52 catalogue entries, 65 fixtures, 14 invariants, and 124 traced requirements.",
+      "The catalogue contains 26 command types and 26 corresponding event types with no adopted historical alias."
+    ],
+    "unknownOrUnqualified": [
+      "No Tekroo v4 runtime implementation has executed the core-hermetic implementation profile.",
+      "MongoDB transaction, change-stream, claim, crash, and recovery conformance has not run against a v4 implementation.",
+      "No synthesized Git merge tree has been qualified.",
+      "OpenHands, SMA, Git/provider, model/provider, migration, performance, and production behavior remain unqualified."
+    ]
+  },
+  "knownLimitations": [
+    "Contract-structure and reference-model PASS do not qualify an implementation.",
+    "The 0.1.0 payload catalogue is the bootstrap surface; later additions require a new version and compatibility gate.",
+    "Numeric performance and resource budgets require measured workload evidence.",
+    "Provider-backed and paid profiles require separate principal authority."
+  ],
+  "externalModification": {
+    "tekrooV3Modified": false,
+    "historicalDataModified": false,
+    "smaModified": false,
+    "openHandsModified": false,
+    "productionSystemModified": false
+  },
+  "confirmationEffect": "Principal confirmation closes Phase 2 Step 1 and accepts the exact contract package identified by the manifest digest. It does not authorize a Tekroo implementation, investigation, migration, provider adoption, production deployment, or the next step.",
+  "principalConfirmation": null,
+  "nextStepAuthorized": false
+}

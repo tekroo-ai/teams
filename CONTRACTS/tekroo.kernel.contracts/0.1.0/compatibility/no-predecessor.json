@@ -1,0 +1,10 @@
+{
+  "compatibilityClaim": "INITIAL_BASELINE_NO_PREDECESSOR",
+  "contractName": "tekroo.kernel.contracts",
+  "contractVersion": "0.1.0",
+  "historicalV3Compatibility": "NOT_CLAIMED",
+  "migrationAuthority": "NONE",
+  "predecessor": null,
+  "rollback": "No predecessor package exists; rejection of this candidate leaves Phase 1B architecture as the accepted design baseline.",
+  "schemaVersion": "1.0.0"
+}

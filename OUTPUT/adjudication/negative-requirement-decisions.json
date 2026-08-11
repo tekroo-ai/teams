@@ -1,0 +1,828 @@
+{
+  "schemaVersion": "1.0.0",
+  "step": "PHASE-1B-ADJUDICATION-STEP-6",
+  "status": "PASS_PRINCIPAL_CONFIRMED",
+  "gateConfirmedAt": "2026-08-11",
+  "gatePrincipalStatement": "Approved, Step 6.",
+  "source": {
+    "jsonPath": "OUTPUT/reports/negative-requirements.json",
+    "jsonSha256": "1cf4dc2434ef6ff0b07b1ca41cae2d547ca018371b62f6f66dc8e7c55f701082",
+    "markdownPath": "OUTPUT/reports/negative-requirements.md",
+    "markdownSha256": "1ea8c0ab9a8a84d1c298031bace24d5c8b6bc342f8a36f2301891419be7645fb",
+    "analysisIdentity": "e08d917f5d1b986bfc7ad5ae2b90dc34599e3fdbdbf2cb0ac18e49e981397d61",
+    "sourceStatus": "PHASE_1B_INPUT_NOT_IMPLEMENTATION_AUTHORITY"
+  },
+  "approvedInputs": [
+    "OUTPUT/adjudication/kernel-decisions.json",
+    "OUTPUT/adjudication/execution-boundary-decisions.json",
+    "OUTPUT/adjudication/sma-memory-decisions.json",
+    "OUTPUT/adjudication/supporting-surface-decisions.json"
+  ],
+  "decisionVocabulary": ["ADOPT", "REVISE", "DEFER", "REJECT"],
+  "thresholdPolicy": "Phase 1A counts do not by themselves establish v4 budgets or enforcement mechanisms.",
+  "implementationAuthority": "NONE",
+  "requirements": [
+    {
+      "order": 1,
+      "id": "NEG-001",
+      "requirement": "The system SHALL NOT repeat a materially similar failed attempt indefinitely without changed-condition evidence, a bounded retry budget, or escalation.",
+      "risk": "POTENTIAL_THRASHING_AND_HIGH_REPETITION",
+      "phase1AConfidence": "HIGH",
+      "phase1AProposal": "ADOPT",
+      "observedBasis": "4 potential-thrashing episodes and 2 unresolved high-repetition episodes.",
+      "sourceEvidence": [
+        {
+          "artifact": "OUTPUT/workflows/loop-analysis.json",
+          "sha256": "9fb9f10d915abc5b7b223ceaa959099a6833a4f3d4addd500f1f5e00c5d5562a",
+          "selector": "$.summary",
+          "evidenceClass": "DERIVED"
+        }
+      ],
+      "decisionStatus": "PRINCIPAL_APPROVED_COORDINATOR_RECOMMENDATION",
+      "finalDisposition": "ADOPT",
+      "decidedAt": "2026-08-11",
+      "principalStatement": "ADOPT",
+      "adoptedRequirement": "The system SHALL NOT repeat a materially similar failed attempt indefinitely without changed-condition evidence, a bounded retry budget, or escalation.",
+      "implementationAuthority": "NONE",
+      "decisionRationale": "A finite retry and escalation invariant is justified even though Phase 1A cannot establish that the cited episodes had unchanged conditions or common root causes. The decision constrains indefinite retry while allowing evidence-backed refinement and operation-specific budgets.",
+      "recordedConditions": {
+        "ledger": "Maintain a durable retry ledger keyed to organizational subject or causal-DAG node plus attempted operation; actor, process, or adapter restart does not reset it.",
+        "similarity": "Determine material similarity from operation, target, relevant inputs, preconditions, and failure outcome rather than message wording.",
+        "changedConditionEvidence": "Reference a concrete source-tree digest, corrected input, configuration revision, dependency or tool version, external-state observation, or new validation evidence.",
+        "budgets": "Set finite budgets by operation class, cost, risk, and failure mode; Phase 1A episode counts do not select the values.",
+        "concurrency": "Concurrent actors and duplicate delivery consume one shared effective budget rather than multiplying retries.",
+        "exhaustion": "Stop automatic retry and emit an explicit blocked or escalated outcome with accountable owner and intervention evidence.",
+        "reset": "Require a durable material-change record or explicit authorized override to reset a budget.",
+        "authority": "Adapters report attempt mechanics and outcomes; Tekroo policy decides similarity, consumption, escalation, reset, and continuation.",
+        "verification": "Test identical failures, changed-condition retry, actor restart, concurrent duplicates, external uncertainty, exhaustion, and authorized reset."
+      },
+      "evidenceCalibration": [
+        {
+          "class": "COMPUTED_DERIVED",
+          "receipt": "OUTPUT/workflows/loop-analysis.json $.summary and the six POTENTIAL_THRASHING or UNRESOLVED_HIGH_REPETITION episode records",
+          "supports": "Four medium-confidence potential-thrashing candidates and two low-confidence unresolved high-repetition candidates contain eight to thirty-nine results and no observed completion or termination event."
+        },
+        {
+          "class": "UNKNOWN",
+          "receipt": "OUTPUT/workflows/loop-analysis.json $.method.qualityBoundary, $.unknowns, and $.unsupportedDetections",
+          "supports": "The analysis does not establish unchanged execution conditions, root cause, motive, code quality, human intervention, or whether alternating validators were serial or parallel."
+        },
+        {
+          "class": "INFERRED_SAFETY_REQUIREMENT",
+          "receipt": "Derived repetition evidence compared with approved bounded-validation, escalation, idempotency, and DAG boundaries",
+          "supports": "A durable finite retry budget plus explicit changed-condition and escalation semantics prevents unbounded repetition without prohibiting legitimate refinement."
+        }
+      ]
+    },
+    {
+      "order": 2,
+      "id": "NEG-002",
+      "requirement": "The system SHALL NOT allow validation/review cycles to remain unbounded or ownerless.",
+      "risk": "VALIDATION_LOOP",
+      "phase1AConfidence": "MEDIUM",
+      "phase1AProposal": "ADOPT",
+      "observedBasis": "211 validation-loop episodes; only 19 meet the strict healthy-refinement rule.",
+      "sourceEvidence": [
+        {
+          "artifact": "OUTPUT/workflows/loop-analysis.json",
+          "sha256": "9fb9f10d915abc5b7b223ceaa959099a6833a4f3d4addd500f1f5e00c5d5562a",
+          "selector": "$.summary",
+          "evidenceClass": "DERIVED"
+        }
+      ],
+      "decisionStatus": "PRINCIPAL_APPROVED_COORDINATOR_RECOMMENDATION",
+      "finalDisposition": "ADOPT",
+      "decidedAt": "2026-08-11",
+      "principalStatement": "ADOPT.",
+      "adoptedRequirement": "The system SHALL NOT allow validation/review cycles to remain unbounded or ownerless.",
+      "implementationAuthority": "NONE",
+      "decisionRationale": "The detector's permissive threshold does not make every repeated validation harmful and Phase 1A did not measure ownership. Nevertheless, finite review budgets, explicit resolution ownership, directed validation branches, and bounded adjudication are required safeguards consistent with the approved DAG and organizational-authority boundaries.",
+      "recordedConditions": {
+        "dagModel": "Represent each required validation dimension as a directed causal-DAG branch with explicit inputs and acceptance criteria.",
+        "ownership": "Assign an accountable resolution owner at request time; validator identity and resolution ownership are distinct.",
+        "bounds": "Each validation branch has a finite round budget and deadline selected by policy; Phase 1A counts do not determine them.",
+        "results": "Failed results carry typed findings and evidence; revalidation cites the prior result and durable changed-condition evidence.",
+        "deduplication": "Deduplicate equivalent findings and supersede stale results rather than creating unconnected review cycles.",
+        "parallelism": "Run independent validators as parallel DAG branches with a deterministic join rather than circular role handoff.",
+        "terminalOutcomes": "Use stable passed, failed, blocked, inconclusive, superseded, and cancelled outcomes.",
+        "adjudication": "Conflicting or inconclusive results reach a designated adjudicator after bounded review and cannot circulate indefinitely.",
+        "authority": "Only Tekroo policy aggregates validation evidence into organizational acceptance.",
+        "verification": "Test healthy refinement, unchanged resubmission, conflicting validators, parallel branches, stale results, owner disappearance, deadline expiry, exhaustion, and explicit reopening."
+      },
+      "evidenceCalibration": [
+        {
+          "class": "COMPUTED_DERIVED",
+          "receipt": "OUTPUT/workflows/loop-analysis.json validation-loop records",
+          "supports": "The detector identifies 211 validation-loop episodes at a threshold of two results; 166 contain an explicit completion signal, 19 meet strict healthy refinement, and no episode has a populated likely cause."
+        },
+        {
+          "class": "UNKNOWN",
+          "receipt": "No owner field occurs in OUTPUT/workflows/loop-analysis.json; $.unknowns records parallel validators as possible",
+          "supports": "The analysis did not establish ownerlessness or whether alternating validators represented serial rework or parallel independent review."
+        },
+        {
+          "class": "INFERRED_SAFETY_REQUIREMENT",
+          "receipt": "Repeated validation patterns compared with approved directed-DAG, bounded-validation, escalation, and acceptance boundaries",
+          "supports": "Explicit ownership, finite budgets, deterministic joins, and adjudication prevent ownerless or unbounded review while preserving legitimate refinement."
+        }
+      ]
+    },
+    {
+      "order": 3,
+      "id": "NEG-003",
+      "requirement": "The system SHALL NOT continue ordinary work under a completed story/task identity; reopening must be explicit and auditable.",
+      "risk": "POST_COMPLETION_ACTIVITY",
+      "phase1AConfidence": "MEDIUM",
+      "phase1AProposal": "ADOPT",
+      "observedBasis": "12 episodes contain post-completion activity.",
+      "sourceEvidence": [
+        {
+          "artifact": "OUTPUT/workflows/loop-analysis.json",
+          "sha256": "9fb9f10d915abc5b7b223ceaa959099a6833a4f3d4addd500f1f5e00c5d5562a",
+          "selector": "$.summary.postCompletionActivityCount",
+          "evidenceClass": "DERIVED"
+        }
+      ],
+      "decisionStatus": "PRINCIPAL_OVERRIDE_OF_COORDINATOR_RECOMMENDATION",
+      "coordinatorRecommendation": "REVISE",
+      "finalDisposition": "ADOPT",
+      "decidedAt": "2026-08-11",
+      "principalStatement": "ADOPT",
+      "adoptedRequirement": "The system SHALL NOT continue ordinary work under a completed story/task identity; reopening must be explicit and auditable.",
+      "implementationAuthority": "NONE",
+      "decisionRationale": "The principal adopted the original Phase 1A wording rather than the coordinator's proposed rewrite. The approved completion boundary supplies the necessary enforcement meaning: completed is an authoritative Tekroo terminal transition, not a message, model assertion, tool result, or provider status alone.",
+      "recordedConditions": {
+        "completionAuthority": "Completed means a Tekroo-authoritative terminal organizational transition, not a model statement, tool exit, provider status, or completion message alone.",
+        "revisionIdentity": "Completion closes a specific story or task revision or lifecycle epoch while preserving its immutable causal history.",
+        "reopening": "Require an authorized actor, reason, supporting evidence, expected new work, and a new revision or epoch linked to the closed one.",
+        "newWork": "Use a causally linked successor or correction DAG node when work is materially new, preserving acyclicity.",
+        "lateEvidence": "Late results may be appended as late evidence but cannot silently reopen or mutate the closed revision.",
+        "concurrency": "Duplicate completion is idempotent and conflicting close, reopen, invalidate, or compensate transitions return explicit outcomes.",
+        "queries": "Distinguish current state from historical closed revisions and epochs.",
+        "verification": "Test late validation, duplicate completion, unauthorized and authorized reopening, correction work, concurrent close and reopen, and stale commands."
+      },
+      "evidenceCalibration": [
+        {
+          "class": "COMPUTED_DERIVED",
+          "receipt": "OUTPUT/workflows/loop-analysis.json post-completion classifications",
+          "supports": "The detector classified eleven validation repetitions and one planning repetition after an earlier subject-completion message."
+        },
+        {
+          "class": "UNKNOWN",
+          "receipt": "The twelve derived episode records contain completion progress signals but no separate observed termination event",
+          "supports": "The evidence does not establish authoritative organizational acceptance, absence of reopening elsewhere, or whether later messages were ordinary work rather than late results."
+        },
+        {
+          "class": "PRINCIPAL_VALUE_JUDGMENT",
+          "receipt": "Principal statement ADOPT after coordinator proposed REVISE",
+          "supports": "The original negative requirement is binding, with completion authority clarified through already approved architectural conditions rather than rewritten."
+        }
+      ]
+    },
+    {
+      "order": 4,
+      "id": "NEG-004",
+      "requirement": "The system SHALL NOT permit circular role handoffs without an accountable owner and bounded escalation path.",
+      "risk": "ROLE_CYCLE",
+      "phase1AConfidence": "LOW",
+      "phase1AProposal": "ADOPT",
+      "observedBasis": "44 unresolved role-cycle candidates.",
+      "sourceEvidence": [
+        {
+          "artifact": "OUTPUT/workflows/loop-analysis.json",
+          "sha256": "9fb9f10d915abc5b7b223ceaa959099a6833a4f3d4addd500f1f5e00c5d5562a",
+          "selector": "$.summary.episodeCountsByClassification.UNRESOLVED_ROLE_CYCLE",
+          "evidenceClass": "DERIVED"
+        }
+      ],
+      "decisionStatus": "PRINCIPAL_APPROVED_COORDINATOR_RECOMMENDATION",
+      "finalDisposition": "ADOPT",
+      "decidedAt": "2026-08-11",
+      "principalStatement": "ADOPT.",
+      "adoptedRequirement": "The system SHALL NOT permit circular role handoffs without an accountable owner and bounded escalation path.",
+      "implementationAuthority": "NONE",
+      "decisionRationale": "Phase 1A role-cycle candidates are uniformly low-confidence and do not establish harmful delegation or root cause. The requirement is nevertheless adopted as a structural organizational safeguard consistent with the principal's directed-acyclic-graph objective.",
+      "recordedConditions": {
+        "acyclicity": "Reject a proposed handoff that creates a causal or responsibility cycle in the organizational work DAG.",
+        "actorReuse": "Repeated participation by the same role or actor across distinct DAG nodes is allowed and is not itself a cycle.",
+        "handoffContract": "Identify source and destination actor FQNs, work node, requested deliverable, reason, evidence, and acceptance conditions.",
+        "ownership": "Sending a handoff does not transfer responsibility; ownership changes only through an explicit accepted transition, and each branch has one accountable resolution owner.",
+        "consultation": "Return consultation evidence through a new directed result edge rather than recreating the prior assignment node.",
+        "budgets": "Set finite handoff-depth and escalation budgets by workflow class; Phase 1A counts do not determine them.",
+        "escalation": "On cycle detection or exhaustion, route once to a designated adjudicator with the complete causal path and unresolved question.",
+        "terminalOutcomes": "Escalation cannot bounce among roles and terminates as resolved, rejected, split, blocked, or human-required.",
+        "verification": "Test legitimate repeat participation, direct and indirect cycles, rejected ownership loops, consultation returns, actor restart under the same FQN, exhaustion, and deterministic DAG traversal."
+      },
+      "evidenceCalibration": [
+        {
+          "class": "COMPUTED_DERIVED",
+          "receipt": "OUTPUT/workflows/loop-analysis.json INTER_AGENT_ROLE_CYCLE records",
+          "supports": "The detector finds fifty-three low-confidence candidates using six alternating compressed producer-role turns: forty-four unresolved and nine with a completion signal."
+        },
+        {
+          "class": "UNKNOWN",
+          "receipt": "OUTPUT/workflows/loop-analysis.json $.unknowns and role-cycle records",
+          "supports": "Likely cause is null for every episode, and 11,872 subjectless messages were excluded because adjacency could not assign them to work."
+        },
+        {
+          "class": "PRINCIPAL_APPROVED_ARCHITECTURAL_CONSTRAINT",
+          "receipt": "Principal's approved directed-DAG objective and statement ADOPT",
+          "supports": "Responsibility and causal work must remain directed and acyclic even though actors may legitimately participate more than once."
+        }
+      ]
+    },
+    {
+      "order": 5,
+      "id": "NEG-005",
+      "requirement": "The system SHALL NOT decompose or re-plan repeatedly without a convergence criterion, implementation milestone, blocker, or explicit stop.",
+      "risk": "PLANNING_REPETITION",
+      "phase1AConfidence": "LOW",
+      "phase1AProposal": "ADOPT",
+      "observedBasis": "30 unresolved planning repetitions.",
+      "sourceEvidence": [
+        {
+          "artifact": "OUTPUT/workflows/loop-analysis.json",
+          "sha256": "9fb9f10d915abc5b7b223ceaa959099a6833a4f3d4addd500f1f5e00c5d5562a",
+          "selector": "$.summary.episodeCountsByClassification.UNRESOLVED_PLANNING_REPETITION",
+          "evidenceClass": "DERIVED"
+        }
+      ],
+      "decisionStatus": "PRINCIPAL_APPROVED_COORDINATOR_RECOMMENDATION",
+      "finalDisposition": "ADOPT",
+      "decidedAt": "2026-08-11",
+      "principalStatement": "ADOPT.",
+      "adoptedRequirement": "The system SHALL NOT decompose or re-plan repeatedly without a convergence criterion, implementation milestone, blocker, or explicit stop.",
+      "implementationAuthority": "NONE",
+      "decisionRationale": "The permissive planning detector does not establish that repeated planning was unnecessary or harmful. The adopted requirement therefore demands durable plan deltas and bounded convergence while preserving legitimate replanning after new evidence.",
+      "recordedConditions": {
+        "revision": "Every plan revision identifies its predecessor, accountable owner, triggering evidence, material delta, and affected causal-DAG nodes.",
+        "convergence": "Start with an explicit criterion such as decided architecture, executable slice, accepted decomposition, verified blocker, authorized deferral, or rejection.",
+        "progress": "Require a durable change in assumptions, decisions, dependencies, scope, acceptance criteria, or implementation sequence; restating or reformatting a plan is not progress.",
+        "budget": "Give each planning branch a finite policy budget for rounds, elapsed time, or cost; Phase 1A counts do not determine the values.",
+        "exhaustion": "Terminate as blocked, escalated, deferred, or rejected without recursively creating another unbounded planning branch.",
+        "implementationTransition": "When prerequisites are satisfied, the next DAG edge leads to an executable milestone or explicit decision.",
+        "reopening": "New evidence may reopen planning through a linked revision without silently erasing prior decisions.",
+        "scopeTraceability": "Preserve parent and child scope and prevent fan-out controls from being evaded through task renaming.",
+        "verification": "Test legitimate refinement, unchanged restatement, new evidence, unresolved dependency, recursive planning, exhaustion, implementation handoff, and explicit reopening."
+      },
+      "evidenceCalibration": [
+        {
+          "class": "COMPUTED_DERIVED",
+          "receipt": "OUTPUT/workflows/loop-analysis.json PLANNING_LOOP records",
+          "supports": "The detector finds thirty-six planning repetitions: thirty unresolved, five with completion, and one after completion; twenty-seven include a later milestone and six an explicit completion signal."
+        },
+        {
+          "class": "UNKNOWN",
+          "receipt": "OUTPUT/workflows/loop-analysis.json $.method.planningLoopThreshold and $.method.qualityBoundary",
+          "supports": "The threshold is repeated planning message type for one story, and no episode has a known likely cause; necessity, unchanged conditions, and harm are not established."
+        },
+        {
+          "class": "INFERRED_SAFETY_REQUIREMENT",
+          "receipt": "Planning repetition evidence compared with approved DAG, retry, escalation, and implementation boundaries",
+          "supports": "Versioned deltas, finite budgets, convergence criteria, and executable transitions prevent planning from becoming an unbounded substitute for progress."
+        }
+      ]
+    },
+    {
+      "order": 6,
+      "id": "NEG-006",
+      "requirement": "The system SHALL NOT expand task fan-out or depth beyond policy budgets without explicit justification and approval.",
+      "risk": "TASK_EXPANSION",
+      "phase1AConfidence": "LOW",
+      "phase1AProposal": "ADOPT",
+      "observedBasis": "3 potential task-explosion candidates.",
+      "sourceEvidence": [
+        {
+          "artifact": "OUTPUT/workflows/loop-analysis.json",
+          "sha256": "9fb9f10d915abc5b7b223ceaa959099a6833a4f3d4addd500f1f5e00c5d5562a",
+          "selector": "$.summary.episodeCountsByClassification.POTENTIAL_TASK_EXPLOSION",
+          "evidenceClass": "DERIVED"
+        }
+      ],
+      "decisionStatus": "PRINCIPAL_APPROVED_COORDINATOR_RECOMMENDATION",
+      "finalDisposition": "ADOPT",
+      "decidedAt": "2026-08-11",
+      "principalStatement": "ADOPT",
+      "adoptedRequirement": "The system SHALL NOT expand task fan-out or depth beyond policy budgets without explicit justification and approval.",
+      "implementationAuthority": "NONE",
+      "decisionRationale": "The low-confidence detector counts distinct task references and cannot establish created topology, depth, necessity, or harm. The requirement is adopted as a prospective scope-control invariant with multidimensional policy budgets rather than the historical four-reference threshold.",
+      "recordedConditions": {
+        "budgetDimensions": "Define direct-child, total-descendant, maximum-depth, simultaneously-active, concurrency, and resource or cost budgets.",
+        "budgetSelection": "Vary budgets by workflow class and assessed complexity; Phase 1A's reference count does not determine them.",
+        "childContract": "Every child has one parent DAG node, non-duplicative scope, acceptance criteria, dependencies, and accountable owner.",
+        "domainOperation": "Expansion is an explicit idempotent domain operation and is not triggered by merely referencing another task ID.",
+        "exceptionApproval": "Beyond-budget expansion requires an authorized actor, justification, revised decomposition, impact estimate, and recorded approval before mutation.",
+        "enforcement": "Kernel policy enforces budgets and approval; prompt text is not enforcement.",
+        "atomicity": "Partial expansion failure cannot leave orphaned tasks or inconsistent parent state.",
+        "identity": "Stable task identity prevents evasion through renaming, closure, reopening, or duplicate delivery.",
+        "joinPolicy": "Parent completion deterministically requires every required child to be completed, waived, superseded, or otherwise resolved.",
+        "verification": "Test breadth, depth, concurrency, duplicate split requests, partial failure, denied and approved exceptions, renaming, reopening, and deterministic joins."
+      },
+      "evidenceCalibration": [
+        {
+          "class": "COMPUTED_DERIVED",
+          "receipt": "OUTPUT/workflows/loop-analysis.json TASK_EXPANSION records",
+          "supports": "Seven low-confidence candidates meet the four-distinct-task-reference threshold: three potential explosion, three expansion with progress, and one unresolved; all seven have a later milestone."
+        },
+        {
+          "class": "UNKNOWN",
+          "receipt": "OUTPUT/workflows/loop-analysis.json $.method.taskExpansionThreshold and task-expansion records",
+          "supports": "The detector does not establish actual task creation, parent-child topology, depth, necessity, root cause, or harm."
+        },
+        {
+          "class": "INFERRED_SAFETY_REQUIREMENT",
+          "receipt": "Expansion candidates compared with approved DAG, bounded planning, ownership, and deterministic completion requirements",
+          "supports": "Explicit multidimensional budgets and approved exceptions prevent uncontrolled scope growth while allowing justified decomposition."
+        }
+      ]
+    },
+    {
+      "order": 7,
+      "id": "NEG-007",
+      "requirement": "The system SHALL NOT silently replace ownership through duplicate or repeated assignment; reassignment must be explicit, exclusive where required, and traceable.",
+      "risk": "REASSIGNMENT",
+      "phase1AConfidence": "MEDIUM",
+      "phase1AProposal": "ADOPT",
+      "observedBasis": "9 unresolved reassignment episodes.",
+      "sourceEvidence": [
+        {
+          "artifact": "OUTPUT/workflows/loop-analysis.json",
+          "sha256": "9fb9f10d915abc5b7b223ceaa959099a6833a4f3d4addd500f1f5e00c5d5562a",
+          "selector": "$.summary.episodeCountsByClassification.UNRESOLVED_REASSIGNMENT",
+          "evidenceClass": "DERIVED"
+        }
+      ],
+      "decisionStatus": "PRINCIPAL_APPROVED_COORDINATOR_RECOMMENDATION",
+      "finalDisposition": "ADOPT",
+      "decidedAt": "2026-08-11",
+      "principalStatement": "ADOPT.",
+      "adoptedRequirement": "The system SHALL NOT silently replace ownership through duplicate or repeated assignment; reassignment must be explicit, exclusive where required, and traceable.",
+      "implementationAuthority": "NONE",
+      "decisionRationale": "The assignment-message detector cannot establish accepted ownership, duplicate delivery, deliberate reassignment, or actual handling. The requirement is adopted prospectively to separate durable organizational ownership from delivery, leases, and execution identity and to make every ownership change versioned and auditable.",
+      "recordedConditions": {
+        "currentOwner": "Maintain one versioned current organizational owner where policy requires exclusivity plus append-only ownership history.",
+        "idempotency": "Assignment is an idempotent domain command and duplicate delivery returns the same recorded outcome.",
+        "sameOwner": "Assigning the current owner again does not create a new epoch unless explicitly requested and justified.",
+        "reassignmentContract": "Name prior owner, new exact actor FQN, expected ownership version, authorized initiator, reason, evidence, and affected causal-DAG node.",
+        "concurrency": "Use compare-and-set semantics so stale and concurrent reassignments return explicit conflicts.",
+        "roleResolution": "A role-addressed request is not ownership until policy resolves it to an exact actor FQN and records acceptance.",
+        "identitySeparation": "Delivery claims, process leases, and ExecutionId changes remain distinct from durable organizational ownership.",
+        "restartContinuity": "Restarting the same actor FQN under a new execution does not itself constitute reassignment.",
+        "recovery": "Owner failure invokes explicit recovery policy and preserves rather than rewrites assignment history.",
+        "verification": "Test duplicate delivery, same-owner and exact-owner changes, role resolution, stale versions, concurrency, failed acceptance, actor restart, lease expiry, and recovery."
+      },
+      "evidenceCalibration": [
+        {
+          "class": "COMPUTED_DERIVED",
+          "receipt": "OUTPUT/workflows/loop-analysis.json REASSIGNMENT_LOOP records",
+          "supports": "The detector finds twenty-six two-or-three-message candidates: seventeen with a completion signal and nine unresolved; some repeat a role or endpoint while others change it."
+        },
+        {
+          "class": "UNKNOWN",
+          "receipt": "OUTPUT/workflows/loop-analysis.json $.method.reassignmentLoopThreshold and reassignment records",
+          "supports": "Two assignment messages do not establish accepted ownership, duplicate delivery, deliberate reassignment, execution restart, handling, or root cause."
+        },
+        {
+          "class": "PRINCIPAL_APPROVED_ARCHITECTURAL_CONSTRAINT",
+          "receipt": "Approved durable actor-FQN, ExecutionId, explicit ownership, and statement ADOPT",
+          "supports": "Ownership changes require an explicit versioned domain transition while actor process replacement preserves FQN continuity."
+        }
+      ]
+    },
+    {
+      "order": 8,
+      "id": "NEG-008",
+      "requirement": "The system SHALL NOT treat an execution-loop FINISHED status, successful shell exit, or model assertion as organizational task completion.",
+      "risk": "EXECUTION_ORGANIZATION_BOUNDARY",
+      "phase1AConfidence": "HIGH",
+      "phase1AProposal": "ADOPT",
+      "observedBasis": "FINISHED and successful tool exit are evidence inputs, not organizational completion; Tekroo review/test/gate policy decides completion.",
+      "sourceEvidence": [
+        {
+          "artifact": "OUTPUT/compatibility/openhands-assessment.json",
+          "sha256": "1d5b0d5d59cf5bfce417d2ef9735071b3c371ab23787740e922914006df6062e",
+          "selector": "$.adapterRequirements[?(@.id=='ACCEPTANCE')]",
+          "evidenceClass": "STATIC_DOCUMENTED_EXECUTED_DERIVED"
+        }
+      ],
+      "decisionStatus": "PRINCIPAL_APPROVED_COORDINATOR_RECOMMENDATION",
+      "finalDisposition": "ADOPT",
+      "decidedAt": "2026-08-11",
+      "principalStatement": "ADOPT",
+      "adoptedRequirement": "The system SHALL NOT treat an execution-loop FINISHED status, successful shell exit, or model assertion as organizational task completion.",
+      "implementationAuthority": "NONE",
+      "decisionRationale": "The requirement is an architectural authority boundary directly supported by the frozen OpenHands assessment and approved execution decisions. Phase 1A does not quantify historical false completion, so the decision does not rely on an incidence claim.",
+      "recordedConditions": {
+        "stateSeparation": "Maintain separate state machines for provider execution attempts and organizational work.",
+        "evidenceTyping": "Record FINISHED, tool exits, observations, artifacts, and model statements as typed evidence linked to ExecutionId and the relevant causal-DAG node.",
+        "modelClaims": "Treat model assertions as untrusted proposals until schema, authorization, causal, and policy validation succeeds.",
+        "successMeaning": "Successful process exit establishes only its own process contract, not correctness, completeness, acceptance, or mergeability.",
+        "failureMeaning": "Execution failure, timeout, and cancellation do not automatically fail organizational work; Tekroo policy chooses retry, block, escalation, or rejection.",
+        "completionPolicy": "Verify authorized actor, expected revision, deliverables, validation joins, blockers, and deterministic merge or release evidence where applicable.",
+        "transition": "Make completion idempotent, durable, and causally linked to the exact evidence set used.",
+        "lateEvidence": "Handle late or contradictory evidence through explicit invalidation, reopening, or correction without rewriting history.",
+        "adapterRestriction": "Provider adapters cannot write completed story or task state directly.",
+        "verification": "Test false model claims, successful but incorrect commands, provider FINISHED without deliverables, valid evidence, duplicates, stale execution fencing, late failures, and conflicting validators."
+      },
+      "evidenceCalibration": [
+        {
+          "class": "OBSERVED_FROZEN_ASSESSMENT",
+          "receipt": "OUTPUT/compatibility/openhands-assessment.json $.adapterRequirements[?(@.id=='ACCEPTANCE')]",
+          "supports": "The assessment explicitly classifies FINISHED and successful tool exit as evidence and assigns organizational completion to Tekroo policy."
+        },
+        {
+          "class": "PRINCIPAL_APPROVED_ARCHITECTURAL_INPUT",
+          "receipt": "OUTPUT/adjudication/execution-boundary-decisions.json OpenHands and provider-boundary conditions",
+          "supports": "OpenHands identifiers and events are execution evidence; only the Tekroo kernel may accept organizational facts."
+        },
+        {
+          "class": "UNKNOWN",
+          "receipt": "The frozen candidate requirement contains no historical incidence selector",
+          "supports": "Phase 1A does not quantify tasks incorrectly completed solely because of FINISHED, tool exit, or model assertion."
+        }
+      ]
+    },
+    {
+      "order": 9,
+      "id": "NEG-009",
+      "requirement": "The system SHALL NOT silently coerce undefined message types or low-confidence aliases into canonical organizational facts.",
+      "risk": "PROTOCOL_DRIFT",
+      "phase1AConfidence": "HIGH",
+      "phase1AProposal": "ADOPT",
+      "observedBasis": "11238 observed messages use undefined types.",
+      "sourceEvidence": [
+        {
+          "artifact": "OUTPUT/evidence/observed-message-catalog.json",
+          "sha256": "7a29e10defba2e221ea6d047748b00b5363522981052e3c51ebbe6418bedeb6e",
+          "selector": "$.types",
+          "evidenceClass": "OBSERVED_AND_DERIVED"
+        }
+      ],
+      "decisionStatus": "PRINCIPAL_APPROVED",
+      "finalDisposition": "ADOPT",
+      "decidedAt": "2026-08-11",
+      "principalStatement": "ADOPT",
+      "adoptedRequirement": "The system SHALL NOT silently coerce undefined message types or low-confidence aliases into canonical organizational facts.",
+      "implementationAuthority": "NONE",
+      "decisionRationale": "The frozen catalogue establishes a large observed-versus-defined mismatch but does not establish semantic invalidity at emission or the historical catalogue revision. The requirement is adopted as a protocol-integrity boundary: raw evidence remains immutable, unknown types cannot create canonical organizational effects, and only explicit versioned compatibility rules may normalize an alias.",
+      "recordedConditions": {
+        "ingressValidation": "Validate every raw type against the versioned active message catalogue at ingress.",
+        "rawPreservation": "Preserve exact raw type spelling, payload, provenance, and source schema or protocol version in an explicit unknown or quarantine representation.",
+        "effectRestriction": "Undefined types cannot trigger canonical organizational transitions, routing side effects, or accepted facts unless an explicit active compatibility rule applies.",
+        "aliasContract": "Represent an alias as a versioned record naming source type, canonical target, effective scope or interval, schema transformation, semantic-equivalence evidence, confidence, approver, and rollback or sunset policy.",
+        "confidence": "Low-confidence alias candidates cannot normalize automatically; retain both the raw type and candidate status.",
+        "failClosed": "Schema mismatch, ambiguous or multiple targets, catalogue collisions, and attempts to alias an already canonical raw type return explicit failures.",
+        "replay": "A normalized view records the compatibility-mapping version and transformed payload digest and retains an immutable link to raw evidence for deterministic replay.",
+        "history": "Historical raw events are never mutated; they may be queried or deterministically reprocessed after formal catalogue or alias adjudication.",
+        "deprecation": "Deprecation and compatibility grace periods are explicit and versioned and do not authorize silent coercion.",
+        "verification": "Test unknown quarantine, exact raw preservation, prohibited organizational side effects, approved aliases, low-confidence non-mapping, schema mismatch, collisions, mapping-version replay, alias withdrawal, and later reprocessing."
+      },
+      "evidenceCalibration": [
+        {
+          "class": "OBSERVED_AND_COMPUTED",
+          "receipt": "OUTPUT/evidence/observed-message-catalog.json $.types",
+          "supports": "The frozen catalogue records 11,236 tekroo-agent-chat events and one each of tekroo-agent-ping and tekroo-agent-pong as OBSERVED_BUT_UNDEFINED, totaling 11,238."
+        },
+        {
+          "class": "OBSERVED_CATALOGUE_METADATA",
+          "receipt": "OUTPUT/evidence/observed-message-catalog.json records for tekroo-agent-chat, tekroo-agent-ping, and tekroo-agent-pong",
+          "supports": "The chat type has no alias evidence; ping and pong are only LOW-confidence provisional aliases based on historical naming similarity."
+        },
+        {
+          "class": "UNKNOWN",
+          "receipt": "OUTPUT/evidence/observed-message-catalog.json unknowns and alias-evidence fields",
+          "supports": "The frozen comparison does not establish semantic equivalence, historical catalogue validity at emission, payload requiredness, or semantic consumption."
+        },
+        {
+          "class": "INFERRED_SAFETY_REQUIREMENT",
+          "receipt": "Observed catalogue mismatch compared with approved kernel-authority, immutable-evidence, and deterministic-replay boundaries",
+          "supports": "Explicit quarantine and versioned alias adjudication prevent protocol drift from silently becoming organizational truth while preserving evidence for later reconciliation."
+        }
+      ]
+    },
+    {
+      "order": 10,
+      "id": "NEG-010",
+      "requirement": "The Tekroo organizational domain SHALL NOT depend directly on a provider-specific agent session, prompt, authentication, persistence, or tool-call model.",
+      "risk": "PROVIDER_COUPLING",
+      "phase1AConfidence": "HIGH",
+      "phase1AProposal": "ADOPT",
+      "observedBasis": "Define provider-neutral agent lifecycle, session, prompt/tool-policy, context, usage, and persistence ports before choosing a v4 execution provider. Treat Claude Code as one adapter, not the domain model.",
+      "sourceEvidence": [
+        {
+          "artifact": "OUTPUT/reports/anthropic-coupling-report.json",
+          "sha256": "3b59673e7a78c80cbf09728a91550012f7a2fe0ef7b4c8e317734d76a4203c2c",
+          "selector": "$.migrationBoundaryRecommendation",
+          "evidenceClass": "STATIC_SOURCE_DERIVED"
+        }
+      ],
+      "decisionStatus": "PRINCIPAL_APPROVED_COORDINATOR_RECOMMENDATION",
+      "finalDisposition": "ADOPT",
+      "decidedAt": "2026-08-11",
+      "principalStatement": "ADOPT",
+      "adoptedRequirement": "The Tekroo organizational domain SHALL NOT depend directly on a provider-specific agent session, prompt, authentication, persistence, or tool-call model.",
+      "implementationAuthority": "NONE",
+      "decisionRationale": "The frozen static analysis identifies provider concepts across lifecycle, sessions, prompts, authentication, persistence, context, usage, and tool semantics even though no Anthropic SDK import was observed. Runtime frequency remains unknown. The requirement adopts an architectural dependency boundary already consistent with approved Step 2 decisions; it does not prohibit provider selection or adapter-specific capabilities.",
+      "recordedConditions": {
+        "domainContracts": "Tekroo organizational state and policy depend only on provider-neutral execution, context, usage, and tool-result contracts.",
+        "identity": "Actor FQN remains durable organizational identity; provider session identifiers are execution metadata associated with an ExecutionId.",
+        "authority": "Claude, OpenHands, Ollama, and later runtimes implement adapters and cannot define organizational identity, authorization, acceptance, or completion.",
+        "providerIsolation": "Keep provider prompts, credentials, session recovery, persistence, token accounting, context formats, and tool-call models within the applicable adapter.",
+        "capabilities": "Expose explicit provider capabilities and fail unsupported operations observably rather than assuming a lowest-common-denominator behavior.",
+        "composition": "Composition-root configuration may select and configure a provider; direct provider dependencies are prohibited in organizational domain state and policy, not in adapter registration.",
+        "mongodbBoundary": "Tekroo MongoDB organizational persistence and change-stream wakeups remain approved infrastructure and are not execution-provider persistence.",
+        "smaBoundary": "An Ollama-compatible SMA proxy may be configured in the model path behind the execution boundary; observation or memory mediation does not grant SMA organizational process authority.",
+        "replacement": "Changing an execution provider must not require changes to organizational identity, lifecycle invariants, or domain-state transitions.",
+        "verification": "Test adapter conformance, provider replacement, lifecycle, FQN continuity across sessions, ExecutionId fencing, credentials, capability negotiation, tool results, cancellation uncertainty, recovery, and failure without domain-state corruption."
+      },
+      "evidenceCalibration": [
+        {
+          "class": "COMPUTED_STATIC_DERIVED",
+          "receipt": "OUTPUT/reports/anthropic-coupling-report.json $.summary and $.requiredCategoryCoverage",
+          "supports": "Strict category patterns produced 4,640 findings, including 2,519 production-classified findings, across provider lifecycle and interaction categories; no Anthropic SDK import was observed."
+        },
+        {
+          "class": "OBSERVED_FROZEN_RECOMMENDATION",
+          "receipt": "OUTPUT/reports/anthropic-coupling-report.json $.migrationBoundaryRecommendation",
+          "supports": "The frozen report classifies the boundary as architectural and recommends provider-neutral lifecycle, session, prompt/tool-policy, context, usage, and persistence ports."
+        },
+        {
+          "class": "UNKNOWN",
+          "receipt": "OUTPUT/reports/anthropic-coupling-report.json $.unknowns",
+          "supports": "Runtime frequency and future provider behavior were not established by static pattern analysis."
+        },
+        {
+          "class": "PRINCIPAL_APPROVED_ARCHITECTURAL_CONSTRAINT",
+          "receipt": "Approved Step 2 execution-boundary decisions and principal statement ADOPT",
+          "supports": "Provider mechanics stay behind AgentExecutionEngine while FQN identity and Tekroo organizational authority remain provider-neutral."
+        }
+      ]
+    },
+    {
+      "order": 11,
+      "id": "NEG-011",
+      "requirement": "Untrusted agent execution SHALL NOT run in an unisolated host workspace or bypass confirmation, security, resource, network, and secret controls.",
+      "risk": "EXECUTION_SECURITY",
+      "phase1AConfidence": "HIGH",
+      "phase1AProposal": "ADOPT",
+      "observedBasis": "Confirmation policies, analyzers, hooks, secret redaction, and container workspaces exist, but LocalWorkspace is not isolation, analyzers classify rather than hard-deny, and direct execute_tool bypasses loop checks.",
+      "sourceEvidence": [
+        {
+          "artifact": "OUTPUT/compatibility/openhands-assessment.json",
+          "sha256": "1d5b0d5d59cf5bfce417d2ef9735071b3c371ab23787740e922914006df6062e",
+          "selector": "$.capabilities[?(@.id=='securityBoundaries')]",
+          "evidenceClass": "STATIC_DOCUMENTED_EXECUTED_DERIVED"
+        }
+      ],
+      "decisionStatus": "PRINCIPAL_APPROVED_COORDINATOR_RECOMMENDATION",
+      "finalDisposition": "ADOPT",
+      "decidedAt": "2026-08-11",
+      "principalStatement": "ADOPT.",
+      "adoptedRequirement": "Untrusted agent execution SHALL NOT run in an unisolated host workspace or bypass confirmation, security, resource, network, and secret controls.",
+      "implementationAuthority": "NONE",
+      "decisionRationale": "Pinned source exposes useful security surfaces but also shows that host LocalWorkspace is not isolation, analyzers do not themselves deny actions, and an alternate direct tool path can bypass conversation-loop checks. The local probe did not exercise untrusted production behavior. The requirement therefore adopts external, mandatory, fail-closed controls rather than treating provider safeguards as a complete security boundary.",
+      "recordedConditions": {
+        "trustDefault": "Treat model-originated execution as untrusted unless explicit auditable policy classifies a bounded workload otherwise.",
+        "workspace": "Run untrusted tasks in a uniformly pinned remote or container workspace; host LocalWorkspace is prohibited.",
+        "filesystem": "Use dedicated worktrees, allowlisted paths, explicit read-only and writable mounts, and containment against traversal and symlink escape.",
+        "resources": "Enforce network-egress, subprocess, CPU, memory, storage, elapsed-time, and concurrency policies outside the provider runtime.",
+        "authorizationGateway": "Route direct tool APIs, conversation tools, MCP tools, plugins, retries, and alternate invocation paths through one mandatory authorization gateway.",
+        "confirmationMeaning": "Confirmation means policy evaluation; deterministic policy may pre-authorize bounded low-risk operations without requiring manual approval for every call.",
+        "analyzers": "Treat security analyzers as evidence inputs rather than hard-deny enforcement unless a separate gate applies their result.",
+        "secrets": "Scope and redact secrets and release them only to the specifically authorized operation; keep control-plane credentials and organizational storage outside the sandbox.",
+        "failure": "Missing, unavailable, or failed controls fail closed and produce an observable terminal or escalated result.",
+        "trustedException": "A trusted local-development exception is explicit, time-bounded, isolated from production and historical data, and cannot silently become the deployment default.",
+        "verification": "Test path traversal, symlink escape, filesystem and network denial, process and resource exhaustion, secret leakage, alternate tool paths, stale execution fencing, and artifact export."
+      },
+      "evidenceCalibration": [
+        {
+          "class": "OBSERVED_PINNED_SOURCE_AND_DERIVED_ASSESSMENT",
+          "receipt": "OUTPUT/compatibility/openhands-assessment.json $.capabilities[?(@.id=='securityBoundaries')] and its four pinned blob references",
+          "supports": "Confirmation policies, analyzers, container workspaces, and redaction surfaces exist; LocalWorkspace is not isolation, analyzers classify rather than deny by themselves, and direct execute_tool bypasses conversation-loop checks."
+        },
+        {
+          "class": "EXECUTED_LOCAL_NON_LLM_PROBE",
+          "receipt": "OUTPUT/compatibility/openhands-local-probe.json",
+          "supports": "A temporary LocalWorkspace and basic terminal/control mechanics were exercised without an LLM or network calls.",
+          "limit": "The probe did not establish isolation or untrusted production behavior."
+        },
+        {
+          "class": "UNKNOWN",
+          "receipt": "OUTPUT/compatibility/openhands-assessment.json $.unknowns",
+          "supports": "Remote/container behavior under Tekroo concurrency and the appropriate production resource envelope remain unqualified."
+        },
+        {
+          "class": "INFERRED_SAFETY_REQUIREMENT",
+          "receipt": "Pinned security surfaces and bypass limitations compared with approved Step 2 prototype stop conditions",
+          "supports": "Untrusted execution requires a provider-independent, mandatory, fail-closed isolation and authorization boundary."
+        }
+      ]
+    },
+    {
+      "order": 12,
+      "id": "NEG-012",
+      "requirement": "The system SHALL NOT assume cancellation rolls back external side effects; commands require idempotency keys and reconciliation after uncertainty.",
+      "risk": "CANCELLATION_SIDE_EFFECTS",
+      "phase1AConfidence": "HIGH",
+      "phase1AProposal": "ADOPT",
+      "observedBasis": "Pause/interrupt cannot roll back external side effects already issued; reconciliation and idempotency are mandatory.",
+      "sourceEvidence": [
+        {
+          "artifact": "OUTPUT/compatibility/openhands-assessment.json",
+          "sha256": "1d5b0d5d59cf5bfce417d2ef9735071b3c371ab23787740e922914006df6062e",
+          "selector": "$.risks[?(@.id=='CANCELLATION_SIDE_EFFECTS')]",
+          "evidenceClass": "STATIC_DOCUMENTED_EXECUTED_DERIVED"
+        }
+      ],
+      "decisionStatus": "PRINCIPAL_APPROVED_COORDINATOR_RECOMMENDATION",
+      "finalDisposition": "ADOPT",
+      "decidedAt": "2026-08-11",
+      "principalStatement": "ADOPT",
+      "adoptedRequirement": "The system SHALL NOT assume cancellation rolls back external side effects; commands require idempotency keys and reconciliation after uncertainty.",
+      "implementationAuthority": "NONE",
+      "decisionRationale": "Pinned OpenHands source establishes that pause and interrupt affect execution control but cannot reverse already issued external effects. Phase 1A did not test destructive production effects. The requirement adopts durable intent, stable idempotency, explicit uncertainty, and authoritative reconciliation without promising universal exactly-once execution.",
+      "recordedConditions": {
+        "durableIntent": "Persist side-effecting command intent and its idempotency key before dispatch.",
+        "keySemantics": "Retries of the same logical operation reuse the key; materially different intent receives a new key.",
+        "propagation": "Carry the idempotency key to the external system when supported.",
+        "localLimit": "Local deduplication may suppress duplicate dispatch but cannot prove whether an external system committed an uncertain operation.",
+        "uncertainty": "After timeout, cancellation, disconnect, crash, fallback, or ambiguous response, record the effect as UNKNOWN and reconcile against authoritative external state.",
+        "retryGate": "Prohibit automatic retry until reconciliation resolves the prior attempt or an explicit bounded policy authorizes continuation.",
+        "cancellationStates": "Track requested, acknowledged, execution stopped, external effects known or unknown, and reconciled separately; never report cancelled as rolled back.",
+        "compensation": "Represent compensation as a new authorized idempotent command with its own evidence, not a historical rewrite.",
+        "lateResults": "Correlate late results to the original attempt and prevent them from silently overriding a reconciled decision.",
+        "riskControls": "Apply stronger preconditions and approval policy to irreversible or high-risk operations.",
+        "completion": "Every asynchronous dispatch and reconciliation completes successfully or exceptionally under an explicit timeout.",
+        "verification": "Test cancellation before, during, and after dispatch; remote commit with lost acknowledgement; duplicate and concurrent retries; fallback; crash; late responses; unavailable remote idempotency; and failed compensation."
+      },
+      "evidenceCalibration": [
+        {
+          "class": "OBSERVED_PINNED_SOURCE_AND_DERIVED_ASSESSMENT",
+          "receipt": "OUTPUT/compatibility/openhands-assessment.json $.capabilities[?(@.id=='cancellation')] and $.risks[?(@.id=='CANCELLATION_SIDE_EFFECTS')]",
+          "supports": "Pause or interrupt stops execution only at defined boundaries and does not roll back already issued external side effects."
+        },
+        {
+          "class": "OBSERVED_FROZEN_ADAPTER_REQUIREMENT",
+          "receipt": "OUTPUT/compatibility/openhands-assessment.json $.adapterRequirements[?(@.id=='IDEMPOTENCY')]",
+          "supports": "The assessment requires idempotency and correlation keys plus reconciliation after timeout, cancellation, fallback, or crash."
+        },
+        {
+          "class": "UNKNOWN",
+          "receipt": "No destructive remote-operation probe is included in the Phase 1A OpenHands evidence",
+          "supports": "Phase 1A did not demonstrate reconciliation or effect certainty against production external systems."
+        },
+        {
+          "class": "INFERRED_SAFETY_REQUIREMENT",
+          "receipt": "Cancellation limits compared with approved execution fencing, retry, and organizational-authority boundaries",
+          "supports": "Cancellation must revoke or stop execution authority without making an unsupported claim that external effects were absent or rolled back."
+        }
+      ]
+    },
+    {
+      "order": 13,
+      "id": "NEG-013",
+      "requirement": "SMA lifecycle, contradiction, consolidation, vector retrieval, or training behavior SHALL NOT be treated as production-proven until an attributable end-to-end vertical slice populates and validates those states.",
+      "risk": "SMA_SOURCE_RUNTIME_GAP",
+      "phase1AConfidence": "HIGH",
+      "phase1AProposal": "ADOPT",
+      "observedBasis": "All 2,921 memory records are raw/non-eligible/hot and every downstream semantic/lifecycle population is zero despite substantial pipeline source.",
+      "sourceEvidence": [
+        {
+          "artifact": "OUTPUT/reports/sma-current-state.json",
+          "sha256": "db41cfc29615d2d280492eba74e4f291acbb9426c1c156ba8e7fcbb5c9c4a35e",
+          "selector": "$.anomalies[?(@.id=='SOURCE_RUNTIME_GAP')]",
+          "evidenceClass": "STATIC_OBSERVED_DERIVED"
+        }
+      ],
+      "decisionStatus": "PRINCIPAL_APPROVED_COORDINATOR_RECOMMENDATION",
+      "finalDisposition": "ADOPT",
+      "decidedAt": "2026-08-11",
+      "principalStatement": "ADOPT",
+      "adoptedRequirement": "SMA lifecycle, contradiction, consolidation, vector retrieval, or training behavior SHALL NOT be treated as production-proven until an attributable end-to-end vertical slice populates and validates those states.",
+      "implementationAuthority": "NONE",
+      "decisionRationale": "The frozen MongoDB snapshot demonstrates intake and storage but contains no downstream semantic or lifecycle population, while substantial source defines those capabilities. The evidence does not establish that those capabilities are absent or broken, and Qdrant was outside the archive. The requirement therefore gates production-proof claims on attributable capability-specific execution and quality evidence without expanding SMA beyond semantic memory.",
+      "recordedConditions": {
+        "capabilitySpecific": "Qualify capture, retrieval, lifecycle, contradiction, consolidation, vector projection, and training independently; passing one does not qualify another.",
+        "attribution": "Record exact source commit, build, configuration, model and prompt versions, input corpus, run identity, timestamps, and raw receipts for every qualification slice.",
+        "initialPath": "The initial applicable slice follows the approved OpenHands-to-SMA-proxy-to-model route with durable capture and bounded memory retrieval.",
+        "quality": "Population is insufficient; held-out cases measure semantic correctness, retrieval usefulness, partition isolation, contradiction precision, lifecycle stability, and deterministic recovery as applicable.",
+        "provenance": "Preserve raw observations and carry revisions and provenance on interpretations, relations, lifecycle state, and vector projections.",
+        "failureRecovery": "Inject persistence, provider, projection, duplicate-delivery, restart, partial-write, and stale-revision failures and prove deterministic idempotent recovery.",
+        "vectorRole": "Qdrant remains a derived rebuildable projection reconciled to Mongo-backed memory and interpretation source revisions.",
+        "unqualifiedState": "A capability without passing attributable evidence remains experimental and cannot be represented as production-proven.",
+        "training": "Level 2 training remains deferred future work and is not required for initial v4 semantic-memory operation.",
+        "authority": "Passing a semantic-memory slice grants neither organizational process authority nor production-deployment approval; security, performance, recovery, and readiness gates remain separate.",
+        "verification": "Retain raw run receipts, expected and actual populations, quality metrics, provenance checks, recovery outcomes, and cross-store reconciliation for each qualified capability."
+      },
+      "evidenceCalibration": [
+        {
+          "class": "OBSERVED_AND_COMPUTED_RUNTIME_SNAPSHOT",
+          "receipt": "OUTPUT/reports/sma-current-state.json $.runtimeFindings and $.anomalies[?(@.id=='SOURCE_RUNTIME_GAP')]",
+          "supports": "The frozen MongoDB snapshot contains 2,921 memory documents and zero interpretations, lifecycle transitions, canonical texts, embedding references, edges, retrieval events, consolidated memories, training candidates, raw artifacts, and themes."
+        },
+        {
+          "class": "OBSERVED_STATIC_SOURCE",
+          "receipt": "OUTPUT/reports/sma-current-state.json $.components and $.source.overlay.relevantFiles",
+          "supports": "Substantial source defines replay, lifecycle, contradiction, consolidation, vector, retrieval, and training-related structures."
+        },
+        {
+          "class": "UNKNOWN",
+          "receipt": "OUTPUT/reports/sma-current-state.json $.unknowns",
+          "supports": "Qdrant population, semantic quality, retrieval usefulness, successful replay, and the executable version responsible for each runtime memory are not established."
+        },
+        {
+          "class": "INFERRED_QUALIFICATION_REQUIREMENT",
+          "receipt": "Source/runtime gap compared with approved Step 4 SMA authority and qualification boundaries",
+          "supports": "Only attributable end-to-end execution plus semantic-quality and recovery evidence can qualify a particular SMA capability as production-proven."
+        }
+      ]
+    },
+    {
+      "order": 14,
+      "id": "NEG-014",
+      "requirement": "The system SHALL NOT infer causality, handling, quality, or abandonment from timestamp order, intended recipients, message frequency, static vocabulary overlap, or snapshot non-completion alone.",
+      "risk": "EVIDENCE_INTEGRITY",
+      "phase1AConfidence": "HIGH",
+      "phase1AProposal": "ADOPT",
+      "observedBasis": "TASKS 003–008 each record one or more of these inference limits.",
+      "sourceEvidence": [
+        {
+          "artifact": "OUTPUT/evidence/canonical-events.json",
+          "sha256": "00492b1395c7ce5e991002fb5233820b1a8181af47a5c6159ac502ef343722cc",
+          "selector": "$.scopePolicy",
+          "evidenceClass": "OBSERVED_NORMALIZED"
+        },
+        {
+          "artifact": "OUTPUT/workflows/process-graph.json",
+          "sha256": "f9c77a2575798441e36db776ca494cc250df9ce7ad590f677788c356cdc200be",
+          "selector": "$.unknowns",
+          "evidenceClass": "DERIVED"
+        },
+        {
+          "artifact": "OUTPUT/workflows/catastrophic-runs.json",
+          "sha256": "7973f9dc16d1d2c0cede508fc8e400901ea0dbcf550041871bbb4f616c5986fa",
+          "selector": "$.unknowns",
+          "evidenceClass": "DERIVED"
+        }
+      ],
+      "decisionStatus": "PRINCIPAL_APPROVED_COORDINATOR_RECOMMENDATION",
+      "finalDisposition": "ADOPT",
+      "decidedAt": "2026-08-11",
+      "principalStatement": "ADOPT",
+      "adoptedRequirement": "The system SHALL NOT infer causality, handling, quality, or abandonment from timestamp order, intended recipients, message frequency, static vocabulary overlap, or snapshot non-completion alone.",
+      "implementationAuthority": "NONE",
+      "decisionRationale": "The frozen event and workflow analyses explicitly separate presentation order from causality, intended routing from handling, frequency from quality, source presence from runtime attribution, and snapshot non-completion from abandonment. The requirement adopts those evidence limits as a durable epistemic boundary while permitting clearly labelled hypotheses and stronger conclusions when corroborating evidence exists.",
+      "recordedConditions": {
+        "evidenceClasses": "Preserve raw observed, normalized, computed or derived, inferred, and asserted evidence as distinct classes.",
+        "derivedProvenance": "Every derived or inferred claim records inputs, method and version, confidence, limitations, and raw receipts.",
+        "causality": "Timestamp or presentation order does not establish causality; require an explicit causal identifier or separately supported auditable adjudication.",
+        "handling": "Keep intended recipient, delivery, receipt, claim, handling, effect, acceptance, and ownership as distinct facts.",
+        "frequency": "Frequency establishes occurrence only and cannot alone establish validity, importance, quality, canonical status, progress, or harm.",
+        "staticRuntime": "Static source or vocabulary overlap establishes implementation presence, not runtime execution or historical responsibility.",
+        "rightCensoring": "Snapshot non-completion remains right-censored unless an explicit terminal, abandonment, cancellation, or supersession fact exists.",
+        "quality": "Role performance and work quality require direct outcome and validation evidence rather than message count, duration, or role label alone.",
+        "joins": "A referenced record without a performed source join remains REFERENCED_NOT_OBSERVED.",
+        "decisionUse": "Derived signals may nominate investigation or trigger review but cannot silently become canonical organizational facts.",
+        "hypotheses": "Clearly labelled hypotheses remain permitted and identify the evidence needed for confirmation or rejection.",
+        "verification": "Test shuffled timestamps, addressed-but-unhandled messages, duplicate frequency, dead or static code, absent joins, snapshot cutoff, and conflicting evidence."
+      },
+      "evidenceCalibration": [
+        {
+          "class": "OBSERVED_NORMALIZED_SCOPE",
+          "receipt": "OUTPUT/evidence/canonical-events.json $.scopePolicy and $.unknowns",
+          "supports": "TASK-003 included teams.messages only, performed no joins, distinguished intended recipients from evidenced handlers, and left historical catalogue intervals unknown."
+        },
+        {
+          "class": "DERIVED_PROCESS_GRAPH",
+          "receipt": "OUTPUT/workflows/process-graph.json $.unknowns",
+          "supports": "Referenced-only nodes were retained without source resolution, timestamp order did not produce causal edges, and unsupported semantic relationships were not emitted."
+        },
+        {
+          "class": "DERIVED_WORKFLOW_ANALYSES",
+          "receipt": "OUTPUT/workflows/workflow-patterns.json $.method and $.unknowns; OUTPUT/workflows/loop-analysis.json $.method and $.unknowns",
+          "supports": "Frequency and repetition were explicitly separated from quality, motive, root cause, and unchanged-condition claims."
+        },
+        {
+          "class": "DERIVED_RIGHT_CENSORING_LIMIT",
+          "receipt": "OUTPUT/workflows/catastrophic-runs.json $.unknowns",
+          "supports": "No completion observed within the snapshot is one severity signal and not proof of abandonment."
+        },
+        {
+          "class": "OBSERVED_STATIC_RUNTIME_LIMIT",
+          "receipt": "OUTPUT/reports/phase-1a-synthesis.json tension TENSION-003",
+          "supports": "Static vocabulary overlap cannot attribute historical execution, and static test presence is not historical passing-test evidence."
+        },
+        {
+          "class": "PRINCIPAL_APPROVED_EVIDENCE_CONSTRAINT",
+          "receipt": "Principal statement ADOPT",
+          "supports": "The weakest supported claim is binding unless corroborating evidence justifies a stronger one."
+        }
+      ]
+    }
+  ],
+  "counts": {
+    "requirementCount": 14,
+    "principalDecisionsRecorded": 14,
+    "pending": 0
+  }
+}

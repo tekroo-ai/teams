@@ -1,0 +1,5 @@
+CONTRACTS/tekroo.kernel.contracts/0.1.0/** text eol=lf -whitespace
+OUTPUT/** text eol=lf -whitespace
+PHASE-1B/** text eol=lf -whitespace
+PHASE-2/** text eol=lf -whitespace
+scripts/generate_phase2_contract.mjs text eol=lf -whitespace
