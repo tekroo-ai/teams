@@ -30,7 +30,7 @@ func (e *ExecutionEngine) Start(ctx context.Context, request kernel.StartExecuti
 	if err := ctx.Err(); err != nil {
 		return kernel.ExecutionObservation{}, err
 	}
-	if !request.ActorFQN.Valid() || !request.ExecutionID.Valid() || request.FencingEpoch == 0 || request.IdempotencyKey == "" {
+	if !request.ActorFQN.Valid() || !request.ExecutionID.Valid() || request.FencingEpoch == 0 || !request.RuntimeIdentity.Valid() || request.IdempotencyKey == "" {
 		return kernel.ExecutionObservation{}, ErrExecutionConflict
 	}
 	e.mu.Lock()

@@ -1,0 +1,130 @@
+{
+  "schemaVersion": "1.0.0",
+  "reportType": "PHASE_3_DETERMINISTIC_EXECUTION_COORDINATOR",
+  "status": "PASS",
+  "acceptedBaseCommit": "476e6a4c9daf600acbaab7967eb5c0f001a40c26",
+  "acceptedBaseTree": "dd0b7391f1fb5e519d2ac3cca1a65e1ef490c895",
+  "contractIdentity": "tekroo.kernel.contracts/0.2.0",
+  "manifestSha256": "cd582fb163e17d49a1a0a627f33cdbb184d15ecace3200981738782cca977dae",
+  "sourceTreeSha256": "f711932ecc318c4b596e55627d3795ee677bdb805e8103882a2aa7a225e1b3b6",
+  "environment": {
+    "goVersion": "go1.26.4",
+    "goos": "darwin",
+    "goarch": "arm64",
+    "locale": "C",
+    "timeZone": "UTC"
+  },
+  "executed": {
+    "focusedTestCases": 92,
+    "focusedTestFailures": 0,
+    "focusedPackagesPassed": 4,
+    "regressionTestCases": 238,
+    "regressionTestFailures": 0,
+    "regressionPackagesPassed": 13,
+    "vetFailures": 0
+  },
+  "assertions": [
+    {
+      "id": "EXEC-001-AUTH-BEFORE-START",
+      "status": "PASS",
+      "tests": [
+        "TestExecutionCoordinatorCommitsRegistryBeforeFakeProviderStart",
+        "TestExecutionCoordinatorRejectsMisalignedOrDeniedStartBeforeProvider"
+      ],
+      "evidenceFloor": "The exact execution registry transition is committed before provider Start; misalignment or rejection has no provider effect."
+    },
+    {
+      "id": "EXEC-002-IDEMPOTENT-CAS",
+      "status": "PASS",
+      "tests": [
+        "TestExecutionCoordinatorAuthorizesBeforeOneIdempotentStart",
+        "TestExecutionCoordinatorConcurrentReplayHasOneProviderEffect"
+      ],
+      "evidenceFloor": "Stable start identity and compare-and-set control transitions produce one provider effect across replay, restart, and concurrent invocation."
+    },
+    {
+      "id": "EXEC-003-BOUNDED-UNCERTAINTY",
+      "status": "PASS",
+      "tests": [
+        "TestExecutionCoordinatorTimeoutIsUncertainAndReconcilesWithinBudget",
+        "TestExecutionCoordinatorRejectsWrongObservationAndBoundsReconciliation"
+      ],
+      "evidenceFloor": "Post-dispatch timeout and identity mismatch remain UNCERTAIN; exact reconciliation is explicit and finite."
+    },
+    {
+      "id": "EXEC-004-LIMITS-ANTI-THRASH",
+      "status": "PASS",
+      "tests": [
+        "TestExecutionControlStoreEnforcesCapacityAndAntiThrash"
+      ],
+      "evidenceFloor": "Atomic total/per-actor capacity and finite per-actor start-window limits fail closed, including uncertain capacity."
+    },
+    {
+      "id": "EXEC-005-PORT-CONFORMANCE",
+      "status": "PASS",
+      "tests": [
+        "TestExecutionCoordinatorStopAndInspectPreserveExactIdentity",
+        "TestExecutionEngineReplaysStartAndStops"
+      ],
+      "evidenceFloor": "Start, stop, inspect, and reconcile preserve exact provider-neutral identity and bounded completion."
+    },
+    {
+      "id": "EXEC-006-BOUNDARY",
+      "status": "PASS",
+      "tests": [
+        "TestApplicationProductionImportsRemainKernelOnly"
+      ],
+      "evidenceFloor": "Application coordination imports only the kernel and no MongoDB, live provider, OpenHands, SMA, or Git implementation."
+    }
+  ],
+  "excludedProfiles": [
+    {
+      "profile": "live-providers",
+      "reason": "OpenHands and other live execution providers are not adopted or exercised."
+    },
+    {
+      "profile": "production-control-persistence",
+      "reason": "The in-memory operational control store is a deterministic reference, not production durability evidence."
+    },
+    {
+      "profile": "work-dag-and-release",
+      "reason": "Automated assignment, validation, completion/reopening, escalation, and Git/provider release execution remain later slices."
+    },
+    {
+      "profile": "sma",
+      "reason": "SMA integration and investigation remain separately authorized."
+    },
+    {
+      "profile": "deployment-migration-security-performance",
+      "reason": "Production deployment, migration, isolation, load, latency, and throughput are not exercised."
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "OUTPUT/phase-3/step-4-execution-coordinator-tests.jsonl",
+      "sha256": "3e226908ffd18716ebd98ee88e7195ff5d48cdd3662f2d04be1805e0dd8dd692"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-4-full-regression-tests.jsonl",
+      "sha256": "2871da8567279567b4f6bf2fe57101b26b09eed40ccc381f3f737a2940681901"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-3-acceptance.json",
+      "sha256": "ad8449796374fcf79a1ed8fcecafe2e8a4284a606e28d541b54ade775f6dc6d2"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-3-release-receipt.json",
+      "sha256": "742f4f58904bccf2029c0c07097d0c603cf424b0778c6b012c38c844ba0e98fa"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-4-authorization.json",
+      "sha256": "d858372160cbae86f87753b76498f4a9e5f4f763fccc04cda83ae5a7245a6545"
+    },
+    {
+      "path": "docs/architecture/005-deterministic-execution-coordinator.md",
+      "sha256": "74efe02763e6ebec5b187d7857505a65f8c3603002642143a60602edc4e2468c"
+    }
+  ],
+  "digestMethod": "SHA-256 of compact JSON with reportSha256 set to the empty string",
+  "reportSha256": "26d6aea36b87efaa5cfe5f8135ae5c2b52d7b49c6c78af6d3097b9f32d01b94b"
+}

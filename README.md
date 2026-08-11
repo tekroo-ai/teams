@@ -78,6 +78,19 @@ remain undefined and are not aliases. Broad routing, live providers, changes to
 MongoDB delivery mechanics, OpenHands/SMA E2E, deployment, migration, and
 performance remain unqualified.
 
+**COMPUTED GATE RESULT:** Phase 3 Step 4
+`deterministic-execution-coordinator` is `PASS`. Its raw race-enabled receipts
+contain 92 focused kernel/application/reference-adapter test cases across 4
+packages and 238 full-regression test cases across 13 packages, with zero test
+or vet failures. The coordinator commits an exact execution-registry command
+before provider start, binds FQN, execution fence, runtime identity, and
+idempotency, and records provider timeout or identity mismatch as explicit
+`UNCERTAIN` state requiring finite reconciliation. Atomic instance and restart
+window limits fail closed. Only the deterministic fake engine and in-memory
+operational control store are qualified; live providers, production control
+persistence, automated work-DAG/release coordination, OpenHands, SMA,
+deployment, migration, security isolation, and performance remain unqualified.
+
 The frozen contract identity is:
 
 ```text
@@ -175,6 +188,15 @@ go run ./cmd/channel-report
 go run ./cmd/channel-report -verify OUTPUT/phase-3/step-3-channel-gate.json
 ```
 
+The Phase 3 Step 4 runner preserves raw execution-coordinator and
+full-regression receipts, runs `go vet`, and verifies accepted-base, source-tree,
+and artifact digests:
+
+```sh
+go run ./cmd/execution-coordinator-report
+go run ./cmd/execution-coordinator-report -verify OUTPUT/phase-3/step-4-execution-coordinator-gate.json
+```
+
 ## Contract validation
 
 The checked-in reference tools require Node.js and write their reports only to
@@ -233,4 +255,9 @@ go run ./cmd/core-hermetic-report -verify build/reports/core-hermetic.json
 - [Phase 3 Step 3 authority](OUTPUT/phase-3/step-3-authorization.json)
 - [Phase 3 exact-directed channel boundary](docs/architecture/004-exact-directed-channel-adapter.md)
 - [Phase 3 Step 3 exact-directed channel gate](OUTPUT/phase-3/step-3-channel-gate.json)
+- [Phase 3 Step 3 acceptance](OUTPUT/phase-3/step-3-acceptance.json)
+- [Phase 3 Step 3 release receipt](OUTPUT/phase-3/step-3-release-receipt.json)
+- [Phase 3 Step 4 authority](OUTPUT/phase-3/step-4-authorization.json)
+- [Phase 3 deterministic execution-coordinator boundary](docs/architecture/005-deterministic-execution-coordinator.md)
+- [Phase 3 Step 4 execution-coordinator gate](OUTPUT/phase-3/step-4-execution-coordinator-gate.json)
 - [Historical Step 2 `0.1.0` encoding-gap record](OUTPUT/phase-2/step-2-contract-encoding-gaps.md)

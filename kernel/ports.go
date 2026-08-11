@@ -49,10 +49,11 @@ const (
 )
 
 type StartExecutionRequest struct {
-	ActorFQN       ActorFQN
-	ExecutionID    UUIDv7
-	FencingEpoch   uint64
-	IdempotencyKey string
+	ActorFQN        ActorFQN
+	ExecutionID     UUIDv7
+	FencingEpoch    uint64
+	RuntimeIdentity Digest
+	IdempotencyKey  string
 }
 
 type ExecutionObservation struct {

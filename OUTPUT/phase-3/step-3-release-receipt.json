@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "RELEASE_RECEIPT",
+  "recordedOn": "2026-08-11",
+  "timePrecision": "DAY",
+  "repository": "https://github.com/tekroo-ai/teams.git",
+  "branch": "main",
+  "priorRemoteCommit": "7f01bb8d67a30f90c714d6cccc176c48b7a31a11",
+  "releasedCommit": "476e6a4c9daf600acbaab7967eb5c0f001a40c26",
+  "releasedTree": "dd0b7391f1fb5e519d2ac3cca1a65e1ef490c895",
+  "observedRemoteCommitAfterPush": "476e6a4c9daf600acbaab7967eb5c0f001a40c26",
+  "pushRefspec": "476e6a4c9daf600acbaab7967eb5c0f001a40c26:refs/heads/main",
+  "gateReport": "OUTPUT/phase-3/step-3-channel-gate.json",
+  "gateReportFileSha256": "b19fd827152b97ec62b52f1253f2ef3d54b9911630144749709255077aa6e7a9",
+  "gateReportSelfSha256": "d6807c4a5896dfe6e95d9334adb30a313f784eb06bd07edca3e02a050d298e77",
+  "verification": {
+    "worktreeCleanBeforePush": true,
+    "gateSelfVerificationBeforePush": "PASS",
+    "remoteCommitMatchedAfterPush": true,
+    "remoteTreeMatchedAfterPush": true
+  },
+  "qualificationBoundary": "This releases only the accepted exact-directed channel tree; excluded provider, Mongo-delivery, broad-routing, OpenHands/SMA, deployment, migration, and performance profiles remain unqualified."
+}

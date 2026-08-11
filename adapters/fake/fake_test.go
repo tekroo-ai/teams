@@ -30,10 +30,11 @@ func TestClockAndIDSourceAreDeterministic(t *testing.T) {
 func TestExecutionEngineReplaysStartAndStops(t *testing.T) {
 	engine := fake.NewExecutionEngine()
 	request := kernel.StartExecutionRequest{
-		ActorFQN:       kernel.ActorFQN("teams::coder-1"),
-		ExecutionID:    kernel.UUIDv7("00000000-0000-7000-8000-000000000001"),
-		FencingEpoch:   1,
-		IdempotencyKey: "start-coder-1-epoch-1",
+		ActorFQN:        kernel.ActorFQN("teams::coder-1"),
+		ExecutionID:     kernel.UUIDv7("00000000-0000-7000-8000-000000000001"),
+		FencingEpoch:    1,
+		RuntimeIdentity: kernel.Digest("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
+		IdempotencyKey:  "start-coder-1-epoch-1",
 	}
 	first, err := engine.Start(context.Background(), request)
 	if err != nil || first.State != kernel.ExecutionRunning {

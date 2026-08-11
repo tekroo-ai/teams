@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "PHASE_STEP_AUTHORIZATION",
+  "recordedOn": "2026-08-11",
+  "timePrecision": "DAY",
+  "principalStatement": "Proceed with Step 4.",
+  "phase": "PHASE_3",
+  "step": "STEP_4_DETERMINISTIC_EXECUTION_COORDINATOR",
+  "authorizedScope": [
+    "provider-neutral execution coordinator over the accepted AgentExecutionEngine port",
+    "durable kernel authorization before provider start",
+    "exact actor FQN, execution ID, fencing epoch, runtime identity, and idempotency alignment",
+    "explicit operational execution states with bounded start, stop, inspect, and reconcile calls",
+    "finite instance limits, restart-rate limits, and reconciliation attempts",
+    "deterministic fake-engine and in-memory operational-store qualification"
+  ],
+  "excludedScope": [
+    "OpenHands or any live execution provider adoption",
+    "SMA integration or investigation",
+    "production operational persistence or deployment",
+    "Git/provider release execution",
+    "automated work-DAG assignment, validation, completion, reopening, or escalation policy",
+    "migration, performance, security-isolation, and paid-provider qualification"
+  ],
+  "acceptedInputCommit": "476e6a4c9daf600acbaab7967eb5c0f001a40c26",
+  "acceptedInputTree": "dd0b7391f1fb5e519d2ac3cca1a65e1ef490c895"
+}
