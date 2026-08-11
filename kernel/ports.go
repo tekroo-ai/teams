@@ -11,11 +11,12 @@ var (
 	ErrCommitUncertain          = errors.New("decision commit acknowledgement uncertain")
 	ErrCommandIdentityConflict  = errors.New("command identity conflict")
 	ErrIdempotencyKeyConflict   = errors.New("idempotency key reuse conflict")
+	ErrReceiptAccessDenied      = errors.New("receipt read access denied")
 )
 
 type KernelDecisionStore interface {
-	Load(context.Context, AggregateRef) (Snapshot, error)
-	LookupReceipt(context.Context, KernelCommand) (CommandReceipt, bool, error)
+	LoadDecision(context.Context, KernelCommand) (Snapshot, error)
+	LookupReceipt(context.Context, KernelCommand, time.Time) (CommandReceipt, bool, error)
 	RecordIdentityConflict(context.Context, IdentityConflictAudit) error
 	Commit(context.Context, Snapshot, Decision) error
 }

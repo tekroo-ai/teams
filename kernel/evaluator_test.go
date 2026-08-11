@@ -97,8 +97,99 @@ func TestEvaluatorSeparatesInvalidTrustedContextFromDomainRejection(t *testing.T
 	}
 }
 
+func TestEvaluatorUsesCurrentPolicyAndDoesNotDiscloseUnreadableTargets(t *testing.T) {
+	evaluator := kernel.Evaluator{Catalogue: loadCatalogue(t)}
+	command := validStoryCreateCommand(t)
+	command.CommandType = "tekroo.command.story.authorize"
+	command.ExpectedRevision = kernel.NewExpectedRevision(1)
+	command.Payload = json.RawMessage(`{"scope_revision":1,"reason":"approved"}`)
+	context := validDecisionContext(t)
+	grant := grantFor(command.Authority, command, context.Provenance.GrantDigests[0])
+	grant.Scope.CanReadTarget = false
+	snapshot := kernel.Snapshot{Authorization: authorizationPolicy(grant)}
+
+	decision := evaluate(t, evaluator, command, snapshot, context)
+	if decision.Receipt.OutcomeCode != kernel.OutcomeRejectedUnauthorized || decision.Receipt.ReasonCode != "UNAUTHORIZED" {
+		t.Fatalf("non-disclosing decision = %#v", decision.Receipt)
+	}
+	grant.Scope.CanReadTarget = true
+	snapshot.Authorization = authorizationPolicy(grant)
+	decision = evaluate(t, evaluator, command, snapshot, context)
+	if decision.Receipt.OutcomeCode != kernel.OutcomeRejectedNotFound || decision.Receipt.ReasonCode != "TARGET_NOT_FOUND" {
+		t.Fatalf("read-authorized absent decision = %#v", decision.Receipt)
+	}
+
+	grant.Revoked = true
+	snapshot.Authorization = authorizationPolicy(grant)
+	decision = evaluate(t, evaluator, command, snapshot, context)
+	if decision.Receipt.OutcomeCode != kernel.OutcomeRejectedUnauthorized || len(decision.Provenance.GrantDigests) != 0 {
+		t.Fatalf("revoked decision = %#v, provenance = %#v", decision.Receipt, decision.Provenance)
+	}
+}
+
+func TestEvaluatorEnforcesCanonicalExactRelatedPreconditions(t *testing.T) {
+	evaluator := kernel.Evaluator{Catalogue: loadCatalogue(t)}
+	command := validStoryCreateCommand(t)
+	context := validDecisionContext(t)
+	related := kernel.AggregateRef{Kind: kernel.AggregateStory, ID: mustUUID(t, "00000000-0000-7000-8000-0000000000d1")}
+	command.Preconditions = []kernel.AggregatePrecondition{{Aggregate: related, Expected: kernel.NewExpectedRevision(3)}}
+	snapshot := kernel.Snapshot{Related: map[kernel.AggregateRef]kernel.RelatedSnapshot{related: {Exists: true, Revision: 3}}}
+
+	if decision := evaluate(t, evaluator, command, snapshot, context); decision.Receipt.OutcomeCode != kernel.OutcomeApplied {
+		t.Fatalf("exact related precondition = %#v", decision.Receipt)
+	}
+	for name, relatedSnapshot := range map[string]kernel.RelatedSnapshot{
+		"stale":   {Exists: true, Revision: 2},
+		"future":  {Exists: true, Revision: 4},
+		"missing": {},
+	} {
+		t.Run(name, func(t *testing.T) {
+			candidate := snapshot
+			candidate.Related = map[kernel.AggregateRef]kernel.RelatedSnapshot{related: relatedSnapshot}
+			if decision := evaluate(t, evaluator, command, candidate, context); decision.Receipt.OutcomeCode != kernel.OutcomeRejectedConflict {
+				t.Fatalf("decision = %#v", decision.Receipt)
+			}
+		})
+	}
+
+	absent := command
+	absent.Preconditions = []kernel.AggregatePrecondition{{Aggregate: related, Expected: kernel.MustNotExist()}}
+	snapshot.Related[related] = kernel.RelatedSnapshot{}
+	if decision := evaluate(t, evaluator, absent, snapshot, context); decision.Receipt.OutcomeCode != kernel.OutcomeApplied {
+		t.Fatalf("MUST_NOT_EXIST absent = %#v", decision.Receipt)
+	}
+	snapshot.Related[related] = kernel.RelatedSnapshot{Exists: true, Revision: 1}
+	if decision := evaluate(t, evaluator, absent, snapshot, context); decision.Receipt.OutcomeCode != kernel.OutcomeRejectedConflict {
+		t.Fatalf("MUST_NOT_EXIST existing = %#v", decision.Receipt)
+	}
+
+	zero := command
+	zero.Preconditions[0].Expected = kernel.ExpectedRevision{}
+	if decision := evaluate(t, evaluator, zero, snapshot, context); decision.Receipt.OutcomeCode != kernel.OutcomeRejectedInvalid {
+		t.Fatalf("zero precondition = %#v", decision.Receipt)
+	}
+	second := kernel.AggregateRef{Kind: kernel.AggregateStory, ID: mustUUID(t, "00000000-0000-7000-8000-0000000000d0")}
+	unordered := command
+	unordered.Preconditions = []kernel.AggregatePrecondition{
+		{Aggregate: related, Expected: kernel.NewExpectedRevision(3)},
+		{Aggregate: second, Expected: kernel.NewExpectedRevision(1)},
+	}
+	if decision := evaluate(t, evaluator, unordered, snapshot, context); decision.Receipt.OutcomeCode != kernel.OutcomeRejectedInvalid {
+		t.Fatalf("unordered vector = %#v", decision.Receipt)
+	}
+}
+
 func evaluate(t *testing.T, evaluator kernel.Evaluator, command kernel.KernelCommand, snapshot kernel.Snapshot, context kernel.DecisionContext) kernel.Decision {
 	t.Helper()
+	if !snapshot.Authorization.PolicyDigest.Valid() {
+		snapshot.Authorization = kernel.AuthorizationPolicy{
+			PolicyDigest: context.Provenance.PolicyDigest, Revision: context.Provenance.PolicyRevision,
+			Grants: []kernel.AuthorityGrant{{
+				GrantDigest: context.Provenance.GrantDigests[0], Grantee: command.Authority,
+				Scope: kernel.AuthorityScope{CommandTypes: []string{command.CommandType}, TargetKinds: []kernel.AggregateKind{command.Target.Kind}, TargetIDs: []kernel.UUIDv7{command.Target.ID}, CanReadTarget: true},
+			}},
+		}
+	}
 	decision, err := evaluator.Evaluate(command, snapshot, context)
 	if err != nil {
 		t.Fatalf("evaluate: %v", err)
@@ -152,6 +243,7 @@ func validProvenanceBasis(t *testing.T) kernel.ProvenanceBasis {
 	return kernel.ProvenanceBasis{
 		CatalogueDigest: mustDigest(t, "8888888888888888888888888888888888888888888888888888888888888888"),
 		PolicyDigest:    mustDigest(t, "9999999999999999999999999999999999999999999999999999999999999999"),
+		PolicyRevision:  1,
 		GrantDigests:    []kernel.Digest{mustDigest(t, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")},
 		Source: kernel.SourceIdentity{
 			Repository: "github.com/tekroo-ai/teams", Commit: "test-source", TreeDigest: sourceDigest, Scope: ".",

@@ -16,6 +16,7 @@ func ProvenanceBasis() (kernel.ProvenanceBasis, error) {
 	return kernel.ProvenanceBasis{
 		CatalogueDigest: kernel.Digest("8888888888888888888888888888888888888888888888888888888888888888"),
 		PolicyDigest:    kernel.Digest("9999999999999999999999999999999999999999999999999999999999999999"),
+		PolicyRevision:  1,
 		GrantDigests:    []kernel.Digest{kernel.Digest("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")},
 		Source: kernel.SourceIdentity{
 			Repository: "github.com/tekroo-ai/teams", Commit: "deterministic-fake", TreeDigest: sourceDigest, Scope: ".",

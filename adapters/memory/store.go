@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/tekroo-ai/teams/kernel"
 )
@@ -34,20 +35,23 @@ const (
 )
 
 type Store struct {
-	mu                sync.RWMutex
-	states            map[kernel.AggregateRef]kernel.AggregateState
-	revisions         map[kernel.AggregateRef]uint64
-	receipts          map[kernel.UUIDv7]kernel.CommandReceipt
-	commandBindings   map[kernel.UUIDv7]decisionIdentity
-	idempotency       map[kernel.Digest]decisionIdentity
-	events            map[kernel.UUIDv7]kernel.DomainEvent
-	executions        map[kernel.ActorFQN]kernel.ExecutionTuple
-	evidence          map[kernel.UUIDv7]kernel.EvidenceMetadata
-	authority         map[kernel.UUIDv7]kernel.AuthorityDecision
-	outbox            map[kernel.UUIDv7]kernel.OutboxIntent
-	identityConflicts []kernel.IdentityConflictAudit
-	provenance        map[kernel.Digest]kernel.DecisionProvenance
-	faultPoint        FaultPoint
+	mu                  sync.RWMutex
+	states              map[kernel.AggregateRef]kernel.AggregateState
+	revisions           map[kernel.AggregateRef]uint64
+	receipts            map[kernel.UUIDv7]kernel.CommandReceipt
+	commandBindings     map[kernel.UUIDv7]decisionIdentity
+	idempotency         map[kernel.Digest]decisionIdentity
+	events              map[kernel.UUIDv7]kernel.DomainEvent
+	executions          map[kernel.ActorFQN]kernel.ExecutionTuple
+	evidence            map[kernel.UUIDv7]kernel.EvidenceMetadata
+	authority           map[kernel.UUIDv7]kernel.AuthorityDecision
+	outbox              map[kernel.UUIDv7]kernel.OutboxIntent
+	identityConflicts   []kernel.IdentityConflictAudit
+	provenance          map[kernel.Digest]kernel.DecisionProvenance
+	authorizationPolicy kernel.AuthorizationPolicy
+	openReviews         map[kernel.CompletionReviewKey]kernel.AggregateRef
+	attemptBudgets      map[kernel.AttemptBudgetKey]kernel.AttemptBudgetSnapshot
+	faultPoint          FaultPoint
 }
 
 func (s *Store) RecordIdentityConflict(ctx context.Context, audit kernel.IdentityConflictAudit) error {
@@ -75,14 +79,14 @@ type decisionIdentity struct {
 	Scope       kernel.Digest
 }
 
-func NewStoreWithFault(point FaultPoint) *Store {
-	store := NewStore()
+func NewStoreWithFault(point FaultPoint, policy ...kernel.AuthorizationPolicy) *Store {
+	store := NewStore(policy...)
 	store.faultPoint = point
 	return store
 }
 
-func NewStore() *Store {
-	return &Store{
+func NewStore(policy ...kernel.AuthorizationPolicy) *Store {
+	store := &Store{
 		states:          make(map[kernel.AggregateRef]kernel.AggregateState),
 		revisions:       make(map[kernel.AggregateRef]uint64),
 		receipts:        make(map[kernel.UUIDv7]kernel.CommandReceipt),
@@ -94,7 +98,19 @@ func NewStore() *Store {
 		authority:       make(map[kernel.UUIDv7]kernel.AuthorityDecision),
 		outbox:          make(map[kernel.UUIDv7]kernel.OutboxIntent),
 		provenance:      make(map[kernel.Digest]kernel.DecisionProvenance),
+		openReviews:     make(map[kernel.CompletionReviewKey]kernel.AggregateRef),
+		attemptBudgets:  make(map[kernel.AttemptBudgetKey]kernel.AttemptBudgetSnapshot),
 	}
+	if len(policy) == 1 {
+		store.authorizationPolicy = cloneAuthorizationPolicy(policy[0])
+	}
+	return store
+}
+
+func (s *Store) SetAuthorizationPolicy(policy kernel.AuthorizationPolicy) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.authorizationPolicy = cloneAuthorizationPolicy(policy)
 }
 
 func (s *Store) Load(ctx context.Context, target kernel.AggregateRef) (kernel.Snapshot, error) {
@@ -103,6 +119,19 @@ func (s *Store) Load(ctx context.Context, target kernel.AggregateRef) (kernel.Sn
 	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+	return s.loadLocked(target, nil), nil
+}
+
+func (s *Store) LoadDecision(ctx context.Context, command kernel.KernelCommand) (kernel.Snapshot, error) {
+	if err := ctx.Err(); err != nil {
+		return kernel.Snapshot{}, err
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.loadLocked(command.Target, command.Preconditions), nil
+}
+
+func (s *Store) loadLocked(target kernel.AggregateRef, preconditions []kernel.AggregatePrecondition) kernel.Snapshot {
 	revision, found := s.revisions[target]
 	snapshot := kernel.Snapshot{Exists: found, Revision: revision}
 	if found {
@@ -123,10 +152,29 @@ func (s *Store) Load(ctx context.Context, target kernel.AggregateRef) (kernel.Sn
 	for evidenceID, metadata := range s.evidence {
 		snapshot.Evidence[evidenceID] = metadata
 	}
-	return snapshot, nil
+	snapshot.Related = make(map[kernel.AggregateRef]kernel.RelatedSnapshot, len(preconditions))
+	for _, precondition := range preconditions {
+		relatedRevision, relatedExists := s.revisions[precondition.Aggregate]
+		related := kernel.RelatedSnapshot{Exists: relatedExists, Revision: relatedRevision}
+		if state, hasState := s.states[precondition.Aggregate]; hasState {
+			copy := state.Clone()
+			related.State = &copy
+		}
+		snapshot.Related[precondition.Aggregate] = related
+	}
+	snapshot.Authorization = cloneAuthorizationPolicy(s.authorizationPolicy)
+	snapshot.OpenReviews = make(map[kernel.CompletionReviewKey]kernel.AggregateRef, len(s.openReviews))
+	for key, review := range s.openReviews {
+		snapshot.OpenReviews[key] = review
+	}
+	snapshot.AttemptBudgets = make(map[kernel.AttemptBudgetKey]kernel.AttemptBudgetSnapshot, len(s.attemptBudgets))
+	for key, budget := range s.attemptBudgets {
+		snapshot.AttemptBudgets[key] = cloneAttemptBudgetSnapshot(budget)
+	}
+	return snapshot
 }
 
-func (s *Store) LookupReceipt(ctx context.Context, command kernel.KernelCommand) (kernel.CommandReceipt, bool, error) {
+func (s *Store) LookupReceipt(ctx context.Context, command kernel.KernelCommand, at time.Time) (kernel.CommandReceipt, bool, error) {
 	if err := ctx.Err(); err != nil {
 		return kernel.CommandReceipt{}, false, err
 	}
@@ -142,6 +190,9 @@ func (s *Store) LookupReceipt(ctx context.Context, command kernel.KernelCommand)
 	defer s.mu.RUnlock()
 	receipt, found := s.receipts[command.CommandID]
 	if found {
+		if !s.canReadReceipt(command, at) {
+			return kernel.CommandReceipt{}, false, kernel.ErrReceiptAccessDenied
+		}
 		binding := s.commandBindings[command.CommandID]
 		if binding.Fingerprint != fingerprint || binding.Scope != scope {
 			return kernel.CommandReceipt{}, false, ErrCommandIdentityConflict
@@ -149,12 +200,24 @@ func (s *Store) LookupReceipt(ctx context.Context, command kernel.KernelCommand)
 		return cloneReceipt(receipt), true, nil
 	}
 	if prior, scoped := s.idempotency[scope]; scoped {
+		if !s.canReadReceipt(command, at) {
+			return kernel.CommandReceipt{}, false, kernel.ErrReceiptAccessDenied
+		}
 		if prior.Fingerprint != fingerprint {
 			return kernel.CommandReceipt{}, false, ErrIdempotencyKeyConflict
 		}
 		return cloneReceipt(s.receipts[prior.CommandID]), true, nil
 	}
 	return kernel.CommandReceipt{}, false, nil
+}
+
+func (s *Store) canReadReceipt(command kernel.KernelCommand, at time.Time) bool {
+	var state *kernel.AggregateState
+	if current, found := s.states[command.Target]; found {
+		copy := current.Clone()
+		state = &copy
+	}
+	return s.authorizationPolicy.Authorize(command, state, at).CanReadTarget
 }
 
 func (s *Store) Commit(ctx context.Context, expected kernel.Snapshot, decision kernel.Decision) error {
@@ -173,6 +236,9 @@ func (s *Store) Commit(ctx context.Context, expected kernel.Snapshot, decision k
 	}
 	provenanceDigest, err := decision.Provenance.Digest()
 	if err != nil || !decision.Provenance.Valid() || !provenanceDigest.Valid() || provenanceDigest != decision.Receipt.ProvenanceDigest || decision.Provenance.CommandID != decision.Receipt.CommandID || decision.Provenance.CommandFingerprint != decision.CommandFingerprint {
+		return ErrInvalidDecision
+	}
+	if decision.Authority.PolicyDigest.Valid() && (decision.Authority.PolicyDigest != decision.Provenance.PolicyDigest || decision.Authority.PolicyRevision != decision.Provenance.PolicyRevision || !reflect.DeepEqual(decision.Authority.GrantDigests, decision.Provenance.GrantDigests) || !reflect.DeepEqual(decision.Authority.DelegationDigests, decision.Provenance.DelegationDigests)) {
 		return ErrInvalidDecision
 	}
 	for _, event := range decision.Events {
@@ -229,6 +295,31 @@ func (s *Store) Commit(ctx context.Context, expected kernel.Snapshot, decision k
 			return ErrConflict
 		}
 	}
+	for _, precondition := range decision.Guards.Preconditions {
+		currentRevision, found := s.revisions[precondition.Aggregate]
+		if precondition.Expected.MustNotExist {
+			if found {
+				return ErrConflict
+			}
+			continue
+		}
+		if !found || currentRevision != precondition.Expected.Revision {
+			return ErrConflict
+		}
+	}
+	if decision.Guards.PolicyDigest.Valid() && (s.authorizationPolicy.PolicyDigest != decision.Guards.PolicyDigest || s.authorizationPolicy.Revision != decision.Guards.PolicyRevision) {
+		return ErrConflict
+	}
+	for _, key := range decision.Guards.AbsentReviewKeys {
+		if _, found := s.openReviews[key]; found {
+			return ErrConflict
+		}
+	}
+	if decision.AttemptBudget != nil {
+		if err := validateAttemptBudgetCommit(s.attemptBudgets, *decision.AttemptBudget); err != nil {
+			return err
+		}
+	}
 	if s.faultPoint == FaultBeforeState || s.faultPoint == FaultBeforeEvents || s.faultPoint == FaultBeforeReceipt || s.faultPoint == FaultBeforeAuthority || s.faultPoint == FaultBeforeOutbox {
 		return fmt.Errorf("%w: %s", ErrInjectedFault, s.faultPoint)
 	}
@@ -242,12 +333,16 @@ func (s *Store) Commit(ctx context.Context, expected kernel.Snapshot, decision k
 	for _, event := range decision.Events {
 		s.events[event.EventID] = cloneEvent(event)
 		s.applyRegistryEvent(event)
+		s.applyReviewEvent(event)
+	}
+	if decision.AttemptBudget != nil {
+		applyAttemptBudget(s.attemptBudgets, *decision.AttemptBudget)
 	}
 	s.receipts[decision.Receipt.CommandID] = cloneReceipt(decision.Receipt)
 	binding := decisionIdentity{CommandID: decision.Receipt.CommandID, Fingerprint: decision.CommandFingerprint, Scope: decision.IdempotencyScope}
 	s.commandBindings[decision.Receipt.CommandID] = binding
 	s.idempotency[decision.IdempotencyScope] = binding
-	s.authority[decision.Receipt.CommandID] = decision.Authority
+	s.authority[decision.Receipt.CommandID] = cloneAuthorityDecision(decision.Authority)
 	s.provenance[provenanceDigest] = decision.Provenance
 	for _, intent := range decision.Outbox {
 		s.outbox[intent.IntentID] = intent
@@ -258,8 +353,20 @@ func (s *Store) Commit(ctx context.Context, expected kernel.Snapshot, decision k
 	return nil
 }
 
+func (s *Store) applyReviewEvent(event kernel.DomainEvent) {
+	if event.EventType != "tekroo.event.completion-review.opened" {
+		return
+	}
+	if key, err := kernel.CompletionReviewKeyFromPayload(event.Payload); err == nil {
+		s.openReviews[key] = event.Aggregate
+	}
+}
+
 func validDecisionTuple(expected kernel.Snapshot, decision kernel.Decision) bool {
 	if !decision.Receipt.CommandID.Valid() || !decision.Receipt.Target.Valid() || !decision.Authority.Principal.Valid() {
+		return false
+	}
+	if decision.AttemptBudget != nil && (!decision.AttemptBudget.Valid() || decision.AttemptBudget.Key.Subject != decision.Receipt.Target) {
 		return false
 	}
 	if len(decision.Events) == 0 {
@@ -392,4 +499,79 @@ func cloneExecution(value *kernel.ExecutionTuple) *kernel.ExecutionTuple {
 	}
 	copy := *value
 	return &copy
+}
+
+func cloneAuthorizationPolicy(value kernel.AuthorizationPolicy) kernel.AuthorizationPolicy {
+	copy := value
+	copy.Requirements.AttemptLimits = make(map[string]uint32, len(value.Requirements.AttemptLimits))
+	for operation, limit := range value.Requirements.AttemptLimits {
+		copy.Requirements.AttemptLimits[operation] = limit
+	}
+	copy.Grants = append([]kernel.AuthorityGrant(nil), value.Grants...)
+	for index := range copy.Grants {
+		copy.Grants[index].Scope = cloneAuthorityScope(copy.Grants[index].Scope)
+	}
+	copy.Delegations = append([]kernel.AuthorityDelegation(nil), value.Delegations...)
+	for index := range copy.Delegations {
+		copy.Delegations[index].Scope = cloneAuthorityScope(copy.Delegations[index].Scope)
+	}
+	return copy
+}
+
+func cloneAttemptBudgetSnapshot(value kernel.AttemptBudgetSnapshot) kernel.AttemptBudgetSnapshot {
+	copy := value
+	copy.Attempts = make(map[string]kernel.Digest, len(value.Attempts))
+	for attempt, digest := range value.Attempts {
+		copy.Attempts[attempt] = digest
+	}
+	return copy
+}
+
+func validateAttemptBudgetCommit(budgets map[kernel.AttemptBudgetKey]kernel.AttemptBudgetSnapshot, decision kernel.AttemptBudgetDecision) error {
+	if !decision.Valid() {
+		return ErrInvalidDecision
+	}
+	current, found := budgets[decision.Key]
+	if !found {
+		if decision.ExpectedUsed != 0 {
+			return ErrConflict
+		}
+		return nil
+	}
+	if current.Limit != decision.Limit || current.Used != decision.ExpectedUsed {
+		return ErrConflict
+	}
+	if prior, duplicate := current.Attempts[decision.AttemptKey]; duplicate && prior != decision.ConditionDigest {
+		return ErrConflict
+	} else if duplicate {
+		return kernel.ErrDecisionAlreadyCommitted
+	}
+	return nil
+}
+
+func applyAttemptBudget(budgets map[kernel.AttemptBudgetKey]kernel.AttemptBudgetSnapshot, decision kernel.AttemptBudgetDecision) {
+	current, found := budgets[decision.Key]
+	if !found {
+		current = kernel.AttemptBudgetSnapshot{Limit: decision.Limit, Attempts: make(map[string]kernel.Digest)}
+	} else {
+		current = cloneAttemptBudgetSnapshot(current)
+	}
+	current.Attempts[decision.AttemptKey] = decision.ConditionDigest
+	current.Used++
+	budgets[decision.Key] = current
+}
+
+func cloneAuthorityScope(value kernel.AuthorityScope) kernel.AuthorityScope {
+	copy := value
+	copy.CommandTypes = append([]string(nil), value.CommandTypes...)
+	copy.TargetKinds = append([]kernel.AggregateKind(nil), value.TargetKinds...)
+	copy.TargetIDs = append([]kernel.UUIDv7(nil), value.TargetIDs...)
+	return copy
+}
+
+func cloneAuthorityDecision(value kernel.AuthorityDecision) kernel.AuthorityDecision {
+	copy := value
+	copy.GrantDigests = append([]kernel.Digest(nil), value.GrantDigests...)
+	copy.DelegationDigests = append([]kernel.Digest(nil), value.DelegationDigests...)
+	return copy
 }

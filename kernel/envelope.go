@@ -6,8 +6,8 @@ import (
 )
 
 type ExpectedRevision struct {
-	MustNotExist bool
-	Revision     uint64
+	MustNotExist bool   `json:"must_not_exist"`
+	Revision     uint64 `json:"revision"`
 }
 
 func NewExpectedRevision(revision uint64) ExpectedRevision {
@@ -15,6 +15,11 @@ func NewExpectedRevision(revision uint64) ExpectedRevision {
 }
 
 func MustNotExist() ExpectedRevision { return ExpectedRevision{MustNotExist: true} }
+
+type AggregatePrecondition struct {
+	Aggregate AggregateRef     `json:"aggregate"`
+	Expected  ExpectedRevision `json:"expected"`
+}
 
 type KernelCommand struct {
 	ContractManifest string
@@ -26,6 +31,7 @@ type KernelCommand struct {
 	ActorFQN         *ActorFQN
 	Execution        *ExecutionTuple
 	ExpectedRevision ExpectedRevision
+	Preconditions    []AggregatePrecondition
 	IdempotencyKey   string
 	CorrelationID    UUIDv7
 	Causation        []DagParent
@@ -82,9 +88,14 @@ type DomainEvent struct {
 }
 
 type AuthorityDecision struct {
-	Principal PrincipalRef
-	Allowed   bool
-	Reason    string
+	Principal         PrincipalRef `json:"principal"`
+	Allowed           bool         `json:"allowed"`
+	CanReadTarget     bool         `json:"can_read_target"`
+	Reason            string       `json:"reason"`
+	PolicyDigest      Digest       `json:"policy_digest"`
+	PolicyRevision    uint64       `json:"policy_revision"`
+	GrantDigests      []Digest     `json:"grant_digests"`
+	DelegationDigests []Digest     `json:"delegation_digests"`
 }
 
 type OutboxIntent struct {
@@ -103,6 +114,7 @@ type Decision struct {
 	Outbox             []OutboxIntent
 	Guards             DecisionGuards
 	Provenance         DecisionProvenance
+	AttemptBudget      *AttemptBudgetDecision
 }
 
 type DecisionGuards struct {
@@ -110,6 +122,10 @@ type DecisionGuards struct {
 	AbsentExecutions []ActorFQN
 	ParentIDs        []UUIDv7
 	EvidenceRefs     []EvidenceRef
+	Preconditions    []AggregatePrecondition
+	PolicyDigest     Digest
+	PolicyRevision   uint64
+	AbsentReviewKeys []CompletionReviewKey
 }
 
 type Snapshot struct {
@@ -119,6 +135,16 @@ type Snapshot struct {
 	AcceptedEvents    map[UUIDv7]AcceptedEvent
 	CurrentExecutions map[ActorFQN]ExecutionTuple
 	Evidence          map[UUIDv7]EvidenceMetadata
+	Related           map[AggregateRef]RelatedSnapshot
+	Authorization     AuthorizationPolicy
+	OpenReviews       map[CompletionReviewKey]AggregateRef
+	AttemptBudgets    map[AttemptBudgetKey]AttemptBudgetSnapshot
+}
+
+type RelatedSnapshot struct {
+	Exists   bool
+	Revision uint64
+	State    *AggregateState
 }
 
 type AcceptedEvent struct {

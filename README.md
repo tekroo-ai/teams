@@ -15,9 +15,13 @@ system is qualified by this slice.
 `PASS`. The executable evidence covers all 26 frozen commands, lifecycle and DAG
 properties, exact execution fencing, semantic idempotency, in-memory atomic fault
 schedules, event folding, unknown-event quarantine, and content-addressed
-provenance/evidence primitives. The machine report records the remaining
-authorization, dependency/review/acceptance, policy-integration, audit-rebuild,
-and mutation-sensitivity gaps that prevent a pass.
+provenance/evidence primitives. Authorization/delegation, exact internal
+multi-aggregate guards, lifecycle decision gates, durable attempt budgets, and
+evidence access/redaction/deletion/audit rebuild are also executable. The machine
+report remains inconclusive because several principal-approved requirements
+cannot be encoded by the immutable `0.1.0` wire schemas, and because the provider,
+MongoDB, synthesized-merge, and complete mutation-sensitivity profiles have not
+run.
 
 The frozen contract identity is:
 
@@ -106,3 +110,4 @@ go run ./cmd/core-hermetic-report -verify build/reports/core-hermetic.json
 - [Repository bootstrap authority](docs/architecture/000-bootstrap-authority.md)
 - [Go kernel bootstrap decision](docs/architecture/001-go-kernel-bootstrap.md)
 - [Phase 2 Step 2 core-hermetic gate](OUTPUT/phase-2/step-2-core-hermetic-gate.json)
+- [Step 2 frozen-contract encoding gaps](OUTPUT/phase-2/step-2-contract-encoding-gaps.md)

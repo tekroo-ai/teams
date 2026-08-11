@@ -1,6 +1,7 @@
 package kernel_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -37,6 +38,51 @@ func TestAttemptBudgetIsFiniteIdempotentAndRestartStable(t *testing.T) {
 	}
 	if budget.Used != 1 {
 		t.Fatalf("clone mutated pre-restart state: used = %d", budget.Used)
+	}
+}
+
+func TestEvaluatorConsumesConfiguredDurableAttemptBudget(t *testing.T) {
+	evaluator := kernel.Evaluator{Catalogue: loadCatalogue(t)}
+	command := validStoryCreateCommand(t)
+	context := validDecisionContext(t)
+	grant := grantFor(command.Authority, command, context.Provenance.GrantDigests[0])
+	snapshot := kernel.Snapshot{Authorization: authorizationPolicy(grant)}
+	snapshot.Authorization.Requirements.AttemptLimits = map[string]uint32{command.CommandType: 2}
+
+	first := evaluate(t, evaluator, command, snapshot, context)
+	if first.Receipt.OutcomeCode != kernel.OutcomeApplied || first.AttemptBudget == nil || first.AttemptBudget.ExpectedUsed != 0 {
+		t.Fatalf("first governed attempt = %#v", first)
+	}
+	key := first.AttemptBudget.Key
+	snapshot.AttemptBudgets = map[kernel.AttemptBudgetKey]kernel.AttemptBudgetSnapshot{key: {
+		Limit: 2, Used: 1, Attempts: map[string]kernel.Digest{first.AttemptBudget.AttemptKey: first.AttemptBudget.ConditionDigest},
+	}}
+	unchangedCommand := command
+	unchangedCommand.CommandID = mustUUID(t, "00000000-0000-7000-8000-000000000010")
+	unchanged := evaluate(t, evaluator, unchangedCommand, snapshot, context)
+	if unchanged.Receipt.OutcomeCode != kernel.OutcomeRejectedPolicy || unchanged.Receipt.ReasonCode != "RETRY_CONDITION_UNCHANGED" {
+		t.Fatalf("unchanged governed attempt = %#v", unchanged)
+	}
+	secondCommand := command
+	secondCommand.CommandID = mustUUID(t, "00000000-0000-7000-8000-000000000011")
+	secondCommand.Payload = json.RawMessage(`{"acceptance_criteria":["one owner wins"],"description":"Exact ownership.","title":"Ownership revised"}`)
+	second := evaluate(t, evaluator, secondCommand, snapshot, context)
+	if second.Receipt.OutcomeCode != kernel.OutcomeApplied || second.AttemptBudget == nil || second.AttemptBudget.ExpectedUsed != 1 {
+		t.Fatalf("second governed attempt = %#v", second)
+	}
+	snapshot.AttemptBudgets[key] = kernel.AttemptBudgetSnapshot{
+		Limit: 2, Used: 2,
+		Attempts: map[string]kernel.Digest{
+			first.AttemptBudget.AttemptKey:  first.AttemptBudget.ConditionDigest,
+			second.AttemptBudget.AttemptKey: second.AttemptBudget.ConditionDigest,
+		},
+	}
+	thirdCommand := secondCommand
+	thirdCommand.CommandID = mustUUID(t, "00000000-0000-7000-8000-000000000012")
+	thirdCommand.Payload = json.RawMessage(`{"acceptance_criteria":["one owner wins"],"description":"A third condition.","title":"Ownership revised"}`)
+	third := evaluate(t, evaluator, thirdCommand, snapshot, context)
+	if third.Receipt.OutcomeCode != kernel.OutcomeRejectedPolicy || third.Receipt.ReasonCode != "RETRY_BUDGET_EXHAUSTED" || third.AttemptBudget != nil {
+		t.Fatalf("exhausted governed attempt = %#v", third)
 	}
 }
 

@@ -5,7 +5,7 @@
   "manifestSha256": "db3f38d4794a6993aad0b9ddf6d8f093eebf36b484d99de42dddc21bf3877c2f",
   "profile": "core-hermetic",
   "status": "INCONCLUSIVE",
-  "sourceTreeSha256": "62f4c844e9510cb19374f78cb464eaf99040d1a43a529cdd8f4e07fa1a8af834",
+  "sourceTreeSha256": "26e731b9d0dba93fddb93c9ef741609fe13000ea3c8651a19ef2173c6fdda17f",
   "environment": {
     "goVersion": "go1.26.4",
     "goos": "darwin",
@@ -14,7 +14,7 @@
     "timeZone": "UTC"
   },
   "executed": {
-    "testCases": 134,
+    "testCases": 150,
     "failedTests": 0,
     "passedPackages": 6,
     "vetFailures": 0,
@@ -104,12 +104,14 @@
     },
     {
       "invariantId": "INV-007-BOUNDED-ITERATION",
-      "status": "INCONCLUSIVE",
+      "status": "PASS",
       "tests": [
         "TestAttemptBudgetIsFiniteIdempotentAndRestartStable",
-        "TestGeneratedAttemptBudgetsNeverExceedLimit"
+        "TestGeneratedAttemptBudgetsNeverExceedLimit",
+        "TestEvaluatorConsumesConfiguredDurableAttemptBudget",
+        "TestStorePersistsAttemptBudgetWithTheAtomicDecision"
       ],
-      "evidenceFloor": "A standalone finite attempt model passes; command-policy integration is absent."
+      "evidenceFloor": "Configured operation budgets execute in the evaluator, reject unchanged/exhausted attempts, and persist atomically across store reloads; 4,096 generated histories remain within their limit."
     },
     {
       "invariantId": "INV-008-UNKNOWN-NO-EFFECT",
@@ -127,11 +129,12 @@
       "tests": [
         "TestEvidenceReferenceRequiresExactAvailableRegistration",
         "TestEvidenceRegistryVerifiesBytesWithoutCollapsingOrigins",
-        "TestClaimClassificationCannotCallUnsupportedClaimObserved",
+        "TestEvidenceAccessRedactionDeletionAndAuditRebuild",
+        "TestClaimAssessmentRevisionsAreLinkedAndRetainRawSupport",
         "TestDecisionProvenanceRejectsIdentitySubstitution",
         "TestStoreRejectsIncompleteOrMismatchedDecisionProvenance"
       ],
-      "evidenceFloor": "Structured evidence, claim classification, distinct source-through-runtime identities, and complete decision provenance digests execute; redaction/deletion/access/audit rebuild do not."
+      "evidenceFloor": "Structured evidence, exact access, derived redaction, deletion tombstones, linked assessments, source-through-runtime identities, decision provenance, and deterministic interruption/resume audit rebuild execute in the pure registry; the frozen evidence-register command cannot encode the complete record."
     },
     {
       "invariantId": "INV-010-NONAUTHORITATIVE-EVIDENCE",
@@ -177,10 +180,11 @@
     }
   ],
   "unresolvedGaps": [
-    "Delegation, grant revision, revocation, expiry, target visibility, and multi-aggregate authorization matrices are not implemented.",
-    "Dependency readiness, asynchronous completion-review joins, acceptance-policy gates, successor sets, and correction applicability lack executable aggregate models.",
-    "Evidence records, claim assessments, and source/overlay/build/runtime/execution identities are executable; redaction, deletion tombstones, access enforcement, and deterministic audit rebuild remain unimplemented.",
-    "The bounded-attempt model is executable but is not yet integrated into planning, retry, validation, review, handoff, and escalation command policies.",
+    "The frozen kernel-command schema cannot encode the approved multi-aggregate precondition vector or exact lifecycle/policy/catalogue preconditions; the internal guards are therefore not reachable from a conformant JSON command.",
+    "The frozen completion-review result schema has no branch identity or join-policy fields, so bounded order-independent asynchronous branch joins remain unencodable.",
+    "The frozen successor command carries one successor_id and cannot encode deterministic split/merge successor sets.",
+    "The frozen evidence-register command omits mandatory Decision 9 producer, transport, sensitivity, access, retention, lineage, computation, redaction, and deletion fields; the executable pure registry is not fully reachable through the command contract.",
+    "Provider/SMA evidence-acceptance matrices and the mongo-integration profile have not run in core-hermetic.",
     "The required deliberately faulty implementation or mutation set has not demonstrated sensitivity for every invariant family."
   ],
   "artifacts": [
@@ -191,8 +195,12 @@
     {
       "path": "build/reports/reference-corpus.core-run.json",
       "sha256": "aca87c781ba6060c3a24098d23a7f8b470928213a7f04613d2fbb904db7acf77"
+    },
+    {
+      "path": "OUTPUT/phase-2/step-2-contract-encoding-gaps.md",
+      "sha256": "e0a23109ae1036a70e920a4dde1747d19d6de06a4eb06a125fb4ba67d1543b6a"
     }
   ],
   "digestMethod": "SHA-256 of compact JSON with reportSha256 set to the empty string",
-  "reportSha256": "f8ea1825958686b03087dd19ce8e9960ab5ba10669c95a63861653536ae8e7d6"
+  "reportSha256": "e4c3d34a3d7b05984fd10b8cd9d16a66141da3cfec06b5bc91b79e9e2b539764"
 }

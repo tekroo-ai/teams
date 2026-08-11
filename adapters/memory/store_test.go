@@ -18,7 +18,18 @@ func TestStoreCommitsAtomicallyAndReplaysExactReceipt(t *testing.T) {
 	store := memory.NewStore()
 	target := kernel.AggregateRef{Kind: kernel.AggregateStory, ID: uuid("00000000-0000-7000-8000-000000000001")}
 	commandID := uuid("00000000-0000-7000-8000-000000000002")
-	command := kernel.KernelCommand{CommandID: commandID, Target: target}
+	command := kernel.KernelCommand{
+		ContractManifest: kernel.ContractIdentity, CommandID: commandID,
+		CommandType: "tekroo.command.story.create", Target: target,
+		Authority: kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "principal"}, IdempotencyKey: "store-test",
+	}
+	store.SetAuthorizationPolicy(kernel.AuthorizationPolicy{
+		PolicyDigest: kernel.Digest("9999999999999999999999999999999999999999999999999999999999999999"), Revision: 1,
+		Grants: []kernel.AuthorityGrant{{
+			GrantDigest: kernel.Digest("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), Grantee: command.Authority,
+			Scope: kernel.AuthorityScope{CommandTypes: []string{command.CommandType}, TargetKinds: []kernel.AggregateKind{target.Kind}, TargetIDs: []kernel.UUIDv7{target.ID}, CanReadTarget: true},
+		}},
+	})
 	fingerprint, err := kernel.CommandFingerprint(command)
 	if err != nil {
 		t.Fatal(err)
@@ -81,7 +92,7 @@ func TestStoreCommitsAtomicallyAndReplaysExactReceipt(t *testing.T) {
 	if err != nil || !snapshot.Exists || snapshot.Revision != 1 {
 		t.Fatalf("load snapshot = %#v, %v", snapshot, err)
 	}
-	receipt, found, err := store.LookupReceipt(context.Background(), command)
+	receipt, found, err := store.LookupReceipt(context.Background(), command, time.Date(2026, 8, 11, 12, 0, 0, 0, time.UTC))
 	if err != nil || !found || receipt.OutcomeCode != kernel.OutcomeApplied {
 		t.Fatalf("lookup receipt = %#v, %t, %v", receipt, found, err)
 	}
@@ -214,6 +225,140 @@ func TestStoreRechecksExecutionFenceAtCommit(t *testing.T) {
 	}
 	if err := store.Commit(context.Background(), kernel.Snapshot{}, stale); !errors.Is(err, memory.ErrConflict) {
 		t.Fatalf("stale fence commit error = %v, want ErrConflict", err)
+	}
+}
+
+func TestStoreRechecksRelatedAggregateAndPolicyGuardsAtomically(t *testing.T) {
+	store := memory.NewStore()
+	first := completeDecision(t)
+	if err := store.Commit(context.Background(), kernel.Snapshot{}, first); err != nil {
+		t.Fatal(err)
+	}
+	related := first.Receipt.Target
+	target := kernel.AggregateRef{Kind: kernel.AggregateStory, ID: uuid("00000000-0000-7000-8000-0000000000b1")}
+	candidate := alternateDecision(t, 51)
+	candidate.Receipt.Target = target
+	candidate.NextState.ID = target.ID
+	candidate.Events[0].Aggregate = target
+	candidate.Guards.Preconditions = []kernel.AggregatePrecondition{{Aggregate: related, Expected: kernel.NewExpectedRevision(1)}}
+	candidate = attachProvenance(t, candidate)
+	expected, err := store.LoadDecision(context.Background(), kernel.KernelCommand{
+		Target: target, Preconditions: candidate.Guards.Preconditions,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	updated := alternateDecision(t, 52)
+	updated.Receipt.Target = related
+	updated.NextState.ID = related.ID
+	updated.NextState.Revision = 2
+	updated.Events[0].Aggregate = related
+	updated.Events[0].AggregateRevision = 2
+	revision := uint64(2)
+	updated.Receipt.ResultingRevision = &revision
+	updated = attachProvenance(t, updated)
+	if err := store.Commit(context.Background(), kernel.Snapshot{Exists: true, Revision: 1, State: first.NextState}, updated); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Commit(context.Background(), expected, candidate); !errors.Is(err, memory.ErrConflict) {
+		t.Fatalf("related guard error = %v, want ErrConflict", err)
+	}
+	if snapshot, err := store.Load(context.Background(), target); err != nil || snapshot.Exists {
+		t.Fatalf("multi-aggregate loser changed target: %#v, %v", snapshot, err)
+	}
+
+	basis, err := fake.ProvenanceBasis()
+	if err != nil {
+		t.Fatal(err)
+	}
+	policyStore := memory.NewStore(kernel.AuthorizationPolicy{PolicyDigest: basis.PolicyDigest, Revision: basis.PolicyRevision})
+	guarded := completeDecision(t)
+	guarded.Authority.PolicyDigest = basis.PolicyDigest
+	guarded.Authority.PolicyRevision = basis.PolicyRevision
+	guarded.Authority.GrantDigests = append([]kernel.Digest(nil), basis.GrantDigests...)
+	guarded.Guards.PolicyDigest = basis.PolicyDigest
+	guarded.Guards.PolicyRevision = basis.PolicyRevision
+	policyStore.SetAuthorizationPolicy(kernel.AuthorizationPolicy{PolicyDigest: basis.PolicyDigest, Revision: basis.PolicyRevision + 1})
+	if err := policyStore.Commit(context.Background(), kernel.Snapshot{}, guarded); !errors.Is(err, memory.ErrConflict) {
+		t.Fatalf("policy guard error = %v, want ErrConflict", err)
+	}
+}
+
+func TestStorePersistsAttemptBudgetWithTheAtomicDecision(t *testing.T) {
+	store := memory.NewStore()
+	first := completeDecision(t)
+	first.AttemptBudget = &kernel.AttemptBudgetDecision{
+		Key:   kernel.AttemptBudgetKey{Subject: first.Receipt.Target, Operation: first.Receipt.CommandType},
+		Limit: 2, AttemptKey: string(first.Receipt.CommandID),
+		ConditionDigest: kernel.Digest("1111111111111111111111111111111111111111111111111111111111111111"),
+	}
+	if err := store.Commit(context.Background(), kernel.Snapshot{}, first); err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err := store.LoadDecision(context.Background(), kernel.KernelCommand{Target: first.Receipt.Target})
+	if err != nil {
+		t.Fatal(err)
+	}
+	budget := snapshot.AttemptBudgets[first.AttemptBudget.Key]
+	if budget.Used != 1 || budget.Limit != 2 || budget.Attempts[first.AttemptBudget.AttemptKey] != first.AttemptBudget.ConditionDigest {
+		t.Fatalf("persisted budget = %#v", budget)
+	}
+
+	second := alternateDecision(t, 61)
+	second.Receipt.Target = first.Receipt.Target
+	second.NextState.ID = first.Receipt.Target.ID
+	second.NextState.Revision = 2
+	second.Events[0].Aggregate = first.Receipt.Target
+	second.Events[0].AggregateRevision = 2
+	revision := uint64(2)
+	second.Receipt.ResultingRevision = &revision
+	second.AttemptBudget = &kernel.AttemptBudgetDecision{
+		Key: first.AttemptBudget.Key, ExpectedUsed: 1, Limit: 2,
+		AttemptKey:      string(second.Receipt.CommandID),
+		ConditionDigest: kernel.Digest("2222222222222222222222222222222222222222222222222222222222222222"),
+	}
+	second = attachProvenance(t, second)
+	if err := store.Commit(context.Background(), snapshot, second); err != nil {
+		t.Fatal(err)
+	}
+	final, err := store.LoadDecision(context.Background(), kernel.KernelCommand{Target: first.Receipt.Target})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if final.AttemptBudgets[first.AttemptBudget.Key].Used != 2 {
+		t.Fatalf("final budget = %#v", final.AttemptBudgets[first.AttemptBudget.Key])
+	}
+}
+
+func TestStoreAllowsOnlyOneCompletionReviewPerSemanticKey(t *testing.T) {
+	payload := json.RawMessage(`{"subject_kind":"story","subject_id":"00000000-0000-7000-8000-0000000000c1","lifecycle_epoch":1,"criteria_revision":2,"evidence_set_digest":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"}`)
+	key, err := kernel.CompletionReviewKeyFromPayload(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first := alternateDecision(t, 71)
+	first.NextState = nil
+	first.Receipt.Target = kernel.AggregateRef{Kind: kernel.AggregateCompletionReview, ID: uuid("00000000-0000-7000-8000-0000000000c2")}
+	first.Events[0].Aggregate = first.Receipt.Target
+	first.Events[0].EventType = "tekroo.event.completion-review.opened"
+	first.Events[0].Payload = payload
+	first.Guards.AbsentReviewKeys = []kernel.CompletionReviewKey{key}
+	first = attachProvenance(t, first)
+	store := memory.NewStore()
+	if err := store.Commit(context.Background(), kernel.Snapshot{}, first); err != nil {
+		t.Fatal(err)
+	}
+	second := alternateDecision(t, 72)
+	second.NextState = nil
+	second.Receipt.Target = kernel.AggregateRef{Kind: kernel.AggregateCompletionReview, ID: uuid("00000000-0000-7000-8000-0000000000c3")}
+	second.Events[0].Aggregate = second.Receipt.Target
+	second.Events[0].EventType = "tekroo.event.completion-review.opened"
+	second.Events[0].Payload = payload
+	second.Guards.AbsentReviewKeys = []kernel.CompletionReviewKey{key}
+	second = attachProvenance(t, second)
+	if err := store.Commit(context.Background(), kernel.Snapshot{}, second); !errors.Is(err, memory.ErrConflict) {
+		t.Fatalf("duplicate semantic review error = %v, want ErrConflict", err)
 	}
 }
 

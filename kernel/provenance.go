@@ -39,13 +39,15 @@ type RuntimeIdentity struct {
 }
 
 type ProvenanceBasis struct {
-	CatalogueDigest Digest          `json:"catalogue_digest"`
-	PolicyDigest    Digest          `json:"policy_digest"`
-	GrantDigests    []Digest        `json:"grant_digests"`
-	Source          SourceIdentity  `json:"source"`
-	Overlay         OverlayIdentity `json:"overlay"`
-	Build           BuildIdentity   `json:"build"`
-	Runtime         RuntimeIdentity `json:"runtime"`
+	CatalogueDigest   Digest          `json:"catalogue_digest"`
+	PolicyDigest      Digest          `json:"policy_digest"`
+	PolicyRevision    uint64          `json:"policy_revision"`
+	GrantDigests      []Digest        `json:"grant_digests"`
+	DelegationDigests []Digest        `json:"delegation_digests"`
+	Source            SourceIdentity  `json:"source"`
+	Overlay           OverlayIdentity `json:"overlay"`
+	Build             BuildIdentity   `json:"build"`
+	Runtime           RuntimeIdentity `json:"runtime"`
 }
 
 type DecisionProvenance struct {
@@ -55,7 +57,9 @@ type DecisionProvenance struct {
 	CommandFingerprint Digest          `json:"command_fingerprint"`
 	Principal          PrincipalRef    `json:"principal"`
 	PolicyDigest       Digest          `json:"policy_digest"`
+	PolicyRevision     uint64          `json:"policy_revision"`
 	GrantDigests       []Digest        `json:"grant_digests"`
+	DelegationDigests  []Digest        `json:"delegation_digests"`
 	ActorFQN           *ActorFQN       `json:"actor_fqn"`
 	Execution          *ExecutionTuple `json:"execution"`
 	Parents            []DagParent     `json:"parents"`
@@ -69,10 +73,15 @@ type DecisionProvenance struct {
 }
 
 func (basis ProvenanceBasis) Valid() bool {
-	if !basis.CatalogueDigest.Valid() || !basis.PolicyDigest.Valid() || !basis.Source.Valid() || !basis.Overlay.Valid() || !basis.Build.Valid() || !basis.Runtime.Valid() {
+	if !basis.CatalogueDigest.Valid() || !basis.PolicyDigest.Valid() || basis.PolicyRevision == 0 || !basis.Source.Valid() || !basis.Overlay.Valid() || !basis.Build.Valid() || !basis.Runtime.Valid() {
 		return false
 	}
 	for _, digest := range basis.GrantDigests {
+		if !digest.Valid() {
+			return false
+		}
+	}
+	for _, digest := range basis.DelegationDigests {
 		if !digest.Valid() {
 			return false
 		}
@@ -119,7 +128,8 @@ func BuildDecisionProvenance(command KernelCommand, fingerprint Digest, context 
 	record := DecisionProvenance{
 		ContractManifest: command.ContractManifest, CatalogueDigest: context.Provenance.CatalogueDigest,
 		CommandID: command.CommandID, CommandFingerprint: fingerprint, Principal: command.Authority,
-		PolicyDigest: context.Provenance.PolicyDigest, GrantDigests: append([]Digest(nil), context.Provenance.GrantDigests...),
+		PolicyDigest: context.Provenance.PolicyDigest, PolicyRevision: context.Provenance.PolicyRevision,
+		GrantDigests: append([]Digest(nil), context.Provenance.GrantDigests...), DelegationDigests: append([]Digest(nil), context.Provenance.DelegationDigests...),
 		ActorFQN: cloneActor(command.ActorFQN), Execution: cloneExecution(command.Execution),
 		Parents: canonicalParents(command.Causation), EvidenceRefs: append([]EvidenceRef(nil), command.EvidenceRefs...),
 		Source: context.Provenance.Source, Overlay: context.Provenance.Overlay, Build: context.Provenance.Build, Runtime: context.Provenance.Runtime,
@@ -135,8 +145,8 @@ func (record DecisionProvenance) Digest() (Digest, error) {
 
 func (record DecisionProvenance) Valid() bool {
 	basis := ProvenanceBasis{
-		CatalogueDigest: record.CatalogueDigest, PolicyDigest: record.PolicyDigest,
-		GrantDigests: record.GrantDigests, Source: record.Source, Overlay: record.Overlay,
+		CatalogueDigest: record.CatalogueDigest, PolicyDigest: record.PolicyDigest, PolicyRevision: record.PolicyRevision,
+		GrantDigests: record.GrantDigests, DelegationDigests: record.DelegationDigests, Source: record.Source, Overlay: record.Overlay,
 		Build: record.Build, Runtime: record.Runtime,
 	}
 	if record.ContractManifest != ContractIdentity || !record.CommandID.Valid() || !record.CommandFingerprint.Valid() || !record.Principal.Valid() || !basis.Valid() || record.ReceivedAt.IsZero() || record.DecidedAt.IsZero() || record.DecidedAt.Before(record.ReceivedAt) {

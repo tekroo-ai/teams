@@ -28,7 +28,7 @@ func (h *Handler) Handle(ctx context.Context, command kernel.KernelCommand, prov
 	if err := ctx.Err(); err != nil {
 		return kernel.CommandReceipt{}, err
 	}
-	if receipt, found, err := h.store.LookupReceipt(ctx, command); err != nil {
+	if receipt, found, err := h.store.LookupReceipt(ctx, command, h.clock.Now()); err != nil {
 		if errors.Is(err, kernel.ErrCommandIdentityConflict) || errors.Is(err, kernel.ErrIdempotencyKeyConflict) {
 			return h.recordIdentityConflict(ctx, command, provenance, err)
 		}
@@ -37,7 +37,7 @@ func (h *Handler) Handle(ctx context.Context, command kernel.KernelCommand, prov
 		return receipt, nil
 	}
 
-	snapshot, err := h.store.Load(ctx, command.Target)
+	snapshot, err := h.store.LoadDecision(ctx, command)
 	if err != nil {
 		return kernel.CommandReceipt{}, fmt.Errorf("load decision snapshot: %w", err)
 	}
@@ -62,7 +62,7 @@ func (h *Handler) Handle(ctx context.Context, command kernel.KernelCommand, prov
 	}
 	if err := h.store.Commit(ctx, snapshot, decision); err != nil {
 		if errors.Is(err, kernel.ErrDecisionAlreadyCommitted) || errors.Is(err, kernel.ErrCommitUncertain) {
-			receipt, found, lookupErr := h.store.LookupReceipt(ctx, command)
+			receipt, found, lookupErr := h.store.LookupReceipt(ctx, command, h.clock.Now())
 			if lookupErr != nil {
 				return kernel.CommandReceipt{}, fmt.Errorf("reconcile committed decision: %w", lookupErr)
 			}

@@ -3,6 +3,7 @@ package application_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -42,6 +43,7 @@ func TestHandlerCommitsOnceAndReturnsStoredReceiptOnReplay(t *testing.T) {
 		Payload:          json.RawMessage(`{"acceptance_criteria":["works"],"description":"description","title":"title"}`),
 	}
 	provenance := testProvenance(t)
+	store.SetAuthorizationPolicy(testAuthorizationPolicy(command, provenance))
 
 	first, err := handler.Handle(context.Background(), command, provenance)
 	if err != nil {
@@ -82,6 +84,12 @@ func TestHandlerCommitsOnceAndReturnsStoredReceiptOnReplay(t *testing.T) {
 	}
 	if store.IdentityConflictCount() != 2 {
 		t.Fatalf("identity conflict audits = %d, want 2", store.IdentityConflictCount())
+	}
+	revoked := testAuthorizationPolicy(command, provenance)
+	revoked.Grants[0].Revoked = true
+	store.SetAuthorizationPolicy(revoked)
+	if _, err := handler.Handle(context.Background(), command, provenance); !errors.Is(err, kernel.ErrReceiptAccessDenied) {
+		t.Fatalf("revoked receipt replay error = %v, want ErrReceiptAccessDenied", err)
 	}
 }
 
@@ -125,7 +133,9 @@ func TestHandlerReconcilesLostCommitAcknowledgement(t *testing.T) {
 		t.Fatal(err)
 	}
 	command := testStoryCreateCommand()
-	receipt, err := handler.Handle(context.Background(), command, testProvenance(t))
+	provenance := testProvenance(t)
+	store.SetAuthorizationPolicy(testAuthorizationPolicy(command, provenance))
+	receipt, err := handler.Handle(context.Background(), command, provenance)
 	if err != nil {
 		t.Fatalf("reconcile uncertain commit: %v", err)
 	}
@@ -142,11 +152,12 @@ type winnerStore struct {
 	receipt kernel.CommandReceipt
 }
 
-func (s *winnerStore) Load(context.Context, kernel.AggregateRef) (kernel.Snapshot, error) {
-	return kernel.Snapshot{}, nil
+func (s *winnerStore) LoadDecision(_ context.Context, command kernel.KernelCommand) (kernel.Snapshot, error) {
+	basis, _ := fake.ProvenanceBasis()
+	return kernel.Snapshot{Authorization: testAuthorizationPolicy(command, basis)}, nil
 }
 
-func (s *winnerStore) LookupReceipt(context.Context, kernel.KernelCommand) (kernel.CommandReceipt, bool, error) {
+func (s *winnerStore) LookupReceipt(context.Context, kernel.KernelCommand, time.Time) (kernel.CommandReceipt, bool, error) {
 	s.lookups++
 	return s.receipt, s.lookups > 1, nil
 }
@@ -195,4 +206,21 @@ func testProvenance(t *testing.T) kernel.ProvenanceBasis {
 		t.Fatal(err)
 	}
 	return basis
+}
+
+func testAuthorizationPolicy(command kernel.KernelCommand, basis kernel.ProvenanceBasis) kernel.AuthorizationPolicy {
+	return kernel.AuthorizationPolicy{
+		PolicyDigest: basis.PolicyDigest,
+		Revision:     basis.PolicyRevision,
+		Grants: []kernel.AuthorityGrant{{
+			GrantDigest: basis.GrantDigests[0],
+			Grantee:     command.Authority,
+			Scope: kernel.AuthorityScope{
+				CommandTypes:  []string{command.CommandType},
+				TargetKinds:   []kernel.AggregateKind{command.Target.Kind},
+				TargetIDs:     []kernel.UUIDv7{command.Target.ID},
+				CanReadTarget: true,
+			},
+		}},
+	}
 }

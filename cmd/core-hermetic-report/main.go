@@ -184,6 +184,11 @@ func run(output string) error {
 	if err != nil {
 		return err
 	}
+	encodingGapPath := "OUTPUT/phase-2/step-2-contract-encoding-gaps.md"
+	encodingGapDigest, err := fileDigest(encodingGapPath)
+	if err != nil {
+		return err
+	}
 
 	result := report{
 		SchemaVersion:    "1.0.0",
@@ -205,13 +210,18 @@ func run(output string) error {
 		},
 		InvariantCoverage: invariantCoverage(),
 		UnresolvedGaps: []string{
-			"Delegation, grant revision, revocation, expiry, target visibility, and multi-aggregate authorization matrices are not implemented.",
-			"Dependency readiness, asynchronous completion-review joins, acceptance-policy gates, successor sets, and correction applicability lack executable aggregate models.",
-			"Evidence records, claim assessments, and source/overlay/build/runtime/execution identities are executable; redaction, deletion tombstones, access enforcement, and deterministic audit rebuild remain unimplemented.",
-			"The bounded-attempt model is executable but is not yet integrated into planning, retry, validation, review, handoff, and escalation command policies.",
+			"The frozen kernel-command schema cannot encode the approved multi-aggregate precondition vector or exact lifecycle/policy/catalogue preconditions; the internal guards are therefore not reachable from a conformant JSON command.",
+			"The frozen completion-review result schema has no branch identity or join-policy fields, so bounded order-independent asynchronous branch joins remain unencodable.",
+			"The frozen successor command carries one successor_id and cannot encode deterministic split/merge successor sets.",
+			"The frozen evidence-register command omits mandatory Decision 9 producer, transport, sensitivity, access, retention, lineage, computation, redaction, and deletion fields; the executable pure registry is not fully reachable through the command contract.",
+			"Provider/SMA evidence-acceptance matrices and the mongo-integration profile have not run in core-hermetic.",
 			"The required deliberately faulty implementation or mutation set has not demonstrated sensitivity for every invariant family.",
 		},
-		Artifacts:    []artifactRecord{{Path: structurePath, SHA256: structureDigest}, {Path: referencePath, SHA256: referenceDigest}},
+		Artifacts: []artifactRecord{
+			{Path: structurePath, SHA256: structureDigest},
+			{Path: referencePath, SHA256: referenceDigest},
+			{Path: encodingGapPath, SHA256: encodingGapDigest},
+		},
 		DigestMethod: "SHA-256 of compact JSON with reportSha256 set to the empty string",
 	}
 	if tests.Failures != 0 || vetFailures != 0 {
@@ -242,9 +252,9 @@ func invariantCoverage() []coverageRecord {
 		{InvariantID: "INV-004-EXACT-OWNERSHIP", Status: "PASS", Tests: []string{"TestAllFrozenCommandsReachTheirDeclaredEventThroughEvaluator", "TestStoreSystematicAndConcurrentOneWinnerSchedules", "TestFrozenContractCorpus/IDENTITY-CONCRETE-FQN"}, Floor: "Exact ActorFQN parsing and versioned one-winner ownership transitions are executed in memory."},
 		{InvariantID: "INV-005-EXECUTION-FENCING", Status: "PASS", Tests: []string{"TestExecutionFencingRequiresExactCurrentTuple", "TestStoreRechecksExecutionFenceAtCommit"}, Floor: "Exact current tuple is checked both at evaluation and commit."},
 		{InvariantID: "INV-006-LIFECYCLE-EPOCHS", Status: "PASS", Tests: []string{"TestLifecycleTransitionTableIsExhaustive", "TestGeneratedLifecycleHistoriesMatchIndependentModel", "TestFoldAggregateReconstructsAndDetectsCorruption"}, Floor: "All listed forward transitions and 4,096 generated bounded histories are executed."},
-		{InvariantID: "INV-007-BOUNDED-ITERATION", Status: "INCONCLUSIVE", Tests: []string{"TestAttemptBudgetIsFiniteIdempotentAndRestartStable", "TestGeneratedAttemptBudgetsNeverExceedLimit"}, Floor: "A standalone finite attempt model passes; command-policy integration is absent."},
+		{InvariantID: "INV-007-BOUNDED-ITERATION", Status: "PASS", Tests: []string{"TestAttemptBudgetIsFiniteIdempotentAndRestartStable", "TestGeneratedAttemptBudgetsNeverExceedLimit", "TestEvaluatorConsumesConfiguredDurableAttemptBudget", "TestStorePersistsAttemptBudgetWithTheAtomicDecision"}, Floor: "Configured operation budgets execute in the evaluator, reject unchanged/exhausted attempts, and persist atomically across store reloads; 4,096 generated histories remain within their limit."},
 		{InvariantID: "INV-008-UNKNOWN-NO-EFFECT", Status: "PASS", Tests: []string{"TestUnknownTypeAndUnsupportedVersionHaveDistinctStableReasons", "TestUnknownEventReplayStopsAndQuarantinesLosslessly", "TestFrozenContractCorpus/CAT-UNKNOWN-COMMAND"}, Floor: "Unknown commands/versions fail closed and unknown authoritative events stop replay at the last understood revision while preserving the record."},
-		{InvariantID: "INV-009-PROVENANCE-COMPLETE", Status: "INCONCLUSIVE", Tests: []string{"TestEvidenceReferenceRequiresExactAvailableRegistration", "TestEvidenceRegistryVerifiesBytesWithoutCollapsingOrigins", "TestClaimClassificationCannotCallUnsupportedClaimObserved", "TestDecisionProvenanceRejectsIdentitySubstitution", "TestStoreRejectsIncompleteOrMismatchedDecisionProvenance"}, Floor: "Structured evidence, claim classification, distinct source-through-runtime identities, and complete decision provenance digests execute; redaction/deletion/access/audit rebuild do not."},
+		{InvariantID: "INV-009-PROVENANCE-COMPLETE", Status: "INCONCLUSIVE", Tests: []string{"TestEvidenceReferenceRequiresExactAvailableRegistration", "TestEvidenceRegistryVerifiesBytesWithoutCollapsingOrigins", "TestEvidenceAccessRedactionDeletionAndAuditRebuild", "TestClaimAssessmentRevisionsAreLinkedAndRetainRawSupport", "TestDecisionProvenanceRejectsIdentitySubstitution", "TestStoreRejectsIncompleteOrMismatchedDecisionProvenance"}, Floor: "Structured evidence, exact access, derived redaction, deletion tombstones, linked assessments, source-through-runtime identities, decision provenance, and deterministic interruption/resume audit rebuild execute in the pure registry; the frozen evidence-register command cannot encode the complete record."},
 		{InvariantID: "INV-010-NONAUTHORITATIVE-EVIDENCE", Status: "INCONCLUSIVE", Tests: []string{"TestEvidenceReferenceRequiresExactAvailableRegistration"}, Floor: "Evidence cannot affect a guarded decision unless registered; provider/SMA acceptance matrices are absent."},
 		{InvariantID: "INV-011-ATOMIC-MONGO-DECISION", Status: "INCONCLUSIVE", Tests: []string{"TestStoreFaultScheduleIsAllOrNone", "TestHandlerReconcilesLostCommitAcknowledgement"}, Floor: "Six in-memory atomic/fault boundaries pass; Mongo belongs to the unrun mongo-integration profile."},
 		{InvariantID: "INV-012-CONFORMANCE-REPRODUCIBLE", Status: "PASS", Tests: []string{"TestFrozenContractCorpus", "TestGeneratedLifecycleHistoriesMatchIndependentModel", "TestGeneratedDAGsAcceptOnlyAcyclicExistingNodes", "TestGeneratedAttemptBudgetsNeverExceedLimit"}, Floor: "Fixed seeds, toolchain identity, source/manifest/artifact digests, and a self-digesting report are emitted."},

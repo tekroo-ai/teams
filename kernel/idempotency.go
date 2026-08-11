@@ -67,6 +67,7 @@ func CommandFingerprint(command KernelCommand) (Digest, error) {
 		}
 		return evidence[i].SHA256 < evidence[j].SHA256
 	})
+	preconditions := canonicalPreconditions(command.Preconditions)
 	var payload any
 	decoder := json.NewDecoder(bytes.NewReader(command.Payload))
 	decoder.UseNumber()
@@ -79,17 +80,18 @@ func CommandFingerprint(command KernelCommand) (Digest, error) {
 		}{RawHex: hex.EncodeToString(command.Payload)}
 	}
 	semantic := struct {
-		ContractManifest string           `json:"contract_manifest"`
-		CommandType      string           `json:"command_type"`
-		CommandVersion   string           `json:"command_version"`
-		Target           AggregateRef     `json:"target"`
-		Authority        PrincipalRef     `json:"authority"`
-		ActorFQN         *ActorFQN        `json:"actor_fqn,omitempty"`
-		Execution        *ExecutionTuple  `json:"execution,omitempty"`
-		ExpectedRevision ExpectedRevision `json:"expected_revision"`
-		Causation        []DagParent      `json:"causation"`
-		Payload          any              `json:"payload"`
-		EvidenceRefs     []EvidenceRef    `json:"evidence_refs"`
+		ContractManifest string                  `json:"contract_manifest"`
+		CommandType      string                  `json:"command_type"`
+		CommandVersion   string                  `json:"command_version"`
+		Target           AggregateRef            `json:"target"`
+		Authority        PrincipalRef            `json:"authority"`
+		ActorFQN         *ActorFQN               `json:"actor_fqn,omitempty"`
+		Execution        *ExecutionTuple         `json:"execution,omitempty"`
+		ExpectedRevision ExpectedRevision        `json:"expected_revision"`
+		Preconditions    []AggregatePrecondition `json:"preconditions"`
+		Causation        []DagParent             `json:"causation"`
+		Payload          any                     `json:"payload"`
+		EvidenceRefs     []EvidenceRef           `json:"evidence_refs"`
 	}{
 		ContractManifest: command.ContractManifest,
 		CommandType:      command.CommandType,
@@ -99,6 +101,7 @@ func CommandFingerprint(command KernelCommand) (Digest, error) {
 		ActorFQN:         command.ActorFQN,
 		Execution:        command.Execution,
 		ExpectedRevision: command.ExpectedRevision,
+		Preconditions:    preconditions,
 		Causation:        parents,
 		Payload:          payload,
 		EvidenceRefs:     evidence,

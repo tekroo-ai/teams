@@ -384,6 +384,40 @@ func commandCase(t *testing.T, commandType string, payload json.RawMessage, targ
 			actor: {ExecutionID: mustUUID(t, "00000000-0000-7000-8000-000000000001"), FencingEpoch: 1},
 		}
 	}
+	var object map[string]any
+	if json.Unmarshal(payload, &object) == nil {
+		if values, ok := object["evidence_ids"].([]any); ok {
+			snapshot.Evidence = make(map[kernel.UUIDv7]kernel.EvidenceMetadata, len(values))
+			for _, value := range values {
+				id := kernel.UUIDv7(value.(string))
+				digest := kernel.Digest("dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd")
+				command.EvidenceRefs = append(command.EvidenceRefs, kernel.EvidenceRef{EvidenceID: id, SHA256: digest})
+				snapshot.Evidence[id] = kernel.EvidenceMetadata{SHA256: digest, Available: true}
+			}
+		}
+		if values, ok := object["validation_event_ids"].([]any); ok {
+			if snapshot.AcceptedEvents == nil {
+				snapshot.AcceptedEvents = make(map[kernel.UUIDv7]kernel.AcceptedEvent)
+			}
+			for _, value := range values {
+				snapshot.AcceptedEvents[kernel.UUIDv7(value.(string))] = kernel.AcceptedEvent{EventType: "tekroo.event.completion-review.result-recorded"}
+			}
+		}
+		if value, ok := object["target_event_id"].(string); ok {
+			if snapshot.AcceptedEvents == nil {
+				snapshot.AcceptedEvents = make(map[kernel.UUIDv7]kernel.AcceptedEvent)
+			}
+			snapshot.AcceptedEvents[kernel.UUIDv7(value)] = kernel.AcceptedEvent{EventType: "tekroo.event.story.completed"}
+		}
+		if commandType == "tekroo.command.completion-review.open" {
+			subject := kernel.AggregateRef{Kind: kernel.AggregateKind(object["subject_kind"].(string)), ID: kernel.UUIDv7(object["subject_id"].(string))}
+			command.Preconditions = []kernel.AggregatePrecondition{{Aggregate: subject, Expected: kernel.NewExpectedRevision(1)}}
+			snapshot.Related = map[kernel.AggregateRef]kernel.RelatedSnapshot{subject: {
+				Exists: true, Revision: 1,
+				State: &kernel.AggregateState{Kind: subject.Kind, ID: subject.ID, Revision: 1, LifecycleEpoch: uint64(object["lifecycle_epoch"].(float64)), Phase: kernel.PhaseActive, Condition: kernel.ConditionRunnable},
+			}}
+		}
+	}
 	return command, snapshot
 }
 
@@ -401,6 +435,8 @@ func stateForCommand(commandType string, target kernel.AggregateRef) *kernel.Agg
 		case "tekroo.command.story.request-acceptance":
 			state.Phase = kernel.PhaseCompleted
 		case "tekroo.command.work.reopen":
+			state.Phase = kernel.PhaseCompleted
+		case "tekroo.command.work.create-successor":
 			state.Phase = kernel.PhaseCompleted
 		case "tekroo.command.work.unblock":
 			state.Condition = kernel.ConditionBlocked

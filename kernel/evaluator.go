@@ -20,6 +20,7 @@ const (
 	reasonNotFound           = "TARGET_NOT_FOUND"
 	reasonAlreadyExists      = "TARGET_ALREADY_EXISTS"
 	reasonRevisionConflict   = "REVISION_CONFLICT"
+	reasonPolicyConflict     = "POLICY_REVISION_CONFLICT"
 	reasonClosed             = "TARGET_CLOSED"
 	reasonPolicy             = "TRANSITION_POLICY"
 	reasonStaleExecution     = "STALE_EXECUTION"
@@ -45,6 +46,8 @@ func (e Evaluator) Evaluate(command KernelCommand, snapshot Snapshot, context De
 	if err != nil {
 		return Decision{}, fmt.Errorf("fingerprint command: %w", err)
 	}
+	context.Provenance.GrantDigests = nil
+	context.Provenance.DelegationDigests = nil
 	provenance, provenanceDigest, err := BuildDecisionProvenance(command, fingerprint, context)
 	if err != nil {
 		return Decision{}, fmt.Errorf("build decision provenance: %w", err)
@@ -70,40 +73,82 @@ func (e Evaluator) Evaluate(command KernelCommand, snapshot Snapshot, context De
 	if !containsPrincipalKind(definition.AuthorityKinds, command.Authority.Kind) {
 		return rejectedDecision(command, context, fingerprint, OutcomeRejectedUnauthorized, reasonUnauthorized), nil
 	}
+	authorization := snapshot.Authorization.Authorize(command, snapshot.State, context.DecidedAt)
+	context.Provenance.GrantDigests = append([]Digest(nil), authorization.GrantDigests...)
+	context.Provenance.DelegationDigests = append([]Digest(nil), authorization.DelegationDigests...)
+	provenance, provenanceDigest, err = BuildDecisionProvenance(command, fingerprint, context)
+	if err != nil {
+		return Decision{}, fmt.Errorf("build authorized decision provenance: %w", err)
+	}
+	context.ProvenanceDigest = provenanceDigest
+	authorityDecision := AuthorityDecision{
+		Principal: command.Authority, Allowed: authorization.Allowed, CanReadTarget: authorization.CanReadTarget,
+		Reason: authorization.ReasonCode, PolicyDigest: snapshot.Authorization.PolicyDigest,
+		PolicyRevision: snapshot.Authorization.Revision, GrantDigests: append([]Digest(nil), authorization.GrantDigests...),
+		DelegationDigests: append([]Digest(nil), authorization.DelegationDigests...),
+	}
+	if snapshot.Authorization.PolicyDigest != context.Provenance.PolicyDigest || snapshot.Authorization.Revision != context.Provenance.PolicyRevision {
+		return rejectedAuthorizedDecision(command, context, fingerprint, OutcomeRejectedConflict, reasonPolicyConflict, authorityDecision), nil
+	}
+	if !authorization.Allowed {
+		return rejectedAuthorizedDecision(command, context, fingerprint, OutcomeRejectedUnauthorized, reasonUnauthorized, authorityDecision), nil
+	}
 	if !actorAttributionValid(command, snapshot, definition.ExecutionRequired) {
-		return rejectedDecision(command, context, fingerprint, OutcomeRejectedStaleExecution, reasonStaleExecution), nil
+		return rejectedAuthorizedDecision(command, context, fingerprint, OutcomeRejectedStaleExecution, reasonStaleExecution, authorityDecision), nil
 	}
 	if commandCreatesAggregate(command.CommandType) != command.ExpectedRevision.MustNotExist {
-		return rejectedDecision(command, context, fingerprint, OutcomeRejectedConflict, reasonRevisionConflict), nil
+		return rejectedAuthorizedDecision(command, context, fingerprint, OutcomeRejectedConflict, reasonRevisionConflict, authorityDecision), nil
 	}
 	if command.ExpectedRevision.MustNotExist {
 		if snapshot.Exists {
-			return rejectedDecision(command, context, fingerprint, OutcomeRejectedConflict, reasonAlreadyExists), nil
+			if !authorization.CanReadTarget {
+				return rejectedAuthorizedDecision(command, context, fingerprint, OutcomeRejectedUnauthorized, reasonUnauthorized, authorityDecision), nil
+			}
+			return rejectedAuthorizedDecision(command, context, fingerprint, OutcomeRejectedConflict, reasonAlreadyExists, authorityDecision), nil
 		}
 	} else {
 		if !snapshot.Exists {
-			return rejectedDecision(command, context, fingerprint, OutcomeRejectedNotFound, reasonNotFound), nil
+			if !authorization.CanReadTarget {
+				return rejectedAuthorizedDecision(command, context, fingerprint, OutcomeRejectedUnauthorized, reasonUnauthorized, authorityDecision), nil
+			}
+			return rejectedAuthorizedDecision(command, context, fingerprint, OutcomeRejectedNotFound, reasonNotFound, authorityDecision), nil
 		}
 		if snapshot.Revision != command.ExpectedRevision.Revision {
-			return rejectedDecision(command, context, fingerprint, OutcomeRejectedConflict, reasonRevisionConflict), nil
+			if !authorization.CanReadTarget {
+				return rejectedAuthorizedDecision(command, context, fingerprint, OutcomeRejectedUnauthorized, reasonUnauthorized, authorityDecision), nil
+			}
+			return rejectedAuthorizedDecision(command, context, fingerprint, OutcomeRejectedConflict, reasonRevisionConflict, authorityDecision), nil
 		}
 	}
+	if !preconditionsMatch(command.Preconditions, snapshot.Related) {
+		if !authorization.CanReadTarget {
+			return rejectedAuthorizedDecision(command, context, fingerprint, OutcomeRejectedUnauthorized, reasonUnauthorized, authorityDecision), nil
+		}
+		return rejectedAuthorizedDecision(command, context, fingerprint, OutcomeRejectedConflict, reasonRevisionConflict, authorityDecision), nil
+	}
 	if outcome, reason := validateExecutionRegistryCommand(command, snapshot); outcome != OutcomeApplied {
-		return rejectedDecision(command, context, fingerprint, outcome, reason), nil
+		return rejectedAuthorizedDecision(command, context, fingerprint, outcome, reason, authorityDecision), nil
 	}
 	if !validDAGParents(command, definition, snapshot) {
-		return rejectedDecision(command, context, fingerprint, OutcomeRejectedInvalid, reasonInvalidDAG), nil
+		return rejectedAuthorizedDecision(command, context, fingerprint, OutcomeRejectedInvalid, reasonInvalidDAG, authorityDecision), nil
 	}
 	if !validEvidenceRefs(command, snapshot) {
-		return rejectedDecision(command, context, fingerprint, OutcomeRejectedInvalid, reasonInvalidEvidence), nil
+		return rejectedAuthorizedDecision(command, context, fingerprint, OutcomeRejectedInvalid, reasonInvalidEvidence, authorityDecision), nil
+	}
+	if outcome, reason := validateCommandPolicy(command, snapshot); outcome != OutcomeApplied {
+		return rejectedAuthorizedDecision(command, context, fingerprint, outcome, reason, authorityDecision), nil
+	}
+	attemptBudget, outcome, reason := evaluateAttemptPolicy(command, snapshot)
+	if outcome != OutcomeApplied {
+		return rejectedAuthorizedDecision(command, context, fingerprint, outcome, reason, authorityDecision), nil
 	}
 
 	nextState, nextRevision, outcome, reason := evolveState(command, snapshot, context.EventID)
 	if outcome != OutcomeApplied {
-		return rejectedDecision(command, context, fingerprint, outcome, reason), nil
+		return rejectedAuthorizedDecision(command, context, fingerprint, outcome, reason, authorityDecision), nil
 	}
 	if len(definition.EventTypes) != 1 {
-		return rejectedDecision(command, context, fingerprint, OutcomeRejectedInvalid, reasonInvalidEnvelope), nil
+		return rejectedAuthorizedDecision(command, context, fingerprint, OutcomeRejectedInvalid, reasonInvalidEnvelope, authorityDecision), nil
 	}
 	lifecycleEpoch := uint64(1)
 	if nextState != nil {
@@ -135,17 +180,21 @@ func (e Evaluator) Evaluate(command KernelCommand, snapshot Snapshot, context De
 		NextState:          nextState,
 		Events:             []DomainEvent{event},
 		Receipt:            receipt,
-		Authority:          AuthorityDecision{Principal: command.Authority, Allowed: true, Reason: reasonApplied},
+		Authority:          authorityDecision,
 		Outbox:             []OutboxIntent{{IntentID: context.IntentID, EventID: context.EventID, Kind: "DOMAIN_EVENT"}},
-		Guards:             decisionGuards(command),
+		Guards:             decisionGuards(command, authorityDecision),
 		Provenance:         provenance,
+		AttemptBudget:      attemptBudget,
 	}, nil
 }
 
-func decisionGuards(command KernelCommand) DecisionGuards {
+func decisionGuards(command KernelCommand, authority AuthorityDecision) DecisionGuards {
 	guards := DecisionGuards{
-		ParentIDs:    make([]UUIDv7, len(command.Causation)),
-		EvidenceRefs: append([]EvidenceRef(nil), command.EvidenceRefs...),
+		ParentIDs:      make([]UUIDv7, len(command.Causation)),
+		EvidenceRefs:   append([]EvidenceRef(nil), command.EvidenceRefs...),
+		Preconditions:  append([]AggregatePrecondition(nil), command.Preconditions...),
+		PolicyDigest:   authority.PolicyDigest,
+		PolicyRevision: authority.PolicyRevision,
 	}
 	for index, parent := range canonicalParents(command.Causation) {
 		guards.ParentIDs[index] = parent.ParentEventID
@@ -161,6 +210,11 @@ func decisionGuards(command KernelCommand) DecisionGuards {
 				guards.Executions = make(map[ActorFQN]ExecutionTuple)
 			}
 			guards.Executions[actor] = prior
+		}
+	}
+	if command.CommandType == "tekroo.command.completion-review.open" {
+		if key, err := CompletionReviewKeyFromPayload(command.Payload); err == nil {
+			guards.AbsentReviewKeys = []CompletionReviewKey{key}
 		}
 	}
 	return guards
@@ -233,8 +287,11 @@ func validateEnvelope(command KernelCommand) error {
 	if len(command.IdempotencyKey) < 1 || len(command.IdempotencyKey) > 256 || !command.CorrelationID.Valid() {
 		return errors.New("invalid idempotency or correlation identity")
 	}
-	if len(command.Causation) > 64 || len(command.EvidenceRefs) > 64 || len(command.Payload) == 0 {
+	if len(command.Causation) > 64 || len(command.EvidenceRefs) > 64 || len(command.Preconditions) > 64 || len(command.Payload) == 0 {
 		return errors.New("envelope bounds exceeded")
+	}
+	if !validPreconditionVector(command.Target, command.Preconditions) {
+		return errors.New("invalid aggregate preconditions")
 	}
 	seenParents := make(map[DagParent]struct{}, len(command.Causation))
 	for _, parent := range command.Causation {
@@ -257,6 +314,46 @@ func validateEnvelope(command KernelCommand) error {
 		seenEvidence[evidence] = struct{}{}
 	}
 	return nil
+}
+
+func validPreconditionVector(target AggregateRef, values []AggregatePrecondition) bool {
+	canonical := canonicalPreconditions(values)
+	for index, value := range values {
+		if !value.Aggregate.Valid() || value.Aggregate == target || value.Expected.MustNotExist == (value.Expected.Revision > 0) || value != canonical[index] {
+			return false
+		}
+		if index > 0 && values[index-1].Aggregate == value.Aggregate {
+			return false
+		}
+	}
+	return true
+}
+
+func canonicalPreconditions(values []AggregatePrecondition) []AggregatePrecondition {
+	preconditions := append([]AggregatePrecondition(nil), values...)
+	sort.Slice(preconditions, func(i, j int) bool {
+		if preconditions[i].Aggregate.Kind != preconditions[j].Aggregate.Kind {
+			return preconditions[i].Aggregate.Kind < preconditions[j].Aggregate.Kind
+		}
+		return preconditions[i].Aggregate.ID < preconditions[j].Aggregate.ID
+	})
+	return preconditions
+}
+
+func preconditionsMatch(values []AggregatePrecondition, related map[AggregateRef]RelatedSnapshot) bool {
+	for _, value := range values {
+		current, found := related[value.Aggregate]
+		if value.Expected.MustNotExist {
+			if found && current.Exists {
+				return false
+			}
+			continue
+		}
+		if !found || !current.Exists || current.Revision != value.Expected.Revision {
+			return false
+		}
+	}
+	return true
 }
 
 func actorAttributionValid(command KernelCommand, snapshot Snapshot, required bool) bool {
@@ -358,7 +455,7 @@ func evolveState(command KernelCommand, snapshot Snapshot, eventID UUIDv7) (*Agg
 	if state.ID != command.Target.ID || state.Kind != command.Target.Kind || state.Revision != snapshot.Revision {
 		return nil, 0, OutcomeRejectedConflict, reasonRevisionConflict
 	}
-	if state.Phase == PhaseClosed {
+	if terminalCommandProhibited(command.CommandType, state.Phase) {
 		return nil, 0, OutcomeRejectedClosed, reasonClosed
 	}
 
@@ -379,12 +476,34 @@ func evolveState(command KernelCommand, snapshot Snapshot, eventID UUIDv7) (*Agg
 		state.Phase = result.Phase
 		state.Condition = result.Condition
 		state.LifecycleEpoch = result.LifecycleEpoch
+		if command.CommandType == "tekroo.command.work.reopen" {
+			object, _ := decodePayloadObject(command.Payload)
+			carry, _ := object["owner_carry_forward"].(bool)
+			if !carry {
+				state.Ownership.OwnerFQN = nil
+				state.Ownership.AssignedEventID = nil
+			}
+		}
 	}
 	if outcome, reason := applyOwnership(command, &state, eventID); outcome != OutcomeApplied {
 		return nil, 0, outcome, reason
 	}
 	state.Revision = nextRevision
 	return &state, nextRevision, OutcomeApplied, reasonApplied
+}
+
+func terminalCommandProhibited(commandType string, phase Phase) bool {
+	if phase != PhaseCompleted && phase != PhaseAccepted && phase != PhaseClosed {
+		return false
+	}
+	switch commandType {
+	case "tekroo.command.work.reopen", "tekroo.command.work.create-successor", "tekroo.command.record.correct":
+		return false
+	case "tekroo.command.story.request-acceptance":
+		return phase != PhaseCompleted
+	default:
+		return true
+	}
 }
 
 func commandCreatesAggregate(commandType string) bool {
@@ -551,6 +670,16 @@ func rejectedDecision(command KernelCommand, context DecisionContext, fingerprin
 		},
 		Provenance: provenance,
 	}
+}
+
+func rejectedAuthorizedDecision(command KernelCommand, context DecisionContext, fingerprint Digest, outcome OutcomeCode, reason string, authority AuthorityDecision) Decision {
+	decision := rejectedDecision(command, context, fingerprint, outcome, reason)
+	decision.Authority = authority
+	decision.Guards = DecisionGuards{
+		Preconditions: append([]AggregatePrecondition(nil), command.Preconditions...),
+		PolicyDigest:  authority.PolicyDigest, PolicyRevision: authority.PolicyRevision,
+	}
+	return decision
 }
 
 func receiptFor(command KernelCommand, context DecisionContext, outcome OutcomeCode, reason string, changed bool, revision *uint64, eventIDs []UUIDv7) CommandReceipt {
