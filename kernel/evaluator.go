@@ -20,7 +20,9 @@ const (
 	reasonNotFound           = "TARGET_NOT_FOUND"
 	reasonAlreadyExists      = "TARGET_ALREADY_EXISTS"
 	reasonRevisionConflict   = "REVISION_CONFLICT"
+	reasonLifecycleConflict  = "LIFECYCLE_EPOCH_CONFLICT"
 	reasonPolicyConflict     = "POLICY_REVISION_CONFLICT"
+	reasonCatalogueConflict  = "CATALOGUE_REVISION_CONFLICT"
 	reasonClosed             = "TARGET_CLOSED"
 	reasonPolicy             = "TRANSITION_POLICY"
 	reasonStaleExecution     = "STALE_EXECUTION"
@@ -73,6 +75,9 @@ func (e Evaluator) Evaluate(command KernelCommand, snapshot Snapshot, context De
 	if !containsPrincipalKind(definition.AuthorityKinds, command.Authority.Kind) {
 		return rejectedDecision(command, context, fingerprint, OutcomeRejectedUnauthorized, reasonUnauthorized), nil
 	}
+	if command.ExpectedCatalogueRevision != e.Catalogue.Revision() {
+		return rejectedDecision(command, context, fingerprint, OutcomeRejectedConflict, reasonCatalogueConflict), nil
+	}
 	authorization := snapshot.Authorization.Authorize(command, snapshot.State, context.DecidedAt)
 	context.Provenance.GrantDigests = append([]Digest(nil), authorization.GrantDigests...)
 	context.Provenance.DelegationDigests = append([]Digest(nil), authorization.DelegationDigests...)
@@ -87,7 +92,7 @@ func (e Evaluator) Evaluate(command KernelCommand, snapshot Snapshot, context De
 		PolicyRevision: snapshot.Authorization.Revision, GrantDigests: append([]Digest(nil), authorization.GrantDigests...),
 		DelegationDigests: append([]Digest(nil), authorization.DelegationDigests...),
 	}
-	if snapshot.Authorization.PolicyDigest != context.Provenance.PolicyDigest || snapshot.Authorization.Revision != context.Provenance.PolicyRevision {
+	if command.ExpectedPolicyRevision != snapshot.Authorization.Revision || snapshot.Authorization.PolicyDigest != context.Provenance.PolicyDigest || snapshot.Authorization.Revision != context.Provenance.PolicyRevision {
 		return rejectedAuthorizedDecision(command, context, fingerprint, OutcomeRejectedConflict, reasonPolicyConflict, authorityDecision), nil
 	}
 	if !authorization.Allowed {
@@ -119,6 +124,12 @@ func (e Evaluator) Evaluate(command KernelCommand, snapshot Snapshot, context De
 			}
 			return rejectedAuthorizedDecision(command, context, fingerprint, OutcomeRejectedConflict, reasonRevisionConflict, authorityDecision), nil
 		}
+	}
+	if !expectedLifecycleEpochMatches(command, snapshot) {
+		if !authorization.CanReadTarget {
+			return rejectedAuthorizedDecision(command, context, fingerprint, OutcomeRejectedUnauthorized, reasonUnauthorized, authorityDecision), nil
+		}
+		return rejectedAuthorizedDecision(command, context, fingerprint, OutcomeRejectedConflict, reasonLifecycleConflict, authorityDecision), nil
 	}
 	if !preconditionsMatch(command.Preconditions, snapshot.Related) {
 		if !authorization.CanReadTarget {
@@ -284,6 +295,12 @@ func validateEnvelope(command KernelCommand) error {
 	if command.ExpectedRevision.MustNotExist == (command.ExpectedRevision.Revision > 0) {
 		return errors.New("invalid expected revision")
 	}
+	if command.ExpectedPolicyRevision == 0 || command.ExpectedCatalogueRevision == 0 {
+		return errors.New("missing expected policy or catalogue revision")
+	}
+	if command.ExpectedLifecycleEpoch != nil && *command.ExpectedLifecycleEpoch == 0 {
+		return errors.New("invalid expected lifecycle epoch")
+	}
 	if len(command.IdempotencyKey) < 1 || len(command.IdempotencyKey) > 256 || !command.CorrelationID.Valid() {
 		return errors.New("invalid idempotency or correlation identity")
 	}
@@ -314,6 +331,23 @@ func validateEnvelope(command KernelCommand) error {
 		seenEvidence[evidence] = struct{}{}
 	}
 	return nil
+}
+
+func expectedLifecycleEpochMatches(command KernelCommand, snapshot Snapshot) bool {
+	if !commandRequiresLifecycleEpoch(command) {
+		return command.ExpectedLifecycleEpoch == nil
+	}
+	if command.ExpectedRevision.MustNotExist || command.ExpectedLifecycleEpoch == nil || snapshot.State == nil {
+		return false
+	}
+	return *command.ExpectedLifecycleEpoch == snapshot.State.LifecycleEpoch
+}
+
+func commandRequiresLifecycleEpoch(command KernelCommand) bool {
+	if command.CommandType == "tekroo.command.story.create" || command.CommandType == "tekroo.command.task.create" || command.CommandType == "tekroo.command.record.correct" {
+		return false
+	}
+	return command.Target.Kind == AggregateStory || command.Target.Kind == AggregateTask
 }
 
 func validPreconditionVector(target AggregateRef, values []AggregatePrecondition) bool {

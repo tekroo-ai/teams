@@ -19,6 +19,7 @@ var ErrInvalidCommand = errors.New("invalid command")
 
 type catalogueDocument struct {
 	ContractIdentity string           `json:"contractIdentity"`
+	Revision         uint64           `json:"revision"`
 	Entries          []catalogueEntry `json:"entries"`
 }
 
@@ -41,6 +42,7 @@ type payloadDocument struct {
 }
 
 type Catalogue struct {
+	revision    uint64
 	commands    map[string]catalogueEntry
 	events      map[string]catalogueEntry
 	payloadDefs map[string]map[string]any
@@ -62,6 +64,9 @@ func Load(fsys fs.FS, packageRoot string) (*Catalogue, error) {
 	}
 	if document.ContractIdentity != kernel.ContractIdentity {
 		return nil, fmt.Errorf("unexpected contract identity %q", document.ContractIdentity)
+	}
+	if document.Revision != kernel.CatalogueRevision {
+		return nil, fmt.Errorf("unexpected catalogue revision %d", document.Revision)
 	}
 	var payloads payloadDocument
 	if err := decodeJSON(payloadBytes, &payloads); err != nil {
@@ -87,8 +92,10 @@ func Load(fsys fs.FS, packageRoot string) (*Catalogue, error) {
 			events[entry.TypeID] = entry
 		}
 	}
-	return &Catalogue{commands: commands, events: events, payloadDefs: payloads.Definitions}, nil
+	return &Catalogue{revision: document.Revision, commands: commands, events: events, payloadDefs: payloads.Definitions}, nil
 }
+
+func (c *Catalogue) Revision() uint64 { return c.revision }
 
 func (c *Catalogue) ResolveCommand(commandType, version string, target kernel.AggregateKind, payload json.RawMessage) (kernel.CommandDefinition, error) {
 	entry, found := c.commands[commandType]

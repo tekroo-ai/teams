@@ -13,7 +13,7 @@ import (
 	"github.com/tekroo-ai/teams/kernel"
 )
 
-const contractRoot = "CONTRACTS/tekroo.kernel.contracts/0.1.0"
+const contractRoot = "CONTRACTS/tekroo.kernel.contracts/0.2.0"
 
 type fixtureDocument struct {
 	Fixtures []fixture `json:"fixtures"`
@@ -42,8 +42,8 @@ func TestFrozenContractCorpus(t *testing.T) {
 		loadFixtures(t, filepath.Join(repositoryRoot, contractRoot, "fixtures/catalogue-coverage.json")),
 		loadFixtures(t, filepath.Join(repositoryRoot, contractRoot, "fixtures/model-and-invariant-scenarios.json"))...,
 	)
-	if len(fixtures) != 65 {
-		t.Fatalf("fixture count = %d, want 65", len(fixtures))
+	if len(fixtures) != 72 {
+		t.Fatalf("fixture count = %d, want 72", len(fixtures))
 	}
 
 	for _, item := range fixtures {
@@ -135,6 +135,57 @@ func runFixture(t *testing.T, catalogue *contract.Catalogue, item fixture) any {
 			DurableDecisionCount int                         `json:"durableDecisionCount"`
 			Receipts             []kernel.IdempotencyReceipt `json:"receipts"`
 		}{DurableDecisionCount: ledger.DurableDecisionCount(), Receipts: receipts}
+	case "PRECONDITION_MODEL":
+		var given struct {
+			Revisions map[string]uint64 `json:"revisions"`
+		}
+		var when struct {
+			Preconditions []struct {
+				Aggregate        string `json:"aggregate"`
+				ExpectedRevision uint64 `json:"expectedRevision"`
+			} `json:"preconditions"`
+		}
+		decode(t, item.Given, &given)
+		decode(t, item.When, &when)
+		valid := true
+		for _, precondition := range when.Preconditions {
+			if given.Revisions[precondition.Aggregate] != precondition.ExpectedRevision {
+				valid = false
+			}
+		}
+		return struct {
+			Valid bool `json:"valid"`
+		}{Valid: valid}
+	case "REVIEW_JOIN_MODEL":
+		var when struct {
+			Results []kernel.ReviewBranchResult `json:"results"`
+		}
+		var given struct {
+			RequiredBranchIDs []string `json:"requiredBranchIds"`
+		}
+		decode(t, item.Given, &given)
+		decode(t, item.When, &when)
+		return kernel.EvaluateAllPassJoin(given.RequiredBranchIDs, when.Results)
+	case "SUCCESSOR_SET_MODEL":
+		var when struct {
+			SuccessorIDs []kernel.UUIDv7 `json:"successorIds"`
+		}
+		decode(t, item.When, &when)
+		return struct {
+			Valid bool `json:"valid"`
+		}{Valid: kernel.CanonicalSuccessorIDs(when.SuccessorIDs)}
+	case "COMPATIBILITY_MODEL":
+		var given struct {
+			SourceVersion string `json:"sourceVersion"`
+		}
+		var when struct {
+			ExactContextAvailable bool `json:"exactContextAvailable"`
+		}
+		decode(t, item.Given, &given)
+		decode(t, item.When, &when)
+		return struct {
+			Outcome string `json:"outcome"`
+		}{Outcome: kernel.CompatibilityOutcome(given.SourceVersion, when.ExactContextAvailable)}
 	default:
 		t.Fatalf("unsupported fixture kind %q", item.Kind)
 		return nil

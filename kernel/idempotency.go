@@ -80,31 +80,37 @@ func CommandFingerprint(command KernelCommand) (Digest, error) {
 		}{RawHex: hex.EncodeToString(command.Payload)}
 	}
 	semantic := struct {
-		ContractManifest string                  `json:"contract_manifest"`
-		CommandType      string                  `json:"command_type"`
-		CommandVersion   string                  `json:"command_version"`
-		Target           AggregateRef            `json:"target"`
-		Authority        PrincipalRef            `json:"authority"`
-		ActorFQN         *ActorFQN               `json:"actor_fqn,omitempty"`
-		Execution        *ExecutionTuple         `json:"execution,omitempty"`
-		ExpectedRevision ExpectedRevision        `json:"expected_revision"`
-		Preconditions    []AggregatePrecondition `json:"preconditions"`
-		Causation        []DagParent             `json:"causation"`
-		Payload          any                     `json:"payload"`
-		EvidenceRefs     []EvidenceRef           `json:"evidence_refs"`
+		ContractManifest          string                  `json:"contract_manifest"`
+		CommandType               string                  `json:"command_type"`
+		CommandVersion            string                  `json:"command_version"`
+		Target                    AggregateRef            `json:"target"`
+		Authority                 PrincipalRef            `json:"authority"`
+		ActorFQN                  *ActorFQN               `json:"actor_fqn,omitempty"`
+		Execution                 *ExecutionTuple         `json:"execution,omitempty"`
+		ExpectedRevision          ExpectedRevision        `json:"expected_revision"`
+		Preconditions             []AggregatePrecondition `json:"preconditions"`
+		ExpectedLifecycleEpoch    *uint64                 `json:"expected_lifecycle_epoch"`
+		ExpectedPolicyRevision    uint64                  `json:"expected_policy_revision"`
+		ExpectedCatalogueRevision uint64                  `json:"expected_catalogue_revision"`
+		Causation                 []DagParent             `json:"causation"`
+		Payload                   any                     `json:"payload"`
+		EvidenceRefs              []EvidenceRef           `json:"evidence_refs"`
 	}{
-		ContractManifest: command.ContractManifest,
-		CommandType:      command.CommandType,
-		CommandVersion:   command.CommandVersion,
-		Target:           command.Target,
-		Authority:        command.Authority,
-		ActorFQN:         command.ActorFQN,
-		Execution:        command.Execution,
-		ExpectedRevision: command.ExpectedRevision,
-		Preconditions:    preconditions,
-		Causation:        parents,
-		Payload:          payload,
-		EvidenceRefs:     evidence,
+		ContractManifest:          command.ContractManifest,
+		CommandType:               command.CommandType,
+		CommandVersion:            command.CommandVersion,
+		Target:                    command.Target,
+		Authority:                 command.Authority,
+		ActorFQN:                  command.ActorFQN,
+		Execution:                 command.Execution,
+		ExpectedRevision:          command.ExpectedRevision,
+		Preconditions:             preconditions,
+		ExpectedLifecycleEpoch:    command.ExpectedLifecycleEpoch,
+		ExpectedPolicyRevision:    command.ExpectedPolicyRevision,
+		ExpectedCatalogueRevision: command.ExpectedCatalogueRevision,
+		Causation:                 parents,
+		Payload:                   payload,
+		EvidenceRefs:              evidence,
 	}
 	canonical, err := canonicalJSON(semantic)
 	if err != nil {

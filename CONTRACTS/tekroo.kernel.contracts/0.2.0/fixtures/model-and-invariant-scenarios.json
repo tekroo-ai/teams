@@ -1,0 +1,566 @@
+{
+  "contractIdentity": "tekroo.kernel.contracts/0.2.0",
+  "fixtures": [
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "MODEL-STORY-FORWARD",
+      "given": {
+        "condition": "RUNNABLE",
+        "lifecycleEpoch": 1,
+        "phase": "DRAFT"
+      },
+      "kind": "STATE_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-006",
+        "P2-KCF-008"
+      ],
+      "then": {
+        "expected": {
+          "condition": "RUNNABLE",
+          "lifecycleEpoch": 1,
+          "phase": "ACCEPTED",
+          "rejected": null
+        }
+      },
+      "when": {
+        "actions": [
+          "authorize",
+          "begin_planning",
+          "activate",
+          "complete",
+          "accept"
+        ]
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "MODEL-TASK-FORWARD",
+      "given": {
+        "condition": "RUNNABLE",
+        "lifecycleEpoch": 1,
+        "phase": "PLANNED"
+      },
+      "kind": "STATE_MODEL",
+      "model": "task",
+      "sourceDecisionIds": [
+        "P2-KCF-006",
+        "P2-KCF-008"
+      ],
+      "then": {
+        "expected": {
+          "condition": "RUNNABLE",
+          "lifecycleEpoch": 1,
+          "phase": "COMPLETED",
+          "rejected": null
+        }
+      },
+      "when": {
+        "actions": [
+          "mark_ready",
+          "activate",
+          "complete"
+        ]
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "MODEL-BLOCK-ORTHOGONAL",
+      "given": {
+        "condition": "RUNNABLE",
+        "lifecycleEpoch": 1,
+        "phase": "ACTIVE"
+      },
+      "kind": "STATE_MODEL",
+      "model": "task",
+      "sourceDecisionIds": [
+        "P2-KCF-006"
+      ],
+      "then": {
+        "expected": {
+          "condition": "RUNNABLE",
+          "lifecycleEpoch": 1,
+          "phase": "ACTIVE",
+          "rejected": null
+        }
+      },
+      "when": {
+        "actions": [
+          "block",
+          "unblock"
+        ]
+      }
+    },
+    {
+      "classification": "REGRESSION_RECEIPT",
+      "fixtureId": "MODEL-COMPLETION-NO-REQUESTED-PHASE",
+      "given": {
+        "condition": "RUNNABLE",
+        "lifecycleEpoch": 1,
+        "phase": "ACTIVE"
+      },
+      "kind": "STATE_MODEL",
+      "model": "task",
+      "sourceDecisionIds": [
+        "P2-KCF-006",
+        "P2-KCF-008"
+      ],
+      "then": {
+        "expected": {
+          "condition": "RUNNABLE",
+          "lifecycleEpoch": 1,
+          "phase": "COMPLETED",
+          "rejected": null
+        }
+      },
+      "when": {
+        "actions": [
+          "complete"
+        ]
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "MODEL-ILLEGAL-COMPLETION",
+      "given": {
+        "condition": "RUNNABLE",
+        "lifecycleEpoch": 1,
+        "phase": "READY"
+      },
+      "kind": "STATE_MODEL",
+      "model": "task",
+      "sourceDecisionIds": [
+        "P2-KCF-006",
+        "P2-KCF-008"
+      ],
+      "then": {
+        "expected": {
+          "condition": "RUNNABLE",
+          "lifecycleEpoch": 1,
+          "phase": "READY",
+          "rejected": "REJECTED_POLICY"
+        }
+      },
+      "when": {
+        "actions": [
+          "complete"
+        ]
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "MODEL-REOPEN-INCREMENTS-EPOCH",
+      "given": {
+        "condition": "RUNNABLE",
+        "lifecycleEpoch": 1,
+        "phase": "COMPLETED"
+      },
+      "kind": "STATE_MODEL",
+      "model": "story",
+      "sourceDecisionIds": [
+        "P2-KCF-008"
+      ],
+      "then": {
+        "expected": {
+          "condition": "RUNNABLE",
+          "lifecycleEpoch": 2,
+          "phase": "ACTIVE",
+          "rejected": null
+        }
+      },
+      "when": {
+        "actions": [
+          "reopen"
+        ]
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "DAG-VALID-BRANCH-JOIN",
+      "given": {
+        "nodes": [
+          "root",
+          "left",
+          "right",
+          "join"
+        ]
+      },
+      "kind": "DAG_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-005"
+      ],
+      "then": {
+        "expected": {
+          "reason": null,
+          "valid": true
+        }
+      },
+      "when": {
+        "edges": [
+          {
+            "child": "left",
+            "parent": "root"
+          },
+          {
+            "child": "right",
+            "parent": "root"
+          },
+          {
+            "child": "join",
+            "parent": "left"
+          },
+          {
+            "child": "join",
+            "parent": "right"
+          }
+        ]
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "DAG-REJECT-CYCLE",
+      "given": {
+        "nodes": [
+          "a",
+          "b"
+        ]
+      },
+      "kind": "DAG_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-005"
+      ],
+      "then": {
+        "expected": {
+          "reason": "CYCLE",
+          "valid": false
+        }
+      },
+      "when": {
+        "edges": [
+          {
+            "child": "b",
+            "parent": "a"
+          },
+          {
+            "child": "a",
+            "parent": "b"
+          }
+        ]
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "IDENTITY-CONCRETE-FQN",
+      "given": {},
+      "kind": "IDENTITY_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-002"
+      ],
+      "then": {
+        "expected": {
+          "valid": true
+        }
+      },
+      "when": {
+        "value": "teams::senior-coder-1"
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "IDENTITY-REJECT-WILDCARD",
+      "given": {},
+      "kind": "IDENTITY_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-002"
+      ],
+      "then": {
+        "expected": {
+          "valid": false
+        }
+      },
+      "when": {
+        "value": "teams::coder-*"
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "IDENTITY-REJECT-LEADING-ZERO",
+      "given": {},
+      "kind": "IDENTITY_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-002"
+      ],
+      "then": {
+        "expected": {
+          "valid": false
+        }
+      },
+      "when": {
+        "value": "teams::coder-01"
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "PRECONDITION-EXACT-ALL",
+      "given": {
+        "revisions": {
+          "story:00000000-0000-7000-8000-000000000701": 3,
+          "task:00000000-0000-7000-8000-000000000702": 5
+        }
+      },
+      "kind": "PRECONDITION_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-007"
+      ],
+      "then": {
+        "expected": {
+          "valid": true
+        }
+      },
+      "when": {
+        "preconditions": [
+          {
+            "aggregate": "story:00000000-0000-7000-8000-000000000701",
+            "expectedRevision": 3
+          },
+          {
+            "aggregate": "task:00000000-0000-7000-8000-000000000702",
+            "expectedRevision": 5
+          }
+        ]
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "PRECONDITION-STALE-NONE",
+      "given": {
+        "revisions": {
+          "story:00000000-0000-7000-8000-000000000701": 4,
+          "task:00000000-0000-7000-8000-000000000702": 5
+        }
+      },
+      "kind": "PRECONDITION_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-007"
+      ],
+      "then": {
+        "expected": {
+          "valid": false
+        }
+      },
+      "when": {
+        "preconditions": [
+          {
+            "aggregate": "story:00000000-0000-7000-8000-000000000701",
+            "expectedRevision": 3
+          },
+          {
+            "aggregate": "task:00000000-0000-7000-8000-000000000702",
+            "expectedRevision": 5
+          }
+        ]
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "REVIEW-JOIN-ORDER-INDEPENDENT",
+      "given": {
+        "joinRule": "ALL_PASS",
+        "partialResultPolicy": "WAIT_ALL",
+        "requiredBranchIds": [
+          "review",
+          "tests"
+        ]
+      },
+      "kind": "REVIEW_JOIN_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-008"
+      ],
+      "then": {
+        "expected": {
+          "complete": true,
+          "status": "PASS"
+        }
+      },
+      "when": {
+        "results": [
+          {
+            "branchId": "tests",
+            "result": "PASS"
+          },
+          {
+            "branchId": "review",
+            "result": "PASS"
+          }
+        ]
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "REVIEW-JOIN-DUPLICATE-CONFLICT",
+      "given": {
+        "joinRule": "ALL_PASS",
+        "partialResultPolicy": "WAIT_ALL",
+        "requiredBranchIds": [
+          "review",
+          "tests"
+        ]
+      },
+      "kind": "REVIEW_JOIN_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-008"
+      ],
+      "then": {
+        "expected": {
+          "complete": false,
+          "status": "CONFLICT"
+        }
+      },
+      "when": {
+        "results": [
+          {
+            "branchId": "tests",
+            "result": "PASS"
+          },
+          {
+            "branchId": "tests",
+            "result": "FAIL"
+          }
+        ]
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "SUCCESSOR-SET-CANONICAL",
+      "given": {},
+      "kind": "SUCCESSOR_SET_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-008"
+      ],
+      "then": {
+        "expected": {
+          "valid": true
+        }
+      },
+      "when": {
+        "successorIds": [
+          "00000000-0000-7000-8000-000000000801",
+          "00000000-0000-7000-8000-000000000802"
+        ]
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "SUCCESSOR-SET-REJECT-UNORDERED",
+      "given": {},
+      "kind": "SUCCESSOR_SET_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-008"
+      ],
+      "then": {
+        "expected": {
+          "valid": false
+        }
+      },
+      "when": {
+        "successorIds": [
+          "00000000-0000-7000-8000-000000000802",
+          "00000000-0000-7000-8000-000000000801"
+        ]
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "COMPATIBILITY-1.0-MISSING-CONTEXT",
+      "given": {
+        "sourceVersion": "1.0.0"
+      },
+      "kind": "COMPATIBILITY_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-012"
+      ],
+      "then": {
+        "expected": {
+          "outcome": "MIGRATION_REQUIRED"
+        }
+      },
+      "when": {
+        "exactContextAvailable": false
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "IDEMPOTENCY-DUPLICATE-AND-CONFLICT",
+      "given": {},
+      "kind": "IDEMPOTENCY_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-007"
+      ],
+      "then": {
+        "expected": {
+          "durableDecisionCount": 1,
+          "receipts": [
+            {
+              "eventCount": 1,
+              "fingerprint": "5d731c4556822547ffc0009f11868f67036020cd2e6c958bec656871037160b4",
+              "outcome": "APPLIED"
+            },
+            {
+              "eventCount": 1,
+              "fingerprint": "5d731c4556822547ffc0009f11868f67036020cd2e6c958bec656871037160b4",
+              "outcome": "APPLIED"
+            },
+            {
+              "eventCount": 0,
+              "outcome": "REJECTED_CONFLICT",
+              "reason": "IDEMPOTENCY_KEY_REUSE"
+            }
+          ]
+        }
+      },
+      "when": {
+        "commands": [
+          {
+            "scope": {
+              "commandType": "tekroo.command.task.activate",
+              "contract": "tekroo.kernel.contracts/0.2.0",
+              "key": "activate-1",
+              "principal": "teams::coder-1",
+              "target": "task-1"
+            },
+            "semanticRequest": {
+              "expectedRevision": 2,
+              "owner": "teams::coder-1"
+            }
+          },
+          {
+            "scope": {
+              "commandType": "tekroo.command.task.activate",
+              "contract": "tekroo.kernel.contracts/0.2.0",
+              "key": "activate-1",
+              "principal": "teams::coder-1",
+              "target": "task-1"
+            },
+            "semanticRequest": {
+              "expectedRevision": 2,
+              "owner": "teams::coder-1"
+            }
+          },
+          {
+            "scope": {
+              "commandType": "tekroo.command.task.activate",
+              "contract": "tekroo.kernel.contracts/0.2.0",
+              "key": "activate-1",
+              "principal": "teams::coder-1",
+              "target": "task-1"
+            },
+            "semanticRequest": {
+              "expectedRevision": 3,
+              "owner": "teams::coder-1"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "schemaVersion": "1.1.0"
+}

@@ -43,11 +43,11 @@ func TestAllFrozenCommandsReachTheirDeclaredEventThroughEvaluator(t *testing.T) 
 	}
 
 	root := testRepositoryRoot(t)
-	fixtureBytes, err := os.ReadFile(filepath.Join(root, "CONTRACTS/tekroo.kernel.contracts/0.1.0/fixtures/catalogue-coverage.json"))
+	fixtureBytes, err := os.ReadFile(filepath.Join(root, "CONTRACTS/tekroo.kernel.contracts/0.2.0/fixtures/catalogue-coverage.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	catalogueBytes, err := os.ReadFile(filepath.Join(root, "CONTRACTS/tekroo.kernel.contracts/0.1.0/catalogue/kernel-catalogue.json"))
+	catalogueBytes, err := os.ReadFile(filepath.Join(root, "CONTRACTS/tekroo.kernel.contracts/0.2.0/catalogue/kernel-catalogue.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -214,6 +214,20 @@ func TestSemanticFingerprintIgnoresTransportFieldsAndSetOrder(t *testing.T) {
 	if third == first {
 		t.Fatal("semantic payload change did not alter fingerprint")
 	}
+	contextChanges := []kernel.KernelCommand{command, command, command}
+	contextChanges[0].ExpectedPolicyRevision++
+	contextChanges[1].ExpectedCatalogueRevision++
+	epoch := uint64(1)
+	contextChanges[2].ExpectedLifecycleEpoch = &epoch
+	for index, changed := range contextChanges {
+		digest, fingerprintErr := kernel.CommandFingerprint(changed)
+		if fingerprintErr != nil {
+			t.Fatal(fingerprintErr)
+		}
+		if digest == first {
+			t.Fatalf("expected decision context change %d did not alter fingerprint", index)
+		}
+	}
 	malformedA := command
 	malformedA.Payload = json.RawMessage(`{} trailing-a`)
 	malformedB := command
@@ -320,6 +334,8 @@ func activeTaskCommand(t *testing.T) (kernel.KernelCommand, kernel.Snapshot) {
 	command.CommandType = "tekroo.command.task.activate"
 	command.Target.Kind = kernel.AggregateTask
 	command.ExpectedRevision = kernel.NewExpectedRevision(2)
+	epoch := uint64(1)
+	command.ExpectedLifecycleEpoch = &epoch
 	actor := kernel.ActorFQN("teams::coder-1")
 	execution := kernel.ExecutionTuple{ExecutionID: mustUUID(t, "00000000-0000-7000-8000-000000000041"), FencingEpoch: 7}
 	command.Authority = kernel.PrincipalRef{Kind: kernel.PrincipalActor, ID: string(actor)}
@@ -344,16 +360,18 @@ func commandCase(t *testing.T, commandType string, payload json.RawMessage, targ
 	t.Helper()
 	target := kernel.AggregateRef{Kind: targetKind, ID: mustUUID(t, "00000000-0000-7000-8000-000000000071")}
 	command := kernel.KernelCommand{
-		ContractManifest: kernel.ContractIdentity,
-		CommandID:        mustUUID(t, "00000000-0000-7000-8000-000000000072"),
-		CommandType:      commandType,
-		CommandVersion:   kernel.SchemaVersion,
-		Target:           target,
-		Authority:        kernel.PrincipalRef{Kind: authorityKind, ID: "principal"},
-		ExpectedRevision: kernel.NewExpectedRevision(1),
-		IdempotencyKey:   "all-command-semantics",
-		CorrelationID:    mustUUID(t, "00000000-0000-7000-8000-000000000073"),
-		Payload:          append(json.RawMessage(nil), payload...),
+		ContractManifest:          kernel.ContractIdentity,
+		CommandID:                 mustUUID(t, "00000000-0000-7000-8000-000000000072"),
+		CommandType:               commandType,
+		CommandVersion:            kernel.SchemaVersion,
+		Target:                    target,
+		Authority:                 kernel.PrincipalRef{Kind: authorityKind, ID: "principal"},
+		ExpectedRevision:          kernel.NewExpectedRevision(1),
+		ExpectedPolicyRevision:    1,
+		ExpectedCatalogueRevision: kernel.CatalogueRevision,
+		IdempotencyKey:            "all-command-semantics",
+		CorrelationID:             mustUUID(t, "00000000-0000-7000-8000-000000000073"),
+		Payload:                   append(json.RawMessage(nil), payload...),
 	}
 	snapshot := kernel.Snapshot{Exists: true, Revision: 1}
 	parent := mustUUID(t, "00000000-0000-7000-8000-000000000074")
@@ -378,6 +396,10 @@ func commandCase(t *testing.T, commandType string, payload json.RawMessage, targ
 	}
 	if targetKind == kernel.AggregateStory || targetKind == kernel.AggregateTask {
 		snapshot.State = stateForCommand(commandType, target)
+		if commandType != "tekroo.command.record.correct" && !command.ExpectedRevision.MustNotExist {
+			epoch := snapshot.State.LifecycleEpoch
+			command.ExpectedLifecycleEpoch = &epoch
+		}
 	}
 	if commandType == "tekroo.command.execution.replace" {
 		snapshot.CurrentExecutions = map[kernel.ActorFQN]kernel.ExecutionTuple{
@@ -400,7 +422,7 @@ func commandCase(t *testing.T, commandType string, payload json.RawMessage, targ
 				snapshot.AcceptedEvents = make(map[kernel.UUIDv7]kernel.AcceptedEvent)
 			}
 			for _, value := range values {
-				snapshot.AcceptedEvents[kernel.UUIDv7(value.(string))] = kernel.AcceptedEvent{EventType: "tekroo.event.completion-review.result-recorded"}
+				snapshot.AcceptedEvents[kernel.UUIDv7(value.(string))] = kernel.AcceptedEvent{EventType: "tekroo.event.completion-review.result-recorded", Qualification: "PASS"}
 			}
 		}
 		if value, ok := object["target_event_id"].(string); ok {
@@ -415,6 +437,19 @@ func commandCase(t *testing.T, commandType string, payload json.RawMessage, targ
 			snapshot.Related = map[kernel.AggregateRef]kernel.RelatedSnapshot{subject: {
 				Exists: true, Revision: 1,
 				State: &kernel.AggregateState{Kind: subject.Kind, ID: subject.ID, Revision: 1, LifecycleEpoch: uint64(object["lifecycle_epoch"].(float64)), Phase: kernel.PhaseActive, Condition: kernel.ConditionRunnable},
+			}}
+		}
+		if commandType == "tekroo.command.completion-review.record-result" {
+			reviewID := kernel.UUIDv7(object["review_id"].(string))
+			command.Target.ID = reviewID
+			policyRevision := uint64(object["branch_policy_revision"].(float64))
+			branchID := object["branch_id"].(string)
+			snapshot.Reviews = map[kernel.AggregateRef]kernel.CompletionReviewSnapshot{command.Target: {
+				BranchPolicyRevision: policyRevision,
+				RequiredBranchIDs:    []string{branchID},
+				PartialResultPolicy:  "WAIT_ALL",
+				Results:              map[string]string{},
+				Join:                 kernel.ReviewJoinResult{Status: "PENDING"},
 			}}
 		}
 	}
@@ -474,6 +509,8 @@ func storyAuthorizeCommand(t *testing.T) kernel.KernelCommand {
 	command := validStoryCreateCommand(t)
 	command.CommandType = "tekroo.command.story.authorize"
 	command.ExpectedRevision = kernel.NewExpectedRevision(1)
+	epoch := uint64(1)
+	command.ExpectedLifecycleEpoch = &epoch
 	command.Payload = json.RawMessage(`{"scope_revision":1,"reason":"approved"}`)
 	return command
 }

@@ -22,22 +22,25 @@ type AggregatePrecondition struct {
 }
 
 type KernelCommand struct {
-	ContractManifest string
-	CommandID        UUIDv7
-	CommandType      string
-	CommandVersion   string
-	Target           AggregateRef
-	Authority        PrincipalRef
-	ActorFQN         *ActorFQN
-	Execution        *ExecutionTuple
-	ExpectedRevision ExpectedRevision
-	Preconditions    []AggregatePrecondition
-	IdempotencyKey   string
-	CorrelationID    UUIDv7
-	Causation        []DagParent
-	IssuedAt         *time.Time
-	Payload          json.RawMessage
-	EvidenceRefs     []EvidenceRef
+	ContractManifest          string
+	CommandID                 UUIDv7
+	CommandType               string
+	CommandVersion            string
+	Target                    AggregateRef
+	Authority                 PrincipalRef
+	ActorFQN                  *ActorFQN
+	Execution                 *ExecutionTuple
+	ExpectedRevision          ExpectedRevision
+	Preconditions             []AggregatePrecondition
+	ExpectedLifecycleEpoch    *uint64
+	ExpectedPolicyRevision    uint64
+	ExpectedCatalogueRevision uint64
+	IdempotencyKey            string
+	CorrelationID             UUIDv7
+	Causation                 []DagParent
+	IssuedAt                  *time.Time
+	Payload                   json.RawMessage
+	EvidenceRefs              []EvidenceRef
 }
 
 type OutcomeCode string
@@ -138,6 +141,7 @@ type Snapshot struct {
 	Related           map[AggregateRef]RelatedSnapshot
 	Authorization     AuthorizationPolicy
 	OpenReviews       map[CompletionReviewKey]AggregateRef
+	Reviews           map[AggregateRef]CompletionReviewSnapshot
 	AttemptBudgets    map[AttemptBudgetKey]AttemptBudgetSnapshot
 }
 
@@ -148,8 +152,9 @@ type RelatedSnapshot struct {
 }
 
 type AcceptedEvent struct {
-	EventType   string
-	Quarantined bool
+	EventType     string
+	Quarantined   bool
+	Qualification string
 }
 
 type EvidenceMetadata struct {

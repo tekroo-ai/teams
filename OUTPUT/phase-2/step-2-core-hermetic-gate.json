@@ -1,11 +1,11 @@
 {
-  "schemaVersion": "1.0.0",
+  "schemaVersion": "1.1.0",
   "reportType": "IMPLEMENTATION_CONFORMANCE",
-  "contractIdentity": "tekroo.kernel.contracts/0.1.0",
-  "manifestSha256": "db3f38d4794a6993aad0b9ddf6d8f093eebf36b484d99de42dddc21bf3877c2f",
+  "contractIdentity": "tekroo.kernel.contracts/0.2.0",
+  "manifestSha256": "cd582fb163e17d49a1a0a627f33cdbb184d15ecace3200981738782cca977dae",
   "profile": "core-hermetic",
   "status": "INCONCLUSIVE",
-  "sourceTreeSha256": "26e731b9d0dba93fddb93c9ef741609fe13000ea3c8651a19ef2173c6fdda17f",
+  "sourceTreeSha256": "2f4d69a8be431e89559441455c53a2949dbef01d202b102b596032ae299fb41d",
   "environment": {
     "goVersion": "go1.26.4",
     "goos": "darwin",
@@ -14,11 +14,11 @@
     "timeZone": "UTC"
   },
   "executed": {
-    "testCases": 150,
+    "testCases": 159,
     "failedTests": 0,
     "passedPackages": 6,
     "vetFailures": 0,
-    "frozenFixtures": 65,
+    "frozenFixtures": 72,
     "generatedHistories": 10240,
     "faultSchedules": 6,
     "concurrencySchedules": 34
@@ -98,9 +98,10 @@
       "tests": [
         "TestLifecycleTransitionTableIsExhaustive",
         "TestGeneratedLifecycleHistoriesMatchIndependentModel",
-        "TestFoldAggregateReconstructsAndDetectsCorruption"
+        "TestFoldAggregateReconstructsAndDetectsCorruption",
+        "TestEvaluatorRejectsStaleCataloguePolicyAndLifecycleContext"
       ],
-      "evidenceFloor": "All listed forward transitions and 4,096 generated bounded histories are executed."
+      "evidenceFloor": "All listed forward transitions and 4,096 generated bounded histories are executed; stale lifecycle epochs are rejected before evolution."
     },
     {
       "invariantId": "INV-007-BOUNDED-ITERATION",
@@ -125,8 +126,9 @@
     },
     {
       "invariantId": "INV-009-PROVENANCE-COMPLETE",
-      "status": "INCONCLUSIVE",
+      "status": "PASS",
       "tests": [
+        "TestAllFrozenCommandsReachTheirDeclaredEventThroughEvaluator/CAT-003-EVIDENCE-REGISTER-VALID",
         "TestEvidenceReferenceRequiresExactAvailableRegistration",
         "TestEvidenceRegistryVerifiesBytesWithoutCollapsingOrigins",
         "TestEvidenceAccessRedactionDeletionAndAuditRebuild",
@@ -134,7 +136,7 @@
         "TestDecisionProvenanceRejectsIdentitySubstitution",
         "TestStoreRejectsIncompleteOrMismatchedDecisionProvenance"
       ],
-      "evidenceFloor": "Structured evidence, exact access, derived redaction, deletion tombstones, linked assessments, source-through-runtime identities, decision provenance, and deterministic interruption/resume audit rebuild execute in the pure registry; the frozen evidence-register command cannot encode the complete record."
+      "evidenceFloor": "The 1.1.0 evidence-register payload encodes the approved metadata and is accepted through the evaluator; structured evidence, exact access, derived redaction, deletion tombstones, linked assessments, source-through-runtime identities, decision provenance, and deterministic interruption/resume audit rebuild execute in the pure registry."
     },
     {
       "invariantId": "INV-010-NONAUTHORITATIVE-EVIDENCE",
@@ -158,11 +160,13 @@
       "status": "PASS",
       "tests": [
         "TestFrozenContractCorpus",
+        "TestEvaluatorRejectsStaleCataloguePolicyAndLifecycleContext",
+        "TestStorePersistsOrderIndependentCompletionReviewJoin",
         "TestGeneratedLifecycleHistoriesMatchIndependentModel",
         "TestGeneratedDAGsAcceptOnlyAcyclicExistingNodes",
         "TestGeneratedAttemptBudgetsNeverExceedLimit"
       ],
-      "evidenceFloor": "Fixed seeds, toolchain identity, source/manifest/artifact digests, and a self-digesting report are emitted."
+      "evidenceFloor": "The authorized 0.2.0 compatibility rule and 72 fixtures execute with fixed seeds; branch joins persist in arrival-independent form; toolchain, source, manifest, and artifact digests plus a self-digesting report are emitted."
     },
     {
       "invariantId": "INV-013-MERGE-TREE-QUALIFIED",
@@ -180,27 +184,28 @@
     }
   ],
   "unresolvedGaps": [
-    "The frozen kernel-command schema cannot encode the approved multi-aggregate precondition vector or exact lifecycle/policy/catalogue preconditions; the internal guards are therefore not reachable from a conformant JSON command.",
-    "The frozen completion-review result schema has no branch identity or join-policy fields, so bounded order-independent asynchronous branch joins remain unencodable.",
-    "The frozen successor command carries one successor_id and cannot encode deterministic split/merge successor sets.",
-    "The frozen evidence-register command omits mandatory Decision 9 producer, transport, sensitivity, access, retention, lineage, computation, redaction, and deletion fields; the executable pure registry is not fully reachable through the command contract.",
     "Provider/SMA evidence-acceptance matrices and the mongo-integration profile have not run in core-hermetic.",
-    "The required deliberately faulty implementation or mutation set has not demonstrated sensitivity for every invariant family."
+    "The required deliberately faulty implementation or mutation set has not demonstrated sensitivity for every invariant family.",
+    "The synthesized-merge profile has not yet run."
   ],
   "artifacts": [
     {
       "path": "build/reports/contract-structure.core-run.json",
-      "sha256": "7b05a72666fe03365a1cfc5b18f055567076b09bce410683683ef365fb21e3cf"
+      "sha256": "4bf88317093f576302635c325c5952e18ae3a42052192fbc8b2fc28a7cf0bef5"
     },
     {
       "path": "build/reports/reference-corpus.core-run.json",
-      "sha256": "aca87c781ba6060c3a24098d23a7f8b470928213a7f04613d2fbb904db7acf77"
+      "sha256": "5e31175da80dc364d78d0932f708d0610c5226f378b2c68a43dfcf0a4a7f18e3"
     },
     {
-      "path": "OUTPUT/phase-2/step-2-contract-encoding-gaps.md",
-      "sha256": "e0a23109ae1036a70e920a4dde1747d19d6de06a4eb06a125fb4ba67d1543b6a"
+      "path": "OUTPUT/phase-2/step-2-contract-revision-authorization.json",
+      "sha256": "5633acecb297d39cb73fc18b60402a92ac505ced45345836d929a47fc96faa00"
+    },
+    {
+      "path": "CONTRACTS/tekroo.kernel.contracts/0.2.0/compatibility/from-0.1.0.json",
+      "sha256": "20a6767616b919601faf1e61929bad8b746ca91340216bc48a99c25fae8ff194"
     }
   ],
   "digestMethod": "SHA-256 of compact JSON with reportSha256 set to the empty string",
-  "reportSha256": "e4c3d34a3d7b05984fd10b8cd9d16a66141da3cfec06b5bc91b79e9e2b539764"
+  "reportSha256": "c7c90c311973b3d552a7a8c52c6c020c05ec7d5f3f8eaaf70fc41cafd4d84d40"
 }

@@ -18,7 +18,7 @@ func TestCompletionRequiresExactEvidenceCriteriaValidationAndDependencies(t *tes
 	command := validStoryCreateCommand(t)
 	command.CommandType = "tekroo.command.story.request-completion"
 	command.ExpectedRevision = kernel.NewExpectedRevision(5)
-	command.Payload = json.RawMessage(`{"criteria_revision":2,"evidence_ids":["00000000-0000-7000-8000-0000000000e1"],"validation_event_ids":["00000000-0000-7000-8000-0000000000e2"]}`)
+	command.Payload = json.RawMessage(`{"lifecycle_epoch":1,"criteria_revision":2,"evidence_ids":["00000000-0000-7000-8000-0000000000e1"],"artifact_digests":[],"validation_event_ids":["00000000-0000-7000-8000-0000000000e2"],"unresolved_exceptions":[]}`)
 	command.EvidenceRefs = []kernel.EvidenceRef{{EvidenceID: evidenceID, SHA256: evidenceDigest}}
 	command.Causation = []kernel.DagParent{{ParentEventID: parentID, EdgeKind: kernel.EdgeCausal}}
 	command.Preconditions = []kernel.AggregatePrecondition{{Aggregate: task, Expected: kernel.NewExpectedRevision(3)}}
@@ -27,7 +27,7 @@ func TestCompletionRequiresExactEvidenceCriteriaValidationAndDependencies(t *tes
 		State:    &kernel.AggregateState{Kind: kernel.AggregateStory, ID: command.Target.ID, Revision: 5, LifecycleEpoch: 1, Phase: kernel.PhaseActive, Condition: kernel.ConditionRunnable},
 		Evidence: map[kernel.UUIDv7]kernel.EvidenceMetadata{evidenceID: {SHA256: evidenceDigest, Available: true}},
 		AcceptedEvents: map[kernel.UUIDv7]kernel.AcceptedEvent{
-			validationID: {EventType: "tekroo.event.completion-review.result-recorded"},
+			validationID: {EventType: "tekroo.event.completion-review.result-recorded", Qualification: "PASS"},
 			parentID:     {EventType: "tekroo.event.story.activated"},
 		},
 		Related: map[kernel.AggregateRef]kernel.RelatedSnapshot{task: {
@@ -50,8 +50,8 @@ func TestCompletionRequiresExactEvidenceCriteriaValidationAndDependencies(t *tes
 	if decision := evaluate(t, evaluator, command, snapshot, context); decision.Receipt.ReasonCode != "VALIDATION_INCOMPLETE" {
 		t.Fatalf("missing validation decision = %#v", decision.Receipt)
 	}
-	snapshot.AcceptedEvents[validationID] = kernel.AcceptedEvent{EventType: "tekroo.event.completion-review.result-recorded"}
-	command.Payload = json.RawMessage(`{"criteria_revision":1,"evidence_ids":["00000000-0000-7000-8000-0000000000e1"],"validation_event_ids":["00000000-0000-7000-8000-0000000000e2"]}`)
+	snapshot.AcceptedEvents[validationID] = kernel.AcceptedEvent{EventType: "tekroo.event.completion-review.result-recorded", Qualification: "PASS"}
+	command.Payload = json.RawMessage(`{"lifecycle_epoch":1,"criteria_revision":1,"evidence_ids":["00000000-0000-7000-8000-0000000000e1"],"artifact_digests":[],"validation_event_ids":["00000000-0000-7000-8000-0000000000e2"],"unresolved_exceptions":[]}`)
 	if decision := evaluate(t, evaluator, command, snapshot, context); decision.Receipt.ReasonCode != "CRITERIA_REVISION_CONFLICT" {
 		t.Fatalf("stale criteria decision = %#v", decision.Receipt)
 	}
@@ -66,7 +66,7 @@ func TestAcceptanceReopenSuccessorAndCorrectionUseExplicitTerminalPaths(t *testi
 	command := validStoryCreateCommand(t)
 	command.CommandType = "tekroo.command.story.request-acceptance"
 	command.ExpectedRevision = kernel.NewExpectedRevision(7)
-	command.Payload = json.RawMessage(`{"acceptance_policy_revision":4,"evidence_ids":["00000000-0000-7000-8000-0000000000f1"]}`)
+	command.Payload = json.RawMessage(`{"lifecycle_epoch":1,"acceptance_policy_revision":4,"evidence_ids":["00000000-0000-7000-8000-0000000000f1"]}`)
 	command.EvidenceRefs = []kernel.EvidenceRef{{EvidenceID: evidenceID, SHA256: evidenceDigest}}
 	command.Causation = []kernel.DagParent{{ParentEventID: parentID, EdgeKind: kernel.EdgeCausal}}
 	snapshot := kernel.Snapshot{
@@ -82,7 +82,7 @@ func TestAcceptanceReopenSuccessorAndCorrectionUseExplicitTerminalPaths(t *testi
 	if decision := evaluate(t, evaluator, command, snapshot, context); decision.Receipt.ReasonCode != "ACCEPTANCE_GATE_FAILED" || decision.NextState != nil {
 		t.Fatalf("missing tree decision = %#v", decision)
 	}
-	command.Payload = json.RawMessage(`{"acceptance_policy_revision":4,"evidence_ids":["00000000-0000-7000-8000-0000000000f1"],"qualified_tree_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`)
+	command.Payload = json.RawMessage(`{"lifecycle_epoch":1,"acceptance_policy_revision":4,"evidence_ids":["00000000-0000-7000-8000-0000000000f1"],"qualified_tree_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`)
 	if decision := evaluate(t, evaluator, command, snapshot, context); decision.Receipt.OutcomeCode != kernel.OutcomeApplied || decision.NextState.Phase != kernel.PhaseAccepted {
 		t.Fatalf("accepted decision = %#v", decision)
 	}
@@ -100,7 +100,7 @@ func TestAcceptanceReopenSuccessorAndCorrectionUseExplicitTerminalPaths(t *testi
 
 	successor := reopen
 	successor.CommandType = "tekroo.command.work.create-successor"
-	successor.Payload = json.RawMessage(`{"successor_id":"00000000-0000-7000-8000-0000000000f2","relation":"SUPERSESSION","reason":"new subject"}`)
+	successor.Payload = json.RawMessage(`{"successor_ids":["00000000-0000-7000-8000-0000000000f2"],"relation":"SUPERSESSION","ownership_rule":"UNOWNED","dependency_rule":"EXPLICIT","reason":"new subject"}`)
 	successor.EvidenceRefs = nil
 	snapshot.Authorization = authorizationPolicy(grantFor(successor.Authority, successor, context.Provenance.GrantDigests[0]))
 	if decision := evaluate(t, evaluator, successor, snapshot, context); decision.Receipt.OutcomeCode != kernel.OutcomeApplied || decision.NextState.Phase != kernel.PhaseCompleted {

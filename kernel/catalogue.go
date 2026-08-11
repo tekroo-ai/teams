@@ -25,6 +25,7 @@ type CommandDefinition struct {
 }
 
 type CatalogueSnapshot interface {
+	Revision() uint64
 	ResolveCommand(commandType, version string, target AggregateKind, payload json.RawMessage) (CommandDefinition, error)
 	ResolveEvent(eventType, version string, target AggregateKind, payload json.RawMessage) (EventDefinition, error)
 }

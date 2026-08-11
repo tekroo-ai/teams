@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "PRINCIPAL_AUTHORIZATION",
+  "recordedOn": "2026-08-11",
+  "timePrecision": "DAY",
+  "principalStatement": "So authorized, Nova.",
+  "authorizedAction": "Create a successor tekroo.kernel.contracts/0.2.0 package without modifying 0.1.0.",
+  "authorizedScope": [
+    "Encode canonical multi-aggregate and lifecycle/policy/catalogue preconditions.",
+    "Encode bounded asynchronous completion-review branches and join policy.",
+    "Encode deterministic successor sets and their ownership/dependency rules.",
+    "Encode complete evidence registration metadata, lineage, access, retention, computation, redaction, and deletion state.",
+    "Update the Go implementation and conformance evidence to consume the successor contract directly."
+  ],
+  "sourceFinding": "OUTPUT/phase-2/step-2-contract-encoding-gaps.md",
+  "predecessorContract": "tekroo.kernel.contracts/0.1.0",
+  "successorContract": "tekroo.kernel.contracts/0.2.0"
+}

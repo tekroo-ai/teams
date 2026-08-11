@@ -1,0 +1,38 @@
+{
+  "contractIdentity": "tekroo.kernel.contracts/0.2.0",
+  "protocolVersion": "1.0.0",
+  "requiredInputs": [
+    "manifest_sha256",
+    "profile",
+    "source_identity",
+    "build_identity",
+    "runtime_identity",
+    "fixture_ids",
+    "fake_clock",
+    "id_source",
+    "fault_schedule"
+  ],
+  "requiredOutputs": [
+    "status",
+    "case_results",
+    "executed_count",
+    "skipped_count",
+    "seeds",
+    "scheduler_traces",
+    "artifacts",
+    "report_sha256"
+  ],
+  "resultClasses": [
+    "PASS",
+    "FAIL",
+    "NOT_RUN",
+    "INCONCLUSIVE"
+  ],
+  "rules": [
+    "A skipped, unsupported, unavailable, or retried-away required case cannot be PASS.",
+    "All variable outputs must be declared by the manifest; undeclared variation is failure.",
+    "Every property failure records seed, bounds, trace, and minimized counterexample.",
+    "Reports state their qualification boundary and cannot claim production readiness from semantic conformance."
+  ],
+  "schemaVersion": "1.1.0"
+}

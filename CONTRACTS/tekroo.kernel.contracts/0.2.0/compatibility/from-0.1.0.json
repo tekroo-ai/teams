@@ -1,0 +1,65 @@
+{
+  "breakingChanges": [
+    "KernelCommand 1.1.0 requires exact related-aggregate, lifecycle, policy, and catalogue preconditions.",
+    "Completion-review commands 1.1.0 require named branch and join-policy fields.",
+    "CreateSuccessor 1.1.0 replaces successor_id with a deterministic successor_ids set and explicit ownership/dependency rules.",
+    "EvidenceRegister 1.1.0 requires the complete Decision 9 evidence metadata and lifecycle fields."
+  ],
+  "compatibilityClaim": "BREAKING_WIRE_REVISION_WITH_EXPLICIT_ADAPTER_MIGRATION",
+  "contractName": "tekroo.kernel.contracts",
+  "contractVersion": "0.2.0",
+  "directions": {
+    "adapter": "REQUIRED",
+    "backward": "PARTIAL_ADAPTER_REQUIRED",
+    "forward": "NOT_COMPATIBLE",
+    "replay": "VERSION_GATED"
+  },
+  "migrationRules": [
+    {
+      "mode": "REJECT_WITHOUT_EXACT_CONTEXT",
+      "reason": "Missing exact preconditions or mandatory metadata cannot be inferred.",
+      "source": "1.0.0",
+      "target": "1.1.0"
+    },
+    {
+      "mode": "IDENTITY",
+      "source": "1.1.0",
+      "target": "1.1.0"
+    }
+  ],
+  "predecessor": {
+    "contractIdentity": "tekroo.kernel.contracts/0.1.0",
+    "contractVersion": "0.1.0",
+    "manifestSha256": "db3f38d4794a6993aad0b9ddf6d8f093eebf36b484d99de42dddc21bf3877c2f"
+  },
+  "rollback": "Readers retain 0.1.0 for historical replay. New 1.1.0 commands are never down-converted to 1.0.0.",
+  "schemaVersion": "1.1.0",
+  "unchangedSemanticTypes": [
+    "tekroo.command.execution.register",
+    "tekroo.command.execution.replace",
+    "tekroo.command.evidence.register",
+    "tekroo.command.story.create",
+    "tekroo.command.story.authorize",
+    "tekroo.command.story.begin-planning",
+    "tekroo.command.story.activate",
+    "tekroo.command.work.block",
+    "tekroo.command.work.unblock",
+    "tekroo.command.task.create",
+    "tekroo.command.task.mark-ready",
+    "tekroo.command.task.dispatch",
+    "tekroo.command.task.acquire-ownership",
+    "tekroo.command.task.release-ownership",
+    "tekroo.command.task.handoff",
+    "tekroo.command.task.force-reassign",
+    "tekroo.command.task.activate",
+    "tekroo.command.task.request-completion",
+    "tekroo.command.story.request-completion",
+    "tekroo.command.story.request-acceptance",
+    "tekroo.command.work.reopen",
+    "tekroo.command.work.close",
+    "tekroo.command.work.create-successor",
+    "tekroo.command.completion-review.open",
+    "tekroo.command.completion-review.record-result",
+    "tekroo.command.record.correct"
+  ]
+}

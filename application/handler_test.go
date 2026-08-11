@@ -31,16 +31,18 @@ func TestHandlerCommitsOnceAndReturnsStoredReceiptOnReplay(t *testing.T) {
 		t.Fatal(err)
 	}
 	command := kernel.KernelCommand{
-		ContractManifest: kernel.ContractIdentity,
-		CommandID:        kernel.UUIDv7("00000000-0000-7000-8000-000000000001"),
-		CommandType:      "tekroo.command.story.create",
-		CommandVersion:   kernel.SchemaVersion,
-		Target:           kernel.AggregateRef{Kind: kernel.AggregateStory, ID: kernel.UUIDv7("00000000-0000-7000-8000-000000000002")},
-		Authority:        kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "principal"},
-		ExpectedRevision: kernel.MustNotExist(),
-		IdempotencyKey:   "create-story-1",
-		CorrelationID:    kernel.UUIDv7("00000000-0000-7000-8000-000000000003"),
-		Payload:          json.RawMessage(`{"acceptance_criteria":["works"],"description":"description","title":"title"}`),
+		ContractManifest:          kernel.ContractIdentity,
+		CommandID:                 kernel.UUIDv7("00000000-0000-7000-8000-000000000001"),
+		CommandType:               "tekroo.command.story.create",
+		CommandVersion:            kernel.SchemaVersion,
+		Target:                    kernel.AggregateRef{Kind: kernel.AggregateStory, ID: kernel.UUIDv7("00000000-0000-7000-8000-000000000002")},
+		Authority:                 kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "principal"},
+		ExpectedRevision:          kernel.MustNotExist(),
+		ExpectedPolicyRevision:    1,
+		ExpectedCatalogueRevision: kernel.CatalogueRevision,
+		IdempotencyKey:            "create-story-1",
+		CorrelationID:             kernel.UUIDv7("00000000-0000-7000-8000-000000000003"),
+		Payload:                   json.RawMessage(`{"acceptance_criteria":["works"],"description":"description","title":"title"}`),
 	}
 	provenance := testProvenance(t)
 	store.SetAuthorizationPolicy(testAuthorizationPolicy(command, provenance))
@@ -172,16 +174,18 @@ func (s *winnerStore) Commit(context.Context, kernel.Snapshot, kernel.Decision) 
 
 func testStoryCreateCommand() kernel.KernelCommand {
 	return kernel.KernelCommand{
-		ContractManifest: kernel.ContractIdentity,
-		CommandID:        kernel.UUIDv7("00000000-0000-7000-8000-000000000001"),
-		CommandType:      "tekroo.command.story.create",
-		CommandVersion:   kernel.SchemaVersion,
-		Target:           kernel.AggregateRef{Kind: kernel.AggregateStory, ID: kernel.UUIDv7("00000000-0000-7000-8000-000000000002")},
-		Authority:        kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "principal"},
-		ExpectedRevision: kernel.MustNotExist(),
-		IdempotencyKey:   "create-story-1",
-		CorrelationID:    kernel.UUIDv7("00000000-0000-7000-8000-000000000003"),
-		Payload:          json.RawMessage(`{"acceptance_criteria":["works"],"description":"description","title":"title"}`),
+		ContractManifest:          kernel.ContractIdentity,
+		CommandID:                 kernel.UUIDv7("00000000-0000-7000-8000-000000000001"),
+		CommandType:               "tekroo.command.story.create",
+		CommandVersion:            kernel.SchemaVersion,
+		Target:                    kernel.AggregateRef{Kind: kernel.AggregateStory, ID: kernel.UUIDv7("00000000-0000-7000-8000-000000000002")},
+		Authority:                 kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "principal"},
+		ExpectedRevision:          kernel.MustNotExist(),
+		ExpectedPolicyRevision:    1,
+		ExpectedCatalogueRevision: kernel.CatalogueRevision,
+		IdempotencyKey:            "create-story-1",
+		CorrelationID:             kernel.UUIDv7("00000000-0000-7000-8000-000000000003"),
+		Payload:                   json.RawMessage(`{"acceptance_criteria":["works"],"description":"description","title":"title"}`),
 	}
 }
 
@@ -192,7 +196,7 @@ func loadCatalogue(t *testing.T) *contract.Catalogue {
 		t.Fatal("locate handler test")
 	}
 	repositoryRoot := filepath.Clean(filepath.Join(filepath.Dir(file), ".."))
-	catalogue, err := contract.Load(os.DirFS(repositoryRoot), "CONTRACTS/tekroo.kernel.contracts/0.1.0")
+	catalogue, err := contract.Load(os.DirFS(repositoryRoot), "CONTRACTS/tekroo.kernel.contracts/0.2.0")
 	if err != nil {
 		t.Fatal(err)
 	}

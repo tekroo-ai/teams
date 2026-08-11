@@ -2,10 +2,11 @@
 
 ## Governing authority
 
-The frozen package under `CONTRACTS/tekroo.kernel.contracts/0.1.0/` and its
-source-lineage decisions govern implementation. Do not edit accepted contract
-files in place. If code and contract disagree, stop and report the disagreement;
-do not weaken fixtures to make code pass.
+The released package under `CONTRACTS/tekroo.kernel.contracts/0.2.0/` and its
+source-lineage decisions govern current implementation. The `0.1.0` package is
+preserved for historical replay and compatibility analysis. Do not edit either
+released package in place. If code and contract disagree, stop and report the
+disagreement; do not weaken fixtures to make code pass.
 
 ## Scope boundaries
 

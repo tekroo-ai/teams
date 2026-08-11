@@ -1,0 +1,213 @@
+{
+  "contractIdentity": "tekroo.kernel.contracts/0.2.0",
+  "invariants": [
+    {
+      "decisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-007"
+      ],
+      "description": "Accepted transitions advance exact contiguous revisions; rejections do not.",
+      "fixtureIds": [
+        "MODEL-TASK-FORWARD",
+        "PRECONDITION-EXACT-ALL",
+        "PRECONDITION-STALE-NONE"
+      ],
+      "invariantId": "INV-001-REVISION-CONTIGUITY",
+      "negativeRequirementIds": []
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-007",
+        "P2-KCF-010"
+      ],
+      "description": "One semantic command produces at most one durable decision and canonical receipt.",
+      "fixtureIds": [
+        "IDEMPOTENCY-DUPLICATE-AND-CONFLICT"
+      ],
+      "invariantId": "INV-002-IDEMPOTENT-DECISION",
+      "negativeRequirementIds": [
+        "NEG-012"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-005"
+      ],
+      "description": "Accepted event lineage remains an immutable acyclic graph with explicit parents.",
+      "fixtureIds": [
+        "DAG-VALID-BRANCH-JOIN",
+        "DAG-REJECT-CYCLE"
+      ],
+      "invariantId": "INV-003-DAG-ACYCLIC",
+      "negativeRequirementIds": [
+        "NEG-004",
+        "NEG-014"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-002",
+        "P2-KCF-006"
+      ],
+      "description": "At most one concrete FQN owns work; routing and claims do not.",
+      "fixtureIds": [
+        "IDENTITY-CONCRETE-FQN",
+        "IDENTITY-REJECT-WILDCARD"
+      ],
+      "invariantId": "INV-004-EXACT-OWNERSHIP",
+      "negativeRequirementIds": [
+        "NEG-007"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-002",
+        "P2-KCF-007"
+      ],
+      "description": "Only the current execution tuple may commit actor-attributed commands.",
+      "fixtureIds": [
+        "CAT-001-EXECUTION-REGISTER-VALID",
+        "CAT-002-EXECUTION-REPLACE-VALID"
+      ],
+      "invariantId": "INV-005-EXECUTION-FENCING",
+      "negativeRequirementIds": [
+        "NEG-011"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-006",
+        "P2-KCF-008"
+      ],
+      "description": "Completion, acceptance, reopening, and correction preserve immutable lifecycle epochs.",
+      "fixtureIds": [
+        "MODEL-COMPLETION-NO-REQUESTED-PHASE",
+        "MODEL-REOPEN-INCREMENTS-EPOCH",
+        "MODEL-ILLEGAL-COMPLETION",
+        "REVIEW-JOIN-ORDER-INDEPENDENT",
+        "REVIEW-JOIN-DUPLICATE-CONFLICT",
+        "SUCCESSOR-SET-CANONICAL",
+        "SUCCESSOR-SET-REJECT-UNORDERED"
+      ],
+      "invariantId": "INV-006-LIFECYCLE-EPOCHS",
+      "negativeRequirementIds": [
+        "NEG-003",
+        "NEG-008"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-005",
+        "P2-KCF-007"
+      ],
+      "description": "Retry, validation, planning, handoff, and escalation are finite and durable across restart.",
+      "fixtureIds": [
+        "IDEMPOTENCY-DUPLICATE-AND-CONFLICT"
+      ],
+      "invariantId": "INV-007-BOUNDED-ITERATION",
+      "negativeRequirementIds": [
+        "NEG-001",
+        "NEG-002",
+        "NEG-005",
+        "NEG-006"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-004"
+      ],
+      "description": "Unknown types are preserved and cannot produce canonical organizational effects.",
+      "fixtureIds": [
+        "CAT-UNKNOWN-COMMAND"
+      ],
+      "invariantId": "INV-008-UNKNOWN-NO-EFFECT",
+      "negativeRequirementIds": [
+        "NEG-009"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-009",
+        "P2-KCF-010"
+      ],
+      "description": "Every event and receipt carries exact authority, evidence, contract, source, and runtime provenance.",
+      "fixtureIds": [
+        "CAT-003-EVIDENCE-REGISTER-VALID"
+      ],
+      "invariantId": "INV-009-PROVENANCE-COMPLETE",
+      "negativeRequirementIds": [
+        "NEG-014"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-009"
+      ],
+      "description": "Provider, model, tool, and SMA output remains evidence until accepted by policy.",
+      "fixtureIds": [
+        "CAT-003-EVIDENCE-REGISTER-VALID"
+      ],
+      "invariantId": "INV-010-NONAUTHORITATIVE-EVIDENCE",
+      "negativeRequirementIds": [
+        "NEG-008",
+        "NEG-013"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-010"
+      ],
+      "description": "State, events, receipt, audit, and outbox commit atomically or remain explicitly uncertain.",
+      "fixtureIds": [
+        "IDEMPOTENCY-DUPLICATE-AND-CONFLICT"
+      ],
+      "invariantId": "INV-011-ATOMIC-MONGO-DECISION",
+      "negativeRequirementIds": [
+        "NEG-012"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-011",
+        "P2-KCF-012"
+      ],
+      "description": "Canonical fixtures and reports reproduce under pinned deterministic inputs.",
+      "fixtureIds": [
+        "MODEL-STORY-FORWARD",
+        "DAG-VALID-BRANCH-JOIN",
+        "COMPATIBILITY-1.0-MISSING-CONTEXT"
+      ],
+      "invariantId": "INV-012-CONFORMANCE-REPRODUCIBLE",
+      "negativeRequirementIds": []
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-012"
+      ],
+      "description": "Qualification binds exact base, heads, ordered merge plan, contract, and resulting tree.",
+      "fixtureIds": [
+        "IDEMPOTENCY-DUPLICATE-AND-CONFLICT"
+      ],
+      "invariantId": "INV-013-MERGE-TREE-QUALIFIED",
+      "negativeRequirementIds": []
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-001",
+        "P2-KCF-004",
+        "P2-KCF-009"
+      ],
+      "description": "Provider, persistence, transport, credential, and process fields cannot redefine kernel semantics.",
+      "fixtureIds": [
+        "CAT-UNKNOWN-COMMAND"
+      ],
+      "invariantId": "INV-014-PROVIDER-NEUTRAL-KERNEL",
+      "negativeRequirementIds": [
+        "NEG-010"
+      ]
+    }
+  ],
+  "schemaVersion": "1.1.0"
+}

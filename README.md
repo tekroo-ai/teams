@@ -6,8 +6,9 @@ kernel. It is not a port of the Tekroo v3 codebase.
 ## Current state
 
 This repository is implementing the pure-kernel bootstrap in Go. It
-contains the principal-approved, content-addressed kernel contract release
-`tekroo.kernel.contracts/0.1.0`, its exact architecture and gate records, and a
+contains the principal-authorized, content-addressed kernel contract release
+`tekroo.kernel.contracts/0.2.0`, the preserved `0.1.0` release, their exact
+compatibility and gate records, and a
 standard-library-only deterministic kernel foundation. No runtime or production
 system is qualified by this slice.
 
@@ -18,19 +19,22 @@ schedules, event folding, unknown-event quarantine, and content-addressed
 provenance/evidence primitives. Authorization/delegation, exact internal
 multi-aggregate guards, lifecycle decision gates, durable attempt budgets, and
 evidence access/redaction/deletion/audit rebuild are also executable. The machine
-report remains inconclusive because several principal-approved requirements
-cannot be encoded by the immutable `0.1.0` wire schemas, and because the provider,
+report remains inconclusive because the provider/SMA evidence-acceptance,
 MongoDB, synthesized-merge, and complete mutation-sensitivity profiles have not
-run.
+run. The four previously reported `0.1.0` encoding gaps are resolved by the
+authorized `0.2.0` contract; `1.0.0` commands lacking exact context require an
+explicit migration and are not silently upgraded.
 
 The frozen contract identity is:
 
 ```text
-tekroo.kernel.contracts/0.1.0
-manifest SHA-256: db3f38d4794a6993aad0b9ddf6d8f093eebf36b484d99de42dddc21bf3877c2f
+tekroo.kernel.contracts/0.2.0
+manifest SHA-256: cd582fb163e17d49a1a0a627f33cdbb184d15ecace3200981738782cca977dae
 ```
 
-Accepted contract files are immutable. Any normative change requires a new
+The preserved `0.1.0` manifest SHA-256 is
+`db3f38d4794a6993aad0b9ddf6d8f093eebf36b484d99de42dddc21bf3877c2f`.
+Released contract files are immutable. Any normative change requires a new
 contract version, compatibility analysis, a new detached manifest digest, and
 the appropriate decision gate.
 
@@ -68,7 +72,7 @@ packages are deliberately narrow:
 - `adapters/memory` — atomic in-memory state/event/receipt storage; and
 - `adapters/fake` — deterministic clock, ID source, and execution engine.
 
-`internal/conformance` runs the Go implementation against all 65 frozen fixtures.
+`internal/conformance` runs the Go implementation against all 72 frozen fixtures.
 That is corpus coverage, not full `core-hermetic`, MongoDB, synthesized-merge,
 provider, performance, or production qualification.
 
@@ -78,8 +82,8 @@ The checked-in reference tools require Node.js and write their reports only to
 the paths supplied by the caller:
 
 ```sh
-node CONTRACTS/tekroo.kernel.contracts/0.1.0/runner/validate-package.mjs /tmp/tekroo-contract-structure.json
-node CONTRACTS/tekroo.kernel.contracts/0.1.0/runner/reference-runner.mjs /tmp/tekroo-reference-corpus.json
+node CONTRACTS/tekroo.kernel.contracts/0.2.0/runner/validate-package.mjs /tmp/tekroo-contract-structure.json
+node CONTRACTS/tekroo.kernel.contracts/0.2.0/runner/reference-runner.mjs /tmp/tekroo-reference-corpus.json
 ```
 
 These checks validate the contract structure and reference corpus. They do not
@@ -105,9 +109,11 @@ go run ./cmd/core-hermetic-report -verify build/reports/core-hermetic.json
 
 - [Final architecture handoff](PHASE-1B/008-final-architecture-handoff.md)
 - [Kernel contract freeze](PHASE-2/001-kernel-contract-freeze.md)
-- [Accepted contract package](CONTRACTS/tekroo.kernel.contracts/0.1.0/manifest.json)
+- [Accepted contract package](CONTRACTS/tekroo.kernel.contracts/0.2.0/manifest.json)
+- [0.1.0 to 0.2.0 compatibility rule](CONTRACTS/tekroo.kernel.contracts/0.2.0/compatibility/from-0.1.0.json)
+- [Step 2 contract-revision authorization](OUTPUT/phase-2/step-2-contract-revision-authorization.json)
 - [Phase 2 Step 1 principal gate](OUTPUT/phase-2/step-1-gate.json)
 - [Repository bootstrap authority](docs/architecture/000-bootstrap-authority.md)
 - [Go kernel bootstrap decision](docs/architecture/001-go-kernel-bootstrap.md)
 - [Phase 2 Step 2 core-hermetic gate](OUTPUT/phase-2/step-2-core-hermetic-gate.json)
-- [Step 2 frozen-contract encoding gaps](OUTPUT/phase-2/step-2-contract-encoding-gaps.md)
+- [Historical Step 2 `0.1.0` encoding-gap record](OUTPUT/phase-2/step-2-contract-encoding-gaps.md)

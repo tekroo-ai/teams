@@ -46,6 +46,12 @@ func validateCommandPolicy(command KernelCommand, snapshot Snapshot) (OutcomeCod
 	if err != nil {
 		return OutcomeRejectedInvalid, reasonInvalidPayload
 	}
+	if payloadEpoch, present := object["lifecycle_epoch"]; present && commandRequiresLifecycleEpoch(command) {
+		epoch, ok := uint64Field(object, "lifecycle_epoch")
+		if !ok || command.ExpectedLifecycleEpoch == nil || epoch != *command.ExpectedLifecycleEpoch || payloadEpoch == nil {
+			return OutcomeRejectedConflict, reasonStaleLifecycleEpoch
+		}
+	}
 	switch command.CommandType {
 	case "tekroo.command.task.request-completion":
 		if !payloadEvidenceMatches(object, command.EvidenceRefs) {
@@ -68,7 +74,7 @@ func validateCommandPolicy(command KernelCommand, snapshot Snapshot) (OutcomeCod
 			return OutcomeRejectedConflict, reasonCriteriaRevisionConflict
 		}
 		validationIDs, ok := uuidArrayField(object, "validation_event_ids")
-		if !ok || !acceptedEventSet(validationIDs, snapshot.AcceptedEvents) {
+		if !ok || !acceptedValidationSet(validationIDs, snapshot.AcceptedEvents) {
 			return OutcomeRejectedPolicy, reasonValidationIncomplete
 		}
 		for _, precondition := range command.Preconditions {
@@ -114,6 +120,14 @@ func validateCommandPolicy(command KernelCommand, snapshot Snapshot) (OutcomeCod
 		if !payloadEvidenceMatches(object, command.EvidenceRefs) {
 			return OutcomeRejectedInvalid, reasonInvalidEvidence
 		}
+		reviewID, policyRevision, branchResult, resultErr := ReviewBranchResultFromPayload(command.Payload)
+		review, found := snapshot.Reviews[command.Target]
+		if resultErr != nil || reviewID != command.Target.ID || !found || review.BranchPolicyRevision != policyRevision {
+			return OutcomeRejectedConflict, reasonCriteriaRevisionConflict
+		}
+		if _, valid := ApplyReviewBranchResult(review, branchResult); !valid {
+			return OutcomeRejectedConflict, reasonValidationIncomplete
+		}
 	case "tekroo.command.work.reopen":
 		if !payloadEvidenceMatches(object, command.EvidenceRefs) {
 			return OutcomeRejectedInvalid, reasonInvalidEvidence
@@ -123,8 +137,8 @@ func validateCommandPolicy(command KernelCommand, snapshot Snapshot) (OutcomeCod
 			return OutcomeRejectedClosed, reasonStaleLifecycleEpoch
 		}
 	case "tekroo.command.work.create-successor":
-		value, ok := object["successor_id"].(string)
-		if !ok || !UUIDv7(value).Valid() || UUIDv7(value) == command.Target.ID || snapshot.State == nil || !terminalPhase(snapshot.State.Phase) {
+		values, ok := uuidArrayField(object, "successor_ids")
+		if !ok || !CanonicalSuccessorIDs(values) || containsUUID(values, command.Target.ID) || snapshot.State == nil || !terminalPhase(snapshot.State.Phase) {
 			return OutcomeRejectedPolicy, reasonInvalidSuccessor
 		}
 	case "tekroo.command.record.correct":
@@ -207,6 +221,16 @@ func acceptedEventSet(ids []UUIDv7, accepted map[UUIDv7]AcceptedEvent) bool {
 	for _, id := range ids {
 		event, found := accepted[id]
 		if !found || event.Quarantined || event.EventType == "" {
+			return false
+		}
+	}
+	return true
+}
+
+func acceptedValidationSet(ids []UUIDv7, accepted map[UUIDv7]AcceptedEvent) bool {
+	for _, id := range ids {
+		event, found := accepted[id]
+		if !found || event.Quarantined || event.EventType != "tekroo.event.completion-review.result-recorded" || event.Qualification != "PASS" {
 			return false
 		}
 	}

@@ -332,7 +332,7 @@ func TestStorePersistsAttemptBudgetWithTheAtomicDecision(t *testing.T) {
 }
 
 func TestStoreAllowsOnlyOneCompletionReviewPerSemanticKey(t *testing.T) {
-	payload := json.RawMessage(`{"subject_kind":"story","subject_id":"00000000-0000-7000-8000-0000000000c1","lifecycle_epoch":1,"criteria_revision":2,"evidence_set_digest":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"}`)
+	payload := json.RawMessage(`{"subject_kind":"story","subject_id":"00000000-0000-7000-8000-0000000000c1","lifecycle_epoch":1,"criteria_revision":2,"evidence_set_digest":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","branch_policy_revision":1,"required_branch_ids":["review","tests"],"join_rule":"ALL_PASS","partial_result_policy":"WAIT_ALL"}`)
 	key, err := kernel.CompletionReviewKeyFromPayload(payload)
 	if err != nil {
 		t.Fatal(err)
@@ -359,6 +359,56 @@ func TestStoreAllowsOnlyOneCompletionReviewPerSemanticKey(t *testing.T) {
 	second = attachProvenance(t, second)
 	if err := store.Commit(context.Background(), kernel.Snapshot{}, second); !errors.Is(err, memory.ErrConflict) {
 		t.Fatalf("duplicate semantic review error = %v, want ErrConflict", err)
+	}
+}
+
+func TestStorePersistsOrderIndependentCompletionReviewJoin(t *testing.T) {
+	target := kernel.AggregateRef{Kind: kernel.AggregateCompletionReview, ID: uuid("00000000-0000-7000-8000-0000000000d1")}
+	openPayload := json.RawMessage(`{"subject_kind":"story","subject_id":"00000000-0000-7000-8000-0000000000d2","lifecycle_epoch":1,"criteria_revision":2,"evidence_set_digest":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","branch_policy_revision":4,"required_branch_ids":["review","tests"],"join_rule":"ALL_PASS","partial_result_policy":"WAIT_ALL"}`)
+	open := alternateDecision(t, 81)
+	open.NextState = nil
+	open.Receipt.Target = target
+	open.Events[0].Aggregate = target
+	open.Events[0].EventType = "tekroo.event.completion-review.opened"
+	open.Events[0].Payload = openPayload
+	open = attachProvenance(t, open)
+	store := memory.NewStore()
+	if err := store.Commit(context.Background(), kernel.Snapshot{}, open); err != nil {
+		t.Fatal(err)
+	}
+
+	commitResult := func(ordinal int, branch string, revision uint64) kernel.UUIDv7 {
+		t.Helper()
+		snapshot, err := store.LoadDecision(context.Background(), kernel.KernelCommand{Target: target})
+		if err != nil {
+			t.Fatal(err)
+		}
+		decision := alternateDecision(t, ordinal)
+		decision.NextState = nil
+		decision.Receipt.Target = target
+		decision.Receipt.ResultingRevision = &revision
+		decision.Events[0].Aggregate = target
+		decision.Events[0].AggregateRevision = revision
+		decision.Events[0].EventType = "tekroo.event.completion-review.result-recorded"
+		decision.Events[0].Payload = json.RawMessage(fmt.Sprintf(`{"review_id":"%s","branch_id":"%s","branch_policy_revision":4,"result":"PASS","reasons":[],"evidence_ids":["00000000-0000-7000-8000-0000000000d3"]}`, target.ID, branch))
+		decision = attachProvenance(t, decision)
+		if err := store.Commit(context.Background(), snapshot, decision); err != nil {
+			t.Fatal(err)
+		}
+		return decision.Events[0].EventID
+	}
+
+	firstResult := commitResult(82, "tests", 2)
+	secondResult := commitResult(83, "review", 3)
+	final, err := store.LoadDecision(context.Background(), kernel.KernelCommand{Target: target})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if final.Reviews[target].Join != (kernel.ReviewJoinResult{Complete: true, Status: "PASS"}) {
+		t.Fatalf("final join = %#v", final.Reviews[target].Join)
+	}
+	if final.AcceptedEvents[firstResult].Qualification != "PENDING" || final.AcceptedEvents[secondResult].Qualification != "PASS" {
+		t.Fatalf("result qualifications = %#v %#v", final.AcceptedEvents[firstResult], final.AcceptedEvents[secondResult])
 	}
 }
 

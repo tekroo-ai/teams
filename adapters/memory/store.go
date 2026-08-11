@@ -50,6 +50,8 @@ type Store struct {
 	provenance          map[kernel.Digest]kernel.DecisionProvenance
 	authorizationPolicy kernel.AuthorizationPolicy
 	openReviews         map[kernel.CompletionReviewKey]kernel.AggregateRef
+	reviews             map[kernel.AggregateRef]kernel.CompletionReviewSnapshot
+	eventQualifications map[kernel.UUIDv7]string
 	attemptBudgets      map[kernel.AttemptBudgetKey]kernel.AttemptBudgetSnapshot
 	faultPoint          FaultPoint
 }
@@ -87,19 +89,21 @@ func NewStoreWithFault(point FaultPoint, policy ...kernel.AuthorizationPolicy) *
 
 func NewStore(policy ...kernel.AuthorizationPolicy) *Store {
 	store := &Store{
-		states:          make(map[kernel.AggregateRef]kernel.AggregateState),
-		revisions:       make(map[kernel.AggregateRef]uint64),
-		receipts:        make(map[kernel.UUIDv7]kernel.CommandReceipt),
-		commandBindings: make(map[kernel.UUIDv7]decisionIdentity),
-		idempotency:     make(map[kernel.Digest]decisionIdentity),
-		events:          make(map[kernel.UUIDv7]kernel.DomainEvent),
-		executions:      make(map[kernel.ActorFQN]kernel.ExecutionTuple),
-		evidence:        make(map[kernel.UUIDv7]kernel.EvidenceMetadata),
-		authority:       make(map[kernel.UUIDv7]kernel.AuthorityDecision),
-		outbox:          make(map[kernel.UUIDv7]kernel.OutboxIntent),
-		provenance:      make(map[kernel.Digest]kernel.DecisionProvenance),
-		openReviews:     make(map[kernel.CompletionReviewKey]kernel.AggregateRef),
-		attemptBudgets:  make(map[kernel.AttemptBudgetKey]kernel.AttemptBudgetSnapshot),
+		states:              make(map[kernel.AggregateRef]kernel.AggregateState),
+		revisions:           make(map[kernel.AggregateRef]uint64),
+		receipts:            make(map[kernel.UUIDv7]kernel.CommandReceipt),
+		commandBindings:     make(map[kernel.UUIDv7]decisionIdentity),
+		idempotency:         make(map[kernel.Digest]decisionIdentity),
+		events:              make(map[kernel.UUIDv7]kernel.DomainEvent),
+		executions:          make(map[kernel.ActorFQN]kernel.ExecutionTuple),
+		evidence:            make(map[kernel.UUIDv7]kernel.EvidenceMetadata),
+		authority:           make(map[kernel.UUIDv7]kernel.AuthorityDecision),
+		outbox:              make(map[kernel.UUIDv7]kernel.OutboxIntent),
+		provenance:          make(map[kernel.Digest]kernel.DecisionProvenance),
+		openReviews:         make(map[kernel.CompletionReviewKey]kernel.AggregateRef),
+		reviews:             make(map[kernel.AggregateRef]kernel.CompletionReviewSnapshot),
+		eventQualifications: make(map[kernel.UUIDv7]string),
+		attemptBudgets:      make(map[kernel.AttemptBudgetKey]kernel.AttemptBudgetSnapshot),
 	}
 	if len(policy) == 1 {
 		store.authorizationPolicy = cloneAuthorizationPolicy(policy[0])
@@ -142,7 +146,7 @@ func (s *Store) loadLocked(target kernel.AggregateRef, preconditions []kernel.Ag
 	}
 	snapshot.AcceptedEvents = make(map[kernel.UUIDv7]kernel.AcceptedEvent, len(s.events))
 	for eventID, event := range s.events {
-		snapshot.AcceptedEvents[eventID] = kernel.AcceptedEvent{EventType: event.EventType}
+		snapshot.AcceptedEvents[eventID] = kernel.AcceptedEvent{EventType: event.EventType, Qualification: s.eventQualifications[eventID]}
 	}
 	snapshot.CurrentExecutions = make(map[kernel.ActorFQN]kernel.ExecutionTuple, len(s.executions))
 	for actor, execution := range s.executions {
@@ -166,6 +170,10 @@ func (s *Store) loadLocked(target kernel.AggregateRef, preconditions []kernel.Ag
 	snapshot.OpenReviews = make(map[kernel.CompletionReviewKey]kernel.AggregateRef, len(s.openReviews))
 	for key, review := range s.openReviews {
 		snapshot.OpenReviews[key] = review
+	}
+	snapshot.Reviews = make(map[kernel.AggregateRef]kernel.CompletionReviewSnapshot, len(s.reviews))
+	for review, progress := range s.reviews {
+		snapshot.Reviews[review] = progress.Clone()
 	}
 	snapshot.AttemptBudgets = make(map[kernel.AttemptBudgetKey]kernel.AttemptBudgetSnapshot, len(s.attemptBudgets))
 	for key, budget := range s.attemptBudgets {
@@ -354,11 +362,25 @@ func (s *Store) Commit(ctx context.Context, expected kernel.Snapshot, decision k
 }
 
 func (s *Store) applyReviewEvent(event kernel.DomainEvent) {
-	if event.EventType != "tekroo.event.completion-review.opened" {
-		return
-	}
-	if key, err := kernel.CompletionReviewKeyFromPayload(event.Payload); err == nil {
-		s.openReviews[key] = event.Aggregate
+	switch event.EventType {
+	case "tekroo.event.completion-review.opened":
+		if key, err := kernel.CompletionReviewKeyFromPayload(event.Payload); err == nil {
+			s.openReviews[key] = event.Aggregate
+		}
+		if review, err := kernel.CompletionReviewFromPayload(event.Payload); err == nil {
+			s.reviews[event.Aggregate] = review
+		}
+	case "tekroo.event.completion-review.result-recorded":
+		reviewID, policyRevision, result, err := kernel.ReviewBranchResultFromPayload(event.Payload)
+		current, found := s.reviews[event.Aggregate]
+		if err != nil || reviewID != event.Aggregate.ID || !found || current.BranchPolicyRevision != policyRevision {
+			return
+		}
+		next, valid := kernel.ApplyReviewBranchResult(current, result)
+		if valid {
+			s.reviews[event.Aggregate] = next
+			s.eventQualifications[event.EventID] = next.Join.Status
+		}
 	}
 }
 

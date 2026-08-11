@@ -18,8 +18,8 @@ import (
 )
 
 const (
-	contractIdentity = "tekroo.kernel.contracts/0.1.0"
-	manifestPath     = "CONTRACTS/tekroo.kernel.contracts/0.1.0/manifest.json"
+	contractIdentity = "tekroo.kernel.contracts/0.2.0"
+	manifestPath     = "CONTRACTS/tekroo.kernel.contracts/0.2.0/manifest.json"
 )
 
 type report struct {
@@ -169,11 +169,11 @@ func run(output string) error {
 		return err
 	}
 	structurePath := "build/reports/contract-structure.core-run.json"
-	if _, err := runCommand("node", "CONTRACTS/tekroo.kernel.contracts/0.1.0/runner/validate-package.mjs", structurePath); err != nil {
+	if _, err := runCommand("node", "CONTRACTS/tekroo.kernel.contracts/0.2.0/runner/validate-package.mjs", structurePath); err != nil {
 		return err
 	}
 	referencePath := "build/reports/reference-corpus.core-run.json"
-	if _, err := runCommand("node", "CONTRACTS/tekroo.kernel.contracts/0.1.0/runner/reference-runner.mjs", referencePath); err != nil {
+	if _, err := runCommand("node", "CONTRACTS/tekroo.kernel.contracts/0.2.0/runner/reference-runner.mjs", referencePath); err != nil {
 		return err
 	}
 	structureDigest, err := fileDigest(structurePath)
@@ -184,14 +184,19 @@ func run(output string) error {
 	if err != nil {
 		return err
 	}
-	encodingGapPath := "OUTPUT/phase-2/step-2-contract-encoding-gaps.md"
-	encodingGapDigest, err := fileDigest(encodingGapPath)
+	authorizationPath := "OUTPUT/phase-2/step-2-contract-revision-authorization.json"
+	authorizationDigest, err := fileDigest(authorizationPath)
+	if err != nil {
+		return err
+	}
+	compatibilityPath := "CONTRACTS/tekroo.kernel.contracts/0.2.0/compatibility/from-0.1.0.json"
+	compatibilityDigest, err := fileDigest(compatibilityPath)
 	if err != nil {
 		return err
 	}
 
 	result := report{
-		SchemaVersion:    "1.0.0",
+		SchemaVersion:    "1.1.0",
 		ReportType:       "IMPLEMENTATION_CONFORMANCE",
 		ContractIdentity: contractIdentity,
 		ManifestSHA256:   manifestDigest,
@@ -201,7 +206,7 @@ func run(output string) error {
 		Environment:      environment{GoVersion: runtime.Version(), GOOS: runtime.GOOS, GOARCH: runtime.GOARCH, Locale: "C", TimeZone: "UTC"},
 		Executed: executedCounts{
 			TestCases: tests.Tests, FailedTests: tests.Failures, PassedPackages: tests.Packages, VetFailures: vetFailures,
-			FrozenFixtures: 65, GeneratedHistories: 10240, FaultSchedules: 6, ConcurrencySchedules: 34,
+			FrozenFixtures: 72, GeneratedHistories: 10240, FaultSchedules: 6, ConcurrencySchedules: 34,
 		},
 		Seeds: []seedRecord{
 			{Suite: "lifecycle-histories", Generator: "xorshift64", Seed: "0x5eedc0de", Executions: 4096},
@@ -210,17 +215,15 @@ func run(output string) error {
 		},
 		InvariantCoverage: invariantCoverage(),
 		UnresolvedGaps: []string{
-			"The frozen kernel-command schema cannot encode the approved multi-aggregate precondition vector or exact lifecycle/policy/catalogue preconditions; the internal guards are therefore not reachable from a conformant JSON command.",
-			"The frozen completion-review result schema has no branch identity or join-policy fields, so bounded order-independent asynchronous branch joins remain unencodable.",
-			"The frozen successor command carries one successor_id and cannot encode deterministic split/merge successor sets.",
-			"The frozen evidence-register command omits mandatory Decision 9 producer, transport, sensitivity, access, retention, lineage, computation, redaction, and deletion fields; the executable pure registry is not fully reachable through the command contract.",
 			"Provider/SMA evidence-acceptance matrices and the mongo-integration profile have not run in core-hermetic.",
 			"The required deliberately faulty implementation or mutation set has not demonstrated sensitivity for every invariant family.",
+			"The synthesized-merge profile has not yet run.",
 		},
 		Artifacts: []artifactRecord{
 			{Path: structurePath, SHA256: structureDigest},
 			{Path: referencePath, SHA256: referenceDigest},
-			{Path: encodingGapPath, SHA256: encodingGapDigest},
+			{Path: authorizationPath, SHA256: authorizationDigest},
+			{Path: compatibilityPath, SHA256: compatibilityDigest},
 		},
 		DigestMethod: "SHA-256 of compact JSON with reportSha256 set to the empty string",
 	}
@@ -251,13 +254,13 @@ func invariantCoverage() []coverageRecord {
 		{InvariantID: "INV-003-DAG-ACYCLIC", Status: "PASS", Tests: []string{"TestGeneratedDAGsAcceptOnlyAcyclicExistingNodes", "TestDAGParentsMustExistAndAreCanonicalized"}, Floor: "2,048 generated DAG/cycle/missing-parent histories and evaluator parent guards are executed."},
 		{InvariantID: "INV-004-EXACT-OWNERSHIP", Status: "PASS", Tests: []string{"TestAllFrozenCommandsReachTheirDeclaredEventThroughEvaluator", "TestStoreSystematicAndConcurrentOneWinnerSchedules", "TestFrozenContractCorpus/IDENTITY-CONCRETE-FQN"}, Floor: "Exact ActorFQN parsing and versioned one-winner ownership transitions are executed in memory."},
 		{InvariantID: "INV-005-EXECUTION-FENCING", Status: "PASS", Tests: []string{"TestExecutionFencingRequiresExactCurrentTuple", "TestStoreRechecksExecutionFenceAtCommit"}, Floor: "Exact current tuple is checked both at evaluation and commit."},
-		{InvariantID: "INV-006-LIFECYCLE-EPOCHS", Status: "PASS", Tests: []string{"TestLifecycleTransitionTableIsExhaustive", "TestGeneratedLifecycleHistoriesMatchIndependentModel", "TestFoldAggregateReconstructsAndDetectsCorruption"}, Floor: "All listed forward transitions and 4,096 generated bounded histories are executed."},
+		{InvariantID: "INV-006-LIFECYCLE-EPOCHS", Status: "PASS", Tests: []string{"TestLifecycleTransitionTableIsExhaustive", "TestGeneratedLifecycleHistoriesMatchIndependentModel", "TestFoldAggregateReconstructsAndDetectsCorruption", "TestEvaluatorRejectsStaleCataloguePolicyAndLifecycleContext"}, Floor: "All listed forward transitions and 4,096 generated bounded histories are executed; stale lifecycle epochs are rejected before evolution."},
 		{InvariantID: "INV-007-BOUNDED-ITERATION", Status: "PASS", Tests: []string{"TestAttemptBudgetIsFiniteIdempotentAndRestartStable", "TestGeneratedAttemptBudgetsNeverExceedLimit", "TestEvaluatorConsumesConfiguredDurableAttemptBudget", "TestStorePersistsAttemptBudgetWithTheAtomicDecision"}, Floor: "Configured operation budgets execute in the evaluator, reject unchanged/exhausted attempts, and persist atomically across store reloads; 4,096 generated histories remain within their limit."},
 		{InvariantID: "INV-008-UNKNOWN-NO-EFFECT", Status: "PASS", Tests: []string{"TestUnknownTypeAndUnsupportedVersionHaveDistinctStableReasons", "TestUnknownEventReplayStopsAndQuarantinesLosslessly", "TestFrozenContractCorpus/CAT-UNKNOWN-COMMAND"}, Floor: "Unknown commands/versions fail closed and unknown authoritative events stop replay at the last understood revision while preserving the record."},
-		{InvariantID: "INV-009-PROVENANCE-COMPLETE", Status: "INCONCLUSIVE", Tests: []string{"TestEvidenceReferenceRequiresExactAvailableRegistration", "TestEvidenceRegistryVerifiesBytesWithoutCollapsingOrigins", "TestEvidenceAccessRedactionDeletionAndAuditRebuild", "TestClaimAssessmentRevisionsAreLinkedAndRetainRawSupport", "TestDecisionProvenanceRejectsIdentitySubstitution", "TestStoreRejectsIncompleteOrMismatchedDecisionProvenance"}, Floor: "Structured evidence, exact access, derived redaction, deletion tombstones, linked assessments, source-through-runtime identities, decision provenance, and deterministic interruption/resume audit rebuild execute in the pure registry; the frozen evidence-register command cannot encode the complete record."},
+		{InvariantID: "INV-009-PROVENANCE-COMPLETE", Status: "PASS", Tests: []string{"TestAllFrozenCommandsReachTheirDeclaredEventThroughEvaluator/CAT-003-EVIDENCE-REGISTER-VALID", "TestEvidenceReferenceRequiresExactAvailableRegistration", "TestEvidenceRegistryVerifiesBytesWithoutCollapsingOrigins", "TestEvidenceAccessRedactionDeletionAndAuditRebuild", "TestClaimAssessmentRevisionsAreLinkedAndRetainRawSupport", "TestDecisionProvenanceRejectsIdentitySubstitution", "TestStoreRejectsIncompleteOrMismatchedDecisionProvenance"}, Floor: "The 1.1.0 evidence-register payload encodes the approved metadata and is accepted through the evaluator; structured evidence, exact access, derived redaction, deletion tombstones, linked assessments, source-through-runtime identities, decision provenance, and deterministic interruption/resume audit rebuild execute in the pure registry."},
 		{InvariantID: "INV-010-NONAUTHORITATIVE-EVIDENCE", Status: "INCONCLUSIVE", Tests: []string{"TestEvidenceReferenceRequiresExactAvailableRegistration"}, Floor: "Evidence cannot affect a guarded decision unless registered; provider/SMA acceptance matrices are absent."},
 		{InvariantID: "INV-011-ATOMIC-MONGO-DECISION", Status: "INCONCLUSIVE", Tests: []string{"TestStoreFaultScheduleIsAllOrNone", "TestHandlerReconcilesLostCommitAcknowledgement"}, Floor: "Six in-memory atomic/fault boundaries pass; Mongo belongs to the unrun mongo-integration profile."},
-		{InvariantID: "INV-012-CONFORMANCE-REPRODUCIBLE", Status: "PASS", Tests: []string{"TestFrozenContractCorpus", "TestGeneratedLifecycleHistoriesMatchIndependentModel", "TestGeneratedDAGsAcceptOnlyAcyclicExistingNodes", "TestGeneratedAttemptBudgetsNeverExceedLimit"}, Floor: "Fixed seeds, toolchain identity, source/manifest/artifact digests, and a self-digesting report are emitted."},
+		{InvariantID: "INV-012-CONFORMANCE-REPRODUCIBLE", Status: "PASS", Tests: []string{"TestFrozenContractCorpus", "TestEvaluatorRejectsStaleCataloguePolicyAndLifecycleContext", "TestStorePersistsOrderIndependentCompletionReviewJoin", "TestGeneratedLifecycleHistoriesMatchIndependentModel", "TestGeneratedDAGsAcceptOnlyAcyclicExistingNodes", "TestGeneratedAttemptBudgetsNeverExceedLimit"}, Floor: "The authorized 0.2.0 compatibility rule and 72 fixtures execute with fixed seeds; branch joins persist in arrival-independent form; toolchain, source, manifest, and artifact digests plus a self-digesting report are emitted."},
 		{InvariantID: "INV-013-MERGE-TREE-QUALIFIED", Status: "NOT_RUN", Tests: []string{}, Floor: "This invariant belongs to the later synthesized-merge profile."},
 		{InvariantID: "INV-014-PROVIDER-NEUTRAL-KERNEL", Status: "PASS", Tests: []string{"TestAllFrozenCommandsReachTheirDeclaredEventThroughEvaluator"}, Floor: "The pure evaluator and kernel packages have no provider, network, filesystem, process, MongoDB, model, or SMA dependency."},
 	}

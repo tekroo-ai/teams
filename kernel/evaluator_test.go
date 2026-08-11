@@ -179,8 +179,50 @@ func TestEvaluatorEnforcesCanonicalExactRelatedPreconditions(t *testing.T) {
 	}
 }
 
+func TestEvaluatorRejectsStaleCataloguePolicyAndLifecycleContext(t *testing.T) {
+	evaluator := kernel.Evaluator{Catalogue: loadCatalogue(t)}
+	context := validDecisionContext(t)
+
+	create := validStoryCreateCommand(t)
+	staleCatalogue := create
+	staleCatalogue.ExpectedCatalogueRevision = kernel.CatalogueRevision - 1
+	if decision := evaluate(t, evaluator, staleCatalogue, kernel.Snapshot{}, context); decision.Receipt.OutcomeCode != kernel.OutcomeRejectedConflict || decision.Receipt.ReasonCode != "CATALOGUE_REVISION_CONFLICT" {
+		t.Fatalf("stale catalogue receipt = %#v", decision.Receipt)
+	}
+
+	stalePolicy := create
+	stalePolicy.ExpectedPolicyRevision = context.Provenance.PolicyRevision + 1
+	if decision := evaluate(t, evaluator, stalePolicy, kernel.Snapshot{}, context); decision.Receipt.OutcomeCode != kernel.OutcomeRejectedConflict || decision.Receipt.ReasonCode != "POLICY_REVISION_CONFLICT" {
+		t.Fatalf("stale policy receipt = %#v", decision.Receipt)
+	}
+
+	authorize := create
+	authorize.CommandType = "tekroo.command.story.authorize"
+	authorize.ExpectedRevision = kernel.NewExpectedRevision(1)
+	staleEpoch := uint64(1)
+	authorize.ExpectedLifecycleEpoch = &staleEpoch
+	authorize.Payload = json.RawMessage(`{"scope_revision":1,"reason":"approved"}`)
+	snapshot := storySnapshot(authorize.Target, kernel.PhaseDraft, 1)
+	snapshot.State.LifecycleEpoch = 2
+	grant := grantFor(authorize.Authority, authorize, context.Provenance.GrantDigests[0])
+	snapshot.Authorization = authorizationPolicy(grant)
+	if decision := evaluate(t, evaluator, authorize, snapshot, context); decision.Receipt.OutcomeCode != kernel.OutcomeRejectedConflict || decision.Receipt.ReasonCode != "LIFECYCLE_EPOCH_CONFLICT" {
+		t.Fatalf("stale lifecycle receipt = %#v", decision.Receipt)
+	}
+}
+
 func evaluate(t *testing.T, evaluator kernel.Evaluator, command kernel.KernelCommand, snapshot kernel.Snapshot, context kernel.DecisionContext) kernel.Decision {
 	t.Helper()
+	if command.ExpectedPolicyRevision == 0 {
+		command.ExpectedPolicyRevision = context.Provenance.PolicyRevision
+	}
+	if command.ExpectedCatalogueRevision == 0 {
+		command.ExpectedCatalogueRevision = kernel.CatalogueRevision
+	}
+	if !command.ExpectedRevision.MustNotExist && command.ExpectedLifecycleEpoch == nil && snapshot.State != nil && command.CommandType != "tekroo.command.record.correct" {
+		epoch := snapshot.State.LifecycleEpoch
+		command.ExpectedLifecycleEpoch = &epoch
+	}
 	if !snapshot.Authorization.PolicyDigest.Valid() {
 		snapshot.Authorization = kernel.AuthorizationPolicy{
 			PolicyDigest: context.Provenance.PolicyDigest, Revision: context.Provenance.PolicyRevision,
@@ -203,16 +245,18 @@ func validStoryCreateCommand(t *testing.T) kernel.KernelCommand {
 	targetID := mustUUID(t, "00000000-0000-7000-8000-000000000002")
 	correlationID := mustUUID(t, "00000000-0000-7000-8000-000000000003")
 	return kernel.KernelCommand{
-		ContractManifest: kernel.ContractIdentity,
-		CommandID:        commandID,
-		CommandType:      "tekroo.command.story.create",
-		CommandVersion:   kernel.SchemaVersion,
-		Target:           kernel.AggregateRef{Kind: kernel.AggregateStory, ID: targetID},
-		Authority:        kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "principal"},
-		ExpectedRevision: kernel.MustNotExist(),
-		IdempotencyKey:   "story-create-1",
-		CorrelationID:    correlationID,
-		Payload:          json.RawMessage(`{"acceptance_criteria":["one owner wins"],"description":"Exact ownership.","title":"Ownership"}`),
+		ContractManifest:          kernel.ContractIdentity,
+		CommandID:                 commandID,
+		CommandType:               "tekroo.command.story.create",
+		CommandVersion:            kernel.SchemaVersion,
+		Target:                    kernel.AggregateRef{Kind: kernel.AggregateStory, ID: targetID},
+		Authority:                 kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "principal"},
+		ExpectedRevision:          kernel.MustNotExist(),
+		ExpectedPolicyRevision:    1,
+		ExpectedCatalogueRevision: kernel.CatalogueRevision,
+		IdempotencyKey:            "story-create-1",
+		CorrelationID:             correlationID,
+		Payload:                   json.RawMessage(`{"acceptance_criteria":["one owner wins"],"description":"Exact ownership.","title":"Ownership"}`),
 	}
 }
 
@@ -272,7 +316,7 @@ func loadCatalogue(t *testing.T) *contract.Catalogue {
 		t.Fatal("locate evaluator test")
 	}
 	repositoryRoot := filepath.Clean(filepath.Join(filepath.Dir(file), ".."))
-	catalogue, err := contract.Load(os.DirFS(repositoryRoot), "CONTRACTS/tekroo.kernel.contracts/0.1.0")
+	catalogue, err := contract.Load(os.DirFS(repositoryRoot), "CONTRACTS/tekroo.kernel.contracts/0.2.0")
 	if err != nil {
 		t.Fatalf("load catalogue: %v", err)
 	}
