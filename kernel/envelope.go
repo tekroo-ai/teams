@@ -121,14 +121,15 @@ type Decision struct {
 }
 
 type DecisionGuards struct {
-	Executions       map[ActorFQN]ExecutionTuple
-	AbsentExecutions []ActorFQN
-	ParentIDs        []UUIDv7
-	EvidenceRefs     []EvidenceRef
-	Preconditions    []AggregatePrecondition
-	PolicyDigest     Digest
-	PolicyRevision   uint64
-	AbsentReviewKeys []CompletionReviewKey
+	Executions           map[ActorFQN]ExecutionTuple
+	AbsentExecutions     []ActorFQN
+	ParentIDs            []UUIDv7
+	EvidenceRefs         []EvidenceRef
+	Preconditions        []AggregatePrecondition
+	PolicyDigest         Digest
+	PolicyRevision       uint64
+	AbsentReviewKeys     []CompletionReviewKey
+	AbsentEscalationKeys []EscalationKey
 }
 
 type Snapshot struct {
@@ -142,6 +143,8 @@ type Snapshot struct {
 	Authorization     AuthorizationPolicy
 	OpenReviews       map[CompletionReviewKey]AggregateRef
 	Reviews           map[AggregateRef]CompletionReviewSnapshot
+	Escalations       map[AggregateRef]EscalationSnapshot
+	EscalationKeys    map[EscalationKey]AggregateRef
 	AttemptBudgets    map[AttemptBudgetKey]AttemptBudgetSnapshot
 }
 

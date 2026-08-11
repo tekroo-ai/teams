@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "PRINCIPAL_ACCEPTANCE",
+  "recordedOn": "2026-08-11",
+  "timePrecision": "DAY",
+  "principalStatement": "Accept and proceed.",
+  "acceptedCommit": "53929a5678ea6682c6e3a96f85b3d4b7a7414caa",
+  "acceptedTree": "df8a35901a7eef3506fd6af90cad6ca592ad1bfa",
+  "acceptedContract": "tekroo.kernel.contracts/0.4.0",
+  "manifestSha256": "5ff83483ce43ace2e06f2cc2f57dd552342553fc2389f3cc775b761c0c6d6d7c",
+  "gateReportSha256": "791f0f1c8484af83377fec482aa07aff010c81f800650e70aa0d884e8b6d0195",
+  "scope": "Acceptance applies to the immutable 0.4.0 escalation contract revision, pure transition model, explicit fail-closed runtime boundary, and Step 8 forward requalification."
+}

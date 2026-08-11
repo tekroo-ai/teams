@@ -196,6 +196,76 @@ func TestCommittedStateSurvivesApplicationRestart(t *testing.T) {
 	}
 }
 
+func TestEscalationProjectionSurvivesRestartAndRejectsSemanticDuplicate(t *testing.T) {
+	database := nextDatabase(t)
+	config := testConfig(testMongoURI, database)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	store, err := Open(ctx, config)
+	cancel()
+	if err != nil {
+		t.Fatal(err)
+	}
+	opening := mongoEscalationOpeningDecision(t, 91, testUUID(9101))
+	ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
+	if err := store.Commit(ctx, kernel.Snapshot{}, opening); err != nil {
+		t.Fatal(err)
+	}
+	cancel()
+	ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
+	if err := store.Close(ctx); err != nil {
+		t.Fatal(err)
+	}
+	cancel()
+
+	ctx, cancel = context.WithTimeout(context.Background(), 15*time.Second)
+	reopened, err := Open(ctx, config)
+	cancel()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		_ = reopened.db.Drop(ctx)
+		_ = reopened.Close(ctx)
+	})
+	ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
+	snapshot, err := reopened.LoadDecision(ctx, kernel.KernelCommand{Target: opening.Receipt.Target})
+	cancel()
+	if err != nil {
+		t.Fatal(err)
+	}
+	projected, found := snapshot.Escalations[opening.Receipt.Target]
+	if !found || projected.State != kernel.EscalationOpen || projected.OpeningEventID != opening.Events[0].EventID || snapshot.EscalationKeys[projected.Key()] != opening.Receipt.Target {
+		t.Fatalf("opening projection after restart = %#v, keys=%#v", projected, snapshot.EscalationKeys)
+	}
+
+	duplicate := mongoEscalationOpeningDecision(t, 92, testUUID(9102))
+	ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
+	err = reopened.Commit(ctx, kernel.Snapshot{}, duplicate)
+	cancel()
+	if !errors.Is(err, ErrConflict) {
+		t.Fatalf("semantic duplicate error = %v, want ErrConflict", err)
+	}
+
+	resolution := mongoEscalationResolutionDecision(t, 93, projected)
+	ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
+	if err := reopened.Commit(ctx, snapshot, resolution); err != nil {
+		t.Fatal(err)
+	}
+	cancel()
+	ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
+	final, err := reopened.LoadDecision(ctx, kernel.KernelCommand{Target: opening.Receipt.Target})
+	cancel()
+	if err != nil {
+		t.Fatal(err)
+	}
+	terminal := final.Escalations[opening.Receipt.Target]
+	if terminal.State != kernel.EscalationTerminal || terminal.TerminalOutcome != kernel.EscalationResolved || terminal.Revision != 2 || terminal.ResolutionEventID != resolution.Events[0].EventID {
+		t.Fatalf("terminal projection = %#v", terminal)
+	}
+}
+
 func TestCommittedStateSurvivesMongoCrashRecovery(t *testing.T) {
 	process, uri, err := startMongod(true)
 	if err != nil {
@@ -692,6 +762,40 @@ func completeDecision(t *testing.T, ordinal int) kernel.Decision {
 	if err != nil {
 		t.Fatal(err)
 	}
+	return attachProvenance(t, decision)
+}
+
+func mongoEscalationOpeningDecision(t *testing.T, ordinal int, escalationID kernel.UUIDv7) kernel.Decision {
+	t.Helper()
+	payload := json.RawMessage(fmt.Sprintf(`{"adjudicator":{"id":"principal-adjudicator","kind":"HUMAN"},"causal_path_event_ids":["00000000-0000-7000-8000-000000009102"],"deadline_at":"2026-08-12T00:00:00Z","escalation_id":"%s","escalation_policy_revision":1,"evidence_ids":["00000000-0000-7000-8000-000000009103"],"expected_subject_revision":7,"resolution_owner_fqn":"teams::coder-1","resolution_round_limit":1,"route_limit":1,"subject_id":"00000000-0000-7000-8000-000000009104","subject_kind":"task","subject_lifecycle_epoch":1,"timeout_policy":{"id":"escalation-timeout-policy","kind":"POLICY"},"trigger":"HANDOFF_CYCLE_DETECTED","triggering_condition_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","unresolved_question":"Which directed successor resolves the detected handoff cycle?"}`, escalationID))
+	escalation, err := kernel.EscalationFromOpenPayload(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decision := completeDecision(t, ordinal)
+	decision.NextState = nil
+	decision.Receipt.Target = kernel.AggregateRef{Kind: kernel.AggregateEscalation, ID: escalationID}
+	decision.Events[0].Aggregate = decision.Receipt.Target
+	decision.Events[0].EventType = "tekroo.event.escalation.opened"
+	decision.Events[0].Payload = payload
+	decision.Guards.AbsentEscalationKeys = []kernel.EscalationKey{escalation.Key()}
+	return attachProvenance(t, decision)
+}
+
+func mongoEscalationResolutionDecision(t *testing.T, ordinal int, escalation kernel.EscalationSnapshot) kernel.Decision {
+	t.Helper()
+	payload := json.RawMessage(fmt.Sprintf(`{"decided_at":"2026-08-11T12:00:00Z","escalation_id":"%s","evidence_ids":["00000000-0000-7000-8000-000000009105"],"expected_escalation_revision":1,"outcome":"RESOLVED","reasons":["A directed successor was selected."],"round":1,"source_role":"ADJUDICATOR","subject_id":"%s","subject_kind":"%s","subject_lifecycle_epoch":%d}`, escalation.EscalationID, escalation.Subject.ID, escalation.Subject.Kind, escalation.SubjectLifecycleEpoch))
+	decision := completeDecision(t, ordinal)
+	revision := uint64(2)
+	decision.NextState = nil
+	decision.Receipt.Target = kernel.AggregateRef{Kind: kernel.AggregateEscalation, ID: escalation.EscalationID}
+	decision.Receipt.ResultingRevision = &revision
+	decision.Events[0].Aggregate = decision.Receipt.Target
+	decision.Events[0].AggregateRevision = revision
+	decision.Events[0].EventType = "tekroo.event.escalation.resolved"
+	decision.Events[0].Payload = payload
+	decision.Events[0].CommittedAt = testNow()
+	decision.Authority.Principal = escalation.Adjudicator
 	return attachProvenance(t, decision)
 }
 

@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "RELEASE_RECEIPT",
+  "recordedOn": "2026-08-11",
+  "timePrecision": "DAY",
+  "repository": "https://github.com/tekroo-ai/teams.git",
+  "branch": "main",
+  "releasedCommit": "53929a5678ea6682c6e3a96f85b3d4b7a7414caa",
+  "releasedTree": "df8a35901a7eef3506fd6af90cad6ca592ad1bfa",
+  "remoteObservedCommit": "53929a5678ea6682c6e3a96f85b3d4b7a7414caa",
+  "remoteObservedTree": "df8a35901a7eef3506fd6af90cad6ca592ad1bfa",
+  "verificationMethod": [
+    "git push origin main",
+    "git ls-remote origin refs/heads/main",
+    "git rev-parse origin/main^{tree}"
+  ],
+  "contractIdentity": "tekroo.kernel.contracts/0.4.0",
+  "manifestSha256": "5ff83483ce43ace2e06f2cc2f57dd552342553fc2389f3cc775b761c0c6d6d7c",
+  "gateReportSha256": "791f0f1c8484af83377fec482aa07aff010c81f800650e70aa0d884e8b6d0195",
+  "qualificationBoundary": "The escalation contract and pure model are released; authoritative escalation coordination and repository projection remain unqualified until the Step 9 implementation gate passes."
+}

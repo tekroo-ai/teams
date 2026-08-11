@@ -1,0 +1,150 @@
+{
+  "schemaVersion": "1.0.0",
+  "reportType": "PHASE_3_DETERMINISTIC_ESCALATION_COORDINATION",
+  "status": "PASS",
+  "acceptedBaseCommit": "53929a5678ea6682c6e3a96f85b3d4b7a7414caa",
+  "acceptedBaseTree": "df8a35901a7eef3506fd6af90cad6ca592ad1bfa",
+  "contractIdentity": "tekroo.kernel.contracts/0.4.0",
+  "manifestSha256": "5ff83483ce43ace2e06f2cc2f57dd552342553fc2389f3cc775b761c0c6d6d7c",
+  "sourceTreeSha256": "3bca7240ed7cb01d28dcd2be9425d3ab44e4c1076330a3a0ecc567b4be7f5f21",
+  "environment": {
+    "goVersion": "go1.26.4",
+    "goos": "darwin",
+    "goarch": "arm64",
+    "locale": "C",
+    "timeZone": "UTC"
+  },
+  "executed": {
+    "contractStructureChecks": 2664,
+    "contractFixtureCases": 97,
+    "focusedTestCases": 154,
+    "focusedTestFailures": 0,
+    "regressionTestCases": 327,
+    "regressionTestFailures": 0,
+    "mongoIntegrationCases": 23,
+    "mongoIntegrationFailures": 0,
+    "vetFailures": 0
+  },
+  "assertions": [
+    {
+      "id": "ESCALATE-001-EXACT-OPENING",
+      "status": "PASS",
+      "tests": [
+        "TestPlanEscalationOpeningCanonicalizesEvidenceAndRetainsDirectedPath",
+        "TestEscalationCoordinatorOpensExactPolicyOwnedEscalation",
+        "TestEscalationOpenPolicyFencesSemanticDuplicateAndSubjectLifecycle"
+      ],
+      "evidenceFloor": "Opening binds one exact nonterminal subject revision and lifecycle, bounded authorities and policy, ordered causal path, condition digest, question, and canonical evidence."
+    },
+    {
+      "id": "ESCALATE-002-SEMANTIC-UNIQUENESS",
+      "status": "PASS",
+      "tests": [
+        "TestPlanEscalationOpeningFailsClosedOnDuplicateAndBounds",
+        "TestStoreAllowsOneConcurrentEscalationPerSemanticKey",
+        "TestEscalationProjectionSurvivesRestartAndRejectsSemanticDuplicate"
+      ],
+      "evidenceFloor": "The semantic key is checked by the evaluator and transactionally retained by both repositories, giving concurrent equivalent openings one winner."
+    },
+    {
+      "id": "ESCALATE-003-BOUNDED-TERMINAL",
+      "status": "PASS",
+      "tests": [
+        "TestPlanEscalationResolutionEnforcesAuthorityDeadlineAndTerminality",
+        "TestTimeoutResolutionRequiresPolicyAfterDeadlineAndBoundedOutcome",
+        "TestEscalationResolutionUsesTrustedDecisionTimeAndExactAdjudicator"
+      ],
+      "evidenceFloor": "Only the exact adjudicator within budget and deadline, or the exact timeout policy strictly after deadline with a bounded outcome, can make an open escalation terminal."
+    },
+    {
+      "id": "ESCALATE-004-DURABLE-PROJECTION",
+      "status": "PASS",
+      "tests": [
+        "TestStorePersistsEscalationOpeningAndTerminalResolution",
+        "TestEscalationProjectionSurvivesRestartAndRejectsSemanticDuplicate"
+      ],
+      "evidenceFloor": "Opening and resolution projections preserve their event IDs, subject binding, semantic key, revision, state, and terminal outcome across repository reload or restart."
+    },
+    {
+      "id": "ESCALATE-005-CONTRACT-CONFORMANCE",
+      "status": "PASS",
+      "tests": [
+        "TestAllFrozenCommandsReachTheirDeclaredEventThroughEvaluator",
+        "TestEscalationCoordinatorOpensExactPolicyOwnedEscalation",
+        "TestEscalationCoordinatorResolvesOnlyAsPlannedAuthority"
+      ],
+      "evidenceFloor": "Both escalation commands validate against the released 0.4.0 schemas and reach their one declared event through the authoritative evaluator."
+    },
+    {
+      "id": "ESCALATE-006-NO-IMPLICIT-CONTROL",
+      "status": "PASS",
+      "tests": [
+        "TestEscalationCoordinatorDoesNotCommandForDuplicateOrInvalidAttribution",
+        "TestApplicationProductionImportsRemainKernelOnly"
+      ],
+      "evidenceFloor": "Invalid or duplicate plans issue no command; the slice contains no trigger discovery, provider effect, OpenHands, SMA, Git, release, or deployment control."
+    }
+  ],
+  "excludedProfiles": [
+    {
+      "profile": "trigger-detection",
+      "reason": "Upstream policy must explicitly classify a supported trigger; this slice does not infer one from retries, validation, blocking, or handoffs."
+    },
+    {
+      "profile": "successor-and-process-control",
+      "reason": "The slice records escalation decisions but does not choose or execute retries, ownership transfers, handoffs, or successor work."
+    },
+    {
+      "profile": "organizational-acceptance-release-provider",
+      "reason": "Acceptance, release planning, synthesized merge, and Git/provider execution remain separate slices."
+    },
+    {
+      "profile": "deployment-migration-performance",
+      "reason": "Production deployment, migration execution, load, latency, and throughput are not exercised."
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "OUTPUT/phase-3/step-9-implementation-contract-structure.json",
+      "sha256": "a704f86b9f7cba78c144ba33304a07725f75e41490bbc4d21dfb2116c5f5062f"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-9-implementation-contract-reference.json",
+      "sha256": "b886b6bec48ba2d80d63b690a58aaf2f24d8809082be5e0b080953a12565f575"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-9-escalation-coordination-tests.jsonl",
+      "sha256": "9aee85d9ddc31deebc7e030fe24f6e12ffdf19f4d17e6122424be77c4e308de0"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-9-implementation-full-regression-tests.jsonl",
+      "sha256": "ee234870aad467eb9c8bb79182956a673ffdb097b66383157ab0d8e95bd1e6c8"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-9-mongo-integration-tests.jsonl",
+      "sha256": "cb39b3d1252c85e709d763f829d7ec08523f255e30c585371affea96ad4755c9"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-9-contract-acceptance.json",
+      "sha256": "491415a44bb8f39ad0a4246f89abbf3da74e14d87b6317c667adf1cdca61cf2a"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-9-contract-release-receipt.json",
+      "sha256": "d91e47df462715320edaf02f48174a36d2ce67579657cefb9191e9309fca2b23"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-9-implementation-authorization.json",
+      "sha256": "48b644e4113a38f068e61350649f86415a52e4031a9475bb41ec1c0712bec0d1"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-9-escalation-contract-gate.json",
+      "sha256": "e46c780f39b4f3699f6393a710e57afee9dbc02d4cb5405897567b2ff7ca3073"
+    },
+    {
+      "path": "docs/architecture/011-deterministic-escalation-coordination.md",
+      "sha256": "445eec23aca3f164713a1d02866ad30031501d7c038f8b7e999369de71e81c47"
+    }
+  ],
+  "digestMethod": "SHA-256 of compact JSON with reportSha256 set to the empty string",
+  "reportSha256": "808ba33fabc8149587926ea638355d96bb8a001fa87996a6b813ff384599a592"
+}

@@ -326,6 +326,34 @@ func (s *Store) loadSnapshot(ctx context.Context, target kernel.AggregateRef, pr
 	}); err != nil {
 		return kernel.Snapshot{}, err
 	}
+	snapshot.EscalationKeys = make(map[kernel.EscalationKey]kernel.AggregateRef)
+	if err := scan(ctx, s.db.Collection("escalation_keys"), bson.D{}, func(document valueDocument) error {
+		var value struct {
+			Key        kernel.EscalationKey `json:"key"`
+			Escalation kernel.AggregateRef  `json:"escalation"`
+		}
+		if err := decode(document.Data, &value); err != nil {
+			return err
+		}
+		snapshot.EscalationKeys[value.Key] = value.Escalation
+		return nil
+	}); err != nil {
+		return kernel.Snapshot{}, err
+	}
+	snapshot.Escalations = make(map[kernel.AggregateRef]kernel.EscalationSnapshot)
+	if err := scan(ctx, s.db.Collection("escalations"), bson.D{}, func(document valueDocument) error {
+		var value struct {
+			Escalation kernel.AggregateRef       `json:"escalation"`
+			Progress   kernel.EscalationSnapshot `json:"progress"`
+		}
+		if err := decode(document.Data, &value); err != nil {
+			return err
+		}
+		snapshot.Escalations[value.Escalation] = value.Progress
+		return nil
+	}); err != nil {
+		return kernel.Snapshot{}, err
+	}
 	snapshot.AttemptBudgets = make(map[kernel.AttemptBudgetKey]kernel.AttemptBudgetSnapshot)
 	if err := scan(ctx, s.db.Collection("attempt_budgets"), bson.D{}, func(document valueDocument) error {
 		var value struct {
@@ -677,6 +705,15 @@ func (s *Store) checkGuards(ctx context.Context, expected kernel.Snapshot, decis
 			return err
 		}
 	}
+	for _, key := range decision.Guards.AbsentEscalationKeys {
+		err := s.db.Collection("escalation_keys").FindOne(ctx, bson.D{{Key: "_id", Value: escalationKey(key)}}).Err()
+		if err == nil {
+			return ErrConflict
+		}
+		if !errors.Is(err, driver.ErrNoDocuments) {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -788,6 +825,53 @@ func (s *Store) applyRegistryAndReview(ctx context.Context, event kernel.DomainE
 			return "", err
 		}
 		return next.Join.Status, nil
+	case "tekroo.event.escalation.opened":
+		if event.Aggregate.Kind != kernel.AggregateEscalation || event.AggregateRevision != 1 {
+			return "", ErrConflict
+		}
+		progress, err := kernel.EscalationFromOpenPayload(event.Payload)
+		if err != nil || progress.EscalationID != event.Aggregate.ID {
+			return "", ErrConflict
+		}
+		progress.OpeningEventID = event.EventID
+		progress.Revision = event.AggregateRevision
+		if !progress.Valid() {
+			return "", ErrConflict
+		}
+		key := progress.Key()
+		if err := s.insertValue(ctx, "escalation_keys", escalationKey(key), struct {
+			Key        kernel.EscalationKey `json:"key"`
+			Escalation kernel.AggregateRef  `json:"escalation"`
+		}{key, event.Aggregate}); err != nil {
+			return "", err
+		}
+		return "", s.insertValue(ctx, "escalations", aggregateKey(event.Aggregate), struct {
+			Escalation kernel.AggregateRef       `json:"escalation"`
+			Progress   kernel.EscalationSnapshot `json:"progress"`
+		}{event.Aggregate, progress})
+	case "tekroo.event.escalation.resolved":
+		var document valueDocument
+		if err := s.db.Collection("escalations").FindOne(ctx, bson.D{{Key: "_id", Value: aggregateKey(event.Aggregate)}}).Decode(&document); err != nil {
+			return "", err
+		}
+		var value struct {
+			Escalation kernel.AggregateRef       `json:"escalation"`
+			Progress   kernel.EscalationSnapshot `json:"progress"`
+		}
+		if err := decode(document.Data, &value); err != nil || value.Progress.Revision+1 != event.AggregateRevision {
+			return "", ErrConflict
+		}
+		next, valid := kernel.ApplyEscalationResolution(value.Progress, event.Authority, event.EventID, event.CommittedAt, event.Payload)
+		if !valid || next.Revision != event.AggregateRevision {
+			return "", ErrConflict
+		}
+		value.Progress = next
+		data, _ := encode(value)
+		result, err := s.db.Collection("escalations").ReplaceOne(ctx, bson.D{{Key: "_id", Value: aggregateKey(event.Aggregate)}}, valueDocument{ID: aggregateKey(event.Aggregate), Data: data})
+		if err != nil || result.ModifiedCount != 1 {
+			return "", ErrConflict
+		}
+		return "", nil
 	default:
 		return "", nil
 	}
@@ -920,6 +1004,12 @@ func aggregateKey(reference kernel.AggregateRef) string {
 }
 
 func reviewKey(key kernel.CompletionReviewKey) string {
+	data, _ := encode(key)
+	digest := sha256.Sum256(data)
+	return hex.EncodeToString(digest[:])
+}
+
+func escalationKey(key kernel.EscalationKey) string {
 	data, _ := encode(key)
 	digest := sha256.Sum256(data)
 	return hex.EncodeToString(digest[:])

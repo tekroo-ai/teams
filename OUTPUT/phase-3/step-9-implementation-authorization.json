@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "PRINCIPAL_AUTHORIZATION",
+  "recordedOn": "2026-08-11",
+  "timePrecision": "DAY",
+  "principalStatement": "Accept and proceed.",
+  "authorizedAction": "Implement and qualify deterministic escalation coordination over the accepted tekroo.kernel.contracts/0.4.0 package.",
+  "authorizedScope": [
+    "plan exact policy-owned escalation openings from explicit trigger decisions without inferring triggers from message text",
+    "enforce one durable escalation per exact subject lifecycle and triggering condition",
+    "bind exact adjudicator, timeout policy, resolution owner, policy revision, deadline, finite round limit, causal path, unresolved question, and evidence",
+    "enforce exact adjudicator resolution before deadline and exact policy timeout after deadline",
+    "project escalation state transactionally in the in-memory and Mongo reference stores",
+    "prove idempotent replay, concurrent duplicate handling, stale lifecycle and revision rejection, route-once, no-reroute, and terminal immutability",
+    "record and verify the accepted 0.4.0 release as predecessor evidence"
+  ],
+  "excludedScope": [
+    "inferring retry, validation, or handoff failures from untyped messages",
+    "automatic organizational acceptance or completion from escalation outcomes",
+    "Git or provider release coordination",
+    "OpenHands or SMA integration",
+    "production deployment, migration execution, and performance qualification",
+    "pushing a candidate without principal acceptance"
+  ],
+  "acceptedInputCommit": "53929a5678ea6682c6e3a96f85b3d4b7a7414caa",
+  "acceptedInputTree": "df8a35901a7eef3506fd6af90cad6ca592ad1bfa",
+  "contractIdentity": "tekroo.kernel.contracts/0.4.0"
+}

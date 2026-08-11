@@ -228,6 +228,11 @@ func decisionGuards(command KernelCommand, authority AuthorityDecision) Decision
 			guards.AbsentReviewKeys = []CompletionReviewKey{key}
 		}
 	}
+	if command.CommandType == "tekroo.command.escalation.open" {
+		if escalation, err := EscalationFromOpenPayload(command.Payload); err == nil {
+			guards.AbsentEscalationKeys = []EscalationKey{escalation.Key()}
+		}
+	}
 	return guards
 }
 
@@ -546,7 +551,8 @@ func commandCreatesAggregate(commandType string) bool {
 		"tekroo.command.task.create",
 		"tekroo.command.evidence.register",
 		"tekroo.command.execution.register",
-		"tekroo.command.completion-review.open":
+		"tekroo.command.completion-review.open",
+		"tekroo.command.escalation.open":
 		return true
 	default:
 		return false

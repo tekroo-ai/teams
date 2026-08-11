@@ -51,6 +51,8 @@ type Store struct {
 	authorizationPolicy kernel.AuthorizationPolicy
 	openReviews         map[kernel.CompletionReviewKey]kernel.AggregateRef
 	reviews             map[kernel.AggregateRef]kernel.CompletionReviewSnapshot
+	escalations         map[kernel.AggregateRef]kernel.EscalationSnapshot
+	escalationKeys      map[kernel.EscalationKey]kernel.AggregateRef
 	eventQualifications map[kernel.UUIDv7]string
 	attemptBudgets      map[kernel.AttemptBudgetKey]kernel.AttemptBudgetSnapshot
 	faultPoint          FaultPoint
@@ -102,6 +104,8 @@ func NewStore(policy ...kernel.AuthorizationPolicy) *Store {
 		provenance:          make(map[kernel.Digest]kernel.DecisionProvenance),
 		openReviews:         make(map[kernel.CompletionReviewKey]kernel.AggregateRef),
 		reviews:             make(map[kernel.AggregateRef]kernel.CompletionReviewSnapshot),
+		escalations:         make(map[kernel.AggregateRef]kernel.EscalationSnapshot),
+		escalationKeys:      make(map[kernel.EscalationKey]kernel.AggregateRef),
 		eventQualifications: make(map[kernel.UUIDv7]string),
 		attemptBudgets:      make(map[kernel.AttemptBudgetKey]kernel.AttemptBudgetSnapshot),
 	}
@@ -174,6 +178,14 @@ func (s *Store) loadLocked(target kernel.AggregateRef, preconditions []kernel.Ag
 	snapshot.Reviews = make(map[kernel.AggregateRef]kernel.CompletionReviewSnapshot, len(s.reviews))
 	for review, progress := range s.reviews {
 		snapshot.Reviews[review] = progress.Clone()
+	}
+	snapshot.Escalations = make(map[kernel.AggregateRef]kernel.EscalationSnapshot, len(s.escalations))
+	for escalation, progress := range s.escalations {
+		snapshot.Escalations[escalation] = progress.Clone()
+	}
+	snapshot.EscalationKeys = make(map[kernel.EscalationKey]kernel.AggregateRef, len(s.escalationKeys))
+	for key, escalation := range s.escalationKeys {
+		snapshot.EscalationKeys[key] = escalation
 	}
 	snapshot.AttemptBudgets = make(map[kernel.AttemptBudgetKey]kernel.AttemptBudgetSnapshot, len(s.attemptBudgets))
 	for key, budget := range s.attemptBudgets {
@@ -323,10 +335,19 @@ func (s *Store) Commit(ctx context.Context, expected kernel.Snapshot, decision k
 			return ErrConflict
 		}
 	}
+	for _, key := range decision.Guards.AbsentEscalationKeys {
+		if _, found := s.escalationKeys[key]; found {
+			return ErrConflict
+		}
+	}
 	if decision.AttemptBudget != nil {
 		if err := validateAttemptBudgetCommit(s.attemptBudgets, *decision.AttemptBudget); err != nil {
 			return err
 		}
+	}
+	escalationProjections, err := s.prepareEscalationProjections(decision.Events)
+	if err != nil {
+		return err
 	}
 	if s.faultPoint == FaultBeforeState || s.faultPoint == FaultBeforeEvents || s.faultPoint == FaultBeforeReceipt || s.faultPoint == FaultBeforeAuthority || s.faultPoint == FaultBeforeOutbox {
 		return fmt.Errorf("%w: %s", ErrInjectedFault, s.faultPoint)
@@ -342,6 +363,12 @@ func (s *Store) Commit(ctx context.Context, expected kernel.Snapshot, decision k
 		s.events[event.EventID] = cloneEvent(event)
 		s.applyRegistryEvent(event)
 		s.applyReviewEvent(event)
+	}
+	for _, projection := range escalationProjections {
+		s.escalations[projection.reference] = projection.snapshot.Clone()
+		if projection.newKey != nil {
+			s.escalationKeys[*projection.newKey] = projection.reference
+		}
 	}
 	if decision.AttemptBudget != nil {
 		applyAttemptBudget(s.attemptBudgets, *decision.AttemptBudget)
@@ -359,6 +386,49 @@ func (s *Store) Commit(ctx context.Context, expected kernel.Snapshot, decision k
 		return kernel.ErrCommitUncertain
 	}
 	return nil
+}
+
+type escalationProjection struct {
+	reference kernel.AggregateRef
+	snapshot  kernel.EscalationSnapshot
+	newKey    *kernel.EscalationKey
+}
+
+func (s *Store) prepareEscalationProjections(events []kernel.DomainEvent) ([]escalationProjection, error) {
+	projections := make([]escalationProjection, 0, len(events))
+	for _, event := range events {
+		switch event.EventType {
+		case "tekroo.event.escalation.opened":
+			if event.Aggregate.Kind != kernel.AggregateEscalation || event.AggregateRevision != 1 {
+				return nil, ErrInvalidDecision
+			}
+			value, err := kernel.EscalationFromOpenPayload(event.Payload)
+			if err != nil || value.EscalationID != event.Aggregate.ID {
+				return nil, ErrInvalidDecision
+			}
+			value.OpeningEventID = event.EventID
+			value.Revision = event.AggregateRevision
+			if !value.Valid() {
+				return nil, ErrInvalidDecision
+			}
+			key := value.Key()
+			if _, exists := s.escalationKeys[key]; exists {
+				return nil, ErrConflict
+			}
+			projections = append(projections, escalationProjection{reference: event.Aggregate, snapshot: value, newKey: &key})
+		case "tekroo.event.escalation.resolved":
+			current, found := s.escalations[event.Aggregate]
+			if !found || current.Revision+1 != event.AggregateRevision {
+				return nil, ErrInvalidDecision
+			}
+			next, valid := kernel.ApplyEscalationResolution(current, event.Authority, event.EventID, event.CommittedAt, event.Payload)
+			if !valid || next.Revision != event.AggregateRevision {
+				return nil, ErrInvalidDecision
+			}
+			projections = append(projections, escalationProjection{reference: event.Aggregate, snapshot: next})
+		}
+	}
+	return projections, nil
 }
 
 func (s *Store) applyReviewEvent(event kernel.DomainEvent) {

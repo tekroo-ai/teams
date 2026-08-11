@@ -14,7 +14,7 @@ import (
 	"github.com/tekroo-ai/teams/kernel"
 )
 
-func TestFrozenCommandsApplyOrFailClosedAtUnqualifiedBoundary(t *testing.T) {
+func TestAllFrozenCommandsReachTheirDeclaredEventThroughEvaluator(t *testing.T) {
 	type fixture struct {
 		FixtureID string `json:"fixtureId"`
 		When      struct {
@@ -69,7 +69,6 @@ func TestFrozenCommandsApplyOrFailClosedAtUnqualifiedBoundary(t *testing.T) {
 	evaluator := kernel.Evaluator{Catalogue: loadCatalogue(t)}
 	executed := 0
 	applied := 0
-	failClosed := 0
 	for _, item := range fixtures.Fixtures {
 		if !strings.HasSuffix(item.FixtureID, "-VALID") {
 			continue
@@ -82,13 +81,6 @@ func TestFrozenCommandsApplyOrFailClosedAtUnqualifiedBoundary(t *testing.T) {
 			}
 			command, snapshot := commandCase(t, item.When.CommandType, item.When.Payload, definition.TargetKinds[0], definition.AuthorityKinds[0], definition.ExecutionRequired, definition.RootAllowed)
 			decision := evaluate(t, evaluator, command, snapshot, validDecisionContext(t))
-			if strings.HasPrefix(item.When.CommandType, "tekroo.command.escalation.") {
-				if decision.Receipt.OutcomeCode != kernel.OutcomeRejectedPolicy || decision.Receipt.ReasonCode != "ESCALATION_NOT_IMPLEMENTED" || len(decision.Events) != 0 {
-					t.Fatalf("unqualified escalation decision = %#v", decision)
-				}
-				failClosed++
-				return
-			}
 			if decision.Receipt.OutcomeCode != kernel.OutcomeApplied || len(decision.Events) != 1 || decision.Events[0].EventType != item.Then.Expected.EventTypes[0] {
 				t.Fatalf("decision = %#v", decision)
 			}
@@ -99,8 +91,8 @@ func TestFrozenCommandsApplyOrFailClosedAtUnqualifiedBoundary(t *testing.T) {
 	if executed != 29 {
 		t.Fatalf("executed command cases = %d, want 29", executed)
 	}
-	if applied != 27 || failClosed != 2 {
-		t.Fatalf("applied = %d, fail-closed = %d, want 27 and 2", applied, failClosed)
+	if applied != 29 {
+		t.Fatalf("applied = %d, want 29", applied)
 	}
 }
 
@@ -121,6 +113,62 @@ func TestExecutionFencingRequiresExactCurrentTuple(t *testing.T) {
 	rejected := evaluate(t, evaluator, stale, snapshot, validDecisionContext(t))
 	if rejected.Receipt.OutcomeCode != kernel.OutcomeRejectedStaleExecution || len(rejected.Events) != 0 {
 		t.Fatalf("stale execution decision = %#v", rejected)
+	}
+}
+
+func TestEscalationOpenPolicyFencesSemanticDuplicateAndSubjectLifecycle(t *testing.T) {
+	evaluator := kernel.Evaluator{Catalogue: loadCatalogue(t)}
+	payload := json.RawMessage(`{"adjudicator":{"id":"principal-adjudicator","kind":"HUMAN"},"causal_path_event_ids":["00000000-0000-7000-8000-000000000702"],"deadline_at":"2026-08-12T00:00:00Z","escalation_id":"00000000-0000-7000-8000-000000000701","escalation_policy_revision":1,"evidence_ids":["00000000-0000-7000-8000-000000000703"],"expected_subject_revision":7,"resolution_owner_fqn":"teams::coder-1","resolution_round_limit":1,"route_limit":1,"subject_id":"00000000-0000-7000-8000-000000000101","subject_kind":"task","subject_lifecycle_epoch":1,"timeout_policy":{"id":"escalation-timeout-policy","kind":"POLICY"},"trigger":"HANDOFF_CYCLE_DETECTED","triggering_condition_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","unresolved_question":"Which directed successor resolves the detected handoff cycle?"}`)
+	command, snapshot := commandCase(t, "tekroo.command.escalation.open", payload, kernel.AggregateEscalation, kernel.PrincipalPolicy, false, false)
+	if decision := evaluate(t, evaluator, command, snapshot, validDecisionContext(t)); decision.Receipt.OutcomeCode != kernel.OutcomeApplied || decision.Events[0].EventType != "tekroo.event.escalation.opened" {
+		t.Fatalf("opening decision = %#v", decision)
+	}
+
+	escalation, err := kernel.EscalationFromOpenPayload(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	duplicate := snapshot
+	duplicate.EscalationKeys = map[kernel.EscalationKey]kernel.AggregateRef{escalation.Key(): command.Target}
+	if decision := evaluate(t, evaluator, command, duplicate, validDecisionContext(t)); decision.Receipt.OutcomeCode != kernel.OutcomeRejectedConflict || decision.Receipt.ReasonCode != "ESCALATION_ALREADY_EXISTS" || len(decision.Events) != 0 {
+		t.Fatalf("duplicate decision = %#v", decision)
+	}
+
+	stale := snapshot
+	stale.Related = map[kernel.AggregateRef]kernel.RelatedSnapshot{}
+	for subject, related := range snapshot.Related {
+		copy := *related.State
+		copy.LifecycleEpoch++
+		related.State = &copy
+		stale.Related[subject] = related
+	}
+	if decision := evaluate(t, evaluator, command, stale, validDecisionContext(t)); decision.Receipt.OutcomeCode != kernel.OutcomeRejectedConflict || decision.Receipt.ReasonCode != "STALE_LIFECYCLE_EPOCH" || len(decision.Events) != 0 {
+		t.Fatalf("stale lifecycle decision = %#v", decision)
+	}
+}
+
+func TestEscalationResolutionUsesTrustedDecisionTimeAndExactAdjudicator(t *testing.T) {
+	evaluator := kernel.Evaluator{Catalogue: loadCatalogue(t)}
+	payload := json.RawMessage(`{"decided_at":"2026-08-11T12:00:00Z","escalation_id":"00000000-0000-7000-8000-000000000701","evidence_ids":["00000000-0000-7000-8000-000000000703"],"expected_escalation_revision":1,"outcome":"RESOLVED","reasons":["A directed successor was selected."],"round":1,"source_role":"ADJUDICATOR","subject_id":"00000000-0000-7000-8000-000000000101","subject_kind":"task","subject_lifecycle_epoch":1}`)
+	command, snapshot := commandCase(t, "tekroo.command.escalation.resolve", payload, kernel.AggregateEscalation, kernel.PrincipalActor, false, false)
+	if decision := evaluate(t, evaluator, command, snapshot, validDecisionContext(t)); decision.Receipt.OutcomeCode != kernel.OutcomeApplied || decision.Events[0].EventType != "tekroo.event.escalation.resolved" {
+		t.Fatalf("resolution decision = %#v", decision)
+	}
+
+	wrongAuthority := snapshot
+	wrongAuthority.Escalations = make(map[kernel.AggregateRef]kernel.EscalationSnapshot, len(snapshot.Escalations))
+	for ref, escalation := range snapshot.Escalations {
+		escalation.Adjudicator = kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "other-adjudicator"}
+		wrongAuthority.Escalations[ref] = escalation
+	}
+	if decision := evaluate(t, evaluator, command, wrongAuthority, validDecisionContext(t)); decision.Receipt.OutcomeCode != kernel.OutcomeRejectedPolicy || decision.Receipt.ReasonCode != "ADJUDICATOR_MISMATCH" || len(decision.Events) != 0 {
+		t.Fatalf("wrong adjudicator decision = %#v", decision)
+	}
+
+	afterDeadline := validDecisionContext(t)
+	afterDeadline.DecidedAt = time.Date(2026, time.August, 12, 0, 0, 0, 1, time.UTC)
+	if decision := evaluate(t, evaluator, command, snapshot, afterDeadline); decision.Receipt.OutcomeCode != kernel.OutcomeRejectedPolicy || decision.Receipt.ReasonCode != "ADJUDICATOR_DEADLINE_EXCEEDED" || len(decision.Events) != 0 {
+		t.Fatalf("late adjudication decision = %#v", decision)
 	}
 }
 
@@ -489,6 +537,61 @@ func commandCase(t *testing.T, commandType string, payload json.RawMessage, targ
 				Subject: subject, LifecycleEpoch: uint64(object["lifecycle_epoch"].(float64)), BranchPolicyRevision: uint64(object["branch_policy_revision"].(float64)),
 				RequiredBranchIDs: []string{branchID}, Results: map[string]string{branchID: "PASS"}, ResultRecords: map[string]kernel.ReviewBranchResult{branchID: result}, KnownResultEvents: map[kernel.UUIDv7]kernel.ReviewBranchResult{resultID: result}, ReviewRevision: uint64(object["expected_review_revision"].(float64)), Join: kernel.ReviewJoinResult{Complete: true, Status: "PASS"},
 			}}
+		}
+		if commandType == "tekroo.command.escalation.open" {
+			escalation, err := kernel.EscalationFromOpenPayload(payload)
+			if err != nil {
+				t.Fatal(err)
+			}
+			command.Target.ID = escalation.EscalationID
+			command.ExpectedRevision = kernel.MustNotExist()
+			command.Preconditions = []kernel.AggregatePrecondition{{Aggregate: escalation.Subject, Expected: kernel.NewExpectedRevision(escalation.ExpectedSubjectRevision)}}
+			command.Causation = make([]kernel.DagParent, len(escalation.CausalPathEventIDs))
+			snapshot.Exists = false
+			snapshot.Revision = 0
+			snapshot.AcceptedEvents = make(map[kernel.UUIDv7]kernel.AcceptedEvent, len(escalation.CausalPathEventIDs))
+			for index, eventID := range escalation.CausalPathEventIDs {
+				command.Causation[index] = kernel.DagParent{ParentEventID: eventID, EdgeKind: kernel.EdgeCausal}
+				snapshot.AcceptedEvents[eventID] = kernel.AcceptedEvent{EventType: "tekroo.event.task.handoff-recorded"}
+			}
+			snapshot.Related = map[kernel.AggregateRef]kernel.RelatedSnapshot{escalation.Subject: {
+				Exists: true, Revision: escalation.ExpectedSubjectRevision,
+				State: &kernel.AggregateState{Kind: escalation.Subject.Kind, ID: escalation.Subject.ID, Revision: escalation.ExpectedSubjectRevision, LifecycleEpoch: escalation.SubjectLifecycleEpoch, Phase: kernel.PhaseActive, Condition: kernel.ConditionRunnable},
+			}}
+			snapshot.Escalations = map[kernel.AggregateRef]kernel.EscalationSnapshot{}
+			snapshot.EscalationKeys = map[kernel.EscalationKey]kernel.AggregateRef{}
+		}
+		if commandType == "tekroo.command.escalation.resolve" {
+			transition, err := kernel.EscalationTransitionFromResolvePayload(payload)
+			if err != nil {
+				t.Fatal(err)
+			}
+			openingEventID := mustUUID(t, "00000000-0000-7000-8000-000000000704")
+			subjectRevision := uint64(7)
+			escalation := kernel.EscalationSnapshot{
+				EscalationID: transition.EscalationID, OpeningEventID: openingEventID, Revision: transition.ExpectedRevision, State: kernel.EscalationOpen,
+				Subject: transition.Subject, SubjectLifecycleEpoch: transition.SubjectLifecycleEpoch, ExpectedSubjectRevision: subjectRevision,
+				Trigger: kernel.EscalationHandoffCycleDetected, ConditionDigest: kernel.Digest("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
+				Adjudicator: command.Authority, TimeoutPolicy: kernel.PrincipalRef{Kind: kernel.PrincipalPolicy, ID: "escalation-timeout-policy"},
+				ResolutionOwnerFQN: actor, DeadlineAt: time.Date(2026, time.August, 12, 0, 0, 0, 0, time.UTC), ResolutionRoundLimit: 1, RouteLimit: 1, PolicyRevision: 1,
+				CausalPathEventIDs: []kernel.UUIDv7{mustUUID(t, "00000000-0000-7000-8000-000000000702")}, UnresolvedQuestion: "Which directed successor resolves the detected handoff cycle?", EvidenceIDs: transition.EvidenceIDs,
+			}
+			if !escalation.Valid() {
+				t.Fatal("invalid escalation fixture snapshot")
+			}
+			command.Target.ID = transition.EscalationID
+			command.ExpectedRevision = kernel.NewExpectedRevision(transition.ExpectedRevision)
+			command.Preconditions = []kernel.AggregatePrecondition{{Aggregate: transition.Subject, Expected: kernel.NewExpectedRevision(subjectRevision)}}
+			command.Causation = []kernel.DagParent{{ParentEventID: openingEventID, EdgeKind: kernel.EdgeResponse}}
+			snapshot.Exists = true
+			snapshot.Revision = transition.ExpectedRevision
+			snapshot.AcceptedEvents = map[kernel.UUIDv7]kernel.AcceptedEvent{openingEventID: {EventType: "tekroo.event.escalation.opened"}}
+			snapshot.Related = map[kernel.AggregateRef]kernel.RelatedSnapshot{transition.Subject: {
+				Exists: true, Revision: subjectRevision,
+				State: &kernel.AggregateState{Kind: transition.Subject.Kind, ID: transition.Subject.ID, Revision: subjectRevision, LifecycleEpoch: transition.SubjectLifecycleEpoch, Phase: kernel.PhaseActive, Condition: kernel.ConditionRunnable},
+			}}
+			snapshot.Escalations = map[kernel.AggregateRef]kernel.EscalationSnapshot{command.Target: escalation}
+			snapshot.EscalationKeys = map[kernel.EscalationKey]kernel.AggregateRef{escalation.Key(): command.Target}
 		}
 	}
 	return command, snapshot

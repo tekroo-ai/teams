@@ -233,7 +233,7 @@ func runFixture(t *testing.T, catalogue *contract.Catalogue, item fixture) any {
 			SubjectLifecycleEpoch uint64                      `json:"subjectLifecycleEpoch"`
 			DecidedAt             time.Time                   `json:"decidedAt"`
 			Round                 uint64                      `json:"round"`
-			Outcome               string                      `json:"outcome"`
+			Outcome               kernel.EscalationOutcome    `json:"outcome"`
 		}
 		decode(t, item.Given, &given)
 		decode(t, item.When, &when)

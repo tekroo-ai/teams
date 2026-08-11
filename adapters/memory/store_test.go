@@ -412,6 +412,70 @@ func TestStorePersistsOrderIndependentCompletionReviewJoin(t *testing.T) {
 	}
 }
 
+func TestStorePersistsEscalationOpeningAndTerminalResolution(t *testing.T) {
+	store := memory.NewStore()
+	opening := escalationOpeningDecision(t, 91, "00000000-0000-7000-8000-000000000901")
+	if err := store.Commit(context.Background(), kernel.Snapshot{}, opening); err != nil {
+		t.Fatal(err)
+	}
+	target := opening.Receipt.Target
+	snapshot, err := store.LoadDecision(context.Background(), kernel.KernelCommand{Target: target})
+	if err != nil {
+		t.Fatal(err)
+	}
+	projected, found := snapshot.Escalations[target]
+	if !found || projected.State != kernel.EscalationOpen || projected.OpeningEventID != opening.Events[0].EventID || snapshot.EscalationKeys[projected.Key()] != target {
+		t.Fatalf("opening projection = %#v, keys = %#v", projected, snapshot.EscalationKeys)
+	}
+
+	resolution := escalationResolutionDecision(t, 92, projected)
+	if err := store.Commit(context.Background(), snapshot, resolution); err != nil {
+		t.Fatal(err)
+	}
+	final, err := store.LoadDecision(context.Background(), kernel.KernelCommand{Target: target})
+	if err != nil {
+		t.Fatal(err)
+	}
+	terminal := final.Escalations[target]
+	if terminal.State != kernel.EscalationTerminal || terminal.TerminalOutcome != kernel.EscalationResolved || terminal.ResolutionEventID != resolution.Events[0].EventID || terminal.Revision != 2 {
+		t.Fatalf("terminal projection = %#v", terminal)
+	}
+	if final.EscalationKeys[terminal.Key()] != target {
+		t.Fatalf("terminal semantic key missing = %#v", final.EscalationKeys)
+	}
+}
+
+func TestStoreAllowsOneConcurrentEscalationPerSemanticKey(t *testing.T) {
+	store := memory.NewStore()
+	const contenders = 16
+	start := make(chan struct{})
+	results := make(chan error, contenders)
+	var ready sync.WaitGroup
+	ready.Add(contenders)
+	for index := 0; index < contenders; index++ {
+		decision := escalationOpeningDecision(t, 100+index, fmt.Sprintf("00000000-0000-7000-8000-%012x", 0x920+index))
+		go func(candidate kernel.Decision) {
+			ready.Done()
+			<-start
+			results <- store.Commit(context.Background(), kernel.Snapshot{}, candidate)
+		}(decision)
+	}
+	ready.Wait()
+	close(start)
+	winners := 0
+	for index := 0; index < contenders; index++ {
+		err := <-results
+		if err == nil {
+			winners++
+		} else if !errors.Is(err, memory.ErrConflict) {
+			t.Fatalf("loser error = %v, want ErrConflict", err)
+		}
+	}
+	if winners != 1 || store.EventCount() != 1 {
+		t.Fatalf("winners=%d events=%d", winners, store.EventCount())
+	}
+}
+
 func TestStoreSystematicAndConcurrentOneWinnerSchedules(t *testing.T) {
 	first := completeDecision(t)
 	second := alternateDecision(t, 2)
@@ -522,6 +586,43 @@ func alternateDecision(t *testing.T, ordinal int) kernel.Decision {
 	decision.Outbox[0].EventID = decision.Events[0].EventID
 	decision.CommandFingerprint = kernel.Digest(fmt.Sprintf("%064x", 4000+ordinal))
 	decision.IdempotencyScope = kernel.Digest(fmt.Sprintf("%064x", 5000+ordinal))
+	return attachProvenance(t, decision)
+}
+
+func escalationOpeningDecision(t *testing.T, ordinal int, escalationID string) kernel.Decision {
+	t.Helper()
+	payload := json.RawMessage(fmt.Sprintf(`{"adjudicator":{"id":"principal-adjudicator","kind":"HUMAN"},"causal_path_event_ids":["00000000-0000-7000-8000-000000000902"],"deadline_at":"2026-08-12T00:00:00Z","escalation_id":"%s","escalation_policy_revision":1,"evidence_ids":["00000000-0000-7000-8000-000000000903"],"expected_subject_revision":7,"resolution_owner_fqn":"teams::coder-1","resolution_round_limit":1,"route_limit":1,"subject_id":"00000000-0000-7000-8000-000000000904","subject_kind":"task","subject_lifecycle_epoch":1,"timeout_policy":{"id":"escalation-timeout-policy","kind":"POLICY"},"trigger":"HANDOFF_CYCLE_DETECTED","triggering_condition_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","unresolved_question":"Which directed successor resolves the detected handoff cycle?"}`, escalationID))
+	escalation, err := kernel.EscalationFromOpenPayload(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decision := alternateDecision(t, ordinal)
+	decision.NextState = nil
+	decision.Receipt.Target = kernel.AggregateRef{Kind: kernel.AggregateEscalation, ID: escalation.EscalationID}
+	decision.Receipt.CommandType = "tekroo.command.escalation.open"
+	decision.Events[0].Aggregate = decision.Receipt.Target
+	decision.Events[0].EventType = "tekroo.event.escalation.opened"
+	decision.Events[0].Payload = payload
+	decision.Events[0].AggregateRevision = 1
+	decision.Guards.AbsentEscalationKeys = []kernel.EscalationKey{escalation.Key()}
+	return attachProvenance(t, decision)
+}
+
+func escalationResolutionDecision(t *testing.T, ordinal int, escalation kernel.EscalationSnapshot) kernel.Decision {
+	t.Helper()
+	payload := json.RawMessage(fmt.Sprintf(`{"decided_at":"2026-08-11T12:00:00Z","escalation_id":"%s","evidence_ids":["00000000-0000-7000-8000-000000000905"],"expected_escalation_revision":1,"outcome":"RESOLVED","reasons":["A directed successor was selected."],"round":1,"source_role":"ADJUDICATOR","subject_id":"%s","subject_kind":"%s","subject_lifecycle_epoch":%d}`, escalation.EscalationID, escalation.Subject.ID, escalation.Subject.Kind, escalation.SubjectLifecycleEpoch))
+	decision := alternateDecision(t, ordinal)
+	revision := uint64(2)
+	decision.NextState = nil
+	decision.Receipt.Target = kernel.AggregateRef{Kind: kernel.AggregateEscalation, ID: escalation.EscalationID}
+	decision.Receipt.CommandType = "tekroo.command.escalation.resolve"
+	decision.Receipt.ResultingRevision = &revision
+	decision.Events[0].Aggregate = decision.Receipt.Target
+	decision.Events[0].EventType = "tekroo.event.escalation.resolved"
+	decision.Events[0].Payload = payload
+	decision.Events[0].AggregateRevision = revision
+	decision.Events[0].CommittedAt = time.Date(2026, time.August, 11, 12, 0, 0, 0, time.UTC)
+	decision.Authority.Principal = escalation.Adjudicator
 	return attachProvenance(t, decision)
 }
 

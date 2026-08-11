@@ -17,7 +17,8 @@ const (
 	reasonCorrectionTarget         = "CORRECTION_TARGET_NOT_FOUND"
 	reasonReviewAlreadyOpen        = "REVIEW_ALREADY_OPEN"
 	reasonReviewNotFinalized       = "REVIEW_NOT_FINALIZED"
-	reasonEscalationNotImplemented = "ESCALATION_NOT_IMPLEMENTED"
+	reasonEscalationAlreadyExists  = "ESCALATION_ALREADY_EXISTS"
+	reasonEscalationNotFound       = "ESCALATION_NOT_FOUND"
 )
 
 type CompletionReviewKey struct {
@@ -55,8 +56,39 @@ func validateCommandPolicy(command KernelCommand, snapshot Snapshot, context Dec
 		}
 	}
 	switch command.CommandType {
-	case "tekroo.command.escalation.open", "tekroo.command.escalation.resolve":
-		return OutcomeRejectedPolicy, reasonEscalationNotImplemented
+	case "tekroo.command.escalation.open":
+		if command.Authority.Kind != PrincipalPolicy || !payloadEvidenceMatches(object, command.EvidenceRefs) {
+			return OutcomeRejectedUnauthorized, reasonUnauthorized
+		}
+		escalation, err := EscalationFromOpenPayload(command.Payload)
+		if err != nil || escalation.EscalationID != command.Target.ID || escalation.PolicyRevision != command.ExpectedPolicyRevision || !context.DecidedAt.Before(escalation.DeadlineAt) || !causalPathMatchesCommand(escalation.CausalPathEventIDs, command.Causation) {
+			return OutcomeRejectedInvalid, reasonInvalidPayload
+		}
+		related, found := snapshot.Related[escalation.Subject]
+		if !found || !related.Exists || related.Revision != escalation.ExpectedSubjectRevision || related.State == nil || related.State.LifecycleEpoch != escalation.SubjectLifecycleEpoch || terminalPhase(related.State.Phase) || !containsAggregatePrecondition(command.Preconditions, escalation.Subject) {
+			return OutcomeRejectedConflict, reasonStaleLifecycleEpoch
+		}
+		if _, exists := snapshot.EscalationKeys[escalation.Key()]; exists {
+			return OutcomeRejectedConflict, reasonEscalationAlreadyExists
+		}
+	case "tekroo.command.escalation.resolve":
+		if !payloadEvidenceMatches(object, command.EvidenceRefs) {
+			return OutcomeRejectedInvalid, reasonInvalidEvidence
+		}
+		escalation, found := snapshot.Escalations[command.Target]
+		transition, err := EscalationTransitionFromResolvePayload(command.Payload)
+		if err != nil || !found || escalation.EscalationID != command.Target.ID || escalation.Revision != snapshot.Revision || transition.EscalationID != command.Target.ID || transition.ExpectedRevision != snapshot.Revision || transition.Subject != escalation.Subject || transition.SubjectLifecycleEpoch != escalation.SubjectLifecycleEpoch {
+			return OutcomeRejectedConflict, reasonEscalationNotFound
+		}
+		related, relatedFound := snapshot.Related[escalation.Subject]
+		if !relatedFound || !related.Exists || related.State == nil || related.State.LifecycleEpoch != escalation.SubjectLifecycleEpoch || terminalPhase(related.State.Phase) || !containsAggregatePrecondition(command.Preconditions, escalation.Subject) || !containsDagParent(command.Causation, escalation.OpeningEventID, EdgeResponse) {
+			return OutcomeRejectedConflict, reasonStaleLifecycleEpoch
+		}
+		transition.Authority = command.Authority
+		transition.DecidedAt = context.DecidedAt
+		if result := EvaluateEscalation(escalation, transition); !result.Accepted {
+			return OutcomeRejectedPolicy, result.Reason
+		}
 	case "tekroo.command.task.request-completion":
 		if !payloadEvidenceMatches(object, command.EvidenceRefs) {
 			return OutcomeRejectedInvalid, reasonInvalidEvidence
@@ -289,6 +321,27 @@ func aggregateField(object map[string]any, kindName, idName string) (AggregateRe
 func containsAggregatePrecondition(values []AggregatePrecondition, target AggregateRef) bool {
 	for _, value := range values {
 		if value.Aggregate == target {
+			return true
+		}
+	}
+	return false
+}
+
+func causalPathMatchesCommand(path []UUIDv7, parents []DagParent) bool {
+	if len(path) == 0 || len(path) != len(parents) {
+		return false
+	}
+	for index, eventID := range path {
+		if parents[index].ParentEventID != eventID || parents[index].EdgeKind != EdgeCausal {
+			return false
+		}
+	}
+	return true
+}
+
+func containsDagParent(values []DagParent, eventID UUIDv7, edge EdgeKind) bool {
+	for _, value := range values {
+		if value.ParentEventID == eventID && value.EdgeKind == edge {
 			return true
 		}
 	}
