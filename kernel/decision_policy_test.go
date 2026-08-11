@@ -13,12 +13,13 @@ func TestCompletionRequiresExactEvidenceCriteriaValidationAndDependencies(t *tes
 	evidenceID := mustUUID(t, "00000000-0000-7000-8000-0000000000e1")
 	evidenceDigest := mustDigest(t, "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee")
 	validationID := mustUUID(t, "00000000-0000-7000-8000-0000000000e2")
+	reviewID := mustUUID(t, "00000000-0000-7000-8000-0000000000e5")
 	parentID := mustUUID(t, "00000000-0000-7000-8000-0000000000e4")
 	task := kernel.AggregateRef{Kind: kernel.AggregateTask, ID: mustUUID(t, "00000000-0000-7000-8000-0000000000e3")}
 	command := validStoryCreateCommand(t)
 	command.CommandType = "tekroo.command.story.request-completion"
 	command.ExpectedRevision = kernel.NewExpectedRevision(5)
-	command.Payload = json.RawMessage(`{"lifecycle_epoch":1,"criteria_revision":2,"evidence_ids":["00000000-0000-7000-8000-0000000000e1"],"artifact_digests":[],"validation_event_ids":["00000000-0000-7000-8000-0000000000e2"],"unresolved_exceptions":[]}`)
+	command.Payload = json.RawMessage(`{"lifecycle_epoch":1,"criteria_revision":2,"evidence_ids":["00000000-0000-7000-8000-0000000000e1"],"artifact_digests":[],"unresolved_exceptions":[],"completion_review_id":"00000000-0000-7000-8000-0000000000e5","completion_review_revision":3,"branch_policy_revision":1,"validation_finalized_event_id":"00000000-0000-7000-8000-0000000000e2"}`)
 	command.EvidenceRefs = []kernel.EvidenceRef{{EvidenceID: evidenceID, SHA256: evidenceDigest}}
 	command.Causation = []kernel.DagParent{{ParentEventID: parentID, EdgeKind: kernel.EdgeCausal}}
 	command.Preconditions = []kernel.AggregatePrecondition{{Aggregate: task, Expected: kernel.NewExpectedRevision(3)}}
@@ -27,9 +28,13 @@ func TestCompletionRequiresExactEvidenceCriteriaValidationAndDependencies(t *tes
 		State:    &kernel.AggregateState{Kind: kernel.AggregateStory, ID: command.Target.ID, Revision: 5, LifecycleEpoch: 1, Phase: kernel.PhaseActive, Condition: kernel.ConditionRunnable},
 		Evidence: map[kernel.UUIDv7]kernel.EvidenceMetadata{evidenceID: {SHA256: evidenceDigest, Available: true}},
 		AcceptedEvents: map[kernel.UUIDv7]kernel.AcceptedEvent{
-			validationID: {EventType: "tekroo.event.completion-review.result-recorded", Qualification: "PASS"},
+			validationID: {EventType: "tekroo.event.completion-review.finalized", Qualification: "PASS"},
 			parentID:     {EventType: "tekroo.event.story.activated"},
 		},
+		Reviews: map[kernel.AggregateRef]kernel.CompletionReviewSnapshot{{Kind: kernel.AggregateCompletionReview, ID: reviewID}: {
+			Subject: command.Target, LifecycleEpoch: 1, CriteriaRevision: 2, BranchPolicyRevision: 1, ReviewRevision: 3,
+			Finalization: &kernel.ReviewFinalization{EventID: validationID, ReviewRevision: 3, TerminalStatus: "PASS"},
+		}},
 		Related: map[kernel.AggregateRef]kernel.RelatedSnapshot{task: {
 			Exists: true, Revision: 3,
 			State: &kernel.AggregateState{Kind: kernel.AggregateTask, ID: task.ID, Revision: 3, LifecycleEpoch: 1, Phase: kernel.PhaseActive, Condition: kernel.ConditionRunnable},
@@ -46,12 +51,21 @@ func TestCompletionRequiresExactEvidenceCriteriaValidationAndDependencies(t *tes
 	if decision := evaluate(t, evaluator, command, snapshot, context); decision.Receipt.OutcomeCode != kernel.OutcomeApplied || decision.NextState.Phase != kernel.PhaseCompleted {
 		t.Fatalf("ready completion decision = %#v", decision)
 	}
+	reviewRef := kernel.AggregateRef{Kind: kernel.AggregateCompletionReview, ID: reviewID}
+	currentReview := snapshot.Reviews[reviewRef]
+	currentReview.ReviewRevision++
+	snapshot.Reviews[reviewRef] = currentReview
+	if decision := evaluate(t, evaluator, command, snapshot, context); decision.Receipt.ReasonCode != "REVIEW_NOT_FINALIZED" {
+		t.Fatalf("stale finalized revision decision = %#v", decision.Receipt)
+	}
+	currentReview.ReviewRevision--
+	snapshot.Reviews[reviewRef] = currentReview
 	delete(snapshot.AcceptedEvents, validationID)
-	if decision := evaluate(t, evaluator, command, snapshot, context); decision.Receipt.ReasonCode != "VALIDATION_INCOMPLETE" {
+	if decision := evaluate(t, evaluator, command, snapshot, context); decision.Receipt.ReasonCode != "REVIEW_NOT_FINALIZED" {
 		t.Fatalf("missing validation decision = %#v", decision.Receipt)
 	}
-	snapshot.AcceptedEvents[validationID] = kernel.AcceptedEvent{EventType: "tekroo.event.completion-review.result-recorded", Qualification: "PASS"}
-	command.Payload = json.RawMessage(`{"lifecycle_epoch":1,"criteria_revision":1,"evidence_ids":["00000000-0000-7000-8000-0000000000e1"],"artifact_digests":[],"validation_event_ids":["00000000-0000-7000-8000-0000000000e2"],"unresolved_exceptions":[]}`)
+	snapshot.AcceptedEvents[validationID] = kernel.AcceptedEvent{EventType: "tekroo.event.completion-review.finalized", Qualification: "PASS"}
+	command.Payload = json.RawMessage(`{"lifecycle_epoch":1,"criteria_revision":1,"evidence_ids":["00000000-0000-7000-8000-0000000000e1"],"artifact_digests":[],"unresolved_exceptions":[],"completion_review_id":"00000000-0000-7000-8000-0000000000e5","completion_review_revision":3,"branch_policy_revision":1,"validation_finalized_event_id":"00000000-0000-7000-8000-0000000000e2"}`)
 	if decision := evaluate(t, evaluator, command, snapshot, context); decision.Receipt.ReasonCode != "CRITERIA_REVISION_CONFLICT" {
 		t.Fatalf("stale criteria decision = %#v", decision.Receipt)
 	}

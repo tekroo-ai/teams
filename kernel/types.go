@@ -6,9 +6,9 @@ import (
 )
 
 const (
-	ContractIdentity  = "tekroo.kernel.contracts/0.2.0"
-	SchemaVersion     = "1.1.0"
-	CatalogueRevision = uint64(2)
+	ContractIdentity  = "tekroo.kernel.contracts/0.3.0"
+	SchemaVersion     = "1.2.0"
+	CatalogueRevision = uint64(3)
 )
 
 var (

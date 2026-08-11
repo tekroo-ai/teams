@@ -1,0 +1,160 @@
+{
+  "schemaVersion": "1.0.0",
+  "reportType": "PHASE_3_BOUNDED_VALIDATION_CONTRACT_REVISION",
+  "status": "PASS",
+  "acceptedBaseCommit": "b5138057f81414b9a61c9b752f0268e0c2d903f1",
+  "acceptedBaseTree": "6d99ef4e5972d3e503822a061f8c2049a845fb5d",
+  "contractIdentity": "tekroo.kernel.contracts/0.3.0",
+  "manifestSha256": "a1831afd5829ce3d020cb65e51644416d6ec39b85dd4c00c82c9bef6f0294c2a",
+  "sourceTreeSha256": "1143be339aa2a1e26959a73a7da2b1bf4018a64606e2dfb7cb771b08d3e956aa",
+  "environment": {
+    "goVersion": "go1.26.4",
+    "goos": "darwin",
+    "goarch": "arm64",
+    "locale": "C",
+    "timeZone": "UTC"
+  },
+  "executed": {
+    "contractStructureChecks": 2537,
+    "contractFixtureCases": 82,
+    "focusedTestCases": 201,
+    "focusedTestFailures": 0,
+    "regressionTestCases": 275,
+    "regressionTestFailures": 0,
+    "vetFailures": 0
+  },
+  "assertions": [
+    {
+      "id": "BOUND-001-EXACT-BRANCH-AUTHORITY",
+      "status": "PASS",
+      "tests": [
+        "TestBoundedValidationEnforcesExactAuthorityDeadlineRoundAndSupersession",
+        "REVIEW-BOUNDED-VALIDATOR-PASS",
+        "REVIEW-BOUNDED-WRONG-VALIDATOR"
+      ],
+      "evidenceFloor": "Every branch binds an exact validator and resolution owner; the authenticated principal must match."
+    },
+    {
+      "id": "BOUND-002-FINITE-TIME-AND-ROUNDS",
+      "status": "PASS",
+      "tests": [
+        "TestBoundedValidationEnforcesExactAuthorityDeadlineRoundAndSupersession",
+        "REVIEW-BOUNDED-DEADLINE",
+        "REVIEW-BOUNDED-ROUND-LIMIT",
+        "REVIEW-BOUNDED-POLICY-TIMEOUT"
+      ],
+      "evidenceFloor": "Trusted decision time and finite branch/adjudication rounds bound validation and timeout outcomes."
+    },
+    {
+      "id": "BOUND-003-SUPERSESSION-ADJUDICATION",
+      "status": "PASS",
+      "tests": [
+        "TestBoundedValidationEnforcesExactAuthorityDeadlineRoundAndSupersession",
+        "TestBoundedValidationDeduplicatesFindingKeysAndRejectsConflicts",
+        "REVIEW-BOUNDED-CHANGED-CONDITION",
+        "REVIEW-BOUNDED-ADJUDICATOR"
+      ],
+      "evidenceFloor": "Finding keys deduplicate exact findings; conflicts reject. Replacing a branch result names the current result event and changed-condition evidence; adjudication uses its exact principal and budget."
+    },
+    {
+      "id": "BOUND-004-POLICY-FINALIZED-COMPLETION",
+      "status": "PASS",
+      "tests": [
+        "TestCompletionReviewFinalizationBindsCurrentResultSet",
+        "TestCompletionRequiresExactEvidenceCriteriaValidationAndDependencies",
+        "CAT-027-COMPLETION-REVIEW-FINALIZE-VALID",
+        "REVIEW-BOUNDED-POST-FINALIZATION"
+      ],
+      "evidenceFloor": "Completion consumes one current policy-finalized PASS review, never an isolated validator PASS; post-finalization results are rejected."
+    },
+    {
+      "id": "BOUND-005-DETERMINISTIC-JOIN-PRESERVED",
+      "status": "PASS",
+      "tests": [
+        "TestValidationJoinProjectionIsCanonicalAndOrderIndependent",
+        "TestValidationJoinPartialPoliciesHaveDeterministicFailurePrecedence",
+        "TestStorePersistsOrderIndependentCompletionReviewJoin"
+      ],
+      "evidenceFloor": "The Step 6 canonical join and deterministic precedence remain passing after augmentation."
+    },
+    {
+      "id": "BOUND-006-IMMUTABLE-COMPATIBILITY",
+      "status": "PASS",
+      "tests": [
+        "TestFrozenContractCorpus",
+        "TestCatalogueRejectsManifestIdentityMismatch"
+      ],
+      "evidenceFloor": "0.3.0 is separately sealed; changed 1.1.0 review/completion records require exact-context migration and are not inferred."
+    }
+  ],
+  "stepAssessment": [
+    {
+      "steps": "1-5",
+      "conclusion": "UNCHANGED",
+      "basis": "Their accepted adapter, channel, execution, and assignment boundaries do not depend on the added NEG-002 fields."
+    },
+    {
+      "steps": "6",
+      "conclusion": "FORWARD_AUGMENTED_AND_REQUALIFIED",
+      "basis": "The released 0.2.0 join claim remains valid; bounded identity, time, round, supersession, adjudication, and finalization are added under 0.3.0."
+    }
+  ],
+  "excludedProfiles": [
+    {
+      "profile": "live-validation-execution",
+      "reason": "The kernel validates commands but does not start validators or choose organizational deadlines."
+    },
+    {
+      "profile": "automatic-reopening-escalation-release",
+      "reason": "Application policies that react to terminal review outcomes and provider release execution remain later slices."
+    },
+    {
+      "profile": "production-migration-and-performance",
+      "reason": "Historical replay adapters, production deployment, load, latency, and throughput are not exercised here."
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "OUTPUT/phase-3/step-7-contract-structure.json",
+      "sha256": "50c73b3506cb5c5ff07d1631b73dadc00a6faeb951cb71f9b32cbe1898240b18"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-7-contract-reference.json",
+      "sha256": "e0b7929f6f5acbe5ba3e816f2ef40f5b4f87016b01839bac22a8d026f5e732a7"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-7-bounded-validation-tests.jsonl",
+      "sha256": "21f0c1ea1972bbcf6f4619b1c50e6bf3d9771fe1d272a72d5fea2036b82ec9cb"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-7-full-regression-tests.jsonl",
+      "sha256": "b42ba0759ff0cff56a1a6c9f37fad0c9979f0ae46f050433494983d8f3bb1d2d"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-6-acceptance.json",
+      "sha256": "d6bdf6a1e012bf9dd35eae79a5e4d8ed033a6b48159de5983533aa39db5480f3"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-6-release-receipt.json",
+      "sha256": "92b04274c2815590d27320a84424dacc2713a365ccacc489198d0edce2e146b1"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-7-contract-revision-authorization.json",
+      "sha256": "3daef234050c0191b8c539bc19ffdec822bd13e454fc17d9ade046908a3ec6a8"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-7-contract-encoding-gaps.md",
+      "sha256": "8215c6e027765c975f4ba03450fee9e84cf12b2b661379bd31106cb6b13addbb"
+    },
+    {
+      "path": "CONTRACTS/tekroo.kernel.contracts/0.3.0/compatibility/from-0.2.0.json",
+      "sha256": "e1fd34d0657d3cabc659fc7efbb8f0ae659114f2b9f1d414449210efa48e854c"
+    },
+    {
+      "path": "docs/architecture/008-bounded-validation-contract-revision.md",
+      "sha256": "8120af72e3077770ccbf8da47049efa4389b94f64f0dc0f39ca9725eb8227a61"
+    }
+  ],
+  "digestMethod": "SHA-256 of compact JSON with reportSha256 set to the empty string",
+  "reportSha256": "e50e7fbf83b7bf4e4626998629963966df33e453bd7ad4696cf0c8676beee398"
+}

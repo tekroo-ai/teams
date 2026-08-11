@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/tekroo-ai/teams/adapters/fake"
 	"github.com/tekroo-ai/teams/application"
@@ -39,10 +40,10 @@ func TestValidationCoordinatorOpensCanonicalPolicyOwnedReview(t *testing.T) {
 		t.Fatalf("subject precondition = %#v", command.Preconditions)
 	}
 	var payload struct {
-		RequiredBranchIDs []string `json:"required_branch_ids"`
-		JoinRule          string   `json:"join_rule"`
+		Branches []kernel.ReviewBranchSpec `json:"branches"`
+		JoinRule string                    `json:"join_rule"`
 	}
-	if json.Unmarshal(command.Payload, &payload) != nil || !reflect.DeepEqual(payload.RequiredBranchIDs, []string{"review", "tests"}) || payload.JoinRule != "ALL_PASS" {
+	if json.Unmarshal(command.Payload, &payload) != nil || len(payload.Branches) != 2 || payload.Branches[0].BranchID != "review" || payload.Branches[1].BranchID != "tests" || payload.JoinRule != "ALL_PASS" {
 		t.Fatalf("review payload = %s", command.Payload)
 	}
 }
@@ -98,13 +99,20 @@ func validationReviewRequest(t *testing.T) application.ValidationReviewRequest {
 	if err != nil {
 		t.Fatal(err)
 	}
+	deadline := time.Date(2026, time.August, 12, 0, 0, 0, 0, time.UTC)
+	evidenceID := kernel.UUIDv7("00000000-0000-7000-8000-000000000203")
 	return application.ValidationReviewRequest{
 		Input: kernel.ValidationReviewInput{
 			ReviewID:         kernel.UUIDv7("00000000-0000-7000-8000-000000000501"),
 			Subject:          kernel.AggregateState{Kind: kernel.AggregateTask, ID: kernel.UUIDv7("00000000-0000-7000-8000-000000000101"), Revision: 3, LifecycleEpoch: 2, Phase: kernel.PhaseActive, Condition: kernel.ConditionRunnable},
 			CriteriaRevision: 5, EvidenceSetDigest: kernel.Digest("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"), BranchPolicyRevision: 4,
 			RequiredBranchIDs: []string{"tests", "review"}, PartialResultPolicy: "WAIT_ALL",
-			Parents: []kernel.DagParent{{ParentEventID: kernel.UUIDv7("00000000-0000-7000-8000-000000000201"), EdgeKind: kernel.EdgeCausal}},
+			Branches: []kernel.ReviewBranchSpec{
+				{BranchID: "tests", Validator: kernel.PrincipalRef{Kind: kernel.PrincipalService, ID: "test-validator"}, ResolutionOwnerFQN: kernel.ActorFQN("teams::coder-1"), AcceptanceCriteria: []string{"tests pass"}, InputEvidenceIDs: []kernel.UUIDv7{evidenceID}, DeadlineAt: deadline, RoundLimit: 2},
+				{BranchID: "review", Validator: kernel.PrincipalRef{Kind: kernel.PrincipalActor, ID: "teams::reviewer-1"}, ResolutionOwnerFQN: kernel.ActorFQN("teams::coder-1"), AcceptanceCriteria: []string{"review passes"}, InputEvidenceIDs: []kernel.UUIDv7{evidenceID}, DeadlineAt: deadline, RoundLimit: 2},
+			},
+			Adjudication: kernel.ReviewAdjudication{Adjudicator: kernel.PrincipalRef{Kind: kernel.PrincipalPolicy, ID: "validation-adjudicator"}, DeadlineAt: deadline.Add(24 * time.Hour), RoundLimit: 1},
+			Parents:      []kernel.DagParent{{ParentEventID: kernel.UUIDv7("00000000-0000-7000-8000-000000000201"), EdgeKind: kernel.EdgeCausal}},
 		},
 		Identity:        application.ValidationReviewCommandIdentity{CommandID: kernel.UUIDv7("00000000-0000-7000-8000-000000000401"), CorrelationID: kernel.UUIDv7("00000000-0000-7000-8000-000000000402"), IdempotencyKey: "validation-review-1"},
 		PolicyAuthority: kernel.PrincipalRef{Kind: kernel.PrincipalPolicy, ID: "validation-policy"}, PolicyRevision: 7, CatalogueRevision: kernel.CatalogueRevision, Provenance: basis,

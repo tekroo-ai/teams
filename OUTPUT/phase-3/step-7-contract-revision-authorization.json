@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "PRINCIPAL_AUTHORIZATION",
+  "recordedOn": "2026-08-11",
+  "timePrecision": "DAY",
+  "principalStatement": "You can proceed with the revision.",
+  "authorizedAction": "Create successor contract tekroo.kernel.contracts/0.3.0 without modifying released 0.1.0 or 0.2.0 packages.",
+  "authorizedScope": [
+    "encode exact validation branch validator and accountable resolution-owner identity",
+    "encode per-branch deadline and finite round budget",
+    "encode complete terminal validation outcomes and deterministic join precedence",
+    "encode finding identity, changed-condition evidence, and explicit supersession lineage",
+    "encode bounded exact-principal adjudication",
+    "require current terminal bounded-review evidence before authoritative completion",
+    "define explicit 0.2.0 to 0.3.0 compatibility, replay, and migration rules",
+    "extend and requalify the Step 6 implementation after the successor contract gate"
+  ],
+  "excludedScope": [
+    "modification of any released contract package",
+    "retroactive invalidation of the accepted Step 6 contract-0.2.0 join claim",
+    "completion/reopening implementation before the successor contract and join extension pass",
+    "OpenHands, SMA, live providers, deployment, migration execution, and performance qualification"
+  ],
+  "predecessorContract": "tekroo.kernel.contracts/0.2.0",
+  "successorContract": "tekroo.kernel.contracts/0.3.0",
+  "acceptedInputCommit": "b5138057f81414b9a61c9b752f0268e0c2d903f1",
+  "acceptedInputTree": "6d99ef4e5972d3e503822a061f8c2049a845fb5d"
+}

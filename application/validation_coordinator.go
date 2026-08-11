@@ -51,19 +51,20 @@ func (coordinator *ValidationReviewCoordinator) Open(ctx context.Context, reques
 		return result, err
 	}
 	payload, _ := json.Marshal(struct {
-		SubjectKind          kernel.AggregateKind `json:"subject_kind"`
-		SubjectID            kernel.UUIDv7        `json:"subject_id"`
-		LifecycleEpoch       uint64               `json:"lifecycle_epoch"`
-		CriteriaRevision     uint64               `json:"criteria_revision"`
-		EvidenceSetDigest    kernel.Digest        `json:"evidence_set_digest"`
-		BranchPolicyRevision uint64               `json:"branch_policy_revision"`
-		RequiredBranchIDs    []string             `json:"required_branch_ids"`
-		JoinRule             string               `json:"join_rule"`
-		PartialResultPolicy  string               `json:"partial_result_policy"`
+		SubjectKind          kernel.AggregateKind      `json:"subject_kind"`
+		SubjectID            kernel.UUIDv7             `json:"subject_id"`
+		LifecycleEpoch       uint64                    `json:"lifecycle_epoch"`
+		CriteriaRevision     uint64                    `json:"criteria_revision"`
+		EvidenceSetDigest    kernel.Digest             `json:"evidence_set_digest"`
+		BranchPolicyRevision uint64                    `json:"branch_policy_revision"`
+		Branches             []kernel.ReviewBranchSpec `json:"branches"`
+		JoinRule             string                    `json:"join_rule"`
+		PartialResultPolicy  string                    `json:"partial_result_policy"`
+		Adjudication         kernel.ReviewAdjudication `json:"adjudication"`
 	}{
 		decision.Subject.Kind, decision.Subject.ID, decision.Subject.LifecycleEpoch,
 		decision.CriteriaRevision, decision.EvidenceSetDigest, decision.BranchPolicyRevision,
-		decision.RequiredBranchIDs, "ALL_PASS", decision.PartialResultPolicy,
+		decision.Branches, "ALL_PASS", decision.PartialResultPolicy, decision.Adjudication,
 	})
 	command := kernel.KernelCommand{
 		ContractManifest: kernel.ContractIdentity,

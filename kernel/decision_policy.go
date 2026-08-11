@@ -16,6 +16,7 @@ const (
 	reasonInvalidSuccessor         = "INVALID_SUCCESSOR"
 	reasonCorrectionTarget         = "CORRECTION_TARGET_NOT_FOUND"
 	reasonReviewAlreadyOpen        = "REVIEW_ALREADY_OPEN"
+	reasonReviewNotFinalized       = "REVIEW_NOT_FINALIZED"
 )
 
 type CompletionReviewKey struct {
@@ -41,7 +42,7 @@ func CompletionReviewKeyFromPayload(payload json.RawMessage) (CompletionReviewKe
 	return CompletionReviewKey{Subject: subject, LifecycleEpoch: epoch, CriteriaRevision: criteria, EvidenceSetDigest: digest}, nil
 }
 
-func validateCommandPolicy(command KernelCommand, snapshot Snapshot) (OutcomeCode, string) {
+func validateCommandPolicy(command KernelCommand, snapshot Snapshot, context DecisionContext) (OutcomeCode, string) {
 	object, err := decodePayloadObject(command.Payload)
 	if err != nil {
 		return OutcomeRejectedInvalid, reasonInvalidPayload
@@ -63,6 +64,9 @@ func validateCommandPolicy(command KernelCommand, snapshot Snapshot) (OutcomeCod
 		if values, ok := stringArrayField(object, "unresolved_exceptions"); !ok || len(values) > 0 {
 			return OutcomeRejectedPolicy, reasonUnresolvedExceptions
 		}
+		if !acceptedFinalizedReview(object, command.Target, snapshot) {
+			return OutcomeRejectedPolicy, reasonReviewNotFinalized
+		}
 		if snapshot.State != nil && snapshot.State.Ownership.OwnerFQN != nil && command.Authority.Kind == PrincipalActor && (command.ActorFQN == nil || *command.ActorFQN != *snapshot.State.Ownership.OwnerFQN) {
 			return OutcomeRejectedUnauthorized, reasonUnauthorized
 		}
@@ -73,9 +77,8 @@ func validateCommandPolicy(command KernelCommand, snapshot Snapshot) (OutcomeCod
 		if revision, ok := uint64Field(object, "criteria_revision"); !ok || (snapshot.Authorization.Requirements.CompletionCriteriaRevision > 0 && revision != snapshot.Authorization.Requirements.CompletionCriteriaRevision) {
 			return OutcomeRejectedConflict, reasonCriteriaRevisionConflict
 		}
-		validationIDs, ok := uuidArrayField(object, "validation_event_ids")
-		if !ok || !acceptedValidationSet(validationIDs, snapshot.AcceptedEvents) {
-			return OutcomeRejectedPolicy, reasonValidationIncomplete
+		if !acceptedFinalizedReview(object, command.Target, snapshot) {
+			return OutcomeRejectedPolicy, reasonReviewNotFinalized
 		}
 		for _, precondition := range command.Preconditions {
 			if precondition.Aggregate.Kind != AggregateTask {
@@ -100,6 +103,9 @@ func validateCommandPolicy(command KernelCommand, snapshot Snapshot) (OutcomeCod
 			}
 		}
 	case "tekroo.command.completion-review.open":
+		if command.Authority.Kind != PrincipalPolicy {
+			return OutcomeRejectedUnauthorized, reasonUnauthorized
+		}
 		subject, ok := aggregateField(object, "subject_kind", "subject_id")
 		epoch, epochOK := uint64Field(object, "lifecycle_epoch")
 		if !ok || !epochOK {
@@ -125,7 +131,26 @@ func validateCommandPolicy(command KernelCommand, snapshot Snapshot) (OutcomeCod
 		if resultErr != nil || reviewID != command.Target.ID || !found || review.BranchPolicyRevision != policyRevision {
 			return OutcomeRejectedConflict, reasonCriteriaRevisionConflict
 		}
-		if _, valid := ApplyReviewBranchResult(review, branchResult); !valid {
+		branchResult.Authority = command.Authority
+		branchResult.EventID = context.EventID
+		branchResult.DecidedAt = context.DecidedAt
+		if len(review.Branches) > 0 {
+			if reason := BoundedReviewResultReason(review, branchResult); reason != "" {
+				return OutcomeRejectedConflict, reason
+			}
+		} else if _, valid := ApplyReviewBranchResult(review, branchResult); !valid {
+			return OutcomeRejectedConflict, reasonValidationIncomplete
+		}
+	case "tekroo.command.completion-review.finalize":
+		if command.Authority.Kind != PrincipalPolicy || !payloadEvidenceMatches(object, command.EvidenceRefs) {
+			return OutcomeRejectedUnauthorized, reasonUnauthorized
+		}
+		reviewID, ok := object["review_id"].(string)
+		review, found := snapshot.Reviews[command.Target]
+		if !ok || UUIDv7(reviewID) != command.Target.ID || !found {
+			return OutcomeRejectedConflict, reasonValidationIncomplete
+		}
+		if _, valid := ApplyReviewFinalization(review, context.EventID, command.Payload); !valid {
 			return OutcomeRejectedConflict, reasonValidationIncomplete
 		}
 	case "tekroo.command.work.reopen":
@@ -235,6 +260,20 @@ func acceptedValidationSet(ids []UUIDv7, accepted map[UUIDv7]AcceptedEvent) bool
 		}
 	}
 	return true
+}
+
+func acceptedFinalizedReview(object map[string]any, subject AggregateRef, snapshot Snapshot) bool {
+	reviewText, reviewOK := object["completion_review_id"].(string)
+	reviewRevision, revisionOK := uint64Field(object, "completion_review_revision")
+	branchRevision, branchOK := uint64Field(object, "branch_policy_revision")
+	finalizedText, finalizedOK := object["validation_finalized_event_id"].(string)
+	reviewRef := AggregateRef{Kind: AggregateCompletionReview, ID: UUIDv7(reviewText)}
+	finalizedID := UUIDv7(finalizedText)
+	review, found := snapshot.Reviews[reviewRef]
+	event, eventFound := snapshot.AcceptedEvents[finalizedID]
+	criteria, criteriaOK := uint64Field(object, "criteria_revision")
+	epoch, epochOK := uint64Field(object, "lifecycle_epoch")
+	return reviewOK && revisionOK && branchOK && finalizedOK && criteriaOK && epochOK && reviewRef.Valid() && finalizedID.Valid() && found && review.Subject == subject && review.LifecycleEpoch == epoch && review.CriteriaRevision == criteria && review.BranchPolicyRevision == branchRevision && review.ReviewRevision == reviewRevision && review.Finalization != nil && review.Finalization.EventID == finalizedID && review.Finalization.ReviewRevision == reviewRevision && review.Finalization.TerminalStatus == "PASS" && eventFound && !event.Quarantined && event.EventType == "tekroo.event.completion-review.finalized"
 }
 
 func aggregateField(object map[string]any, kindName, idName string) (AggregateRef, bool) {

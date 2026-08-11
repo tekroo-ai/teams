@@ -752,7 +752,32 @@ func (s *Store) applyRegistryAndReview(ctx context.Context, event kernel.DomainE
 		if err := decode(document.Data, &value); err != nil || value.Progress.BranchPolicyRevision != policyRevision {
 			return "", ErrConflict
 		}
+		result.Authority = event.Authority
+		result.EventID = event.EventID
+		result.DecidedAt = event.CommittedAt
 		next, valid := kernel.ApplyReviewBranchResult(value.Progress, result)
+		if !valid {
+			return "", ErrConflict
+		}
+		value.Progress = next
+		data, _ := encode(value)
+		if _, err := s.db.Collection("reviews").ReplaceOne(ctx, bson.D{{Key: "_id", Value: aggregateKey(event.Aggregate)}}, valueDocument{ID: aggregateKey(event.Aggregate), Data: data}); err != nil {
+			return "", err
+		}
+		return next.Join.Status, nil
+	case "tekroo.event.completion-review.finalized":
+		var document valueDocument
+		if err := s.db.Collection("reviews").FindOne(ctx, bson.D{{Key: "_id", Value: aggregateKey(event.Aggregate)}}).Decode(&document); err != nil {
+			return "", err
+		}
+		var value struct {
+			Review   kernel.AggregateRef             `json:"review"`
+			Progress kernel.CompletionReviewSnapshot `json:"progress"`
+		}
+		if err := decode(document.Data, &value); err != nil {
+			return "", err
+		}
+		next, valid := kernel.ApplyReviewFinalization(value.Progress, event.EventID, event.Payload)
 		if !valid {
 			return "", ErrConflict
 		}

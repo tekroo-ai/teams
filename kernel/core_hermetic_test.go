@@ -43,11 +43,11 @@ func TestAllFrozenCommandsReachTheirDeclaredEventThroughEvaluator(t *testing.T) 
 	}
 
 	root := testRepositoryRoot(t)
-	fixtureBytes, err := os.ReadFile(filepath.Join(root, "CONTRACTS/tekroo.kernel.contracts/0.2.0/fixtures/catalogue-coverage.json"))
+	fixtureBytes, err := os.ReadFile(filepath.Join(root, "CONTRACTS/tekroo.kernel.contracts/0.3.0/fixtures/catalogue-coverage.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	catalogueBytes, err := os.ReadFile(filepath.Join(root, "CONTRACTS/tekroo.kernel.contracts/0.2.0/catalogue/kernel-catalogue.json"))
+	catalogueBytes, err := os.ReadFile(filepath.Join(root, "CONTRACTS/tekroo.kernel.contracts/0.3.0/catalogue/kernel-catalogue.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,8 +86,8 @@ func TestAllFrozenCommandsReachTheirDeclaredEventThroughEvaluator(t *testing.T) 
 		})
 		executed++
 	}
-	if executed != 26 {
-		t.Fatalf("executed command cases = %d, want 26", executed)
+	if executed != 27 {
+		t.Fatalf("executed command cases = %d, want 27", executed)
 	}
 }
 
@@ -417,13 +417,20 @@ func commandCase(t *testing.T, commandType string, payload json.RawMessage, targ
 				snapshot.Evidence[id] = kernel.EvidenceMetadata{SHA256: digest, Available: true}
 			}
 		}
-		if values, ok := object["validation_event_ids"].([]any); ok {
+		if reviewValue, ok := object["completion_review_id"].(string); ok {
+			reviewRef := kernel.AggregateRef{Kind: kernel.AggregateCompletionReview, ID: kernel.UUIDv7(reviewValue)}
+			finalizedID := kernel.UUIDv7(object["validation_finalized_event_id"].(string))
+			reviewRevision := uint64(object["completion_review_revision"].(float64))
+			policyRevision := uint64(object["branch_policy_revision"].(float64))
+			criteriaRevision := uint64(object["criteria_revision"].(float64))
+			snapshot.Reviews = map[kernel.AggregateRef]kernel.CompletionReviewSnapshot{reviewRef: {
+				Subject: target, LifecycleEpoch: 1, CriteriaRevision: criteriaRevision, BranchPolicyRevision: policyRevision, ReviewRevision: reviewRevision,
+				Finalization: &kernel.ReviewFinalization{EventID: finalizedID, ReviewRevision: reviewRevision, TerminalStatus: "PASS"},
+			}}
 			if snapshot.AcceptedEvents == nil {
 				snapshot.AcceptedEvents = make(map[kernel.UUIDv7]kernel.AcceptedEvent)
 			}
-			for _, value := range values {
-				snapshot.AcceptedEvents[kernel.UUIDv7(value.(string))] = kernel.AcceptedEvent{EventType: "tekroo.event.completion-review.result-recorded", Qualification: "PASS"}
-			}
+			snapshot.AcceptedEvents[finalizedID] = kernel.AcceptedEvent{EventType: "tekroo.event.completion-review.finalized", Qualification: "PASS"}
 		}
 		if value, ok := object["target_event_id"].(string); ok {
 			if snapshot.AcceptedEvents == nil {
@@ -444,12 +451,30 @@ func commandCase(t *testing.T, commandType string, payload json.RawMessage, targ
 			command.Target.ID = reviewID
 			policyRevision := uint64(object["branch_policy_revision"].(float64))
 			branchID := object["branch_id"].(string)
+			deadline := time.Date(2026, time.August, 12, 0, 0, 0, 0, time.UTC)
 			snapshot.Reviews = map[kernel.AggregateRef]kernel.CompletionReviewSnapshot{command.Target: {
 				BranchPolicyRevision: policyRevision,
 				RequiredBranchIDs:    []string{branchID},
+				Branches:             map[string]kernel.ReviewBranchSpec{branchID: {BranchID: branchID, Validator: command.Authority, DeadlineAt: deadline, RoundLimit: 2}},
+				Adjudication:         kernel.ReviewAdjudication{Adjudicator: kernel.PrincipalRef{Kind: kernel.PrincipalPolicy, ID: "adjudicator"}, DeadlineAt: deadline, RoundLimit: 2},
 				PartialResultPolicy:  "WAIT_ALL",
 				Results:              map[string]string{},
+				ResultRecords:        map[string]kernel.ReviewBranchResult{},
+				KnownResultEvents:    map[kernel.UUIDv7]kernel.ReviewBranchResult{},
+				ReviewRevision:       1,
 				Join:                 kernel.ReviewJoinResult{Status: "PENDING"},
+			}}
+		}
+		if commandType == "tekroo.command.completion-review.finalize" {
+			reviewID := kernel.UUIDv7(object["review_id"].(string))
+			command.Target.ID = reviewID
+			resultID := kernel.UUIDv7(object["result_event_ids"].([]any)[0].(string))
+			branchID := "tests"
+			result := kernel.ReviewBranchResult{BranchID: branchID, Result: "PASS", EventID: resultID}
+			subject := kernel.AggregateRef{Kind: kernel.AggregateKind(object["subject_kind"].(string)), ID: kernel.UUIDv7(object["subject_id"].(string))}
+			snapshot.Reviews = map[kernel.AggregateRef]kernel.CompletionReviewSnapshot{command.Target: {
+				Subject: subject, LifecycleEpoch: uint64(object["lifecycle_epoch"].(float64)), BranchPolicyRevision: uint64(object["branch_policy_revision"].(float64)),
+				RequiredBranchIDs: []string{branchID}, Results: map[string]string{branchID: "PASS"}, ResultRecords: map[string]kernel.ReviewBranchResult{branchID: result}, KnownResultEvents: map[kernel.UUIDv7]kernel.ReviewBranchResult{resultID: result}, ReviewRevision: uint64(object["expected_review_revision"].(float64)), Join: kernel.ReviewJoinResult{Complete: true, Status: "PASS"},
 			}}
 		}
 	}

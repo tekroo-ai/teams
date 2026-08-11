@@ -146,7 +146,7 @@ func (e Evaluator) Evaluate(command KernelCommand, snapshot Snapshot, context De
 	if !validEvidenceRefs(command, snapshot) {
 		return rejectedAuthorizedDecision(command, context, fingerprint, OutcomeRejectedInvalid, reasonInvalidEvidence, authorityDecision), nil
 	}
-	if outcome, reason := validateCommandPolicy(command, snapshot); outcome != OutcomeApplied {
+	if outcome, reason := validateCommandPolicy(command, snapshot, context); outcome != OutcomeApplied {
 		return rejectedAuthorizedDecision(command, context, fingerprint, outcome, reason, authorityDecision), nil
 	}
 	attemptBudget, outcome, reason := evaluateAttemptPolicy(command, snapshot)

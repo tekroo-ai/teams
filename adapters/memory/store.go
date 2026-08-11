@@ -376,7 +376,20 @@ func (s *Store) applyReviewEvent(event kernel.DomainEvent) {
 		if err != nil || reviewID != event.Aggregate.ID || !found || current.BranchPolicyRevision != policyRevision {
 			return
 		}
+		result.Authority = event.Authority
+		result.EventID = event.EventID
+		result.DecidedAt = event.CommittedAt
 		next, valid := kernel.ApplyReviewBranchResult(current, result)
+		if valid {
+			s.reviews[event.Aggregate] = next
+			s.eventQualifications[event.EventID] = next.Join.Status
+		}
+	case "tekroo.event.completion-review.finalized":
+		current, found := s.reviews[event.Aggregate]
+		if !found {
+			return
+		}
+		next, valid := kernel.ApplyReviewFinalization(current, event.EventID, event.Payload)
 		if valid {
 			s.reviews[event.Aggregate] = next
 			s.eventQualifications[event.EventID] = next.Join.Status

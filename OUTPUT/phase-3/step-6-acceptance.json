@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "PRINCIPAL_ACCEPTANCE",
+  "recordedOn": "2026-08-11",
+  "timePrecision": "DAY",
+  "principalStatement": "Accepted. Proceed to the next step.",
+  "acceptedPhase": "PHASE_3",
+  "acceptedStep": "STEP_6_DETERMINISTIC_VALIDATION_JOIN",
+  "acceptedCommit": "b5138057f81414b9a61c9b752f0268e0c2d903f1",
+  "acceptedTree": "6d99ef4e5972d3e503822a061f8c2049a845fb5d",
+  "gateReport": "OUTPUT/phase-3/step-6-validation-join-gate.json",
+  "gateReportFileSha256": "79fab94fcf2c8ef5ffaf62a7cd4283bdc3f1677230ac82e98dd8f9dd8bf4fb74",
+  "gateReportSelfSha256": "d69c099cdf3327e9ab417698c8870a8f610eadb647d986e5e1a7e77afd1def0f",
+  "scope": "Acceptance applies to the deterministic join substrate qualified against contract 0.2.0; explicitly excluded bounded-review lifecycle fields remain unqualified."
+}

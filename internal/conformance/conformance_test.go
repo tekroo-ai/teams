@@ -8,12 +8,13 @@ import (
 	"reflect"
 	"runtime"
 	"testing"
+	"time"
 
 	"github.com/tekroo-ai/teams/contract"
 	"github.com/tekroo-ai/teams/kernel"
 )
 
-const contractRoot = "CONTRACTS/tekroo.kernel.contracts/0.2.0"
+const contractRoot = "CONTRACTS/tekroo.kernel.contracts/0.3.0"
 
 type fixtureDocument struct {
 	Fixtures []fixture `json:"fixtures"`
@@ -42,8 +43,8 @@ func TestFrozenContractCorpus(t *testing.T) {
 		loadFixtures(t, filepath.Join(repositoryRoot, contractRoot, "fixtures/catalogue-coverage.json")),
 		loadFixtures(t, filepath.Join(repositoryRoot, contractRoot, "fixtures/model-and-invariant-scenarios.json"))...,
 	)
-	if len(fixtures) != 72 {
-		t.Fatalf("fixture count = %d, want 72", len(fixtures))
+	if len(fixtures) != 82 {
+		t.Fatalf("fixture count = %d, want 82", len(fixtures))
 	}
 
 	for _, item := range fixtures {
@@ -166,6 +167,56 @@ func runFixture(t *testing.T, catalogue *contract.Catalogue, item fixture) any {
 		decode(t, item.Given, &given)
 		decode(t, item.When, &when)
 		return kernel.EvaluateAllPassJoin(given.RequiredBranchIDs, when.Results)
+	case "BOUNDED_REVIEW_MODEL":
+		var given struct {
+			Finalized bool `json:"finalized"`
+			Branch    struct {
+				BranchID   string              `json:"branch_id"`
+				Validator  kernel.PrincipalRef `json:"validator"`
+				DeadlineAt time.Time           `json:"deadline_at"`
+				RoundLimit uint64              `json:"round_limit"`
+			} `json:"branch"`
+			Adjudication struct {
+				Adjudicator kernel.PrincipalRef `json:"adjudicator"`
+				DeadlineAt  time.Time           `json:"deadline_at"`
+				RoundLimit  uint64              `json:"round_limit"`
+			} `json:"adjudication"`
+		}
+		var when struct {
+			Authority                   kernel.PrincipalRef `json:"authority"`
+			SourceRole                  string              `json:"sourceRole"`
+			Round                       uint64              `json:"round"`
+			Result                      string              `json:"result"`
+			DecidedAt                   time.Time           `json:"decidedAt"`
+			SupersedesResultEventIDs    []kernel.UUIDv7     `json:"supersedesResultEventIds"`
+			ChangedConditionEvidenceIDs []kernel.UUIDv7     `json:"changedConditionEvidenceIds"`
+		}
+		decode(t, item.Given, &given)
+		decode(t, item.When, &when)
+		evidenceID := kernel.UUIDv7("00000000-0000-7000-8000-000000000207")
+		snapshot := kernel.CompletionReviewSnapshot{
+			Branches:      map[string]kernel.ReviewBranchSpec{given.Branch.BranchID: {BranchID: given.Branch.BranchID, Validator: given.Branch.Validator, DeadlineAt: given.Branch.DeadlineAt, RoundLimit: given.Branch.RoundLimit}},
+			Adjudication:  kernel.ReviewAdjudication{Adjudicator: given.Adjudication.Adjudicator, DeadlineAt: given.Adjudication.DeadlineAt, RoundLimit: given.Adjudication.RoundLimit},
+			ResultRecords: map[string]kernel.ReviewBranchResult{}, KnownResultEvents: map[kernel.UUIDv7]kernel.ReviewBranchResult{},
+		}
+		if given.Finalized {
+			snapshot.Finalization = &kernel.ReviewFinalization{EventID: kernel.UUIDv7("00000000-0000-7000-8000-000000000698"), ReviewRevision: 1, TerminalStatus: "PASS"}
+		}
+		if len(when.SupersedesResultEventIDs) > 0 {
+			prior := kernel.ReviewBranchResult{BranchID: given.Branch.BranchID, SourceRole: "VALIDATOR", Round: 1, Result: "FAIL", EventID: when.SupersedesResultEventIDs[0]}
+			snapshot.ResultRecords[given.Branch.BranchID] = prior
+			snapshot.KnownResultEvents[prior.EventID] = prior
+		}
+		result := kernel.ReviewBranchResult{BranchID: given.Branch.BranchID, SourceRole: when.SourceRole, Authority: when.Authority, Round: when.Round, Result: when.Result, EvidenceIDs: []kernel.UUIDv7{evidenceID}, SupersedesResultEventIDs: when.SupersedesResultEventIDs, ChangedConditionEvidenceIDs: when.ChangedConditionEvidenceIDs, EventID: kernel.UUIDv7("00000000-0000-7000-8000-000000000699"), DecidedAt: when.DecidedAt}
+		reason := kernel.BoundedReviewResultReason(snapshot, result)
+		accepted := reason == ""
+		if accepted {
+			reason = "ACCEPTED"
+		}
+		return struct {
+			Accepted bool   `json:"accepted"`
+			Reason   string `json:"reason"`
+		}{Accepted: accepted, Reason: reason}
 	case "SUCCESSOR_SET_MODEL":
 		var when struct {
 			SuccessorIDs []kernel.UUIDv7 `json:"successorIds"`

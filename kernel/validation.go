@@ -16,6 +16,8 @@ type ValidationReviewInput struct {
 	EvidenceSetDigest    Digest
 	BranchPolicyRevision uint64
 	RequiredBranchIDs    []string
+	Branches             []ReviewBranchSpec
+	Adjudication         ReviewAdjudication
 	PartialResultPolicy  string
 	Parents              []DagParent
 }
@@ -29,6 +31,8 @@ type ValidationReviewDecision struct {
 	EvidenceSetDigest    Digest
 	BranchPolicyRevision uint64
 	RequiredBranchIDs    []string
+	Branches             []ReviewBranchSpec
+	Adjudication         ReviewAdjudication
 	PartialResultPolicy  string
 	Parents              []DagParent
 }
@@ -46,8 +50,30 @@ func PlanValidationReview(input ValidationReviewInput) ValidationReviewDecision 
 	if !input.ReviewID.Valid() || (input.Subject.Kind != AggregateTask && input.Subject.Kind != AggregateStory) || !input.Subject.ID.Valid() || input.Subject.Revision == 0 || input.Subject.LifecycleEpoch == 0 || input.Subject.Phase != PhaseActive || input.Subject.Condition != ConditionRunnable || input.CriteriaRevision == 0 || !input.EvidenceSetDigest.Valid() || input.BranchPolicyRevision == 0 || (input.PartialResultPolicy != "WAIT_ALL" && input.PartialResultPolicy != "FAIL_FAST") {
 		return decision
 	}
-	branches, ok := canonicalValidationBranches(input.RequiredBranchIDs)
+	branchSpecs, ok := canonicalReviewBranchSpecs(input.Branches)
 	if !ok {
+		return decision
+	}
+	branchIDs := make([]string, len(branchSpecs))
+	for index := range branchSpecs {
+		branchIDs[index] = branchSpecs[index].BranchID
+	}
+	if len(input.RequiredBranchIDs) > 0 {
+		required, valid := canonicalValidationBranches(input.RequiredBranchIDs)
+		if !valid || len(required) != len(branchIDs) {
+			return decision
+		}
+		for index := range required {
+			if required[index] != branchIDs[index] {
+				return decision
+			}
+		}
+	}
+	branches, ok := canonicalValidationBranches(branchIDs)
+	if !ok {
+		return decision
+	}
+	if !input.Adjudication.Adjudicator.Valid() || input.Adjudication.DeadlineAt.IsZero() || input.Adjudication.RoundLimit == 0 || input.Adjudication.RoundLimit > 1000 {
 		return decision
 	}
 	parents, ok := canonicalValidationParents(input.Parents)
@@ -58,10 +84,41 @@ func PlanValidationReview(input ValidationReviewInput) ValidationReviewDecision 
 	decision.EvidenceSetDigest = input.EvidenceSetDigest
 	decision.BranchPolicyRevision = input.BranchPolicyRevision
 	decision.RequiredBranchIDs = branches
+	decision.Branches = branchSpecs
+	decision.Adjudication = input.Adjudication
 	decision.PartialResultPolicy = input.PartialResultPolicy
 	decision.Parents = parents
 	decision.Status, decision.Reason = ValidationOpeningReady, "READY_TO_OPEN"
 	return decision
+}
+
+func canonicalReviewBranchSpecs(values []ReviewBranchSpec) ([]ReviewBranchSpec, bool) {
+	if len(values) == 0 || len(values) > 32 {
+		return nil, false
+	}
+	branches := append([]ReviewBranchSpec(nil), values...)
+	for index := range branches {
+		branch := &branches[index]
+		if branch.BranchID == "" || len(branch.BranchID) > 4096 || !branch.Validator.Valid() || !branch.ResolutionOwnerFQN.Valid() || len(branch.AcceptanceCriteria) == 0 || len(branch.AcceptanceCriteria) > 64 || !validUUIDSet(branch.InputEvidenceIDs, true) || branch.DeadlineAt.IsZero() || branch.RoundLimit == 0 || branch.RoundLimit > 1000 {
+			return nil, false
+		}
+		branch.AcceptanceCriteria = append([]string(nil), branch.AcceptanceCriteria...)
+		branch.InputEvidenceIDs = append([]UUIDv7(nil), branch.InputEvidenceIDs...)
+		sort.Strings(branch.AcceptanceCriteria)
+		for criterion := range branch.AcceptanceCriteria {
+			if branch.AcceptanceCriteria[criterion] == "" || len(branch.AcceptanceCriteria[criterion]) > 4096 || (criterion > 0 && branch.AcceptanceCriteria[criterion-1] == branch.AcceptanceCriteria[criterion]) {
+				return nil, false
+			}
+		}
+		sort.Slice(branch.InputEvidenceIDs, func(i, j int) bool { return branch.InputEvidenceIDs[i] < branch.InputEvidenceIDs[j] })
+	}
+	sort.Slice(branches, func(i, j int) bool { return branches[i].BranchID < branches[j].BranchID })
+	for index := 1; index < len(branches); index++ {
+		if branches[index-1].BranchID == branches[index].BranchID {
+			return nil, false
+		}
+	}
+	return branches, true
 }
 
 func PlanValidationJoin(snapshot CompletionReviewSnapshot) ValidationJoinDecision {

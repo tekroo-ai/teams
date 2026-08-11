@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "RELEASE_RECEIPT",
+  "recordedOn": "2026-08-11",
+  "timePrecision": "DAY",
+  "repository": "https://github.com/tekroo-ai/teams.git",
+  "branch": "main",
+  "priorRemoteCommit": "0f4f046567ce3ac297d907ccc0bc2dd1aa99d0b2",
+  "releasedCommit": "b5138057f81414b9a61c9b752f0268e0c2d903f1",
+  "releasedTree": "6d99ef4e5972d3e503822a061f8c2049a845fb5d",
+  "observedRemoteCommitAfterPush": "b5138057f81414b9a61c9b752f0268e0c2d903f1",
+  "pushRefspec": "b5138057f81414b9a61c9b752f0268e0c2d903f1:refs/heads/main",
+  "gateReport": "OUTPUT/phase-3/step-6-validation-join-gate.json",
+  "gateReportFileSha256": "79fab94fcf2c8ef5ffaf62a7cd4283bdc3f1677230ac82e98dd8f9dd8bf4fb74",
+  "gateReportSelfSha256": "d69c099cdf3327e9ab417698c8870a8f610eadb647d986e5e1a7e77afd1def0f",
+  "verification": {
+    "worktreeCleanBeforePush": true,
+    "gateSelfVerificationBeforePush": "PASS",
+    "remoteCommitMatchedAfterPush": true,
+    "remoteTreeMatchedAfterPush": true
+  },
+  "qualificationBoundary": "Only the accepted deterministic validation-join substrate is released; its excluded bounded-review lifecycle remains unqualified."
+}

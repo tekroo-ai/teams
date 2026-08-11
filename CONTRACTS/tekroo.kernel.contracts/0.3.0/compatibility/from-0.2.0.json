@@ -1,0 +1,96 @@
+{
+  "breakingChanges": [
+    "CompletionReviewOpen 1.2.0 replaces bare branch IDs with exact bounded branch and adjudication specifications.",
+    "CompletionReviewRecordResult 1.2.0 adds source role, round, complete terminal outcomes, typed findings, supersession, and changed-condition evidence.",
+    "TaskCompletion and StoryCompletion 1.2.0 require an exact current policy-finalized completion review.",
+    "CompletionReviewFinalize 1.2.0 is a new policy-only organizational aggregation command."
+  ],
+  "compatibilityClaim": "BREAKING_BOUNDED_VALIDATION_REVISION_WITH_EXPLICIT_ADAPTER_MIGRATION",
+  "contractName": "tekroo.kernel.contracts",
+  "contractVersion": "0.3.0",
+  "directions": {
+    "adapter": "REQUIRED",
+    "backward": "PARTIAL_ADAPTER_REQUIRED",
+    "forward": "NOT_COMPATIBLE",
+    "replay": "VERSION_GATED"
+  },
+  "migrationRules": [
+    {
+      "appliesTo": [
+        "tekroo.command.evidence.register",
+        "tekroo.command.execution.register",
+        "tekroo.command.execution.replace",
+        "tekroo.command.record.correct",
+        "tekroo.command.story.activate",
+        "tekroo.command.story.authorize",
+        "tekroo.command.story.begin-planning",
+        "tekroo.command.story.create",
+        "tekroo.command.story.request-acceptance",
+        "tekroo.command.task.acquire-ownership",
+        "tekroo.command.task.activate",
+        "tekroo.command.task.create",
+        "tekroo.command.task.dispatch",
+        "tekroo.command.task.force-reassign",
+        "tekroo.command.task.handoff",
+        "tekroo.command.task.mark-ready",
+        "tekroo.command.task.release-ownership",
+        "tekroo.command.work.block",
+        "tekroo.command.work.close",
+        "tekroo.command.work.create-successor",
+        "tekroo.command.work.reopen",
+        "tekroo.command.work.unblock"
+      ],
+      "mode": "IDENTITY",
+      "source": "1.1.0",
+      "target": "1.2.0"
+    },
+    {
+      "appliesTo": [
+        "tekroo.command.completion-review.open",
+        "tekroo.command.completion-review.record-result",
+        "tekroo.command.task.request-completion",
+        "tekroo.command.story.request-completion"
+      ],
+      "mode": "REJECT_WITHOUT_EXACT_CONTEXT",
+      "reason": "Validator, owner, deadline, per-branch budget, adjudication, supersession, and finalization context cannot be inferred.",
+      "source": "1.1.0",
+      "target": "1.2.0"
+    },
+    {
+      "mode": "IDENTITY",
+      "source": "1.2.0",
+      "target": "1.2.0"
+    }
+  ],
+  "predecessor": {
+    "contractIdentity": "tekroo.kernel.contracts/0.2.0",
+    "contractVersion": "0.2.0",
+    "manifestSha256": "cd582fb163e17d49a1a0a627f33cdbb184d15ecace3200981738782cca977dae"
+  },
+  "rollback": "Readers retain 0.2.0 for historical replay. New bounded-review and finalization commands are never down-converted to 1.1.0.",
+  "schemaVersion": "1.2.0",
+  "unchangedSemanticTypes": [
+    "tekroo.command.evidence.register",
+    "tekroo.command.execution.register",
+    "tekroo.command.execution.replace",
+    "tekroo.command.record.correct",
+    "tekroo.command.story.activate",
+    "tekroo.command.story.authorize",
+    "tekroo.command.story.begin-planning",
+    "tekroo.command.story.create",
+    "tekroo.command.story.request-acceptance",
+    "tekroo.command.task.acquire-ownership",
+    "tekroo.command.task.activate",
+    "tekroo.command.task.create",
+    "tekroo.command.task.dispatch",
+    "tekroo.command.task.force-reassign",
+    "tekroo.command.task.handoff",
+    "tekroo.command.task.mark-ready",
+    "tekroo.command.task.release-ownership",
+    "tekroo.command.work.block",
+    "tekroo.command.work.close",
+    "tekroo.command.work.create-successor",
+    "tekroo.command.work.reopen",
+    "tekroo.command.work.unblock"
+  ]
+}
