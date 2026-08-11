@@ -1,0 +1,186 @@
+package conformance_test
+
+import (
+	"bytes"
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"reflect"
+	"runtime"
+	"testing"
+
+	"github.com/tekroo-ai/teams/contract"
+	"github.com/tekroo-ai/teams/kernel"
+)
+
+const contractRoot = "CONTRACTS/tekroo.kernel.contracts/0.1.0"
+
+type fixtureDocument struct {
+	Fixtures []fixture `json:"fixtures"`
+}
+
+type fixture struct {
+	FixtureID string          `json:"fixtureId"`
+	Kind      string          `json:"kind"`
+	Model     string          `json:"model"`
+	Given     json.RawMessage `json:"given"`
+	When      json.RawMessage `json:"when"`
+	Then      struct {
+		Expected json.RawMessage `json:"expected"`
+	} `json:"then"`
+}
+
+func TestFrozenContractCorpus(t *testing.T) {
+	repositoryRoot := locateRepositoryRoot(t)
+	fsys := os.DirFS(repositoryRoot)
+	catalogue, err := contract.Load(fsys, contractRoot)
+	if err != nil {
+		t.Fatalf("load frozen catalogue: %v", err)
+	}
+
+	fixtures := append(
+		loadFixtures(t, filepath.Join(repositoryRoot, contractRoot, "fixtures/catalogue-coverage.json")),
+		loadFixtures(t, filepath.Join(repositoryRoot, contractRoot, "fixtures/model-and-invariant-scenarios.json"))...,
+	)
+	if len(fixtures) != 65 {
+		t.Fatalf("fixture count = %d, want 65", len(fixtures))
+	}
+
+	for _, item := range fixtures {
+		item := item
+		t.Run(item.FixtureID, func(t *testing.T) {
+			actual := runFixture(t, catalogue, item)
+			assertJSONEqual(t, item.Then.Expected, actual)
+		})
+	}
+}
+
+func runFixture(t *testing.T, catalogue *contract.Catalogue, item fixture) any {
+	t.Helper()
+	switch item.Kind {
+	case "CATALOGUE_COMMAND":
+		var input struct {
+			CommandType string          `json:"commandType"`
+			Payload     json.RawMessage `json:"payload"`
+		}
+		decode(t, item.When, &input)
+		eventTypes, err := catalogue.ValidateFixtureCommand(input.CommandType, input.Payload)
+		if err != nil {
+			return struct {
+				EventTypes  []string `json:"eventTypes"`
+				OutcomeCode string   `json:"outcomeCode"`
+			}{EventTypes: []string{}, OutcomeCode: "REJECTED_INVALID"}
+		}
+		return struct {
+			EventTypes  []string `json:"eventTypes"`
+			OutcomeCode string   `json:"outcomeCode"`
+		}{EventTypes: eventTypes, OutcomeCode: "APPLIED"}
+	case "STATE_MODEL":
+		var given struct {
+			Condition      kernel.Condition `json:"condition"`
+			LifecycleEpoch uint64           `json:"lifecycleEpoch"`
+			Phase          kernel.Phase     `json:"phase"`
+		}
+		var when struct {
+			Actions []kernel.LifecycleAction `json:"actions"`
+		}
+		decode(t, item.Given, &given)
+		decode(t, item.When, &when)
+		model := kernel.LifecycleStory
+		if item.Model == "task" {
+			model = kernel.LifecycleTask
+		}
+		return kernel.ApplyLifecycleActions(model, kernel.LifecycleState{
+			Phase:          given.Phase,
+			Condition:      given.Condition,
+			LifecycleEpoch: given.LifecycleEpoch,
+		}, when.Actions)
+	case "DAG_MODEL":
+		var given struct {
+			Nodes []string `json:"nodes"`
+		}
+		var when struct {
+			Edges []kernel.GraphEdge `json:"edges"`
+		}
+		decode(t, item.Given, &given)
+		decode(t, item.When, &when)
+		return kernel.ValidateDAG(given.Nodes, when.Edges)
+	case "IDENTITY_MODEL":
+		var when struct {
+			Value string `json:"value"`
+		}
+		decode(t, item.When, &when)
+		_, err := kernel.ParseActorFQN(when.Value)
+		return struct {
+			Valid bool `json:"valid"`
+		}{Valid: err == nil}
+	case "IDEMPOTENCY_MODEL":
+		var when struct {
+			Commands []struct {
+				Scope           any `json:"scope"`
+				SemanticRequest any `json:"semanticRequest"`
+			} `json:"commands"`
+		}
+		decode(t, item.When, &when)
+		ledger := kernel.NewIdempotencyLedger()
+		receipts := make([]kernel.IdempotencyReceipt, 0, len(when.Commands))
+		for _, command := range when.Commands {
+			receipt, err := ledger.Apply(command.Scope, command.SemanticRequest)
+			if err != nil {
+				t.Fatalf("apply idempotency command: %v", err)
+			}
+			receipts = append(receipts, receipt)
+		}
+		return struct {
+			DurableDecisionCount int                         `json:"durableDecisionCount"`
+			Receipts             []kernel.IdempotencyReceipt `json:"receipts"`
+		}{DurableDecisionCount: ledger.DurableDecisionCount(), Receipts: receipts}
+	default:
+		t.Fatalf("unsupported fixture kind %q", item.Kind)
+		return nil
+	}
+}
+
+func loadFixtures(t *testing.T, path string) []fixture {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read fixtures %s: %v", path, err)
+	}
+	var document fixtureDocument
+	decode(t, data, &document)
+	return document.Fixtures
+}
+
+func locateRepositoryRoot(t *testing.T) string {
+	t.Helper()
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("locate conformance test source")
+	}
+	return filepath.Clean(filepath.Join(filepath.Dir(file), "../.."))
+}
+
+func decode(t *testing.T, data []byte, target any) {
+	t.Helper()
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.UseNumber()
+	if err := decoder.Decode(target); err != nil {
+		t.Fatalf("decode JSON: %v", err)
+	}
+}
+
+func assertJSONEqual(t *testing.T, expected json.RawMessage, actual any) {
+	t.Helper()
+	actualBytes, err := json.Marshal(actual)
+	if err != nil {
+		t.Fatalf("marshal actual result: %v", err)
+	}
+	var expectedValue any
+	var actualValue any
+	decode(t, expected, &expectedValue)
+	decode(t, actualBytes, &actualValue)
+	if !reflect.DeepEqual(expectedValue, actualValue) {
+		t.Fatalf("result mismatch\nexpected: %s\nactual:   %s", expected, actualBytes)
+	}
+}

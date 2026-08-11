@@ -5,10 +5,11 @@ kernel. It is not a port of the Tekroo v3 codebase.
 
 ## Current state
 
-This repository is at the implementation-bootstrap boundary. It contains the
-principal-approved, content-addressed kernel contract release
-`tekroo.kernel.contracts/0.1.0` and the exact architecture and gate records that
-authorize it. No runtime implementation is qualified by this bootstrap commit.
+This repository is implementing the first pure-kernel bootstrap slice in Go. It
+contains the principal-approved, content-addressed kernel contract release
+`tekroo.kernel.contracts/0.1.0`, its exact architecture and gate records, and a
+standard-library-only deterministic kernel foundation. No runtime or production
+system is qualified by this slice.
 
 The frozen contract identity is:
 
@@ -42,6 +43,23 @@ ports. OpenHands and SMA adoption require separate qualification and authority.
 4. Establish the canonical build and synthesized-merge gate.
 5. Add MongoDB and external adapters only in separately qualified slices.
 
+## Go implementation
+
+The Go module is pinned to the toolchain recorded in `go.mod`. The initial
+packages are deliberately narrow:
+
+- `kernel` — provider-neutral values, envelopes, lifecycle/DAG/idempotency
+  models, pure evaluation, decisions, and semantic ports;
+- `application` — receipt-first orchestration of snapshot load, pure evaluation,
+  and one atomic decision commit;
+- `contract` — read-only loading and payload validation for the frozen catalogue;
+- `adapters/memory` — atomic in-memory state/event/receipt storage; and
+- `adapters/fake` — deterministic clock, ID source, and execution engine.
+
+`internal/conformance` runs the Go implementation against all 65 frozen fixtures.
+That is corpus coverage, not full `core-hermetic`, MongoDB, synthesized-merge,
+provider, performance, or production qualification.
+
 ## Contract validation
 
 The checked-in reference tools require Node.js and write their reports only to
@@ -56,6 +74,13 @@ These checks validate the contract structure and reference corpus. They do not
 qualify a Tekroo implementation, MongoDB deployment, provider, migration, or
 production system.
 
+The current local verification entrypoint runs Go tests with the race detector,
+Go vet, and both frozen reference checks:
+
+```sh
+./scripts/verify.sh
+```
+
 ## Authoritative records
 
 - [Final architecture handoff](PHASE-1B/008-final-architecture-handoff.md)
@@ -63,3 +88,4 @@ production system.
 - [Accepted contract package](CONTRACTS/tekroo.kernel.contracts/0.1.0/manifest.json)
 - [Phase 2 Step 1 principal gate](OUTPUT/phase-2/step-1-gate.json)
 - [Repository bootstrap authority](docs/architecture/000-bootstrap-authority.md)
+- [Go kernel bootstrap decision](docs/architecture/001-go-kernel-bootstrap.md)
