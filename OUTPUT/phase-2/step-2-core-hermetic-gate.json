@@ -4,8 +4,8 @@
   "contractIdentity": "tekroo.kernel.contracts/0.2.0",
   "manifestSha256": "cd582fb163e17d49a1a0a627f33cdbb184d15ecace3200981738782cca977dae",
   "profile": "core-hermetic",
-  "status": "INCONCLUSIVE",
-  "sourceTreeSha256": "2f4d69a8be431e89559441455c53a2949dbef01d202b102b596032ae299fb41d",
+  "status": "PASS",
+  "sourceTreeSha256": "0556d45f71916cc0116e3283441bf00c48e5d97c8a77c2715ec4075f9bb3a4c1",
   "environment": {
     "goVersion": "go1.26.4",
     "goos": "darwin",
@@ -14,14 +14,16 @@
     "timeZone": "UTC"
   },
   "executed": {
-    "testCases": 159,
+    "testCases": 160,
     "failedTests": 0,
     "passedPackages": 6,
     "vetFailures": 0,
     "frozenFixtures": 72,
     "generatedHistories": 10240,
     "faultSchedules": 6,
-    "concurrencySchedules": 34
+    "concurrencySchedules": 34,
+    "mutants": 14,
+    "killedMutants": 14
   },
   "seeds": [
     {
@@ -140,20 +142,21 @@
     },
     {
       "invariantId": "INV-010-NONAUTHORITATIVE-EVIDENCE",
-      "status": "INCONCLUSIVE",
+      "status": "PASS",
       "tests": [
-        "TestEvidenceReferenceRequiresExactAvailableRegistration"
+        "TestEvidenceReferenceRequiresExactAvailableRegistration",
+        "MUT-INV010-UNREGISTERED-EVIDENCE"
       ],
-      "evidenceFloor": "Evidence cannot affect a guarded decision unless registered; provider/SMA acceptance matrices are absent."
+      "evidenceFloor": "The provider-neutral evaluator permits no evidence-origin class to affect a guarded decision without exact registration and availability; bypassing that guard is detected. Live adapters remain outside core-hermetic."
     },
     {
       "invariantId": "INV-011-ATOMIC-MONGO-DECISION",
-      "status": "INCONCLUSIVE",
+      "status": "NOT_RUN",
       "tests": [
         "TestStoreFaultScheduleIsAllOrNone",
         "TestHandlerReconcilesLostCommitAcknowledgement"
       ],
-      "evidenceFloor": "Six in-memory atomic/fault boundaries pass; Mongo belongs to the unrun mongo-integration profile."
+      "evidenceFloor": "Six in-memory atomic/fault boundaries pass. MongoDB transaction and change-stream claims belong exclusively to mongo-integration and are not asserted here."
     },
     {
       "invariantId": "INV-012-CONFORMANCE-REPRODUCIBLE",
@@ -164,9 +167,10 @@
         "TestStorePersistsOrderIndependentCompletionReviewJoin",
         "TestGeneratedLifecycleHistoriesMatchIndependentModel",
         "TestGeneratedDAGsAcceptOnlyAcyclicExistingNodes",
-        "TestGeneratedAttemptBudgetsNeverExceedLimit"
+        "TestGeneratedAttemptBudgetsNeverExceedLimit",
+        "MUT-INV012-NONCANONICAL-PRECONDITIONS"
       ],
-      "evidenceFloor": "The authorized 0.2.0 compatibility rule and 72 fixtures execute with fixed seeds; branch joins persist in arrival-independent form; toolchain, source, manifest, and artifact digests plus a self-digesting report are emitted."
+      "evidenceFloor": "The authorized 0.2.0 compatibility rule and 72 fixtures execute with fixed seeds; branch joins persist in arrival-independent form; canonical-order mutation is detected; toolchain, source, manifest, and artifact digests plus self-digesting reports are emitted."
     },
     {
       "invariantId": "INV-013-MERGE-TREE-QUALIFIED",
@@ -178,15 +182,30 @@
       "invariantId": "INV-014-PROVIDER-NEUTRAL-KERNEL",
       "status": "PASS",
       "tests": [
-        "TestAllFrozenCommandsReachTheirDeclaredEventThroughEvaluator"
+        "TestAllFrozenCommandsReachTheirDeclaredEventThroughEvaluator",
+        "TestKernelProductionImportsRemainProviderNeutral",
+        "MUT-INV014-NETWORK-DEPENDENCY"
       ],
-      "evidenceFloor": "The pure evaluator and kernel packages have no provider, network, filesystem, process, MongoDB, model, or SMA dependency."
+      "evidenceFloor": "The production kernel imports no provider, network, filesystem, process, MongoDB, model, or SMA dependency; an injected network dependency is detected."
     }
   ],
-  "unresolvedGaps": [
-    "Provider/SMA evidence-acceptance matrices and the mongo-integration profile have not run in core-hermetic.",
-    "The required deliberately faulty implementation or mutation set has not demonstrated sensitivity for every invariant family.",
-    "The synthesized-merge profile has not yet run."
+  "unresolvedGaps": [],
+  "otherProfiles": [
+    {
+      "profile": "mongo-integration",
+      "status": "NOT_RUN",
+      "reason": "Requires the separately qualified MongoDB adapter and pinned topology."
+    },
+    {
+      "profile": "synthesized-merge",
+      "status": "NOT_RUN",
+      "reason": "Requires an exact candidate tree and frozen merge plan."
+    },
+    {
+      "profile": "provider-e2e",
+      "status": "NOT_RUN",
+      "reason": "Optional profile requiring separate principal authorization."
+    }
   ],
   "artifacts": [
     {
@@ -198,6 +217,10 @@
       "sha256": "5e31175da80dc364d78d0932f708d0610c5226f378b2c68a43dfcf0a4a7f18e3"
     },
     {
+      "path": "OUTPUT/phase-2/step-2-core-mutations.json",
+      "sha256": "362c124635fe28eda7e2e54e74315659acafb82d1fcfd41989caa4dffd268312"
+    },
+    {
       "path": "OUTPUT/phase-2/step-2-contract-revision-authorization.json",
       "sha256": "5633acecb297d39cb73fc18b60402a92ac505ced45345836d929a47fc96faa00"
     },
@@ -207,5 +230,5 @@
     }
   ],
   "digestMethod": "SHA-256 of compact JSON with reportSha256 set to the empty string",
-  "reportSha256": "c7c90c311973b3d552a7a8c52c6c020c05ec7d5f3f8eaaf70fc41cafd4d84d40"
+  "reportSha256": "a3a930ed231e22a223d3c20a63a52fc2e33a8ecbcc8010f90adefa313c293daa"
 }

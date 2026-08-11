@@ -1,0 +1,10 @@
+--- FAIL: TestFrozenContractCorpus (<DURATION>)
+    --- FAIL: TestFrozenContractCorpus/SUCCESSOR-SET-REJECT-UNORDERED (<DURATION>)
+        conformance_test.go:53: result mismatch
+            expected: {
+                      "valid": false
+                    }
+            actual:   {"valid":true}
+FAIL
+FAIL	github.com/tekroo-ai/teams/internal/conformance	<DURATION>
+FAIL

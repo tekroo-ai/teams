@@ -1,0 +1,11 @@
+--- FAIL: TestFrozenContractCorpus (<DURATION>)
+    --- FAIL: TestFrozenContractCorpus/REVIEW-JOIN-DUPLICATE-CONFLICT (<DURATION>)
+        conformance_test.go:53: result mismatch
+            expected: {
+                      "complete": false,
+                      "status": "CONFLICT"
+                    }
+            actual:   {"complete":false,"status":"PENDING"}
+FAIL
+FAIL	github.com/tekroo-ai/teams/internal/conformance	<DURATION>
+FAIL

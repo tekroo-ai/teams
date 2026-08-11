@@ -1,0 +1,5 @@
+--- FAIL: TestEvaluatorEnforcesCanonicalExactRelatedPreconditions (<DURATION>)
+    evaluator_test.go:178: unordered vector = kernel.CommandReceipt{ContractManifest:"tekroo.kernel.contracts/0.2.0", CommandID:"00000000-0000-7000-8000-000000000001", CommandType:"tekroo.command.story.create", Target:kernel.AggregateRef{Kind:"story", ID:"00000000-0000-7000-8000-000000000002"}, OutcomeCode:"REJECTED_CONFLICT", ReasonCode:"REVISION_CONFLICT", StateChanged:false, ResultingRevision:(*uint64)(nil), EventIDs:[]kernel.UUIDv7(nil), ReceivedAt:time.Date(2026, time.August, 11, 12, 0, 0, 0, time.UTC), DecidedAt:time.Date(2026, time.August, 11, 12, 0, 0, 1000000, time.UTC), ProvenanceDigest:"32718f920e786b4919b92bd545578985f4f2a580f09c87a500bb8e9604aa324c"}
+FAIL
+FAIL	github.com/tekroo-ai/teams/kernel	<DURATION>
+FAIL

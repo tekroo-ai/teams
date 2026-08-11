@@ -1,0 +1,5 @@
+--- FAIL: TestAttemptBudgetIsFiniteIdempotentAndRestartStable (<DURATION>)
+    budget_test.go:37: exhausted attempt = CONSUMED, used = 4
+FAIL
+FAIL	github.com/tekroo-ai/teams/kernel	<DURATION>
+FAIL

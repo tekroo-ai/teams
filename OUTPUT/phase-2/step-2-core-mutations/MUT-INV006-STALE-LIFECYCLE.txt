@@ -1,0 +1,5 @@
+--- FAIL: TestEvaluatorRejectsStaleCataloguePolicyAndLifecycleContext (<DURATION>)
+    evaluator_test.go:210: stale lifecycle receipt = kernel.CommandReceipt{ContractManifest:"tekroo.kernel.contracts/0.2.0", CommandID:"00000000-0000-7000-8000-000000000001", CommandType:"tekroo.command.story.authorize", Target:kernel.AggregateRef{Kind:"story", ID:"00000000-0000-7000-8000-000000000002"}, OutcomeCode:"REJECTED_INVALID", ReasonCode:"INVALID_DAG_PARENT", StateChanged:false, ResultingRevision:(*uint64)(nil), EventIDs:[]kernel.UUIDv7(nil), ReceivedAt:time.Date(2026, time.August, 11, 12, 0, 0, 0, time.UTC), DecidedAt:time.Date(2026, time.August, 11, 12, 0, 0, 1000000, time.UTC), ProvenanceDigest:"b126223efe8eabb64dc1c56f95518622181868f0e969891cfb9ee834247664f3"}
+FAIL
+FAIL	github.com/tekroo-ai/teams/kernel	<DURATION>
+FAIL

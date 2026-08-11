@@ -1,0 +1,5 @@
+--- FAIL: TestUnknownTypeAndUnsupportedVersionHaveDistinctStableReasons (<DURATION>)
+    core_hermetic_test.go:177: unknown command receipt = kernel.CommandReceipt{ContractManifest:"tekroo.kernel.contracts/0.2.0", CommandID:"00000000-0000-7000-8000-000000000001", CommandType:"tekroo.command.unknown.operation", Target:kernel.AggregateRef{Kind:"story", ID:"00000000-0000-7000-8000-000000000002"}, OutcomeCode:"REJECTED_INVALID", ReasonCode:"UNSUPPORTED_COMMAND_VERSION", StateChanged:false, ResultingRevision:(*uint64)(nil), EventIDs:[]kernel.UUIDv7(nil), ReceivedAt:time.Date(2026, time.August, 11, 12, 0, 0, 0, time.UTC), DecidedAt:time.Date(2026, time.August, 11, 12, 0, 0, 1000000, time.UTC), ProvenanceDigest:"dfe7d45e2e1a99e515014de46f2b8c86746045d71535dd214e14655f41d43863"}
+FAIL
+FAIL	github.com/tekroo-ai/teams/kernel	<DURATION>
+FAIL

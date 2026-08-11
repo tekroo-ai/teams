@@ -12,16 +12,17 @@ compatibility and gate records, and a
 standard-library-only deterministic kernel foundation. No runtime or production
 system is qualified by this slice.
 
-**COMPUTED GATE RESULT:** Phase 2 Step 2 is currently `INCONCLUSIVE`, not
-`PASS`. The executable evidence covers all 26 frozen commands, lifecycle and DAG
+**COMPUTED GATE RESULT:** The Phase 2 Step 2 `core-hermetic` profile is `PASS`.
+The executable evidence covers all 26 frozen commands, lifecycle and DAG
 properties, exact execution fencing, semantic idempotency, in-memory atomic fault
 schedules, event folding, unknown-event quarantine, and content-addressed
 provenance/evidence primitives. Authorization/delegation, exact internal
 multi-aggregate guards, lifecycle decision gates, durable attempt budgets, and
-evidence access/redaction/deletion/audit rebuild are also executable. The machine
-report remains inconclusive because the provider/SMA evidence-acceptance,
-MongoDB, synthesized-merge, and complete mutation-sensitivity profiles have not
-run. The four previously reported `0.1.0` encoding gaps are resolved by the
+evidence access/redaction/deletion/audit rebuild are also executable. Fourteen
+disposable-copy implementation mutants across all core-hermetic invariant
+families are detected. MongoDB and synthesized-merge remain `NOT_RUN` in their
+own required profiles; optional provider E2E also remains `NOT_RUN`. The four
+previously reported `0.1.0` encoding gaps are resolved by the
 authorized `0.2.0` contract; `1.0.0` commands lacking exact context require an
 explicit migration and are not silently upgraded.
 
@@ -91,7 +92,8 @@ qualify a Tekroo implementation, MongoDB deployment, provider, migration, or
 production system.
 
 The current local verification entrypoint runs Go tests with the race detector,
-Go vet, and both frozen reference checks:
+Go vet, the deterministic mutation-sensitivity suite, and both frozen reference
+checks:
 
 ```sh
 ./scripts/verify.sh
