@@ -17,9 +17,13 @@ func TestThinAdapterProductionImportsRemainWithinBoundary(t *testing.T) {
 	adaptersRoot := filepath.Clean(filepath.Join(filepath.Dir(file), ".."))
 	allowed := map[string]map[string]bool{
 		"protocol": {"github.com/tekroo-ai/teams/kernel": true},
-		"stdio":    {"github.com/tekroo-ai/teams/adapters/protocol": true},
-		"daemon":   {"github.com/tekroo-ai/teams/adapters/stdio": true},
-		"httpapi":  {"github.com/tekroo-ai/teams/adapters/protocol": true},
+		"channel": {
+			"github.com/tekroo-ai/teams/adapters/protocol": true,
+			"github.com/tekroo-ai/teams/kernel":            true,
+		},
+		"stdio":   {"github.com/tekroo-ai/teams/adapters/protocol": true},
+		"daemon":  {"github.com/tekroo-ai/teams/adapters/stdio": true},
+		"httpapi": {"github.com/tekroo-ai/teams/adapters/protocol": true},
 		"mcp": {
 			"github.com/tekroo-ai/teams/adapters/httpapi":  true,
 			"github.com/tekroo-ai/teams/adapters/protocol": true,

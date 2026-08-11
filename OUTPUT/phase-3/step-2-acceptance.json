@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "PRINCIPAL_ACCEPTANCE",
+  "recordedOn": "2026-08-11",
+  "timePrecision": "DAY",
+  "principalStatement": "Accepted. You may push and proceed to the next step.",
+  "acceptedPhase": "PHASE_3",
+  "acceptedStep": "STEP_2_HTTP_MCP_ADAPTER",
+  "acceptedCommit": "7f01bb8d67a30f90c714d6cccc176c48b7a31a11",
+  "acceptedTree": "8e1bc0877afc3b448d106617c6e185ee597b885c",
+  "gateReport": "OUTPUT/phase-3/step-2-http-mcp-gate.json",
+  "gateReportFileSha256": "c0e17bdc92f58c86821b412bc59a0636a75459b9d34136908a19d34fe31c6f25",
+  "gateReportSelfSha256": "5fe72e93c0b0d1946f11c04d5a929252ac79dfb74a5f4f66867eae5f307a50ce",
+  "scope": "Acceptance applies to the qualified Phase 3 Step 2 HTTP/MCP adapter and not to its excluded profiles."
+}

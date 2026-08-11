@@ -66,6 +66,18 @@ trusted authentication rather than MCP client metadata or command JSON.
 Request-scoped SSE, subscriptions, multi-round-trip requests, legacy MCP
 sessions, public deployment, and performance remain unqualified.
 
+**COMPUTED GATE RESULT:** Phase 3 Step 3 `exact-directed-channel` is `PASS`.
+Its raw race-enabled receipts contain 32 focused channel/protocol test cases
+across 2 packages and 229 full-regression test cases across 13 packages, with
+zero test or vet failures. The provider-neutral frame addresses one exact actor
+FQN and execution tuple, injects authenticated sender identity outside client
+JSON, preserves only declared DAG parents, and relies on kernel idempotency for
+at-least-once redelivery. Bounded unknown or unsupported input is quarantined
+losslessly; `tekroo-agent-chat`, `tekroo-agent-ping`, and `tekroo-agent-pong`
+remain undefined and are not aliases. Broad routing, live providers, changes to
+MongoDB delivery mechanics, OpenHands/SMA E2E, deployment, migration, and
+performance remain unqualified.
+
 The frozen contract identity is:
 
 ```text
@@ -155,6 +167,14 @@ go run ./cmd/http-mcp-report
 go run ./cmd/http-mcp-report -verify OUTPUT/phase-3/step-2-http-mcp-gate.json
 ```
 
+The Phase 3 Step 3 runner preserves raw channel/protocol and full-regression
+receipts, runs `go vet`, and verifies the accepted-base and artifact digests:
+
+```sh
+go run ./cmd/channel-report
+go run ./cmd/channel-report -verify OUTPUT/phase-3/step-3-channel-gate.json
+```
+
 ## Contract validation
 
 The checked-in reference tools require Node.js and write their reports only to
@@ -208,4 +228,9 @@ go run ./cmd/core-hermetic-report -verify build/reports/core-hermetic.json
 - [Phase 3 Step 2 authority](OUTPUT/phase-3/step-2-authorization.json)
 - [Phase 3 HTTP/MCP boundary](docs/architecture/003-http-mcp-adapter.md)
 - [Phase 3 Step 2 HTTP/MCP gate](OUTPUT/phase-3/step-2-http-mcp-gate.json)
+- [Phase 3 Step 2 acceptance](OUTPUT/phase-3/step-2-acceptance.json)
+- [Phase 3 Step 2 release receipt](OUTPUT/phase-3/step-2-release-receipt.json)
+- [Phase 3 Step 3 authority](OUTPUT/phase-3/step-3-authorization.json)
+- [Phase 3 exact-directed channel boundary](docs/architecture/004-exact-directed-channel-adapter.md)
+- [Phase 3 Step 3 exact-directed channel gate](OUTPUT/phase-3/step-3-channel-gate.json)
 - [Historical Step 2 `0.1.0` encoding-gap record](OUTPUT/phase-2/step-2-contract-encoding-gaps.md)

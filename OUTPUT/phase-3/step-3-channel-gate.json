@@ -1,0 +1,129 @@
+{
+  "schemaVersion": "1.0.0",
+  "reportType": "PHASE_3_EXACT_DIRECTED_CHANNEL",
+  "status": "PASS",
+  "acceptedBaseCommit": "7f01bb8d67a30f90c714d6cccc176c48b7a31a11",
+  "acceptedBaseTree": "8e1bc0877afc3b448d106617c6e185ee597b885c",
+  "contractIdentity": "tekroo.kernel.contracts/0.2.0",
+  "manifestSha256": "cd582fb163e17d49a1a0a627f33cdbb184d15ecace3200981738782cca977dae",
+  "sourceTreeSha256": "72049a7b5ba915466bff245cdf9e40bcae8528d9f540103b86278875bc0a3876",
+  "environment": {
+    "goVersion": "go1.26.4",
+    "goos": "darwin",
+    "goarch": "arm64",
+    "locale": "C",
+    "timeZone": "UTC"
+  },
+  "executed": {
+    "focusedTestCases": 32,
+    "focusedTestFailures": 0,
+    "focusedPackagesPassed": 2,
+    "regressionTestCases": 229,
+    "regressionTestFailures": 0,
+    "regressionPackagesPassed": 13,
+    "vetFailures": 0
+  },
+  "assertions": [
+    {
+      "id": "CHANNEL-001-EXACT-DIRECTED",
+      "status": "PASS",
+      "tests": [
+        "TestReceiverInjectsTrustedSenderAndPreservesDeclaredDAG",
+        "TestReceiverRejectsNonExactRecipientBeforeEndpoint",
+        "TestReceiverRejectsRoleWildcardAndClientAssertedAuthentication"
+      ],
+      "evidenceFloor": "One valid actor FQN and one execution tuple must exactly match the configured receiver before dispatch; role, wildcard, stale execution, and client-authenticated identities do not reach the endpoint."
+    },
+    {
+      "id": "CHANNEL-002-UNKNOWN-LOSSLESS",
+      "status": "PASS",
+      "tests": [
+        "TestUnknownHistoricalTypesAndVersionsArePreservedWithoutAliases",
+        "TestMalformedQuarantineOversizeAndSinkFailureAreObservable"
+      ],
+      "evidenceFloor": "Bounded unknown, unsupported, and malformed inputs are quarantined with byte-identical content, digest, trusted source, receive time, provenance, and reason; historical chat/ping/pong names are not aliases."
+    },
+    {
+      "id": "CHANNEL-003-IDEMPOTENT-REDELIVERY",
+      "status": "PASS",
+      "tests": [
+        "TestDuplicateChannelDeliveryCommitsOneOrganizationalEffect"
+      ],
+      "evidenceFloor": "Duplicate delivery through the real gateway, application handler, evaluator, and memory store returns the original receipt and commits one event."
+    },
+    {
+      "id": "CHANNEL-004-DAG-PRESERVATION",
+      "status": "PASS",
+      "tests": [
+        "TestReceiverInjectsTrustedSenderAndPreservesDeclaredDAG"
+      ],
+      "evidenceFloor": "The channel forwards only declared command DAG parents and synthesizes no edge from delivery, route, sender, or receive time."
+    },
+    {
+      "id": "CHANNEL-005-UNCERTAIN-OUTCOME",
+      "status": "PASS",
+      "tests": [
+        "TestReceiverPreservesPostDispatchTimeoutUncertainty"
+      ],
+      "evidenceFloor": "A timeout after dispatch remains explicitly outcome-unknown at the channel surface."
+    },
+    {
+      "id": "CHANNEL-006-IMPORT-OWNERSHIP-BOUNDARY",
+      "status": "PASS",
+      "tests": [
+        "TestThinAdapterProductionImportsRemainWithinBoundary"
+      ],
+      "evidenceFloor": "Channel production code imports only protocol and kernel packages; it has no MongoDB, persistence, delivery-claim, or ownership mutation dependency."
+    }
+  ],
+  "excludedProfiles": [
+    {
+      "profile": "broad-routing",
+      "reason": "Role-class, wildcard, fan-out, and broadcast recipient-set, ownership, join, timeout, and partial-delivery semantics are not approved."
+    },
+    {
+      "profile": "mongo-delivery-mechanics",
+      "reason": "Change streams, outbox claims, claim epochs, leases, resume, readdressing, and dead letters remain unchanged and are not requalified by this slice."
+    },
+    {
+      "profile": "historical-message-aliases",
+      "reason": "tekroo-agent-chat, tekroo-agent-ping, and tekroo-agent-pong remain observed-but-undefined and are deliberately not mapped."
+    },
+    {
+      "profile": "openhands-sma-provider-e2e",
+      "reason": "Live providers, credentials, OpenHands, and SMA remain outside this authority."
+    },
+    {
+      "profile": "deployment-migration-performance",
+      "reason": "Public deployment, historical migration, production topology, load, latency, and throughput are not exercised."
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "OUTPUT/phase-3/step-3-channel-tests.jsonl",
+      "sha256": "f73e843455665000ad9f37c8a585c5e454c2743bc01b6c2e01623ffbf74c2afc"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-3-full-regression-tests.jsonl",
+      "sha256": "c56623cfba61a30f80074897f7b6e7182078cdedb2d5887b5b4cfd451d2b8b35"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-2-acceptance.json",
+      "sha256": "d12e798a0e389b617ac350111ad9d72623f4b1ce8d00cf4b2b7fd587888cf531"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-2-release-receipt.json",
+      "sha256": "db6f56ec01e770ed1089bccaf3876dabb82f36b59a0cb88e327c969cd50a75b4"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-3-authorization.json",
+      "sha256": "03b53bb7f4e098be7d2add081b546cc24f50b7700ba2b78a9aa221c975a64f79"
+    },
+    {
+      "path": "docs/architecture/004-exact-directed-channel-adapter.md",
+      "sha256": "ad8f94d6e7e304f2d33a4dfeac1cfec6b3afcfbd4b0e20eecd193c31aa259bde"
+    }
+  ],
+  "digestMethod": "SHA-256 of compact JSON with reportSha256 set to the empty string",
+  "reportSha256": "d6807c4a5896dfe6e95d9334adb30a313f784eb06bd07edca3e02a050d298e77"
+}

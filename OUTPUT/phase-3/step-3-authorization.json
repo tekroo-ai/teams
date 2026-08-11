@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "PHASE_STEP_AUTHORIZATION",
+  "recordedOn": "2026-08-11",
+  "timePrecision": "DAY",
+  "principalStatement": "Accepted. You may push and proceed to the next step.",
+  "phase": "PHASE_3",
+  "step": "STEP_3_EXACT_DIRECTED_CHANNEL_ADAPTER",
+  "authorizedScope": [
+    "provider-neutral canonical channel command envelope",
+    "exact recipient FQN and recipient execution fencing",
+    "trusted authenticated sender injection",
+    "semantic command idempotency across at-least-once redelivery",
+    "preservation of declared command DAG causation",
+    "bounded lossless quarantine of unknown channel types and versions",
+    "cancellation, timeout, and uncertain-outcome conformance"
+  ],
+  "excludedScope": [
+    "role-class, wildcard, fan-out, or broadcast routing",
+    "implicit aliases for tekroo-agent-chat, tekroo-agent-ping, or tekroo-agent-pong",
+    "task ownership mutation by delivery state",
+    "replacement or modification of MongoDB outbox claim and change-stream mechanics",
+    "live channel providers",
+    "OpenHands, SMA, provider E2E, public deployment, migration, and performance qualification"
+  ],
+  "acceptedInputCommit": "7f01bb8d67a30f90c714d6cccc176c48b7a31a11",
+  "acceptedInputTree": "8e1bc0877afc3b448d106617c6e185ee597b885c"
+}
