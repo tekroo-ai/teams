@@ -1,0 +1,134 @@
+{
+  "schemaVersion": "1.0.0",
+  "reportType": "PHASE_3_DETERMINISTIC_ASSIGNMENT_READINESS",
+  "status": "PASS",
+  "acceptedBaseCommit": "f20672772fbc822a4935c2bf04b87301abb6a92f",
+  "acceptedBaseTree": "c47f15f5b24424332100b2be57f2a885d4adc8ee",
+  "contractIdentity": "tekroo.kernel.contracts/0.2.0",
+  "manifestSha256": "cd582fb163e17d49a1a0a627f33cdbb184d15ecace3200981738782cca977dae",
+  "sourceTreeSha256": "bacfdc1626330e618f9f60ad03f67099d3ad17c82e3d15cde0448a8102b5c52d",
+  "environment": {
+    "goVersion": "go1.26.4",
+    "goos": "darwin",
+    "goarch": "arm64",
+    "locale": "C",
+    "timeZone": "UTC"
+  },
+  "executed": {
+    "focusedTestCases": 104,
+    "focusedTestFailures": 0,
+    "focusedPackagesPassed": 3,
+    "regressionTestCases": 247,
+    "regressionTestFailures": 0,
+    "regressionPackagesPassed": 13,
+    "vetFailures": 0
+  },
+  "assertions": [
+    {
+      "id": "ASSIGN-001-ORDER-INDEPENDENT",
+      "status": "PASS",
+      "tests": [
+        "TestAssignmentPlanIsInvariantToDependencyCandidateAndParentOrder"
+      ],
+      "evidenceFloor": "Dependency, parent, and candidate iteration order does not alter the selected exact actor or canonical evidence order."
+    },
+    {
+      "id": "ASSIGN-002-EXACT-DEPENDENCIES",
+      "status": "PASS",
+      "tests": [
+        "TestAssignmentPlanUsesExactDependencyPredicate"
+      ],
+      "evidenceFloor": "Readiness requires the exact declared terminal phase and an explicitly linked dependency evidence event; terminal phases are not interchangeable."
+    },
+    {
+      "id": "ASSIGN-003-FINITE-NO-EFFECT",
+      "status": "PASS",
+      "tests": [
+        "TestAssignmentPlanReturnsFiniteNoEffectOutcomes",
+        "TestAssignmentCoordinatorReturnsPlannerNoEffectWithoutCommands"
+      ],
+      "evidenceFloor": "Owned, non-runnable, unsatisfied, invalid, and no-eligible-actor inputs return one stable no-effect result without command or retry loops."
+    },
+    {
+      "id": "ASSIGN-004-DIRECTED-ACTOR-ACCEPTANCE",
+      "status": "PASS",
+      "tests": [
+        "TestAssignmentCoordinatorEmitsReadinessAndExactDispatchWithoutForgingActorAcceptance",
+        "TestAssignmentCoordinatorDispatchesReadyTaskFromReadiedEvent",
+        "TestAssignmentCoordinatorStopsAfterRejectedStage",
+        "TestGatewayCarriesExactAuthenticatedContextToTypedService",
+        "TestGatewayRejectsIdentityFenceAndIdempotencyMismatchBeforeService",
+        "TestExecutionFencingRequiresExactCurrentTuple",
+        "TestStoreSystematicAndConcurrentOneWinnerSchedules"
+      ],
+      "evidenceFloor": "Policy orders readiness and EXACT dispatch but does not forge actor acceptance; the gateway requires matching authenticated actor/execution context and the frozen kernel/store provide fenced compare-and-set ownership."
+    },
+    {
+      "id": "ASSIGN-005-REPLAY-RESTART",
+      "status": "PASS",
+      "tests": [
+        "TestAssignmentCoordinatorReplayUsesIdenticalCommands",
+        "TestAssignmentPlanPreservesActorFQNAcrossExecutionRestart"
+      ],
+      "evidenceFloor": "Replay emits identical stable commands; actor FQN remains durable while a restarted execution tuple changes independently."
+    },
+    {
+      "id": "ASSIGN-006-BOUNDARY",
+      "status": "PASS",
+      "tests": [
+        "TestApplicationProductionImportsRemainKernelOnly"
+      ],
+      "evidenceFloor": "The planner is pure kernel code and application coordination imports no persistence, provider, OpenHands, SMA, or Git implementation."
+    }
+  ],
+  "excludedProfiles": [
+    {
+      "profile": "actor-acceptance-reconciliation",
+      "reason": "Acceptance timeout, retry, reconciliation, expiry, and reassignment policy remain later slices."
+    },
+    {
+      "profile": "completion-escalation-release",
+      "reason": "Validation/completion joins, reopening, escalation execution, and release coordination remain later slices."
+    },
+    {
+      "profile": "broad-routing",
+      "reason": "Role-class, wildcard, fan-out, and broadcast routing remain unsupported."
+    },
+    {
+      "profile": "live-providers-sma",
+      "reason": "OpenHands, SMA, and live providers remain separately authorized."
+    },
+    {
+      "profile": "deployment-migration-performance",
+      "reason": "Production deployment, migration, load, latency, and throughput are not exercised."
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "OUTPUT/phase-3/step-5-assignment-readiness-tests.jsonl",
+      "sha256": "b31cf4512acf27918adc636a51ca2f7315aa5d4e82377d4763f5e3ea78ff19e9"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-5-full-regression-tests.jsonl",
+      "sha256": "12c4c54eb93dbaaf60b022058940e1ad52cb2eef60a64c9480e781b719c19491"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-4-acceptance.json",
+      "sha256": "9a8d03b7cc898a01650cf83b8b846ec9215d194ded9c0dd3bce34a8ba7ca32c8"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-4-release-receipt.json",
+      "sha256": "4f0b1d934d86229425690c7a43632a6f025fe61b578555de785563694de5e4fa"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-5-authorization.json",
+      "sha256": "e66c86d4a23d042cfc5c62569eeb0291f75e6608f0e845f43b92a986c6ce4e82"
+    },
+    {
+      "path": "docs/architecture/006-deterministic-assignment-readiness.md",
+      "sha256": "9c5399b9ea2e79a23d6694320e9649f81a3e98b584583a240fedf2f0b5e97d95"
+    }
+  ],
+  "digestMethod": "SHA-256 of compact JSON with reportSha256 set to the empty string",
+  "reportSha256": "205429f19e2403d1caac50e52d47c5101c2c9f99f990a3a09f1f368705c99d72"
+}

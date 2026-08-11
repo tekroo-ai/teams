@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "RELEASE_RECEIPT",
+  "recordedOn": "2026-08-11",
+  "timePrecision": "DAY",
+  "repository": "https://github.com/tekroo-ai/teams.git",
+  "branch": "main",
+  "priorRemoteCommit": "476e6a4c9daf600acbaab7967eb5c0f001a40c26",
+  "releasedCommit": "f20672772fbc822a4935c2bf04b87301abb6a92f",
+  "releasedTree": "c47f15f5b24424332100b2be57f2a885d4adc8ee",
+  "observedRemoteCommitAfterPush": "f20672772fbc822a4935c2bf04b87301abb6a92f",
+  "pushRefspec": "f20672772fbc822a4935c2bf04b87301abb6a92f:refs/heads/main",
+  "gateReport": "OUTPUT/phase-3/step-4-execution-coordinator-gate.json",
+  "gateReportFileSha256": "dd8ac1d7bab327825b396964231d306a40f70c1d299a3b25551fe25ee91ae587",
+  "gateReportSelfSha256": "26d6aea36b87efaa5cfe5f8135ae5c2b52d7b49c6c78af6d3097b9f32d01b94b",
+  "verification": {"worktreeCleanBeforePush": true, "gateSelfVerificationBeforePush": "PASS", "remoteCommitMatchedAfterPush": true, "remoteTreeMatchedAfterPush": true},
+  "qualificationBoundary": "Only the accepted deterministic execution-coordinator tree is released; all excluded profiles remain unqualified."
+}

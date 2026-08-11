@@ -91,6 +91,22 @@ operational control store are qualified; live providers, production control
 persistence, automated work-DAG/release coordination, OpenHands, SMA,
 deployment, migration, security isolation, and performance remain unqualified.
 
+**COMPUTED GATE RESULT:** Phase 3 Step 5
+`deterministic-assignment-readiness` is `PASS`. Its raw race-enabled receipts
+contain 104 focused kernel/application/protocol test cases across 3 packages
+and 247 full-regression test cases across 13 packages, with zero test or vet
+failures.
+The pure planner requires exact terminal dependency predicates and explicit DAG
+lineage, then deterministically selects the least-loaded eligible actor with
+lexical FQN tie-breaking. The application coordinator emits an ordered
+readiness and exact-directed dispatch sequence without forging actor
+acceptance; the exact actor acquires ownership separately through the
+authenticated execution-fenced compare-and-set command. Blocked, ineligible,
+already-owned, non-runnable, and invalid snapshots produce finite no-effect
+decisions. Live scheduling policy discovery, durable queueing, provider
+execution, synthesized merge/release, OpenHands, SMA, deployment, migration,
+security isolation, and performance remain unqualified.
+
 The frozen contract identity is:
 
 ```text
@@ -197,6 +213,15 @@ go run ./cmd/execution-coordinator-report
 go run ./cmd/execution-coordinator-report -verify OUTPUT/phase-3/step-4-execution-coordinator-gate.json
 ```
 
+The Phase 3 Step 5 runner preserves raw assignment/readiness and full-regression
+receipts, runs `go vet`, and verifies accepted-base, source-tree, and artifact
+digests:
+
+```sh
+go run ./cmd/assignment-readiness-report
+go run ./cmd/assignment-readiness-report -verify OUTPUT/phase-3/step-5-assignment-readiness-gate.json
+```
+
 ## Contract validation
 
 The checked-in reference tools require Node.js and write their reports only to
@@ -260,4 +285,9 @@ go run ./cmd/core-hermetic-report -verify build/reports/core-hermetic.json
 - [Phase 3 Step 4 authority](OUTPUT/phase-3/step-4-authorization.json)
 - [Phase 3 deterministic execution-coordinator boundary](docs/architecture/005-deterministic-execution-coordinator.md)
 - [Phase 3 Step 4 execution-coordinator gate](OUTPUT/phase-3/step-4-execution-coordinator-gate.json)
+- [Phase 3 Step 4 acceptance](OUTPUT/phase-3/step-4-acceptance.json)
+- [Phase 3 Step 4 release receipt](OUTPUT/phase-3/step-4-release-receipt.json)
+- [Phase 3 Step 5 authority](OUTPUT/phase-3/step-5-authorization.json)
+- [Phase 3 deterministic assignment/readiness boundary](docs/architecture/006-deterministic-assignment-readiness.md)
+- [Phase 3 Step 5 assignment/readiness gate](OUTPUT/phase-3/step-5-assignment-readiness-gate.json)
 - [Historical Step 2 `0.1.0` encoding-gap record](OUTPUT/phase-2/step-2-contract-encoding-gaps.md)

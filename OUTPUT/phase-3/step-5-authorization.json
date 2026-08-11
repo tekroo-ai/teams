@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "PHASE_STEP_AUTHORIZATION",
+  "recordedOn": "2026-08-11",
+  "timePrecision": "DAY",
+  "principalStatement": "Proceed.",
+  "phase": "PHASE_3",
+  "step": "STEP_5_DETERMINISTIC_ASSIGNMENT_READINESS",
+  "authorizedScope": [
+    "provider-neutral deterministic readiness and assignment planning",
+    "exact dependency terminal predicates and canonical DAG evidence order",
+    "exact actor FQN and current execution selection from eligible candidates",
+    "separate task readiness and exact dispatch from actor-authenticated compare-and-set ownership acceptance",
+    "stable outcomes under input reordering, duplicate wakeups, replay, and actor-process restart",
+    "explicit blocked or no-eligible-actor outcomes without retry loops"
+  ],
+  "excludedScope": [
+    "actor-acceptance timeout, retry, reconciliation, expiry, and reassignment policy",
+    "validation/completion joins, reopening, escalation execution, and release coordination",
+    "role-class, wildcard, fan-out, or broadcast routing",
+    "OpenHands, SMA, live providers, Git providers, deployment, migration, and performance qualification"
+  ],
+  "acceptedInputCommit": "f20672772fbc822a4935c2bf04b87301abb6a92f",
+  "acceptedInputTree": "c47f15f5b24424332100b2be57f2a885d4adc8ee"
+}

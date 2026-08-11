@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "PRINCIPAL_ACCEPTANCE",
+  "recordedOn": "2026-08-11",
+  "timePrecision": "DAY",
+  "principalStatement": "Approved...what's next?",
+  "acceptedPhase": "PHASE_3",
+  "acceptedStep": "STEP_4_DETERMINISTIC_EXECUTION_COORDINATOR",
+  "acceptedCommit": "f20672772fbc822a4935c2bf04b87301abb6a92f",
+  "acceptedTree": "c47f15f5b24424332100b2be57f2a885d4adc8ee",
+  "gateReport": "OUTPUT/phase-3/step-4-execution-coordinator-gate.json",
+  "gateReportFileSha256": "dd8ac1d7bab327825b396964231d306a40f70c1d299a3b25551fe25ee91ae587",
+  "gateReportSelfSha256": "26d6aea36b87efaa5cfe5f8135ae5c2b52d7b49c6c78af6d3097b9f32d01b94b",
+  "scope": "Acceptance applies only to the qualified deterministic execution-coordinator slice and not to its excluded profiles."
+}
