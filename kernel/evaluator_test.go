@@ -129,10 +129,47 @@ func validDecisionContext(t *testing.T) kernel.DecisionContext {
 	t.Helper()
 	received := time.Date(2026, 8, 11, 12, 0, 0, 0, time.UTC)
 	return kernel.DecisionContext{
-		ReceivedAt:       received,
-		DecidedAt:        received.Add(time.Millisecond),
-		EventID:          mustUUID(t, "00000000-0000-7000-8000-000000000004"),
-		ProvenanceDigest: mustDigest(t, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
+		ReceivedAt: received,
+		DecidedAt:  received.Add(time.Millisecond),
+		EventID:    mustUUID(t, "00000000-0000-7000-8000-000000000004"),
+		IntentID:   mustUUID(t, "00000000-0000-7000-8000-000000000005"),
+		Provenance: validProvenanceBasis(t),
+	}
+}
+
+func validProvenanceBasis(t *testing.T) kernel.ProvenanceBasis {
+	t.Helper()
+	sourceDigest := mustDigest(t, "1111111111111111111111111111111111111111111111111111111111111111")
+	overlay := kernel.OverlayIdentity{
+		SourceTreeDigest: sourceDigest,
+		ChangeDigest:     mustDigest(t, "2222222222222222222222222222222222222222222222222222222222222222"),
+	}
+	overlayDigest, err := overlay.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	artifactDigest := mustDigest(t, "7777777777777777777777777777777777777777777777777777777777777777")
+	return kernel.ProvenanceBasis{
+		CatalogueDigest: mustDigest(t, "8888888888888888888888888888888888888888888888888888888888888888"),
+		PolicyDigest:    mustDigest(t, "9999999999999999999999999999999999999999999999999999999999999999"),
+		GrantDigests:    []kernel.Digest{mustDigest(t, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")},
+		Source: kernel.SourceIdentity{
+			Repository: "github.com/tekroo-ai/teams", Commit: "test-source", TreeDigest: sourceDigest, Scope: ".",
+		},
+		Overlay: overlay,
+		Build: kernel.BuildIdentity{
+			SourceTreeDigest: sourceDigest, OverlayDigest: overlayDigest,
+			DependencyLockDigest:  mustDigest(t, "3333333333333333333333333333333333333333333333333333333333333333"),
+			ToolchainDigest:       mustDigest(t, "4444444444444444444444444444444444444444444444444444444444444444"),
+			BuildDefinitionDigest: mustDigest(t, "5555555555555555555555555555555555555555555555555555555555555555"),
+			ArtifactDigest:        artifactDigest,
+		},
+		Runtime: kernel.RuntimeIdentity{
+			BuildArtifactDigest: artifactDigest, ContractManifest: kernel.ContractIdentity,
+			ConfigurationDigest: mustDigest(t, "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
+			EnvironmentDigest:   mustDigest(t, "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"),
+			RoleLibraryDigests:  []kernel.Digest{}, Capabilities: []string{"kernel-evaluate"}, ProviderIdentities: []string{},
+		},
 	}
 }
 

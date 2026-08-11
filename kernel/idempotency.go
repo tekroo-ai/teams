@@ -5,7 +5,10 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
+	"sort"
 )
 
 type IdempotencyReceipt struct {
@@ -50,9 +53,75 @@ func (l *IdempotencyLedger) Apply(scope, semanticRequest any) (IdempotencyReceip
 func (l *IdempotencyLedger) DurableDecisionCount() int { return len(l.decisions) }
 
 func CommandFingerprint(command KernelCommand) (Digest, error) {
-	canonical, err := canonicalJSON(command)
+	parents := append([]DagParent(nil), command.Causation...)
+	sort.Slice(parents, func(i, j int) bool {
+		if parents[i].EdgeKind != parents[j].EdgeKind {
+			return parents[i].EdgeKind < parents[j].EdgeKind
+		}
+		return parents[i].ParentEventID < parents[j].ParentEventID
+	})
+	evidence := append([]EvidenceRef(nil), command.EvidenceRefs...)
+	sort.Slice(evidence, func(i, j int) bool {
+		if evidence[i].EvidenceID != evidence[j].EvidenceID {
+			return evidence[i].EvidenceID < evidence[j].EvidenceID
+		}
+		return evidence[i].SHA256 < evidence[j].SHA256
+	})
+	var payload any
+	decoder := json.NewDecoder(bytes.NewReader(command.Payload))
+	decoder.UseNumber()
+	decodeErr := decoder.Decode(&payload)
+	var trailing any
+	trailingErr := decoder.Decode(&trailing)
+	if decodeErr != nil || !errors.Is(trailingErr, io.EOF) {
+		payload = struct {
+			RawHex string `json:"raw_hex"`
+		}{RawHex: hex.EncodeToString(command.Payload)}
+	}
+	semantic := struct {
+		ContractManifest string           `json:"contract_manifest"`
+		CommandType      string           `json:"command_type"`
+		CommandVersion   string           `json:"command_version"`
+		Target           AggregateRef     `json:"target"`
+		Authority        PrincipalRef     `json:"authority"`
+		ActorFQN         *ActorFQN        `json:"actor_fqn,omitempty"`
+		Execution        *ExecutionTuple  `json:"execution,omitempty"`
+		ExpectedRevision ExpectedRevision `json:"expected_revision"`
+		Causation        []DagParent      `json:"causation"`
+		Payload          any              `json:"payload"`
+		EvidenceRefs     []EvidenceRef    `json:"evidence_refs"`
+	}{
+		ContractManifest: command.ContractManifest,
+		CommandType:      command.CommandType,
+		CommandVersion:   command.CommandVersion,
+		Target:           command.Target,
+		Authority:        command.Authority,
+		ActorFQN:         command.ActorFQN,
+		Execution:        command.Execution,
+		ExpectedRevision: command.ExpectedRevision,
+		Causation:        parents,
+		Payload:          payload,
+		EvidenceRefs:     evidence,
+	}
+	canonical, err := canonicalJSON(semantic)
 	if err != nil {
 		return "", fmt.Errorf("canonicalize command: %w", err)
+	}
+	digest := sha256.Sum256(canonical)
+	return Digest(hex.EncodeToString(digest[:])), nil
+}
+
+func IdempotencyScopeDigest(command KernelCommand) (Digest, error) {
+	scope := struct {
+		ContractManifest string       `json:"contract_manifest"`
+		Principal        PrincipalRef `json:"principal_ref"`
+		CommandType      string       `json:"command_type"`
+		Target           AggregateRef `json:"target"`
+		IdempotencyKey   string       `json:"idempotency_key"`
+	}{command.ContractManifest, command.Authority, command.CommandType, command.Target, command.IdempotencyKey}
+	canonical, err := canonicalJSON(scope)
+	if err != nil {
+		return "", fmt.Errorf("canonicalize idempotency scope: %w", err)
 	}
 	digest := sha256.Sum256(canonical)
 	return Digest(hex.EncodeToString(digest[:])), nil

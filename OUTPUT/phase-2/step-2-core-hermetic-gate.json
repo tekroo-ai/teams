@@ -1,0 +1,198 @@
+{
+  "schemaVersion": "1.0.0",
+  "reportType": "IMPLEMENTATION_CONFORMANCE",
+  "contractIdentity": "tekroo.kernel.contracts/0.1.0",
+  "manifestSha256": "db3f38d4794a6993aad0b9ddf6d8f093eebf36b484d99de42dddc21bf3877c2f",
+  "profile": "core-hermetic",
+  "status": "INCONCLUSIVE",
+  "sourceTreeSha256": "62f4c844e9510cb19374f78cb464eaf99040d1a43a529cdd8f4e07fa1a8af834",
+  "environment": {
+    "goVersion": "go1.26.4",
+    "goos": "darwin",
+    "goarch": "arm64",
+    "locale": "C",
+    "timeZone": "UTC"
+  },
+  "executed": {
+    "testCases": 134,
+    "failedTests": 0,
+    "passedPackages": 6,
+    "vetFailures": 0,
+    "frozenFixtures": 65,
+    "generatedHistories": 10240,
+    "faultSchedules": 6,
+    "concurrencySchedules": 34
+  },
+  "seeds": [
+    {
+      "suite": "lifecycle-histories",
+      "generator": "xorshift64",
+      "seed": "0x5eedc0de",
+      "executions": 4096
+    },
+    {
+      "suite": "dag-histories",
+      "generator": "xorshift64",
+      "seed": "0x0da6ac1c",
+      "executions": 2048
+    },
+    {
+      "suite": "bounded-attempt-histories",
+      "generator": "xorshift64",
+      "seed": "0x71e5b00d",
+      "executions": 4096
+    }
+  ],
+  "invariantCoverage": [
+    {
+      "invariantId": "INV-001-REVISION-CONTIGUITY",
+      "status": "PASS",
+      "tests": [
+        "TestLifecycleTransitionTableIsExhaustive",
+        "TestFoldAggregateReconstructsAndDetectsCorruption",
+        "TestStoreSystematicAndConcurrentOneWinnerSchedules"
+      ],
+      "evidenceFloor": "Contiguous in-memory aggregate revisions and rejection/no-winner behavior are executed."
+    },
+    {
+      "invariantId": "INV-002-IDEMPOTENT-DECISION",
+      "status": "PASS",
+      "tests": [
+        "TestHandlerCommitsOnceAndReturnsStoredReceiptOnReplay",
+        "TestHandlerReconcilesLostCommitAcknowledgement",
+        "TestStoreSystematicAndConcurrentOneWinnerSchedules"
+      ],
+      "evidenceFloor": "Sequential, scope-equivalent, conflicting, uncertain-ack, systematic, and concurrent in-memory decisions are executed."
+    },
+    {
+      "invariantId": "INV-003-DAG-ACYCLIC",
+      "status": "PASS",
+      "tests": [
+        "TestGeneratedDAGsAcceptOnlyAcyclicExistingNodes",
+        "TestDAGParentsMustExistAndAreCanonicalized"
+      ],
+      "evidenceFloor": "2,048 generated DAG/cycle/missing-parent histories and evaluator parent guards are executed."
+    },
+    {
+      "invariantId": "INV-004-EXACT-OWNERSHIP",
+      "status": "PASS",
+      "tests": [
+        "TestAllFrozenCommandsReachTheirDeclaredEventThroughEvaluator",
+        "TestStoreSystematicAndConcurrentOneWinnerSchedules",
+        "TestFrozenContractCorpus/IDENTITY-CONCRETE-FQN"
+      ],
+      "evidenceFloor": "Exact ActorFQN parsing and versioned one-winner ownership transitions are executed in memory."
+    },
+    {
+      "invariantId": "INV-005-EXECUTION-FENCING",
+      "status": "PASS",
+      "tests": [
+        "TestExecutionFencingRequiresExactCurrentTuple",
+        "TestStoreRechecksExecutionFenceAtCommit"
+      ],
+      "evidenceFloor": "Exact current tuple is checked both at evaluation and commit."
+    },
+    {
+      "invariantId": "INV-006-LIFECYCLE-EPOCHS",
+      "status": "PASS",
+      "tests": [
+        "TestLifecycleTransitionTableIsExhaustive",
+        "TestGeneratedLifecycleHistoriesMatchIndependentModel",
+        "TestFoldAggregateReconstructsAndDetectsCorruption"
+      ],
+      "evidenceFloor": "All listed forward transitions and 4,096 generated bounded histories are executed."
+    },
+    {
+      "invariantId": "INV-007-BOUNDED-ITERATION",
+      "status": "INCONCLUSIVE",
+      "tests": [
+        "TestAttemptBudgetIsFiniteIdempotentAndRestartStable",
+        "TestGeneratedAttemptBudgetsNeverExceedLimit"
+      ],
+      "evidenceFloor": "A standalone finite attempt model passes; command-policy integration is absent."
+    },
+    {
+      "invariantId": "INV-008-UNKNOWN-NO-EFFECT",
+      "status": "PASS",
+      "tests": [
+        "TestUnknownTypeAndUnsupportedVersionHaveDistinctStableReasons",
+        "TestUnknownEventReplayStopsAndQuarantinesLosslessly",
+        "TestFrozenContractCorpus/CAT-UNKNOWN-COMMAND"
+      ],
+      "evidenceFloor": "Unknown commands/versions fail closed and unknown authoritative events stop replay at the last understood revision while preserving the record."
+    },
+    {
+      "invariantId": "INV-009-PROVENANCE-COMPLETE",
+      "status": "INCONCLUSIVE",
+      "tests": [
+        "TestEvidenceReferenceRequiresExactAvailableRegistration",
+        "TestEvidenceRegistryVerifiesBytesWithoutCollapsingOrigins",
+        "TestClaimClassificationCannotCallUnsupportedClaimObserved",
+        "TestDecisionProvenanceRejectsIdentitySubstitution",
+        "TestStoreRejectsIncompleteOrMismatchedDecisionProvenance"
+      ],
+      "evidenceFloor": "Structured evidence, claim classification, distinct source-through-runtime identities, and complete decision provenance digests execute; redaction/deletion/access/audit rebuild do not."
+    },
+    {
+      "invariantId": "INV-010-NONAUTHORITATIVE-EVIDENCE",
+      "status": "INCONCLUSIVE",
+      "tests": [
+        "TestEvidenceReferenceRequiresExactAvailableRegistration"
+      ],
+      "evidenceFloor": "Evidence cannot affect a guarded decision unless registered; provider/SMA acceptance matrices are absent."
+    },
+    {
+      "invariantId": "INV-011-ATOMIC-MONGO-DECISION",
+      "status": "INCONCLUSIVE",
+      "tests": [
+        "TestStoreFaultScheduleIsAllOrNone",
+        "TestHandlerReconcilesLostCommitAcknowledgement"
+      ],
+      "evidenceFloor": "Six in-memory atomic/fault boundaries pass; Mongo belongs to the unrun mongo-integration profile."
+    },
+    {
+      "invariantId": "INV-012-CONFORMANCE-REPRODUCIBLE",
+      "status": "PASS",
+      "tests": [
+        "TestFrozenContractCorpus",
+        "TestGeneratedLifecycleHistoriesMatchIndependentModel",
+        "TestGeneratedDAGsAcceptOnlyAcyclicExistingNodes",
+        "TestGeneratedAttemptBudgetsNeverExceedLimit"
+      ],
+      "evidenceFloor": "Fixed seeds, toolchain identity, source/manifest/artifact digests, and a self-digesting report are emitted."
+    },
+    {
+      "invariantId": "INV-013-MERGE-TREE-QUALIFIED",
+      "status": "NOT_RUN",
+      "tests": [],
+      "evidenceFloor": "This invariant belongs to the later synthesized-merge profile."
+    },
+    {
+      "invariantId": "INV-014-PROVIDER-NEUTRAL-KERNEL",
+      "status": "PASS",
+      "tests": [
+        "TestAllFrozenCommandsReachTheirDeclaredEventThroughEvaluator"
+      ],
+      "evidenceFloor": "The pure evaluator and kernel packages have no provider, network, filesystem, process, MongoDB, model, or SMA dependency."
+    }
+  ],
+  "unresolvedGaps": [
+    "Delegation, grant revision, revocation, expiry, target visibility, and multi-aggregate authorization matrices are not implemented.",
+    "Dependency readiness, asynchronous completion-review joins, acceptance-policy gates, successor sets, and correction applicability lack executable aggregate models.",
+    "Evidence records, claim assessments, and source/overlay/build/runtime/execution identities are executable; redaction, deletion tombstones, access enforcement, and deterministic audit rebuild remain unimplemented.",
+    "The bounded-attempt model is executable but is not yet integrated into planning, retry, validation, review, handoff, and escalation command policies.",
+    "The required deliberately faulty implementation or mutation set has not demonstrated sensitivity for every invariant family."
+  ],
+  "artifacts": [
+    {
+      "path": "build/reports/contract-structure.core-run.json",
+      "sha256": "7b05a72666fe03365a1cfc5b18f055567076b09bce410683683ef365fb21e3cf"
+    },
+    {
+      "path": "build/reports/reference-corpus.core-run.json",
+      "sha256": "aca87c781ba6060c3a24098d23a7f8b470928213a7f04613d2fbb904db7acf77"
+    }
+  ],
+  "digestMethod": "SHA-256 of compact JSON with reportSha256 set to the empty string",
+  "reportSha256": "f8ea1825958686b03087dd19ce8e9960ab5ba10669c95a63861653536ae8e7d6"
+}

@@ -23,15 +23,17 @@ type catalogueDocument struct {
 }
 
 type catalogueEntry struct {
-	TypeID            string                 `json:"typeId"`
-	Version           string                 `json:"version"`
-	Kind              string                 `json:"kind"`
-	Lifecycle         string                 `json:"lifecycle"`
-	TargetKinds       []kernel.AggregateKind `json:"targetKinds"`
-	AuthorityKinds    []kernel.PrincipalKind `json:"authorityKinds"`
-	ExecutionRequired bool                   `json:"executionRequired"`
-	Emits             []string               `json:"emits"`
-	PayloadSchema     string                 `json:"payloadSchema"`
+	TypeID             string                 `json:"typeId"`
+	Version            string                 `json:"version"`
+	Kind               string                 `json:"kind"`
+	Lifecycle          string                 `json:"lifecycle"`
+	TargetKinds        []kernel.AggregateKind `json:"targetKinds"`
+	AuthorityKinds     []kernel.PrincipalKind `json:"authorityKinds"`
+	ExecutionRequired  bool                   `json:"executionRequired"`
+	Emits              []string               `json:"emits"`
+	PayloadSchema      string                 `json:"payloadSchema"`
+	RootAllowed        bool                   `json:"rootAllowed"`
+	AllowedParentEdges []kernel.EdgeKind      `json:"allowedParentEdges"`
 }
 
 type payloadDocument struct {
@@ -40,6 +42,7 @@ type payloadDocument struct {
 
 type Catalogue struct {
 	commands    map[string]catalogueEntry
+	events      map[string]catalogueEntry
 	payloadDefs map[string]map[string]any
 }
 
@@ -66,25 +69,37 @@ func Load(fsys fs.FS, packageRoot string) (*Catalogue, error) {
 	}
 
 	commands := make(map[string]catalogueEntry, len(document.Entries)/2)
+	events := make(map[string]catalogueEntry, len(document.Entries)/2)
 	for _, entry := range document.Entries {
-		if entry.Kind != "COMMAND" || entry.Lifecycle != "ACTIVE" {
+		if entry.Lifecycle != "ACTIVE" {
 			continue
 		}
-		if _, duplicate := commands[entry.TypeID]; duplicate {
-			return nil, fmt.Errorf("duplicate command type %q", entry.TypeID)
+		switch entry.Kind {
+		case "COMMAND":
+			if _, duplicate := commands[entry.TypeID]; duplicate {
+				return nil, fmt.Errorf("duplicate command type %q", entry.TypeID)
+			}
+			commands[entry.TypeID] = entry
+		case "EVENT":
+			if _, duplicate := events[entry.TypeID]; duplicate {
+				return nil, fmt.Errorf("duplicate event type %q", entry.TypeID)
+			}
+			events[entry.TypeID] = entry
 		}
-		commands[entry.TypeID] = entry
 	}
-	return &Catalogue{commands: commands, payloadDefs: payloads.Definitions}, nil
+	return &Catalogue{commands: commands, events: events, payloadDefs: payloads.Definitions}, nil
 }
 
 func (c *Catalogue) ResolveCommand(commandType, version string, target kernel.AggregateKind, payload json.RawMessage) (kernel.CommandDefinition, error) {
 	entry, found := c.commands[commandType]
-	if !found || entry.Version != version {
-		return kernel.CommandDefinition{}, fmt.Errorf("%w: unknown command or version", ErrInvalidCommand)
+	if !found {
+		return kernel.CommandDefinition{}, fmt.Errorf("%w: %w", ErrInvalidCommand, kernel.ErrUnknownCommand)
+	}
+	if entry.Version != version {
+		return kernel.CommandDefinition{}, fmt.Errorf("%w: %w", ErrInvalidCommand, kernel.ErrUnsupportedVersion)
 	}
 	if !containsTarget(entry.TargetKinds, target) {
-		return kernel.CommandDefinition{}, fmt.Errorf("%w: target kind %q is not allowed", ErrInvalidCommand, target)
+		return kernel.CommandDefinition{}, fmt.Errorf("%w: %w: kind %q", ErrInvalidCommand, kernel.ErrInvalidTarget, target)
 	}
 	definitionName, found := strings.CutPrefix(entry.PayloadSchema, "schemas/payloads.schema.json#/$defs/")
 	if !found {
@@ -96,19 +111,46 @@ func (c *Catalogue) ResolveCommand(commandType, version string, target kernel.Ag
 	}
 	var value any
 	if err := decodeJSON(payload, &value); err != nil {
-		return kernel.CommandDefinition{}, fmt.Errorf("%w: malformed payload", ErrInvalidCommand)
+		return kernel.CommandDefinition{}, fmt.Errorf("%w: %w: malformed JSON", ErrInvalidCommand, kernel.ErrInvalidPayload)
 	}
 	if err := validateValue(value, rule); err != nil {
-		return kernel.CommandDefinition{}, fmt.Errorf("%w: %v", ErrInvalidCommand, err)
+		return kernel.CommandDefinition{}, fmt.Errorf("%w: %w: %v", ErrInvalidCommand, kernel.ErrInvalidPayload, err)
 	}
 	return kernel.CommandDefinition{
-		TypeID:            entry.TypeID,
-		Version:           entry.Version,
-		TargetKinds:       append([]kernel.AggregateKind(nil), entry.TargetKinds...),
-		AuthorityKinds:    append([]kernel.PrincipalKind(nil), entry.AuthorityKinds...),
-		ExecutionRequired: entry.ExecutionRequired,
-		EventTypes:        append([]string(nil), entry.Emits...),
+		TypeID:             entry.TypeID,
+		Version:            entry.Version,
+		TargetKinds:        append([]kernel.AggregateKind(nil), entry.TargetKinds...),
+		AuthorityKinds:     append([]kernel.PrincipalKind(nil), entry.AuthorityKinds...),
+		ExecutionRequired:  entry.ExecutionRequired,
+		EventTypes:         append([]string(nil), entry.Emits...),
+		RootAllowed:        entry.RootAllowed,
+		AllowedParentEdges: append([]kernel.EdgeKind(nil), entry.AllowedParentEdges...),
 	}, nil
+}
+
+func (c *Catalogue) ResolveEvent(eventType, version string, target kernel.AggregateKind, payload json.RawMessage) (kernel.EventDefinition, error) {
+	entry, found := c.events[eventType]
+	if !found {
+		return kernel.EventDefinition{}, kernel.ErrUnknownEvent
+	}
+	if entry.Version != version {
+		return kernel.EventDefinition{}, kernel.ErrUnsupportedVersion
+	}
+	if !containsTarget(entry.TargetKinds, target) {
+		return kernel.EventDefinition{}, kernel.ErrInvalidTarget
+	}
+	definitionName, found := strings.CutPrefix(entry.PayloadSchema, "schemas/payloads.schema.json#/$defs/")
+	if !found {
+		return kernel.EventDefinition{}, kernel.ErrInvalidPayload
+	}
+	var value any
+	if err := decodeJSON(payload, &value); err != nil {
+		return kernel.EventDefinition{}, fmt.Errorf("%w: malformed JSON", kernel.ErrInvalidPayload)
+	}
+	if err := validateValue(value, c.payloadDefs[definitionName]); err != nil {
+		return kernel.EventDefinition{}, fmt.Errorf("%w: %v", kernel.ErrInvalidPayload, err)
+	}
+	return kernel.EventDefinition{TypeID: entry.TypeID, Version: entry.Version, TargetKinds: append([]kernel.AggregateKind(nil), entry.TargetKinds...)}, nil
 }
 
 func (c *Catalogue) ValidateFixtureCommand(commandType string, payload json.RawMessage) ([]string, error) {

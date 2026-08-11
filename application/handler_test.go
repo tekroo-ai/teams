@@ -3,7 +3,6 @@ package application_test
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -25,7 +24,7 @@ func TestHandlerCommitsOnceAndReturnsStoredReceiptOnReplay(t *testing.T) {
 		store,
 		kernel.Evaluator{Catalogue: catalogue},
 		fake.NewClock(time.Date(2026, 8, 11, 12, 0, 0, 0, time.UTC)),
-		fake.NewIDSource(eventID),
+		fake.NewIDSource(eventID, kernel.UUIDv7("00000000-0000-7000-8000-000000000005")),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -42,7 +41,7 @@ func TestHandlerCommitsOnceAndReturnsStoredReceiptOnReplay(t *testing.T) {
 		CorrelationID:    kernel.UUIDv7("00000000-0000-7000-8000-000000000003"),
 		Payload:          json.RawMessage(`{"acceptance_criteria":["works"],"description":"description","title":"title"}`),
 	}
-	provenance := kernel.Digest("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+	provenance := testProvenance(t)
 
 	first, err := handler.Handle(context.Background(), command, provenance)
 	if err != nil {
@@ -58,10 +57,31 @@ func TestHandlerCommitsOnceAndReturnsStoredReceiptOnReplay(t *testing.T) {
 	if store.EventCount() != 1 {
 		t.Fatalf("event count = %d, want 1", store.EventCount())
 	}
+	sameScope := command
+	sameScope.CommandID = kernel.UUIDv7("00000000-0000-7000-8000-000000000011")
+	sameScope.CorrelationID = kernel.UUIDv7("00000000-0000-7000-8000-000000000012")
+	scopedReceipt, err := handler.Handle(context.Background(), sameScope, provenance)
+	if err != nil {
+		t.Fatalf("same idempotency scope replay: %v", err)
+	}
+	if scopedReceipt.CommandID != command.CommandID || store.EventCount() != 1 {
+		t.Fatalf("scope replay receipt = %#v, event count = %d", scopedReceipt, store.EventCount())
+	}
+	changedScopeContent := sameScope
+	changedScopeContent.CommandID = kernel.UUIDv7("00000000-0000-7000-8000-000000000013")
+	changedScopeContent.Payload = json.RawMessage(`{"acceptance_criteria":["different"],"description":"description","title":"title"}`)
+	idempotencyConflict, err := handler.Handle(context.Background(), changedScopeContent, provenance)
+	if err != nil || idempotencyConflict.OutcomeCode != kernel.OutcomeRejectedConflict || idempotencyConflict.ReasonCode != "IDEMPOTENCY_KEY_REUSE" {
+		t.Fatalf("idempotency key reuse receipt = %#v, error = %v", idempotencyConflict, err)
+	}
 	conflicting := command
 	conflicting.Payload = json.RawMessage(`{"acceptance_criteria":["different"],"description":"description","title":"title"}`)
-	if _, err := handler.Handle(context.Background(), conflicting, provenance); !errors.Is(err, memory.ErrCommandIdentityConflict) {
-		t.Fatalf("command identity reuse error = %v, want ErrCommandIdentityConflict", err)
+	commandConflict, err := handler.Handle(context.Background(), conflicting, provenance)
+	if err != nil || commandConflict.OutcomeCode != kernel.OutcomeRejectedConflict || commandConflict.ReasonCode != "COMMAND_ID_REUSE" {
+		t.Fatalf("command identity reuse receipt = %#v, error = %v", commandConflict, err)
+	}
+	if store.IdentityConflictCount() != 2 {
+		t.Fatalf("identity conflict audits = %d, want 2", store.IdentityConflictCount())
 	}
 }
 
@@ -74,17 +94,46 @@ func TestHandlerReconcilesConcurrentWinner(t *testing.T) {
 		store,
 		kernel.Evaluator{Catalogue: catalogue},
 		fake.NewClock(time.Date(2026, 8, 11, 12, 0, 0, 0, time.UTC)),
-		fake.NewIDSource(kernel.UUIDv7("00000000-0000-7000-8000-000000000004")),
+		fake.NewIDSource(
+			kernel.UUIDv7("00000000-0000-7000-8000-000000000004"),
+			kernel.UUIDv7("00000000-0000-7000-8000-000000000005"),
+		),
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	receipt, err := handler.Handle(context.Background(), command, kernel.Digest("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"))
+	receipt, err := handler.Handle(context.Background(), command, testProvenance(t))
 	if err != nil {
 		t.Fatalf("handle: %v", err)
 	}
 	if receipt.CommandID != stored.CommandID || store.lookups != 2 {
 		t.Fatalf("reconciled receipt = %#v, lookups = %d", receipt, store.lookups)
+	}
+}
+
+func TestHandlerReconcilesLostCommitAcknowledgement(t *testing.T) {
+	catalogue := loadCatalogue(t)
+	store := memory.NewStoreWithFault(memory.FaultAfterCommitBeforeAck)
+	eventID := kernel.UUIDv7("00000000-0000-7000-8000-000000000004")
+	handler, err := application.NewHandler(
+		store,
+		kernel.Evaluator{Catalogue: catalogue},
+		fake.NewClock(time.Date(2026, 8, 11, 12, 0, 0, 0, time.UTC)),
+		fake.NewIDSource(eventID, kernel.UUIDv7("00000000-0000-7000-8000-000000000005")),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	command := testStoryCreateCommand()
+	receipt, err := handler.Handle(context.Background(), command, testProvenance(t))
+	if err != nil {
+		t.Fatalf("reconcile uncertain commit: %v", err)
+	}
+	if receipt.OutcomeCode != kernel.OutcomeApplied || len(receipt.EventIDs) != 1 || receipt.EventIDs[0] != eventID {
+		t.Fatalf("reconciled receipt = %#v", receipt)
+	}
+	if store.EventCount() != 1 {
+		t.Fatalf("event count = %d, want 1", store.EventCount())
 	}
 }
 
@@ -100,6 +149,10 @@ func (s *winnerStore) Load(context.Context, kernel.AggregateRef) (kernel.Snapsho
 func (s *winnerStore) LookupReceipt(context.Context, kernel.KernelCommand) (kernel.CommandReceipt, bool, error) {
 	s.lookups++
 	return s.receipt, s.lookups > 1, nil
+}
+
+func (s *winnerStore) RecordIdentityConflict(context.Context, kernel.IdentityConflictAudit) error {
+	return nil
 }
 
 func (s *winnerStore) Commit(context.Context, kernel.Snapshot, kernel.Decision) error {
@@ -133,4 +186,13 @@ func loadCatalogue(t *testing.T) *contract.Catalogue {
 		t.Fatal(err)
 	}
 	return catalogue
+}
+
+func testProvenance(t *testing.T) kernel.ProvenanceBasis {
+	t.Helper()
+	basis, err := fake.ProvenanceBasis()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return basis
 }

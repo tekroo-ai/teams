@@ -5,19 +5,24 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 )
 
 const (
-	reasonApplied          = "APPLIED"
-	reasonInvalidEnvelope  = "INVALID_ENVELOPE"
-	reasonInvalidPayload   = "INVALID_PAYLOAD"
-	reasonUnauthorized     = "UNAUTHORIZED"
-	reasonNotFound         = "TARGET_NOT_FOUND"
-	reasonAlreadyExists    = "TARGET_ALREADY_EXISTS"
-	reasonRevisionConflict = "REVISION_CONFLICT"
-	reasonClosed           = "TARGET_CLOSED"
-	reasonPolicy           = "TRANSITION_POLICY"
-	reasonStaleExecution   = "STALE_EXECUTION"
+	reasonApplied            = "APPLIED"
+	reasonInvalidEnvelope    = "INVALID_ENVELOPE"
+	reasonInvalidPayload     = "INVALID_PAYLOAD"
+	reasonUnknownCommand     = "UNKNOWN_COMMAND_TYPE"
+	reasonUnsupportedVersion = "UNSUPPORTED_COMMAND_VERSION"
+	reasonInvalidDAG         = "INVALID_DAG_PARENT"
+	reasonInvalidEvidence    = "INVALID_EVIDENCE_REFERENCE"
+	reasonUnauthorized       = "UNAUTHORIZED"
+	reasonNotFound           = "TARGET_NOT_FOUND"
+	reasonAlreadyExists      = "TARGET_ALREADY_EXISTS"
+	reasonRevisionConflict   = "REVISION_CONFLICT"
+	reasonClosed             = "TARGET_CLOSED"
+	reasonPolicy             = "TRANSITION_POLICY"
+	reasonStaleExecution     = "STALE_EXECUTION"
 )
 
 type Evaluator struct {
@@ -40,17 +45,32 @@ func (e Evaluator) Evaluate(command KernelCommand, snapshot Snapshot, context De
 	if err != nil {
 		return Decision{}, fmt.Errorf("fingerprint command: %w", err)
 	}
+	provenance, provenanceDigest, err := BuildDecisionProvenance(command, fingerprint, context)
+	if err != nil {
+		return Decision{}, fmt.Errorf("build decision provenance: %w", err)
+	}
+	context.ProvenanceDigest = provenanceDigest
+	idempotencyScope, err := IdempotencyScopeDigest(command)
+	if err != nil {
+		return Decision{}, fmt.Errorf("fingerprint idempotency scope: %w", err)
+	}
 	if err := validateEnvelope(command); err != nil {
 		return rejectedDecision(command, context, fingerprint, OutcomeRejectedInvalid, reasonInvalidEnvelope), nil
 	}
 	definition, err := e.Catalogue.ResolveCommand(command.CommandType, command.CommandVersion, command.Target.Kind, command.Payload)
 	if err != nil {
-		return rejectedDecision(command, context, fingerprint, OutcomeRejectedInvalid, reasonInvalidPayload), nil
+		reason := reasonInvalidPayload
+		if errors.Is(err, ErrUnknownCommand) {
+			reason = reasonUnknownCommand
+		} else if errors.Is(err, ErrUnsupportedVersion) {
+			reason = reasonUnsupportedVersion
+		}
+		return rejectedDecision(command, context, fingerprint, OutcomeRejectedInvalid, reason), nil
 	}
 	if !containsPrincipalKind(definition.AuthorityKinds, command.Authority.Kind) {
 		return rejectedDecision(command, context, fingerprint, OutcomeRejectedUnauthorized, reasonUnauthorized), nil
 	}
-	if definition.ExecutionRequired && command.Execution == nil {
+	if !actorAttributionValid(command, snapshot, definition.ExecutionRequired) {
 		return rejectedDecision(command, context, fingerprint, OutcomeRejectedStaleExecution, reasonStaleExecution), nil
 	}
 	if commandCreatesAggregate(command.CommandType) != command.ExpectedRevision.MustNotExist {
@@ -67,6 +87,15 @@ func (e Evaluator) Evaluate(command KernelCommand, snapshot Snapshot, context De
 		if snapshot.Revision != command.ExpectedRevision.Revision {
 			return rejectedDecision(command, context, fingerprint, OutcomeRejectedConflict, reasonRevisionConflict), nil
 		}
+	}
+	if outcome, reason := validateExecutionRegistryCommand(command, snapshot); outcome != OutcomeApplied {
+		return rejectedDecision(command, context, fingerprint, outcome, reason), nil
+	}
+	if !validDAGParents(command, definition, snapshot) {
+		return rejectedDecision(command, context, fingerprint, OutcomeRejectedInvalid, reasonInvalidDAG), nil
+	}
+	if !validEvidenceRefs(command, snapshot) {
+		return rejectedDecision(command, context, fingerprint, OutcomeRejectedInvalid, reasonInvalidEvidence), nil
 	}
 
 	nextState, nextRevision, outcome, reason := evolveState(command, snapshot, context.EventID)
@@ -93,7 +122,7 @@ func (e Evaluator) Evaluate(command KernelCommand, snapshot Snapshot, context De
 		Authority:         command.Authority,
 		ActorFQN:          cloneActor(command.ActorFQN),
 		Execution:         cloneExecution(command.Execution),
-		Parents:           append([]DagParent(nil), command.Causation...),
+		Parents:           canonicalParents(command.Causation),
 		CommittedAt:       context.DecidedAt,
 		Payload:           payload,
 		ProvenanceDigest:  context.ProvenanceDigest,
@@ -102,16 +131,92 @@ func (e Evaluator) Evaluate(command KernelCommand, snapshot Snapshot, context De
 	receipt := receiptFor(command, context, OutcomeApplied, reasonApplied, true, &revision, []UUIDv7{context.EventID})
 	return Decision{
 		CommandFingerprint: fingerprint,
+		IdempotencyScope:   idempotencyScope,
 		NextState:          nextState,
 		Events:             []DomainEvent{event},
 		Receipt:            receipt,
 		Authority:          AuthorityDecision{Principal: command.Authority, Allowed: true, Reason: reasonApplied},
+		Outbox:             []OutboxIntent{{IntentID: context.IntentID, EventID: context.EventID, Kind: "DOMAIN_EVENT"}},
+		Guards:             decisionGuards(command),
+		Provenance:         provenance,
 	}, nil
 }
 
+func decisionGuards(command KernelCommand) DecisionGuards {
+	guards := DecisionGuards{
+		ParentIDs:    make([]UUIDv7, len(command.Causation)),
+		EvidenceRefs: append([]EvidenceRef(nil), command.EvidenceRefs...),
+	}
+	for index, parent := range canonicalParents(command.Causation) {
+		guards.ParentIDs[index] = parent.ParentEventID
+	}
+	if command.ActorFQN != nil && command.Execution != nil {
+		guards.Executions = map[ActorFQN]ExecutionTuple{*command.ActorFQN: *command.Execution}
+	}
+	if actor, prior, registered, ok := executionRegistryExpectation(command); ok {
+		if registered {
+			guards.AbsentExecutions = []ActorFQN{actor}
+		} else {
+			if guards.Executions == nil {
+				guards.Executions = make(map[ActorFQN]ExecutionTuple)
+			}
+			guards.Executions[actor] = prior
+		}
+	}
+	return guards
+}
+
+func validateExecutionRegistryCommand(command KernelCommand, snapshot Snapshot) (OutcomeCode, string) {
+	actor, prior, registering, ok := executionRegistryExpectation(command)
+	if !ok {
+		return OutcomeApplied, reasonApplied
+	}
+	current, exists := snapshot.CurrentExecutions[actor]
+	if registering {
+		if exists {
+			return OutcomeRejectedConflict, reasonRevisionConflict
+		}
+		return OutcomeApplied, reasonApplied
+	}
+	if !exists || current != prior {
+		return OutcomeRejectedStaleExecution, reasonStaleExecution
+	}
+	return OutcomeApplied, reasonApplied
+}
+
+func executionRegistryExpectation(command KernelCommand) (ActorFQN, ExecutionTuple, bool, bool) {
+	if command.CommandType != "tekroo.command.execution.register" && command.CommandType != "tekroo.command.execution.replace" {
+		return "", ExecutionTuple{}, false, false
+	}
+	object, err := decodePayloadObject(command.Payload)
+	if err != nil {
+		return "", ExecutionTuple{}, false, false
+	}
+	actor, err := ParseActorFQN(fmt.Sprint(object["actor_fqn"]))
+	if err != nil {
+		return "", ExecutionTuple{}, false, false
+	}
+	if command.CommandType == "tekroo.command.execution.register" {
+		return actor, ExecutionTuple{}, true, true
+	}
+	priorID, err := ParseUUIDv7(fmt.Sprint(object["prior_execution_id"]))
+	if err != nil {
+		return "", ExecutionTuple{}, false, false
+	}
+	number, ok := object["new_fencing_epoch"].(json.Number)
+	if !ok {
+		return "", ExecutionTuple{}, false, false
+	}
+	newEpoch, err := number.Int64()
+	if err != nil || newEpoch < 2 {
+		return "", ExecutionTuple{}, false, false
+	}
+	return actor, ExecutionTuple{ExecutionID: priorID, FencingEpoch: uint64(newEpoch - 1)}, false, true
+}
+
 func validateEnvelope(command KernelCommand) error {
-	if command.ContractManifest != ContractIdentity || command.CommandVersion != SchemaVersion {
-		return errors.New("contract or command version mismatch")
+	if command.ContractManifest != ContractIdentity || command.CommandType == "" || command.CommandVersion == "" {
+		return errors.New("contract or command identity mismatch")
 	}
 	if !command.CommandID.Valid() || !command.Target.Valid() || !command.Authority.Valid() {
 		return errors.New("invalid identity")
@@ -154,11 +259,71 @@ func validateEnvelope(command KernelCommand) error {
 	return nil
 }
 
+func actorAttributionValid(command KernelCommand, snapshot Snapshot, required bool) bool {
+	if command.Authority.Kind == PrincipalActor {
+		if command.ActorFQN == nil || command.Authority.ID != string(*command.ActorFQN) {
+			return false
+		}
+	}
+	if required && (command.ActorFQN == nil || command.Execution == nil) {
+		return false
+	}
+	if command.Execution == nil {
+		return !required
+	}
+	if command.ActorFQN == nil {
+		return false
+	}
+	current, found := snapshot.CurrentExecutions[*command.ActorFQN]
+	return found && current == *command.Execution
+}
+
+func validDAGParents(command KernelCommand, definition CommandDefinition, snapshot Snapshot) bool {
+	if len(command.Causation) == 0 {
+		return definition.RootAllowed
+	}
+	allowed := make(map[EdgeKind]struct{}, len(definition.AllowedParentEdges))
+	for _, kind := range definition.AllowedParentEdges {
+		allowed[kind] = struct{}{}
+	}
+	for _, parent := range command.Causation {
+		if _, ok := allowed[parent.EdgeKind]; !ok {
+			return false
+		}
+		accepted, ok := snapshot.AcceptedEvents[parent.ParentEventID]
+		if !ok || accepted.Quarantined || accepted.EventType == "" {
+			return false
+		}
+	}
+	return true
+}
+
+func validEvidenceRefs(command KernelCommand, snapshot Snapshot) bool {
+	for _, reference := range command.EvidenceRefs {
+		metadata, ok := snapshot.Evidence[reference.EvidenceID]
+		if !ok || !metadata.Available || metadata.SHA256 != reference.SHA256 {
+			return false
+		}
+	}
+	return true
+}
+
+func canonicalParents(values []DagParent) []DagParent {
+	parents := append([]DagParent(nil), values...)
+	sort.Slice(parents, func(i, j int) bool {
+		if parents[i].EdgeKind != parents[j].EdgeKind {
+			return parents[i].EdgeKind < parents[j].EdgeKind
+		}
+		return parents[i].ParentEventID < parents[j].ParentEventID
+	})
+	return parents
+}
+
 func validateDecisionContext(context DecisionContext) error {
 	if context.ReceivedAt.IsZero() || context.DecidedAt.IsZero() || context.DecidedAt.Before(context.ReceivedAt) {
 		return errors.New("invalid decision time")
 	}
-	if !context.EventID.Valid() || !context.ProvenanceDigest.Valid() {
+	if !context.EventID.Valid() || !context.IntentID.Valid() || !context.Provenance.Valid() {
 		return errors.New("invalid decision identity")
 	}
 	return nil
@@ -373,14 +538,18 @@ func decodePayloadObject(payload json.RawMessage) (map[string]any, error) {
 }
 
 func rejectedDecision(command KernelCommand, context DecisionContext, fingerprint Digest, outcome OutcomeCode, reason string) Decision {
+	idempotencyScope, _ := IdempotencyScopeDigest(command)
+	provenance, _, _ := BuildDecisionProvenance(command, fingerprint, context)
 	return Decision{
 		CommandFingerprint: fingerprint,
+		IdempotencyScope:   idempotencyScope,
 		Receipt:            receiptFor(command, context, outcome, reason, false, nil, nil),
 		Authority: AuthorityDecision{
 			Principal: command.Authority,
 			Allowed:   outcome != OutcomeRejectedUnauthorized,
 			Reason:    reason,
 		},
+		Provenance: provenance,
 	}
 }
 

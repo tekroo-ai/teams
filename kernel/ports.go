@@ -6,12 +6,27 @@ import (
 	"time"
 )
 
-var ErrDecisionAlreadyCommitted = errors.New("decision already committed")
+var (
+	ErrDecisionAlreadyCommitted = errors.New("decision already committed")
+	ErrCommitUncertain          = errors.New("decision commit acknowledgement uncertain")
+	ErrCommandIdentityConflict  = errors.New("command identity conflict")
+	ErrIdempotencyKeyConflict   = errors.New("idempotency key reuse conflict")
+)
 
 type KernelDecisionStore interface {
 	Load(context.Context, AggregateRef) (Snapshot, error)
 	LookupReceipt(context.Context, KernelCommand) (CommandReceipt, bool, error)
+	RecordIdentityConflict(context.Context, IdentityConflictAudit) error
 	Commit(context.Context, Snapshot, Decision) error
+}
+
+type IdentityConflictAudit struct {
+	CommandID        UUIDv7
+	IdempotencyScope Digest
+	Fingerprint      Digest
+	ReasonCode       string
+	ObservedAt       time.Time
+	ProvenanceDigest Digest
 }
 
 type Clock interface {

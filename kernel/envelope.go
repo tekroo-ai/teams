@@ -95,22 +95,47 @@ type OutboxIntent struct {
 
 type Decision struct {
 	CommandFingerprint Digest
+	IdempotencyScope   Digest
 	NextState          *AggregateState
 	Events             []DomainEvent
 	Receipt            CommandReceipt
 	Authority          AuthorityDecision
 	Outbox             []OutboxIntent
+	Guards             DecisionGuards
+	Provenance         DecisionProvenance
+}
+
+type DecisionGuards struct {
+	Executions       map[ActorFQN]ExecutionTuple
+	AbsentExecutions []ActorFQN
+	ParentIDs        []UUIDv7
+	EvidenceRefs     []EvidenceRef
 }
 
 type Snapshot struct {
-	Exists   bool
-	Revision uint64
-	State    *AggregateState
+	Exists            bool
+	Revision          uint64
+	State             *AggregateState
+	AcceptedEvents    map[UUIDv7]AcceptedEvent
+	CurrentExecutions map[ActorFQN]ExecutionTuple
+	Evidence          map[UUIDv7]EvidenceMetadata
+}
+
+type AcceptedEvent struct {
+	EventType   string
+	Quarantined bool
+}
+
+type EvidenceMetadata struct {
+	SHA256    Digest
+	Available bool
 }
 
 type DecisionContext struct {
 	ReceivedAt       time.Time
 	DecidedAt        time.Time
 	EventID          UUIDv7
+	IntentID         UUIDv7
+	Provenance       ProvenanceBasis
 	ProvenanceDigest Digest
 }

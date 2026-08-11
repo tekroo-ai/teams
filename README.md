@@ -5,11 +5,19 @@ kernel. It is not a port of the Tekroo v3 codebase.
 
 ## Current state
 
-This repository is implementing the first pure-kernel bootstrap slice in Go. It
+This repository is implementing the pure-kernel bootstrap in Go. It
 contains the principal-approved, content-addressed kernel contract release
 `tekroo.kernel.contracts/0.1.0`, its exact architecture and gate records, and a
 standard-library-only deterministic kernel foundation. No runtime or production
 system is qualified by this slice.
+
+**COMPUTED GATE RESULT:** Phase 2 Step 2 is currently `INCONCLUSIVE`, not
+`PASS`. The executable evidence covers all 26 frozen commands, lifecycle and DAG
+properties, exact execution fencing, semantic idempotency, in-memory atomic fault
+schedules, event folding, unknown-event quarantine, and content-addressed
+provenance/evidence primitives. The machine report records the remaining
+authorization, dependency/review/acceptance, policy-integration, audit-rebuild,
+and mutation-sensitivity gaps that prevent a pass.
 
 The frozen contract identity is:
 
@@ -81,6 +89,14 @@ Go vet, and both frozen reference checks:
 ./scripts/verify.sh
 ```
 
+The Step 2 evidence runner independently executes the race suite, Go vet, and
+both frozen contract runners before writing a self-digesting report:
+
+```sh
+go run ./cmd/core-hermetic-report -output build/reports/core-hermetic.json
+go run ./cmd/core-hermetic-report -verify build/reports/core-hermetic.json
+```
+
 ## Authoritative records
 
 - [Final architecture handoff](PHASE-1B/008-final-architecture-handoff.md)
@@ -89,3 +105,4 @@ Go vet, and both frozen reference checks:
 - [Phase 2 Step 1 principal gate](OUTPUT/phase-2/step-1-gate.json)
 - [Repository bootstrap authority](docs/architecture/000-bootstrap-authority.md)
 - [Go kernel bootstrap decision](docs/architecture/001-go-kernel-bootstrap.md)
+- [Phase 2 Step 2 core-hermetic gate](OUTPUT/phase-2/step-2-core-hermetic-gate.json)
