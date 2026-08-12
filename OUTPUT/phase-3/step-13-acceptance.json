@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "PRINCIPAL_ACCEPTANCE",
+  "recordedOn": "2026-08-11",
+  "timePrecision": "DAY",
+  "principalStatement": "Approved, push and procede to the next step.",
+  "acceptedPhase": "PHASE_3",
+  "acceptedStep": "STEP_13_ISOLATED_DETERMINISTIC_CAPSTONE",
+  "acceptedCommit": "22cc0f571ba2026e0eb4f18aecc115357eaa9141",
+  "acceptedTree": "192d5894bb632a6b5a177f7c5012ddf039abcce9",
+  "acceptedGate": "OUTPUT/phase-3/step-13-capstone-gate.json",
+  "gateReportSha256": "35529a494b626a1bf4f2b67115e06a71646e85d5a2b219d28ea65a79a5fc8419",
+  "scope": "Acceptance applies to the isolated deterministic capstone qualified by the Step 13 gate and not to network forge, historical migration, production deployment, performance, OpenHands-Q1, or SMA-Q1 profiles."
+}

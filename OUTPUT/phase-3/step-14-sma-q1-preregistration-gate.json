@@ -1,0 +1,168 @@
+{
+  "schemaVersion": "1.0.0",
+  "reportType": "PHASE_3_SMA_Q1_PREREGISTRATION_GATE",
+  "status": "PASS_PREREGISTRATION",
+  "resultClaim": "NOT_AUTHORIZED",
+  "executionState": "NOT_STARTED",
+  "executionReady": false,
+  "executionBlockers": [
+    "The intended SMA implementation must first be reviewed and frozen as a clean immutable commit with every required identity receipt."
+  ],
+  "acceptedBaseCommit": "22cc0f571ba2026e0eb4f18aecc115357eaa9141",
+  "acceptedBaseTree": "192d5894bb632a6b5a177f7c5012ddf039abcce9",
+  "manifestSha256": "e819e7de6cfdcf3a1d7c2100a7a7702b1cc6837b07b9242a3116523fc4245ac1",
+  "sourceTreeSha256": "5fa3514011790a962d06a6544123769dc900741a1a6980baaf762370d8c783b5",
+  "environment": {
+    "goVersion": "go1.26.4",
+    "goos": "darwin",
+    "goarch": "arm64",
+    "locale": "C",
+    "timeZone": "UTC"
+  },
+  "validation": {
+    "structuralChecks": 13,
+    "scenarioDefinitions": 16,
+    "scenarioRepetitions": 86,
+    "scenariosExecuted": 0,
+    "regressionTestCases": 405,
+    "regressionTestFailures": 0,
+    "vetFailures": 0
+  },
+  "smaSourceObservation": {
+    "observationKind": "READ_ONLY_UNPINNED_WORKTREE_OBSERVATION",
+    "headCommit": "1df53a2b57f98bdf092841148b3e644afbc7a62a",
+    "headTree": "d9e2d24f16b514c853a87428a5f8f549ef6b0b39",
+    "dirty": true,
+    "statusEntryCount": 74,
+    "trackedEntryCount": 41,
+    "untrackedEntryCount": 33,
+    "statusSha256": "ae9607ce87ae653ba6d6fcccb8d46bb5e1ce015c6dcd7f731f35469c24e856a0",
+    "trackedDiffSha256": "bae74d73fab5831b8df9d3a7829c999926bb8901bbbf00e0c2594cea22d967ad",
+    "observedSourceSha256": "80668fd985dca09048c1ffb1c541080e6d47e5693c0ee14dfb6f2c05ce1cab42",
+    "sourceDigestExcludes": [
+      ".git",
+      ".idea",
+      "target",
+      ".env",
+      ".tekroo"
+    ],
+    "qualification": "This receipt identifies only what was observed. A dirty worktree is not an immutable SMA-Q1 execution identity and none of its content is qualified by Step 14."
+  },
+  "assertions": [
+    {
+      "id": "SMAQ1-PREREG-001-BEFORE-EXECUTION",
+      "status": "PASS",
+      "evidence": [
+        "investigations/sma-q1/preregistration.json"
+      ],
+      "evidenceFloor": "The manifest says NOT_STARTED, authorizes no result claim, and the gate executes zero SMA-Q1 scenarios."
+    },
+    {
+      "id": "SMAQ1-PREREG-002-FINITE-CORPUS",
+      "status": "PASS",
+      "evidence": [
+        "investigations/sma-q1/preregistration.json"
+      ],
+      "evidenceFloor": "Four exact synthetic memories and sixteen exact scenarios with fixed prompts, faults, expected outcomes, and repetitions are frozen."
+    },
+    {
+      "id": "SMAQ1-PREREG-003-THRESHOLDS",
+      "status": "PASS",
+      "evidence": [
+        "investigations/sma-q1/preregistration.json"
+      ],
+      "evidenceFloor": "Absolute safety, semantic, reliability, latency, bounded-resource, raw-token, percentile, and paired-direct measurement rules are explicit."
+    },
+    {
+      "id": "SMAQ1-PREREG-004-SEMANTIC-ONLY",
+      "status": "PASS",
+      "evidence": [
+        "investigations/sma-q1/preregistration.json",
+        "docs/architecture/017-sma-q1-preregistration.md"
+      ],
+      "evidenceFloor": "SMA is limited to bounded partitioned semantic recall and durable idempotent capture; workflow and organizational authority remain excluded."
+    },
+    {
+      "id": "SMAQ1-PREREG-005-STOP-AND-ADJUDICATE",
+      "status": "PASS",
+      "evidence": [
+        "investigations/sma-q1/preregistration.json"
+      ],
+      "evidenceFloor": "Seven exact stop conditions and PASS, FAIL, INCONCLUSIVE, default, and rerun policies are frozen."
+    },
+    {
+      "id": "SMAQ1-PREREG-006-IDENTITY-FENCE",
+      "status": "PASS",
+      "evidence": [
+        "investigations/sma-q1/preregistration.json"
+      ],
+      "evidenceFloor": "Execution requires clean content-addressed Teams, SMA, OpenHands, Ollama, model, schema, datastore, prompt, and non-secret configuration identities."
+    },
+    {
+      "id": "SMAQ1-PREREG-007-NO-RESULT-REUSE",
+      "status": "PASS",
+      "evidence": [
+        "investigations/sma-q1/preregistration.json"
+      ],
+      "evidenceFloor": "SMA Gate 4 and the legacy proxy are prior evidence only and are not counted as SMA-Q1 observations."
+    },
+    {
+      "id": "SMAQ1-PREREG-008-DIRTY-SOURCE-BLOCK",
+      "status": "PASS",
+      "evidence": [
+        "OUTPUT/phase-3/step-14-sma-q1-preregistration-gate.json"
+      ],
+      "evidenceFloor": "The current SMA checkout is recorded read-only by hashes; because it is dirty and unpinned as an execution package, SMA-Q1 remains blocked."
+    }
+  ],
+  "excludedProfiles": [
+    {
+      "profile": "sma-q1-execution",
+      "reason": "No proxy, retrieval, capture, model, database, vector, fault, latency, or contamination scenario is executed."
+    },
+    {
+      "profile": "sma-worktree-mutation",
+      "reason": "The shared dirty SMA checkout is not edited, cleaned, stashed, committed, merged, or pushed."
+    },
+    {
+      "profile": "services-and-wp5",
+      "reason": "OpenHands, SMA, Ollama, MongoDB, Qdrant, launchd, and SMA WP5 are not started, stopped, or reconfigured."
+    },
+    {
+      "profile": "production-and-historical-data",
+      "reason": "No production or historical memory, prompt, conversation, credential, repository, database, or vector collection is used."
+    },
+    {
+      "profile": "openhands-q1-and-sma-q2",
+      "reason": "Later separately gated investigations are not begun."
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "investigations/sma-q1/preregistration.json",
+      "sha256": "e819e7de6cfdcf3a1d7c2100a7a7702b1cc6837b07b9242a3116523fc4245ac1"
+    },
+    {
+      "path": "docs/architecture/017-sma-q1-preregistration.md",
+      "sha256": "3441bb34112a40049d5b774354cd30a9ec97a8636d66ea0df92ddd5c2e04b5c0"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-13-acceptance.json",
+      "sha256": "d11ab7d89a06eff106c3835ee59fa7975a6753d383fc5dff5f80bb8bdbca1e8a"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-13-release-receipt.json",
+      "sha256": "eb78d9e1827b119387250b6a4295183978ac309a561b5f6ca78c66804a6d100b"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-14-authorization.json",
+      "sha256": "dab15fb2f365009686fe250a2f9d2d507081442c71005f13a2546ac40e99494a"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-14-full-regression-tests.jsonl",
+      "sha256": "17d8c409602588b81f63f4ada37686db4572308d2b4f6a26499e8ff524fd5964"
+    }
+  ],
+  "digestMethod": "SHA-256 of compact JSON with reportSha256 set to the empty string",
+  "reportSha256": "df9544bd0281de271d871cc5a4bba70e045755d199b110381077e32fc8bb327b"
+}
