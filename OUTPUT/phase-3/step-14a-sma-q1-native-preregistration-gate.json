@@ -1,0 +1,156 @@
+{
+  "schemaVersion": "1.0.0",
+  "reportType": "PHASE_3_SMA_Q1_NATIVE_PREREGISTRATION_AMENDMENT_GATE",
+  "status": "PASS_AMENDMENT",
+  "resultClaim": "NOT_AUTHORIZED",
+  "executionState": "NOT_STARTED",
+  "wp5ResultsObserved": false,
+  "step15Authorized": false,
+  "acceptedBaseCommit": "7c8a5e54987b101d2b04a18b76600393fe6b757c",
+  "acceptedBaseTree": "73546d32c5c5b06179962b45c50d35b49739dfb5",
+  "priorManifestSha256": "e819e7de6cfdcf3a1d7c2100a7a7702b1cc6837b07b9242a3116523fc4245ac1",
+  "manifestSha256": "c618371d571d5333aebd2bdc83d2db2559115f5ec3e1903b33e8e0ab157edf5d",
+  "sourceTreeSha256": "cacc031db3361a1c778adc2b523de9489e8f8e01b5d93e7827c754208ff904c7",
+  "environment": {
+    "goVersion": "go1.26.4",
+    "goos": "darwin",
+    "goarch": "arm64",
+    "locale": "C",
+    "timeZone": "UTC"
+  },
+  "validation": {
+    "structuralChecks": 13,
+    "scenarioDefinitions": 18,
+    "scenarioRepetitions": 96,
+    "wp5EligibleScenarios": 8,
+    "step15ReservedScenarios": 10,
+    "scenariosExecuted": 0,
+    "regressionTestCases": 405,
+    "regressionTestFailures": 0,
+    "vetFailures": 0
+  },
+  "freezeObservation": {
+    "observationKind": "READ_ONLY_PRE_WP5_RESULT_FREEZE_BOUNDARY",
+    "smaCommit": "d5d49ca18d5845b4ba172cf169d4d7b196c5b38d",
+    "smaTree": "5f2ccb3734be6ae36d194ddabc91df4b002c90a2",
+    "smaWorktreeClean": true,
+    "smaStatusSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "wp5DocumentCount": 0,
+    "gate5ArtifactCount": 0,
+    "qualification": "This observation proves only that the exact clean WP4 baseline and no named WP5/Gate 5 artifact were present when the amendment gate ran; it is not a WP5 or SMA-Q1 result."
+  },
+  "assertions": [
+    {
+      "id": "SMAQ1N-PREREG-001-NONDESTRUCTIVE-SUPERSESSION",
+      "status": "PASS",
+      "evidence": [
+        "investigations/sma-q1/preregistration.json",
+        "investigations/sma-q1/preregistration-native-v2.json"
+      ],
+      "evidenceFloor": "The original digest is unchanged, remains NOT_STARTED, and is superseded only for future execution."
+    },
+    {
+      "id": "SMAQ1N-PREREG-002-BEFORE-WP5-RESULTS",
+      "status": "PASS",
+      "evidence": [
+        "OUTPUT/phase-3/step-14a-sma-q1-native-preregistration-gate.json"
+      ],
+      "evidenceFloor": "The clean WP4 baseline was observed before any WP5 document or Gate 5 artifact; zero WP5 result is used."
+    },
+    {
+      "id": "SMAQ1N-PREREG-003-NATIVE-BOUNDARY",
+      "status": "PASS",
+      "evidence": [
+        "investigations/sma-q1/preregistration-native-v2.json",
+        "docs/architecture/018-sma-q1-native-path-amendment.md"
+      ],
+      "evidenceFloor": "Capture uses persisted events and delivery uses UserPromptSubmit additionalContext; model-traffic proxying and prompt-time cognition are excluded."
+    },
+    {
+      "id": "SMAQ1N-PREREG-004-FINITE-CORPUS",
+      "status": "PASS",
+      "evidence": [
+        "investigations/sma-q1/preregistration-native-v2.json"
+      ],
+      "evidenceFloor": "Four exact memories and eighteen exact scenarios with 96 fixed repetitions are content-addressed."
+    },
+    {
+      "id": "SMAQ1N-PREREG-005-WP5-EVIDENCE-FENCE",
+      "status": "PASS",
+      "evidence": [
+        "investigations/sma-q1/preregistration-native-v2.json"
+      ],
+      "evidenceFloor": "Eight scenarios may reuse WP5 evidence only on exact digest and field match; ten remain explicitly reserved for Step 15."
+    },
+    {
+      "id": "SMAQ1N-PREREG-006-THRESHOLDS-AND-RECEIPTS",
+      "status": "PASS",
+      "evidence": [
+        "investigations/sma-q1/preregistration-native-v2.json"
+      ],
+      "evidenceFloor": "Safety, semantic, reliability, latency, resource bounds, measurement rules, and raw receipt requirements are frozen."
+    },
+    {
+      "id": "SMAQ1N-PREREG-007-IDENTITY-LIMITATION",
+      "status": "PASS",
+      "evidence": [
+        "investigations/sma-q1/preregistration-native-v2.json"
+      ],
+      "evidenceFloor": "Canary workspace/profile partitioning is testable but is not represented as final durable authorship, role, scope, visibility, or Teams actor identity."
+    },
+    {
+      "id": "SMAQ1N-PREREG-008-AUTHORITY-BOUNDARY",
+      "status": "PASS",
+      "evidence": [
+        "investigations/sma-q1/preregistration-native-v2.json"
+      ],
+      "evidenceFloor": "SMA remains semantic memory only, protected retrieval fails closed, prompt submission fails open, and Level 2 remains disabled."
+    }
+  ],
+  "excludedProfiles": [
+    {
+      "profile": "wp5-execution",
+      "reason": "Teams does not execute, inspect, or adjudicate WP5 results in Step 14A."
+    },
+    {
+      "profile": "sma-q1-execution",
+      "reason": "No native hook, capture, retrieval, lifecycle, model, datastore, fault, latency, or contamination scenario is executed."
+    },
+    {
+      "profile": "sma-mutation-or-operation",
+      "reason": "The SMA source, services, databases, vectors, OpenHands, Ollama, and launchd state are not modified or operated."
+    },
+    {
+      "profile": "step15-and-downstream",
+      "reason": "Step 15, OpenHands-Q1, SMA-Q2, production rollout, and historical migration remain unauthorized."
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "investigations/sma-q1/preregistration.json",
+      "sha256": "e819e7de6cfdcf3a1d7c2100a7a7702b1cc6837b07b9242a3116523fc4245ac1"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-14-sma-q1-preregistration-gate.json",
+      "sha256": "31894c59bfb8f5e55b7c2c09dd2c64854ea4b3cbc0850943b360895b4a10e1f1"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-14a-authorization.json",
+      "sha256": "a0138323bcaa4fe7ecbe5e96f9cd1024d35a6b85b005ba951ab36f71055e700b"
+    },
+    {
+      "path": "investigations/sma-q1/preregistration-native-v2.json",
+      "sha256": "c618371d571d5333aebd2bdc83d2db2559115f5ec3e1903b33e8e0ab157edf5d"
+    },
+    {
+      "path": "docs/architecture/018-sma-q1-native-path-amendment.md",
+      "sha256": "0dfd1f5902c7f59e2ab27620f7225d5f250acb25febe178fdbabb9bbc1f1b402"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-14a-full-regression-tests.jsonl",
+      "sha256": "9538fd10c88a4c01a9e4543136f8e914fbc7a7abbc4ad42b607df3dd3f0c34cc"
+    }
+  ],
+  "digestMethod": "SHA-256 of compact JSON with reportSha256 set to the empty string",
+  "reportSha256": "d7231d96d1751023169c525c0f49d2ca32da0ed24bb486a8b78a30ed3f1b7a41"
+}

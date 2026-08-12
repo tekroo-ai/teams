@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "PRINCIPAL_AUTHORIZATION",
+  "recordedOn": "2026-08-12",
+  "timePrecision": "DAY",
+  "principalStatement": "Approved. You may proceed.",
+  "authorizedPhase": "PHASE_3",
+  "authorizedStep": "STEP_14A_SMA_Q1_NATIVE_PATH_AMENDMENT",
+  "acceptedInputCommit": "7c8a5e54987b101d2b04a18b76600393fe6b757c",
+  "acceptedInputTree": "73546d32c5c5b06179962b45c50d35b49739dfb5",
+  "scope": [
+    "Preserve the pushed proxy-path preregistration as an unexecuted historical record.",
+    "Freeze a prospective native OpenHands event and UserPromptSubmit additionalContext SMA-Q1 preregistration before WP5 results are observed.",
+    "Map exact WP5 evidence eligibility and reserve uncovered scenarios for separately authorized Step 15 execution.",
+    "Record the clean accepted WP4 source baseline and require a later accepted WP5 commit as the execution identity."
+  ],
+  "excluded": [
+    "Editing, deleting, or relabelling the pushed Step 14 artifacts.",
+    "Executing WP5 or any SMA-Q1 scenario from the Teams repository.",
+    "Inspecting or using WP5 measurements before the amendment is frozen.",
+    "Editing, committing, merging, pushing, or operating the SMA repository or its services.",
+    "Authorizing Step 15, SMA-Q1 results, OpenHands-Q1, SMA-Q2, production rollout, or historical migration."
+  ],
+  "releaseRule": "Freeze and report the Step 14A amendment candidate locally; do not push it without subsequent principal acceptance."
+}
