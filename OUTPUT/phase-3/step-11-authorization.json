@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "PRINCIPAL_AUTHORIZATION",
+  "recordedOn": "2026-08-11",
+  "timePrecision": "DAY",
+  "principalStatement": "Proceed to step 11.",
+  "authorizedAction": "Implement and independently qualify a deterministic local-Git release-provider adapter against accepted contract 0.5.0 and the accepted Step 10 coordinator port.",
+  "authorizedScope": [
+    "operate only on fresh isolated temporary bare and working Git repositories created by the test harness",
+    "implement exact FF-only ordered merge behavior with authoritative post-effect reconciliation",
+    "verify base, head, tree, conflict, already-merged, changed-input, timeout, duplicate, concurrent, partial, unavailable, and non-code boundaries",
+    "use bounded non-interactive Git subprocesses with explicit environment and deterministic receipts",
+    "forward-requalify every accepted behavior"
+  ],
+  "excludedScope": [
+    "calling GitHub or another remote forge API",
+    "mutating tekroo-ai/teams, teams-v3, any user repository, or any pre-existing worktree as a provider target",
+    "pushing provider effects to any network remote",
+    "claiming Mongo release projection, production, deployment, migration, performance, OpenHands, or SMA qualification",
+    "pushing the Step 11 candidate without principal acceptance"
+  ],
+  "acceptedInputCommit": "8904949041db2b7423de6dae2820a8db4f7569ff",
+  "acceptedInputTree": "5d754a0a9abd21b8c8f725ea0886c7017c7a05bc",
+  "contractIdentity": "tekroo.kernel.contracts/0.5.0",
+  "manifestSha256": "1b5a9a5d9ca1331e444f9d1c3e9ca63b77e1c0f3899dd84669f8668b52872213"
+}

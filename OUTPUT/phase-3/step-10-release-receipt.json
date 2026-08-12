@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "RELEASE_RECEIPT",
+  "recordedOn": "2026-08-11",
+  "timePrecision": "DAY",
+  "repository": "https://github.com/tekroo-ai/teams.git",
+  "branch": "main",
+  "releasedCommit": "8904949041db2b7423de6dae2820a8db4f7569ff",
+  "releasedTree": "5d754a0a9abd21b8c8f725ea0886c7017c7a05bc",
+  "remoteObservedCommit": "8904949041db2b7423de6dae2820a8db4f7569ff",
+  "remoteObservedTree": "5d754a0a9abd21b8c8f725ea0886c7017c7a05bc",
+  "verificationMethod": [
+    "git push origin main",
+    "git ls-remote origin refs/heads/main",
+    "git rev-parse origin/main^{tree}"
+  ],
+  "contractIdentity": "tekroo.kernel.contracts/0.5.0",
+  "gateReport": "OUTPUT/phase-3/step-10-release-coordination-gate.json",
+  "gateReportSha256": "ea6ffd7715904c4fa20909e5a6d41b853b0ec359aa8254b9623528d04ef7b513",
+  "qualificationBoundary": "Only the accepted deterministic in-memory release coordinator and fake-provider profile are released; a concrete Git provider, Mongo release projection, GitHub, production, deployment, OpenHands, and SMA remain unqualified."
+}

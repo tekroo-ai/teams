@@ -185,7 +185,7 @@ func releaseProviderRequest(plan kernel.ReleasePlanSnapshot, attemptID kernel.UU
 	request := kernel.ReleaseMergeRequest{
 		ReleasePlanID: plan.ReleasePlanID, PlanDigest: plan.PlanDigest, MergeID: merge.MergeID, AttemptID: attemptID, Round: round,
 		ProviderIdempotencyKey: providerKey, RepositoryURL: plan.RepositoryURL, BaseRef: plan.BaseRef, BaseCommit: plan.BaseCommit,
-		ChangeRef: merge.ChangeRef, HeadCommit: merge.HeadCommit, MergeStrategy: plan.MergeStrategy,
+		ChangeRef: merge.ChangeRef, HeadCommit: merge.HeadCommit, MergeStrategy: plan.MergeStrategy, GitVersion: plan.GitVersion, ConflictPolicy: plan.ConflictPolicy,
 	}
 	if !request.Valid() {
 		return kernel.ReleaseMergeRequest{}, kernel.ReleaseMergePlan{}, ErrInvalidReleaseOperation

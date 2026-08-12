@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "PRINCIPAL_ACCEPTANCE",
+  "recordedOn": "2026-08-11",
+  "timePrecision": "DAY",
+  "principalStatement": "Accept, push and advance to the next step.",
+  "acceptedPhase": "PHASE_3",
+  "acceptedStep": "STEP_10_DETERMINISTIC_RELEASE_COORDINATION",
+  "acceptedCommit": "8904949041db2b7423de6dae2820a8db4f7569ff",
+  "acceptedTree": "5d754a0a9abd21b8c8f725ea0886c7017c7a05bc",
+  "acceptedGate": "OUTPUT/phase-3/step-10-release-coordination-gate.json",
+  "gateReportSha256": "ea6ffd7715904c4fa20909e5a6d41b853b0ec359aa8254b9623528d04ef7b513",
+  "scope": "Acceptance applies to the deterministic in-memory release coordination implementation qualified by the Step 10 gate and not to its excluded real-provider, Mongo release-projection, production, OpenHands, or SMA profiles."
+}

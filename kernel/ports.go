@@ -97,10 +97,12 @@ type ReleaseMergeRequest struct {
 	ChangeRef              string
 	HeadCommit             string
 	MergeStrategy          string
+	GitVersion             string
+	ConflictPolicy         string
 }
 
 func (request ReleaseMergeRequest) Valid() bool {
-	return request.ReleasePlanID.Valid() && request.PlanDigest.Valid() && request.MergeID.Valid() && request.AttemptID.Valid() && request.Round > 0 && request.ProviderIdempotencyKey != "" && request.RepositoryURL != "" && request.BaseRef != "" && request.BaseCommit != "" && request.ChangeRef != "" && request.HeadCommit != "" && request.MergeStrategy == "FF_ONLY_ORDERED"
+	return request.ReleasePlanID.Valid() && request.PlanDigest.Valid() && request.MergeID.Valid() && request.AttemptID.Valid() && request.Round > 0 && request.ProviderIdempotencyKey != "" && request.RepositoryURL != "" && request.BaseRef != "" && request.BaseCommit != "" && request.ChangeRef != "" && request.HeadCommit != "" && request.MergeStrategy == "FF_ONLY_ORDERED" && request.GitVersion != "" && request.ConflictPolicy == "FAIL_NO_IMPROVISATION"
 }
 
 // ReleaseProviderObservation is authoritative provider evidence for one

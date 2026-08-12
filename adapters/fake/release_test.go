@@ -16,6 +16,7 @@ func TestReleaseProviderConcurrentDuplicateUsesOneIdempotentEffect(t *testing.T)
 		MergeID: "00000000-0000-7000-8000-000000000752", AttemptID: "00000000-0000-7000-8000-000000000755", Round: 1,
 		ProviderIdempotencyKey: "release-751-merge-752-round-1", RepositoryURL: "https://example.invalid/tekroo/teams.git", BaseRef: "main",
 		BaseCommit: "1111111111111111111111111111111111111111", ChangeRef: "refs/heads/story-1", HeadCommit: "2222222222222222222222222222222222222222", MergeStrategy: "FF_ONLY_ORDERED",
+		GitVersion: "git version 2.51.0", ConflictPolicy: "FAIL_NO_IMPROVISATION",
 	}
 	want := kernel.ReleaseProviderObservation{
 		ReleasePlanID: request.ReleasePlanID, MergeID: request.MergeID, AttemptID: request.AttemptID, State: kernel.ReleaseProviderMerged, Outcome: kernel.ReleaseOutcomeMerged,

@@ -1,0 +1,154 @@
+{
+  "schemaVersion": "1.0.0",
+  "reportType": "PHASE_3_DETERMINISTIC_LOCAL_GIT_PROVIDER",
+  "status": "PASS",
+  "acceptedBaseCommit": "8904949041db2b7423de6dae2820a8db4f7569ff",
+  "acceptedBaseTree": "5d754a0a9abd21b8c8f725ea0886c7017c7a05bc",
+  "contractIdentity": "tekroo.kernel.contracts/0.5.0",
+  "manifestSha256": "1b5a9a5d9ca1331e444f9d1c3e9ca63b77e1c0f3899dd84669f8668b52872213",
+  "sourceTreeSha256": "ccef3b42f8e35d5166dbe21bb6b83523f122c74b86f1fe7198967716fad8878c",
+  "environment": {
+    "goVersion": "go1.26.4",
+    "goos": "darwin",
+    "goarch": "arm64",
+    "gitVersion": "git version 2.54.0",
+    "locale": "C",
+    "timeZone": "UTC"
+  },
+  "executed": {
+    "contractStructureChecks": 2889,
+    "contractFixtureCases": 138,
+    "focusedTestCases": 192,
+    "focusedTestFailures": 0,
+    "regressionTestCases": 405,
+    "regressionTestFailures": 0,
+    "vetFailures": 0
+  },
+  "assertions": [
+    {
+      "id": "GITPROVIDER-001-EXACT-FF",
+      "status": "PASS",
+      "tests": [
+        "TestProviderFastForwardsOnlyExactPlannedHeadAndReplaysAlreadyMerged",
+        "TestProviderExecutesCumulativeOrderedHeadsAndRetainsQualifiedBase"
+      ],
+      "evidenceFloor": "Only the exact planned head can advance the base ref, by compare-and-swap and FF-only ancestry, while cumulative ordered heads retain the qualified base identity."
+    },
+    {
+      "id": "GITPROVIDER-002-NO-IMPROVISATION",
+      "status": "PASS",
+      "tests": [
+        "TestProviderRejectsChangedHeadDivergedBaseAndIdempotencyReuseWithoutMutation"
+      ],
+      "evidenceFloor": "Changed heads, diverged bases, missing refs, Git-version mismatch, and conflicting idempotency reuse produce explicit non-mutating failures."
+    },
+    {
+      "id": "GITPROVIDER-003-AMBIGUOUS-RECONCILIATION",
+      "status": "PASS",
+      "tests": [
+        "TestProviderReconcilesAmbiguousSuccessfulUpdateAuthoritatively",
+        "TestProviderClassifiesRejectedOrTimedOutUnappliedUpdateFromAuthoritativeState"
+      ],
+      "evidenceFloor": "An ambiguous update acknowledgement is classified only after a detached bounded authoritative read; possible success is recovered and unapplied effects remain failed."
+    },
+    {
+      "id": "GITPROVIDER-004-DUPLICATE-CONVERGENCE",
+      "status": "PASS",
+      "tests": [
+        "TestProviderConcurrentDuplicatesConvergeOnOneHead"
+      ],
+      "evidenceFloor": "Concurrent duplicate calls converge on the exact planned ref and tree without creating merge commits."
+    },
+    {
+      "id": "GITPROVIDER-005-READ-ONLY-RECONCILE",
+      "status": "PASS",
+      "tests": [
+        "TestProviderReconcileIsReadOnlyAndClassifiesUnmergedAndMergedState"
+      ],
+      "evidenceFloor": "Reconciliation classifies authoritative unmerged or merged state without invoking a provider mutation."
+    },
+    {
+      "id": "GITPROVIDER-006-LOCAL-BOUNDARY",
+      "status": "PASS",
+      "tests": [
+        "TestProviderFailsClosedOutsideAllowedRootAndWhenGitIsUnavailable"
+      ],
+      "evidenceFloor": "Repositories outside the allowed root, network URI schemes, and unavailable Git state fail closed without target mutation."
+    },
+    {
+      "id": "GITPROVIDER-007-COORDINATOR-INTEGRATION",
+      "status": "PASS",
+      "tests": [
+        "TestReleaseCoordinatorAndLocalGitProviderCompleteExactPortBoundary"
+      ],
+      "evidenceFloor": "The accepted coordinator persists contract-valid intent and result commands around one exact local-Git provider effect."
+    },
+    {
+      "id": "GITPROVIDER-008-FORWARD-CONFORMANCE",
+      "status": "PASS",
+      "tests": [
+        "TestAllFrozenCommandsReachTheirDeclaredEventThroughEvaluator",
+        "TestNoReleaseRequiredFinalizesWithoutProviderIdentity"
+      ],
+      "evidenceFloor": "The released 0.5.0 corpus and all accepted release paths remain qualified; non-code release invokes no provider identity."
+    }
+  ],
+  "excludedProfiles": [
+    {
+      "profile": "network-forge-provider",
+      "reason": "No GitHub, GitLab, forge API, network remote, credential, webhook, pull-request, or branch-protection behavior is exercised."
+    },
+    {
+      "profile": "user-and-production-repositories",
+      "reason": "Only fresh test-owned temporary repositories are provider targets; no pre-existing repository or worktree is mutated."
+    },
+    {
+      "profile": "mongo-release-projection",
+      "reason": "The Mongo release projection remains fail-closed and separately gated."
+    },
+    {
+      "profile": "deployment-migration-performance",
+      "reason": "Production deployment, migration, rollback, load, latency, and throughput are not exercised."
+    },
+    {
+      "profile": "openhands-and-sma",
+      "reason": "The provider adapter does not alter OpenHands or SMA behavior."
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "OUTPUT/phase-3/step-11-contract-structure.json",
+      "sha256": "429491098a4e234b75e3e53af0c237ed00267e8277066cf784a45c254d7600a9"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-11-contract-reference.json",
+      "sha256": "a42d7f4efd87035ef4464c44f9b0394656efea42b0b2fb5115092c270ad39a15"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-11-local-git-provider-tests.jsonl",
+      "sha256": "538f227d5ca024de41f981000b6bcd5070cf3ba946123caeff11383a5bd3f97f"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-11-full-regression-tests.jsonl",
+      "sha256": "adb8ab9e6fbe7531dc1c856463cd38be3263c6e0444ce135259fccde665dcd3b"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-10-acceptance.json",
+      "sha256": "2c06d9463a1402a0d0e9432bbddf565b8b71d948e37bbe39bd9918348d09114d"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-10-release-receipt.json",
+      "sha256": "256366fd5be109f6424443b916d8e7740f1a27d11ba90a5795763a575e83ef1c"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-11-authorization.json",
+      "sha256": "094b500120abf49b02213c51b9d1df97713662518e9882dd4ac1c9e2b3ed0ec6"
+    },
+    {
+      "path": "docs/architecture/014-deterministic-local-git-provider.md",
+      "sha256": "a71eafc3e393a4adcffd944ab7e20000637e049a8c5bdffdc37849e39dcc0819"
+    }
+  ],
+  "digestMethod": "SHA-256 of compact JSON with reportSha256 set to the empty string",
+  "reportSha256": "635b9dc59575bfc54d0de37418a8a8fbc5726a219e3391c3d2a764f6f98bdc88"
+}

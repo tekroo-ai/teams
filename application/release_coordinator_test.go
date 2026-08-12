@@ -4,11 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/url"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"reflect"
 	"testing"
 	"time"
 
 	"github.com/tekroo-ai/teams/adapters/fake"
+	"github.com/tekroo-ai/teams/adapters/gitprovider"
 	"github.com/tekroo-ai/teams/application"
 	"github.com/tekroo-ai/teams/kernel"
 )
@@ -159,6 +164,50 @@ func TestReleaseCoordinatorLinksNextOrderedMergeToPriorEffectiveResult(t *testin
 	}
 }
 
+func TestReleaseCoordinatorAndLocalGitProviderCompleteExactPortBoundary(t *testing.T) {
+	fixture := localGitFixture(t)
+	plan := qualifiedReleasePlan()
+	plan.RepositoryURL = (&url.URL{Scheme: "file", Path: fixture.bare}).String()
+	plan.BaseCommit = fixture.base
+	plan.OrderedMerges[0].HeadCommit = fixture.head
+	plan.OrderedMerges[0].ChangeRef = "refs/heads/story-1"
+	plan.GitVersion = fixture.version
+	plan.ExpectedQualifiedTree = fixture.tree
+	plan.Qualification.QualifiedBaseCommit = fixture.base
+	plan.Qualification.OrderedHeadCommits = []string{fixture.head}
+	plan.Qualification.QualifiedTreeDigest = fixture.tree
+	createPayload, err := json.Marshal(map[string]any{
+		"author": plan.Author, "author_approval_event_id": plan.AuthorApprovalEventID, "author_approval_revision": plan.AuthorApprovalRevision,
+		"base_commit": plan.BaseCommit, "base_ref": plan.BaseRef, "conflict_policy": plan.ConflictPolicy, "contract_manifest": plan.ContractManifest,
+		"evidence_ids": plan.EvidenceIDs, "execution_round_limit": plan.ExecutionRoundLimit, "expected_qualified_tree": plan.ExpectedQualifiedTree,
+		"expected_story_revision": plan.ExpectedStoryRevision, "git_version": plan.GitVersion, "manifest_sha256": plan.ManifestSHA256,
+		"merge_strategy": plan.MergeStrategy, "ordered_merges": plan.OrderedMerges, "plan_digest": plan.PlanDigest, "release_mode": plan.Mode,
+		"release_plan_id": plan.ReleasePlanID, "release_policy_revision": plan.PolicyRevision, "repository_url": plan.RepositoryURL,
+		"required_profiles": plan.RequiredProfiles, "story_id": plan.Story.ID, "story_lifecycle_epoch": plan.StoryLifecycleEpoch,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if emits, validationErr := loadCatalogue(t).ValidateFixtureCommand("tekroo.command.release-plan.create", createPayload); validationErr != nil || !reflect.DeepEqual(emits, []string{"tekroo.event.release-plan.created"}) {
+		t.Fatalf("file URI release plan contract validation: emits=%v err=%v payload=%s", emits, validationErr, createPayload)
+	}
+	provider, err := gitprovider.New(gitprovider.Config{AllowedRoot: fixture.root, OperationTimeout: 2 * time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	operation := releaseExecutionOperation(t, plan)
+	var commands []kernel.KernelCommand
+	coordinator, _ := application.NewReleaseCoordinator(releaseReceiptService(t, &commands, plan.Revision), provider, application.ReleaseCoordinatorPolicy{OperationTimeout: 2 * time.Second})
+
+	result, err := coordinator.ExecuteNext(context.Background(), operation)
+	if err != nil || result.ResultReceipt == nil || result.Observation.Outcome != kernel.ReleaseOutcomeMerged || result.Observation.TreeDigest != fixture.tree || len(commands) != 2 {
+		t.Fatalf("result=%#v err=%v commands=%d", result, err, len(commands))
+	}
+	if current := runLocalGit(t, "--git-dir", fixture.bare, "rev-parse", "refs/heads/main"); current != fixture.head {
+		t.Fatalf("base ref=%s, want %s", current, fixture.head)
+	}
+}
+
 func releaseReceiptService(t *testing.T, commands *[]kernel.KernelCommand, initialRevision uint64) executionCommandFunc {
 	t.Helper()
 	catalogue := loadCatalogue(t)
@@ -251,4 +300,48 @@ func releaseObservation(plan kernel.ReleasePlanSnapshot, attemptID kernel.UUIDv7
 
 func commandsReceiptEvent(index int) kernel.UUIDv7 {
 	return []kernel.UUIDv7{"00000000-0000-7000-8000-000000000757", "00000000-0000-7000-8000-000000000758", "00000000-0000-7000-8000-000000000759"}[index]
+}
+
+type localGitRepository struct {
+	root, bare, base, head, tree, version string
+}
+
+func localGitFixture(t *testing.T) localGitRepository {
+	t.Helper()
+	root := t.TempDir()
+	source := filepath.Join(root, "source")
+	bare := filepath.Join(root, "target.git")
+	runLocalGit(t, "init", "-b", "main", source)
+	runLocalGit(t, "-C", source, "config", "user.name", "Tekroo Test")
+	runLocalGit(t, "-C", source, "config", "user.email", "tekroo@example.invalid")
+	if err := os.WriteFile(filepath.Join(source, "artifact.txt"), []byte("base\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runLocalGit(t, "-C", source, "add", "artifact.txt")
+	runLocalGit(t, "-C", source, "commit", "-m", "base")
+	base := runLocalGit(t, "-C", source, "rev-parse", "HEAD")
+	runLocalGit(t, "-C", source, "switch", "-c", "story-1")
+	if err := os.WriteFile(filepath.Join(source, "artifact.txt"), []byte("base\nstory\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runLocalGit(t, "-C", source, "commit", "-am", "story")
+	head := runLocalGit(t, "-C", source, "rev-parse", "HEAD")
+	tree := runLocalGit(t, "-C", source, "rev-parse", "HEAD^{tree}")
+	runLocalGit(t, "clone", "--bare", source, bare)
+	return localGitRepository{root: root, bare: bare, base: base, head: head, tree: tree, version: runLocalGit(t, "--version")}
+}
+
+func runLocalGit(t *testing.T, arguments ...string) string {
+	t.Helper()
+	command := exec.Command("git", arguments...)
+	command.Env = append(os.Environ(), "LC_ALL=C", "TZ=UTC", "GIT_TERMINAL_PROMPT=0", "GIT_NO_LAZY_FETCH=1")
+	output, err := command.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %v: %v\n%s", arguments, err, output)
+	}
+	value := string(output)
+	for len(value) > 0 && (value[len(value)-1] == '\n' || value[len(value)-1] == '\r' || value[len(value)-1] == ' ' || value[len(value)-1] == '\t') {
+		value = value[:len(value)-1]
+	}
+	return value
 }
