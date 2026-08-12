@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "PRINCIPAL_ACCEPTANCE",
+  "recordedOn": "2026-08-12",
+  "timePrecision": "DAY",
+  "principalStatement": "Accept and push, then proceed to the next step.",
+  "acceptedCommit": "e105abb9215358df3470a6d295c1dd6afca6e5bb",
+  "acceptedTree": "ec126279b92ec46ed8c0237e41c625673d747c34",
+  "acceptedGate": "OUTPUT/phase-3/step-14a-sma-q1-native-preregistration-gate.json",
+  "acceptedGateStatus": "PASS_AMENDMENT",
+  "scope": "Acceptance applies to the prospective native-path preregistration amendment. It does not accept a WP5 result, authorize an SMA-Q1 result, waive the frozen evidence rules, or authorize Step 15 experimental execution before its prerequisites are satisfied."
+}

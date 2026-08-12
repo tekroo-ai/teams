@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "REMOTE_RELEASE_RECEIPT",
+  "recordedOn": "2026-08-12",
+  "timePrecision": "DAY",
+  "repository": "https://github.com/tekroo-ai/teams.git",
+  "ref": "refs/heads/main",
+  "observedRemoteCommit": "e105abb9215358df3470a6d295c1dd6afca6e5bb",
+  "observedRemoteTree": "ec126279b92ec46ed8c0237e41c625673d747c34",
+  "verification": {
+    "commitCommand": "git ls-remote origin refs/heads/main",
+    "treeCommand": "git rev-parse origin/main^{tree}",
+    "commitMatchedAcceptedCandidate": true,
+    "treeMatchedAcceptedCandidate": true
+  }
+}

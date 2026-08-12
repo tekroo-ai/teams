@@ -1,0 +1,69 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "STEP_READINESS_ASSESSMENT",
+  "recordedOn": "2026-08-12",
+  "timePrecision": "DAY",
+  "step": "STEP_15_SMA_Q1_NATIVE_EXECUTION_AND_ADJUDICATION",
+  "status": "WAITING_FOR_WP5_ALIGNMENT_AND_GATE5",
+  "executionStarted": false,
+  "scenarioExecutions": 0,
+  "authorityInterpretation": "The principal authorized progression to the next step. This does not waive the already accepted prerequisites or transform an active WP5 work package into accepted evidence.",
+  "acceptedPrerequisite": {
+    "teamsCommit": "e105abb9215358df3470a6d295c1dd6afca6e5bb",
+    "teamsTree": "ec126279b92ec46ed8c0237e41c625673d747c34",
+    "manifest": "investigations/sma-q1/preregistration-native-v2.json",
+    "manifestSHA256": "c618371d571d5333aebd2bdc83d2db2559115f5ec3e1903b33e8e0ab157edf5d"
+  },
+  "observedSMAState": {
+    "repository": "/Users/paul/work/tekroo-ai/sma",
+    "baselineCommit": "d5d49ca18d5845b4ba172cf169d4d7b196c5b38d",
+    "baselineTree": "5f2ccb3734be6ae36d194ddabc91df4b002c90a2",
+    "taskStatus": "WP5 active; exact next action WP5-A1",
+    "gate5ReceiptObserved": false,
+    "wp5ExecutionDocument": "docs/WP5_EXECUTION.md",
+    "wp5ExecutionDocumentSHA256": "86ff3c0a187c550f00f9c9e27bd60409bdcbe95a063f1f55ad88e79c12da4e84",
+    "worktreeChangesObserved": [
+      "M TASK_STATUS.md",
+      "M docs/OPENHANDS_SMA_INTEGRATION_PLAN.md",
+      "?? docs/WP5_EXECUTION.md"
+    ]
+  },
+  "alignmentFindings": [
+    {
+      "id": "STEP15-READY-001-MANIFEST-REFERENCE",
+      "classification": "OBSERVED",
+      "status": "OPEN",
+      "finding": "The current WP5 execution document does not reference the accepted native Q1 manifest, its SHA-256 digest, or any SMAQ1N scenario identifier.",
+      "requiredResolution": "Before a measured WP5 pass intended for Q1 reuse, the WP5 receipt protocol must name the exact manifest digest and scenario identifiers."
+    },
+    {
+      "id": "STEP15-READY-002-REPETITION-MATCH",
+      "classification": "OBSERVED",
+      "status": "OPEN",
+      "finding": "The WP5 work-package counts are not the frozen per-scenario Q1 repetition counts: examples include one first-prompt pass, one live adversarial prompt, at least 20 warm hits and misses, three contention rounds, and one restart sequence.",
+      "requiredResolution": "Either execute and label the exact frozen repetitions within WP5 or classify the corresponding Q1 scenarios NOT_RUN; do not infer exact coverage from a semantically similar WP5 pass."
+    },
+    {
+      "id": "STEP15-READY-003-GATE5",
+      "classification": "OBSERVED",
+      "status": "OPEN",
+      "finding": "WP5 is active at WP5-A1 and no WP5 Gate 5 receipt was observed.",
+      "requiredResolution": "Complete WP5 through an accepted Gate 5 receipt and freeze the accepted SMA implementation as a clean immutable commit and tree."
+    },
+    {
+      "id": "STEP15-READY-004-EVIDENCE-ADJUDICATION",
+      "classification": "INFERRED_FROM_ACCEPTED_RULES",
+      "status": "PENDING",
+      "finding": "No WP5 scenario can presently be credited to SMA-Q1-v2 because the required exact evidence mapping and accepted Gate 5 receipt do not yet exist.",
+      "requiredResolution": "After Gate 5 acceptance, adjudicate each of the eight potentially eligible scenarios individually and retain the other ten for Step 15 execution."
+    }
+  ],
+  "nextAuthorizedActionWithinTeams": "Receive the immutable accepted Gate 5 package, validate exact WP5 evidence eligibility against the accepted manifest, and generate the final Step 15 execution manifest for only the scenarios still NOT_RUN.",
+  "forbiddenUntilReady": [
+    "Claiming that WP5 or SMA-Q1 passed.",
+    "Counting a generic Gate 5 PASS as exact SMA-Q1 evidence.",
+    "Executing the ten Step-15-reserved scenarios.",
+    "Executing any of the eight WP5-eligible scenarios whose exact evidence status is still unknown.",
+    "Authorizing OpenHands-Q1, SMA-Q2, global enablement, production rollout, or historical migration."
+  ]
+}
