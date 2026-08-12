@@ -205,6 +205,19 @@ func containsTarget(values []kernel.AggregateKind, target kernel.AggregateKind) 
 }
 
 func validateValue(value any, rule map[string]any) error {
+	if alternatives, ok := rule["oneOf"].([]any); ok {
+		matches := 0
+		for _, alternative := range alternatives {
+			candidate, ok := alternative.(map[string]any)
+			if ok && validateValue(value, candidate) == nil {
+				matches++
+			}
+		}
+		if matches != 1 {
+			return errors.New("does not match exactly one allowed schema")
+		}
+		return nil
+	}
 	if alternatives, ok := rule["anyOf"].([]any); ok {
 		for _, alternative := range alternatives {
 			candidate, ok := alternative.(map[string]any)

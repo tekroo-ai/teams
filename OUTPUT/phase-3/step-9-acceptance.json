@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "PRINCIPAL_ACCEPTANCE",
+  "recordedOn": "2026-08-11",
+  "timePrecision": "DAY",
+  "principalStatement": "Accept and push...then proceed to the next step.",
+  "acceptedPhase": "PHASE_3",
+  "acceptedStep": "STEP_9_DETERMINISTIC_ESCALATION_COORDINATION",
+  "acceptedCommit": "6dc8bc98a56d45829fdbb58778242d5f2077aaef",
+  "acceptedTree": "f7c77fd2ef7e5bec106ff598dfc3d3ae8c790198",
+  "acceptedGate": "OUTPUT/phase-3/step-9-escalation-coordination-gate.json",
+  "gateReportSha256": "808ba33fabc8149587926ea638355d96bb8a001fa87996a6b813ff384599a592",
+  "scope": "Acceptance applies to the deterministic escalation coordination implementation qualified by the Step 9 gate and not to its excluded profiles."
+}

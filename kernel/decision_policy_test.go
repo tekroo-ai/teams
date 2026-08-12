@@ -71,7 +71,7 @@ func TestCompletionRequiresExactEvidenceCriteriaValidationAndDependencies(t *tes
 	}
 }
 
-func TestAcceptanceReopenSuccessorAndCorrectionUseExplicitTerminalPaths(t *testing.T) {
+func TestAcceptanceFailsClosedUntilReleaseImplementationAndOtherTerminalPathsRemainExplicit(t *testing.T) {
 	evaluator := kernel.Evaluator{Catalogue: loadCatalogue(t)}
 	context := validDecisionContext(t)
 	evidenceID := mustUUID(t, "00000000-0000-7000-8000-0000000000f1")
@@ -80,7 +80,7 @@ func TestAcceptanceReopenSuccessorAndCorrectionUseExplicitTerminalPaths(t *testi
 	command := validStoryCreateCommand(t)
 	command.CommandType = "tekroo.command.story.request-acceptance"
 	command.ExpectedRevision = kernel.NewExpectedRevision(7)
-	command.Payload = json.RawMessage(`{"lifecycle_epoch":1,"acceptance_policy_revision":4,"evidence_ids":["00000000-0000-7000-8000-0000000000f1"]}`)
+	command.Payload = json.RawMessage(`{"lifecycle_epoch":1,"acceptance_policy_revision":4,"release_mode":"CODE","release_plan_id":"00000000-0000-7000-8000-000000000751","release_plan_revision":8,"release_finalized_event_id":"00000000-0000-7000-8000-000000000760","qualified_tree_digest":"3333333333333333333333333333333333333333","evidence_ids":["00000000-0000-7000-8000-0000000000f1"]}`)
 	command.EvidenceRefs = []kernel.EvidenceRef{{EvidenceID: evidenceID, SHA256: evidenceDigest}}
 	command.Causation = []kernel.DagParent{{ParentEventID: parentID, EdgeKind: kernel.EdgeCausal}}
 	snapshot := kernel.Snapshot{
@@ -92,13 +92,8 @@ func TestAcceptanceReopenSuccessorAndCorrectionUseExplicitTerminalPaths(t *testi
 	grant := grantFor(command.Authority, command, context.Provenance.GrantDigests[0])
 	snapshot.Authorization = authorizationPolicy(grant)
 	snapshot.Authorization.Requirements.AcceptancePolicyRevision = 4
-	snapshot.Authorization.Requirements.RequireQualifiedTree = true
-	if decision := evaluate(t, evaluator, command, snapshot, context); decision.Receipt.ReasonCode != "ACCEPTANCE_GATE_FAILED" || decision.NextState != nil {
-		t.Fatalf("missing tree decision = %#v", decision)
-	}
-	command.Payload = json.RawMessage(`{"lifecycle_epoch":1,"acceptance_policy_revision":4,"evidence_ids":["00000000-0000-7000-8000-0000000000f1"],"qualified_tree_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`)
-	if decision := evaluate(t, evaluator, command, snapshot, context); decision.Receipt.OutcomeCode != kernel.OutcomeApplied || decision.NextState.Phase != kernel.PhaseAccepted {
-		t.Fatalf("accepted decision = %#v", decision)
+	if decision := evaluate(t, evaluator, command, snapshot, context); decision.Receipt.OutcomeCode != kernel.OutcomeRejectedPolicy || decision.Receipt.ReasonCode != "RELEASE_NOT_IMPLEMENTED" || decision.NextState != nil {
+		t.Fatalf("acceptance fail-closed decision = %#v", decision)
 	}
 
 	reopen := command

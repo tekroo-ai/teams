@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "PRINCIPAL_AUTHORIZATION",
+  "recordedOn": "2026-08-11",
+  "timePrecision": "DAY",
+  "principalStatement": "Yes, authorized.",
+  "authorizedAction": "Create and independently qualify immutable tekroo.kernel.contracts/0.5.0 as the minimum deterministic-release successor to accepted contract 0.4.0.",
+  "authorizedScope": [
+    "add a release-plan aggregate and exact frozen-plan identity",
+    "encode qualification, durable execution intent, per-merge result, authoritative reconciliation, bounded retry, partial join, terminal finalization, and non-code release semantics",
+    "revise story acceptance to bind an exact finalized release plan and qualified tree when code release is required",
+    "provide executable compatibility, catalogue, model, invariant, negative, concurrency, and replay fixtures",
+    "forward-requalify all accepted Step 9 behavior against the successor package"
+  ],
+  "excludedScope": [
+    "editing contract 0.4.0 or any earlier release in place",
+    "implementing the release coordinator or a Git/provider adapter",
+    "calling GitHub or mutating any external repository",
+    "claiming Mongo, provider, production, deployment, migration, performance, OpenHands, or SMA qualification",
+    "pushing the contract candidate without principal acceptance"
+  ],
+  "acceptedInputCommit": "6dc8bc98a56d45829fdbb58778242d5f2077aaef",
+  "acceptedInputTree": "f7c77fd2ef7e5bec106ff598dfc3d3ae8c790198",
+  "predecessorContract": "tekroo.kernel.contracts/0.4.0",
+  "recommendedSuccessorContract": "tekroo.kernel.contracts/0.5.0",
+  "recommendedWireVersion": "1.4.0"
+}

@@ -1,0 +1,369 @@
+{
+  "contractIdentity": "tekroo.kernel.contracts/0.5.0",
+  "invariants": [
+    {
+      "decisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-007"
+      ],
+      "description": "Accepted transitions advance exact contiguous revisions; rejections do not.",
+      "fixtureIds": [
+        "MODEL-TASK-FORWARD",
+        "PRECONDITION-EXACT-ALL",
+        "PRECONDITION-STALE-NONE"
+      ],
+      "invariantId": "INV-001-REVISION-CONTIGUITY",
+      "negativeRequirementIds": []
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-007",
+        "P2-KCF-010"
+      ],
+      "description": "One semantic command produces at most one durable decision and canonical receipt.",
+      "fixtureIds": [
+        "IDEMPOTENCY-DUPLICATE-AND-CONFLICT"
+      ],
+      "invariantId": "INV-002-IDEMPOTENT-DECISION",
+      "negativeRequirementIds": [
+        "NEG-012"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-005"
+      ],
+      "description": "Accepted event lineage remains an immutable acyclic graph with explicit parents.",
+      "fixtureIds": [
+        "DAG-VALID-BRANCH-JOIN",
+        "DAG-REJECT-CYCLE"
+      ],
+      "invariantId": "INV-003-DAG-ACYCLIC",
+      "negativeRequirementIds": [
+        "NEG-004",
+        "NEG-014"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-002",
+        "P2-KCF-006"
+      ],
+      "description": "At most one concrete FQN owns work; routing and claims do not.",
+      "fixtureIds": [
+        "IDENTITY-CONCRETE-FQN",
+        "IDENTITY-REJECT-WILDCARD"
+      ],
+      "invariantId": "INV-004-EXACT-OWNERSHIP",
+      "negativeRequirementIds": [
+        "NEG-007"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-002",
+        "P2-KCF-007"
+      ],
+      "description": "Only the current execution tuple may commit actor-attributed commands.",
+      "fixtureIds": [
+        "CAT-001-EXECUTION-REGISTER-VALID",
+        "CAT-002-EXECUTION-REPLACE-VALID"
+      ],
+      "invariantId": "INV-005-EXECUTION-FENCING",
+      "negativeRequirementIds": [
+        "NEG-011"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-006",
+        "P2-KCF-008"
+      ],
+      "description": "Completion, acceptance, reopening, and correction preserve immutable lifecycle epochs.",
+      "fixtureIds": [
+        "MODEL-COMPLETION-NO-REQUESTED-PHASE",
+        "MODEL-REOPEN-INCREMENTS-EPOCH",
+        "MODEL-ILLEGAL-COMPLETION",
+        "REVIEW-JOIN-ORDER-INDEPENDENT",
+        "REVIEW-JOIN-DUPLICATE-CONFLICT",
+        "SUCCESSOR-SET-CANONICAL",
+        "SUCCESSOR-SET-REJECT-UNORDERED"
+      ],
+      "invariantId": "INV-006-LIFECYCLE-EPOCHS",
+      "negativeRequirementIds": [
+        "NEG-003",
+        "NEG-008"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-005",
+        "P2-KCF-007"
+      ],
+      "description": "Retry, validation, planning, handoff, and escalation are finite and durable across restart.",
+      "fixtureIds": [
+        "IDEMPOTENCY-DUPLICATE-AND-CONFLICT"
+      ],
+      "invariantId": "INV-007-BOUNDED-ITERATION",
+      "negativeRequirementIds": [
+        "NEG-001",
+        "NEG-002",
+        "NEG-005",
+        "NEG-006"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-004"
+      ],
+      "description": "Unknown types are preserved and cannot produce canonical organizational effects.",
+      "fixtureIds": [
+        "CAT-UNKNOWN-COMMAND"
+      ],
+      "invariantId": "INV-008-UNKNOWN-NO-EFFECT",
+      "negativeRequirementIds": [
+        "NEG-009"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-009",
+        "P2-KCF-010"
+      ],
+      "description": "Every event and receipt carries exact authority, evidence, contract, source, and runtime provenance.",
+      "fixtureIds": [
+        "CAT-003-EVIDENCE-REGISTER-VALID"
+      ],
+      "invariantId": "INV-009-PROVENANCE-COMPLETE",
+      "negativeRequirementIds": [
+        "NEG-014"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-009"
+      ],
+      "description": "Provider, model, tool, and SMA output remains evidence until accepted by policy.",
+      "fixtureIds": [
+        "CAT-003-EVIDENCE-REGISTER-VALID"
+      ],
+      "invariantId": "INV-010-NONAUTHORITATIVE-EVIDENCE",
+      "negativeRequirementIds": [
+        "NEG-008",
+        "NEG-013"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-010"
+      ],
+      "description": "State, events, receipt, audit, and outbox commit atomically or remain explicitly uncertain.",
+      "fixtureIds": [
+        "IDEMPOTENCY-DUPLICATE-AND-CONFLICT"
+      ],
+      "invariantId": "INV-011-ATOMIC-MONGO-DECISION",
+      "negativeRequirementIds": [
+        "NEG-012"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-011",
+        "P2-KCF-012"
+      ],
+      "description": "Canonical fixtures and reports reproduce under pinned deterministic inputs.",
+      "fixtureIds": [
+        "MODEL-STORY-FORWARD",
+        "DAG-VALID-BRANCH-JOIN",
+        "COMPATIBILITY-1.0-MISSING-CONTEXT"
+      ],
+      "invariantId": "INV-012-CONFORMANCE-REPRODUCIBLE",
+      "negativeRequirementIds": []
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-012"
+      ],
+      "description": "Qualification binds exact base, heads, ordered merge plan, contract, and resulting tree.",
+      "fixtureIds": [
+        "IDEMPOTENCY-DUPLICATE-AND-CONFLICT"
+      ],
+      "invariantId": "INV-013-MERGE-TREE-QUALIFIED",
+      "negativeRequirementIds": []
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-001",
+        "P2-KCF-004",
+        "P2-KCF-009"
+      ],
+      "description": "Provider, persistence, transport, credential, and process fields cannot redefine kernel semantics.",
+      "fixtureIds": [
+        "CAT-UNKNOWN-COMMAND"
+      ],
+      "invariantId": "INV-014-PROVIDER-NEUTRAL-KERNEL",
+      "negativeRequirementIds": [
+        "NEG-010"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-008"
+      ],
+      "description": "Every validation branch has exact validator and resolution-owner identity, explicit inputs and criteria, a finite round limit, and a deadline.",
+      "fixtureIds": [
+        "REVIEW-BOUNDED-VALIDATOR-PASS",
+        "REVIEW-BOUNDED-WRONG-VALIDATOR",
+        "REVIEW-BOUNDED-DEADLINE",
+        "REVIEW-BOUNDED-ROUND-LIMIT"
+      ],
+      "invariantId": "INV-015-BOUNDED-VALIDATION-BRANCH",
+      "negativeRequirementIds": [
+        "NEG-002"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-008"
+      ],
+      "description": "Finding keys deduplicate exact logical findings; revalidation cites superseded results and changed-condition evidence; inconclusive or conflicting review is resolved only by the exact bounded adjudicator.",
+      "fixtureIds": [
+        "REVIEW-BOUNDED-CHANGED-CONDITION",
+        "REVIEW-BOUNDED-ADJUDICATOR",
+        "REVIEW-BOUNDED-POLICY-TIMEOUT"
+      ],
+      "invariantId": "INV-016-VALIDATION-SUPERSESSION-ADJUDICATION",
+      "negativeRequirementIds": [
+        "NEG-002"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-008"
+      ],
+      "description": "Authoritative completion references one current policy-finalized bounded review, cannot treat an individual validator result as organizational completion, and rejects post-finalization results.",
+      "fixtureIds": [
+        "CAT-027-COMPLETION-REVIEW-FINALIZE-VALID",
+        "CAT-027-COMPLETION-REVIEW-FINALIZE-INVALID",
+        "REVIEW-BOUNDED-POST-FINALIZATION"
+      ],
+      "invariantId": "INV-017-POLICY-FINALIZED-COMPLETION",
+      "negativeRequirementIds": [
+        "NEG-002",
+        "NEG-007"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-005",
+        "P2-KCF-007",
+        "P2-KCF-008"
+      ],
+      "description": "Each escalation binds one exact work lifecycle epoch, accountable resolution owner, designated adjudicator, timeout policy, finite resolution budget, deadline, causal path, unresolved question, and evidence.",
+      "fixtureIds": [
+        "ESCALATION-EXACT-ADJUDICATOR",
+        "ESCALATION-WRONG-ADJUDICATOR",
+        "ESCALATION-STALE-LIFECYCLE",
+        "ESCALATION-ROUND-EXHAUSTED",
+        "ESCALATION-ADJUDICATOR-DEADLINE",
+        "ESCALATION-POLICY-TIMEOUT"
+      ],
+      "invariantId": "INV-018-EXACT-BOUNDED-ESCALATION",
+      "negativeRequirementIds": [
+        "NEG-001",
+        "NEG-002",
+        "NEG-004"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-005",
+        "P2-KCF-007"
+      ],
+      "description": "An escalation routes once, cannot bounce or reopen, and terminates through the exact adjudicator or exact timeout policy with one stable accepted outcome.",
+      "fixtureIds": [
+        "ESCALATION-ROUTE-ONCE",
+        "ESCALATION-NO-REROUTE",
+        "ESCALATION-TERMINAL",
+        "ESCALATION-TIMEOUT-BEFORE-DEADLINE",
+        "ESCALATION-TIMEOUT-OUTCOME"
+      ],
+      "invariantId": "INV-019-ONE-WAY-TERMINAL-ESCALATION",
+      "negativeRequirementIds": [
+        "NEG-001",
+        "NEG-002",
+        "NEG-004"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P1B-V3-INTERNAL-RELEASE",
+        "P2-KCF-012"
+      ],
+      "description": "External release execution is authorized only from an exact, durably persisted, author-approved plan whose repository, base, ordered changes, heads, policy, toolchain, contract, profiles, and synthesized tree match the qualified plan.",
+      "fixtureIds": [
+        "RELEASE-EXACT-AUTHOR-APPROVAL",
+        "RELEASE-AUTHOR-APPROVAL-MISMATCH",
+        "RELEASE-EXACT-QUALIFICATION",
+        "RELEASE-CHANGED-PLAN",
+        "RELEASE-CHANGED-BASE",
+        "RELEASE-CHANGED-HEAD",
+        "RELEASE-FIRST-ORDERED-REQUEST",
+        "RELEASE-WRONG-ORDER",
+        "RELEASE-EXECUTE-BEFORE-QUALIFICATION"
+      ],
+      "invariantId": "INV-020-FROZEN-RELEASE-PLAN",
+      "negativeRequirementIds": [
+        "NEG-012"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P1B-V3-INTERNAL-RELEASE",
+        "P2-KCF-012"
+      ],
+      "description": "Every external attempt and outcome is durably recorded; UNKNOWN remains unresolved, prohibits retry, and can advance only through exact provider reconciliation that supersedes the recorded uncertain result.",
+      "fixtureIds": [
+        "RELEASE-IDEMPOTENCY-DUPLICATE-AND-CONFLICT",
+        "RELEASE-CONCURRENT-WORKER",
+        "RELEASE-BOUNDED-RETRY",
+        "RELEASE-RETRY-BUDGET-EXHAUSTED",
+        "RELEASE-UNKNOWN-RESULT",
+        "RELEASE-CLEAN-MERGE",
+        "RELEASE-ALREADY-MERGED",
+        "RELEASE-GENUINE-FAILURE-RETRYABLE",
+        "RELEASE-GENUINE-FAILURE-EXHAUSTED",
+        "RELEASE-NO-RETRY-WHILE-UNKNOWN",
+        "RELEASE-EXACT-RECONCILIATION",
+        "RELEASE-PROVIDER-UNAVAILABLE",
+        "RELEASE-WRONG-SUPERSESSION"
+      ],
+      "invariantId": "INV-021-DURABLE-RELEASE-INTENT-RECONCILIATION",
+      "negativeRequirementIds": [
+        "NEG-012"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P1B-V3-INTERNAL-RELEASE",
+        "P2-KCF-012"
+      ],
+      "description": "A code story is eligible for acceptance only after every ordered merge is verified and the provider tree equals the qualified tree; partial, ambiguous, mismatched, and terminal release states cannot be silently accepted or reopened.",
+      "fixtureIds": [
+        "RELEASE-PARTIAL-FINALIZE",
+        "RELEASE-TREE-MISMATCH",
+        "RELEASE-VERIFIED-FINALIZE",
+        "RELEASE-TERMINAL-IMMUTABLE",
+        "RELEASE-NO-CODE-FINALIZE",
+        "CAT-020-STORY-REQUEST-ACCEPTANCE-VALID"
+      ],
+      "invariantId": "INV-022-VERIFIED-RELEASE-ACCEPTANCE",
+      "negativeRequirementIds": [
+        "NEG-012"
+      ]
+    }
+  ],
+  "schemaVersion": "1.4.0"
+}

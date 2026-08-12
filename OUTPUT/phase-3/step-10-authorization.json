@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "PRINCIPAL_AUTHORIZATION",
+  "recordedOn": "2026-08-11",
+  "timePrecision": "DAY",
+  "principalStatement": "Accept and push...then proceed to the next step.",
+  "authorizedAction": "Advance from accepted Step 9 into the Step 10 normative-contract sufficiency check for deterministic release and organizational acceptance.",
+  "authorizedScope": [
+    "record Step 9 principal acceptance and verified release",
+    "compare the frozen 0.4.0 release and story-acceptance surface with the accepted Phase 1B deterministic-release requirements",
+    "identify the minimum successor encoding required before release coordination or Git/provider implementation"
+  ],
+  "excludedScope": [
+    "editing released contract packages in place",
+    "creating or releasing a successor normative contract without explicit principal approval",
+    "implementing release coordination against invented or non-normative wire semantics",
+    "calling GitHub or another provider or mutating any external repository",
+    "OpenHands or SMA integration",
+    "production deployment, migration execution, and performance qualification",
+    "pushing a Step 10 candidate without principal acceptance"
+  ],
+  "acceptedInputCommit": "6dc8bc98a56d45829fdbb58778242d5f2077aaef",
+  "acceptedInputTree": "f7c77fd2ef7e5bec106ff598dfc3d3ae8c790198",
+  "contractIdentity": "tekroo.kernel.contracts/0.4.0"
+}

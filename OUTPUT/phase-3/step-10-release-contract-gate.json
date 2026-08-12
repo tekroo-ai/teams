@@ -1,0 +1,185 @@
+{
+  "schemaVersion": "1.0.0",
+  "reportType": "PHASE_3_RELEASE_CONTRACT_REVISION",
+  "status": "PASS",
+  "acceptedBaseCommit": "6dc8bc98a56d45829fdbb58778242d5f2077aaef",
+  "acceptedBaseTree": "f7c77fd2ef7e5bec106ff598dfc3d3ae8c790198",
+  "contractIdentity": "tekroo.kernel.contracts/0.5.0",
+  "manifestSha256": "1b5a9a5d9ca1331e444f9d1c3e9ca63b77e1c0f3899dd84669f8668b52872213",
+  "sourceTreeSha256": "3acd4c7e05338309c2be6c47e1d96adf9084fad6b25c011553b59d25e7ff5add",
+  "environment": {
+    "goVersion": "go1.26.4",
+    "goos": "darwin",
+    "goarch": "arm64",
+    "locale": "C",
+    "timeZone": "UTC"
+  },
+  "executed": {
+    "contractStructureChecks": 2889,
+    "contractFixtureCases": 138,
+    "focusedTestCases": 285,
+    "focusedTestFailures": 0,
+    "regressionTestCases": 375,
+    "regressionTestFailures": 0,
+    "vetFailures": 0
+  },
+  "assertions": [
+    {
+      "id": "RELEASE-CONTRACT-001-DEDICATED-TYPES",
+      "status": "PASS",
+      "tests": [
+        "TestFrozenContractCorpus/CAT-036-RELEASE-APPROVAL-VALID",
+        "TestFrozenContractCorpus/CAT-030-RELEASE-CREATE-VALID",
+        "TestFrozenContractCorpus/RELEASE-EXACT-AUTHOR-APPROVAL",
+        "TestFrozenContractCorpus/RELEASE-AUTHOR-APPROVAL-MISMATCH",
+        "TestFrozenContractCorpus/CAT-035-RELEASE-FINALIZE-VALID"
+      ],
+      "evidenceFloor": "Author approval is an explicit event bound exactly by release creation; release planning is a dedicated aggregate with six command/event pairs; evidence IDs do not substitute for either record."
+    },
+    {
+      "id": "RELEASE-CONTRACT-002-FROZEN-QUALIFICATION",
+      "status": "PASS",
+      "tests": [
+        "TestFrozenContractCorpus/RELEASE-EXACT-QUALIFICATION",
+        "TestFrozenContractCorpus/RELEASE-CHANGED-PLAN",
+        "TestFrozenContractCorpus/RELEASE-CHANGED-BASE",
+        "TestFrozenContractCorpus/RELEASE-CHANGED-HEAD"
+      ],
+      "evidenceFloor": "Qualification is accepted only for the exact persisted plan digest, base, ordered heads, and qualified tree."
+    },
+    {
+      "id": "RELEASE-CONTRACT-003-ORDERED-EXECUTION",
+      "status": "PASS",
+      "tests": [
+        "TestFrozenContractCorpus/RELEASE-EXECUTE-BEFORE-QUALIFICATION",
+        "TestFrozenContractCorpus/RELEASE-FIRST-ORDERED-REQUEST",
+        "TestFrozenContractCorpus/RELEASE-WRONG-ORDER",
+        "TestFrozenContractCorpus/RELEASE-CONCURRENT-WORKER",
+        "TestFrozenContractCorpus/RELEASE-IDEMPOTENCY-DUPLICATE-AND-CONFLICT",
+        "TestFrozenContractCorpus/RELEASE-BOUNDED-RETRY",
+        "TestFrozenContractCorpus/RELEASE-RETRY-BUDGET-EXHAUSTED"
+      ],
+      "evidenceFloor": "Execution requires qualification, the exact next merge, one active attempt, stable idempotency, and an exact finite retry round."
+    },
+    {
+      "id": "RELEASE-CONTRACT-004-UNCERTAINTY",
+      "status": "PASS",
+      "tests": [
+        "TestFrozenContractCorpus/RELEASE-UNKNOWN-RESULT",
+        "TestFrozenContractCorpus/RELEASE-CLEAN-MERGE",
+        "TestFrozenContractCorpus/RELEASE-ALREADY-MERGED",
+        "TestFrozenContractCorpus/RELEASE-GENUINE-FAILURE-RETRYABLE",
+        "TestFrozenContractCorpus/RELEASE-GENUINE-FAILURE-EXHAUSTED",
+        "TestFrozenContractCorpus/RELEASE-NO-RETRY-WHILE-UNKNOWN",
+        "TestFrozenContractCorpus/RELEASE-EXACT-RECONCILIATION",
+        "TestFrozenContractCorpus/RELEASE-PROVIDER-UNAVAILABLE",
+        "TestFrozenContractCorpus/RELEASE-WRONG-SUPERSESSION"
+      ],
+      "evidenceFloor": "Every result remains explicit; UNKNOWN blocks retry and advances only through exact provider reconciliation, while genuine failure consumes the finite retry budget."
+    },
+    {
+      "id": "RELEASE-CONTRACT-005-VERIFIED-ACCEPTANCE",
+      "status": "PASS",
+      "tests": [
+        "TestFrozenContractCorpus/RELEASE-PARTIAL-FINALIZE",
+        "TestFrozenContractCorpus/RELEASE-TREE-MISMATCH",
+        "TestFrozenContractCorpus/RELEASE-VERIFIED-FINALIZE",
+        "TestFrozenContractCorpus/RELEASE-NO-CODE-FINALIZE"
+      ],
+      "evidenceFloor": "Code release finalization requires all ordered merges and exact provider/qualified tree equality; non-code work is explicit."
+    },
+    {
+      "id": "RELEASE-CONTRACT-006-COMPATIBILITY",
+      "status": "PASS",
+      "tests": [
+        "TestFrozenContractCorpus",
+        "TestCatalogueRejectsManifestIdentityMismatch",
+        "TestCompletionCoordinatorStoryDependenciesAndReplayAreDeterministic"
+      ],
+      "evidenceFloor": "Released 0.4.0 remains byte-identical; unchanged semantics migrate identically while story acceptance requires explicit 1.4.0 release context."
+    },
+    {
+      "id": "RELEASE-CONTRACT-007-BOUNDARY",
+      "status": "PASS",
+      "tests": [
+        "TestAllFrozenCommandsReachTheirDeclaredEventThroughEvaluator",
+        "TestAcceptanceFailsClosedUntilReleaseImplementationAndOtherTerminalPathsRemainExplicit"
+      ],
+      "evidenceFloor": "The pure transition model is qualified, while release-dependent authoritative commands fail closed with RELEASE_NOT_IMPLEMENTED."
+    }
+  ],
+  "excludedProfiles": [
+    {
+      "profile": "release-coordination",
+      "reason": "Durable release projection and application coordination are not implemented."
+    },
+    {
+      "profile": "git-provider-execution",
+      "reason": "No Git or provider mutation, authentication, retry, or reconciliation I/O is exercised."
+    },
+    {
+      "profile": "mongo-integration",
+      "reason": "Release-plan persistence and projection are not implemented or exercised."
+    },
+    {
+      "profile": "synthesized-merge",
+      "reason": "No candidate merge tree is synthesized by this contract-only gate."
+    },
+    {
+      "profile": "deployment-migration-performance",
+      "reason": "Production deployment, migration execution, load, latency, and throughput are not exercised."
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "OUTPUT/phase-3/step-10-contract-structure.json",
+      "sha256": "429491098a4e234b75e3e53af0c237ed00267e8277066cf784a45c254d7600a9"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-10-contract-reference.json",
+      "sha256": "a42d7f4efd87035ef4464c44f9b0394656efea42b0b2fb5115092c270ad39a15"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-10-release-contract-tests.jsonl",
+      "sha256": "a424a173209da77cd57bb8b9e546308fae3284ba2e9c6b4b617abf3e5e359d35"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-10-full-regression-tests.jsonl",
+      "sha256": "d3cd72773b8e00aa0f6ec57529ba8edcce66f7331a7a1cc7f32deafa2edfaa85"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-9-acceptance.json",
+      "sha256": "7cb8219cc0f09130c6edf093942dc21b0f38c25cf8f8bbd60f56b10e74a88966"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-9-release-receipt.json",
+      "sha256": "c776c3325193e1341c6579283fa76c2e1f6365b3969c1ceda473142af6b4339a"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-10-authorization.json",
+      "sha256": "2c76022845421adf1003d5dd48df6e87d7234954702288a3e5093ecac640f213"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-10-contract-revision-authorization.json",
+      "sha256": "ab08e9a301284220ee79067399bf322bd1e7297e70330a7364aad9dd6c9304a0"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-10-release-contract-sufficiency.json",
+      "sha256": "ff3b90c143e4c91a17be43c083e089bca7f557f1762226cc21d2a3b4986b5641"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-10-release-contract-encoding-gaps.md",
+      "sha256": "62b6d9c2412bebeb4ba0769875d67bd49a4266cf40ee15c0f08197a7d22ac342"
+    },
+    {
+      "path": "CONTRACTS/tekroo.kernel.contracts/0.5.0/compatibility/from-0.4.0.json",
+      "sha256": "befdbe8ef5ee7aa2bea14cfbbfceb21d6bf9c34e9e3a728e843fb0fd7bbeeec0"
+    },
+    {
+      "path": "docs/architecture/012-deterministic-release-contract-revision.md",
+      "sha256": "f142abf0850e14981e5b7e7924c7f8639cf3baf3ea38614e184d186d8e8d23a7"
+    }
+  ],
+  "digestMethod": "SHA-256 of compact JSON with reportSha256 set to the empty string",
+  "reportSha256": "139b99d1ad6d2981d5eac2b2aae40ed3ee878e0dd6e2df4ffb73a3b09554ada6"
+}

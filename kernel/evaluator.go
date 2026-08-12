@@ -552,7 +552,8 @@ func commandCreatesAggregate(commandType string) bool {
 		"tekroo.command.evidence.register",
 		"tekroo.command.execution.register",
 		"tekroo.command.completion-review.open",
-		"tekroo.command.escalation.open":
+		"tekroo.command.escalation.open",
+		"tekroo.command.release-plan.create":
 		return true
 	default:
 		return false

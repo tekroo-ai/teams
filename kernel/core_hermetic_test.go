@@ -43,11 +43,11 @@ func TestAllFrozenCommandsReachTheirDeclaredEventThroughEvaluator(t *testing.T) 
 	}
 
 	root := testRepositoryRoot(t)
-	fixtureBytes, err := os.ReadFile(filepath.Join(root, "CONTRACTS/tekroo.kernel.contracts/0.4.0/fixtures/catalogue-coverage.json"))
+	fixtureBytes, err := os.ReadFile(filepath.Join(root, "CONTRACTS/tekroo.kernel.contracts/0.5.0/fixtures/catalogue-coverage.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	catalogueBytes, err := os.ReadFile(filepath.Join(root, "CONTRACTS/tekroo.kernel.contracts/0.4.0/catalogue/kernel-catalogue.json"))
+	catalogueBytes, err := os.ReadFile(filepath.Join(root, "CONTRACTS/tekroo.kernel.contracts/0.5.0/catalogue/kernel-catalogue.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,6 +69,7 @@ func TestAllFrozenCommandsReachTheirDeclaredEventThroughEvaluator(t *testing.T) 
 	evaluator := kernel.Evaluator{Catalogue: loadCatalogue(t)}
 	executed := 0
 	applied := 0
+	failClosed := 0
 	for _, item := range fixtures.Fixtures {
 		if !strings.HasSuffix(item.FixtureID, "-VALID") {
 			continue
@@ -81,6 +82,13 @@ func TestAllFrozenCommandsReachTheirDeclaredEventThroughEvaluator(t *testing.T) 
 			}
 			command, snapshot := commandCase(t, item.When.CommandType, item.When.Payload, definition.TargetKinds[0], definition.AuthorityKinds[0], definition.ExecutionRequired, definition.RootAllowed)
 			decision := evaluate(t, evaluator, command, snapshot, validDecisionContext(t))
+			if item.When.CommandType == "tekroo.command.story.request-acceptance" || item.When.CommandType == "tekroo.command.story.approve-release" || strings.HasPrefix(item.When.CommandType, "tekroo.command.release-plan.") {
+				if decision.Receipt.OutcomeCode != kernel.OutcomeRejectedPolicy || decision.Receipt.ReasonCode != "RELEASE_NOT_IMPLEMENTED" || len(decision.Events) != 0 {
+					t.Fatalf("release-dependent command did not fail closed: %#v", decision)
+				}
+				failClosed++
+				return
+			}
 			if decision.Receipt.OutcomeCode != kernel.OutcomeApplied || len(decision.Events) != 1 || decision.Events[0].EventType != item.Then.Expected.EventTypes[0] {
 				t.Fatalf("decision = %#v", decision)
 			}
@@ -88,11 +96,14 @@ func TestAllFrozenCommandsReachTheirDeclaredEventThroughEvaluator(t *testing.T) 
 		})
 		executed++
 	}
-	if executed != 29 {
-		t.Fatalf("executed command cases = %d, want 29", executed)
+	if executed != 36 {
+		t.Fatalf("executed command cases = %d, want 36", executed)
 	}
-	if applied != 29 {
-		t.Fatalf("applied = %d, want 29", applied)
+	if applied != 28 {
+		t.Fatalf("applied = %d, want 28", applied)
+	}
+	if failClosed != 8 {
+		t.Fatalf("fail-closed release-dependent cases = %d, want 8", failClosed)
 	}
 }
 
@@ -443,6 +454,11 @@ func commandCase(t *testing.T, commandType string, payload json.RawMessage, targ
 	} else {
 		command.Causation = []kernel.DagParent{{ParentEventID: parent, EdgeKind: kernel.EdgeCausal}}
 		snapshot.AcceptedEvents = map[kernel.UUIDv7]kernel.AcceptedEvent{parent: {EventType: "tekroo.event.story.created"}}
+	}
+	if commandType == "tekroo.command.release-plan.create" {
+		command.ExpectedRevision = kernel.MustNotExist()
+		snapshot.Exists = false
+		snapshot.Revision = 0
 	}
 	actor := kernel.ActorFQN("teams::coder-1")
 	execution := kernel.ExecutionTuple{ExecutionID: mustUUID(t, "00000000-0000-7000-8000-000000000075"), FencingEpoch: 7}

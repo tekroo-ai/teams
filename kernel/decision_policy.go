@@ -19,6 +19,7 @@ const (
 	reasonReviewNotFinalized       = "REVIEW_NOT_FINALIZED"
 	reasonEscalationAlreadyExists  = "ESCALATION_ALREADY_EXISTS"
 	reasonEscalationNotFound       = "ESCALATION_NOT_FOUND"
+	reasonReleaseNotImplemented    = "RELEASE_NOT_IMPLEMENTED"
 )
 
 type CompletionReviewKey struct {
@@ -56,6 +57,14 @@ func validateCommandPolicy(command KernelCommand, snapshot Snapshot, context Dec
 		}
 	}
 	switch command.CommandType {
+	case "tekroo.command.release-plan.create",
+		"tekroo.command.release-plan.record-qualification",
+		"tekroo.command.release-plan.request-execution",
+		"tekroo.command.release-plan.record-result",
+		"tekroo.command.release-plan.record-reconciliation",
+		"tekroo.command.release-plan.finalize",
+		"tekroo.command.story.approve-release":
+		return OutcomeRejectedPolicy, reasonReleaseNotImplemented
 	case "tekroo.command.escalation.open":
 		if command.Authority.Kind != PrincipalPolicy || !payloadEvidenceMatches(object, command.EvidenceRefs) {
 			return OutcomeRejectedUnauthorized, reasonUnauthorized
@@ -125,18 +134,7 @@ func validateCommandPolicy(command KernelCommand, snapshot Snapshot, context Dec
 			}
 		}
 	case "tekroo.command.story.request-acceptance":
-		if !payloadEvidenceMatches(object, command.EvidenceRefs) {
-			return OutcomeRejectedInvalid, reasonInvalidEvidence
-		}
-		revision, ok := uint64Field(object, "acceptance_policy_revision")
-		if !ok || (snapshot.Authorization.Requirements.AcceptancePolicyRevision > 0 && revision != snapshot.Authorization.Requirements.AcceptancePolicyRevision) {
-			return OutcomeRejectedConflict, reasonCriteriaRevisionConflict
-		}
-		if snapshot.Authorization.Requirements.RequireQualifiedTree {
-			if digest, ok := object["qualified_tree_digest"].(string); !ok || !Digest(digest).Valid() {
-				return OutcomeRejectedPolicy, reasonAcceptanceGateFailed
-			}
-		}
+		return OutcomeRejectedPolicy, reasonReleaseNotImplemented
 	case "tekroo.command.completion-review.open":
 		if command.Authority.Kind != PrincipalPolicy {
 			return OutcomeRejectedUnauthorized, reasonUnauthorized

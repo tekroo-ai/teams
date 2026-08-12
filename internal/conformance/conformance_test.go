@@ -14,7 +14,7 @@ import (
 	"github.com/tekroo-ai/teams/kernel"
 )
 
-const contractRoot = "CONTRACTS/tekroo.kernel.contracts/0.4.0"
+const contractRoot = "CONTRACTS/tekroo.kernel.contracts/0.5.0"
 
 type fixtureDocument struct {
 	Fixtures []fixture `json:"fixtures"`
@@ -43,8 +43,8 @@ func TestFrozenContractCorpus(t *testing.T) {
 		loadFixtures(t, filepath.Join(repositoryRoot, contractRoot, "fixtures/catalogue-coverage.json")),
 		loadFixtures(t, filepath.Join(repositoryRoot, contractRoot, "fixtures/model-and-invariant-scenarios.json"))...,
 	)
-	if len(fixtures) != 97 {
-		t.Fatalf("fixture count = %d, want 97", len(fixtures))
+	if len(fixtures) != 138 {
+		t.Fatalf("fixture count = %d, want 138", len(fixtures))
 	}
 
 	for _, item := range fixtures {
@@ -247,6 +247,64 @@ func runFixture(t *testing.T, catalogue *contract.Catalogue, item fixture) any {
 				Action: when.Action, Authority: when.Authority, SourceRole: when.SourceRole,
 				SubjectLifecycleEpoch: when.SubjectLifecycleEpoch, DecidedAt: when.DecidedAt,
 				Round: when.Round, Outcome: when.Outcome,
+			},
+		)
+	case "RELEASE_MODEL":
+		var given struct {
+			State                 kernel.ReleaseState `json:"state"`
+			ReleaseMode           kernel.ReleaseMode  `json:"releaseMode"`
+			Author                kernel.PrincipalRef `json:"author"`
+			AuthorApprovalEventID kernel.UUIDv7       `json:"authorApprovalEventId"`
+			PlanDigest            kernel.Digest       `json:"planDigest"`
+			BaseCommit            string              `json:"baseCommit"`
+			HeadCommits           []string            `json:"headCommits"`
+			MergeOrder            []kernel.UUIDv7     `json:"mergeOrder"`
+			NextMergeIndex        uint64              `json:"nextMergeIndex"`
+			ExecutionRoundLimit   uint64              `json:"executionRoundLimit"`
+			NextRound             uint64              `json:"nextRound"`
+			ActiveRound           uint64              `json:"activeRound"`
+			ActiveMergeID         kernel.UUIDv7       `json:"activeMergeId"`
+			ActiveAttemptID       kernel.UUIDv7       `json:"activeAttemptId"`
+			UnresolvedAttemptID   kernel.UUIDv7       `json:"unresolvedAttemptId"`
+			LatestResultEventID   kernel.UUIDv7       `json:"latestResultEventId"`
+			QualifiedTreeDigest   string              `json:"qualifiedTreeDigest"`
+			ProviderTreeDigest    string              `json:"providerTreeDigest"`
+		}
+		var when struct {
+			Action                  kernel.ReleaseAction  `json:"action"`
+			Author                  kernel.PrincipalRef   `json:"author"`
+			AuthorApprovalEventID   kernel.UUIDv7         `json:"authorApprovalEventId"`
+			PlanDigest              kernel.Digest         `json:"planDigest"`
+			BaseCommit              string                `json:"baseCommit"`
+			HeadCommits             []string              `json:"headCommits"`
+			MergeID                 kernel.UUIDv7         `json:"mergeId"`
+			AttemptID               kernel.UUIDv7         `json:"attemptId"`
+			Round                   uint64                `json:"round"`
+			ResultEventID           kernel.UUIDv7         `json:"resultEventId"`
+			SupersedesResultEventID kernel.UUIDv7         `json:"supersedesResultEventId"`
+			Outcome                 kernel.ReleaseOutcome `json:"outcome"`
+			QualifiedTreeDigest     string                `json:"qualifiedTreeDigest"`
+			ProviderTreeDigest      string                `json:"providerTreeDigest"`
+			TerminalStatus          kernel.ReleaseState   `json:"terminalStatus"`
+		}
+		decode(t, item.Given, &given)
+		decode(t, item.When, &when)
+		return kernel.EvaluateRelease(
+			kernel.ReleaseSnapshot{
+				State: given.State, ReleaseMode: given.ReleaseMode, Author: given.Author, AuthorApprovalEventID: given.AuthorApprovalEventID, PlanDigest: given.PlanDigest,
+				BaseCommit: given.BaseCommit, HeadCommits: given.HeadCommits,
+				MergeOrder: given.MergeOrder, NextMergeIndex: given.NextMergeIndex,
+				ExecutionRoundLimit: given.ExecutionRoundLimit, NextRound: given.NextRound, ActiveRound: given.ActiveRound,
+				ActiveMergeID: given.ActiveMergeID, ActiveAttemptID: given.ActiveAttemptID,
+				UnresolvedAttemptID: given.UnresolvedAttemptID, LatestResultEventID: given.LatestResultEventID,
+				QualifiedTreeDigest: given.QualifiedTreeDigest, ProviderTreeDigest: given.ProviderTreeDigest,
+			},
+			kernel.ReleaseTransition{
+				Action: when.Action, Author: when.Author, AuthorApprovalEventID: when.AuthorApprovalEventID, PlanDigest: when.PlanDigest, BaseCommit: when.BaseCommit, HeadCommits: when.HeadCommits,
+				MergeID: when.MergeID, AttemptID: when.AttemptID, Round: when.Round, ResultEventID: when.ResultEventID,
+				SupersedesResultEventID: when.SupersedesResultEventID, Outcome: when.Outcome,
+				QualifiedTreeDigest: when.QualifiedTreeDigest, ProviderTreeDigest: when.ProviderTreeDigest,
+				TerminalStatus: when.TerminalStatus,
 			},
 		)
 	case "SUCCESSOR_SET_MODEL":

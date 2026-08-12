@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "RELEASE_RECEIPT",
+  "recordedOn": "2026-08-11",
+  "timePrecision": "DAY",
+  "repository": "https://github.com/tekroo-ai/teams.git",
+  "branch": "main",
+  "releasedCommit": "6dc8bc98a56d45829fdbb58778242d5f2077aaef",
+  "releasedTree": "f7c77fd2ef7e5bec106ff598dfc3d3ae8c790198",
+  "remoteObservedCommit": "6dc8bc98a56d45829fdbb58778242d5f2077aaef",
+  "remoteObservedTree": "f7c77fd2ef7e5bec106ff598dfc3d3ae8c790198",
+  "verificationMethod": [
+    "git push origin main",
+    "git ls-remote origin refs/heads/main",
+    "git rev-parse origin/main^{tree}"
+  ],
+  "contractIdentity": "tekroo.kernel.contracts/0.4.0",
+  "gateReport": "OUTPUT/phase-3/step-9-escalation-coordination-gate.json",
+  "gateReportSha256": "808ba33fabc8149587926ea638355d96bb8a001fa87996a6b813ff384599a592",
+  "qualificationBoundary": "Only the accepted Step 9 deterministic escalation coordination tree is released; organizational acceptance, deterministic release planning, Git/provider effects, OpenHands, SMA, deployment, migration, performance, and production remain unqualified."
+}

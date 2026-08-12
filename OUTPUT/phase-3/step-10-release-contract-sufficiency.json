@@ -1,0 +1,135 @@
+{
+  "schemaVersion": "1.0.0",
+  "reportType": "PHASE_3_STEP_10_RELEASE_CONTRACT_SUFFICIENCY",
+  "status": "REVISION_REQUIRED",
+  "evaluatedContract": "tekroo.kernel.contracts/0.4.0",
+  "manifestSha256": "5ff83483ce43ace2e06f2cc2f57dd552342553fc2389f3cc775b761c0c6d6d7c",
+  "acceptedInputCommit": "6dc8bc98a56d45829fdbb58778242d5f2077aaef",
+  "acceptedInputTree": "f7c77fd2ef7e5bec106ff598dfc3d3ae8c790198",
+  "sources": [
+    {
+      "path": "OUTPUT/adjudication/phase-1b-architecture-handoff.json",
+      "sha256": "137a1399a70cfc96cf36997e8c2154b1847cdde5ee8a50f7a39f7d06e3c83e20",
+      "evidenceClass": "PRINCIPAL_ACCEPTED_HANDOFF"
+    },
+    {
+      "path": "PHASE-1B/008-final-architecture-handoff.md",
+      "sha256": "ec0aef90ceab404c6288a0279d47f49ee4c5af1c00577d55b8ffd25882b18fef",
+      "evidenceClass": "PRINCIPAL_ACCEPTED_HANDOFF"
+    },
+    {
+      "path": "/Users/paul/work/tekroo-ai/teams-v3/tekroo-v4-archaeology/OUTPUT/adjudication/kernel-decision-proposals.json",
+      "sha256": "598acef9cca08f80258a8117174bd50eb5394b6c4055efae142ac17fb92e014e",
+      "evidenceClass": "PRINCIPAL_ADJUDICATION_REGISTER"
+    },
+    {
+      "path": "CONTRACTS/tekroo.kernel.contracts/0.4.0/catalogue/kernel-catalogue.json",
+      "sha256": "aa1b080895dc885c7638b9d6eeda03c56e2384a43039fa316ab3e5957dd1e983",
+      "evidenceClass": "OBSERVED_RELEASED_CONTRACT"
+    },
+    {
+      "path": "CONTRACTS/tekroo.kernel.contracts/0.4.0/schemas/core.schema.json",
+      "sha256": "a4a9f8172f23075d18e807e8f6d587914ec8632fd8c807a866594d8abd196ea2",
+      "evidenceClass": "OBSERVED_RELEASED_CONTRACT"
+    },
+    {
+      "path": "CONTRACTS/tekroo.kernel.contracts/0.4.0/schemas/payloads.schema.json",
+      "sha256": "7781a4f98c7600dc8cf55a5dd0f210c326a324b4ba678a7d7f090886db2476f1",
+      "evidenceClass": "OBSERVED_RELEASED_CONTRACT"
+    },
+    {
+      "path": "CONTRACTS/tekroo.kernel.contracts/0.4.0/invariants/invariants.json",
+      "sha256": "e5891fbba8fe1baae67129512212a260df6cb50dc401669e793bb0fcc0986237",
+      "evidenceClass": "OBSERVED_RELEASED_CONTRACT"
+    }
+  ],
+  "requiredSemantics": [
+    "persist an ordered release plan before external execution",
+    "bind exact repository, base commit, ordered PR and head identities, merge strategy and tool version, conflict policy, contract manifest, required profiles, policy revision, and idempotency",
+    "qualify and retain the exact synthesized tree plus gate and artifact identities",
+    "record one durable external-effect intent before provider dispatch",
+    "record per-PR merged, failed, and unknown outcomes without assuming rollback",
+    "reconcile timeout, cancellation, transport failure, crash, and ambiguous provider results against authoritative provider state",
+    "bound retries and prohibit retry of an unknown attempt until reconciliation",
+    "serialize conflicting release operations and make concurrent workers converge",
+    "accept a story only after author approval and authoritative verification that all required PRs are merged and the provider tree equals the qualified tree",
+    "retain explicit non-code-story handling"
+  ],
+  "observedContractSurface": {
+    "aggregateKinds": [
+      "completion-review",
+      "escalation",
+      "evidence",
+      "execution",
+      "story",
+      "system",
+      "task"
+    ],
+    "releaseAggregatePresent": false,
+    "releaseCommandTypes": [],
+    "releaseEventTypes": [],
+    "storyAcceptanceCommand": "tekroo.command.story.request-acceptance",
+    "storyAcceptanceFields": [
+      "lifecycle_epoch",
+      "acceptance_policy_revision",
+      "evidence_ids",
+      "qualified_tree_digest (optional)"
+    ],
+    "mergeTreeInvariant": "INV-013-MERGE-TREE-QUALIFIED",
+    "mergeTreeInvariantFixtureIds": [
+      "IDEMPOTENCY-DUPLICATE-AND-CONFLICT"
+    ]
+  },
+  "findings": [
+    {
+      "id": "REL-GAP-001",
+      "classification": "OBSERVED",
+      "severity": "BLOCKING",
+      "finding": "Contract 0.4.0 defines no release-plan aggregate kind and no release command or event types."
+    },
+    {
+      "id": "REL-GAP-002",
+      "classification": "OBSERVED",
+      "severity": "BLOCKING",
+      "finding": "The story-acceptance payload cannot identify a release plan, plan revision, finalization event, repository, exact base and ordered heads, required PRs, provider observations, per-PR outcomes, or reconciliation state."
+    },
+    {
+      "id": "REL-GAP-003",
+      "classification": "OBSERVED",
+      "severity": "BLOCKING",
+      "finding": "INV-013 states exact merge-tree qualification but its only named fixture is the generic idempotency scenario; the released corpus contains no release-plan transition, partial-outcome, ambiguity, reconciliation, concurrent-worker, changed-head/base, or non-code-story model."
+    },
+    {
+      "id": "REL-GAP-004",
+      "classification": "INFERRED_FROM_ACCEPTED_REQUIREMENTS",
+      "severity": "BLOCKING",
+      "finding": "Using evidence IDs or qualified_tree_digest alone as an implicit release record would move required release semantics outside the normative replayable contract and would permit acceptance without proving the accepted deterministic release conditions."
+    }
+  ],
+  "minimumSuccessorEncoding": {
+    "recommendedContractVersion": "0.5.0",
+    "recommendedWireVersion": "1.4.0",
+    "aggregateKind": "release-plan",
+    "commandsAndEvents": [
+      ["tekroo.command.release-plan.create", "tekroo.event.release-plan.created"],
+      ["tekroo.command.release-plan.record-qualification", "tekroo.event.release-plan.qualification-recorded"],
+      ["tekroo.command.release-plan.request-execution", "tekroo.event.release-plan.execution-requested"],
+      ["tekroo.command.release-plan.record-result", "tekroo.event.release-plan.result-recorded"],
+      ["tekroo.command.release-plan.record-reconciliation", "tekroo.event.release-plan.reconciliation-recorded"],
+      ["tekroo.command.release-plan.finalize", "tekroo.event.release-plan.finalized"]
+    ],
+    "storyAcceptanceRevision": "Require release_plan_id, release_plan_revision, release_finalized_event_id, and qualified_tree_digest for code stories; retain an explicit finalized NO_RELEASE_REQUIRED path for non-code stories.",
+    "requiredModels": [
+      "canonical frozen release plan and semantic plan key",
+      "exact synthesized-tree qualification",
+      "durable execution intent and per-PR attempt identity",
+      "MERGED, ALREADY_MERGED, FAILED, and UNKNOWN provider outcomes",
+      "authoritative reconciliation that supersedes UNKNOWN without rewriting history",
+      "bounded retry and single-active-worker fencing",
+      "partial multi-PR join and terminal release outcome",
+      "story acceptance gated by exact finalized release state"
+    ]
+  },
+  "conclusion": "Do not implement deterministic release or organizational acceptance against contract 0.4.0. Create and separately qualify immutable successor contract 0.5.0 before implementation.",
+  "authorityRequired": "Explicit principal approval is required before creating or releasing contract 0.5.0."
+}
