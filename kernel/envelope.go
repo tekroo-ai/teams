@@ -130,6 +130,7 @@ type DecisionGuards struct {
 	PolicyRevision       uint64
 	AbsentReviewKeys     []CompletionReviewKey
 	AbsentEscalationKeys []EscalationKey
+	AbsentReleaseKeys    []ReleasePlanKey
 }
 
 type Snapshot struct {
@@ -145,6 +146,8 @@ type Snapshot struct {
 	Reviews           map[AggregateRef]CompletionReviewSnapshot
 	Escalations       map[AggregateRef]EscalationSnapshot
 	EscalationKeys    map[EscalationKey]AggregateRef
+	ReleasePlans      map[AggregateRef]ReleasePlanSnapshot
+	ReleasePlanKeys   map[ReleasePlanKey]AggregateRef
 	AttemptBudgets    map[AttemptBudgetKey]AttemptBudgetSnapshot
 }
 

@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "PRINCIPAL_ACCEPTANCE",
+  "recordedOn": "2026-08-11",
+  "timePrecision": "DAY",
+  "principalStatement": "Accept and proceed.",
+  "acceptedPhase": "PHASE_3",
+  "acceptedStep": "STEP_10_DETERMINISTIC_RELEASE_CONTRACT_REVISION",
+  "acceptedCommit": "d994fa9cee8edae25fb561741c4decc3c9c459e6",
+  "acceptedTree": "735d8d94166588589c4adae14934966432012d8f",
+  "acceptedContract": "tekroo.kernel.contracts/0.5.0",
+  "manifestSha256": "1b5a9a5d9ca1331e444f9d1c3e9ca63b77e1c0f3899dd84669f8668b52872213",
+  "acceptedGate": "OUTPUT/phase-3/step-10-release-contract-gate.json",
+  "gateReportSha256": "139b99d1ad6d2981d5eac2b2aae40ed3ee878e0dd6e2df4ffb73a3b09554ada6",
+  "scope": "Acceptance applies to the immutable 0.5.0 deterministic-release contract and its contract-only qualification boundary; it does not itself qualify release coordination or provider execution."
+}

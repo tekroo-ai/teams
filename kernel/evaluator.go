@@ -233,6 +233,11 @@ func decisionGuards(command KernelCommand, authority AuthorityDecision) Decision
 			guards.AbsentEscalationKeys = []EscalationKey{escalation.Key()}
 		}
 	}
+	if command.CommandType == "tekroo.command.release-plan.create" {
+		if key, err := ReleasePlanKeyFromCreatePayload(command.Payload); err == nil {
+			guards.AbsentReleaseKeys = []ReleasePlanKey{key}
+		}
+	}
 	return guards
 }
 
@@ -539,6 +544,8 @@ func terminalCommandProhibited(commandType string, phase Phase) bool {
 	case "tekroo.command.work.reopen", "tekroo.command.work.create-successor", "tekroo.command.record.correct":
 		return false
 	case "tekroo.command.story.request-acceptance":
+		return phase != PhaseCompleted
+	case "tekroo.command.story.approve-release":
 		return phase != PhaseCompleted
 	default:
 		return true

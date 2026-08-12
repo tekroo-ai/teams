@@ -19,7 +19,9 @@ const (
 	reasonReviewNotFinalized       = "REVIEW_NOT_FINALIZED"
 	reasonEscalationAlreadyExists  = "ESCALATION_ALREADY_EXISTS"
 	reasonEscalationNotFound       = "ESCALATION_NOT_FOUND"
-	reasonReleaseNotImplemented    = "RELEASE_NOT_IMPLEMENTED"
+	reasonReleaseAlreadyExists     = "RELEASE_ALREADY_EXISTS"
+	reasonReleaseNotFound          = "RELEASE_NOT_FOUND"
+	reasonReleaseGateFailed        = "RELEASE_GATE_FAILED"
 )
 
 type CompletionReviewKey struct {
@@ -57,14 +59,44 @@ func validateCommandPolicy(command KernelCommand, snapshot Snapshot, context Dec
 		}
 	}
 	switch command.CommandType {
-	case "tekroo.command.release-plan.create",
-		"tekroo.command.release-plan.record-qualification",
+	case "tekroo.command.story.approve-release":
+		var value struct {
+			StoryID               UUIDv7       `json:"story_id"`
+			LifecycleEpoch        uint64       `json:"lifecycle_epoch"`
+			ExpectedStoryRevision uint64       `json:"expected_story_revision"`
+			Author                PrincipalRef `json:"author"`
+			EvidenceIDs           []UUIDv7     `json:"evidence_ids"`
+		}
+		if json.Unmarshal(command.Payload, &value) != nil || value.StoryID != command.Target.ID || value.Author != command.Authority || snapshot.State == nil || snapshot.State.Phase != PhaseCompleted || snapshot.State.LifecycleEpoch != value.LifecycleEpoch || snapshot.Revision != value.ExpectedStoryRevision || !payloadEvidenceMatches(object, command.EvidenceRefs) {
+			return OutcomeRejectedPolicy, reasonReleaseGateFailed
+		}
+	case "tekroo.command.release-plan.create":
+		plan, err := ReleasePlanFromCreatePayload(command.Payload, context.EventID)
+		if err != nil || command.Authority.Kind != PrincipalPolicy || plan.ReleasePlanID != command.Target.ID || plan.PolicyRevision != command.ExpectedPolicyRevision || !payloadEvidenceMatches(object, command.EvidenceRefs) {
+			return OutcomeRejectedInvalid, reasonInvalidPayload
+		}
+		story, found := snapshot.Related[plan.Story]
+		approval, approved := snapshot.AcceptedEvents[plan.AuthorApprovalEventID]
+		if !found || !story.Exists || story.Revision != plan.ExpectedStoryRevision || story.State == nil || story.State.LifecycleEpoch != plan.StoryLifecycleEpoch || story.State.Phase != PhaseCompleted || !containsAggregatePrecondition(command.Preconditions, plan.Story) || !approved || approval.EventType != "tekroo.event.story.release-approved" || !containsDagParent(command.Causation, plan.AuthorApprovalEventID, EdgeResponse) {
+			return OutcomeRejectedPolicy, reasonReleaseGateFailed
+		}
+		if _, exists := snapshot.ReleasePlanKeys[plan.Key()]; exists {
+			return OutcomeRejectedConflict, reasonReleaseAlreadyExists
+		}
+	case "tekroo.command.release-plan.record-qualification",
 		"tekroo.command.release-plan.request-execution",
 		"tekroo.command.release-plan.record-result",
 		"tekroo.command.release-plan.record-reconciliation",
-		"tekroo.command.release-plan.finalize",
-		"tekroo.command.story.approve-release":
-		return OutcomeRejectedPolicy, reasonReleaseNotImplemented
+		"tekroo.command.release-plan.finalize":
+		plan, found := snapshot.ReleasePlans[command.Target]
+		eventType, known := releaseEventTypeForCommand(command.CommandType)
+		if !found || !known || plan.Revision != snapshot.Revision || !payloadEvidenceMatches(object, command.EvidenceRefs) {
+			return OutcomeRejectedConflict, reasonReleaseNotFound
+		}
+		_, valid := ApplyReleaseEvent(plan, DomainEvent{EventID: context.EventID, EventType: eventType, Aggregate: command.Target, AggregateRevision: snapshot.Revision + 1, CommittedAt: context.DecidedAt, Payload: command.Payload})
+		if !valid {
+			return OutcomeRejectedPolicy, reasonReleaseGateFailed
+		}
 	case "tekroo.command.escalation.open":
 		if command.Authority.Kind != PrincipalPolicy || !payloadEvidenceMatches(object, command.EvidenceRefs) {
 			return OutcomeRejectedUnauthorized, reasonUnauthorized
@@ -134,7 +166,27 @@ func validateCommandPolicy(command KernelCommand, snapshot Snapshot, context Dec
 			}
 		}
 	case "tekroo.command.story.request-acceptance":
-		return OutcomeRejectedPolicy, reasonReleaseNotImplemented
+		var value struct {
+			ReleaseMode             ReleaseMode `json:"release_mode"`
+			ReleasePlanID           UUIDv7      `json:"release_plan_id"`
+			ReleasePlanRevision     uint64      `json:"release_plan_revision"`
+			ReleaseFinalizedEventID UUIDv7      `json:"release_finalized_event_id"`
+			QualifiedTreeDigest     string      `json:"qualified_tree_digest"`
+		}
+		if json.Unmarshal(command.Payload, &value) != nil || !payloadEvidenceMatches(object, command.EvidenceRefs) {
+			return OutcomeRejectedInvalid, reasonInvalidPayload
+		}
+		planRef := AggregateRef{Kind: AggregateReleasePlan, ID: value.ReleasePlanID}
+		plan, found := snapshot.ReleasePlans[planRef]
+		if !found || plan.Story != command.Target || plan.Revision != value.ReleasePlanRevision || plan.FinalizationEventID != value.ReleaseFinalizedEventID || plan.Mode != value.ReleaseMode || !containsAggregatePrecondition(command.Preconditions, planRef) || !containsDagParent(command.Causation, value.ReleaseFinalizedEventID, EdgeResponse) {
+			return OutcomeRejectedPolicy, reasonReleaseGateFailed
+		}
+		if value.ReleaseMode == ReleaseModeCode && (plan.State != ReleaseReadyForAcceptance || plan.ExpectedQualifiedTree != value.QualifiedTreeDigest || plan.ProviderTreeDigest != value.QualifiedTreeDigest) {
+			return OutcomeRejectedPolicy, reasonReleaseGateFailed
+		}
+		if value.ReleaseMode == ReleaseModeNotRequired && plan.State != ReleaseNotRequired {
+			return OutcomeRejectedPolicy, reasonReleaseGateFailed
+		}
 	case "tekroo.command.completion-review.open":
 		if command.Authority.Kind != PrincipalPolicy {
 			return OutcomeRejectedUnauthorized, reasonUnauthorized

@@ -53,6 +53,8 @@ type Store struct {
 	reviews             map[kernel.AggregateRef]kernel.CompletionReviewSnapshot
 	escalations         map[kernel.AggregateRef]kernel.EscalationSnapshot
 	escalationKeys      map[kernel.EscalationKey]kernel.AggregateRef
+	releasePlans        map[kernel.AggregateRef]kernel.ReleasePlanSnapshot
+	releasePlanKeys     map[kernel.ReleasePlanKey]kernel.AggregateRef
 	eventQualifications map[kernel.UUIDv7]string
 	attemptBudgets      map[kernel.AttemptBudgetKey]kernel.AttemptBudgetSnapshot
 	faultPoint          FaultPoint
@@ -106,6 +108,8 @@ func NewStore(policy ...kernel.AuthorizationPolicy) *Store {
 		reviews:             make(map[kernel.AggregateRef]kernel.CompletionReviewSnapshot),
 		escalations:         make(map[kernel.AggregateRef]kernel.EscalationSnapshot),
 		escalationKeys:      make(map[kernel.EscalationKey]kernel.AggregateRef),
+		releasePlans:        make(map[kernel.AggregateRef]kernel.ReleasePlanSnapshot),
+		releasePlanKeys:     make(map[kernel.ReleasePlanKey]kernel.AggregateRef),
 		eventQualifications: make(map[kernel.UUIDv7]string),
 		attemptBudgets:      make(map[kernel.AttemptBudgetKey]kernel.AttemptBudgetSnapshot),
 	}
@@ -186,6 +190,14 @@ func (s *Store) loadLocked(target kernel.AggregateRef, preconditions []kernel.Ag
 	snapshot.EscalationKeys = make(map[kernel.EscalationKey]kernel.AggregateRef, len(s.escalationKeys))
 	for key, escalation := range s.escalationKeys {
 		snapshot.EscalationKeys[key] = escalation
+	}
+	snapshot.ReleasePlans = make(map[kernel.AggregateRef]kernel.ReleasePlanSnapshot, len(s.releasePlans))
+	for release, progress := range s.releasePlans {
+		snapshot.ReleasePlans[release] = progress.Clone()
+	}
+	snapshot.ReleasePlanKeys = make(map[kernel.ReleasePlanKey]kernel.AggregateRef, len(s.releasePlanKeys))
+	for key, release := range s.releasePlanKeys {
+		snapshot.ReleasePlanKeys[key] = release
 	}
 	snapshot.AttemptBudgets = make(map[kernel.AttemptBudgetKey]kernel.AttemptBudgetSnapshot, len(s.attemptBudgets))
 	for key, budget := range s.attemptBudgets {
@@ -340,12 +352,21 @@ func (s *Store) Commit(ctx context.Context, expected kernel.Snapshot, decision k
 			return ErrConflict
 		}
 	}
+	for _, key := range decision.Guards.AbsentReleaseKeys {
+		if _, found := s.releasePlanKeys[key]; found {
+			return ErrConflict
+		}
+	}
 	if decision.AttemptBudget != nil {
 		if err := validateAttemptBudgetCommit(s.attemptBudgets, *decision.AttemptBudget); err != nil {
 			return err
 		}
 	}
 	escalationProjections, err := s.prepareEscalationProjections(decision.Events)
+	if err != nil {
+		return err
+	}
+	releaseProjections, err := s.prepareReleaseProjections(decision.Events)
 	if err != nil {
 		return err
 	}
@@ -368,6 +389,12 @@ func (s *Store) Commit(ctx context.Context, expected kernel.Snapshot, decision k
 		s.escalations[projection.reference] = projection.snapshot.Clone()
 		if projection.newKey != nil {
 			s.escalationKeys[*projection.newKey] = projection.reference
+		}
+	}
+	for _, projection := range releaseProjections {
+		s.releasePlans[projection.reference] = projection.snapshot.Clone()
+		if projection.newKey != nil {
+			s.releasePlanKeys[*projection.newKey] = projection.reference
 		}
 	}
 	if decision.AttemptBudget != nil {
@@ -426,6 +453,44 @@ func (s *Store) prepareEscalationProjections(events []kernel.DomainEvent) ([]esc
 				return nil, ErrInvalidDecision
 			}
 			projections = append(projections, escalationProjection{reference: event.Aggregate, snapshot: next})
+		}
+	}
+	return projections, nil
+}
+
+type releaseProjection struct {
+	reference kernel.AggregateRef
+	snapshot  kernel.ReleasePlanSnapshot
+	newKey    *kernel.ReleasePlanKey
+}
+
+func (s *Store) prepareReleaseProjections(events []kernel.DomainEvent) ([]releaseProjection, error) {
+	projections := make([]releaseProjection, 0, len(events))
+	for _, event := range events {
+		switch event.EventType {
+		case "tekroo.event.release-plan.created":
+			if event.Aggregate.Kind != kernel.AggregateReleasePlan || event.AggregateRevision != 1 {
+				return nil, ErrInvalidDecision
+			}
+			value, err := kernel.ReleasePlanFromCreatePayload(event.Payload, event.EventID)
+			if err != nil || value.ReleasePlanID != event.Aggregate.ID {
+				return nil, ErrInvalidDecision
+			}
+			key := value.Key()
+			if _, exists := s.releasePlanKeys[key]; exists {
+				return nil, ErrConflict
+			}
+			projections = append(projections, releaseProjection{reference: event.Aggregate, snapshot: value, newKey: &key})
+		case "tekroo.event.release-plan.qualification-recorded", "tekroo.event.release-plan.execution-requested", "tekroo.event.release-plan.result-recorded", "tekroo.event.release-plan.reconciliation-recorded", "tekroo.event.release-plan.finalized":
+			current, found := s.releasePlans[event.Aggregate]
+			if !found || current.Revision+1 != event.AggregateRevision {
+				return nil, ErrInvalidDecision
+			}
+			next, valid := kernel.ApplyReleaseEvent(current, event)
+			if !valid || next.Revision != event.AggregateRevision {
+				return nil, ErrInvalidDecision
+			}
+			projections = append(projections, releaseProjection{reference: event.Aggregate, snapshot: next})
 		}
 	}
 	return projections, nil

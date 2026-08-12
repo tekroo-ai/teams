@@ -69,7 +69,6 @@ func TestAllFrozenCommandsReachTheirDeclaredEventThroughEvaluator(t *testing.T) 
 	evaluator := kernel.Evaluator{Catalogue: loadCatalogue(t)}
 	executed := 0
 	applied := 0
-	failClosed := 0
 	for _, item := range fixtures.Fixtures {
 		if !strings.HasSuffix(item.FixtureID, "-VALID") {
 			continue
@@ -82,13 +81,6 @@ func TestAllFrozenCommandsReachTheirDeclaredEventThroughEvaluator(t *testing.T) 
 			}
 			command, snapshot := commandCase(t, item.When.CommandType, item.When.Payload, definition.TargetKinds[0], definition.AuthorityKinds[0], definition.ExecutionRequired, definition.RootAllowed)
 			decision := evaluate(t, evaluator, command, snapshot, validDecisionContext(t))
-			if item.When.CommandType == "tekroo.command.story.request-acceptance" || item.When.CommandType == "tekroo.command.story.approve-release" || strings.HasPrefix(item.When.CommandType, "tekroo.command.release-plan.") {
-				if decision.Receipt.OutcomeCode != kernel.OutcomeRejectedPolicy || decision.Receipt.ReasonCode != "RELEASE_NOT_IMPLEMENTED" || len(decision.Events) != 0 {
-					t.Fatalf("release-dependent command did not fail closed: %#v", decision)
-				}
-				failClosed++
-				return
-			}
 			if decision.Receipt.OutcomeCode != kernel.OutcomeApplied || len(decision.Events) != 1 || decision.Events[0].EventType != item.Then.Expected.EventTypes[0] {
 				t.Fatalf("decision = %#v", decision)
 			}
@@ -99,11 +91,8 @@ func TestAllFrozenCommandsReachTheirDeclaredEventThroughEvaluator(t *testing.T) 
 	if executed != 36 {
 		t.Fatalf("executed command cases = %d, want 36", executed)
 	}
-	if applied != 28 {
-		t.Fatalf("applied = %d, want 28", applied)
-	}
-	if failClosed != 8 {
-		t.Fatalf("fail-closed release-dependent cases = %d, want 8", failClosed)
+	if applied != 36 {
+		t.Fatalf("applied = %d, want 36", applied)
 	}
 }
 
@@ -609,8 +598,124 @@ func commandCase(t *testing.T, commandType string, payload json.RawMessage, targ
 			snapshot.Escalations = map[kernel.AggregateRef]kernel.EscalationSnapshot{command.Target: escalation}
 			snapshot.EscalationKeys = map[kernel.EscalationKey]kernel.AggregateRef{escalation.Key(): command.Target}
 		}
+		configureReleaseCommandCase(t, &command, &snapshot, object)
 	}
 	return command, snapshot
+}
+
+func configureReleaseCommandCase(t *testing.T, command *kernel.KernelCommand, snapshot *kernel.Snapshot, object map[string]any) {
+	t.Helper()
+	if command.CommandType == "tekroo.command.story.approve-release" {
+		storyID := kernel.UUIDv7(object["story_id"].(string))
+		revision := uint64(object["expected_story_revision"].(float64))
+		command.Target.ID = storyID
+		command.ExpectedRevision = kernel.NewExpectedRevision(revision)
+		epoch := uint64(object["lifecycle_epoch"].(float64))
+		command.ExpectedLifecycleEpoch = &epoch
+		command.Authority = kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "principal-author"}
+		snapshot.Exists = true
+		snapshot.Revision = revision
+		snapshot.State = &kernel.AggregateState{Kind: kernel.AggregateStory, ID: storyID, Revision: revision, LifecycleEpoch: epoch, Phase: kernel.PhaseCompleted, Condition: kernel.ConditionRunnable}
+		return
+	}
+
+	if command.CommandType == "tekroo.command.release-plan.create" {
+		plan, err := kernel.ReleasePlanFromCreatePayload(command.Payload, mustUUID(t, "00000000-0000-7000-8000-000000000748"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		command.Target.ID = plan.ReleasePlanID
+		command.ExpectedRevision = kernel.MustNotExist()
+		command.Preconditions = []kernel.AggregatePrecondition{{Aggregate: plan.Story, Expected: kernel.NewExpectedRevision(plan.ExpectedStoryRevision)}}
+		command.Causation = []kernel.DagParent{{ParentEventID: plan.AuthorApprovalEventID, EdgeKind: kernel.EdgeResponse}}
+		snapshot.Exists = false
+		snapshot.Revision = 0
+		snapshot.AcceptedEvents = map[kernel.UUIDv7]kernel.AcceptedEvent{plan.AuthorApprovalEventID: {EventType: "tekroo.event.story.release-approved"}}
+		snapshot.Related = map[kernel.AggregateRef]kernel.RelatedSnapshot{plan.Story: {
+			Exists: true, Revision: plan.ExpectedStoryRevision,
+			State: &kernel.AggregateState{Kind: kernel.AggregateStory, ID: plan.Story.ID, Revision: plan.ExpectedStoryRevision, LifecycleEpoch: plan.StoryLifecycleEpoch, Phase: kernel.PhaseCompleted, Condition: kernel.ConditionRunnable},
+		}}
+		snapshot.ReleasePlanKeys = map[kernel.ReleasePlanKey]kernel.AggregateRef{}
+		return
+	}
+
+	if !strings.HasPrefix(command.CommandType, "tekroo.command.release-plan.") && command.CommandType != "tekroo.command.story.request-acceptance" {
+		return
+	}
+
+	plan := releaseFixturePlan(t)
+	if command.CommandType == "tekroo.command.story.request-acceptance" {
+		plan.Revision = uint64(object["release_plan_revision"].(float64))
+		plan.State = kernel.ReleaseReadyForAcceptance
+		plan.Qualification = releaseFixtureQualification(plan, mustUUID(t, "00000000-0000-7000-8000-000000000758"))
+		plan.NextMergeIndex = uint64(len(plan.OrderedMerges))
+		plan.FinalizationEventID = kernel.UUIDv7(object["release_finalized_event_id"].(string))
+		plan.ProviderTreeDigest = object["qualified_tree_digest"].(string)
+		plan.Story = command.Target
+		planRef := kernel.AggregateRef{Kind: kernel.AggregateReleasePlan, ID: plan.ReleasePlanID}
+		command.Preconditions = []kernel.AggregatePrecondition{{Aggregate: planRef, Expected: kernel.NewExpectedRevision(plan.Revision)}}
+		command.Causation = []kernel.DagParent{{ParentEventID: plan.FinalizationEventID, EdgeKind: kernel.EdgeResponse}}
+		snapshot.AcceptedEvents = map[kernel.UUIDv7]kernel.AcceptedEvent{plan.FinalizationEventID: {EventType: "tekroo.event.release-plan.finalized"}}
+		snapshot.Related = map[kernel.AggregateRef]kernel.RelatedSnapshot{planRef: {Exists: true, Revision: plan.Revision}}
+		snapshot.ReleasePlans = map[kernel.AggregateRef]kernel.ReleasePlanSnapshot{planRef: plan}
+		return
+	}
+
+	command.Target.ID = plan.ReleasePlanID
+	plan.Revision = uint64(object["expected_release_revision"].(float64))
+	command.ExpectedRevision = kernel.NewExpectedRevision(plan.Revision)
+	snapshot.Exists = true
+	snapshot.Revision = plan.Revision
+	switch command.CommandType {
+	case "tekroo.command.release-plan.record-qualification":
+		plan.State = kernel.ReleasePlanned
+	case "tekroo.command.release-plan.request-execution":
+		plan.State = kernel.ReleaseQualified
+		plan.Qualification = releaseFixtureQualification(plan, mustUUID(t, "00000000-0000-7000-8000-000000000758"))
+	case "tekroo.command.release-plan.record-result":
+		plan.State = kernel.ReleaseExecuting
+		plan.Qualification = releaseFixtureQualification(plan, mustUUID(t, "00000000-0000-7000-8000-000000000758"))
+		plan.ActiveAttempt = &kernel.ReleaseAttempt{MergeID: kernel.UUIDv7(object["merge_id"].(string)), AttemptID: kernel.UUIDv7(object["attempt_id"].(string)), Round: 1, ProviderIdempotencyKey: "release-751-merge-752-round-1", RequestEventID: mustUUID(t, "00000000-0000-7000-8000-000000000758")}
+	case "tekroo.command.release-plan.record-reconciliation":
+		plan.State = kernel.ReleaseReconciling
+		plan.Qualification = releaseFixtureQualification(plan, mustUUID(t, "00000000-0000-7000-8000-000000000758"))
+		plan.ActiveAttempt = &kernel.ReleaseAttempt{MergeID: kernel.UUIDv7(object["merge_id"].(string)), AttemptID: kernel.UUIDv7(object["attempt_id"].(string)), Round: 1, ProviderIdempotencyKey: "release-751-merge-752-round-1", RequestEventID: mustUUID(t, "00000000-0000-7000-8000-000000000758")}
+		priorID := kernel.UUIDv7(object["supersedes_result_event_id"].(string))
+		plan.Results[plan.ActiveAttempt.MergeID] = kernel.ReleaseResult{MergeID: plan.ActiveAttempt.MergeID, AttemptID: plan.ActiveAttempt.AttemptID, Outcome: kernel.ReleaseOutcomeUnknown, ResultEventID: priorID}
+	case "tekroo.command.release-plan.finalize":
+		plan.State = kernel.ReleaseQualified
+		plan.Qualification = releaseFixtureQualification(plan, kernel.UUIDv7(object["qualification_event_id"].(string)))
+		plan.NextMergeIndex = uint64(len(plan.OrderedMerges))
+		plan.ProviderTreeDigest = plan.ExpectedQualifiedTree
+		resultID := kernel.UUIDv7(object["result_event_ids"].([]any)[0].(string))
+		merge := plan.OrderedMerges[0]
+		plan.Results[merge.MergeID] = kernel.ReleaseResult{MergeID: merge.MergeID, AttemptID: mustUUID(t, "00000000-0000-7000-8000-000000000755"), Outcome: kernel.ReleaseOutcomeMerged, ResultEventID: resultID, ObservedTree: plan.ExpectedQualifiedTree, Reconciled: true, ReconciliationEventID: resultID}
+	}
+	snapshot.ReleasePlans = map[kernel.AggregateRef]kernel.ReleasePlanSnapshot{command.Target: plan}
+}
+
+func releaseFixtureQualification(plan kernel.ReleasePlanSnapshot, eventID kernel.UUIDv7) *kernel.ReleaseQualification {
+	return &kernel.ReleaseQualification{
+		EventID: eventID, QualificationID: "00000000-0000-7000-8000-000000000754", QualifiedBaseCommit: plan.BaseCommit,
+		OrderedHeadCommits: []string{plan.OrderedMerges[0].HeadCommit}, QualifiedTreeDigest: plan.ExpectedQualifiedTree,
+		GateDefinition: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", Toolchain: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+		DependencyLock: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", ArtifactDigests: []kernel.Digest{"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"},
+	}
+}
+
+func releaseFixturePlan(t *testing.T) kernel.ReleasePlanSnapshot {
+	t.Helper()
+	return kernel.ReleasePlanSnapshot{
+		ReleasePlanID: mustUUID(t, "00000000-0000-7000-8000-000000000751"), OpeningEventID: mustUUID(t, "00000000-0000-7000-8000-000000000748"), Revision: 1, State: kernel.ReleasePlanned, Mode: kernel.ReleaseModeCode,
+		Story: kernel.AggregateRef{Kind: kernel.AggregateStory, ID: mustUUID(t, "00000000-0000-7000-8000-000000000101")}, StoryLifecycleEpoch: 1, ExpectedStoryRevision: 8,
+		Author: kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "principal-author"}, AuthorApprovalEventID: mustUUID(t, "00000000-0000-7000-8000-000000000749"), AuthorApprovalRevision: 1,
+		PolicyRevision: 1, PlanDigest: kernel.Digest("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), EvidenceIDs: []kernel.UUIDv7{mustUUID(t, "00000000-0000-7000-8000-000000000750")},
+		RepositoryURL: "https://example.invalid/tekroo/teams.git", BaseRef: "main", BaseCommit: "1111111111111111111111111111111111111111",
+		OrderedMerges: []kernel.ReleaseMergePlan{{MergeID: mustUUID(t, "00000000-0000-7000-8000-000000000752"), ChangeRef: "refs/heads/story-1", HeadCommit: "2222222222222222222222222222222222222222", Role: "story"}},
+		MergeStrategy: "FF_ONLY_ORDERED", GitVersion: "git version 2.51.0", ConflictPolicy: "FAIL_NO_IMPROVISATION", ContractManifest: kernel.ContractIdentity,
+		ManifestSHA256: kernel.Digest("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"), RequiredProfiles: []string{"contract-structure", "core-hermetic", "mongo-integration", "synthesized-merge"},
+		ExpectedQualifiedTree: "3333333333333333333333333333333333333333", ExecutionRoundLimit: 2, NextRound: 1, Results: map[kernel.UUIDv7]kernel.ReleaseResult{},
+	}
 }
 
 func stateForCommand(commandType string, target kernel.AggregateRef) *kernel.AggregateState {

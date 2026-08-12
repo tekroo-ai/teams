@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 	"sync"
 	"time"
 
@@ -21,13 +22,14 @@ import (
 )
 
 var (
-	ErrDeadlineRequired    = errors.New("mongo operation requires a context deadline")
-	ErrUnsupportedTopology = errors.New("mongo topology does not support transactions and change streams")
-	ErrMetadataMismatch    = errors.New("mongo kernel metadata mismatch")
-	ErrConflict            = errors.New("mongo decision precondition conflict")
-	ErrInvalidDecision     = errors.New("invalid mongo decision")
-	ErrCorruptAggregate    = errors.New("mongo aggregate snapshot contradicts event fold")
-	ErrInjectedFault       = errors.New("injected mongo transaction fault")
+	ErrDeadlineRequired             = errors.New("mongo operation requires a context deadline")
+	ErrUnsupportedTopology          = errors.New("mongo topology does not support transactions and change streams")
+	ErrMetadataMismatch             = errors.New("mongo kernel metadata mismatch")
+	ErrConflict                     = errors.New("mongo decision precondition conflict")
+	ErrInvalidDecision              = errors.New("invalid mongo decision")
+	ErrCorruptAggregate             = errors.New("mongo aggregate snapshot contradicts event fold")
+	ErrInjectedFault                = errors.New("injected mongo transaction fault")
+	ErrReleaseProjectionUnsupported = errors.New("mongo release-plan projection is not implemented")
 )
 
 type Config struct {
@@ -485,6 +487,9 @@ func (s *Store) Commit(ctx context.Context, expected kernel.Snapshot, decision k
 	if err := requireDeadline(ctx); err != nil {
 		return err
 	}
+	if releaseProjectionUnsupported(decision) {
+		return ErrReleaseProjectionUnsupported
+	}
 	if err := validateDecision(expected, decision); err != nil {
 		return err
 	}
@@ -516,6 +521,15 @@ func (s *Store) Commit(ctx context.Context, expected kernel.Snapshot, decision k
 		return kernel.ErrCommitUncertain
 	}
 	return nil
+}
+
+func releaseProjectionUnsupported(decision kernel.Decision) bool {
+	for _, event := range decision.Events {
+		if strings.HasPrefix(event.EventType, "tekroo.event.release-plan.") {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Store) commitTransaction(ctx context.Context, expected kernel.Snapshot, decision kernel.Decision) error {

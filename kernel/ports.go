@@ -69,3 +69,57 @@ type AgentExecutionEngine interface {
 	Inspect(context.Context, UUIDv7) (ExecutionObservation, error)
 	Reconcile(context.Context, UUIDv7) (ExecutionObservation, error)
 }
+
+type ReleaseProviderState string
+
+const (
+	ReleaseProviderMerged         ReleaseProviderState = "MERGED"
+	ReleaseProviderOpen           ReleaseProviderState = "OPEN"
+	ReleaseProviderClosedUnmerged ReleaseProviderState = "CLOSED_UNMERGED"
+	ReleaseProviderMissing        ReleaseProviderState = "MISSING"
+	ReleaseProviderUnavailable    ReleaseProviderState = "UNAVAILABLE"
+)
+
+// ReleaseMergeRequest is an immutable projection of one entry in the durable,
+// ordered release plan. Provider adapters must use ProviderIdempotencyKey as
+// the external mutation key and must not infer a different head, base, or
+// merge strategy.
+type ReleaseMergeRequest struct {
+	ReleasePlanID          UUIDv7
+	PlanDigest             Digest
+	MergeID                UUIDv7
+	AttemptID              UUIDv7
+	Round                  uint64
+	ProviderIdempotencyKey string
+	RepositoryURL          string
+	BaseRef                string
+	BaseCommit             string
+	ChangeRef              string
+	HeadCommit             string
+	MergeStrategy          string
+}
+
+func (request ReleaseMergeRequest) Valid() bool {
+	return request.ReleasePlanID.Valid() && request.PlanDigest.Valid() && request.MergeID.Valid() && request.AttemptID.Valid() && request.Round > 0 && request.ProviderIdempotencyKey != "" && request.RepositoryURL != "" && request.BaseRef != "" && request.BaseCommit != "" && request.ChangeRef != "" && request.HeadCommit != "" && request.MergeStrategy == "FF_ONLY_ORDERED"
+}
+
+// ReleaseProviderObservation is authoritative provider evidence for one
+// planned merge. Commit and tree fields are required only for successful
+// outcomes; failed and unavailable observations intentionally carry no
+// inferred repository identity.
+type ReleaseProviderObservation struct {
+	ReleasePlanID UUIDv7
+	MergeID       UUIDv7
+	AttemptID     UUIDv7
+	State         ReleaseProviderState
+	Outcome       ReleaseOutcome
+	BaseCommit    string
+	HeadCommit    string
+	TreeDigest    string
+	Reasons       []string
+}
+
+type ReleaseProvider interface {
+	Merge(context.Context, ReleaseMergeRequest) (ReleaseProviderObservation, error)
+	Reconcile(context.Context, ReleaseMergeRequest) (ReleaseProviderObservation, error)
+}

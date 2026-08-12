@@ -1,0 +1,164 @@
+{
+  "schemaVersion": "1.0.0",
+  "reportType": "PHASE_3_DETERMINISTIC_RELEASE_COORDINATION",
+  "status": "PASS",
+  "acceptedBaseCommit": "d994fa9cee8edae25fb561741c4decc3c9c459e6",
+  "acceptedBaseTree": "735d8d94166588589c4adae14934966432012d8f",
+  "contractIdentity": "tekroo.kernel.contracts/0.5.0",
+  "manifestSha256": "1b5a9a5d9ca1331e444f9d1c3e9ca63b77e1c0f3899dd84669f8668b52872213",
+  "sourceTreeSha256": "8bb6dedeccabd56ae9100acc1c363ea8a4d56530809e47a7686e9d8844f197ce",
+  "environment": {
+    "goVersion": "go1.26.4",
+    "goos": "darwin",
+    "goarch": "arm64",
+    "locale": "C",
+    "timeZone": "UTC"
+  },
+  "executed": {
+    "contractStructureChecks": 2889,
+    "contractFixtureCases": 138,
+    "focusedTestCases": 176,
+    "focusedTestFailures": 0,
+    "regressionTestCases": 388,
+    "regressionTestFailures": 0,
+    "vetFailures": 0
+  },
+  "assertions": [
+    {
+      "id": "RELEASE-001-EXACT-PLAN",
+      "status": "PASS",
+      "tests": [
+        "TestAllFrozenCommandsReachTheirDeclaredEventThroughEvaluator",
+        "TestStoreProjectsCompleteReleaseSequenceAndFencesDuplicateStoryPlan"
+      ],
+      "evidenceFloor": "Approval and planning bind the exact story lifecycle, immutable ordered merge inputs, reproducibility identities, policy revisions, evidence, and one semantic plan key."
+    },
+    {
+      "id": "RELEASE-002-INTENT-BEFORE-EFFECT",
+      "status": "PASS",
+      "tests": [
+        "TestReleaseCoordinatorPersistsIntentBeforeDeterministicProviderOutcomes"
+      ],
+      "evidenceFloor": "The provider is invoked only after an APPLIED execution-requested receipt for the exact next merge, attempt, round, and provider idempotency key."
+    },
+    {
+      "id": "RELEASE-003-AMBIGUITY-RECONCILIATION",
+      "status": "PASS",
+      "tests": [
+        "TestReleaseCoordinatorRecordsUnknownAfterTimeoutAndReplayIsIdentical",
+        "TestReleaseCoordinatorReconcilesUnknownWithoutAnotherMerge"
+      ],
+      "evidenceFloor": "Timeout and cancellation persist UNKNOWN; authoritative reconciliation supersedes that exact result and never initiates another merge."
+    },
+    {
+      "id": "RELEASE-004-PROVIDER-IDENTITY",
+      "status": "PASS",
+      "tests": [
+        "TestReleaseCoordinatorConvertsChangedProviderIdentityToUnknown",
+        "TestStoreProjectsCompleteReleaseSequenceAndFencesDuplicateStoryPlan",
+        "TestReleaseProjectionRetainsPartialOrderedProgressAndRejectsEarlyFinalization"
+      ],
+      "evidenceFloor": "Successful observations must match the planned base and head; partial progress remains ordered; finalization requires the exact qualification, complete effective result vector, and qualified provider tree."
+    },
+    {
+      "id": "RELEASE-005-DUPLICATE-CONVERGENCE",
+      "status": "PASS",
+      "tests": [
+        "TestReleaseProviderConcurrentDuplicateUsesOneIdempotentEffect",
+        "TestStoreProjectsCompleteReleaseSequenceAndFencesDuplicateStoryPlan"
+      ],
+      "evidenceFloor": "Concurrent duplicate provider calls share one idempotent effect and equivalent story-lifecycle plans have one transactional winner."
+    },
+    {
+      "id": "RELEASE-006-CONTRACT-CONFORMANCE",
+      "status": "PASS",
+      "tests": [
+        "TestAllFrozenCommandsReachTheirDeclaredEventThroughEvaluator",
+        "TestAcceptanceRequiresExactFinalizedReleaseAndOtherTerminalPathsRemainExplicit"
+      ],
+      "evidenceFloor": "All 36 frozen valid commands, including the eight release-dependent commands, reach their one declared event; story acceptance requires the exact finalized release projection."
+    },
+    {
+      "id": "RELEASE-007-EXCLUDED-STORES-FAIL-CLOSED",
+      "status": "PASS",
+      "tests": [
+        "TestMongoFailsClosedForUnimplementedReleaseProjection"
+      ],
+      "evidenceFloor": "The Mongo store explicitly rejects release-plan projection events; the candidate does not claim durable Mongo release coordination."
+    },
+    {
+      "id": "RELEASE-008-NON-CODE-TERMINAL",
+      "status": "PASS",
+      "tests": [
+        "TestNoReleaseRequiredFinalizesWithoutProviderIdentity"
+      ],
+      "evidenceFloor": "A non-code release finalizes explicitly without a merge plan, qualification, provider attempt, result, or inferred provider identity."
+    },
+    {
+      "id": "RELEASE-009-DIRECTED-MERGE-DAG",
+      "status": "PASS",
+      "tests": [
+        "TestReleaseCoordinatorLinksNextOrderedMergeToPriorEffectiveResult"
+      ],
+      "evidenceFloor": "Each later ordered merge responds to the prior merge's effective result; retries respond to the current merge's prior failed or reconciled result."
+    }
+  ],
+  "excludedProfiles": [
+    {
+      "profile": "real-release-provider",
+      "reason": "No GitHub, Git, forge, repository, branch, pull-request, or deployment mutation was performed; only the deterministic fake provider was exercised."
+    },
+    {
+      "profile": "mongo-release-projection",
+      "reason": "The Mongo decision store fails closed for release-plan events; implementing and validating its durable release projection requires a separately authorized slice."
+    },
+    {
+      "profile": "production-rollout-and-migration",
+      "reason": "Production deployment, migration execution, rollback, load, latency, and throughput are not exercised."
+    },
+    {
+      "profile": "openhands-and-sma",
+      "reason": "Release coordination does not alter OpenHands or SMA integration and performs no semantic-memory or model-call behavior."
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "OUTPUT/phase-3/step-10-implementation-contract-structure.json",
+      "sha256": "429491098a4e234b75e3e53af0c237ed00267e8277066cf784a45c254d7600a9"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-10-implementation-contract-reference.json",
+      "sha256": "a42d7f4efd87035ef4464c44f9b0394656efea42b0b2fb5115092c270ad39a15"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-10-release-coordination-tests.jsonl",
+      "sha256": "76a1543d66afe953aef26e85412c651b54cfe2ec9c8e313a52f081bacc403558"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-10-implementation-full-regression-tests.jsonl",
+      "sha256": "360dcf971752548d43d08b98e89c2b1c88860f4f4f3cca68933f5c2e108ef235"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-10-contract-acceptance.json",
+      "sha256": "47fa14622f91b48a41ab491c2088160d23962f3cc5e7e2276c0c008c45e875d2"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-10-contract-release-receipt.json",
+      "sha256": "e1e926ea448a6325d0821ec47de3509408532b74c58d94108c42a86aa6d06b20"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-10-implementation-authorization.json",
+      "sha256": "f4690379c5de34eba819febc5b3239c0ecf6253ded2a04c1b51a23ea7b6f5582"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-10-release-contract-gate.json",
+      "sha256": "0bd3532abe0866388f9c5f1ea8ba56d77b3fd7ecbca037ca0c833c9f3e11a35e"
+    },
+    {
+      "path": "docs/architecture/013-deterministic-release-coordination.md",
+      "sha256": "043fce5482d2c7918299b2700f3f564205e2c05a875bbeb7f3a922f6cf5bec40"
+    }
+  ],
+  "digestMethod": "SHA-256 of compact JSON with reportSha256 set to the empty string",
+  "reportSha256": "ea6ffd7715904c4fa20909e5a6d41b853b0ec359aa8254b9623528d04ef7b513"
+}

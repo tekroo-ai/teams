@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -147,6 +148,82 @@ func TestStoreTracksRevisionWithoutWorkState(t *testing.T) {
 	snapshot, err := store.Load(context.Background(), target)
 	if err != nil || !snapshot.Exists || snapshot.Revision != 1 || snapshot.State != nil {
 		t.Fatalf("generic snapshot = %#v, %v", snapshot, err)
+	}
+}
+
+func TestStoreProjectsCompleteReleaseSequenceAndFencesDuplicateStoryPlan(t *testing.T) {
+	store := memory.NewStore()
+	createPayload := json.RawMessage(`{"author":{"id":"principal-author","kind":"HUMAN"},"author_approval_event_id":"00000000-0000-7000-8000-000000000749","author_approval_revision":1,"base_commit":"1111111111111111111111111111111111111111","base_ref":"main","conflict_policy":"FAIL_NO_IMPROVISATION","contract_manifest":"tekroo.kernel.contracts/0.5.0","evidence_ids":["00000000-0000-7000-8000-000000000750"],"execution_round_limit":2,"expected_qualified_tree":"3333333333333333333333333333333333333333","expected_story_revision":8,"git_version":"git version 2.51.0","manifest_sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","merge_strategy":"FF_ONLY_ORDERED","ordered_merges":[{"change_ref":"refs/heads/story-1","head_commit":"2222222222222222222222222222222222222222","merge_id":"00000000-0000-7000-8000-000000000752","role":"story"}],"plan_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","release_mode":"CODE","release_plan_id":"00000000-0000-7000-8000-000000000751","release_policy_revision":1,"repository_url":"https://example.invalid/tekroo/teams.git","required_profiles":["contract-structure","core-hermetic","mongo-integration","synthesized-merge"],"story_id":"00000000-0000-7000-8000-000000000101","story_lifecycle_epoch":1}`)
+	target := kernel.AggregateRef{Kind: kernel.AggregateReleasePlan, ID: uuid("00000000-0000-7000-8000-000000000751")}
+	create := releaseProjectionDecision(t, 21, target, "tekroo.command.release-plan.create", "tekroo.event.release-plan.created", 1, createPayload)
+	key, err := kernel.ReleasePlanKeyFromCreatePayload(createPayload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	create.Guards.AbsentReleaseKeys = []kernel.ReleasePlanKey{key}
+	if err := store.Commit(context.Background(), kernel.Snapshot{}, create); err != nil {
+		t.Fatal(err)
+	}
+
+	transitions := []struct {
+		command string
+		event   string
+		payload json.RawMessage
+	}{
+		{command: "tekroo.command.release-plan.record-qualification", event: "tekroo.event.release-plan.qualification-recorded", payload: json.RawMessage(`{"artifact_digests":["ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"],"contract_manifest":"tekroo.kernel.contracts/0.5.0","dependency_lock_digest":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","evidence_ids":["00000000-0000-7000-8000-000000000750"],"expected_release_revision":1,"gate_definition_digest":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","manifest_sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","ordered_head_commits":["2222222222222222222222222222222222222222"],"plan_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","qualification_id":"00000000-0000-7000-8000-000000000754","qualified_base_commit":"1111111111111111111111111111111111111111","qualified_tree_digest":"3333333333333333333333333333333333333333","release_plan_id":"00000000-0000-7000-8000-000000000751","required_profiles":["contract-structure","core-hermetic","mongo-integration","synthesized-merge"],"toolchain_digest":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"}`)},
+		{command: "tekroo.command.release-plan.request-execution", event: "tekroo.event.release-plan.execution-requested", payload: json.RawMessage(`{"attempt_id":"00000000-0000-7000-8000-000000000755","evidence_ids":["00000000-0000-7000-8000-000000000750"],"expected_release_revision":2,"merge_id":"00000000-0000-7000-8000-000000000752","plan_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","provider_idempotency_key":"release-751-merge-752-round-1","release_plan_id":"00000000-0000-7000-8000-000000000751","round":1}`)},
+		{command: "tekroo.command.release-plan.record-result", event: "tekroo.event.release-plan.result-recorded", payload: json.RawMessage(`{"attempt_id":"00000000-0000-7000-8000-000000000755","evidence_ids":["00000000-0000-7000-8000-000000000756"],"expected_release_revision":3,"merge_id":"00000000-0000-7000-8000-000000000752","observed_at":"2026-08-11T12:00:00Z","outcome":"UNKNOWN","plan_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","reasons":["provider response was not terminal"],"release_plan_id":"00000000-0000-7000-8000-000000000751"}`)},
+		{command: "tekroo.command.release-plan.record-reconciliation", event: "tekroo.event.release-plan.reconciliation-recorded", payload: nil},
+		{command: "tekroo.command.release-plan.finalize", event: "tekroo.event.release-plan.finalized", payload: nil},
+	}
+	for index := 0; index < 3; index++ {
+		snapshot, loadErr := store.Load(context.Background(), target)
+		if loadErr != nil {
+			t.Fatal(loadErr)
+		}
+		decision := releaseProjectionDecision(t, 22+index, target, transitions[index].command, transitions[index].event, uint64(index+2), transitions[index].payload)
+		if err := store.Commit(context.Background(), snapshot, decision); err != nil {
+			t.Fatalf("%s: %v", transitions[index].event, err)
+		}
+	}
+
+	snapshot, err := store.Load(context.Background(), target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	unknown := snapshot.ReleasePlans[target]
+	priorResultID := unknown.Results[unknown.OrderedMerges[0].MergeID].ResultEventID
+	transitions[3].payload = json.RawMessage(fmt.Sprintf(`{"attempt_id":"00000000-0000-7000-8000-000000000755","evidence_ids":["00000000-0000-7000-8000-000000000756"],"expected_release_revision":4,"merge_id":"00000000-0000-7000-8000-000000000752","observed_at":"2026-08-11T12:01:00Z","observed_base_commit":"1111111111111111111111111111111111111111","observed_head_commit":"2222222222222222222222222222222222222222","observed_tree_digest":"3333333333333333333333333333333333333333","outcome":"MERGED","plan_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","provider_state":"MERGED","reasons":["provider reports exact planned head merged"],"reconciliation_id":"00000000-0000-7000-8000-000000000759","release_plan_id":"00000000-0000-7000-8000-000000000751","supersedes_result_event_id":"%s"}`, priorResultID))
+	reconciliation := releaseProjectionDecision(t, 25, target, transitions[3].command, transitions[3].event, 5, transitions[3].payload)
+	if err := store.Commit(context.Background(), snapshot, reconciliation); err != nil {
+		t.Fatal(err)
+	}
+
+	snapshot, _ = store.Load(context.Background(), target)
+	plan := snapshot.ReleasePlans[target]
+	result := plan.Results[plan.OrderedMerges[0].MergeID]
+	transitions[4].payload = json.RawMessage(fmt.Sprintf(`{"evidence_ids":["00000000-0000-7000-8000-000000000750"],"expected_release_revision":5,"plan_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","provider_tree_digest":"3333333333333333333333333333333333333333","qualification_event_id":"%s","qualified_tree_digest":"3333333333333333333333333333333333333333","reasons":["all planned merges and the provider tree are verified"],"release_mode":"CODE","release_plan_id":"00000000-0000-7000-8000-000000000751","result_event_ids":["%s"],"terminal_status":"READY_FOR_ACCEPTANCE"}`, plan.Qualification.EventID, result.ReconciliationEventID))
+	wrongFinalPayload := json.RawMessage(strings.ReplaceAll(string(transitions[4].payload), string(result.ReconciliationEventID), "00000000-0000-7000-8000-000000000799"))
+	wrongFinalization := releaseProjectionDecision(t, 28, target, transitions[4].command, transitions[4].event, 6, wrongFinalPayload)
+	if err := store.Commit(context.Background(), snapshot, wrongFinalization); !errors.Is(err, memory.ErrInvalidDecision) {
+		t.Fatalf("unverified finalization error = %v, want ErrInvalidDecision", err)
+	}
+	finalization := releaseProjectionDecision(t, 26, target, transitions[4].command, transitions[4].event, 6, transitions[4].payload)
+	if err := store.Commit(context.Background(), snapshot, finalization); err != nil {
+		t.Fatal(err)
+	}
+
+	final, _ := store.Load(context.Background(), target)
+	if projected := final.ReleasePlans[target]; projected.State != kernel.ReleaseReadyForAcceptance || projected.Revision != 6 || projected.ProviderTreeDigest != projected.ExpectedQualifiedTree || projected.NextMergeIndex != 1 {
+		t.Fatalf("final release projection = %#v", projected)
+	}
+
+	duplicatePayload := json.RawMessage(strings.ReplaceAll(string(createPayload), "00000000-0000-7000-8000-000000000751", "00000000-0000-7000-8000-000000000771"))
+	duplicateTarget := kernel.AggregateRef{Kind: kernel.AggregateReleasePlan, ID: uuid("00000000-0000-7000-8000-000000000771")}
+	duplicate := releaseProjectionDecision(t, 27, duplicateTarget, "tekroo.command.release-plan.create", "tekroo.event.release-plan.created", 1, duplicatePayload)
+	duplicate.Guards.AbsentReleaseKeys = []kernel.ReleasePlanKey{key}
+	if err := store.Commit(context.Background(), kernel.Snapshot{}, duplicate); !errors.Is(err, memory.ErrConflict) {
+		t.Fatalf("duplicate story release error = %v, want ErrConflict", err)
 	}
 }
 
@@ -546,6 +623,21 @@ func completeDecision(t *testing.T) kernel.Decision {
 		Authority: kernel.AuthorityDecision{Principal: kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "principal"}, Allowed: true, Reason: "APPLIED"},
 		Outbox:    []kernel.OutboxIntent{{IntentID: uuid("00000000-0000-7000-8000-000000000004"), EventID: eventID, Kind: "DOMAIN_EVENT"}},
 	}
+	return attachProvenance(t, decision)
+}
+
+func releaseProjectionDecision(t *testing.T, ordinal int, target kernel.AggregateRef, commandType, eventType string, revision uint64, payload json.RawMessage) kernel.Decision {
+	t.Helper()
+	decision := alternateDecision(t, ordinal)
+	decision.NextState = nil
+	decision.Receipt.Target = target
+	decision.Receipt.CommandType = commandType
+	decision.Receipt.ResultingRevision = &revision
+	decision.Events[0].Aggregate = target
+	decision.Events[0].EventType = eventType
+	decision.Events[0].AggregateRevision = revision
+	decision.Events[0].CommittedAt = time.Date(2026, time.August, 11, 12, 0, ordinal, 0, time.UTC)
+	decision.Events[0].Payload = append(json.RawMessage(nil), payload...)
 	return attachProvenance(t, decision)
 }
 

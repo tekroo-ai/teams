@@ -71,30 +71,49 @@ func TestCompletionRequiresExactEvidenceCriteriaValidationAndDependencies(t *tes
 	}
 }
 
-func TestAcceptanceFailsClosedUntilReleaseImplementationAndOtherTerminalPathsRemainExplicit(t *testing.T) {
+func TestAcceptanceRequiresExactFinalizedReleaseAndOtherTerminalPathsRemainExplicit(t *testing.T) {
 	evaluator := kernel.Evaluator{Catalogue: loadCatalogue(t)}
 	context := validDecisionContext(t)
 	evidenceID := mustUUID(t, "00000000-0000-7000-8000-0000000000f1")
 	evidenceDigest := mustDigest(t, "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
-	parentID := mustUUID(t, "00000000-0000-7000-8000-0000000000f4")
+	parentID := mustUUID(t, "00000000-0000-7000-8000-000000000760")
 	command := validStoryCreateCommand(t)
 	command.CommandType = "tekroo.command.story.request-acceptance"
 	command.ExpectedRevision = kernel.NewExpectedRevision(7)
 	command.Payload = json.RawMessage(`{"lifecycle_epoch":1,"acceptance_policy_revision":4,"release_mode":"CODE","release_plan_id":"00000000-0000-7000-8000-000000000751","release_plan_revision":8,"release_finalized_event_id":"00000000-0000-7000-8000-000000000760","qualified_tree_digest":"3333333333333333333333333333333333333333","evidence_ids":["00000000-0000-7000-8000-0000000000f1"]}`)
 	command.EvidenceRefs = []kernel.EvidenceRef{{EvidenceID: evidenceID, SHA256: evidenceDigest}}
-	command.Causation = []kernel.DagParent{{ParentEventID: parentID, EdgeKind: kernel.EdgeCausal}}
+	command.Causation = []kernel.DagParent{{ParentEventID: parentID, EdgeKind: kernel.EdgeResponse}}
+	plan := releaseFixturePlan(t)
+	plan.Story = command.Target
+	plan.Revision = 8
+	plan.State = kernel.ReleaseReadyForAcceptance
+	plan.Qualification = releaseFixtureQualification(plan, mustUUID(t, "00000000-0000-7000-8000-000000000758"))
+	plan.NextMergeIndex = uint64(len(plan.OrderedMerges))
+	plan.FinalizationEventID = parentID
+	plan.ProviderTreeDigest = plan.ExpectedQualifiedTree
+	planRef := kernel.AggregateRef{Kind: kernel.AggregateReleasePlan, ID: plan.ReleasePlanID}
+	command.Preconditions = []kernel.AggregatePrecondition{{Aggregate: planRef, Expected: kernel.NewExpectedRevision(plan.Revision)}}
 	snapshot := kernel.Snapshot{
 		Exists: true, Revision: 7,
 		State:          &kernel.AggregateState{Kind: kernel.AggregateStory, ID: command.Target.ID, Revision: 7, LifecycleEpoch: 1, Phase: kernel.PhaseCompleted, Condition: kernel.ConditionRunnable},
 		Evidence:       map[kernel.UUIDv7]kernel.EvidenceMetadata{evidenceID: {SHA256: evidenceDigest, Available: true}},
-		AcceptedEvents: map[kernel.UUIDv7]kernel.AcceptedEvent{parentID: {EventType: "tekroo.event.story.completed"}},
+		AcceptedEvents: map[kernel.UUIDv7]kernel.AcceptedEvent{parentID: {EventType: "tekroo.event.release-plan.finalized"}},
+		Related:        map[kernel.AggregateRef]kernel.RelatedSnapshot{planRef: {Exists: true, Revision: plan.Revision}},
+		ReleasePlans:   map[kernel.AggregateRef]kernel.ReleasePlanSnapshot{planRef: plan},
 	}
 	grant := grantFor(command.Authority, command, context.Provenance.GrantDigests[0])
 	snapshot.Authorization = authorizationPolicy(grant)
 	snapshot.Authorization.Requirements.AcceptancePolicyRevision = 4
-	if decision := evaluate(t, evaluator, command, snapshot, context); decision.Receipt.OutcomeCode != kernel.OutcomeRejectedPolicy || decision.Receipt.ReasonCode != "RELEASE_NOT_IMPLEMENTED" || decision.NextState != nil {
-		t.Fatalf("acceptance fail-closed decision = %#v", decision)
+	if decision := evaluate(t, evaluator, command, snapshot, context); decision.Receipt.OutcomeCode != kernel.OutcomeApplied || decision.NextState == nil || decision.NextState.Phase != kernel.PhaseAccepted {
+		t.Fatalf("acceptance decision = %#v", decision)
 	}
+	stalePlan := plan
+	stalePlan.ProviderTreeDigest = "4444444444444444444444444444444444444444"
+	snapshot.ReleasePlans[planRef] = stalePlan
+	if decision := evaluate(t, evaluator, command, snapshot, context); decision.Receipt.OutcomeCode != kernel.OutcomeRejectedPolicy || decision.Receipt.ReasonCode != "RELEASE_GATE_FAILED" || decision.NextState != nil {
+		t.Fatalf("tree mismatch decision = %#v", decision)
+	}
+	snapshot.ReleasePlans[planRef] = plan
 
 	reopen := command
 	reopen.CommandType = "tekroo.command.work.reopen"
