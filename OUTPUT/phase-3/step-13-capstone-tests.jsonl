@@ -1,0 +1,12 @@
+{"Time":"2026-08-12T02:17:42.290595Z","Action":"start","Package":"github.com/tekroo-ai/teams/adapters/mongo"}
+{"Time":"2026-08-12T02:17:43.520879Z","Action":"run","Package":"github.com/tekroo-ai/teams/adapters/mongo","Test":"TestIsolatedCapstonePersistsExactReleaseBeforeStoryAcceptance"}
+{"Time":"2026-08-12T02:17:43.520988Z","Action":"output","Package":"github.com/tekroo-ai/teams/adapters/mongo","Test":"TestIsolatedCapstonePersistsExactReleaseBeforeStoryAcceptance","Output":"=== RUN   TestIsolatedCapstonePersistsExactReleaseBeforeStoryAcceptance\n"}
+{"Time":"2026-08-12T02:17:44.494657Z","Action":"output","Package":"github.com/tekroo-ai/teams/adapters/mongo","Test":"TestIsolatedCapstonePersistsExactReleaseBeforeStoryAcceptance","Output":"--- PASS: TestIsolatedCapstonePersistsExactReleaseBeforeStoryAcceptance (0.97s)\n"}
+{"Time":"2026-08-12T02:17:44.494687Z","Action":"pass","Package":"github.com/tekroo-ai/teams/adapters/mongo","Test":"TestIsolatedCapstonePersistsExactReleaseBeforeStoryAcceptance","Elapsed":0.97}
+{"Time":"2026-08-12T02:17:44.494702Z","Action":"run","Package":"github.com/tekroo-ai/teams/adapters/mongo","Test":"TestCapstoneFixtureUsesNoNetworkRepository"}
+{"Time":"2026-08-12T02:17:44.494704Z","Action":"output","Package":"github.com/tekroo-ai/teams/adapters/mongo","Test":"TestCapstoneFixtureUsesNoNetworkRepository","Output":"=== RUN   TestCapstoneFixtureUsesNoNetworkRepository\n"}
+{"Time":"2026-08-12T02:17:44.617329Z","Action":"output","Package":"github.com/tekroo-ai/teams/adapters/mongo","Test":"TestCapstoneFixtureUsesNoNetworkRepository","Output":"--- PASS: TestCapstoneFixtureUsesNoNetworkRepository (0.12s)\n"}
+{"Time":"2026-08-12T02:17:44.617345Z","Action":"pass","Package":"github.com/tekroo-ai/teams/adapters/mongo","Test":"TestCapstoneFixtureUsesNoNetworkRepository","Elapsed":0.12}
+{"Time":"2026-08-12T02:17:44.617523Z","Action":"output","Package":"github.com/tekroo-ai/teams/adapters/mongo","Output":"PASS\n"}
+{"Time":"2026-08-12T02:17:45.923238Z","Action":"output","Package":"github.com/tekroo-ai/teams/adapters/mongo","Output":"ok  \tgithub.com/tekroo-ai/teams/adapters/mongo\t3.632s\n"}
+{"Time":"2026-08-12T02:17:45.923272Z","Action":"pass","Package":"github.com/tekroo-ai/teams/adapters/mongo","Elapsed":3.633}

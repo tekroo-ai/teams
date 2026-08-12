@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "PRINCIPAL_ACCEPTANCE",
+  "recordedOn": "2026-08-11",
+  "timePrecision": "DAY",
+  "principalStatement": "Accept, push and proceed to the next step.",
+  "acceptedPhase": "PHASE_3",
+  "acceptedStep": "STEP_12_DURABLE_MONGODB_RELEASE_PLAN_PROJECTION",
+  "acceptedCommit": "876787ccd12ba5d02437ab8f3097058696491561",
+  "acceptedTree": "77d09a6903b80022ab3c15c91d00f5210de01f84",
+  "acceptedGate": "OUTPUT/phase-3/step-12-mongo-release-projection-gate.json",
+  "gateReportSha256": "439c19611944d0e9714c1d61b9bbaea6178c1cdf71202ec0d9817fd2e4189b50",
+  "scope": "Acceptance applies to the transactional MongoDB release-plan projection qualified by the Step 12 gate and not to network Git providers, historical migration, production deployment, OpenHands, or SMA profiles."
+}

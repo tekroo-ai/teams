@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "RELEASE_RECEIPT",
+  "recordedOn": "2026-08-11",
+  "timePrecision": "DAY",
+  "repository": "https://github.com/tekroo-ai/teams.git",
+  "branch": "main",
+  "releasedCommit": "876787ccd12ba5d02437ab8f3097058696491561",
+  "releasedTree": "77d09a6903b80022ab3c15c91d00f5210de01f84",
+  "remoteObservedCommit": "876787ccd12ba5d02437ab8f3097058696491561",
+  "remoteObservedTree": "77d09a6903b80022ab3c15c91d00f5210de01f84",
+  "verificationMethod": [
+    "git push origin main",
+    "git ls-remote origin refs/heads/main",
+    "git rev-parse origin/main^{tree}"
+  ],
+  "contractIdentity": "tekroo.kernel.contracts/0.5.0",
+  "gateReport": "OUTPUT/phase-3/step-12-mongo-release-projection-gate.json",
+  "gateReportSha256": "439c19611944d0e9714c1d61b9bbaea6178c1cdf71202ec0d9817fd2e4189b50",
+  "qualificationBoundary": "Only the accepted transactional MongoDB release-plan projection is released; network Git, historical migration, production deployment, OpenHands, and SMA remain unqualified."
+}

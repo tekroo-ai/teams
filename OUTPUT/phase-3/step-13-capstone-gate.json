@@ -1,0 +1,143 @@
+{
+  "schemaVersion": "1.0.0",
+  "reportType": "PHASE_3_ISOLATED_DETERMINISTIC_CAPSTONE",
+  "status": "PASS",
+  "acceptedBaseCommit": "876787ccd12ba5d02437ab8f3097058696491561",
+  "acceptedBaseTree": "77d09a6903b80022ab3c15c91d00f5210de01f84",
+  "contractIdentity": "tekroo.kernel.contracts/0.5.0",
+  "manifestSha256": "1b5a9a5d9ca1331e444f9d1c3e9ca63b77e1c0f3899dd84669f8668b52872213",
+  "sourceTreeSha256": "1c8cb9d514d471ec7689be481326149284834a16838c7066e8a7c41ec38ca9c8",
+  "environment": {
+    "goVersion": "go1.26.4",
+    "goos": "darwin",
+    "goarch": "arm64",
+    "gitVersion": "git version 2.54.0",
+    "mongoDbProfile": "fresh local single-node replica set",
+    "locale": "C",
+    "timeZone": "UTC"
+  },
+  "executed": {
+    "contractStructureChecks": 2889,
+    "contractFixtureCases": 138,
+    "capstoneRaceCases": 2,
+    "capstoneRaceFailures": 0,
+    "mongoIntegrationRaceCases": 29,
+    "mongoIntegrationRaceFailures": 0,
+    "fullRegressionRaceCases": 405,
+    "fullRegressionRaceFailures": 0,
+    "vetFailures": 0
+  },
+  "assertions": [
+    {
+      "id": "CAPSTONE-001-COMPOSED-PATH",
+      "status": "PASS",
+      "tests": [
+        "TestIsolatedCapstonePersistsExactReleaseBeforeStoryAcceptance"
+      ],
+      "evidenceFloor": "The application handler, evaluator, Mongo store, release coordinator, local Git provider, protocol gateway, and HTTP adapter complete one deterministic release-to-acceptance path."
+    },
+    {
+      "id": "CAPSTONE-002-INTENT-BEFORE-EFFECT",
+      "status": "PASS",
+      "tests": [
+        "TestIsolatedCapstonePersistsExactReleaseBeforeStoryAcceptance"
+      ],
+      "evidenceFloor": "The provider observes the matching Mongo projection in EXECUTING state with the exact active attempt before it mutates the isolated Git ref."
+    },
+    {
+      "id": "CAPSTONE-003-EXACT-GIT-IDENTITY",
+      "status": "PASS",
+      "tests": [
+        "TestIsolatedCapstonePersistsExactReleaseBeforeStoryAcceptance",
+        "TestCapstoneFixtureUsesNoNetworkRepository"
+      ],
+      "evidenceFloor": "The test-owned local bare repository advances to the exact planned head and qualified tree without a network repository."
+    },
+    {
+      "id": "CAPSTONE-004-ACCEPTANCE-FENCE",
+      "status": "PASS",
+      "tests": [
+        "TestIsolatedCapstonePersistsExactReleaseBeforeStoryAcceptance"
+      ],
+      "evidenceFloor": "HTTP story acceptance is rejected before finalization and applied only after the exact finalized release projection is durable."
+    },
+    {
+      "id": "CAPSTONE-005-REPLAY-AND-RESTART",
+      "status": "PASS",
+      "tests": [
+        "TestIsolatedCapstonePersistsExactReleaseBeforeStoryAcceptance"
+      ],
+      "evidenceFloor": "Acceptance replay returns the original event; after restart the accepted story and terminal release projection reload with exact event counts."
+    },
+    {
+      "id": "CAPSTONE-006-LAYERED-REGRESSION",
+      "status": "PASS",
+      "tests": [
+        "contract structure runner",
+        "contract reference runner",
+        "Mongo integration race suite",
+        "full Go race suite",
+        "go vet"
+      ],
+      "evidenceFloor": "The released 0.5.0 contract and all prior repository profiles remain qualified."
+    }
+  ],
+  "excludedProfiles": [
+    {
+      "profile": "network-forge-and-existing-repositories",
+      "reason": "No forge API, credential, network repository, or pre-existing repository is used or mutated."
+    },
+    {
+      "profile": "historical-migration",
+      "reason": "No Tekroo v3 source or historical database is migrated or mutated."
+    },
+    {
+      "profile": "production-deployment-performance",
+      "reason": "Production topology, deployment, rollback, load, latency, throughput, and resource budgets are not exercised."
+    },
+    {
+      "profile": "openhands-and-sma-investigations",
+      "reason": "The separately gated OPENHANDS-Q1, SMA-Q1, and SMA-Q2 investigations are not executed."
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "OUTPUT/phase-3/step-13-contract-structure.json",
+      "sha256": "429491098a4e234b75e3e53af0c237ed00267e8277066cf784a45c254d7600a9"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-13-contract-reference.json",
+      "sha256": "a42d7f4efd87035ef4464c44f9b0394656efea42b0b2fb5115092c270ad39a15"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-13-capstone-tests.jsonl",
+      "sha256": "d2424e54cd2f63eaa8fa5bf211caa23895de5ee3b742de2d1a09459b253ae062"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-13-mongo-integration-tests.jsonl",
+      "sha256": "7fee235735c10e5e9ec582567ac0e2206410ff01fc8fa8f5b5003b8cac295053"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-13-full-regression-tests.jsonl",
+      "sha256": "91ebe3a7c15a806aa0b2c5b7da75b0d598010cc97db5045153b75e98bb896ce5"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-12-acceptance.json",
+      "sha256": "a61963a190a6ed3b2bd8dc8df9bba5e6b92a23afcdff40473ef96f9c5d544f65"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-12-release-receipt.json",
+      "sha256": "358b1794d6285b1d0181d476a89551a01e8cabf1fd242064ade219558e9d7c49"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-13-authorization.json",
+      "sha256": "13c21b899d2eaa41568afeda421dffb18e3a7b85212cebe0d8bdfd8d6f2c8eb1"
+    },
+    {
+      "path": "docs/architecture/016-isolated-deterministic-capstone.md",
+      "sha256": "f4df69c76ea602dd563251613b195966a36dad039b146f610a3f2fe96c255c2c"
+    }
+  ],
+  "digestMethod": "SHA-256 of compact JSON with reportSha256 set to the empty string",
+  "reportSha256": "e06864c838d745a03db33a730bcddac50564b786edc0bb4b88dcac3b2916db3f"
+}

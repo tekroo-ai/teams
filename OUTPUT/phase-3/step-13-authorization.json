@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "PRINCIPAL_AUTHORIZATION",
+  "recordedOn": "2026-08-11",
+  "timePrecision": "DAY",
+  "principalStatement": "Accept, push and proceed to the next step.",
+  "authorizedPhase": "PHASE_3",
+  "authorizedStep": "STEP_13_ISOLATED_DETERMINISTIC_CAPSTONE",
+  "acceptedInputCommit": "876787ccd12ba5d02437ab8f3097058696491561",
+  "acceptedInputTree": "77d09a6903b80022ab3c15c91d00f5210de01f84",
+  "architectureBasis": "OUTPUT/adjudication/phase-1b-architecture-handoff.json $.recommendedBootstrapSequence[6]",
+  "contractIdentity": "tekroo.kernel.contracts/0.5.0",
+  "scope": [
+    "Build an isolated deterministic capstone harness across the released transport, kernel, MongoDB, release coordinator, and local bare-Git provider boundaries.",
+    "Prove persisted intent precedes the provider effect, the exact planned head is merged, the provider result and terminal release projection are durable, and story acceptance is reachable only from that finalized projection.",
+    "Prove replay convergence and restart recovery using fresh test-owned MongoDB and Git fixtures.",
+    "Run the released contract runners, focused race-enabled capstone profile, full race-enabled regression profile, and vet."
+  ],
+  "excluded": [
+    "Contract package mutation or a new contract revision.",
+    "Network forge APIs, credentials, or mutation of pre-existing repositories.",
+    "Historical Tekroo v3 data migration or mutation.",
+    "Production deployment, performance qualification, OpenHands investigation, or SMA investigation."
+  ],
+  "releaseRule": "Freeze and report the Step 13 candidate locally; do not push it without subsequent principal acceptance."
+}
