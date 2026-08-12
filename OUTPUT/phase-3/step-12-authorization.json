@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "PRINCIPAL_AUTHORIZATION",
+  "recordedOn": "2026-08-11",
+  "timePrecision": "DAY",
+  "principalStatement": "Accept, push and proceed to the next step.",
+  "authorizedPhase": "PHASE_3",
+  "authorizedStep": "STEP_12_DURABLE_MONGODB_RELEASE_PLAN_PROJECTION",
+  "acceptedInputCommit": "e1e3035961f125048fe5cf4fd299ee2e52236a9d",
+  "acceptedInputTree": "a5985727db339d21aec9d56acd19a85c27d66b6f",
+  "contractIdentity": "tekroo.kernel.contracts/0.5.0",
+  "scope": [
+    "Implement transactional MongoDB persistence and reload of the existing release-plan projection.",
+    "Enforce one release plan per story lifecycle through the contract semantic key.",
+    "Apply the released release-plan event transition rules exactly and fail closed on stale or invalid writes.",
+    "Qualify restart recovery, exact event replay, duplicate races, transition conflicts, and organizational-acceptance lookup prerequisites."
+  ],
+  "excluded": [
+    "Contract package mutation or a new contract revision.",
+    "Network Git provider calls or external repository mutation from MongoDB qualification tests.",
+    "Production deployment, historical migration, OpenHands integration, or SMA integration."
+  ],
+  "releaseRule": "Freeze and report the Step 12 candidate locally; do not push it without subsequent principal acceptance."
+}

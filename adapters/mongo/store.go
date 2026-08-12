@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"strings"
 	"sync"
 	"time"
 
@@ -22,14 +21,13 @@ import (
 )
 
 var (
-	ErrDeadlineRequired             = errors.New("mongo operation requires a context deadline")
-	ErrUnsupportedTopology          = errors.New("mongo topology does not support transactions and change streams")
-	ErrMetadataMismatch             = errors.New("mongo kernel metadata mismatch")
-	ErrConflict                     = errors.New("mongo decision precondition conflict")
-	ErrInvalidDecision              = errors.New("invalid mongo decision")
-	ErrCorruptAggregate             = errors.New("mongo aggregate snapshot contradicts event fold")
-	ErrInjectedFault                = errors.New("injected mongo transaction fault")
-	ErrReleaseProjectionUnsupported = errors.New("mongo release-plan projection is not implemented")
+	ErrDeadlineRequired    = errors.New("mongo operation requires a context deadline")
+	ErrUnsupportedTopology = errors.New("mongo topology does not support transactions and change streams")
+	ErrMetadataMismatch    = errors.New("mongo kernel metadata mismatch")
+	ErrConflict            = errors.New("mongo decision precondition conflict")
+	ErrInvalidDecision     = errors.New("invalid mongo decision")
+	ErrCorruptAggregate    = errors.New("mongo aggregate snapshot contradicts event fold")
+	ErrInjectedFault       = errors.New("injected mongo transaction fault")
 )
 
 type Config struct {
@@ -356,6 +354,51 @@ func (s *Store) loadSnapshot(ctx context.Context, target kernel.AggregateRef, pr
 	}); err != nil {
 		return kernel.Snapshot{}, err
 	}
+	snapshot.ReleasePlanKeys = make(map[kernel.ReleasePlanKey]kernel.AggregateRef)
+	if err := scan(ctx, s.db.Collection("release_plan_keys"), bson.D{}, func(document valueDocument) error {
+		var value struct {
+			Key         kernel.ReleasePlanKey `json:"key"`
+			ReleasePlan kernel.AggregateRef   `json:"release_plan"`
+		}
+		if err := decode(document.Data, &value); err != nil {
+			return err
+		}
+		if !value.Key.Valid() || value.ReleasePlan.Kind != kernel.AggregateReleasePlan || !value.ReleasePlan.ID.Valid() || document.ID != releasePlanKey(value.Key) {
+			return ErrCorruptAggregate
+		}
+		snapshot.ReleasePlanKeys[value.Key] = value.ReleasePlan
+		return nil
+	}); err != nil {
+		return kernel.Snapshot{}, err
+	}
+	snapshot.ReleasePlans = make(map[kernel.AggregateRef]kernel.ReleasePlanSnapshot)
+	if err := scan(ctx, s.db.Collection("release_plans"), bson.D{}, func(document valueDocument) error {
+		var value struct {
+			ReleasePlan kernel.AggregateRef        `json:"release_plan"`
+			Progress    kernel.ReleasePlanSnapshot `json:"progress"`
+		}
+		if err := decode(document.Data, &value); err != nil {
+			return err
+		}
+		if value.ReleasePlan.Kind != kernel.AggregateReleasePlan || value.ReleasePlan.ID != value.Progress.ReleasePlanID || !value.Progress.Valid() || document.ID != aggregateKey(value.ReleasePlan) {
+			return ErrCorruptAggregate
+		}
+		snapshot.ReleasePlans[value.ReleasePlan] = value.Progress
+		return nil
+	}); err != nil {
+		return kernel.Snapshot{}, err
+	}
+	for key, reference := range snapshot.ReleasePlanKeys {
+		progress, found := snapshot.ReleasePlans[reference]
+		if !found || progress.Key() != key {
+			return kernel.Snapshot{}, ErrCorruptAggregate
+		}
+	}
+	for reference, progress := range snapshot.ReleasePlans {
+		if snapshot.ReleasePlanKeys[progress.Key()] != reference {
+			return kernel.Snapshot{}, ErrCorruptAggregate
+		}
+	}
 	snapshot.AttemptBudgets = make(map[kernel.AttemptBudgetKey]kernel.AttemptBudgetSnapshot)
 	if err := scan(ctx, s.db.Collection("attempt_budgets"), bson.D{}, func(document valueDocument) error {
 		var value struct {
@@ -487,9 +530,6 @@ func (s *Store) Commit(ctx context.Context, expected kernel.Snapshot, decision k
 	if err := requireDeadline(ctx); err != nil {
 		return err
 	}
-	if releaseProjectionUnsupported(decision) {
-		return ErrReleaseProjectionUnsupported
-	}
 	if err := validateDecision(expected, decision); err != nil {
 		return err
 	}
@@ -521,15 +561,6 @@ func (s *Store) Commit(ctx context.Context, expected kernel.Snapshot, decision k
 		return kernel.ErrCommitUncertain
 	}
 	return nil
-}
-
-func releaseProjectionUnsupported(decision kernel.Decision) bool {
-	for _, event := range decision.Events {
-		if strings.HasPrefix(event.EventType, "tekroo.event.release-plan.") {
-			return true
-		}
-	}
-	return false
 }
 
 func (s *Store) commitTransaction(ctx context.Context, expected kernel.Snapshot, decision kernel.Decision) error {
@@ -728,6 +759,15 @@ func (s *Store) checkGuards(ctx context.Context, expected kernel.Snapshot, decis
 			return err
 		}
 	}
+	for _, key := range decision.Guards.AbsentReleaseKeys {
+		err := s.db.Collection("release_plan_keys").FindOne(ctx, bson.D{{Key: "_id", Value: releasePlanKey(key)}}).Err()
+		if err == nil {
+			return ErrConflict
+		}
+		if !errors.Is(err, driver.ErrNoDocuments) {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -886,6 +926,51 @@ func (s *Store) applyRegistryAndReview(ctx context.Context, event kernel.DomainE
 			return "", ErrConflict
 		}
 		return "", nil
+	case "tekroo.event.release-plan.created":
+		if event.Aggregate.Kind != kernel.AggregateReleasePlan || event.AggregateRevision != 1 {
+			return "", ErrConflict
+		}
+		progress, err := kernel.ReleasePlanFromCreatePayload(event.Payload, event.EventID)
+		if err != nil || progress.ReleasePlanID != event.Aggregate.ID || progress.Revision != event.AggregateRevision {
+			return "", ErrConflict
+		}
+		key := progress.Key()
+		if err := s.insertValue(ctx, "release_plan_keys", releasePlanKey(key), struct {
+			Key         kernel.ReleasePlanKey `json:"key"`
+			ReleasePlan kernel.AggregateRef   `json:"release_plan"`
+		}{key, event.Aggregate}); err != nil {
+			return "", err
+		}
+		return "", s.insertValue(ctx, "release_plans", aggregateKey(event.Aggregate), struct {
+			ReleasePlan kernel.AggregateRef        `json:"release_plan"`
+			Progress    kernel.ReleasePlanSnapshot `json:"progress"`
+		}{event.Aggregate, progress})
+	case "tekroo.event.release-plan.qualification-recorded", "tekroo.event.release-plan.execution-requested", "tekroo.event.release-plan.result-recorded", "tekroo.event.release-plan.reconciliation-recorded", "tekroo.event.release-plan.finalized":
+		var document valueDocument
+		if err := s.db.Collection("release_plans").FindOne(ctx, bson.D{{Key: "_id", Value: aggregateKey(event.Aggregate)}}).Decode(&document); err != nil {
+			return "", err
+		}
+		var value struct {
+			ReleasePlan kernel.AggregateRef        `json:"release_plan"`
+			Progress    kernel.ReleasePlanSnapshot `json:"progress"`
+		}
+		if err := decode(document.Data, &value); err != nil || value.ReleasePlan != event.Aggregate || value.Progress.Revision+1 != event.AggregateRevision {
+			return "", ErrConflict
+		}
+		next, valid := kernel.ApplyReleaseEvent(value.Progress, event)
+		if !valid || next.Revision != event.AggregateRevision {
+			return "", ErrConflict
+		}
+		value.Progress = next
+		data, err := encode(value)
+		if err != nil {
+			return "", err
+		}
+		result, err := s.db.Collection("release_plans").ReplaceOne(ctx, bson.D{{Key: "_id", Value: aggregateKey(event.Aggregate)}}, valueDocument{ID: aggregateKey(event.Aggregate), Data: data})
+		if err != nil || result.ModifiedCount != 1 {
+			return "", ErrConflict
+		}
+		return "", nil
 	default:
 		return "", nil
 	}
@@ -1024,6 +1109,12 @@ func reviewKey(key kernel.CompletionReviewKey) string {
 }
 
 func escalationKey(key kernel.EscalationKey) string {
+	data, _ := encode(key)
+	digest := sha256.Sum256(data)
+	return hex.EncodeToString(digest[:])
+}
+
+func releasePlanKey(key kernel.ReleasePlanKey) string {
 	data, _ := encode(key)
 	digest := sha256.Sum256(data)
 	return hex.EncodeToString(digest[:])

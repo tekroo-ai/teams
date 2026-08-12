@@ -1,0 +1,150 @@
+{
+  "schemaVersion": "1.0.0",
+  "reportType": "PHASE_3_DURABLE_MONGODB_RELEASE_PLAN_PROJECTION",
+  "status": "PASS",
+  "acceptedBaseCommit": "e1e3035961f125048fe5cf4fd299ee2e52236a9d",
+  "acceptedBaseTree": "a5985727db339d21aec9d56acd19a85c27d66b6f",
+  "contractIdentity": "tekroo.kernel.contracts/0.5.0",
+  "manifestSha256": "1b5a9a5d9ca1331e444f9d1c3e9ca63b77e1c0f3899dd84669f8668b52872213",
+  "sourceTreeSha256": "502f30508ab274173f9e61fdec38eacd701fa12e8418c616b564ac30d0249fa2",
+  "environment": {
+    "goVersion": "go1.26.4",
+    "goos": "darwin",
+    "goarch": "arm64",
+    "mongoDbProfile": "fresh local single-node replica set",
+    "locale": "C",
+    "timeZone": "UTC"
+  },
+  "executed": {
+    "contractStructureChecks": 2889,
+    "contractFixtureCases": 138,
+    "mongoIntegrationRaceCases": 27,
+    "mongoIntegrationRaceFailures": 0,
+    "fullRegressionRaceCases": 405,
+    "fullRegressionRaceFailures": 0,
+    "vetFailures": 0
+  },
+  "assertions": [
+    {
+      "id": "MONGO-RELEASE-001-TRANSACTIONAL-SEQUENCE",
+      "status": "PASS",
+      "tests": [
+        "TestReleaseProjectionSurvivesRestartAndReplaysExactTerminalState"
+      ],
+      "evidenceFloor": "The six released release events and their projection changes commit atomically and reload as READY_FOR_ACCEPTANCE."
+    },
+    {
+      "id": "MONGO-RELEASE-002-RESTART",
+      "status": "PASS",
+      "tests": [
+        "TestReleaseProjectionSurvivesRestartAndReplaysExactTerminalState"
+      ],
+      "evidenceFloor": "A closed and reopened store reloads the release plan, opening event, revision, state, and semantic key."
+    },
+    {
+      "id": "MONGO-RELEASE-003-INVALID-FINALIZATION",
+      "status": "PASS",
+      "tests": [
+        "TestReleaseProjectionSurvivesRestartAndReplaysExactTerminalState"
+      ],
+      "evidenceFloor": "A finalization whose result vector does not identify the authoritative reconciliation is rejected transactionally."
+    },
+    {
+      "id": "MONGO-RELEASE-004-STALE-TRANSITION",
+      "status": "PASS",
+      "tests": [
+        "TestReleaseProjectionSurvivesRestartAndReplaysExactTerminalState"
+      ],
+      "evidenceFloor": "A valid transition evaluated from a stale release revision conflicts and does not append another event."
+    },
+    {
+      "id": "MONGO-RELEASE-005-SEMANTIC-RACE",
+      "status": "PASS",
+      "tests": [
+        "TestConcurrentReleaseCreationHasOneSemanticWinner"
+      ],
+      "evidenceFloor": "Two simultaneous creations for one story lifecycle yield exactly one committed binding and one conflict."
+    },
+    {
+      "id": "MONGO-RELEASE-006-ACCEPTANCE-LOOKUP",
+      "status": "PASS",
+      "tests": [
+        "TestReleaseProjectionSurvivesRestartAndReplaysExactTerminalState"
+      ],
+      "evidenceFloor": "Loading the story target includes the finalized release plan and story-lifecycle binding used by the acceptance policy."
+    },
+    {
+      "id": "MONGO-RELEASE-007-CORRUPTION-FENCE",
+      "status": "PASS",
+      "tests": [
+        "TestReleaseProjectionLoadFailsClosedOnCorruptSemanticBinding"
+      ],
+      "evidenceFloor": "A malformed or contradictory durable release binding is rejected rather than entering an evaluation snapshot."
+    },
+    {
+      "id": "MONGO-RELEASE-008-FORWARD-CONFORMANCE",
+      "status": "PASS",
+      "tests": [
+        "contract structure runner",
+        "contract reference runner",
+        "full Go race suite",
+        "go vet"
+      ],
+      "evidenceFloor": "The released 0.5.0 package and the full repository remain qualified."
+    }
+  ],
+  "excludedProfiles": [
+    {
+      "profile": "network-git-provider",
+      "reason": "No Git provider is called and no external repository is mutated."
+    },
+    {
+      "profile": "historical-migration",
+      "reason": "No historical v3 or pre-Step-12 database is migrated."
+    },
+    {
+      "profile": "production-deployment-performance",
+      "reason": "Deployment, rollback, load, latency, and throughput are not exercised."
+    },
+    {
+      "profile": "openhands-and-sma",
+      "reason": "No OpenHands or SMA behavior is changed."
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "OUTPUT/phase-3/step-12-contract-structure.json",
+      "sha256": "429491098a4e234b75e3e53af0c237ed00267e8277066cf784a45c254d7600a9"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-12-contract-reference.json",
+      "sha256": "a42d7f4efd87035ef4464c44f9b0394656efea42b0b2fb5115092c270ad39a15"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-12-mongo-release-projection-tests.jsonl",
+      "sha256": "4f14aa8184b318cad46e5979646459b78da50089f12f026d74f1826e7f6db7f0"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-12-full-regression-tests.jsonl",
+      "sha256": "6b43bedb199e4ea551c836ba1e00d3d62fdce7962347ab4d77211436f49b8cdf"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-11-acceptance.json",
+      "sha256": "c3bbc4237a1097b92d869f926a66621fba963fccf887f22f1f5320bf4f4204ea"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-11-release-receipt.json",
+      "sha256": "6cecb215e3eaa952f3c0e207aa630e73b01fb6d7545e52a42b77e602da27c960"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-12-authorization.json",
+      "sha256": "f65bac4e811183711efc88b47a8e37281181d4679d00348d99bc0ca1347ae295"
+    },
+    {
+      "path": "docs/architecture/015-durable-mongo-release-projection.md",
+      "sha256": "2fde9915d4bc6e1a8db89f5a013910503558b4c76b83bc5d3ab690bc6a285d9b"
+    }
+  ],
+  "digestMethod": "SHA-256 of compact JSON with ReportSHA256 set to the empty string",
+  "reportSha256": "0d56a3361b8a79f8bbea4eb067dbc5737e13acb65858639b7a2bc22fb1b917e4"
+}

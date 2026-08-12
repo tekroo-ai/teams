@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -263,6 +264,178 @@ func TestEscalationProjectionSurvivesRestartAndRejectsSemanticDuplicate(t *testi
 	terminal := final.Escalations[opening.Receipt.Target]
 	if terminal.State != kernel.EscalationTerminal || terminal.TerminalOutcome != kernel.EscalationResolved || terminal.Revision != 2 || terminal.ResolutionEventID != resolution.Events[0].EventID {
 		t.Fatalf("terminal projection = %#v", terminal)
+	}
+}
+
+func TestReleaseProjectionSurvivesRestartAndReplaysExactTerminalState(t *testing.T) {
+	database := nextDatabase(t)
+	config := testConfig(testMongoURI, database)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	store, err := Open(ctx, config)
+	cancel()
+	if err != nil {
+		t.Fatal(err)
+	}
+	createPayload := mongoReleaseCreatePayload("00000000-0000-7000-8000-000000000751")
+	target := kernel.AggregateRef{Kind: kernel.AggregateReleasePlan, ID: testUUID(0x751)}
+	create := mongoReleaseDecision(t, 101, target, "tekroo.command.release-plan.create", "tekroo.event.release-plan.created", 1, createPayload)
+	key, err := kernel.ReleasePlanKeyFromCreatePayload(createPayload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	create.Guards.AbsentReleaseKeys = []kernel.ReleasePlanKey{key}
+	commitMongoRelease(t, store, kernel.Snapshot{}, create)
+
+	ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
+	if err := store.Close(ctx); err != nil {
+		t.Fatal(err)
+	}
+	cancel()
+	ctx, cancel = context.WithTimeout(context.Background(), 15*time.Second)
+	reopened, err := Open(ctx, config)
+	cancel()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		_ = reopened.db.Drop(ctx)
+		_ = reopened.Close(ctx)
+	})
+
+	snapshot := loadMongoRelease(t, reopened, target)
+	if projected := snapshot.ReleasePlans[target]; projected.State != kernel.ReleasePlanned || projected.Revision != 1 || snapshot.ReleasePlanKeys[key] != target {
+		t.Fatalf("created release projection after restart = %#v, keys=%#v", projected, snapshot.ReleasePlanKeys)
+	}
+	qualificationPayload := json.RawMessage(`{"artifact_digests":["ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"],"contract_manifest":"tekroo.kernel.contracts/0.5.0","dependency_lock_digest":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","evidence_ids":["00000000-0000-7000-8000-000000000750"],"expected_release_revision":1,"gate_definition_digest":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","manifest_sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","ordered_head_commits":["2222222222222222222222222222222222222222"],"plan_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","qualification_id":"00000000-0000-7000-8000-000000000754","qualified_base_commit":"1111111111111111111111111111111111111111","qualified_tree_digest":"3333333333333333333333333333333333333333","release_plan_id":"00000000-0000-7000-8000-000000000751","required_profiles":["contract-structure","core-hermetic","mongo-integration","synthesized-merge"],"toolchain_digest":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"}`)
+	qualification := mongoReleaseDecision(t, 102, target, "tekroo.command.release-plan.record-qualification", "tekroo.event.release-plan.qualification-recorded", 2, qualificationPayload)
+	commitMongoRelease(t, reopened, snapshot, qualification)
+
+	qualified := loadMongoRelease(t, reopened, target)
+	requestPayload := json.RawMessage(`{"attempt_id":"00000000-0000-7000-8000-000000000755","evidence_ids":["00000000-0000-7000-8000-000000000750"],"expected_release_revision":2,"merge_id":"00000000-0000-7000-8000-000000000752","plan_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","provider_idempotency_key":"release-751-merge-752-round-1","release_plan_id":"00000000-0000-7000-8000-000000000751","round":1}`)
+	request := mongoReleaseDecision(t, 103, target, "tekroo.command.release-plan.request-execution", "tekroo.event.release-plan.execution-requested", 3, requestPayload)
+	commitMongoRelease(t, reopened, qualified, request)
+
+	executing := loadMongoRelease(t, reopened, target)
+	unknownPayload := json.RawMessage(`{"attempt_id":"00000000-0000-7000-8000-000000000755","evidence_ids":["00000000-0000-7000-8000-000000000756"],"expected_release_revision":3,"merge_id":"00000000-0000-7000-8000-000000000752","observed_at":"2026-08-11T12:00:00Z","outcome":"UNKNOWN","plan_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","reasons":["provider response was not terminal"],"release_plan_id":"00000000-0000-7000-8000-000000000751"}`)
+	unknown := mongoReleaseDecision(t, 104, target, "tekroo.command.release-plan.record-result", "tekroo.event.release-plan.result-recorded", 4, unknownPayload)
+	commitMongoRelease(t, reopened, executing, unknown)
+
+	reconciling := loadMongoRelease(t, reopened, target)
+	priorResultID := reconciling.ReleasePlans[target].Results[testUUID(0x752)].ResultEventID
+	reconciliationPayload := json.RawMessage(fmt.Sprintf(`{"attempt_id":"00000000-0000-7000-8000-000000000755","evidence_ids":["00000000-0000-7000-8000-000000000756"],"expected_release_revision":4,"merge_id":"00000000-0000-7000-8000-000000000752","observed_at":"2026-08-11T12:01:00Z","observed_base_commit":"1111111111111111111111111111111111111111","observed_head_commit":"2222222222222222222222222222222222222222","observed_tree_digest":"3333333333333333333333333333333333333333","outcome":"MERGED","plan_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","provider_state":"MERGED","reasons":["provider reports exact planned head merged"],"reconciliation_id":"00000000-0000-7000-8000-000000000759","release_plan_id":"00000000-0000-7000-8000-000000000751","supersedes_result_event_id":"%s"}`, priorResultID))
+	reconciliation := mongoReleaseDecision(t, 105, target, "tekroo.command.release-plan.record-reconciliation", "tekroo.event.release-plan.reconciliation-recorded", 5, reconciliationPayload)
+	commitMongoRelease(t, reopened, reconciling, reconciliation)
+
+	merged := loadMongoRelease(t, reopened, target)
+	plan := merged.ReleasePlans[target]
+	result := plan.Results[testUUID(0x752)]
+	finalPayload := json.RawMessage(fmt.Sprintf(`{"evidence_ids":["00000000-0000-7000-8000-000000000750"],"expected_release_revision":5,"plan_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","provider_tree_digest":"3333333333333333333333333333333333333333","qualification_event_id":"%s","qualified_tree_digest":"3333333333333333333333333333333333333333","reasons":["all planned merges and the provider tree are verified"],"release_mode":"CODE","release_plan_id":"00000000-0000-7000-8000-000000000751","result_event_ids":["%s"],"terminal_status":"READY_FOR_ACCEPTANCE"}`, plan.Qualification.EventID, result.ReconciliationEventID))
+	invalidPayload := json.RawMessage(strings.ReplaceAll(string(finalPayload), string(result.ReconciliationEventID), "00000000-0000-7000-8000-000000000799"))
+	invalid := mongoReleaseDecision(t, 106, target, "tekroo.command.release-plan.finalize", "tekroo.event.release-plan.finalized", 6, invalidPayload)
+	ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
+	err = reopened.Commit(ctx, merged, invalid)
+	cancel()
+	if !errors.Is(err, ErrConflict) {
+		t.Fatalf("invalid result-vector finalization error = %v, want ErrConflict", err)
+	}
+	finalization := mongoReleaseDecision(t, 107, target, "tekroo.command.release-plan.finalize", "tekroo.event.release-plan.finalized", 6, finalPayload)
+	commitMongoRelease(t, reopened, merged, finalization)
+
+	final := loadMongoRelease(t, reopened, target)
+	projected := final.ReleasePlans[target]
+	if projected.State != kernel.ReleaseReadyForAcceptance || projected.Revision != 6 || projected.ProviderTreeDigest != projected.ExpectedQualifiedTree || projected.NextMergeIndex != 1 || final.ReleasePlanKeys[key] != target {
+		t.Fatalf("terminal release projection = %#v, keys=%#v", projected, final.ReleasePlanKeys)
+	}
+	acceptanceSnapshot := loadMongoRelease(t, reopened, key.Story)
+	if acceptanceSnapshot.ReleasePlans[target].FinalizationEventID != projected.FinalizationEventID || acceptanceSnapshot.ReleasePlanKeys[key] != target {
+		t.Fatalf("story acceptance lookup did not load the finalized plan: plans=%#v keys=%#v", acceptanceSnapshot.ReleasePlans, acceptanceSnapshot.ReleasePlanKeys)
+	}
+	ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
+	eventCount, err := reopened.db.Collection("events").CountDocuments(ctx, bson.D{{Key: "aggregate_key", Value: aggregateKey(target)}})
+	cancel()
+	if err != nil || eventCount != 6 {
+		t.Fatalf("release event count = %d, err=%v, want 6", eventCount, err)
+	}
+	stale := mongoReleaseDecision(t, 108, target, "tekroo.command.release-plan.finalize", "tekroo.event.release-plan.finalized", 6, finalPayload)
+	ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
+	err = reopened.Commit(ctx, merged, stale)
+	cancel()
+	if !errors.Is(err, ErrConflict) {
+		t.Fatalf("stale release transition error = %v, want ErrConflict", err)
+	}
+}
+
+func TestConcurrentReleaseCreationHasOneSemanticWinner(t *testing.T) {
+	store := openTestStore(t)
+	firstTarget := kernel.AggregateRef{Kind: kernel.AggregateReleasePlan, ID: testUUID(0x771)}
+	secondTarget := kernel.AggregateRef{Kind: kernel.AggregateReleasePlan, ID: testUUID(0x772)}
+	firstPayload := mongoReleaseCreatePayload(string(firstTarget.ID))
+	secondPayload := mongoReleaseCreatePayload(string(secondTarget.ID))
+	key, err := kernel.ReleasePlanKeyFromCreatePayload(firstPayload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first := mongoReleaseDecision(t, 111, firstTarget, "tekroo.command.release-plan.create", "tekroo.event.release-plan.created", 1, firstPayload)
+	second := mongoReleaseDecision(t, 112, secondTarget, "tekroo.command.release-plan.create", "tekroo.event.release-plan.created", 1, secondPayload)
+	first.Guards.AbsentReleaseKeys = []kernel.ReleasePlanKey{key}
+	second.Guards.AbsentReleaseKeys = []kernel.ReleasePlanKey{key}
+	errorsByAttempt := make(chan error, 2)
+	var ready sync.WaitGroup
+	ready.Add(2)
+	start := make(chan struct{})
+	for _, decision := range []kernel.Decision{first, second} {
+		go func(decision kernel.Decision) {
+			ready.Done()
+			<-start
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			errorsByAttempt <- store.Commit(ctx, kernel.Snapshot{}, decision)
+		}(decision)
+	}
+	ready.Wait()
+	close(start)
+	firstErr := <-errorsByAttempt
+	secondErr := <-errorsByAttempt
+	successes := 0
+	conflicts := 0
+	for _, err := range []error{firstErr, secondErr} {
+		if err == nil {
+			successes++
+		} else if errors.Is(err, ErrConflict) {
+			conflicts++
+		} else {
+			t.Fatalf("concurrent release creation error = %v", err)
+		}
+	}
+	if successes != 1 || conflicts != 1 {
+		t.Fatalf("concurrent release outcomes: successes=%d conflicts=%d", successes, conflicts)
+	}
+}
+
+func TestReleaseProjectionLoadFailsClosedOnCorruptSemanticBinding(t *testing.T) {
+	store := openTestStore(t)
+	target := kernel.AggregateRef{Kind: kernel.AggregateReleasePlan, ID: testUUID(0x781)}
+	payload := mongoReleaseCreatePayload(string(target.ID))
+	decision := mongoReleaseDecision(t, 121, target, "tekroo.command.release-plan.create", "tekroo.event.release-plan.created", 1, payload)
+	key, err := kernel.ReleasePlanKeyFromCreatePayload(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decision.Guards.AbsentReleaseKeys = []kernel.ReleasePlanKey{key}
+	commitMongoRelease(t, store, kernel.Snapshot{}, decision)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	_, err = store.db.Collection("release_plan_keys").UpdateOne(ctx, bson.D{{Key: "_id", Value: releasePlanKey(key)}}, bson.D{{Key: "$set", Value: bson.D{{Key: "data", Value: []byte(`{}`)}}}})
+	cancel()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
+	_, err = store.LoadDecision(ctx, kernel.KernelCommand{Target: target})
+	cancel()
+	if !errors.Is(err, ErrCorruptAggregate) {
+		t.Fatalf("corrupt release binding load error = %v, want ErrCorruptAggregate", err)
 	}
 }
 
@@ -797,6 +970,45 @@ func mongoEscalationResolutionDecision(t *testing.T, ordinal int, escalation ker
 	decision.Events[0].CommittedAt = testNow()
 	decision.Authority.Principal = escalation.Adjudicator
 	return attachProvenance(t, decision)
+}
+
+func mongoReleaseCreatePayload(releasePlanID string) json.RawMessage {
+	return json.RawMessage(fmt.Sprintf(`{"author":{"id":"principal-author","kind":"HUMAN"},"author_approval_event_id":"00000000-0000-7000-8000-000000000749","author_approval_revision":1,"base_commit":"1111111111111111111111111111111111111111","base_ref":"main","conflict_policy":"FAIL_NO_IMPROVISATION","contract_manifest":"tekroo.kernel.contracts/0.5.0","evidence_ids":["00000000-0000-7000-8000-000000000750"],"execution_round_limit":2,"expected_qualified_tree":"3333333333333333333333333333333333333333","expected_story_revision":8,"git_version":"git version 2.51.0","manifest_sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","merge_strategy":"FF_ONLY_ORDERED","ordered_merges":[{"change_ref":"refs/heads/story-1","head_commit":"2222222222222222222222222222222222222222","merge_id":"00000000-0000-7000-8000-000000000752","role":"story"}],"plan_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","release_mode":"CODE","release_plan_id":"%s","release_policy_revision":1,"repository_url":"https://example.invalid/tekroo/teams.git","required_profiles":["contract-structure","core-hermetic","mongo-integration","synthesized-merge"],"story_id":"00000000-0000-7000-8000-000000000101","story_lifecycle_epoch":1}`, releasePlanID))
+}
+
+func mongoReleaseDecision(t *testing.T, ordinal int, target kernel.AggregateRef, commandType, eventType string, revision uint64, payload json.RawMessage) kernel.Decision {
+	t.Helper()
+	decision := completeDecision(t, ordinal)
+	decision.NextState = nil
+	decision.Receipt.Target = target
+	decision.Receipt.CommandType = commandType
+	decision.Receipt.ResultingRevision = &revision
+	decision.Events[0].Aggregate = target
+	decision.Events[0].EventType = eventType
+	decision.Events[0].AggregateRevision = revision
+	decision.Events[0].CommittedAt = time.Date(2026, time.August, 11, 12, 0, ordinal, 0, time.UTC)
+	decision.Events[0].Payload = append(json.RawMessage(nil), payload...)
+	return attachProvenance(t, decision)
+}
+
+func commitMongoRelease(t *testing.T, store *Store, expected kernel.Snapshot, decision kernel.Decision) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := store.Commit(ctx, expected, decision); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func loadMongoRelease(t *testing.T, store *Store, target kernel.AggregateRef) kernel.Snapshot {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	snapshot, err := store.LoadDecision(ctx, kernel.KernelCommand{Target: target})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return snapshot
 }
 
 func retargetDecision(t *testing.T, decision kernel.Decision, targetID kernel.UUIDv7) kernel.Decision {

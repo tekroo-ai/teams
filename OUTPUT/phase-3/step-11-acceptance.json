@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "PRINCIPAL_ACCEPTANCE",
+  "recordedOn": "2026-08-11",
+  "timePrecision": "DAY",
+  "principalStatement": "Accept, push and proceed to the next step.",
+  "acceptedPhase": "PHASE_3",
+  "acceptedStep": "STEP_11_DETERMINISTIC_LOCAL_GIT_PROVIDER",
+  "acceptedCommit": "e1e3035961f125048fe5cf4fd299ee2e52236a9d",
+  "acceptedTree": "a5985727db339d21aec9d56acd19a85c27d66b6f",
+  "acceptedGate": "OUTPUT/phase-3/step-11-local-git-provider-gate.json",
+  "gateReportSha256": "a471055f5c9ec98dc167b07301a0042aca7a035164a554b7b93a6b4c65b1af4a",
+  "scope": "Acceptance applies to the deterministic local bare-Git provider qualified by the Step 11 gate and not to network Git providers, Mongo release projection, production, deployment, OpenHands, or SMA profiles."
+}
