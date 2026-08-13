@@ -14,7 +14,7 @@ import (
 	"github.com/tekroo-ai/teams/kernel"
 )
 
-const contractRoot = "CONTRACTS/tekroo.kernel.contracts/0.5.0"
+const contractRoot = "CONTRACTS/tekroo.kernel.contracts/0.7.0"
 
 type fixtureDocument struct {
 	Fixtures []fixture `json:"fixtures"`
@@ -43,8 +43,8 @@ func TestFrozenContractCorpus(t *testing.T) {
 		loadFixtures(t, filepath.Join(repositoryRoot, contractRoot, "fixtures/catalogue-coverage.json")),
 		loadFixtures(t, filepath.Join(repositoryRoot, contractRoot, "fixtures/model-and-invariant-scenarios.json"))...,
 	)
-	if len(fixtures) != 138 {
-		t.Fatalf("fixture count = %d, want 138", len(fixtures))
+	if len(fixtures) != 235 {
+		t.Fatalf("fixture count = %d, want 235", len(fixtures))
 	}
 
 	for _, item := range fixtures {
@@ -327,6 +327,164 @@ func runFixture(t *testing.T, catalogue *contract.Catalogue, item fixture) any {
 		return struct {
 			Outcome string `json:"outcome"`
 		}{Outcome: kernel.CompatibilityOutcome(given.SourceVersion, when.ExactContextAvailable)}
+	case "MODEL_CAPABILITY_POLICY_MODEL":
+		var given struct {
+			ScopeRevision         uint64                         `json:"scopeRevision"`
+			ProfileScopeRevision  uint64                         `json:"profileScopeRevision"`
+			RequiredRoute         kernel.DecisionRoute           `json:"requiredRoute"`
+			SelectedRoute         kernel.DecisionRoute           `json:"selectedRoute"`
+			QualificationStatus   kernel.QualificationStatus     `json:"qualificationStatus"`
+			Revoked               bool                           `json:"revoked"`
+			HardConstraintsPass   bool                           `json:"hardConstraintsPass"`
+			RequiredDimensions    []kernel.IndependenceDimension `json:"requiredDimensions"`
+			ProvenDimensions      []kernel.IndependenceDimension `json:"provenDimensions"`
+			Classification        kernel.VariantClassification   `json:"classification"`
+			SubmittedCandidateIDs []kernel.UUIDv7                `json:"submittedCandidateIds"`
+		}
+		var when struct {
+			Action              kernel.ModelCapabilityPolicyAction `json:"action"`
+			SelectedCandidateID kernel.UUIDv7                      `json:"selectedCandidateId"`
+		}
+		decode(t, item.Given, &given)
+		decode(t, item.When, &when)
+		return kernel.EvaluateModelCapabilityPolicy(kernel.ModelCapabilityPolicyInput{
+			Action: when.Action, ScopeRevision: given.ScopeRevision, ProfileScopeRevision: given.ProfileScopeRevision,
+			RequiredRoute: given.RequiredRoute, SelectedRoute: given.SelectedRoute,
+			QualificationStatus: given.QualificationStatus, QualificationRevoked: given.Revoked,
+			HardConstraintsPass: given.HardConstraintsPass, RequiredDimensions: given.RequiredDimensions,
+			ProvenDimensions: given.ProvenDimensions, VariantClassification: given.Classification,
+			SubmittedCandidateIDs: given.SubmittedCandidateIDs, SelectedCandidateID: when.SelectedCandidateID,
+		})
+	case "OPERATOR_SEPARATION_MODEL":
+		var given struct {
+			SourceKind            string                 `json:"sourceKind"`
+			ClaimedKind           string                 `json:"claimedKind"`
+			TargetKind            kernel.PrincipalKind   `json:"targetKind"`
+			CurrentExecution      bool                   `json:"currentExecution"`
+			ExplicitlyAuthorized  bool                   `json:"explicitlyAuthorized"`
+			CommandAuthorityKinds []kernel.PrincipalKind `json:"commandAuthorityKinds"`
+		}
+		var when struct {
+			Action string `json:"action"`
+		}
+		decode(t, item.Given, &given)
+		decode(t, item.When, &when)
+		if when.Action == "ROUTE_HUMAN_REQUIRED" {
+			return kernel.EvaluateHumanRequiredTarget(kernel.PrincipalRef{Kind: given.TargetKind, ID: "fixture-principal"})
+		}
+		actorAdmitted := false
+		for _, kind := range given.CommandAuthorityKinds {
+			actorAdmitted = actorAdmitted || kind == kernel.PrincipalActor
+		}
+		return kernel.EvaluateAuthorityPresentation(kernel.AuthorityPresentationInput{SourceKind: given.SourceKind, ClaimedKind: given.ClaimedKind, CurrentExecution: given.CurrentExecution, ActorCommandAdmitted: actorAdmitted, ExplicitlyAuthorized: given.ExplicitlyAuthorized})
+	case "HUMAN_PARTICIPANT_MODEL":
+		var given struct {
+			ParticipantIDs                   []string               `json:"participantIds"`
+			Active                           bool                   `json:"active"`
+			RoleCurrent                      *bool                  `json:"roleCurrent"`
+			ScopeMatches                     bool                   `json:"scopeMatches"`
+			CommandAuthorized                bool                   `json:"commandAuthorized"`
+			BindingActive                    bool                   `json:"bindingActive"`
+			SubjectMatches                   bool                   `json:"subjectMatches"`
+			AssuranceSufficient              bool                   `json:"assuranceSufficient"`
+			ActiveAuthenticationBindingIDs   []kernel.UUIDv7        `json:"activeAuthenticationBindingIds"`
+			DeliveryAuthenticationBindingIDs []kernel.UUIDv7        `json:"deliveryAuthenticationBindingIds"`
+			RequestedConfidentiality         kernel.Confidentiality `json:"requestedConfidentiality"`
+			RouteCeiling                     kernel.Confidentiality `json:"routeCeiling"`
+		}
+		var when struct {
+			Action kernel.HumanParticipantPolicyAction `json:"action"`
+		}
+		decode(t, item.Given, &given)
+		decode(t, item.When, &when)
+		roleCurrent := false
+		if given.RoleCurrent != nil {
+			roleCurrent = *given.RoleCurrent
+		}
+		return kernel.EvaluateHumanParticipantPolicy(kernel.HumanParticipantPolicyInput{
+			Action: when.Action, ParticipantIDs: given.ParticipantIDs, Active: given.Active,
+			RoleCurrent: roleCurrent, RoleCurrentSpecified: given.RoleCurrent != nil, ScopeMatches: given.ScopeMatches,
+			CommandAuthorized: given.CommandAuthorized, BindingActive: given.BindingActive,
+			SubjectMatches: given.SubjectMatches, AssuranceSufficient: given.AssuranceSufficient,
+			ActiveAuthenticationBindingIDs:   given.ActiveAuthenticationBindingIDs,
+			DeliveryAuthenticationBindingIDs: given.DeliveryAuthenticationBindingIDs,
+			RequestedConfidentiality:         given.RequestedConfidentiality, RouteCeiling: given.RouteCeiling,
+		})
+	case "HUMAN_INTERACTION_MODEL":
+		var given struct {
+			OriginKind                   kernel.PrincipalKind       `json:"originKind"`
+			OriginActorFQN               *string                    `json:"originActorFqn"`
+			OriginExecutionID            *kernel.UUIDv7             `json:"originExecutionId"`
+			SelectedHumanIDs             []string                   `json:"selectedHumanIds"`
+			AcceptedHumanIDs             []string                   `json:"acceptedHumanIds"`
+			QuestionRevision             uint64                     `json:"questionRevision"`
+			ParticipantActive            bool                       `json:"participantActive"`
+			AuthenticationValid          bool                       `json:"authenticationValid"`
+			ResponseSpecificationMatches bool                       `json:"responseSpecificationMatches"`
+			Duplicate                    bool                       `json:"duplicate"`
+			RenderedDiffers              bool                       `json:"renderedDiffers"`
+			MaterialEquivalenceProven    bool                       `json:"materialEquivalenceProven"`
+			CredentialVerified           bool                       `json:"credentialVerified"`
+			CommitSucceeded              bool                       `json:"commitSucceeded"`
+			ResponsePolicy               kernel.HumanResponsePolicy `json:"responsePolicy"`
+			DeclaredEffect               string                     `json:"declaredEffect"`
+			ScopedCommandAuthority       bool                       `json:"scopedCommandAuthority"`
+			DeadlineExpired              bool                       `json:"deadlineExpired"`
+		}
+		var when struct {
+			Action           kernel.HumanInteractionPolicyAction `json:"action"`
+			SourceKind       kernel.PrincipalKind                `json:"sourceKind"`
+			ActorFQN         *string                             `json:"actorFqn"`
+			RespondentID     string                              `json:"respondentId"`
+			QuestionRevision uint64                              `json:"questionRevision"`
+			SilenceIsConsent bool                                `json:"silenceIsConsent"`
+		}
+		decode(t, item.Given, &given)
+		decode(t, item.When, &when)
+		return kernel.EvaluateHumanInteractionPolicy(kernel.HumanInteractionPolicyInput{
+			Action: when.Action, OriginKind: given.OriginKind, OriginActorPresent: given.OriginActorFQN != nil,
+			OriginExecutionPresent: given.OriginExecutionID != nil, SourceKind: when.SourceKind, ActorFQNPresent: when.ActorFQN != nil,
+			SelectedHumanIDs: given.SelectedHumanIDs, AcceptedHumanIDs: given.AcceptedHumanIDs, RespondentID: when.RespondentID,
+			QuestionRevision: given.QuestionRevision, PresentedQuestionRevision: when.QuestionRevision,
+			ParticipantActive: given.ParticipantActive, AuthenticationValid: given.AuthenticationValid,
+			ResponseSpecificationMatch: given.ResponseSpecificationMatches, Duplicate: given.Duplicate,
+			RenderedDiffers: given.RenderedDiffers, MaterialEquivalenceProven: given.MaterialEquivalenceProven,
+			CredentialVerified: given.CredentialVerified, CommitSucceeded: given.CommitSucceeded,
+			ResponsePolicy: given.ResponsePolicy, DeclaredEffect: given.DeclaredEffect,
+			ScopedCommandAuthority: given.ScopedCommandAuthority, DeadlineExpired: given.DeadlineExpired,
+			SilenceIsConsent: when.SilenceIsConsent,
+		})
+	case "TEAM_CONTINUITY_MODEL":
+		var given struct {
+			State                  kernel.ContinuityControlState `json:"state"`
+			PowerEpoch             uint64                        `json:"powerEpoch"`
+			AdmissionOpen          bool                          `json:"admissionOpen"`
+			OperatingPosture       string                        `json:"operatingPosture"`
+			UnresolvedExecutionIDs []kernel.UUIDv7               `json:"unresolvedExecutionIds"`
+		}
+		var when struct {
+			Action                    kernel.TeamContinuityPolicyAction `json:"action"`
+			PowerEpoch                uint64                            `json:"powerEpoch"`
+			NextPowerEpoch            uint64                            `json:"nextPowerEpoch"`
+			AllExecutionsRecorded     bool                              `json:"allExecutionsRecorded"`
+			UnresolvedExecutionIDs    []kernel.UUIDv7                   `json:"unresolvedExecutionIds"`
+			ReconciledExecutionIDs    []kernel.UUIDv7                   `json:"reconciledExecutionIds"`
+			KnownInFlightExecutionIDs []kernel.UUIDv7                   `json:"knownInFlightExecutionIds"`
+			ServicesHealthy           bool                              `json:"servicesHealthy"`
+			OutboxReconciled          bool                              `json:"outboxReconciled"`
+			ChangeStreamReconciled    bool                              `json:"changeStreamReconciled"`
+		}
+		decode(t, item.Given, &given)
+		decode(t, item.When, &when)
+		return kernel.EvaluateTeamContinuityPolicy(kernel.TeamContinuityPolicyInput{
+			Action: when.Action, State: given.State, PowerEpoch: given.PowerEpoch, AdmissionOpen: given.AdmissionOpen,
+			OperatingPosture: given.OperatingPosture, UnresolvedExecutionIDs: given.UnresolvedExecutionIDs,
+			PresentedPowerEpoch: when.PowerEpoch, NextPowerEpoch: when.NextPowerEpoch,
+			AllExecutionsRecorded: when.AllExecutionsRecorded, RecordedUnresolvedIDs: when.UnresolvedExecutionIDs,
+			ReconciledExecutionIDs: when.ReconciledExecutionIDs,
+			KnownInFlightIDs:       when.KnownInFlightExecutionIDs, ServicesHealthy: when.ServicesHealthy,
+			OutboxReconciled: when.OutboxReconciled, ChangeStreamReconciled: when.ChangeStreamReconciled,
+		})
 	default:
 		t.Fatalf("unsupported fixture kind %q", item.Kind)
 		return nil

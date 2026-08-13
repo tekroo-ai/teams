@@ -219,7 +219,7 @@ func evaluate(t *testing.T, evaluator kernel.Evaluator, command kernel.KernelCom
 	if command.ExpectedCatalogueRevision == 0 {
 		command.ExpectedCatalogueRevision = kernel.CatalogueRevision
 	}
-	if !command.ExpectedRevision.MustNotExist && command.ExpectedLifecycleEpoch == nil && snapshot.State != nil && command.CommandType != "tekroo.command.record.correct" {
+	if !command.ExpectedRevision.MustNotExist && command.ExpectedLifecycleEpoch == nil && snapshot.State != nil && command.CommandType != "tekroo.command.record.correct" && (command.Target.Kind == kernel.AggregateStory || command.Target.Kind == kernel.AggregateTask) {
 		epoch := snapshot.State.LifecycleEpoch
 		command.ExpectedLifecycleEpoch = &epoch
 	}
@@ -316,7 +316,7 @@ func loadCatalogue(t *testing.T) *contract.Catalogue {
 		t.Fatal("locate evaluator test")
 	}
 	repositoryRoot := filepath.Clean(filepath.Join(filepath.Dir(file), ".."))
-	catalogue, err := contract.Load(os.DirFS(repositoryRoot), "CONTRACTS/tekroo.kernel.contracts/0.5.0")
+	catalogue, err := contract.Load(os.DirFS(repositoryRoot), "CONTRACTS/tekroo.kernel.contracts/0.7.0")
 	if err != nil {
 		t.Fatalf("load catalogue: %v", err)
 	}

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -43,11 +44,11 @@ func TestAllFrozenCommandsReachTheirDeclaredEventThroughEvaluator(t *testing.T) 
 	}
 
 	root := testRepositoryRoot(t)
-	fixtureBytes, err := os.ReadFile(filepath.Join(root, "CONTRACTS/tekroo.kernel.contracts/0.5.0/fixtures/catalogue-coverage.json"))
+	fixtureBytes, err := os.ReadFile(filepath.Join(root, "CONTRACTS/tekroo.kernel.contracts/0.7.0/fixtures/catalogue-coverage.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	catalogueBytes, err := os.ReadFile(filepath.Join(root, "CONTRACTS/tekroo.kernel.contracts/0.5.0/catalogue/kernel-catalogue.json"))
+	catalogueBytes, err := os.ReadFile(filepath.Join(root, "CONTRACTS/tekroo.kernel.contracts/0.7.0/catalogue/kernel-catalogue.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,17 +83,17 @@ func TestAllFrozenCommandsReachTheirDeclaredEventThroughEvaluator(t *testing.T) 
 			command, snapshot := commandCase(t, item.When.CommandType, item.When.Payload, definition.TargetKinds[0], definition.AuthorityKinds[0], definition.ExecutionRequired, definition.RootAllowed)
 			decision := evaluate(t, evaluator, command, snapshot, validDecisionContext(t))
 			if decision.Receipt.OutcomeCode != kernel.OutcomeApplied || len(decision.Events) != 1 || decision.Events[0].EventType != item.Then.Expected.EventTypes[0] {
-				t.Fatalf("decision = %#v", decision)
+				t.Fatalf("target=%q expected_lifecycle_epoch=%v decision = %#v", command.Target.Kind, command.ExpectedLifecycleEpoch, decision)
 			}
 			applied++
 		})
 		executed++
 	}
-	if executed != 36 {
-		t.Fatalf("executed command cases = %d, want 36", executed)
+	if executed != 56 {
+		t.Fatalf("executed command cases = %d, want 56", executed)
 	}
-	if applied != 36 {
-		t.Fatalf("applied = %d, want 36", applied)
+	if applied != 56 {
+		t.Fatalf("applied = %d, want 56", applied)
 	}
 }
 
@@ -113,6 +114,28 @@ func TestExecutionFencingRequiresExactCurrentTuple(t *testing.T) {
 	rejected := evaluate(t, evaluator, stale, snapshot, validDecisionContext(t))
 	if rejected.Receipt.OutcomeCode != kernel.OutcomeRejectedStaleExecution || len(rejected.Events) != 0 {
 		t.Fatalf("stale execution decision = %#v", rejected)
+	}
+}
+
+func TestDispatchRequiresExactQualifiedAssignmentAuthorization(t *testing.T) {
+	evaluator := kernel.Evaluator{Catalogue: loadCatalogue(t)}
+	payload := json.RawMessage(`{"destination":"teams::coder-1","routing_mode":"EXACT"}`)
+	command, snapshot := commandCase(t, "tekroo.command.task.dispatch", payload, kernel.AggregateTask, kernel.PrincipalPolicy, false, false)
+	if decision := evaluate(t, evaluator, command, snapshot, validDecisionContext(t)); decision.Receipt.OutcomeCode != kernel.OutcomeApplied {
+		t.Fatalf("authorized dispatch = %#v", decision)
+	}
+
+	missing := snapshot
+	missing.QualifiedAssignments = map[kernel.AggregateRef]kernel.QualifiedAssignmentAuthorization{}
+	if decision := evaluate(t, evaluator, command, missing, validDecisionContext(t)); decision.Receipt.OutcomeCode != kernel.OutcomeRejectedPolicy || len(decision.Events) != 0 {
+		t.Fatalf("dispatch without authorization = %#v", decision)
+	}
+
+	stale := snapshot
+	authorization := stale.QualifiedAssignments[command.Target]
+	stale.CurrentExecutions = map[kernel.ActorFQN]kernel.ExecutionTuple{authorization.SelectedActorFQN: {ExecutionID: authorization.SelectedExecutionID, FencingEpoch: authorization.SelectedFencingEpoch + 1}}
+	if decision := evaluate(t, evaluator, command, stale, validDecisionContext(t)); decision.Receipt.OutcomeCode != kernel.OutcomeRejectedStaleExecution || len(decision.Events) != 0 {
+		t.Fatalf("dispatch with stale fence = %#v", decision)
 	}
 }
 
@@ -474,9 +497,16 @@ func commandCase(t *testing.T, commandType string, payload json.RawMessage, targ
 	}
 	var object map[string]any
 	if json.Unmarshal(payload, &object) == nil {
-		if values, ok := object["evidence_ids"].([]any); ok {
-			snapshot.Evidence = make(map[kernel.UUIDv7]kernel.EvidenceMetadata, len(values))
-			for _, value := range values {
+		if commandType == "tekroo.command.human-interaction.open" {
+			command.Target.ID = kernel.UUIDv7(object["interaction_id"].(string))
+		}
+		evidenceValues, hasEvidence := object["evidence_ids"].([]any)
+		if commandType == "tekroo.command.task.bind-work-profile" {
+			evidenceValues, hasEvidence = object["classification_evidence_ids"].([]any)
+		}
+		if hasEvidence {
+			snapshot.Evidence = make(map[kernel.UUIDv7]kernel.EvidenceMetadata, len(evidenceValues))
+			for _, value := range evidenceValues {
 				id := kernel.UUIDv7(value.(string))
 				digest := kernel.Digest("dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd")
 				command.EvidenceRefs = append(command.EvidenceRefs, kernel.EvidenceRef{EvidenceID: id, SHA256: digest})
@@ -506,11 +536,24 @@ func commandCase(t *testing.T, commandType string, payload json.RawMessage, targ
 		}
 		if commandType == "tekroo.command.completion-review.open" {
 			subject := kernel.AggregateRef{Kind: kernel.AggregateKind(object["subject_kind"].(string)), ID: kernel.UUIDv7(object["subject_id"].(string))}
+			review, err := kernel.CompletionReviewFromPayload(payload)
+			if err != nil {
+				t.Fatal(err)
+			}
 			command.Preconditions = []kernel.AggregatePrecondition{{Aggregate: subject, Expected: kernel.NewExpectedRevision(1)}}
 			snapshot.Related = map[kernel.AggregateRef]kernel.RelatedSnapshot{subject: {
 				Exists: true, Revision: 1,
-				State: &kernel.AggregateState{Kind: subject.Kind, ID: subject.ID, Revision: 1, LifecycleEpoch: uint64(object["lifecycle_epoch"].(float64)), Phase: kernel.PhaseActive, Condition: kernel.ConditionRunnable},
+				State: &kernel.AggregateState{Kind: subject.Kind, ID: subject.ID, Revision: 1, LifecycleEpoch: uint64(object["lifecycle_epoch"].(float64)), ScopeRevision: review.ScopeRevision, Phase: kernel.PhaseActive, Condition: kernel.ConditionRunnable},
 			}}
+			if subject.Kind == kernel.AggregateTask {
+				profile := variantFixtureWorkProfile(subject.ID)
+				profile.Profile.ProfileID = review.WorkProfile.ProfileID
+				profile.Profile.ProfileRevision = review.WorkProfile.ProfileRevision
+				profile.Profile.ProfileDigest = review.WorkProfile.ProfileDigest
+				profile.Profile.LifecycleEpoch = review.WorkProfile.LifecycleEpoch
+				profile.Profile.ScopeRevision = review.WorkProfile.ScopeRevision
+				snapshot.WorkProfiles = map[kernel.AggregateRef]kernel.WorkProfileSnapshot{subject: profile}
+			}
 		}
 		if commandType == "tekroo.command.completion-review.record-result" {
 			reviewID := kernel.UUIDv7(object["review_id"].(string))
@@ -598,9 +641,152 @@ func commandCase(t *testing.T, commandType string, payload json.RawMessage, targ
 			snapshot.Escalations = map[kernel.AggregateRef]kernel.EscalationSnapshot{command.Target: escalation}
 			snapshot.EscalationKeys = map[kernel.EscalationKey]kernel.AggregateRef{escalation.Key(): command.Target}
 		}
+		configureModelCapabilityCommandCase(t, &command, &snapshot, object)
 		configureReleaseCommandCase(t, &command, &snapshot, object)
+		configureOperatorHumanContinuityCommandCase(t, &command, &snapshot, object)
 	}
 	return command, snapshot
+}
+
+func configureModelCapabilityCommandCase(t *testing.T, command *kernel.KernelCommand, snapshot *kernel.Snapshot, object map[string]any) {
+	t.Helper()
+	if command.CommandType == "tekroo.command.task.bind-work-profile" {
+		profile, err := kernel.WorkRiskProfileFromPayload(command.Payload)
+		if err != nil {
+			t.Fatal(err)
+		}
+		command.Target.ID = profile.TaskID
+		command.ExpectedRevision = kernel.NewExpectedRevision(1)
+		epoch := profile.LifecycleEpoch
+		command.ExpectedLifecycleEpoch = &epoch
+		snapshot.Exists = true
+		snapshot.Revision = 1
+		snapshot.State = &kernel.AggregateState{Kind: kernel.AggregateTask, ID: profile.TaskID, Revision: 1, LifecycleEpoch: profile.LifecycleEpoch, ScopeRevision: profile.ScopeRevision, Phase: kernel.PhasePlanned, Condition: kernel.ConditionRunnable}
+		snapshot.WorkProfiles = map[kernel.AggregateRef]kernel.WorkProfileSnapshot{}
+		return
+	}
+	if command.CommandType == "tekroo.command.task.authorize-qualified-assignment" {
+		authorization, err := kernel.QualifiedAssignmentAuthorizationFromPayload(command.Payload, command.CommandID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		command.Target.ID = authorization.TaskID
+		command.ExpectedRevision = kernel.NewExpectedRevision(authorization.ExpectedTaskRevision)
+		epoch := authorization.WorkProfile.LifecycleEpoch
+		command.ExpectedLifecycleEpoch = &epoch
+		snapshot.Exists = true
+		snapshot.Revision = authorization.ExpectedTaskRevision
+		snapshot.State = &kernel.AggregateState{Kind: kernel.AggregateTask, ID: authorization.TaskID, Revision: authorization.ExpectedTaskRevision, LifecycleEpoch: authorization.WorkProfile.LifecycleEpoch, ScopeRevision: authorization.WorkProfile.ScopeRevision, Phase: kernel.PhaseReady, Condition: kernel.ConditionRunnable}
+		snapshot.WorkProfiles = map[kernel.AggregateRef]kernel.WorkProfileSnapshot{command.Target: variantFixtureWorkProfile(authorization.TaskID)}
+		snapshot.CurrentExecutions = map[kernel.ActorFQN]kernel.ExecutionTuple{authorization.SelectedActorFQN: authorization.SelectedExecution()}
+		return
+	}
+	if command.CommandType == "tekroo.command.task.dispatch" {
+		profile := variantFixtureWorkProfile(command.Target.ID)
+		authorizationEventID := kernel.UUIDv7("00000000-0000-7000-8000-000000000076")
+		authorization := qualifiedAssignmentFixture(command.Target.ID, authorizationEventID)
+		snapshot.Revision = 2
+		snapshot.State.Revision = 2
+		command.ExpectedRevision = kernel.NewExpectedRevision(2)
+		command.Causation = []kernel.DagParent{{ParentEventID: authorizationEventID, EdgeKind: kernel.EdgeCausal}}
+		snapshot.AcceptedEvents = map[kernel.UUIDv7]kernel.AcceptedEvent{authorizationEventID: {EventType: "tekroo.event.task.qualified-assignment-authorized"}}
+		snapshot.WorkProfiles = map[kernel.AggregateRef]kernel.WorkProfileSnapshot{command.Target: profile}
+		snapshot.QualifiedAssignments = map[kernel.AggregateRef]kernel.QualifiedAssignmentAuthorization{command.Target: authorization}
+		snapshot.CurrentExecutions = map[kernel.ActorFQN]kernel.ExecutionTuple{authorization.SelectedActorFQN: authorization.SelectedExecution()}
+		return
+	}
+	if !strings.HasPrefix(command.CommandType, "tekroo.command.variant-group.") {
+		return
+	}
+	groupID := kernel.UUIDv7(object["variant_group_id"].(string))
+	command.Target = kernel.AggregateRef{Kind: kernel.AggregateVariantGroup, ID: groupID}
+	group := variantFixtureGroup(t, groupID)
+	snapshot.VariantGroups = map[kernel.AggregateRef]kernel.VariantGroupSnapshot{}
+	snapshot.VariantGroupKeys = map[kernel.VariantGroupKey]kernel.AggregateRef{}
+	if command.CommandType == "tekroo.command.variant-group.open" {
+		opened, err := kernel.VariantGroupFromOpenPayload(command.Payload, command.CommandID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		task := kernel.AggregateRef{Kind: kernel.AggregateTask, ID: opened.TaskID}
+		command.ExpectedRevision = kernel.MustNotExist()
+		command.Preconditions = []kernel.AggregatePrecondition{{Aggregate: task, Expected: kernel.NewExpectedRevision(1)}}
+		snapshot.Exists = false
+		snapshot.Revision = 0
+		snapshot.Related = map[kernel.AggregateRef]kernel.RelatedSnapshot{task: {Exists: true, Revision: 1, State: &kernel.AggregateState{Kind: kernel.AggregateTask, ID: task.ID, Revision: 1, LifecycleEpoch: 1, ScopeRevision: 1, Phase: kernel.PhasePlanned, Condition: kernel.ConditionRunnable}}}
+		snapshot.WorkProfiles = map[kernel.AggregateRef]kernel.WorkProfileSnapshot{task: variantFixtureWorkProfile(task.ID)}
+		return
+	}
+	group.Revision = uint64(object["expected_group_revision"].(float64))
+	command.ExpectedRevision = kernel.NewExpectedRevision(group.Revision)
+	snapshot.Exists = true
+	snapshot.Revision = group.Revision
+	if command.CommandType != "tekroo.command.variant-group.submit-candidate" {
+		group.Candidates = variantFixtureCandidates()
+	}
+	if command.CommandType == "tekroo.command.variant-group.record-comparison" {
+		command.Authority = group.Comparator
+		actor := kernel.ActorFQN(group.Comparator.ID)
+		execution := kernel.ExecutionTuple{ExecutionID: kernel.UUIDv7(object["comparator_execution_id"].(string)), FencingEpoch: 1}
+		command.ActorFQN = &actor
+		command.Execution = &execution
+		snapshot.CurrentExecutions = map[kernel.ActorFQN]kernel.ExecutionTuple{actor: execution}
+	}
+	if command.CommandType == "tekroo.command.variant-group.select" {
+		group.State = kernel.VariantCompared
+		group.Comparison = &kernel.VariantComparison{EventID: kernel.UUIDv7(object["comparison_event_id"].(string)), CandidateIDs: []kernel.UUIDv7{"00000000-0000-7000-8000-000000000808", "00000000-0000-7000-8000-000000000809"}, Comparator: group.Comparator, ComparatorExecutionID: "00000000-0000-7000-8000-000000000811", Classification: kernel.VariantMaterialAgreement, ComparisonMethodID: group.ComparisonMethodID, ComparisonReceiptDigest: "6666666666666666666666666666666666666666666666666666666666666666", Reasons: []string{"behavior and architecture agree"}, EvidenceIDs: []kernel.UUIDv7{"00000000-0000-7000-8000-000000000806"}}
+		command.Authority = group.Adjudicator
+	}
+	if command.CommandType == "tekroo.command.variant-group.submit-candidate" {
+		actor := kernel.ActorFQN(object["actor_fqn"].(string))
+		execution := kernel.ExecutionTuple{ExecutionID: kernel.UUIDv7(object["execution_id"].(string)), FencingEpoch: uint64(object["fencing_epoch"].(float64))}
+		command.Authority = kernel.PrincipalRef{Kind: kernel.PrincipalActor, ID: string(actor)}
+		command.ActorFQN = &actor
+		command.Execution = &execution
+		snapshot.CurrentExecutions = map[kernel.ActorFQN]kernel.ExecutionTuple{actor: execution}
+	}
+	snapshot.VariantGroups[command.Target] = group
+}
+
+func qualifiedAssignmentFixture(taskID kernel.UUIDv7, eventID kernel.UUIDv7) kernel.QualifiedAssignmentAuthorization {
+	return kernel.QualifiedAssignmentAuthorization{
+		AssignmentID: "00000000-0000-7000-8000-000000000803", TaskID: taskID, ExpectedTaskRevision: 1,
+		WorkProfile:           kernel.WorkProfileBinding{ProfileID: "00000000-0000-7000-8000-000000000802", ProfileRevision: 1, ProfileDigest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", LifecycleEpoch: 1, ScopeRevision: 1},
+		RequiredDecisionRoute: kernel.RouteBoundedExecution, SelectedDecisionRoute: kernel.RouteBoundedExecution, SelectedActorFQN: "teams::coder-1", SelectedExecutionID: "00000000-0000-7000-8000-000000000804", SelectedFencingEpoch: 1,
+		ModelProfileDigest: "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", RuntimeIdentityDigest: "1111111111111111111111111111111111111111111111111111111111111111",
+		Qualification:           kernel.AssignmentQualificationReceipt{QualificationID: "00000000-0000-7000-8000-000000000805", QualificationDigest: "2222222222222222222222222222222222222222222222222222222222222222", QualificationCorpusDigest: "3333333333333333333333333333333333333333333333333333333333333333", ModelProfileDigest: "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", DecisionRoute: kernel.RouteBoundedExecution, QualifiedRole: "programmer", Status: kernel.QualificationPass, ObservedAt: time.Date(2026, time.August, 13, 12, 0, 0, 0, time.UTC)},
+		SelectionPolicyRevision: 1, SelectionPolicyDigest: "4444444444444444444444444444444444444444444444444444444444444444", HardConstraintResults: []kernel.HardConstraintResult{{ConstraintID: "data-residency", Outcome: kernel.ConstraintPass, EvidenceIDs: []kernel.UUIDv7{"00000000-0000-7000-8000-000000000806"}}}, SelectionReasons: []string{"least-cost qualified profile"}, EvidenceIDs: []kernel.UUIDv7{"00000000-0000-7000-8000-000000000806"}, AuthorizationEventID: eventID,
+	}
+}
+
+func variantFixtureWorkProfile(taskID kernel.UUIDv7) kernel.WorkProfileSnapshot {
+	return kernel.WorkProfileSnapshot{BoundEventID: "00000000-0000-7000-8000-000000000806", TaskRevision: 1, Profile: kernel.WorkRiskProfile{
+		TaskID: taskID, ProfileID: "00000000-0000-7000-8000-000000000802", ProfileRevision: 1, ProfileDigest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", LifecycleEpoch: 1, ScopeRevision: 1,
+		WorkKind: kernel.WorkImplementation, Ambiguity: kernel.AmbiguityLow, Novelty: kernel.NoveltyRoutine, BlastRadius: kernel.BlastLocal, SecuritySensitivity: kernel.SecurityOrdinary,
+		MinimumDecisionRoute: kernel.RouteBoundedExecution, AcceptanceCriteriaDigest: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", RequiredDeterministicGateIDs: []string{"go-test"}, RequiredValidationBranches: 1,
+		RequiredIndependenceDimensions: []kernel.IndependenceDimension{kernel.IndependencePrincipal, kernel.IndependenceActor, kernel.IndependenceExecution, kernel.IndependenceContext, kernel.IndependenceWorkspace, kernel.IndependenceMethod},
+		ImplementationVariantCount:     1, ValidCandidateQuorum: 1, VerificationTopologyDigest: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+		ClassificationPolicyRevision: 1, ClassificationPolicyDigest: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", PromotionPolicyRevision: 1, PromotionPolicyDigest: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+		Budgets: kernel.FiniteWorkBudgets{AttemptLimit: 2, ReviewRoundLimit: 2, PromotionLimit: 1, EscalationLimit: 1, DeadlineAt: time.Date(2026, time.August, 14, 0, 0, 0, 0, time.UTC)}, ClassificationAuthority: kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "principal"}, ClassificationEvidenceIDs: []kernel.UUIDv7{"00000000-0000-7000-8000-000000000806"},
+	}}
+}
+
+func variantFixtureGroup(t *testing.T, groupID kernel.UUIDv7) kernel.VariantGroupSnapshot {
+	t.Helper()
+	payload := json.RawMessage(`{"acceptance_manifest_digest":"9999999999999999999999999999999999999999999999999999999999999999","adjudicator":{"id":"principal","kind":"HUMAN"},"base_artifact_digest":"5555555555555555555555555555555555555555555555555555555555555555","candidate_count":2,"comparator":{"id":"teams::reviewer-1","kind":"ACTOR"},"comparison_method_id":"structured-diff-v1","comparison_policy_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","decision_deadline_at":"2026-08-15T00:00:00Z","dependency_lock_digest":"8888888888888888888888888888888888888888888888888888888888888888","evidence_ids":["00000000-0000-7000-8000-000000000806"],"input_evidence_set_digest":"6666666666666666666666666666666666666666666666666666666666666666","materiality_policy_digest":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","replacement_budget":1,"required_independence_dimensions":["ACTOR","EXECUTION","CONTEXT","WORKSPACE"],"submission_deadline_at":"2026-08-14T00:00:00Z","task_id":"00000000-0000-7000-8000-000000000801","toolchain_digest":"7777777777777777777777777777777777777777777777777777777777777777","valid_candidate_quorum":2,"variant_group_id":"00000000-0000-7000-8000-000000000807","work_profile":{"lifecycle_epoch":1,"profile_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","profile_id":"00000000-0000-7000-8000-000000000802","profile_revision":1,"scope_revision":1}}`)
+	group, err := kernel.VariantGroupFromOpenPayload(payload, "00000000-0000-7000-8000-000000000807")
+	if err != nil {
+		t.Fatal(err)
+	}
+	group.VariantGroupID = groupID
+	return group
+}
+
+func variantFixtureCandidates() map[kernel.UUIDv7]kernel.VariantCandidate {
+	return map[kernel.UUIDv7]kernel.VariantCandidate{
+		"00000000-0000-7000-8000-000000000808": {CandidateID: "00000000-0000-7000-8000-000000000808", ActorFQN: "teams::coder-1", Execution: kernel.ExecutionTuple{ExecutionID: "00000000-0000-7000-8000-000000000804", FencingEpoch: 1}, ModelProfileDigest: "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", RuntimeIdentityDigest: "1111111111111111111111111111111111111111111111111111111111111111", ContextDigest: "2222222222222222222222222222222222222222222222222222222222222222", WorkspaceDigest: "3333333333333333333333333333333333333333333333333333333333333333", ArtifactDigest: "4444444444444444444444444444444444444444444444444444444444444444", ChangedFileInventoryDigest: "5555555555555555555555555555555555555555555555555555555555555555", DeterministicGateReceiptIDs: []kernel.UUIDv7{"00000000-0000-7000-8000-000000000806"}, EvidenceIDs: []kernel.UUIDv7{"00000000-0000-7000-8000-000000000806"}, SubmissionEventID: "00000000-0000-7000-8000-000000000808"},
+		"00000000-0000-7000-8000-000000000809": {CandidateID: "00000000-0000-7000-8000-000000000809", ActorFQN: "teams::coder-2", Execution: kernel.ExecutionTuple{ExecutionID: "00000000-0000-7000-8000-000000000805", FencingEpoch: 1}, ModelProfileDigest: "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", RuntimeIdentityDigest: "1111111111111111111111111111111111111111111111111111111111111111", ContextDigest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", WorkspaceDigest: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", ArtifactDigest: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", ChangedFileInventoryDigest: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", DeterministicGateReceiptIDs: []kernel.UUIDv7{"00000000-0000-7000-8000-000000000806"}, EvidenceIDs: []kernel.UUIDv7{"00000000-0000-7000-8000-000000000806"}, SubmissionEventID: "00000000-0000-7000-8000-000000000809"},
+	}
 }
 
 func configureReleaseCommandCase(t *testing.T, command *kernel.KernelCommand, snapshot *kernel.Snapshot, object map[string]any) {
@@ -613,6 +799,8 @@ func configureReleaseCommandCase(t *testing.T, command *kernel.KernelCommand, sn
 		epoch := uint64(object["lifecycle_epoch"].(float64))
 		command.ExpectedLifecycleEpoch = &epoch
 		command.Authority = kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "principal-author"}
+		command.ActorFQN = nil
+		command.Execution = nil
 		snapshot.Exists = true
 		snapshot.Revision = revision
 		snapshot.State = &kernel.AggregateState{Kind: kernel.AggregateStory, ID: storyID, Revision: revision, LifecycleEpoch: epoch, Phase: kernel.PhaseCompleted, Condition: kernel.ConditionRunnable}
@@ -694,6 +882,143 @@ func configureReleaseCommandCase(t *testing.T, command *kernel.KernelCommand, sn
 	snapshot.ReleasePlans = map[kernel.AggregateRef]kernel.ReleasePlanSnapshot{command.Target: plan}
 }
 
+func configureOperatorHumanContinuityCommandCase(t *testing.T, command *kernel.KernelCommand, snapshot *kernel.Snapshot, object map[string]any) {
+	t.Helper()
+	continuity := func(revision uint64, state kernel.ContinuityControlState, power uint64, inFlight, unresolved []kernel.UUIDv7) *kernel.AggregateState {
+		value := kernel.TeamContinuitySnapshot{Revision: revision, OperatingPosture: "CONTINUOUS", ControlState: state, PowerEpoch: power, AdmissionOpen: state == kernel.ContinuityActive, ContinuityPolicyRevision: 1, ContinuityPolicyDigest: kernel.Digest("dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"), HealthRequirementDigest: kernel.Digest("eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"), InFlightExecutionIDs: inFlight, UnresolvedExecutionIDs: unresolved, LastTransitionEventID: mustUUID(t, "00000000-0000-7000-8000-000000000906")}
+		return &kernel.AggregateState{Kind: kernel.AggregateSystem, ID: command.Target.ID, Revision: revision, LifecycleEpoch: 1, ScopeRevision: 1, Phase: kernel.PhaseDraft, Condition: kernel.ConditionRunnable, Continuity: &value}
+	}
+	switch command.CommandType {
+	case "tekroo.command.system.request-quiescence":
+		command.ExpectedLifecycleEpoch = nil
+		command.ExpectedRevision = kernel.NewExpectedRevision(1)
+		snapshot.Revision = 1
+		snapshot.State = continuity(1, kernel.ContinuityActive, 1, nil, nil)
+	case "tekroo.command.system.record-suspended":
+		command.ExpectedLifecycleEpoch = nil
+		ids := []kernel.UUIDv7{mustUUID(t, "00000000-0000-7000-8000-000000000904"), mustUUID(t, "00000000-0000-7000-8000-000000000905")}
+		command.ExpectedRevision = kernel.NewExpectedRevision(2)
+		snapshot.Revision = 2
+		snapshot.State = continuity(2, kernel.ContinuityQuiescing, 2, ids, nil)
+	case "tekroo.command.system.record-unexpected-outage":
+		command.ExpectedLifecycleEpoch = nil
+		command.ExpectedRevision = kernel.NewExpectedRevision(1)
+		snapshot.Revision = 1
+		snapshot.State = continuity(1, kernel.ContinuityActive, 1, nil, nil)
+	case "tekroo.command.system.begin-reconciliation":
+		command.ExpectedLifecycleEpoch = nil
+		ids := []kernel.UUIDv7{mustUUID(t, "00000000-0000-7000-8000-000000000905")}
+		command.ExpectedRevision = kernel.NewExpectedRevision(3)
+		snapshot.Revision = 3
+		snapshot.State = continuity(3, kernel.ContinuitySuspended, 2, nil, ids)
+	case "tekroo.command.system.resume":
+		command.ExpectedLifecycleEpoch = nil
+		ids := []kernel.UUIDv7{mustUUID(t, "00000000-0000-7000-8000-000000000905")}
+		command.ExpectedRevision = kernel.NewExpectedRevision(4)
+		snapshot.Revision = 4
+		snapshot.State = continuity(4, kernel.ContinuityReconciling, 2, nil, ids)
+	case "tekroo.command.human-participant.revoke":
+		participantObject := object["participant"].(map[string]any)
+		participant := kernel.PrincipalRef{Kind: kernel.PrincipalKind(participantObject["kind"].(string)), ID: participantObject["id"].(string)}
+		profileID := kernel.UUIDv7(object["expected_profile_id"].(string))
+		recipient := kernel.HumanInteractionRecipient{Principal: participant, ParticipantProfileID: profileID, ParticipantProfileRevision: 1, ParticipantProfileDigest: "6666666666666666666666666666666666666666666666666666666666666666", RoleBindingID: "00000000-0000-7000-8000-000000000910", DeliveryBindingID: "00000000-0000-7000-8000-000000000912"}
+		profile := participantFixture(recipient)
+		command.ExpectedLifecycleEpoch = nil
+		command.ExpectedRevision = kernel.NewExpectedRevision(profile.Revision)
+		snapshot.Revision = profile.Revision
+		snapshot.State = &kernel.AggregateState{Kind: kernel.AggregateHumanParticipant, ID: command.Target.ID, Revision: profile.Revision, LifecycleEpoch: 1, ScopeRevision: 1, Phase: kernel.PhaseDraft, Condition: kernel.ConditionRunnable, Participant: &profile}
+	case "tekroo.command.human-interaction.open":
+		interaction, err := kernel.HumanInteractionFromOpenPayload(command.Payload, 1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		command.Target.ID = interaction.InteractionID
+		command.Preconditions = []kernel.AggregatePrecondition{{Aggregate: interaction.Subject, Expected: kernel.NewExpectedRevision(interaction.ExpectedSubjectRevision)}}
+		command.Causation = []kernel.DagParent{{ParentEventID: mustUUID(t, "00000000-0000-7000-8000-000000000903"), EdgeKind: kernel.EdgeCausal}}
+		command.ActorFQN = interaction.OriginActorFQN
+		command.Execution = interaction.OriginExecution
+		snapshot.CurrentExecutions = map[kernel.ActorFQN]kernel.ExecutionTuple{*interaction.OriginActorFQN: *interaction.OriginExecution}
+		snapshot.AcceptedEvents = map[kernel.UUIDv7]kernel.AcceptedEvent{command.Causation[0].ParentEventID: {EventType: "tekroo.event.task.handoff-recorded"}}
+		snapshot.Related = map[kernel.AggregateRef]kernel.RelatedSnapshot{interaction.Subject: {Exists: true, Revision: interaction.ExpectedSubjectRevision, State: &kernel.AggregateState{Kind: interaction.Subject.Kind, ID: interaction.Subject.ID, Revision: interaction.ExpectedSubjectRevision, LifecycleEpoch: interaction.SubjectLifecycleEpoch, Phase: kernel.PhaseActive, Condition: kernel.ConditionRunnable}}}
+		for index, recipient := range interaction.Recipients {
+			ref := kernel.AggregateRef{Kind: kernel.AggregateHumanParticipant, ID: kernel.UUIDv7(fmt.Sprintf("00000000-0000-7000-8000-%012d", 920+index))}
+			profile := participantFixture(recipient)
+			snapshot.Related[ref] = kernel.RelatedSnapshot{Exists: true, Revision: profile.Revision, State: &kernel.AggregateState{Kind: ref.Kind, ID: ref.ID, Revision: profile.Revision, LifecycleEpoch: 1, ScopeRevision: 1, Phase: kernel.PhaseDraft, Condition: kernel.ConditionRunnable, Participant: &profile}}
+			command.Preconditions = append(command.Preconditions, kernel.AggregatePrecondition{Aggregate: ref, Expected: kernel.NewExpectedRevision(profile.Revision)})
+		}
+		sort.Slice(command.Preconditions, func(i, j int) bool {
+			return command.Preconditions[i].Aggregate.Kind < command.Preconditions[j].Aggregate.Kind || command.Preconditions[i].Aggregate.Kind == command.Preconditions[j].Aggregate.Kind && command.Preconditions[i].Aggregate.ID < command.Preconditions[j].Aggregate.ID
+		})
+	case "tekroo.command.human-interaction.record-delivery", "tekroo.command.human-interaction.respond", "tekroo.command.human-interaction.close", "tekroo.command.human-interaction.expire":
+		configureHumanInteractionContinuation(t, command, snapshot, object)
+	}
+}
+
+func participantFixture(recipient kernel.HumanInteractionRecipient) kernel.HumanParticipantSnapshot {
+	validFrom := time.Date(2026, time.August, 10, 0, 0, 0, 0, time.UTC)
+	return kernel.HumanParticipantSnapshot{Participant: recipient.Principal, Revision: 1, ProfileID: recipient.ParticipantProfileID, ProfileRevision: recipient.ParticipantProfileRevision, ProfileDigest: recipient.ParticipantProfileDigest, DisplayLabel: "Alice", PrivacyClassification: kernel.ConfidentialityInternal, ParticipantPolicyRevision: 1, ParticipantPolicyDigest: kernel.Digest("cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"), Active: true,
+		RoleBindings:           []kernel.HumanRoleBinding{{RoleBindingID: recipient.RoleBindingID, RoleClass: "SME", RoleID: "sme", ScopeKind: "PROJECT", ScopeID: "tekroo-v4", AuthorityPolicyRevision: 1, AuthorityPolicyDigest: kernel.Digest("7777777777777777777777777777777777777777777777777777777777777777"), ValidFrom: validFrom, Active: true, EvidenceIDs: []kernel.UUIDv7{"00000000-0000-7000-8000-000000000903"}}},
+		AuthenticationBindings: []kernel.HumanAuthenticationBinding{{AuthenticationBindingID: "00000000-0000-7000-8000-000000000911", Method: "OIDC", IssuerDigest: "8888888888888888888888888888888888888888888888888888888888888888", SubjectDigest: "9999999999999999999999999999999999999999999999999999999999999999", Assurance: "STANDARD", BindingRevision: 1, Active: true, EvidenceIDs: []kernel.UUIDv7{"00000000-0000-7000-8000-000000000903"}}},
+		DeliveryBindings:       []kernel.HumanDeliveryBinding{{DeliveryBindingID: recipient.DeliveryBindingID, Channel: "WEB_PORTAL", EndpointDigest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", AdapterProfileDigest: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", ConfidentialityCeiling: kernel.ConfidentialityConfidential, AuthenticationBindingIDs: []kernel.UUIDv7{"00000000-0000-7000-8000-000000000911"}, BindingRevision: 1, Active: true, EvidenceIDs: []kernel.UUIDv7{"00000000-0000-7000-8000-000000000903"}}},
+	}
+}
+
+func configureHumanInteractionContinuation(t *testing.T, command *kernel.KernelCommand, snapshot *kernel.Snapshot, object map[string]any) {
+	t.Helper()
+	command.ExpectedLifecycleEpoch = nil
+	interactionID := kernel.UUIDv7(object["interaction_id"].(string))
+	revision := uint64(object["expected_interaction_revision"].(float64))
+	questionRevision := uint64(object["question_revision"].(float64))
+	respondent := kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "human:alice"}
+	if raw, ok := object["recipient"].(map[string]any); ok {
+		respondent.ID = raw["id"].(string)
+	}
+	if raw, ok := object["respondent"].(map[string]any); ok {
+		respondent.ID = raw["id"].(string)
+		command.Authority = respondent
+		command.ActorFQN = nil
+		command.Execution = nil
+	}
+	profileID := kernel.UUIDv7("00000000-0000-7000-8000-000000000909")
+	if value, ok := object["participant_profile_id"].(string); ok {
+		profileID = kernel.UUIDv7(value)
+	}
+	roleID := kernel.UUIDv7("00000000-0000-7000-8000-000000000910")
+	if value, ok := object["role_binding_id"].(string); ok {
+		roleID = kernel.UUIDv7(value)
+	}
+	deliveryBindingID := kernel.UUIDv7("00000000-0000-7000-8000-000000000912")
+	if value, ok := object["delivery_binding_id"].(string); ok {
+		deliveryBindingID = kernel.UUIDv7(value)
+	}
+	recipient := kernel.HumanInteractionRecipient{Principal: respondent, ParticipantProfileID: profileID, ParticipantProfileRevision: 1, ParticipantProfileDigest: "6666666666666666666666666666666666666666666666666666666666666666", RoleBindingID: roleID, DeliveryBindingID: deliveryBindingID}
+	interaction := kernel.HumanInteractionSnapshot{InteractionID: interactionID, Revision: revision, Phase: kernel.HumanInteractionOpen, Subject: kernel.AggregateRef{Kind: kernel.AggregateTask, ID: "00000000-0000-7000-8000-000000000901"}, SubjectLifecycleEpoch: 1, ExpectedSubjectRevision: 2, QuestionRevision: questionRevision, CanonicalQuestionDigest: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", ResponseSpecificationDigest: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", OriginPrincipal: kernel.PrincipalRef{Kind: kernel.PrincipalActor, ID: "teams::coder-1"}, OriginActorFQN: actorPointer("teams::coder-1"), OriginExecution: &kernel.ExecutionTuple{ExecutionID: "00000000-0000-7000-8000-000000000904", FencingEpoch: 1}, Recipients: []kernel.HumanInteractionRecipient{recipient}, ResponsePolicy: kernel.HumanResponsePolicy{Kind: kernel.HumanResponseExactOne}, Purpose: "ADVISORY_CONSULTATION", DeclaredEffect: "ADVISORY_ONLY", Confidentiality: kernel.ConfidentialityInternal, DeadlineAt: time.Date(2026, time.August, 14, 0, 0, 0, 0, time.UTC), TimeoutPolicy: kernel.PrincipalRef{Kind: kernel.PrincipalPolicy, ID: "human-interaction-timeout"}, DisclosureScopeDigest: "1212121212121212121212121212121212121212121212121212121212121212", InteractionPolicyRevision: 1, InteractionPolicyDigest: "1313131313131313131313131313131313131313131313131313131313131313"}
+	if command.CommandType == "tekroo.command.human-interaction.respond" {
+		deliveryID := kernel.UUIDv7(object["delivery_id"].(string))
+		interaction.Deliveries = []kernel.HumanDeliveryRecord{{DeliveryID: deliveryID, EventID: kernel.UUIDv7(object["delivery_event_id"].(string)), Recipient: respondent, DeliveryBindingID: deliveryBindingID, Outcome: "DELIVERED"}}
+		interaction.Phase = kernel.HumanInteractionCollecting
+	}
+	if command.CommandType == "tekroo.command.human-interaction.close" {
+		responseID := kernel.UUIDv7(object["accepted_response_event_ids"].([]any)[0].(string))
+		interaction.Deliveries = []kernel.HumanDeliveryRecord{{DeliveryID: "00000000-0000-7000-8000-000000000914", EventID: "00000000-0000-7000-8000-000000000915", Recipient: respondent, DeliveryBindingID: deliveryBindingID, Outcome: "DELIVERED"}}
+		interaction.Responses = []kernel.HumanResponseRecord{{EventID: responseID, Respondent: respondent, ParticipantProfileID: profileID, ParticipantProfileRevision: 1, RoleBindingID: roleID, AuthenticationBindingID: "00000000-0000-7000-8000-000000000911", DeliveryID: "00000000-0000-7000-8000-000000000914", ResponseArtifactDigest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", ResponseSpecificationDigest: interaction.ResponseSpecificationDigest}}
+		interaction.Phase = kernel.HumanInteractionSatisfied
+	}
+	command.Target.ID = interactionID
+	command.ExpectedRevision = kernel.NewExpectedRevision(revision)
+	snapshot.Exists = true
+	snapshot.Revision = revision
+	snapshot.State = &kernel.AggregateState{Kind: kernel.AggregateHumanInteraction, ID: interactionID, Revision: revision, LifecycleEpoch: 1, ScopeRevision: 1, Phase: kernel.PhaseDraft, Condition: kernel.ConditionRunnable, Interaction: &interaction}
+	if command.CommandType == "tekroo.command.human-interaction.respond" {
+		profile := participantFixture(recipient)
+		ref := kernel.AggregateRef{Kind: kernel.AggregateHumanParticipant, ID: "00000000-0000-7000-8000-000000000920"}
+		snapshot.Related = map[kernel.AggregateRef]kernel.RelatedSnapshot{ref: {Exists: true, Revision: 1, State: &kernel.AggregateState{Kind: ref.Kind, ID: ref.ID, Revision: 1, LifecycleEpoch: 1, ScopeRevision: 1, Phase: kernel.PhaseDraft, Condition: kernel.ConditionRunnable, Participant: &profile}}}
+		command.Preconditions = []kernel.AggregatePrecondition{{Aggregate: ref, Expected: kernel.NewExpectedRevision(1)}}
+	}
+}
+
+func actorPointer(value kernel.ActorFQN) *kernel.ActorFQN { return &value }
+
 func releaseFixtureQualification(plan kernel.ReleasePlanSnapshot, eventID kernel.UUIDv7) *kernel.ReleaseQualification {
 	return &kernel.ReleaseQualification{
 		EventID: eventID, QualificationID: "00000000-0000-7000-8000-000000000754", QualifiedBaseCommit: plan.BaseCommit,
@@ -719,7 +1044,7 @@ func releaseFixturePlan(t *testing.T) kernel.ReleasePlanSnapshot {
 }
 
 func stateForCommand(commandType string, target kernel.AggregateRef) *kernel.AggregateState {
-	state := &kernel.AggregateState{Kind: target.Kind, ID: target.ID, Revision: 1, LifecycleEpoch: 1, Condition: kernel.ConditionRunnable}
+	state := &kernel.AggregateState{Kind: target.Kind, ID: target.ID, Revision: 1, LifecycleEpoch: 1, ScopeRevision: 1, Condition: kernel.ConditionRunnable}
 	if target.Kind == kernel.AggregateStory {
 		state.Phase = kernel.PhaseActive
 		switch commandType {

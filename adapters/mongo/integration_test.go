@@ -28,7 +28,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
-const testManifestSHA = kernel.Digest("1b5a9a5d9ca1331e444f9d1c3e9ca63b77e1c0f3899dd84669f8668b52872213")
+const testManifestSHA = kernel.Digest("e2b9b5224a860a3eaa07451cf48fb5ac16a440b22b8dd592ff1662c1cff67f16")
 
 var (
 	testMongoURI string
@@ -62,7 +62,7 @@ func TestStartupRejectsUnsupportedTopology(t *testing.T) {
 }
 
 func TestStartupPinsMetadataAndRequiredIndexes(t *testing.T) {
-	manifest, err := os.ReadFile("../../CONTRACTS/tekroo.kernel.contracts/0.5.0/manifest.json")
+	manifest, err := os.ReadFile("../../CONTRACTS/tekroo.kernel.contracts/0.7.0/manifest.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -276,7 +276,7 @@ func TestReleaseProjectionSurvivesRestartAndReplaysExactTerminalState(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
-	createPayload := mongoReleaseCreatePayload("00000000-0000-7000-8000-000000000751")
+	createPayload := currentMongoContractPayload(mongoReleaseCreatePayload("00000000-0000-7000-8000-000000000751"))
 	target := kernel.AggregateRef{Kind: kernel.AggregateReleasePlan, ID: testUUID(0x751)}
 	create := mongoReleaseDecision(t, 101, target, "tekroo.command.release-plan.create", "tekroo.event.release-plan.created", 1, createPayload)
 	key, err := kernel.ReleasePlanKeyFromCreatePayload(createPayload)
@@ -308,7 +308,8 @@ func TestReleaseProjectionSurvivesRestartAndReplaysExactTerminalState(t *testing
 	if projected := snapshot.ReleasePlans[target]; projected.State != kernel.ReleasePlanned || projected.Revision != 1 || snapshot.ReleasePlanKeys[key] != target {
 		t.Fatalf("created release projection after restart = %#v, keys=%#v", projected, snapshot.ReleasePlanKeys)
 	}
-	qualificationPayload := json.RawMessage(`{"artifact_digests":["ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"],"contract_manifest":"tekroo.kernel.contracts/0.5.0","dependency_lock_digest":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","evidence_ids":["00000000-0000-7000-8000-000000000750"],"expected_release_revision":1,"gate_definition_digest":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","manifest_sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","ordered_head_commits":["2222222222222222222222222222222222222222"],"plan_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","qualification_id":"00000000-0000-7000-8000-000000000754","qualified_base_commit":"1111111111111111111111111111111111111111","qualified_tree_digest":"3333333333333333333333333333333333333333","release_plan_id":"00000000-0000-7000-8000-000000000751","required_profiles":["contract-structure","core-hermetic","mongo-integration","synthesized-merge"],"toolchain_digest":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"}`)
+	qualificationPayload := json.RawMessage(`{"artifact_digests":["ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"],"contract_manifest":"tekroo.kernel.contracts/0.6.0","dependency_lock_digest":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","evidence_ids":["00000000-0000-7000-8000-000000000750"],"expected_release_revision":1,"gate_definition_digest":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","manifest_sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","ordered_head_commits":["2222222222222222222222222222222222222222"],"plan_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","qualification_id":"00000000-0000-7000-8000-000000000754","qualified_base_commit":"1111111111111111111111111111111111111111","qualified_tree_digest":"3333333333333333333333333333333333333333","release_plan_id":"00000000-0000-7000-8000-000000000751","required_profiles":["contract-structure","core-hermetic","mongo-integration","synthesized-merge"],"toolchain_digest":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"}`)
+	qualificationPayload = currentMongoContractPayload(qualificationPayload)
 	qualification := mongoReleaseDecision(t, 102, target, "tekroo.command.release-plan.record-qualification", "tekroo.event.release-plan.qualification-recorded", 2, qualificationPayload)
 	commitMongoRelease(t, reopened, snapshot, qualification)
 
@@ -371,8 +372,8 @@ func TestConcurrentReleaseCreationHasOneSemanticWinner(t *testing.T) {
 	store := openTestStore(t)
 	firstTarget := kernel.AggregateRef{Kind: kernel.AggregateReleasePlan, ID: testUUID(0x771)}
 	secondTarget := kernel.AggregateRef{Kind: kernel.AggregateReleasePlan, ID: testUUID(0x772)}
-	firstPayload := mongoReleaseCreatePayload(string(firstTarget.ID))
-	secondPayload := mongoReleaseCreatePayload(string(secondTarget.ID))
+	firstPayload := currentMongoContractPayload(mongoReleaseCreatePayload(string(firstTarget.ID)))
+	secondPayload := currentMongoContractPayload(mongoReleaseCreatePayload(string(secondTarget.ID)))
 	key, err := kernel.ReleasePlanKeyFromCreatePayload(firstPayload)
 	if err != nil {
 		t.Fatal(err)
@@ -417,7 +418,7 @@ func TestConcurrentReleaseCreationHasOneSemanticWinner(t *testing.T) {
 func TestReleaseProjectionLoadFailsClosedOnCorruptSemanticBinding(t *testing.T) {
 	store := openTestStore(t)
 	target := kernel.AggregateRef{Kind: kernel.AggregateReleasePlan, ID: testUUID(0x781)}
-	payload := mongoReleaseCreatePayload(string(target.ID))
+	payload := currentMongoContractPayload(mongoReleaseCreatePayload(string(target.ID)))
 	decision := mongoReleaseDecision(t, 121, target, "tekroo.command.release-plan.create", "tekroo.event.release-plan.created", 1, payload)
 	key, err := kernel.ReleasePlanKeyFromCreatePayload(payload)
 	if err != nil {
@@ -551,6 +552,56 @@ func TestAggregateFoldDetectsMaterializedCorruption(t *testing.T) {
 	}
 	if err := store.VerifyAggregate(ctx, decision.Receipt.Target); !errors.Is(err, ErrCorruptAggregate) {
 		t.Fatalf("corrupt fold error = %v, want ErrCorruptAggregate", err)
+	}
+}
+
+func TestModelCapabilityProjectionsRoundTrip(t *testing.T) {
+	store := openTestStore(t)
+	task := kernel.AggregateRef{Kind: kernel.AggregateTask, ID: testUUID(801)}
+	profile := mongoTestWorkProfile(task.ID)
+	profilePayload, err := json.Marshal(profile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bind := mongoReleaseDecision(t, 81, task, "tekroo.command.task.bind-work-profile", "tekroo.event.task.work-profile-bound", 1, profilePayload)
+	commitMongoRelease(t, store, kernel.Snapshot{}, bind)
+
+	snapshot := loadMongoRelease(t, store, task)
+	projectedProfile, found := snapshot.WorkProfiles[task]
+	if !found || projectedProfile.Profile.ProfileDigest != profile.ProfileDigest || projectedProfile.BoundEventID != bind.Events[0].EventID {
+		t.Fatalf("work profile projection = %#v", projectedProfile)
+	}
+
+	authorization := mongoTestAssignmentAuthorization(task.ID, profile.Binding())
+	authorizationPayload, err := json.Marshal(authorization)
+	if err != nil {
+		t.Fatal(err)
+	}
+	authorize := mongoReleaseDecision(t, 82, task, "tekroo.command.task.authorize-qualified-assignment", "tekroo.event.task.qualified-assignment-authorized", 2, authorizationPayload)
+	commitMongoRelease(t, store, snapshot, authorize)
+
+	snapshot = loadMongoRelease(t, store, task)
+	projectedAuthorization, found := snapshot.QualifiedAssignments[task]
+	if !found || projectedAuthorization.AssignmentID != authorization.AssignmentID || projectedAuthorization.AuthorizationEventID != authorize.Events[0].EventID {
+		t.Fatalf("qualified assignment projection = %#v", projectedAuthorization)
+	}
+
+	variantTarget := kernel.AggregateRef{Kind: kernel.AggregateVariantGroup, ID: testUUID(807)}
+	variantPayload := mongoTestVariantOpenPayload(variantTarget.ID, task.ID)
+	group, err := kernel.VariantGroupFromOpenPayload(variantPayload, testUUID(808))
+	if err != nil {
+		t.Fatal(err)
+	}
+	open := mongoReleaseDecision(t, 83, variantTarget, "tekroo.command.variant-group.open", "tekroo.event.variant-group.opened", 1, variantPayload)
+	open.Guards.AbsentVariantKeys = []kernel.VariantGroupKey{group.Key()}
+	commitMongoRelease(t, store, kernel.Snapshot{}, open)
+
+	variantSnapshot := loadMongoRelease(t, store, variantTarget)
+	if projected, found := variantSnapshot.VariantGroups[variantTarget]; !found || projected.VariantGroupID != variantTarget.ID {
+		t.Fatalf("variant group projection = %#v", projected)
+	}
+	if reference, found := variantSnapshot.VariantGroupKeys[group.Key()]; !found || reference != variantTarget {
+		t.Fatalf("variant key projection = %#v, %t", reference, found)
 	}
 }
 
@@ -914,7 +965,7 @@ func completeDecision(t *testing.T, ordinal int) kernel.Decision {
 	eventID := testUUID(3000 + ordinal)
 	intentID := testUUID(4000 + ordinal)
 	revision := uint64(1)
-	state := kernel.AggregateState{Kind: kernel.AggregateStory, ID: target.ID, Revision: 1, LifecycleEpoch: 1, Phase: kernel.PhaseDraft, Condition: kernel.ConditionRunnable}
+	state := kernel.AggregateState{Kind: kernel.AggregateStory, ID: target.ID, Revision: 1, LifecycleEpoch: 1, ScopeRevision: 1, Phase: kernel.PhaseDraft, Condition: kernel.ConditionRunnable}
 	payload, err := json.Marshal(state)
 	if err != nil {
 		t.Fatal(err)
@@ -973,7 +1024,7 @@ func mongoEscalationResolutionDecision(t *testing.T, ordinal int, escalation ker
 }
 
 func mongoReleaseCreatePayload(releasePlanID string) json.RawMessage {
-	return json.RawMessage(fmt.Sprintf(`{"author":{"id":"principal-author","kind":"HUMAN"},"author_approval_event_id":"00000000-0000-7000-8000-000000000749","author_approval_revision":1,"base_commit":"1111111111111111111111111111111111111111","base_ref":"main","conflict_policy":"FAIL_NO_IMPROVISATION","contract_manifest":"tekroo.kernel.contracts/0.5.0","evidence_ids":["00000000-0000-7000-8000-000000000750"],"execution_round_limit":2,"expected_qualified_tree":"3333333333333333333333333333333333333333","expected_story_revision":8,"git_version":"git version 2.51.0","manifest_sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","merge_strategy":"FF_ONLY_ORDERED","ordered_merges":[{"change_ref":"refs/heads/story-1","head_commit":"2222222222222222222222222222222222222222","merge_id":"00000000-0000-7000-8000-000000000752","role":"story"}],"plan_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","release_mode":"CODE","release_plan_id":"%s","release_policy_revision":1,"repository_url":"https://example.invalid/tekroo/teams.git","required_profiles":["contract-structure","core-hermetic","mongo-integration","synthesized-merge"],"story_id":"00000000-0000-7000-8000-000000000101","story_lifecycle_epoch":1}`, releasePlanID))
+	return json.RawMessage(fmt.Sprintf(`{"author":{"id":"principal-author","kind":"HUMAN"},"author_approval_event_id":"00000000-0000-7000-8000-000000000749","author_approval_revision":1,"base_commit":"1111111111111111111111111111111111111111","base_ref":"main","conflict_policy":"FAIL_NO_IMPROVISATION","contract_manifest":"tekroo.kernel.contracts/0.6.0","evidence_ids":["00000000-0000-7000-8000-000000000750"],"execution_round_limit":2,"expected_qualified_tree":"3333333333333333333333333333333333333333","expected_story_revision":8,"git_version":"git version 2.51.0","manifest_sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","merge_strategy":"FF_ONLY_ORDERED","ordered_merges":[{"change_ref":"refs/heads/story-1","head_commit":"2222222222222222222222222222222222222222","merge_id":"00000000-0000-7000-8000-000000000752","role":"story"}],"plan_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","release_mode":"CODE","release_plan_id":"%s","release_policy_revision":1,"repository_url":"https://example.invalid/tekroo/teams.git","required_profiles":["contract-structure","core-hermetic","mongo-integration","synthesized-merge"],"story_id":"00000000-0000-7000-8000-000000000101","story_lifecycle_epoch":1}`, releasePlanID))
 }
 
 func mongoReleaseDecision(t *testing.T, ordinal int, target kernel.AggregateRef, commandType, eventType string, revision uint64, payload json.RawMessage) kernel.Decision {
@@ -989,6 +1040,39 @@ func mongoReleaseDecision(t *testing.T, ordinal int, target kernel.AggregateRef,
 	decision.Events[0].CommittedAt = time.Date(2026, time.August, 11, 12, 0, ordinal, 0, time.UTC)
 	decision.Events[0].Payload = append(json.RawMessage(nil), payload...)
 	return attachProvenance(t, decision)
+}
+
+func mongoTestWorkProfile(taskID kernel.UUIDv7) kernel.WorkRiskProfile {
+	return kernel.WorkRiskProfile{
+		TaskID: taskID, ProfileID: testUUID(802), ProfileRevision: 1,
+		ProfileDigest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", LifecycleEpoch: 1, ScopeRevision: 1,
+		WorkKind: kernel.WorkImplementation, Ambiguity: kernel.AmbiguityLow, Novelty: kernel.NoveltyRoutine, BlastRadius: kernel.BlastLocal, SecuritySensitivity: kernel.SecurityOrdinary,
+		MinimumDecisionRoute: kernel.RouteBoundedExecution, AcceptanceCriteriaDigest: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+		RequiredDeterministicGateIDs: []string{"go-test"}, RequiredValidationBranches: 1,
+		RequiredIndependenceDimensions: []kernel.IndependenceDimension{kernel.IndependenceActor, kernel.IndependenceExecution, kernel.IndependenceContext, kernel.IndependenceWorkspace, kernel.IndependenceMethod},
+		ImplementationVariantCount:     1, ValidCandidateQuorum: 1, VerificationTopologyDigest: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+		ClassificationPolicyRevision: 1, ClassificationPolicyDigest: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+		PromotionPolicyRevision: 1, PromotionPolicyDigest: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+		Budgets:                 kernel.FiniteWorkBudgets{AttemptLimit: 2, ReviewRoundLimit: 2, PromotionLimit: 1, EscalationLimit: 1, DeadlineAt: time.Date(2026, time.August, 14, 0, 0, 0, 0, time.UTC)},
+		ClassificationAuthority: kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "principal"}, ClassificationEvidenceIDs: []kernel.UUIDv7{testUUID(806)},
+	}
+}
+
+func mongoTestAssignmentAuthorization(taskID kernel.UUIDv7, profile kernel.WorkProfileBinding) kernel.QualifiedAssignmentAuthorization {
+	return kernel.QualifiedAssignmentAuthorization{
+		AssignmentID: testUUID(803), TaskID: taskID, ExpectedTaskRevision: 1, WorkProfile: profile,
+		RequiredDecisionRoute: kernel.RouteBoundedExecution, SelectedDecisionRoute: kernel.RouteBoundedExecution, SelectedActorFQN: "teams::coder-1",
+		SelectedExecutionID: testUUID(804), SelectedFencingEpoch: 1,
+		ModelProfileDigest: "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", RuntimeIdentityDigest: "1111111111111111111111111111111111111111111111111111111111111111",
+		Qualification:           kernel.AssignmentQualificationReceipt{QualificationID: testUUID(805), QualificationDigest: "2222222222222222222222222222222222222222222222222222222222222222", QualificationCorpusDigest: "3333333333333333333333333333333333333333333333333333333333333333", ModelProfileDigest: "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", DecisionRoute: kernel.RouteBoundedExecution, QualifiedRole: "programmer", Status: kernel.QualificationPass, ObservedAt: time.Date(2026, time.August, 13, 12, 0, 0, 0, time.UTC)},
+		SelectionPolicyRevision: 1, SelectionPolicyDigest: "4444444444444444444444444444444444444444444444444444444444444444",
+		HardConstraintResults: []kernel.HardConstraintResult{{ConstraintID: "data-residency", Outcome: kernel.ConstraintPass, EvidenceIDs: []kernel.UUIDv7{testUUID(806)}}},
+		SelectionReasons:      []string{"least-cost qualified profile"}, EvidenceIDs: []kernel.UUIDv7{testUUID(806)}, AuthorizationEventID: testUUID(807),
+	}
+}
+
+func mongoTestVariantOpenPayload(groupID, taskID kernel.UUIDv7) json.RawMessage {
+	return json.RawMessage(fmt.Sprintf(`{"acceptance_manifest_digest":"9999999999999999999999999999999999999999999999999999999999999999","adjudicator":{"id":"principal","kind":"HUMAN"},"base_artifact_digest":"5555555555555555555555555555555555555555555555555555555555555555","candidate_count":2,"comparator":{"id":"teams::reviewer-1","kind":"ACTOR"},"comparison_method_id":"structured-diff-v1","comparison_policy_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","decision_deadline_at":"2026-08-15T00:00:00Z","dependency_lock_digest":"8888888888888888888888888888888888888888888888888888888888888888","evidence_ids":["00000000-0000-7000-8000-000000000806"],"input_evidence_set_digest":"6666666666666666666666666666666666666666666666666666666666666666","materiality_policy_digest":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","replacement_budget":1,"required_independence_dimensions":["ACTOR","EXECUTION","CONTEXT","WORKSPACE"],"submission_deadline_at":"2026-08-14T00:00:00Z","task_id":"%s","toolchain_digest":"7777777777777777777777777777777777777777777777777777777777777777","valid_candidate_quorum":2,"variant_group_id":"%s","work_profile":{"lifecycle_epoch":1,"profile_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","profile_id":"00000000-0000-7000-8000-000000000802","profile_revision":1,"scope_revision":1}}`, taskID, groupID))
 }
 
 func commitMongoRelease(t *testing.T, store *Store, expected kernel.Snapshot, decision kernel.Decision) {
@@ -1196,4 +1280,8 @@ func stopMongod(process *mongodProcess) {
 		<-done
 	}
 	_ = os.RemoveAll(process.dir)
+}
+
+func currentMongoContractPayload(payload json.RawMessage) json.RawMessage {
+	return json.RawMessage(strings.ReplaceAll(string(payload), "tekroo.kernel.contracts/0.6.0", kernel.ContractIdentity))
 }

@@ -60,6 +60,10 @@ func PlanCompletion(input CompletionInput) CompletionDecision {
 		decision.Status, decision.Reason = CompletionNotReady, "STALE_COMPLETION_REVIEW"
 		return decision
 	}
+	if review.TopologyBound && (input.Work.ScopeRevision == 0 || review.ScopeRevision != input.Work.ScopeRevision || review.WorkProfile.LifecycleEpoch != input.Work.LifecycleEpoch || review.WorkProfile.ScopeRevision != input.Work.ScopeRevision || !review.CandidateArtifactDigest.Valid() || !review.VerificationTopologyDigest.Valid()) {
+		decision.Status, decision.Reason = CompletionNotReady, "STALE_VERIFICATION_TOPOLOGY"
+		return decision
+	}
 	if review.Finalization == nil || !review.Finalization.EventID.Valid() || review.Finalization.ReviewRevision != review.ReviewRevision {
 		decision.Status, decision.Reason = CompletionNotReady, "REVIEW_NOT_FINALIZED"
 		return decision
@@ -129,7 +133,7 @@ type ReopeningDecision struct {
 
 func PlanReopening(input ReopeningInput) ReopeningDecision {
 	decision := ReopeningDecision{Status: ReopeningInvalid, Reason: "INVALID_REOPENING_INPUT", Work: input.Work.Clone()}
-	if (input.Work.Kind != AggregateTask && input.Work.Kind != AggregateStory) || !input.Work.ID.Valid() || input.Work.Revision == 0 || input.Work.LifecycleEpoch == 0 || input.NewScopeRevision == 0 || input.Reason == "" || len(input.Reason) > 4096 {
+	if (input.Work.Kind != AggregateTask && input.Work.Kind != AggregateStory) || !input.Work.ID.Valid() || input.Work.Revision == 0 || input.Work.LifecycleEpoch == 0 || input.NewScopeRevision == 0 || input.NewScopeRevision <= input.Work.ScopeRevision || input.Reason == "" || len(input.Reason) > 4096 {
 		return decision
 	}
 	eligible := input.Work.Phase == PhaseCompleted || (input.Work.Kind == AggregateStory && input.Work.Phase == PhaseAccepted)

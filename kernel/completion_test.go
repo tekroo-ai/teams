@@ -57,6 +57,20 @@ func TestCompletionPlanHasNoEffectForNonPassStaleOrClosedWork(t *testing.T) {
 	}
 }
 
+func TestCompletionPlanRejectsStaleVerificationScope(t *testing.T) {
+	input := completionInput(kernel.AggregateTask)
+	input.Work.ScopeRevision = 3
+	input.Review.TopologyBound = true
+	input.Review.ScopeRevision = 2
+	input.Review.WorkProfile = kernel.WorkProfileBinding{ProfileID: kernel.UUIDv7("00000000-0000-7000-8000-000000000720"), ProfileRevision: 1, ProfileDigest: kernel.Digest("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), LifecycleEpoch: input.Work.LifecycleEpoch, ScopeRevision: 2}
+	input.Review.CandidateArtifactDigest = kernel.Digest("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
+	input.Review.VerificationTopologyDigest = kernel.Digest("cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc")
+	decision := kernel.PlanCompletion(input)
+	if decision.Status != kernel.CompletionNotReady || decision.Reason != "STALE_VERIFICATION_TOPOLOGY" {
+		t.Fatalf("stale topology decision = %#v", decision)
+	}
+}
+
 func TestReopeningPlanIsExplicitCanonicalAndTerminalOnly(t *testing.T) {
 	input := reopeningInput()
 	first := kernel.PlanReopening(input)
@@ -79,6 +93,11 @@ func TestReopeningPlanIsExplicitCanonicalAndTerminalOnly(t *testing.T) {
 	input.Work.Phase = kernel.PhaseAccepted
 	if decision := kernel.PlanReopening(input); decision.Status != kernel.ReopeningNotEligible {
 		t.Fatalf("accepted task reopening decision = %#v", decision)
+	}
+	input = reopeningInput()
+	input.NewScopeRevision = input.Work.ScopeRevision
+	if decision := kernel.PlanReopening(input); decision.Status != kernel.ReopeningInvalid {
+		t.Fatalf("non-advancing scope decision = %#v", decision)
 	}
 }
 
@@ -116,7 +135,7 @@ func completionInput(kind kernel.AggregateKind) kernel.CompletionInput {
 func reopeningInput() kernel.ReopeningInput {
 	owner := kernel.ActorFQN("teams::coder-1")
 	return kernel.ReopeningInput{
-		Work:             kernel.AggregateState{Kind: kernel.AggregateTask, ID: kernel.UUIDv7("00000000-0000-7000-8000-000000000711"), Revision: 7, LifecycleEpoch: 2, Phase: kernel.PhaseCompleted, Condition: kernel.ConditionRunnable, Ownership: kernel.Ownership{OwnerFQN: &owner, OwnershipVersion: 3}},
+		Work:             kernel.AggregateState{Kind: kernel.AggregateTask, ID: kernel.UUIDv7("00000000-0000-7000-8000-000000000711"), Revision: 7, LifecycleEpoch: 2, ScopeRevision: 3, Phase: kernel.PhaseCompleted, Condition: kernel.ConditionRunnable, Ownership: kernel.Ownership{OwnerFQN: &owner, OwnershipVersion: 3}},
 		NewScopeRevision: 4, Reason: "new evidence requires remediation", OwnerCarryForward: true,
 		EvidenceRefs: []kernel.EvidenceRef{
 			{EvidenceID: kernel.UUIDv7("00000000-0000-7000-8000-000000000713"), SHA256: kernel.Digest("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")},

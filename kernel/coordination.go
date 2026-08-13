@@ -9,18 +9,22 @@ import (
 )
 
 type ReviewBranchResult struct {
-	BranchID                    string          `json:"branchId"`
-	SourceRole                  string          `json:"sourceRole,omitempty"`
-	Authority                   PrincipalRef    `json:"authority,omitempty"`
-	Round                       uint64          `json:"round,omitempty"`
-	Result                      string          `json:"result"`
-	Reasons                     []string        `json:"reasons,omitempty"`
-	EvidenceIDs                 []UUIDv7        `json:"evidenceIds,omitempty"`
-	Findings                    []ReviewFinding `json:"findings,omitempty"`
-	SupersedesResultEventIDs    []UUIDv7        `json:"supersedesResultEventIds,omitempty"`
-	ChangedConditionEvidenceIDs []UUIDv7        `json:"changedConditionEvidenceIds,omitempty"`
-	EventID                     UUIDv7          `json:"eventId,omitempty"`
-	DecidedAt                   time.Time       `json:"decidedAt,omitempty"`
+	BranchID                    string              `json:"branchId"`
+	SourceRole                  string              `json:"sourceRole,omitempty"`
+	Authority                   PrincipalRef        `json:"authority,omitempty"`
+	Round                       uint64              `json:"round,omitempty"`
+	Result                      string              `json:"result"`
+	Reasons                     []string            `json:"reasons,omitempty"`
+	EvidenceIDs                 []UUIDv7            `json:"evidenceIds,omitempty"`
+	Findings                    []ReviewFinding     `json:"findings,omitempty"`
+	SupersedesResultEventIDs    []UUIDv7            `json:"supersedesResultEventIds,omitempty"`
+	ChangedConditionEvidenceIDs []UUIDv7            `json:"changedConditionEvidenceIds,omitempty"`
+	EventID                     UUIDv7              `json:"eventId,omitempty"`
+	DecidedAt                   time.Time           `json:"decidedAt,omitempty"`
+	CandidateArtifactDigest     Digest              `json:"candidateArtifactDigest,omitempty"`
+	IndependenceReceipt         IndependenceReceipt `json:"independenceReceipt,omitempty"`
+	ActorFQN                    *ActorFQN           `json:"actorFqn,omitempty"`
+	Execution                   *ExecutionTuple     `json:"execution,omitempty"`
 }
 
 type ReviewFinding struct {
@@ -32,13 +36,15 @@ type ReviewFinding struct {
 }
 
 type ReviewBranchSpec struct {
-	BranchID           string       `json:"branch_id"`
-	Validator          PrincipalRef `json:"validator"`
-	ResolutionOwnerFQN ActorFQN     `json:"resolution_owner_fqn"`
-	AcceptanceCriteria []string     `json:"acceptance_criteria"`
-	InputEvidenceIDs   []UUIDv7     `json:"input_evidence_ids"`
-	DeadlineAt         time.Time    `json:"deadline_at"`
-	RoundLimit         uint64       `json:"round_limit"`
+	BranchID                       string                  `json:"branch_id"`
+	Validator                      PrincipalRef            `json:"validator"`
+	ResolutionOwnerFQN             ActorFQN                `json:"resolution_owner_fqn"`
+	AcceptanceCriteria             []string                `json:"acceptance_criteria"`
+	InputEvidenceIDs               []UUIDv7                `json:"input_evidence_ids"`
+	DeadlineAt                     time.Time               `json:"deadline_at"`
+	RoundLimit                     uint64                  `json:"round_limit"`
+	RequiredIndependenceDimensions []IndependenceDimension `json:"required_independence_dimensions"`
+	RequiredMethodIDs              []string                `json:"required_method_ids"`
 }
 
 type ReviewAdjudication struct {
@@ -48,11 +54,15 @@ type ReviewAdjudication struct {
 }
 
 type ReviewFinalization struct {
-	EventID        UUIDv7   `json:"eventId"`
-	ReviewRevision uint64   `json:"reviewRevision"`
-	TerminalStatus string   `json:"terminalStatus"`
-	ResultEventIDs []UUIDv7 `json:"resultEventIds"`
-	EvidenceIDs    []UUIDv7 `json:"evidenceIds"`
+	EventID                    UUIDv7             `json:"eventId"`
+	ReviewRevision             uint64             `json:"reviewRevision"`
+	TerminalStatus             string             `json:"terminalStatus"`
+	ResultEventIDs             []UUIDv7           `json:"resultEventIds"`
+	EvidenceIDs                []UUIDv7           `json:"evidenceIds"`
+	ScopeRevision              uint64             `json:"scopeRevision,omitempty"`
+	WorkProfile                WorkProfileBinding `json:"workProfile,omitempty"`
+	CandidateArtifactDigest    Digest             `json:"candidateArtifactDigest,omitempty"`
+	VerificationTopologyDigest Digest             `json:"verificationTopologyDigest,omitempty"`
 }
 
 type ReviewJoinResult struct {
@@ -61,23 +71,30 @@ type ReviewJoinResult struct {
 }
 
 type CompletionReviewSnapshot struct {
-	ReviewID             UUIDv7
-	Subject              AggregateRef
-	LifecycleEpoch       uint64
-	CriteriaRevision     uint64
-	EvidenceSetDigest    Digest
-	BranchPolicyRevision uint64
-	RequiredBranchIDs    []string
-	Branches             map[string]ReviewBranchSpec
-	Adjudication         ReviewAdjudication
-	PartialResultPolicy  string
-	Results              map[string]string
-	ResultRecords        map[string]ReviewBranchResult
-	KnownResultEvents    map[UUIDv7]ReviewBranchResult
-	CurrentFindings      map[Digest]ReviewFinding
-	ReviewRevision       uint64
-	Finalization         *ReviewFinalization
-	Join                 ReviewJoinResult
+	ReviewID                   UUIDv7
+	Subject                    AggregateRef
+	LifecycleEpoch             uint64
+	CriteriaRevision           uint64
+	EvidenceSetDigest          Digest
+	BranchPolicyRevision       uint64
+	RequiredBranchIDs          []string
+	Branches                   map[string]ReviewBranchSpec
+	Adjudication               ReviewAdjudication
+	PartialResultPolicy        string
+	Results                    map[string]string
+	ResultRecords              map[string]ReviewBranchResult
+	KnownResultEvents          map[UUIDv7]ReviewBranchResult
+	CurrentFindings            map[Digest]ReviewFinding
+	ReviewRevision             uint64
+	Finalization               *ReviewFinalization
+	Join                       ReviewJoinResult
+	TopologyBound              bool
+	ScopeRevision              uint64
+	WorkProfile                WorkProfileBinding
+	CandidateArtifactDigest    Digest
+	Implementer                WorkExecutionIdentity
+	VerificationTopologyDigest Digest
+	VariantGroupID             *UUIDv7
 }
 
 func (s CompletionReviewSnapshot) Clone() CompletionReviewSnapshot {
@@ -91,6 +108,8 @@ func (s CompletionReviewSnapshot) Clone() CompletionReviewSnapshot {
 	for branch, spec := range s.Branches {
 		spec.AcceptanceCriteria = append([]string(nil), spec.AcceptanceCriteria...)
 		spec.InputEvidenceIDs = append([]UUIDv7(nil), spec.InputEvidenceIDs...)
+		spec.RequiredIndependenceDimensions = append([]IndependenceDimension(nil), spec.RequiredIndependenceDimensions...)
+		spec.RequiredMethodIDs = append([]string(nil), spec.RequiredMethodIDs...)
 		copy.Branches[branch] = spec
 	}
 	copy.ResultRecords = make(map[string]ReviewBranchResult, len(s.ResultRecords))
@@ -112,6 +131,10 @@ func (s CompletionReviewSnapshot) Clone() CompletionReviewSnapshot {
 		value.EvidenceIDs = append([]UUIDv7(nil), value.EvidenceIDs...)
 		copy.Finalization = &value
 	}
+	if s.VariantGroupID != nil {
+		value := *s.VariantGroupID
+		copy.VariantGroupID = &value
+	}
 	return copy
 }
 
@@ -120,6 +143,11 @@ func cloneReviewBranchResult(value ReviewBranchResult) ReviewBranchResult {
 	value.EvidenceIDs = append([]UUIDv7(nil), value.EvidenceIDs...)
 	value.SupersedesResultEventIDs = append([]UUIDv7(nil), value.SupersedesResultEventIDs...)
 	value.ChangedConditionEvidenceIDs = append([]UUIDv7(nil), value.ChangedConditionEvidenceIDs...)
+	value.IndependenceReceipt.ProvenDimensions = append([]IndependenceDimension(nil), value.IndependenceReceipt.ProvenDimensions...)
+	value.IndependenceReceipt.MethodIDs = append([]string(nil), value.IndependenceReceipt.MethodIDs...)
+	value.IndependenceReceipt.EvidenceIDs = append([]UUIDv7(nil), value.IndependenceReceipt.EvidenceIDs...)
+	value.ActorFQN = cloneActor(value.ActorFQN)
+	value.Execution = cloneExecution(value.Execution)
 	value.Findings = append([]ReviewFinding(nil), value.Findings...)
 	for index := range value.Findings {
 		value.Findings[index].EvidenceIDs = append([]UUIDv7(nil), value.Findings[index].EvidenceIDs...)
@@ -206,21 +234,29 @@ func CompletionReviewFromPayload(payload json.RawMessage) (CompletionReviewSnaps
 		BranchPolicyRevision uint64   `json:"branch_policy_revision"`
 		RequiredBranchIDs    []string `json:"required_branch_ids"`
 		Branches             []struct {
-			BranchID           string       `json:"branch_id"`
-			Validator          PrincipalRef `json:"validator"`
-			ResolutionOwnerFQN ActorFQN     `json:"resolution_owner_fqn"`
-			AcceptanceCriteria []string     `json:"acceptance_criteria"`
-			InputEvidenceIDs   []UUIDv7     `json:"input_evidence_ids"`
-			DeadlineAt         time.Time    `json:"deadline_at"`
-			RoundLimit         uint64       `json:"round_limit"`
+			BranchID                       string                  `json:"branch_id"`
+			Validator                      PrincipalRef            `json:"validator"`
+			ResolutionOwnerFQN             ActorFQN                `json:"resolution_owner_fqn"`
+			AcceptanceCriteria             []string                `json:"acceptance_criteria"`
+			InputEvidenceIDs               []UUIDv7                `json:"input_evidence_ids"`
+			DeadlineAt                     time.Time               `json:"deadline_at"`
+			RoundLimit                     uint64                  `json:"round_limit"`
+			RequiredIndependenceDimensions []IndependenceDimension `json:"required_independence_dimensions"`
+			RequiredMethodIDs              []string                `json:"required_method_ids"`
 		} `json:"branches"`
 		Adjudication struct {
 			Adjudicator PrincipalRef `json:"adjudicator"`
 			DeadlineAt  time.Time    `json:"deadline_at"`
 			RoundLimit  uint64       `json:"round_limit"`
 		} `json:"adjudication"`
-		JoinRule            string `json:"join_rule"`
-		PartialResultPolicy string `json:"partial_result_policy"`
+		JoinRule                   string                `json:"join_rule"`
+		PartialResultPolicy        string                `json:"partial_result_policy"`
+		ScopeRevision              uint64                `json:"scope_revision"`
+		WorkProfile                WorkProfileBinding    `json:"work_profile"`
+		CandidateArtifactDigest    Digest                `json:"candidate_artifact_digest"`
+		Implementer                WorkExecutionIdentity `json:"implementer"`
+		VerificationTopologyDigest Digest                `json:"verification_topology_digest"`
+		VariantGroupID             *UUIDv7               `json:"variant_group_id"`
 	}
 	if json.Unmarshal(payload, &value) != nil {
 		return CompletionReviewSnapshot{}, errors.New("invalid completion review policy")
@@ -228,6 +264,10 @@ func CompletionReviewFromPayload(payload json.RawMessage) (CompletionReviewSnaps
 	subject := AggregateRef{Kind: AggregateKind(value.SubjectKind), ID: value.SubjectID}
 	if !subject.Valid() || value.LifecycleEpoch == 0 || value.CriteriaRevision == 0 || !value.EvidenceSetDigest.Valid() || value.BranchPolicyRevision == 0 || value.JoinRule != "ALL_PASS" || (value.PartialResultPolicy != "WAIT_ALL" && value.PartialResultPolicy != "FAIL_FAST") {
 		return CompletionReviewSnapshot{}, errors.New("invalid completion review policy")
+	}
+	topologyBound := value.ScopeRevision > 0 || value.WorkProfile.ProfileID != "" || value.CandidateArtifactDigest != "" || value.VerificationTopologyDigest != ""
+	if topologyBound && (value.ScopeRevision == 0 || !value.WorkProfile.Valid() || value.WorkProfile.LifecycleEpoch != value.LifecycleEpoch || value.WorkProfile.ScopeRevision != value.ScopeRevision || !value.CandidateArtifactDigest.Valid() || !value.Implementer.Valid() || !value.VerificationTopologyDigest.Valid() || value.VariantGroupID != nil && !value.VariantGroupID.Valid()) {
+		return CompletionReviewSnapshot{}, errors.New("invalid completion review topology")
 	}
 	legacy := len(value.Branches) == 0
 	if legacy && len(value.RequiredBranchIDs) == 0 {
@@ -238,7 +278,7 @@ func CompletionReviewFromPayload(payload json.RawMessage) (CompletionReviewSnaps
 	if !legacy {
 		required = required[:0]
 		for _, branch := range value.Branches {
-			if branch.BranchID == "" || !branch.Validator.Valid() || !branch.ResolutionOwnerFQN.Valid() || !validUniqueBoundedStrings(branch.AcceptanceCriteria) || !validUUIDSet(branch.InputEvidenceIDs, true) || branch.DeadlineAt.IsZero() || branch.RoundLimit == 0 || branch.RoundLimit > 1000 {
+			if branch.BranchID == "" || !branch.Validator.Valid() || !branch.ResolutionOwnerFQN.Valid() || !validUniqueBoundedStrings(branch.AcceptanceCriteria) || !validUUIDSet(branch.InputEvidenceIDs, true) || branch.DeadlineAt.IsZero() || branch.RoundLimit == 0 || branch.RoundLimit > 1000 || topologyBound && (!validUniqueDimensions(branch.RequiredIndependenceDimensions) || !validUniqueStrings(branch.RequiredMethodIDs, 1, 64)) {
 				return CompletionReviewSnapshot{}, errors.New("invalid bounded completion review branch")
 			}
 			if _, duplicate := branches[branch.BranchID]; duplicate {
@@ -248,7 +288,7 @@ func CompletionReviewFromPayload(payload json.RawMessage) (CompletionReviewSnaps
 			sort.Strings(criteria)
 			evidence := append([]UUIDv7(nil), branch.InputEvidenceIDs...)
 			sort.Slice(evidence, func(i, j int) bool { return evidence[i] < evidence[j] })
-			branches[branch.BranchID] = ReviewBranchSpec{BranchID: branch.BranchID, Validator: branch.Validator, ResolutionOwnerFQN: branch.ResolutionOwnerFQN, AcceptanceCriteria: criteria, InputEvidenceIDs: evidence, DeadlineAt: branch.DeadlineAt, RoundLimit: branch.RoundLimit}
+			branches[branch.BranchID] = ReviewBranchSpec{BranchID: branch.BranchID, Validator: branch.Validator, ResolutionOwnerFQN: branch.ResolutionOwnerFQN, AcceptanceCriteria: criteria, InputEvidenceIDs: evidence, DeadlineAt: branch.DeadlineAt, RoundLimit: branch.RoundLimit, RequiredIndependenceDimensions: append([]IndependenceDimension(nil), branch.RequiredIndependenceDimensions...), RequiredMethodIDs: append([]string(nil), branch.RequiredMethodIDs...)}
 			required = append(required, branch.BranchID)
 		}
 		if !value.Adjudication.Adjudicator.Valid() || value.Adjudication.DeadlineAt.IsZero() || value.Adjudication.RoundLimit == 0 || value.Adjudication.RoundLimit > 1000 {
@@ -261,21 +301,28 @@ func CompletionReviewFromPayload(payload json.RawMessage) (CompletionReviewSnaps
 	}
 	required, _ = canonicalValidationBranches(required)
 	return CompletionReviewSnapshot{
-		Subject:              subject,
-		LifecycleEpoch:       value.LifecycleEpoch,
-		CriteriaRevision:     value.CriteriaRevision,
-		EvidenceSetDigest:    value.EvidenceSetDigest,
-		BranchPolicyRevision: value.BranchPolicyRevision,
-		RequiredBranchIDs:    required,
-		Branches:             branches,
-		Adjudication:         ReviewAdjudication{Adjudicator: value.Adjudication.Adjudicator, DeadlineAt: value.Adjudication.DeadlineAt, RoundLimit: value.Adjudication.RoundLimit},
-		PartialResultPolicy:  value.PartialResultPolicy,
-		Results:              make(map[string]string),
-		ResultRecords:        make(map[string]ReviewBranchResult),
-		KnownResultEvents:    make(map[UUIDv7]ReviewBranchResult),
-		CurrentFindings:      make(map[Digest]ReviewFinding),
-		ReviewRevision:       1,
-		Join:                 join,
+		Subject:                    subject,
+		LifecycleEpoch:             value.LifecycleEpoch,
+		CriteriaRevision:           value.CriteriaRevision,
+		EvidenceSetDigest:          value.EvidenceSetDigest,
+		BranchPolicyRevision:       value.BranchPolicyRevision,
+		RequiredBranchIDs:          required,
+		Branches:                   branches,
+		Adjudication:               ReviewAdjudication{Adjudicator: value.Adjudication.Adjudicator, DeadlineAt: value.Adjudication.DeadlineAt, RoundLimit: value.Adjudication.RoundLimit},
+		PartialResultPolicy:        value.PartialResultPolicy,
+		Results:                    make(map[string]string),
+		ResultRecords:              make(map[string]ReviewBranchResult),
+		KnownResultEvents:          make(map[UUIDv7]ReviewBranchResult),
+		CurrentFindings:            make(map[Digest]ReviewFinding),
+		ReviewRevision:             1,
+		Join:                       join,
+		TopologyBound:              topologyBound,
+		ScopeRevision:              value.ScopeRevision,
+		WorkProfile:                value.WorkProfile,
+		CandidateArtifactDigest:    value.CandidateArtifactDigest,
+		Implementer:                value.Implementer,
+		VerificationTopologyDigest: value.VerificationTopologyDigest,
+		VariantGroupID:             value.VariantGroupID,
 	}, nil
 }
 
@@ -296,13 +343,15 @@ func ReviewBranchResultFromPayload(payload json.RawMessage) (UUIDv7, uint64, Rev
 			Summary        string   `json:"summary"`
 			EvidenceIDs    []UUIDv7 `json:"evidence_ids"`
 		} `json:"findings"`
-		SupersedesResultEventIDs    []UUIDv7 `json:"supersedes_result_event_ids"`
-		ChangedConditionEvidenceIDs []UUIDv7 `json:"changed_condition_evidence_ids"`
+		SupersedesResultEventIDs    []UUIDv7            `json:"supersedes_result_event_ids"`
+		ChangedConditionEvidenceIDs []UUIDv7            `json:"changed_condition_evidence_ids"`
+		CandidateArtifactDigest     Digest              `json:"candidate_artifact_digest"`
+		IndependenceReceipt         IndependenceReceipt `json:"independence_receipt"`
 	}
 	if json.Unmarshal(payload, &value) != nil || !value.ReviewID.Valid() || value.BranchID == "" || value.BranchPolicyRevision == 0 || !validReviewResult(value.Result) {
 		return "", 0, ReviewBranchResult{}, errors.New("invalid review branch result")
 	}
-	result := ReviewBranchResult{BranchID: value.BranchID, SourceRole: value.SourceRole, Round: value.Round, Result: value.Result, Reasons: value.Reasons, EvidenceIDs: value.EvidenceIDs, SupersedesResultEventIDs: value.SupersedesResultEventIDs, ChangedConditionEvidenceIDs: value.ChangedConditionEvidenceIDs}
+	result := ReviewBranchResult{BranchID: value.BranchID, SourceRole: value.SourceRole, Round: value.Round, Result: value.Result, Reasons: value.Reasons, EvidenceIDs: value.EvidenceIDs, SupersedesResultEventIDs: value.SupersedesResultEventIDs, ChangedConditionEvidenceIDs: value.ChangedConditionEvidenceIDs, CandidateArtifactDigest: value.CandidateArtifactDigest, IndependenceReceipt: value.IndependenceReceipt}
 	findingKeys := make(map[Digest]struct{}, len(value.Findings))
 	for _, finding := range value.Findings {
 		if !finding.FindingID.Valid() || !finding.FindingKey.Valid() || finding.Summary == "" || !validUUIDSet(finding.EvidenceIDs, true) {
@@ -377,6 +426,9 @@ func BoundedReviewResultReason(snapshot CompletionReviewSnapshot, result ReviewB
 	spec, required := snapshot.Branches[result.BranchID]
 	if !required || !result.EventID.Valid() || result.DecidedAt.IsZero() || !result.Authority.Valid() || result.Round == 0 || !validReviewResult(result.Result) || !validUUIDSet(result.EvidenceIDs, true) {
 		return "INVALID_REVIEW_RESULT"
+	}
+	if snapshot.TopologyBound && (result.CandidateArtifactDigest != snapshot.CandidateArtifactDigest || !result.IndependenceReceipt.Proves(spec.RequiredIndependenceDimensions, spec.RequiredMethodIDs) || !RequiredSeparationProven(snapshot.Implementer, result.Authority, result.ActorFQN, result.Execution, spec.RequiredIndependenceDimensions, result.IndependenceReceipt)) {
+		return "INDEPENDENCE_NOT_PROVEN"
 	}
 	switch result.SourceRole {
 	case "VALIDATOR":
@@ -454,21 +506,28 @@ func currentFindingSet(results map[string]ReviewBranchResult) (map[Digest]Review
 
 func ApplyReviewFinalization(snapshot CompletionReviewSnapshot, eventID UUIDv7, payload json.RawMessage) (CompletionReviewSnapshot, bool) {
 	var value struct {
-		ReviewID               UUIDv7   `json:"review_id"`
-		SubjectKind            string   `json:"subject_kind"`
-		SubjectID              UUIDv7   `json:"subject_id"`
-		LifecycleEpoch         uint64   `json:"lifecycle_epoch"`
-		BranchPolicyRevision   uint64   `json:"branch_policy_revision"`
-		ExpectedReviewRevision uint64   `json:"expected_review_revision"`
-		TerminalStatus         string   `json:"terminal_status"`
-		ResultEventIDs         []UUIDv7 `json:"result_event_ids"`
-		EvidenceIDs            []UUIDv7 `json:"evidence_ids"`
+		ReviewID                   UUIDv7             `json:"review_id"`
+		SubjectKind                string             `json:"subject_kind"`
+		SubjectID                  UUIDv7             `json:"subject_id"`
+		LifecycleEpoch             uint64             `json:"lifecycle_epoch"`
+		BranchPolicyRevision       uint64             `json:"branch_policy_revision"`
+		ExpectedReviewRevision     uint64             `json:"expected_review_revision"`
+		TerminalStatus             string             `json:"terminal_status"`
+		ResultEventIDs             []UUIDv7           `json:"result_event_ids"`
+		EvidenceIDs                []UUIDv7           `json:"evidence_ids"`
+		ScopeRevision              uint64             `json:"scope_revision"`
+		WorkProfile                WorkProfileBinding `json:"work_profile"`
+		CandidateArtifactDigest    Digest             `json:"candidate_artifact_digest"`
+		VerificationTopologyDigest Digest             `json:"verification_topology_digest"`
 	}
 	if json.Unmarshal(payload, &value) != nil {
 		return snapshot, false
 	}
 	subject := AggregateRef{Kind: AggregateKind(value.SubjectKind), ID: value.SubjectID}
 	if !value.ReviewID.Valid() || !eventID.Valid() || snapshot.Finalization != nil || subject != snapshot.Subject || value.LifecycleEpoch != snapshot.LifecycleEpoch || value.BranchPolicyRevision != snapshot.BranchPolicyRevision || value.ExpectedReviewRevision != snapshot.ReviewRevision || !snapshot.Join.Complete || value.TerminalStatus != snapshot.Join.Status || !validUUIDSet(value.ResultEventIDs, true) || !validUUIDSet(value.EvidenceIDs, true) {
+		return snapshot, false
+	}
+	if snapshot.TopologyBound && (value.ScopeRevision != snapshot.ScopeRevision || value.WorkProfile != snapshot.WorkProfile || value.CandidateArtifactDigest != snapshot.CandidateArtifactDigest || value.VerificationTopologyDigest != snapshot.VerificationTopologyDigest) {
 		return snapshot, false
 	}
 	want := make([]UUIDv7, 0, len(snapshot.ResultRecords))
@@ -482,7 +541,7 @@ func ApplyReviewFinalization(snapshot CompletionReviewSnapshot, eventID UUIDv7, 
 		return snapshot, false
 	}
 	next := snapshot.Clone()
-	next.Finalization = &ReviewFinalization{EventID: eventID, ReviewRevision: value.ExpectedReviewRevision, TerminalStatus: value.TerminalStatus, ResultEventIDs: got, EvidenceIDs: append([]UUIDv7(nil), value.EvidenceIDs...)}
+	next.Finalization = &ReviewFinalization{EventID: eventID, ReviewRevision: value.ExpectedReviewRevision, TerminalStatus: value.TerminalStatus, ResultEventIDs: got, EvidenceIDs: append([]UUIDv7(nil), value.EvidenceIDs...), ScopeRevision: value.ScopeRevision, WorkProfile: value.WorkProfile, CandidateArtifactDigest: value.CandidateArtifactDigest, VerificationTopologyDigest: value.VerificationTopologyDigest}
 	return next, true
 }
 

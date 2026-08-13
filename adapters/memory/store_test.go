@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -46,7 +47,7 @@ func TestStoreCommitsAtomicallyAndReplaysExactReceipt(t *testing.T) {
 		IdempotencyScope:   scope,
 		NextState: &kernel.AggregateState{
 			Kind: kernel.AggregateStory, ID: target.ID, Revision: 1,
-			LifecycleEpoch: 1, Phase: kernel.PhaseDraft, Condition: kernel.ConditionRunnable,
+			LifecycleEpoch: 1, ScopeRevision: 1, Phase: kernel.PhaseDraft, Condition: kernel.ConditionRunnable,
 		},
 		Events: []kernel.DomainEvent{{EventID: eventID, EventType: "tekroo.event.story.created", Aggregate: target, AggregateRevision: 1, LifecycleEpoch: 1}},
 		Receipt: kernel.CommandReceipt{
@@ -151,9 +152,98 @@ func TestStoreTracksRevisionWithoutWorkState(t *testing.T) {
 	}
 }
 
+func TestStoreProjectsModelCapabilityState(t *testing.T) {
+	store := memory.NewStore()
+	task := kernel.AggregateRef{Kind: kernel.AggregateTask, ID: uuid("00000000-0000-7000-8000-000000000801")}
+	profile := kernel.WorkRiskProfile{
+		TaskID: task.ID, ProfileID: "00000000-0000-7000-8000-000000000802", ProfileRevision: 1,
+		ProfileDigest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", LifecycleEpoch: 1, ScopeRevision: 1,
+		WorkKind: kernel.WorkImplementation, Ambiguity: kernel.AmbiguityLow, Novelty: kernel.NoveltyRoutine, BlastRadius: kernel.BlastLocal, SecuritySensitivity: kernel.SecurityOrdinary,
+		MinimumDecisionRoute: kernel.RouteBoundedExecution, AcceptanceCriteriaDigest: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+		RequiredDeterministicGateIDs: []string{"go-test"}, RequiredValidationBranches: 1,
+		RequiredIndependenceDimensions: []kernel.IndependenceDimension{kernel.IndependenceActor, kernel.IndependenceExecution, kernel.IndependenceContext, kernel.IndependenceWorkspace, kernel.IndependenceMethod},
+		ImplementationVariantCount:     1, ValidCandidateQuorum: 1, VerificationTopologyDigest: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+		ClassificationPolicyRevision: 1, ClassificationPolicyDigest: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+		PromotionPolicyRevision: 1, PromotionPolicyDigest: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+		Budgets:                 kernel.FiniteWorkBudgets{AttemptLimit: 2, ReviewRoundLimit: 2, PromotionLimit: 1, EscalationLimit: 1, DeadlineAt: time.Date(2026, time.August, 14, 0, 0, 0, 0, time.UTC)},
+		ClassificationAuthority: kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "principal"}, ClassificationEvidenceIDs: []kernel.UUIDv7{"00000000-0000-7000-8000-000000000806"},
+	}
+	profilePayload, err := json.Marshal(profile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bind := releaseProjectionDecision(t, 81, task, "tekroo.command.task.bind-work-profile", "tekroo.event.task.work-profile-bound", 1, profilePayload)
+	if err := store.Commit(context.Background(), kernel.Snapshot{}, bind); err != nil {
+		t.Fatal(err)
+	}
+
+	snapshot, err := store.Load(context.Background(), task)
+	if err != nil {
+		t.Fatal(err)
+	}
+	projectedProfile, found := snapshot.WorkProfiles[task]
+	if !found || projectedProfile.Profile.ProfileDigest != profile.ProfileDigest || projectedProfile.BoundEventID != bind.Events[0].EventID {
+		t.Fatalf("work profile projection = %#v", projectedProfile)
+	}
+
+	authorization := kernel.QualifiedAssignmentAuthorization{
+		AssignmentID: "00000000-0000-7000-8000-000000000803", TaskID: task.ID, ExpectedTaskRevision: 1, WorkProfile: profile.Binding(),
+		RequiredDecisionRoute: kernel.RouteBoundedExecution, SelectedDecisionRoute: kernel.RouteBoundedExecution, SelectedActorFQN: "teams::coder-1",
+		SelectedExecutionID: "00000000-0000-7000-8000-000000000804", SelectedFencingEpoch: 1,
+		ModelProfileDigest: "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", RuntimeIdentityDigest: "1111111111111111111111111111111111111111111111111111111111111111",
+		Qualification:           kernel.AssignmentQualificationReceipt{QualificationID: "00000000-0000-7000-8000-000000000805", QualificationDigest: "2222222222222222222222222222222222222222222222222222222222222222", QualificationCorpusDigest: "3333333333333333333333333333333333333333333333333333333333333333", ModelProfileDigest: "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", DecisionRoute: kernel.RouteBoundedExecution, QualifiedRole: "programmer", Status: kernel.QualificationPass, ObservedAt: time.Date(2026, time.August, 13, 12, 0, 0, 0, time.UTC)},
+		SelectionPolicyRevision: 1, SelectionPolicyDigest: "4444444444444444444444444444444444444444444444444444444444444444",
+		HardConstraintResults: []kernel.HardConstraintResult{{ConstraintID: "data-residency", Outcome: kernel.ConstraintPass, EvidenceIDs: []kernel.UUIDv7{"00000000-0000-7000-8000-000000000806"}}},
+		SelectionReasons:      []string{"least-cost qualified profile"}, EvidenceIDs: []kernel.UUIDv7{"00000000-0000-7000-8000-000000000806"}, AuthorizationEventID: "00000000-0000-7000-8000-000000000807",
+	}
+	authorizationPayload, err := json.Marshal(authorization)
+	if err != nil {
+		t.Fatal(err)
+	}
+	authorize := releaseProjectionDecision(t, 82, task, "tekroo.command.task.authorize-qualified-assignment", "tekroo.event.task.qualified-assignment-authorized", 2, authorizationPayload)
+	if err := store.Commit(context.Background(), snapshot, authorize); err != nil {
+		t.Fatal(err)
+	}
+
+	snapshot, err = store.Load(context.Background(), task)
+	if err != nil {
+		t.Fatal(err)
+	}
+	projectedAuthorization, found := snapshot.QualifiedAssignments[task]
+	if !found || projectedAuthorization.AssignmentID != authorization.AssignmentID || projectedAuthorization.AuthorizationEventID != authorize.Events[0].EventID {
+		t.Fatalf("qualified assignment projection = %#v", projectedAuthorization)
+	}
+}
+
+func TestStoreProjectsVariantGroupAndUniquenessKey(t *testing.T) {
+	store := memory.NewStore()
+	target := kernel.AggregateRef{Kind: kernel.AggregateVariantGroup, ID: uuid("00000000-0000-7000-8000-000000000807")}
+	payload := json.RawMessage(`{"acceptance_manifest_digest":"9999999999999999999999999999999999999999999999999999999999999999","adjudicator":{"id":"principal","kind":"HUMAN"},"base_artifact_digest":"5555555555555555555555555555555555555555555555555555555555555555","candidate_count":2,"comparator":{"id":"teams::reviewer-1","kind":"ACTOR"},"comparison_method_id":"structured-diff-v1","comparison_policy_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","decision_deadline_at":"2026-08-15T00:00:00Z","dependency_lock_digest":"8888888888888888888888888888888888888888888888888888888888888888","evidence_ids":["00000000-0000-7000-8000-000000000806"],"input_evidence_set_digest":"6666666666666666666666666666666666666666666666666666666666666666","materiality_policy_digest":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","replacement_budget":1,"required_independence_dimensions":["ACTOR","EXECUTION","CONTEXT","WORKSPACE"],"submission_deadline_at":"2026-08-14T00:00:00Z","task_id":"00000000-0000-7000-8000-000000000801","toolchain_digest":"7777777777777777777777777777777777777777777777777777777777777777","valid_candidate_quorum":2,"variant_group_id":"00000000-0000-7000-8000-000000000807","work_profile":{"lifecycle_epoch":1,"profile_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","profile_id":"00000000-0000-7000-8000-000000000802","profile_revision":1,"scope_revision":1}}`)
+	group, err := kernel.VariantGroupFromOpenPayload(payload, "00000000-0000-7000-8000-000000000808")
+	if err != nil {
+		t.Fatal(err)
+	}
+	open := releaseProjectionDecision(t, 83, target, "tekroo.command.variant-group.open", "tekroo.event.variant-group.opened", 1, payload)
+	open.Guards.AbsentVariantKeys = []kernel.VariantGroupKey{group.Key()}
+	if err := store.Commit(context.Background(), kernel.Snapshot{}, open); err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err := store.Load(context.Background(), target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if projected, found := snapshot.VariantGroups[target]; !found || projected.VariantGroupID != target.ID {
+		t.Fatalf("variant group projection = %#v", projected)
+	}
+	if reference, found := snapshot.VariantGroupKeys[group.Key()]; !found || reference != target {
+		t.Fatalf("variant key projection = %#v, %t", reference, found)
+	}
+}
+
 func TestStoreProjectsCompleteReleaseSequenceAndFencesDuplicateStoryPlan(t *testing.T) {
 	store := memory.NewStore()
-	createPayload := json.RawMessage(`{"author":{"id":"principal-author","kind":"HUMAN"},"author_approval_event_id":"00000000-0000-7000-8000-000000000749","author_approval_revision":1,"base_commit":"1111111111111111111111111111111111111111","base_ref":"main","conflict_policy":"FAIL_NO_IMPROVISATION","contract_manifest":"tekroo.kernel.contracts/0.5.0","evidence_ids":["00000000-0000-7000-8000-000000000750"],"execution_round_limit":2,"expected_qualified_tree":"3333333333333333333333333333333333333333","expected_story_revision":8,"git_version":"git version 2.51.0","manifest_sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","merge_strategy":"FF_ONLY_ORDERED","ordered_merges":[{"change_ref":"refs/heads/story-1","head_commit":"2222222222222222222222222222222222222222","merge_id":"00000000-0000-7000-8000-000000000752","role":"story"}],"plan_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","release_mode":"CODE","release_plan_id":"00000000-0000-7000-8000-000000000751","release_policy_revision":1,"repository_url":"https://example.invalid/tekroo/teams.git","required_profiles":["contract-structure","core-hermetic","mongo-integration","synthesized-merge"],"story_id":"00000000-0000-7000-8000-000000000101","story_lifecycle_epoch":1}`)
+	createPayload := json.RawMessage(`{"author":{"id":"principal-author","kind":"HUMAN"},"author_approval_event_id":"00000000-0000-7000-8000-000000000749","author_approval_revision":1,"base_commit":"1111111111111111111111111111111111111111","base_ref":"main","conflict_policy":"FAIL_NO_IMPROVISATION","contract_manifest":"tekroo.kernel.contracts/0.6.0","evidence_ids":["00000000-0000-7000-8000-000000000750"],"execution_round_limit":2,"expected_qualified_tree":"3333333333333333333333333333333333333333","expected_story_revision":8,"git_version":"git version 2.51.0","manifest_sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","merge_strategy":"FF_ONLY_ORDERED","ordered_merges":[{"change_ref":"refs/heads/story-1","head_commit":"2222222222222222222222222222222222222222","merge_id":"00000000-0000-7000-8000-000000000752","role":"story"}],"plan_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","release_mode":"CODE","release_plan_id":"00000000-0000-7000-8000-000000000751","release_policy_revision":1,"repository_url":"https://example.invalid/tekroo/teams.git","required_profiles":["contract-structure","core-hermetic","mongo-integration","synthesized-merge"],"story_id":"00000000-0000-7000-8000-000000000101","story_lifecycle_epoch":1}`)
+	createPayload = currentContractPayload(createPayload)
 	target := kernel.AggregateRef{Kind: kernel.AggregateReleasePlan, ID: uuid("00000000-0000-7000-8000-000000000751")}
 	create := releaseProjectionDecision(t, 21, target, "tekroo.command.release-plan.create", "tekroo.event.release-plan.created", 1, createPayload)
 	key, err := kernel.ReleasePlanKeyFromCreatePayload(createPayload)
@@ -170,13 +260,14 @@ func TestStoreProjectsCompleteReleaseSequenceAndFencesDuplicateStoryPlan(t *test
 		event   string
 		payload json.RawMessage
 	}{
-		{command: "tekroo.command.release-plan.record-qualification", event: "tekroo.event.release-plan.qualification-recorded", payload: json.RawMessage(`{"artifact_digests":["ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"],"contract_manifest":"tekroo.kernel.contracts/0.5.0","dependency_lock_digest":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","evidence_ids":["00000000-0000-7000-8000-000000000750"],"expected_release_revision":1,"gate_definition_digest":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","manifest_sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","ordered_head_commits":["2222222222222222222222222222222222222222"],"plan_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","qualification_id":"00000000-0000-7000-8000-000000000754","qualified_base_commit":"1111111111111111111111111111111111111111","qualified_tree_digest":"3333333333333333333333333333333333333333","release_plan_id":"00000000-0000-7000-8000-000000000751","required_profiles":["contract-structure","core-hermetic","mongo-integration","synthesized-merge"],"toolchain_digest":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"}`)},
+		{command: "tekroo.command.release-plan.record-qualification", event: "tekroo.event.release-plan.qualification-recorded", payload: json.RawMessage(`{"artifact_digests":["ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"],"contract_manifest":"tekroo.kernel.contracts/0.6.0","dependency_lock_digest":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","evidence_ids":["00000000-0000-7000-8000-000000000750"],"expected_release_revision":1,"gate_definition_digest":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","manifest_sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","ordered_head_commits":["2222222222222222222222222222222222222222"],"plan_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","qualification_id":"00000000-0000-7000-8000-000000000754","qualified_base_commit":"1111111111111111111111111111111111111111","qualified_tree_digest":"3333333333333333333333333333333333333333","release_plan_id":"00000000-0000-7000-8000-000000000751","required_profiles":["contract-structure","core-hermetic","mongo-integration","synthesized-merge"],"toolchain_digest":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"}`)},
 		{command: "tekroo.command.release-plan.request-execution", event: "tekroo.event.release-plan.execution-requested", payload: json.RawMessage(`{"attempt_id":"00000000-0000-7000-8000-000000000755","evidence_ids":["00000000-0000-7000-8000-000000000750"],"expected_release_revision":2,"merge_id":"00000000-0000-7000-8000-000000000752","plan_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","provider_idempotency_key":"release-751-merge-752-round-1","release_plan_id":"00000000-0000-7000-8000-000000000751","round":1}`)},
 		{command: "tekroo.command.release-plan.record-result", event: "tekroo.event.release-plan.result-recorded", payload: json.RawMessage(`{"attempt_id":"00000000-0000-7000-8000-000000000755","evidence_ids":["00000000-0000-7000-8000-000000000756"],"expected_release_revision":3,"merge_id":"00000000-0000-7000-8000-000000000752","observed_at":"2026-08-11T12:00:00Z","outcome":"UNKNOWN","plan_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","reasons":["provider response was not terminal"],"release_plan_id":"00000000-0000-7000-8000-000000000751"}`)},
 		{command: "tekroo.command.release-plan.record-reconciliation", event: "tekroo.event.release-plan.reconciliation-recorded", payload: nil},
 		{command: "tekroo.command.release-plan.finalize", event: "tekroo.event.release-plan.finalized", payload: nil},
 	}
 	for index := 0; index < 3; index++ {
+		transitions[index].payload = currentContractPayload(transitions[index].payload)
 		snapshot, loadErr := store.Load(context.Background(), target)
 		if loadErr != nil {
 			t.Fatal(loadErr)
@@ -224,6 +315,38 @@ func TestStoreProjectsCompleteReleaseSequenceAndFencesDuplicateStoryPlan(t *test
 	duplicate.Guards.AbsentReleaseKeys = []kernel.ReleasePlanKey{key}
 	if err := store.Commit(context.Background(), kernel.Snapshot{}, duplicate); !errors.Is(err, memory.ErrConflict) {
 		t.Fatalf("duplicate story release error = %v, want ErrConflict", err)
+	}
+}
+
+func TestStoreRoundTripsAndClonesOperatorHumanContinuityState(t *testing.T) {
+	store := memory.NewStore()
+	target := kernel.AggregateRef{Kind: kernel.AggregateSystem, ID: uuid("00000000-0000-7000-8000-000000000931")}
+	operator := kernel.OperatorRoleProfile{BindingID: uuid("00000000-0000-7000-8000-000000000932"), CapabilityIDs: []string{"coordinate"}}
+	participant := kernel.HumanParticipantSnapshot{Participant: kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "human:alice"}, Revision: 1, RoleBindings: []kernel.HumanRoleBinding{{RoleBindingID: uuid("00000000-0000-7000-8000-000000000933")}}, Active: true}
+	interaction := kernel.HumanInteractionSnapshot{InteractionID: uuid("00000000-0000-7000-8000-000000000934"), Revision: 1, Recipients: []kernel.HumanInteractionRecipient{{Principal: participant.Participant}}, ResponsePolicy: kernel.HumanResponsePolicy{Kind: kernel.HumanResponseExactOne}}
+	continuity := kernel.TeamContinuitySnapshot{Revision: 1, OperatingPosture: "CONTINUOUS", ControlState: kernel.ContinuityActive, PowerEpoch: 7, AdmissionOpen: true, InFlightExecutionIDs: []kernel.UUIDv7{uuid("00000000-0000-7000-8000-000000000935")}, LastTransitionEventID: uuid("00000000-0000-7000-8000-000000000936")}
+	state := kernel.AggregateState{Kind: target.Kind, ID: target.ID, Revision: 1, LifecycleEpoch: 1, ScopeRevision: 1, Phase: kernel.PhaseDraft, Condition: kernel.ConditionRunnable, OperatorRole: &operator, Participant: &participant, Interaction: &interaction, Continuity: &continuity}
+	decision := alternateDecision(t, 93)
+	decision.NextState = &state
+	decision.Receipt.Target = target
+	decision.Receipt.CommandType = "tekroo.command.system.configure-continuity"
+	revision := uint64(1)
+	decision.Receipt.ResultingRevision = &revision
+	decision.Events[0].Aggregate = target
+	decision.Events[0].AggregateRevision = revision
+	decision.Events[0].EventType = "tekroo.event.system.continuity-configured"
+	decision = attachProvenance(t, decision)
+	if err := store.Commit(context.Background(), kernel.Snapshot{}, decision); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := store.Load(context.Background(), target)
+	if err != nil || loaded.State == nil || !reflect.DeepEqual(*loaded.State, state) {
+		t.Fatalf("round trip state=%#v err=%v", loaded.State, err)
+	}
+	loaded.State.Continuity.InFlightExecutionIDs[0] = uuid("00000000-0000-7000-8000-000000000937")
+	reloaded, err := store.Load(context.Background(), target)
+	if err != nil || reloaded.State == nil || !reflect.DeepEqual(*reloaded.State, state) {
+		t.Fatalf("stored state aliased loaded mutation: %#v err=%v", reloaded.State, err)
 	}
 }
 
@@ -767,3 +890,7 @@ func attachProvenance(t *testing.T, decision kernel.Decision) kernel.Decision {
 }
 
 func uuid(value string) kernel.UUIDv7 { return kernel.UUIDv7(value) }
+
+func currentContractPayload(payload json.RawMessage) json.RawMessage {
+	return json.RawMessage(strings.ReplaceAll(string(payload), "tekroo.kernel.contracts/0.6.0", kernel.ContractIdentity))
+}

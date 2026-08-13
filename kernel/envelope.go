@@ -131,24 +131,29 @@ type DecisionGuards struct {
 	AbsentReviewKeys     []CompletionReviewKey
 	AbsentEscalationKeys []EscalationKey
 	AbsentReleaseKeys    []ReleasePlanKey
+	AbsentVariantKeys    []VariantGroupKey
 }
 
 type Snapshot struct {
-	Exists            bool
-	Revision          uint64
-	State             *AggregateState
-	AcceptedEvents    map[UUIDv7]AcceptedEvent
-	CurrentExecutions map[ActorFQN]ExecutionTuple
-	Evidence          map[UUIDv7]EvidenceMetadata
-	Related           map[AggregateRef]RelatedSnapshot
-	Authorization     AuthorizationPolicy
-	OpenReviews       map[CompletionReviewKey]AggregateRef
-	Reviews           map[AggregateRef]CompletionReviewSnapshot
-	Escalations       map[AggregateRef]EscalationSnapshot
-	EscalationKeys    map[EscalationKey]AggregateRef
-	ReleasePlans      map[AggregateRef]ReleasePlanSnapshot
-	ReleasePlanKeys   map[ReleasePlanKey]AggregateRef
-	AttemptBudgets    map[AttemptBudgetKey]AttemptBudgetSnapshot
+	Exists               bool
+	Revision             uint64
+	State                *AggregateState
+	AcceptedEvents       map[UUIDv7]AcceptedEvent
+	CurrentExecutions    map[ActorFQN]ExecutionTuple
+	Evidence             map[UUIDv7]EvidenceMetadata
+	Related              map[AggregateRef]RelatedSnapshot
+	Authorization        AuthorizationPolicy
+	OpenReviews          map[CompletionReviewKey]AggregateRef
+	Reviews              map[AggregateRef]CompletionReviewSnapshot
+	Escalations          map[AggregateRef]EscalationSnapshot
+	EscalationKeys       map[EscalationKey]AggregateRef
+	ReleasePlans         map[AggregateRef]ReleasePlanSnapshot
+	ReleasePlanKeys      map[ReleasePlanKey]AggregateRef
+	AttemptBudgets       map[AttemptBudgetKey]AttemptBudgetSnapshot
+	WorkProfiles         map[AggregateRef]WorkProfileSnapshot
+	QualifiedAssignments map[AggregateRef]QualifiedAssignmentAuthorization
+	VariantGroups        map[AggregateRef]VariantGroupSnapshot
+	VariantGroupKeys     map[VariantGroupKey]AggregateRef
 }
 
 type RelatedSnapshot struct {

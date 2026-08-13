@@ -51,27 +51,38 @@ func (coordinator *ValidationReviewCoordinator) Open(ctx context.Context, reques
 		return result, err
 	}
 	payload, _ := json.Marshal(struct {
-		SubjectKind          kernel.AggregateKind      `json:"subject_kind"`
-		SubjectID            kernel.UUIDv7             `json:"subject_id"`
-		LifecycleEpoch       uint64                    `json:"lifecycle_epoch"`
-		CriteriaRevision     uint64                    `json:"criteria_revision"`
-		EvidenceSetDigest    kernel.Digest             `json:"evidence_set_digest"`
-		BranchPolicyRevision uint64                    `json:"branch_policy_revision"`
-		Branches             []kernel.ReviewBranchSpec `json:"branches"`
-		JoinRule             string                    `json:"join_rule"`
-		PartialResultPolicy  string                    `json:"partial_result_policy"`
-		Adjudication         kernel.ReviewAdjudication `json:"adjudication"`
+		SubjectKind                kernel.AggregateKind         `json:"subject_kind"`
+		SubjectID                  kernel.UUIDv7                `json:"subject_id"`
+		LifecycleEpoch             uint64                       `json:"lifecycle_epoch"`
+		ScopeRevision              uint64                       `json:"scope_revision"`
+		CriteriaRevision           uint64                       `json:"criteria_revision"`
+		EvidenceSetDigest          kernel.Digest                `json:"evidence_set_digest"`
+		BranchPolicyRevision       uint64                       `json:"branch_policy_revision"`
+		Branches                   []kernel.ReviewBranchSpec    `json:"branches"`
+		JoinRule                   string                       `json:"join_rule"`
+		PartialResultPolicy        string                       `json:"partial_result_policy"`
+		Adjudication               kernel.ReviewAdjudication    `json:"adjudication"`
+		WorkProfile                kernel.WorkProfileBinding    `json:"work_profile"`
+		CandidateArtifactDigest    kernel.Digest                `json:"candidate_artifact_digest"`
+		Implementer                kernel.WorkExecutionIdentity `json:"implementer"`
+		VerificationTopologyDigest kernel.Digest                `json:"verification_topology_digest"`
+		VariantGroupID             *kernel.UUIDv7               `json:"variant_group_id"`
 	}{
-		decision.Subject.Kind, decision.Subject.ID, decision.Subject.LifecycleEpoch,
+		decision.Subject.Kind, decision.Subject.ID, decision.Subject.LifecycleEpoch, decision.Subject.ScopeRevision,
 		decision.CriteriaRevision, decision.EvidenceSetDigest, decision.BranchPolicyRevision,
 		decision.Branches, "ALL_PASS", decision.PartialResultPolicy, decision.Adjudication,
+		decision.WorkProfile, decision.CandidateArtifactDigest, decision.Implementer, decision.VerificationTopologyDigest, decision.VariantGroupID,
 	})
+	preconditions := []kernel.AggregatePrecondition{{Aggregate: kernel.AggregateRef{Kind: decision.Subject.Kind, ID: decision.Subject.ID}, Expected: kernel.NewExpectedRevision(decision.Subject.Revision)}}
+	if decision.VariantGroupID != nil {
+		preconditions = append(preconditions, kernel.AggregatePrecondition{Aggregate: kernel.AggregateRef{Kind: kernel.AggregateVariantGroup, ID: *decision.VariantGroupID}, Expected: kernel.NewExpectedRevision(decision.VariantGroupRevision)})
+	}
 	command := kernel.KernelCommand{
 		ContractManifest: kernel.ContractIdentity,
 		CommandID:        request.Identity.CommandID, CommandType: "tekroo.command.completion-review.open", CommandVersion: kernel.SchemaVersion,
 		Target: kernel.AggregateRef{Kind: kernel.AggregateCompletionReview, ID: decision.ReviewID}, Authority: request.PolicyAuthority,
 		ExpectedRevision:       kernel.MustNotExist(),
-		Preconditions:          []kernel.AggregatePrecondition{{Aggregate: kernel.AggregateRef{Kind: decision.Subject.Kind, ID: decision.Subject.ID}, Expected: kernel.NewExpectedRevision(decision.Subject.Revision)}},
+		Preconditions:          preconditions,
 		ExpectedPolicyRevision: request.PolicyRevision, ExpectedCatalogueRevision: request.CatalogueRevision,
 		IdempotencyKey: request.Identity.IdempotencyKey, CorrelationID: request.Identity.CorrelationID,
 		Causation: append([]kernel.DagParent(nil), decision.Parents...), Payload: payload,

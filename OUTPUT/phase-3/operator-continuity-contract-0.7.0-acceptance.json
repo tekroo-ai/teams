@@ -1,0 +1,32 @@
+{
+  "artifact": "operator-continuity-contract-0.7.0-acceptance",
+  "recordedAt": "2026-08-13",
+  "status": "ACCEPTED_CONTRACT_IMPLEMENTATION_PENDING",
+  "principalStatement": "That's fine for now. I approve the 0.7.0 contract.",
+  "acceptedCandidate": {
+    "identity": "tekroo.kernel.contracts/0.7.0",
+    "schemaVersion": "1.6.0",
+    "manifestSha256": "e2b9b5224a860a3eaa07451cf48fb5ac16a440b22b8dd592ff1662c1cff67f16",
+    "candidateGate": "OUTPUT/phase-3/operator-continuity-contract-0.7.0-candidate-gate.json",
+    "candidateGateSha256": "7d360fd24b1cff18f78ab533389b2db03442cc9fa3400b97d06f5626f927a80c",
+    "structureReport": "OUTPUT/phase-3/operator-continuity-contract-0.7.0-structure-report.json",
+    "referenceReport": "OUTPUT/phase-3/operator-continuity-contract-0.7.0-reference-report.json"
+  },
+  "acceptedEffects": [
+    "contract 0.7.0 is the latest accepted Tekroo kernel contract",
+    "contract 0.7.0 and its source-lineage decisions are immutable",
+    "operator identity separation, multiple human participation, finite mediated human interaction, and host continuity are binding successor requirements",
+    "historical replay remains version-gated under the contract that accepted each record"
+  ],
+  "notAuthorized": [
+    "modifying accepted contract 0.7.0 in place",
+    "implementing contract 0.7.0 semantics without separate principal authorization",
+    "claiming the current implementation conforms to contract 0.7.0",
+    "activating an operator role bundle or human interaction channel",
+    "live OpenHands, SMA, model-provider, authentication-provider, or channel execution",
+    "production deployment or autonomous operation",
+    "historical data migration",
+    "committing or pushing repository changes"
+  ],
+  "nextGate": "Obtain separate principal authorization for provider-neutral implementation and forward requalification of contract 0.7.0."
+}

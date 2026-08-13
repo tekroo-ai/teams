@@ -1,0 +1,568 @@
+{
+  "artifact": "model-capability-remediation-impact",
+  "status": "APPROVED_DESIGN_CONTRACT_0_6_0_ACCEPTED_IMPLEMENTATION_AUTHORIZED",
+  "recordedAt": "2026-08-13",
+  "approvedDecisions": [
+    {
+      "decision": 1,
+      "title": "decision-route ladder and provider-neutral boundary",
+      "principalStatement": "Approved",
+      "decidedAt": "2026-08-13",
+      "semantics": {
+        "routes": [
+          "DETERMINISTIC",
+          "BOUNDED_EXECUTION",
+          "COMPLEX_REASONING",
+          "NOVEL_REASONING",
+          "HUMAN_REQUIRED"
+        ],
+        "capabilityAndDeploymentOrthogonal": true,
+        "concreteProfileFactsOutsideKernel": [
+          "deployment location",
+          "weight availability",
+          "provider",
+          "model identifier",
+          "data-residency eligibility",
+          "tool support",
+          "context bound",
+          "cost class",
+          "qualification digest"
+        ],
+        "higherRouteBypassesControls": false,
+        "promotionRequiresPolicyOrEvidence": true,
+        "promotionCreatesNewExecutionOrSuccessor": true,
+        "unqualifiedDowngradeProhibited": true
+      }
+    },
+    {
+      "decision": 2,
+      "title": "mandatory work-risk profile and decomposition",
+      "principalStatement": "Approved",
+      "decidedAt": "2026-08-13",
+      "semantics": {
+        "profileRequiredBeforeLiveModelAssignment": true,
+        "profileContentAddressedAndRevisionBound": true,
+        "dimensions": [
+          "work kind",
+          "ambiguity",
+          "novelty",
+          "blast radius",
+          "security sensitivity",
+          "minimum decision route",
+          "deterministic gates",
+          "validation and independence topology",
+          "implementation variant count",
+          "finite budgets",
+          "classification evidence",
+          "policy revision",
+          "accountable policy authority"
+        ],
+        "unknownDefaultsToLowRisk": false,
+        "highOrUnknownAmbiguityRequiresPredecessorInvestigationOrDesign": true,
+        "architecturalOrExternalEffectRequiresAcceptedDesignPredecessor": true,
+        "sensitiveOrCriticalRequiresSecurityPlanAndIndependentValidation": true,
+        "novelOrCrossDomainDefaultRoute": "NOVEL_REASONING_OR_HUMAN_REQUIRED",
+        "understatedRiskStopsMutation": true,
+        "actorMaySelfPromote": false,
+        "reclassificationRequiresNewRevisionOrSuccessor": true,
+        "riskReductionRequiresEvidenceBackedPolicyDecision": true,
+        "taskExpansionConsumesPlanningBudgetAndCreatesDagSuccessor": true
+      }
+    },
+    {
+      "decision": 3,
+      "title": "separation of duty and independence",
+      "principalStatement": "Approved",
+      "decidedAt": "2026-08-13",
+      "semantics": {
+        "implementerMayBeSoleValidatorOrAdjudicator": false,
+        "requiredDistinctValidationPrincipal": true,
+        "sameActorNewExecutionProvidesActorIndependence": false,
+        "validationUsesImmutableCandidateOrIsolatedWorkspace": true,
+        "privateReasoningTransferProhibitedWhenContextIndependenceRequired": true,
+        "deterministicToolsAreIndependentEvidenceNotIndependentReviewerIdentity": true,
+        "independenceDimensions": [
+          "PRINCIPAL",
+          "ACTOR",
+          "EXECUTION",
+          "CONTEXT",
+          "WORKSPACE",
+          "MODEL_PROFILE",
+          "PROVIDER",
+          "METHOD",
+          "HUMAN"
+        ],
+        "unqualifiedIndependentLabelProhibited": true,
+        "modelOrProviderDiversityUniversallyRequired": false,
+        "diversityAloneProvesCorrectness": false,
+        "humanOverrideMayRetroactivelyAssertIndependence": false,
+        "missingRequiredIndependenceTerminalStates": [
+          "INCONCLUSIVE",
+          "BLOCKED",
+          "HUMAN_REQUIRED"
+        ]
+      }
+    },
+    {
+      "decision": 4,
+      "title": "evidence-driven reclassification, promotion, and escalation",
+      "principalStatement": "Approved",
+      "decidedAt": "2026-08-13",
+      "semantics": {
+        "reclassificationPromotionAndEscalationDistinct": true,
+        "triggers": [
+          "RETRY_EXHAUSTED",
+          "VALIDATION_CONFLICT",
+          "VALIDATION_INCONCLUSIVE",
+          "VALIDATION_BUDGET_EXHAUSTED",
+          "VALIDATION_DEADLINE_EXPIRED",
+          "HANDOFF_CYCLE_DETECTED",
+          "HANDOFF_BUDGET_EXHAUSTED",
+          "REQUIREMENT_CONTRADICTION",
+          "ARCHITECTURE_AMBIGUITY",
+          "MATERIAL_VARIANT_DISAGREEMENT",
+          "CAPABILITY_MISMATCH",
+          "RISK_PROFILE_BREACH",
+          "BLAST_RADIUS_EXCEEDED",
+          "SECURITY_CLASSIFICATION_ELEVATED",
+          "ROOT_CAUSE_UNRESOLVED",
+          "REQUIRED_TOOL_UNAVAILABLE",
+          "NOVELTY_RECLASSIFIED"
+        ],
+        "triggerRequiresTypedEvidenceMethodPolicyAndDigest": true,
+        "modelConfidenceMayEstablishOrResolveTrigger": false,
+        "singleOrdinaryTestFailureAutomaticallyPromotes": false,
+        "riskProfileBreachStopsMutation": true,
+        "promotionSelectsLowestQualifiedSatisfyingRoute": true,
+        "policyMayJumpToNovelOrHuman": true,
+        "providerFailureAllowsUnqualifiedDowngrade": false,
+        "promotionCreatesNewFencedExecutionOrSuccessor": true,
+        "priorMutationAuthorityStoppedOrFenced": true,
+        "promotionResetsBudgetsOrErasesEvidence": false,
+        "finitePromotionAndAttemptBudgets": true,
+        "terminalOutcomes": [
+          "RESOLVED",
+          "SPLIT",
+          "BLOCKED",
+          "HUMAN_REQUIRED"
+        ]
+      }
+    },
+    {
+      "decision": 5,
+      "title": "N-version isolation, comparison, and selection",
+      "principalStatement": "Approved",
+      "decidedAt": "2026-08-13",
+      "semantics": {
+        "defaultImplementationVariantCount": 1,
+        "nVersionRiskDriven": true,
+        "architectureUncertaintyDuplicatesDesignBeforeFullImplementation": true,
+        "variantGroupBindsFrozenInputsPolicyQuorumIndependenceComparisonAndBudgets": true,
+        "mandatoryVariantIndependence": [
+          "distinct actor FQN",
+          "distinct fenced execution",
+          "isolated worktree",
+          "independent context",
+          "no candidate information exchange before immutable submission"
+        ],
+        "modelOrProviderDiversityAlwaysRequired": false,
+        "candidateReceiptContentAddressed": true,
+        "comparisonOrder": [
+          "deterministic eligibility and verification",
+          "structured behavioral and architectural comparison",
+          "independent classification",
+          "exact adjudication"
+        ],
+        "classifications": [
+          "MATERIAL_AGREEMENT",
+          "NON_MATERIAL_VARIATION",
+          "MATERIAL_DISAGREEMENT",
+          "INSUFFICIENT_VALID_CANDIDATES",
+          "INCONCLUSIVE"
+        ],
+        "agreementIsOrganizationalPass": false,
+        "requiredQuorumMaySilentlyDecrease": false,
+        "materialDisagreementTriggersEscalation": true,
+        "automaticPatchBlendingProhibited": true,
+        "synthesisCreatesNewDerivedSuccessor": true,
+        "exactlyOneOriginalCandidateMayBeSelected": true,
+        "rejectedCandidatesEnterSynthesizedMerge": false,
+        "selectedCandidateBypassesOrdinaryGates": false
+      }
+    },
+        {
+            "decision": 6,
+      "title": "default role-to-capability allocation",
+      "principalStatement": "Approved",
+      "decidedAt": "2026-08-13",
+      "semantics": {
+        "workRiskProfileOverridesRoleDefault": true,
+        "roleNameIsCapabilityProof": false,
+        "defaults": {
+          "coordinatorRoutinePm": "BOUNDED_EXECUTION",
+          "programmer": "BOUNDED_EXECUTION",
+          "investigator": "COMPLEX_REASONING",
+          "architect": "COMPLEX_REASONING",
+          "localizedKnownFailureDebugger": "BOUNDED_EXECUTION",
+          "ambiguousDebugger": "COMPLEX_REASONING",
+          "reviewer": "AT_LEAST_ROUTE_REQUIRED_TO_JUDGE_WORK_PROFILE",
+          "nVersionComparator": "COMPLEX_REASONING",
+          "securityReviewer": "SPECIALIZED_COMPLEX_REASONING_OR_ABOVE_PLUS_DETERMINISTIC_SCANNERS",
+          "testHarnessAuthor": "BOUNDED_EXECUTION",
+          "deterministicVerifier": "DETERMINISTIC",
+          "escalationAdjudicator": "AT_LEAST_COMPLEX_REASONING_MATCHED_TO_RECLASSIFIED_PROFILE",
+          "finalAcceptance": "KERNEL_ONLY"
+        },
+        "selectionChoosesLeastCostlyQualifiedCompliantProfile": true,
+        "qualificationExactProfileAndRoleRouteSpecific": true,
+        "strongerRouteMayRunLowerWorkOnlyByPolicy": true,
+        "lowerRouteMayRunHigherWork": false,
+        "profileChangeCreatesNewExecutionNotActor": true,
+        "sameActorPromotionProvidesActorIndependence": false,
+        "localPreferredWhenEquallyQualifiedAndCompliant": true,
+        "frontierPrestigeDefault": false,
+        "outageAllowsUnqualifiedFallback": false,
+                "modelOutputCreatesOrganizationalAcceptance": false
+            }
+        },
+        {
+            "decision": 7,
+            "title": "qualification, revocation, provenance, and economics",
+            "principalStatement": "Approved",
+            "decidedAt": "2026-08-13",
+            "semantics": {
+                "qualificationBindsExactDeployableProfile": true,
+                "profileIdentityIncludes": [
+                    "provider and endpoint class",
+                    "exact model identifier and revision",
+                    "weights digest when available",
+                    "quantization",
+                    "inference engine and version",
+                    "sampling and reasoning configuration",
+                    "context and output bounds",
+                    "tool and structured-output surface",
+                    "system-prompt and role-library digests",
+                    "hardware and runtime",
+                    "isolation and data-residency constraints",
+                    "cost-accounting identity",
+                    "qualification-corpus and receipt digests"
+                ],
+                "hostedProfileWithoutWeightsClaimsWeightReproducibility": false,
+                "qualificationSpecificity": [
+                    "exact profile",
+                    "decision route",
+                    "role or work kind",
+                    "tool surface",
+                    "runtime constraints"
+                ],
+                "benchmarkOrVendorClaimIsQualification": false,
+                "relatedModelOrQuantizationInheritsQualification": false,
+                "higherRouteCoversLowerOnlyWhenCorpusIncludesLowerRequirements": true,
+                "corpusFiniteAndPreregistered": true,
+                "rawFailuresAndCorrectiveRerunsRetained": true,
+                "qualificationOutcomes": [
+                    "PASS",
+                    "FAIL",
+                    "NOT_RUN",
+                    "INCONCLUSIVE"
+                ],
+                "materialProfileChangeRequiresRequalification": true,
+                "policyMayRequireFiniteFreshness": true,
+                "materialSafetyOrRegressionSignalSuspendsEligibility": true,
+                "priorPassAfterStalenessOrRevocationIsFutureAuthority": false,
+                "assignmentAndResultProvenanceRequired": true,
+                "credentialsSecretsPrivateReasoningOrRawSensitivePromptsInOrdinaryTelemetry": false,
+                "missingEconomicData": "NOT_REPORTED",
+                "localExecutionAssumedFree": false,
+                "economicsAppliedAfterHardEligibilityFilters": true,
+                "selectionPolicyFrozenAndDeterministic": true,
+                "uncontrolledAggregateEstablishesCausalSuperiority": false,
+                "controlledComparisonMayUpdateLaterPolicyOnly": true,
+                "costMayAuthorizeCapabilityDowngradeOrSkippedGate": false,
+                "uncalibratedModelConfidenceIsEconomicEvidence": false
+            }
+        },
+        {
+            "decision": 8,
+            "title": "contract revision and compatibility boundary",
+            "principalStatement": "Approved",
+            "decidedAt": "2026-08-13",
+            "semantics": {
+                "successorContract": "tekroo.kernel.contracts/0.6.0",
+                "successorSchemaVersion": "1.5.0",
+                "releasedPackagesRemainImmutable": true,
+                "semanticScopeRevisionAddedToStoryAndTaskState": true,
+                "routineTransitionsIncrementScopeRevision": false,
+                "workProfileBinding": [
+                    "task id",
+                    "lifecycle epoch",
+                    "scope revision",
+                    "profile revision",
+                    "profile digest"
+                ],
+                "reclassificationCreatesExplicitSupersedingProfile": true,
+                "qualifiedAssignmentAuthorizationRequiredBeforeLiveModelExecution": true,
+                "plannerEligibleBooleanIsAuthoritative": false,
+                "completionFinalizationProvesFrozenVerificationTopology": true,
+                "durableVariantGroupContractRequired": true,
+                "decision4EscalationVocabularyAdded": true,
+                "concreteModelCatalogueAndEconomicOptimizerOutsideKernel": true,
+                "historical050ReplayPreserved": true,
+                "unchanged140FamiliesMayUseDeclaredIdentityTransform": true,
+                "missingNewEvidenceMayBeSilentlyUpconverted": false,
+                "activeTasksRequireExplicitMigrationBeforeLiveModelExecution": true,
+                "priorCompletedGatesRetroactivelyInvalidated": false,
+                "releaseGateRequires": [
+                    "schemas",
+                    "catalogue",
+                    "compatibility declarations",
+                    "positive and negative fixtures",
+                    "invariants",
+                    "traceability",
+                    "reference-runner validation",
+                    "Go forward requalification"
+                ],
+                "approvalAuthorizesPackageGenerationOrImplementation": false
+            }
+        },
+        {
+            "decision": 9,
+            "title": "implementation and OpenHands-Q1 sequence",
+            "principalStatement": "Approved",
+            "decidedAt": "2026-08-13",
+            "semantics": {
+                "contractCandidateFirst": true,
+                "candidate": "tekroo.kernel.contracts/0.6.0",
+                "principalAcceptanceRequiredBeforeImplementationDependsOnCandidate": true,
+                "implementationDependencyOrderFrozen": true,
+                "affectedSurfacesForwardRequalified": true,
+                "blanketPriorStepRerunRequired": false,
+                "priorTestsPreservedAsRegression": true,
+                "providerNeutralFakeProfilesFirst": true,
+                "standaloneOpenHandsQ1PreregistrationRequired": true,
+                "separateOpenHandsQ1PreexecutionGateRequired": true,
+                "missingIdentityOrQualificationGate": "NO_GO",
+                "liveProviderExecutionRequiresSeparatePrincipalAuthority": true,
+                "productionOrAutonomousOperationAuthorized": false,
+                "onlyAttributablePassProfilesEligible": true,
+                "integratedCapstoneRequiredBeforeProductionRecommendation": true,
+                "smaQ1SeparateAndNonQualifyingForModelRouting": true
+            }
+        }
+  ],
+  "draftAuthority": {
+    "principalStatement": "Proceed as you recommend.",
+    "authorized": [
+      "draft provider-neutral model-capability and verification policy",
+      "assess contract impact",
+      "present binding decisions one at a time"
+    ],
+    "notAuthorized": [
+      "change a released contract",
+      "generate or release contract 0.6.0",
+      "implement model routing",
+      "freeze or execute OpenHands-Q1",
+      "adopt a provider or model",
+      "claim production readiness"
+    ]
+  },
+  "executionAuthority": {
+    "principalStatement": "Accepted and authorized",
+    "authorized": [
+      "generate and validate the tekroo.kernel.contracts/0.6.0 candidate",
+      "perform local deterministic implementation against accepted contract 0.6.0",
+      "perform forward requalification against accepted contract 0.6.0",
+      "create qualification harnesses using provider-neutral fake profiles",
+      "create and freeze a standalone OpenHands-Q1 preregistration and read-only preexecution gate"
+    ],
+    "conditional": [],
+    "notAuthorized": [
+      "live provider or OpenHands-Q1 execution",
+      "provider expenditure",
+      "production deployment",
+      "autonomous operation",
+      "historical data migration",
+      "pushing commits"
+    ]
+  },
+  "source": {
+    "policyDraft": "docs/architecture/020-model-capability-and-verification-policy.md",
+    "currentReleasedSuccessor": "CONTRACTS/tekroo.kernel.contracts/0.5.0",
+    "pendingSmaBoundary": "investigations/sma-q1/preregistration-native-v2.json"
+  },
+  "observedExistingCoverage": [
+    {
+      "concept": "directed decomposition and joins",
+      "coverage": "STRONG_SUBSTRATE",
+      "receipt": "PHASE-1B/008-final-architecture-handoff.md"
+    },
+    {
+      "concept": "bounded retries and changed-condition evidence",
+      "coverage": "IMPLEMENTED",
+      "receipt": "kernel/budget.go"
+    },
+    {
+      "concept": "independent validation branches and deterministic all-pass finalization",
+      "coverage": "IMPLEMENTED_WITHOUT_MANDATORY_SEPARATION_OF_DUTY",
+      "receipt": "kernel/coordination.go"
+    },
+    {
+      "concept": "bounded exact escalation",
+      "coverage": "IMPLEMENTED_WITH_UPSTREAM_TRIGGER_CLASSIFICATION",
+      "receipt": "docs/architecture/011-deterministic-escalation-coordination.md"
+    },
+    {
+      "concept": "model/provider replaceability",
+      "coverage": "IMPLEMENTED_AS_EXECUTION_PROVENANCE_BOUNDARY",
+      "receipt": "kernel/ports.go"
+    },
+    {
+      "concept": "content-addressed external evidence and claim classification",
+      "coverage": "IMPLEMENTED",
+      "receipt": "kernel/evidence.go"
+    }
+  ],
+  "observedGaps": [
+    {
+      "id": "MCG-001",
+      "gap": "No provider-neutral capability ladder or concrete-profile mapping policy is frozen."
+    },
+    {
+      "id": "MCG-002",
+      "gap": "Task assignment consumes an unexplained Eligible Boolean and does not retain capability qualification or eligibility evidence."
+    },
+    {
+      "id": "MCG-003",
+      "gap": "No mandatory work-risk profile binds ambiguity, novelty, blast radius, security sensitivity, capability, verification, and independence requirements."
+    },
+    {
+      "id": "MCG-004",
+      "gap": "No invariant requires implementation, validation, comparison, and adjudication to use policy-defined independent principals or executions."
+    },
+    {
+      "id": "MCG-005",
+      "gap": "No N-version variant-group, isolation, comparison, disagreement, or single-selection contract exists."
+    },
+    {
+      "id": "MCG-006",
+      "gap": "Automatic evidence-driven escalation discovery and capability-tier promotion are not implemented."
+    },
+    {
+      "id": "MCG-007",
+      "gap": "No default role-to-capability allocation or role-specific model qualification gate is frozen."
+    },
+    {
+      "id": "MCG-008",
+      "gap": "No attributable selection/cost feedback policy governs economical routing without changing frozen thresholds after observation."
+    }
+  ],
+  "contractImpact": {
+    "noChangeRequired": [
+      {
+        "area": "actor identity",
+        "reason": "Actor FQN already remains stable across model, provider, role-library, worktree, and process changes."
+      },
+      {
+        "area": "execution fencing",
+        "reason": "ExecutionId, fencing epoch, and runtime-identity digest already separate runtime incarnation from durable actor identity."
+      },
+      {
+        "area": "evidence registry",
+        "reason": "Generic evidence, lineage, computation, integrity, sensitivity, and claim-classification primitives can retain qualification and routing receipts."
+      },
+      {
+        "area": "DAG semantics",
+        "reason": "Existing causal, derivation, response, retry, and supersession edges can represent investigation, design, implementation, comparison, and successor work."
+      },
+      {
+        "area": "completion authority",
+        "reason": "Finalized all-pass validation and kernel completion remain the correct terminal authority."
+      }
+    ],
+    "policyOrAdapterOnlyCandidates": [
+      {
+        "area": "concrete model catalogue",
+        "boundary": "Signed provider/role profile maps capability class to exact model, endpoint, tools, context, prices, and credentials."
+      },
+      {
+        "area": "qualification harness",
+        "boundary": "Finite preregistered corpora qualify concrete profiles for claimed roles and capability classes."
+      },
+      {
+        "area": "economic optimizer",
+        "boundary": "Application policy may choose among already qualified routes using attributable observations without changing frozen work requirements."
+      },
+      {
+        "area": "SMA context reconstruction",
+        "boundary": "SMA supplies bounded non-authoritative context and has no routing or adjudication authority."
+      }
+    ],
+    "likelyNormativeSuccessorChanges": [
+      {
+        "area": "work execution policy binding",
+        "reason": "A task revision needs an exact risk/capability/verification policy identity before live assignment."
+      },
+      {
+        "area": "assignment eligibility provenance",
+        "reason": "The durable decision needs required capability, selected qualified profile identity, policy revision, and eligibility evidence instead of an unexplained Boolean."
+      },
+      {
+        "area": "separation of duties",
+        "reason": "Policy-defined actor, execution, profile, or provider independence must be validated rather than left to prompt convention."
+      },
+      {
+        "area": "additional escalation triggers",
+        "reason": "Requirement contradiction, architecture ambiguity, material variant disagreement, capability mismatch, and discovered risk-bound breach are not in the closed trigger vocabulary."
+      },
+      {
+        "area": "variant group and selection",
+        "reason": "Independent candidates need a shared frozen input identity, isolated execution identities, immutable submissions, comparison evidence, and exactly one selected successor."
+      },
+      {
+        "area": "completion verification topology",
+        "reason": "When a work profile requires independence or variants, finalization must prove that exact topology was satisfied."
+      }
+    ],
+        "versionRecommendation": {
+            "status": "ACCEPTED_IMPLEMENTATION_AUTHORIZED",
+            "candidate": "tekroo.kernel.contracts/0.6.0",
+            "schemaVersion": "1.5.0",
+            "rule": "Implement and forward-requalify against the exact accepted manifest; never modify the accepted package in place.",
+            "immutability": "Do not edit 0.1.0 through 0.5.0 in place."
+        }
+  },
+  "sequencing": [
+    "continue bounded SMA pre-Q1 remediation and SMA-Q1 under its separate gate",
+    "adjudicate model-capability decisions one at a time",
+    "freeze exact contract impact and compatibility rules",
+    "release and implement the authorized successor contract",
+    "amend and freeze OpenHands-Q1 to qualify capability selection, independence, escalation, and termination",
+    "only then authorize live model-based assignment or production autonomy"
+  ],
+  "stopBoundary": {
+    "blocks": [
+      "OpenHands-Q1 freeze or execution",
+      "live model-based assignment",
+      "N-version independence claims",
+      "evidence-driven model-escalation claims",
+      "autonomous programming-organization production-readiness claims"
+    ],
+    "doesNotBlock": [
+      "current bounded SMA remediation",
+      "SMA-Q1 when its own preexecution gate passes",
+      "existing deterministic kernel and adapter verification",
+      "read-only design and contract-impact analysis"
+    ]
+  },
+  "decisionSequence": [
+    "capability ladder and provider-neutral boundary",
+    "work-risk profile and decomposition rules",
+    "separation of duty and independence",
+    "promotion and escalation triggers",
+    "N-version isolation, comparison, and selection",
+    "role-to-capability allocation",
+    "qualification, provenance, and economics",
+    "contract revision and compatibility",
+    "OpenHands-Q1 amendment and implementation sequence"
+  ]
+}

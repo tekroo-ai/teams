@@ -1,0 +1,126 @@
+{
+  "schemaVersion": "1.0.0",
+  "reportType": "MODEL_CAPABILITY_REMEDIATION_IMPLEMENTATION_GATE",
+  "status": "PASS_LOCAL_DETERMINISTIC_IMPLEMENTATION",
+  "resultClaim": "LOCAL_IMPLEMENTATION_QUALIFIED",
+  "contractIdentity": "tekroo.kernel.contracts/0.6.0",
+  "contractManifestSha256": "eff818a5ea876e8be71d18d9555dd281298db6c667956602d6d7467d1c0ff9ed",
+  "authorizationBoundary": {
+    "localDeterministicImplementationAuthorized": true,
+    "liveOpenHandsOrProviderExecutionAuthorized": false,
+    "productionAuthorized": false,
+    "commitOrPushAuthorizedByThisGate": false
+  },
+  "assertions": [
+    {
+      "id": "MC-IMPL-001-CONTRACT",
+      "status": "PASS",
+      "classification": "OBSERVED_AND_COMPUTED",
+      "evidence": [
+        "The immutable 0.6.0 package manifest SHA-256 is eff818a5ea876e8be71d18d9555dd281298db6c667956602d6d7467d1c0ff9ed.",
+        "The structure runner returned PASS for 3004 checks.",
+        "The reference runner returned PASS for 161 fixtures."
+      ]
+    },
+    {
+      "id": "MC-IMPL-002-POLICY-SURFACES",
+      "status": "PASS",
+      "classification": "OBSERVED",
+      "evidence": [
+        "The implementation contains lifecycle-bound work profiles, exact qualified-assignment authorization, derived eligibility, deterministic selection, verification-topology enforcement, expanded escalation triggers, and durable variant-group coordination.",
+        "Dispatch rejects missing or stale qualified-assignment authorization.",
+        "Constraint identifiers must be unique and every constraint evidence identifier must be present in the authorization evidence set."
+      ]
+    },
+    {
+      "id": "MC-IMPL-003-PERSISTENCE",
+      "status": "PASS",
+      "classification": "OBSERVED",
+      "evidence": [
+        "Memory-adapter tests directly round-trip work-profile, qualified-assignment, variant-group, and variant-key projections.",
+        "The build-tagged Mongo integration suite starts an isolated disposable local MongoDB and passes, including direct 0.6 capability-projection round trips."
+      ]
+    },
+    {
+      "id": "MC-IMPL-004-PROFILE-REGISTRY",
+      "status": "PASS",
+      "classification": "OBSERVED",
+      "evidence": [
+        "The provider-neutral registry content-addresses exact model profiles and qualification corpora, preserves exact qualification records, and removes revoked qualifications from future eligibility.",
+        "Optional weight and cost digests are fail-closed: they must be valid when claimed and empty when not claimed.",
+        "The fake qualification runner requires every finite corpus scenario and preserves PASS, FAIL, NOT_RUN, and INCONCLUSIVE."
+      ]
+    },
+    {
+      "id": "MC-IMPL-005-OPENHANDS-Q1",
+      "status": "PASS_CANDIDATE_ONLY",
+      "classification": "OBSERVED",
+      "evidence": [
+        "investigations/openhands-q1/preregistration.json",
+        "The preregistration validator returned PASS for 20 scenarios with executionAuthorized=false."
+      ],
+      "evidenceFloor": "The preregistration is FROZEN_CANDIDATE, NOT_STARTED, and not accepted by this implementation gate. It contains unbound preexecution identities and authorizes no live traffic or expenditure."
+    }
+  ],
+  "validation": [
+    {
+      "command": "go test ./...",
+      "status": "PASS",
+      "exitCode": 0
+    },
+    {
+      "command": "go vet ./...",
+      "status": "PASS",
+      "exitCode": 0
+    },
+    {
+      "command": "go test -race ./...",
+      "status": "PASS",
+      "exitCode": 0
+    },
+    {
+      "command": "go test -tags=mongo_integration ./adapters/mongo",
+      "status": "PASS",
+      "exitCode": 0,
+      "scope": "isolated disposable local MongoDB"
+    },
+    {
+      "command": "node CONTRACTS/tekroo.kernel.contracts/0.6.0/runner/validate-package.mjs OUTPUT/phase-3/model-capability-implementation-contract-structure.json",
+      "status": "PASS",
+      "exitCode": 0,
+      "executedChecks": 3004,
+      "reportSha256": "708fcbdf86027cf02d2da38ee7ecc7126c156a0c4f9a49c29a67c200f8f74684"
+    },
+    {
+      "command": "node CONTRACTS/tekroo.kernel.contracts/0.6.0/runner/reference-runner.mjs OUTPUT/phase-3/model-capability-implementation-contract-reference.json",
+      "status": "PASS",
+      "exitCode": 0,
+      "executedFixtures": 161,
+      "reportSha256": "d88109bec51599d5b851d674881bac697968e9155858b9e22a7a2742b61b4764"
+    },
+    {
+      "command": "node scripts/validate_openhands_q1_prereg.mjs",
+      "status": "PASS",
+      "exitCode": 0,
+      "scenarios": 20,
+      "executionAuthorized": false
+    },
+    {
+      "command": "git diff --check",
+      "status": "PASS",
+      "exitCode": 0
+    }
+  ],
+  "openHandsQ1": {
+    "status": "FROZEN_CANDIDATE",
+    "executionState": "NOT_STARTED",
+    "executionAuthorized": false,
+    "scenarioExecutions": 0,
+    "preregistrationSha256": "ea8fe6b4debbc1f17507f0b3fe71c6526b2fb601d9aafa2e07f008608022e3d9",
+    "fileSha256": "e09f00c945d03dca5b92eece86203adf3624cb711c9cc47ee61866e1dfd038fb"
+  },
+  "qualificationBoundary": "PASS qualifies the local deterministic implementation against the accepted 0.6.0 contract. It does not qualify any concrete OpenHands/model/provider profile, production deployment, historical migration, expenditure, or autonomous operation.",
+  "nextGate": "Principal acceptance of the OpenHands-Q1 frozen candidate, followed by a separately reviewed immutable preexecution binding package and separate live-execution authority.",
+  "reportDigestMethod": "SHA-256 of RFC-8785-compatible sorted-key compact JSON with reportSha256 set to the empty string",
+  "reportSha256": "12846e9133b56528cba871d2bfed2c55e582d5bc9a953553ee79953adb7dc829"
+}

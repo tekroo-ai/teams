@@ -1,0 +1,94 @@
+{
+  "$id": "https://contracts.tekroo.ai/tekroo.kernel.contracts/0.6.0/schemas/domain-event.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "actor_fqn": {
+      "anyOf": [
+        {
+          "$ref": "./core.schema.json#/$defs/ActorFQN"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "aggregate": {
+      "$ref": "./core.schema.json#/$defs/AggregateRef"
+    },
+    "aggregate_revision": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "authority": {
+      "$ref": "./core.schema.json#/$defs/PrincipalRef"
+    },
+    "command_id": {
+      "$ref": "./core.schema.json#/$defs/UUIDv7"
+    },
+    "committed_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "contract_manifest": {
+      "$ref": "./core.schema.json#/$defs/ContractManifestIdentity"
+    },
+    "event_id": {
+      "$ref": "./core.schema.json#/$defs/UUIDv7"
+    },
+    "event_type": {
+      "pattern": "^tekroo\\.event\\.[a-z0-9]+(?:[.-][a-z0-9]+)*$",
+      "type": "string"
+    },
+    "event_version": {
+      "const": "1.5.0"
+    },
+    "execution": {
+      "anyOf": [
+        {
+          "$ref": "./core.schema.json#/$defs/ExecutionTuple"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "lifecycle_epoch": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "parents": {
+      "items": {
+        "$ref": "./core.schema.json#/$defs/DagParent"
+      },
+      "maxItems": 64,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "payload": {
+      "type": "object"
+    },
+    "provenance_digest": {
+      "$ref": "./core.schema.json#/$defs/Sha256"
+    }
+  },
+  "required": [
+    "contract_manifest",
+    "event_id",
+    "event_type",
+    "event_version",
+    "aggregate",
+    "aggregate_revision",
+    "lifecycle_epoch",
+    "command_id",
+    "authority",
+    "actor_fqn",
+    "execution",
+    "parents",
+    "committed_at",
+    "payload",
+    "provenance_digest"
+  ],
+  "title": "DomainEvent",
+  "type": "object"
+}

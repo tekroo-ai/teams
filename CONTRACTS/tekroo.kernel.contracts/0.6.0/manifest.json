@@ -1,0 +1,309 @@
+{
+  "authority": {
+    "decisionAuthority": "Principal",
+    "implementationAuthority": "PENDING_CANDIDATE_ACCEPTANCE",
+    "productionAuthority": "NONE"
+  },
+  "canonicalization": {
+    "byteDigest": "SHA-256",
+    "byteOrderMark": false,
+    "jsonSemanticCanonicalization": "RFC-8785-compatible sorted-key canonical JSON",
+    "lineEnding": "LF",
+    "manifestDigest": "detached manifest.sha256",
+    "textEncoding": "UTF-8"
+  },
+  "contract": {
+    "name": "tekroo.kernel.contracts",
+    "status": "FROZEN_CANDIDATE",
+    "version": "0.6.0"
+  },
+  "counts": {
+    "catalogueEntries": 84,
+    "commandTypes": 42,
+    "eventTypes": 42,
+    "fixtures": 161,
+    "invariants": 27,
+    "schemas": 10,
+    "traceabilityRequirements": 139
+  },
+  "files": [
+    {
+      "bytes": 82245,
+      "canonicalJsonSha256": "4315ac4665e60646f52e9ed7a00ef954a3b6bc7d4ec3ef819fe69de379e9e3d0",
+      "dependencies": [
+        "schemas/payloads.schema.json"
+      ],
+      "mediaType": "application/json",
+      "path": "catalogue/kernel-catalogue.json",
+      "role": "catalogue",
+      "sha256": "cb571481e3332db1b3b4a0d9dc46b0e63c10863ecdcc1dfca150d64887c24770"
+    },
+    {
+      "bytes": 9039,
+      "canonicalJsonSha256": "fb27a588c73db0168e7ef0a5dd189d4667e9cfa96480b806c0ded91def88bc06",
+      "dependencies": [],
+      "mediaType": "application/json",
+      "path": "compatibility/from-0.5.0.json",
+      "role": "compatibility",
+      "sha256": "e479db551ebd8a96f232a0aa86276abaa69ba3c8e0378fa75803f1c5e7f9a68a"
+    },
+    {
+      "bytes": 99671,
+      "canonicalJsonSha256": "c605b3c69133be5e1fc171c65a43c7806ff71b8129e20a4521afb2a96705f3f4",
+      "dependencies": [
+        "catalogue/kernel-catalogue.json",
+        "schemas/conformance-fixture.schema.json",
+        "schemas/payloads.schema.json"
+      ],
+      "mediaType": "application/json",
+      "path": "fixtures/catalogue-coverage.json",
+      "role": "fixtures",
+      "sha256": "ec6a34455aadf4e9725cbb47f9bf763cb0cf625d014d5190a7370a70d2688648"
+    },
+    {
+      "bytes": 84872,
+      "canonicalJsonSha256": "cf503fd1ed99eefd4e25ef8fad28b3b44d83261a6279a20a088db5048ecc3bcb",
+      "dependencies": [
+        "catalogue/kernel-catalogue.json",
+        "schemas/conformance-fixture.schema.json",
+        "schemas/payloads.schema.json"
+      ],
+      "mediaType": "application/json",
+      "path": "fixtures/model-and-invariant-scenarios.json",
+      "role": "fixtures",
+      "sha256": "f675e9f7c60e7f39d1db7411605c108e16712dfef4eb35b07dde17d5cb45ebee"
+    },
+    {
+      "bytes": 15087,
+      "canonicalJsonSha256": "a0c42aafd5e6924a727003b04b14003996aad8cc14bad6a04acdfcce626efbbe",
+      "dependencies": [
+        "fixtures/catalogue-coverage.json",
+        "fixtures/model-and-invariant-scenarios.json"
+      ],
+      "mediaType": "application/json",
+      "path": "invariants/invariants.json",
+      "role": "invariants",
+      "sha256": "74c6dabecd87c6222cb1c99e00039049274605f9bc49343a0504222f331c77ca"
+    },
+    {
+      "bytes": 994,
+      "canonicalJsonSha256": "77b4187a9b2601ea3455c4a42fa2eeceb3e3684dca701e201fedc5dbccced317",
+      "dependencies": [],
+      "mediaType": "application/json",
+      "path": "runner/protocol.json",
+      "role": "runner-protocol",
+      "sha256": "96ce77ebff8befae636fb2f979fa907de2c39f5c461a469a4a734144d942e869"
+    },
+    {
+      "bytes": 22585,
+      "canonicalJsonSha256": null,
+      "dependencies": [
+        "catalogue/kernel-catalogue.json",
+        "schemas/payloads.schema.json",
+        "fixtures/catalogue-coverage.json",
+        "fixtures/model-and-invariant-scenarios.json"
+      ],
+      "mediaType": "text/javascript",
+      "path": "runner/reference-runner.mjs",
+      "role": "runner-tool",
+      "sha256": "6e32a44fc401573dd9910dd7c207bd617ddd5b486c7e7bbf8cf656911ad0ab6b"
+    },
+    {
+      "bytes": 7653,
+      "canonicalJsonSha256": null,
+      "dependencies": [
+        "catalogue/kernel-catalogue.json",
+        "schemas/payloads.schema.json",
+        "invariants/invariants.json",
+        "traceability/traceability.json",
+        "compatibility/from-0.5.0.json",
+        "runner/protocol.json"
+      ],
+      "mediaType": "text/javascript",
+      "path": "runner/validate-package.mjs",
+      "role": "runner-tool",
+      "sha256": "baedbcbe410513775eeb37c1aaff2232d9d6557ebfaba7e21bac6b8ff4f15c1d"
+    },
+    {
+      "bytes": 3151,
+      "canonicalJsonSha256": "d0b54acdf4a02c076512207a4c8e222de578350320a4616c330a828532ad2454",
+      "dependencies": [
+        "schemas/core.schema.json"
+      ],
+      "mediaType": "application/json",
+      "path": "schemas/aggregate-state.schema.json",
+      "role": "schemas",
+      "sha256": "8fbf3ffa57156e9a5ae168f0079e4e9b961d70e53dea9a3c9d88b4079289c020"
+    },
+    {
+      "bytes": 1864,
+      "canonicalJsonSha256": "052683dfdeb8aab6bf09c371ad9609588f4c19c945dff8eb7e194cd2131ca898",
+      "dependencies": [
+        "schemas/core.schema.json"
+      ],
+      "mediaType": "application/json",
+      "path": "schemas/command-receipt.schema.json",
+      "role": "schemas",
+      "sha256": "baddae7461983d8de8d30c235cec28602a153a0120ba1ef7e6667c18d5000700"
+    },
+    {
+      "bytes": 1460,
+      "canonicalJsonSha256": "484ad5e52971f019fa3617911be89f1ca94460197970be50fd842eff8dfb95bf",
+      "dependencies": [
+        "schemas/core.schema.json"
+      ],
+      "mediaType": "application/json",
+      "path": "schemas/conformance-fixture.schema.json",
+      "role": "schemas",
+      "sha256": "03c55a8158999adc88034394df10601e68218f1719c86aba3a2a66763aca9887"
+    },
+    {
+      "bytes": 1005,
+      "canonicalJsonSha256": "f86d0b9578feacd64d3122225db0c7687a987f1183cb796fa81e6489071564e2",
+      "dependencies": [
+        "schemas/core.schema.json"
+      ],
+      "mediaType": "application/json",
+      "path": "schemas/conformance-report.schema.json",
+      "role": "schemas",
+      "sha256": "8827da07ad36b7b075725bde3790ede1858e1a2babcb6317c09d3a20bd07b494"
+    },
+    {
+      "bytes": 3350,
+      "canonicalJsonSha256": "94f6a1f7e578fd611cf186d0bbb45f347f16fb13d147ae481d5277ae425aa40a",
+      "dependencies": [],
+      "mediaType": "application/json",
+      "path": "schemas/core.schema.json",
+      "role": "schemas",
+      "sha256": "c0a0fc334bfdf3572e62dd8d867d400c894ec153b26c2c31a788610406ea35f5"
+    },
+    {
+      "bytes": 2052,
+      "canonicalJsonSha256": "ce8d3445b3097873d3793d8d47806533a5455041bc0b8d04dfbcd55971fc2f32",
+      "dependencies": [
+        "schemas/core.schema.json"
+      ],
+      "mediaType": "application/json",
+      "path": "schemas/domain-event.schema.json",
+      "role": "schemas",
+      "sha256": "4a6334bad43af8baba3d213b43b7190b6b5d4a78763d835d5d35efd195730c23"
+    },
+    {
+      "bytes": 4267,
+      "canonicalJsonSha256": "62b0220e21c13612e69f849624d39fc58eb36b153d100c26a54d417fe1039392",
+      "dependencies": [
+        "schemas/core.schema.json"
+      ],
+      "mediaType": "application/json",
+      "path": "schemas/evidence-record.schema.json",
+      "role": "schemas",
+      "sha256": "925321dc483e4ac019d7a0ee17969f1c9207dbdb3654e0be94bb7180b3685d14"
+    },
+    {
+      "bytes": 2908,
+      "canonicalJsonSha256": "de4a9b408c1b889e86a0cb02f812dce0623229a1a426eab43aec7c8cd9556f20",
+      "dependencies": [
+        "schemas/core.schema.json"
+      ],
+      "mediaType": "application/json",
+      "path": "schemas/kernel-command.schema.json",
+      "role": "schemas",
+      "sha256": "fe37d99aaf3ca6717314a262cff7dd874e190989c4259a56c9f32f9bdf865564"
+    },
+    {
+      "bytes": 241515,
+      "canonicalJsonSha256": "a5c0a2959e4229376722366a851aa044282e1825a5ea2bf5da285fcfb4f0b5b4",
+      "dependencies": [
+        "schemas/core.schema.json"
+      ],
+      "mediaType": "application/json",
+      "path": "schemas/payloads.schema.json",
+      "role": "schemas",
+      "sha256": "bdf6d447d08df8ed644843563f1289e7b101bf98bf7f564884d9941447d6edbc"
+    },
+    {
+      "bytes": 6173,
+      "canonicalJsonSha256": "f92194b3bfac5cdeb4f063aaa68285e3a711ef8e7a2c9130952ac928c4ecdf31",
+      "dependencies": [
+        "schemas/core.schema.json"
+      ],
+      "mediaType": "application/json",
+      "path": "schemas/work-profile.schema.json",
+      "role": "schemas",
+      "sha256": "25a0ce71f1cc718f391d3d7cff96fd1d419077aa4567d84de53324d43a62907e"
+    },
+    {
+      "bytes": 142317,
+      "canonicalJsonSha256": "51633e69f39c3f0f3a695ff92c5ab9b1151db86df3269a9b970de0f4e6acc79d",
+      "dependencies": [
+        "invariants/invariants.json",
+        "fixtures/catalogue-coverage.json",
+        "fixtures/model-and-invariant-scenarios.json"
+      ],
+      "mediaType": "application/json",
+      "path": "traceability/traceability.json",
+      "role": "traceability",
+      "sha256": "c28aa50866b39a1eba02de21bcda5fce09a878ef6abc2a11170df0a4c3ef8954"
+    }
+  ],
+  "generatedAt": "2026-08-13T00:00:00Z",
+  "inventoryBoundary": "files lists every payload asset; manifest.json is identified by detached manifest.sha256 and manifest.sha256 is not self-listed.",
+  "knownLimitations": [
+    "Contract-structure PASS does not qualify the Go implementation, MongoDB integration, OpenHands, SMA, any provider, or production operation.",
+    "Concrete model profiles, qualification corpora, prices, credentials, and provider execution remain outside the provider-neutral kernel package.",
+    "Active 0.5.0 tasks require explicit semantic-scope and work-profile migration before live model execution; no automatic backfill is defined.",
+    "OpenHands-Q1 has not been preregistered or executed, and live provider execution requires separate principal authority.",
+    "Performance, reliability, and economic claims require later attributable measured evidence."
+  ],
+  "profiles": [
+    {
+      "authorization": "MODEL_CAPABILITY_DECISION_9",
+      "currentStatus": "READY_TO_RUN",
+      "name": "contract-structure",
+      "required": true
+    },
+    {
+      "authorization": "AFTER_PRINCIPAL_CANDIDATE_ACCEPTANCE",
+      "currentStatus": "NOT_RUN",
+      "name": "core-hermetic",
+      "required": true
+    },
+    {
+      "authorization": "AFTER_PRINCIPAL_CANDIDATE_ACCEPTANCE",
+      "currentStatus": "NOT_RUN",
+      "name": "mongo-integration",
+      "required": true
+    },
+    {
+      "authorization": "AFTER_PRINCIPAL_CANDIDATE_ACCEPTANCE",
+      "currentStatus": "NOT_RUN",
+      "name": "synthesized-merge",
+      "required": true
+    },
+    {
+      "authorization": "SEPARATE_PRINCIPAL_AUTHORIZATION",
+      "currentStatus": "NOT_RUN",
+      "name": "provider-e2e",
+      "required": false
+    }
+  ],
+  "schemaVersion": "1.5.0",
+  "sourceLineage": [
+    {
+      "path": "docs/architecture/020-model-capability-and-verification-policy.md",
+      "sha256": "efb01b2131a7205153a34944ea04e0407050af6e2c6f76c2a42d68c75eb6774d"
+    },
+    {
+      "path": "OUTPUT/phase-3/model-capability-remediation-impact.json",
+      "sha256": "d658df469adc3fac2836ee1b3916b8e78f3e69933c48433c60d831a2e381c8ae"
+    },
+    {
+      "path": "CONTRACTS/tekroo.kernel.contracts/0.5.0/manifest.json",
+      "sha256": "1b5a9a5d9ca1331e444f9d1c3e9ca63b77e1c0f3899dd84669f8668b52872213"
+    },
+    {
+      "path": "scripts/generate_phase3_contract_0_6.mjs",
+      "sha256": "65afa1d5f30cc3d4a44740bd4db5dcd6b8dae42a82eabfbd6b1b19270edb2275"
+    }
+  ]
+}

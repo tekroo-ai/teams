@@ -1,0 +1,108 @@
+{
+  "schemaVersion": "1.1.0",
+  "reportType": "CONTRACT_CANDIDATE_GATE",
+  "contractIdentity": "tekroo.kernel.contracts/0.7.0",
+  "candidateStatus": "FROZEN_CANDIDATE",
+  "manifestSha256": "e2b9b5224a860a3eaa07451cf48fb5ac16a440b22b8dd592ff1662c1cff67f16",
+  "predecessor": {
+    "contractIdentity": "tekroo.kernel.contracts/0.6.0",
+    "manifestSha256": "eff818a5ea876e8be71d18d9555dd281298db6c667956602d6d7467d1c0ff9ed",
+    "modifiedInPlace": false
+  },
+  "authority": {
+    "designAuthority": "Principal approval of explicit operator preservation, multiple human participants, mediated human communication, continuous operation, and planned suspension fallback on 2026-08-13",
+    "candidateGeneration": "AUTHORIZED",
+    "implementationAuthority": "PENDING_EXACT_CANDIDATE_ACCEPTANCE",
+    "productionAuthority": "NONE",
+    "commitAuthority": "NONE",
+    "pushAuthority": "NONE"
+  },
+  "scope": {
+    "operator": [
+      "authenticated human principal, durable operator actor, and control surface are distinct identities",
+      "operator actor uses exact FQN, ExecutionId, fencing, qualification, work-profile, and role-bundle rules",
+      "operator name and role content grant no intrinsic authority",
+      "operator may present or summarize a human interaction but cannot impersonate its originator or respondent"
+    ],
+    "humanParticipation": [
+      "multiple exact HUMAN principals may independently hold the same or different scoped roles",
+      "SME, client, end-user, approver, principal, and project-defined labels select role bindings but grant no intrinsic authority",
+      "participant profiles contain versioned scoped roles and opaque authentication and delivery bindings without reusable credentials or raw contact addresses",
+      "ordinary consultation uses a finite human-interaction aggregate rather than being coerced into escalation",
+      "questions bind exact recipients, canonical and response-specification digests, purpose, effect, response policy, deadline, confidentiality, disclosure scope, and causal lineage",
+      "operator renderings retain canonical and rendered digests plus presenter and delivery provenance; material divergence requires equivalence evidence or a successor interaction",
+      "responses require exact selected active HUMAN authority, current profile and question, active authentication and delivery lineage, and null actor execution",
+      "EXACT_ONE, ANY_ONE, ALL, and QUORUM count distinct selected humans",
+      "advice, evidence, and independently authorized decision effects remain distinct",
+      "delivery, silence, manual relay, role labels, shared channels, and response text do not independently create authority or consent",
+      "one-time response capabilities remain retryable until the accepted response commit"
+    ],
+    "hostContinuity": [
+      "CONTINUOUS is the preferred posture only while required local services and host leases are observed healthy",
+      "planned control state is ACTIVE to QUIESCING to SUSPENDED to RECONCILING to ACTIVE",
+      "planned quiescence and unexpected outage advance a monotonic power epoch and close admission",
+      "provider execution disposition is preregistered as CANCEL_ON_SUSPEND, COMPLETE_AND_QUARANTINE, or DETACH_AND_RECONCILE",
+      "late prior-epoch results remain evidence and cannot create organizational truth",
+      "resume requires exact reconciliation and an authorized HUMAN or POLICY command"
+    ]
+  },
+  "additiveDeltaFrom060": {
+    "catalogueEntries": 28,
+    "commandTypes": 14,
+    "eventTypes": 14,
+    "schemas": 4,
+    "fixtures": 74,
+    "invariants": 14,
+    "traceabilityDecisions": 16,
+    "changedExistingSemanticTypes": 0
+  },
+  "verification": {
+    "reproducibility": {
+      "status": "PASS",
+      "observedManifestDigests": [
+        "e2b9b5224a860a3eaa07451cf48fb5ac16a440b22b8dd592ff1662c1cff67f16",
+        "e2b9b5224a860a3eaa07451cf48fb5ac16a440b22b8dd592ff1662c1cff67f16"
+      ]
+    },
+    "contractStructure": {
+      "status": "PASS",
+      "checks": 3290,
+      "failed": 0,
+      "reportPath": "OUTPUT/phase-3/operator-continuity-contract-0.7.0-structure-report.json",
+      "reportSha256": "0d9e07ceaa0814d8ea82bda404fab00bca852fcd22571ea4af929d5051ce7e7b",
+      "semanticReportDigest": "1f25b8d4a860b98e0ff369ca4a931bfe35cb931ed9cc7afea112d6dd4cb7863e"
+    },
+    "referenceCorpus": {
+      "status": "PASS",
+      "total": 235,
+      "passed": 235,
+      "failed": 0,
+      "reportPath": "OUTPUT/phase-3/operator-continuity-contract-0.7.0-reference-report.json",
+      "reportSha256": "393abca079b6cca7c66c9dd7e30c188f0e3ef87112915dc3df30c3ce914b4be3",
+      "semanticReportDigest": "dfbcf729888d453e4df0f581fcbfb942cb1f7f925917d26ef3f8917014b1ae41"
+    },
+    "repositoryRegression": {
+      "goTest": "PASS",
+      "goVet": "PASS",
+      "goRace": "PASS",
+      "gitDiffCheck": "PASS",
+      "generatedRunnerSyntax": "PASS"
+    }
+  },
+  "knownLimitations": [
+    "No 0.7.0 Go implementation has been authorized or performed.",
+    "No operator role bundle has been implemented, signed, or activated.",
+    "No participant directory, authentication provider, channel adapter, response portal, credential, endpoint, or confidentiality control has been implemented or qualified.",
+    "Questions, renderings, responses, endpoints, and credential subjects are represented by opaque digests; secure artifact storage and access enforcement remain implementation responsibilities.",
+    "No host sleep/wake, closed-display, dedicated-host, remote-job, or provider-cancellation behavior has been empirically qualified.",
+    "No OpenHands, SMA, model-provider, production, migration, or deployment authority is created by this candidate.",
+    "Repository regression tests exercise the current accepted implementation and do not prove the additive 0.7.0 runtime semantics."
+  ],
+  "adjudication": {
+    "status": "PASS_CANDIDATE_ONLY",
+    "recommendation": "ACCEPT_CONTRACT_0_7_0",
+    "nextRequiredDecision": "Principal acceptance of the exact manifest digest before implementation",
+    "implementationGoNoGo": "NO_GO_PENDING_ACCEPTANCE",
+    "productionGoNoGo": "NO_GO"
+  }
+}

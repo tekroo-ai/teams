@@ -23,7 +23,7 @@ func TestGatewayInvokesApplicationHandlerAndPreservesIdempotentReceipt(t *testin
 		t.Fatal("locate integration test")
 	}
 	repositoryRoot := filepath.Clean(filepath.Join(filepath.Dir(file), "../.."))
-	catalogue, err := contract.Load(os.DirFS(repositoryRoot), "CONTRACTS/tekroo.kernel.contracts/0.5.0")
+	catalogue, err := contract.Load(os.DirFS(repositoryRoot), "CONTRACTS/tekroo.kernel.contracts/0.7.0")
 	if err != nil {
 		t.Fatal(err)
 	}

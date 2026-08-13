@@ -101,7 +101,7 @@ func (e Evaluator) Evaluate(command KernelCommand, snapshot Snapshot, context De
 	if !actorAttributionValid(command, snapshot, definition.ExecutionRequired) {
 		return rejectedAuthorizedDecision(command, context, fingerprint, OutcomeRejectedStaleExecution, reasonStaleExecution, authorityDecision), nil
 	}
-	if commandCreatesAggregate(command.CommandType) != command.ExpectedRevision.MustNotExist {
+	if commandCreatesAggregate(command) != command.ExpectedRevision.MustNotExist {
 		return rejectedAuthorizedDecision(command, context, fingerprint, OutcomeRejectedConflict, reasonRevisionConflict, authorityDecision), nil
 	}
 	if command.ExpectedRevision.MustNotExist {
@@ -238,6 +238,11 @@ func decisionGuards(command KernelCommand, authority AuthorityDecision) Decision
 			guards.AbsentReleaseKeys = []ReleasePlanKey{key}
 		}
 	}
+	if command.CommandType == "tekroo.command.variant-group.open" {
+		if group, err := VariantGroupFromOpenPayload(command.Payload, command.CommandID); err == nil {
+			guards.AbsentVariantKeys = []VariantGroupKey{group.Key()}
+		}
+	}
 	return guards
 }
 
@@ -344,13 +349,18 @@ func validateEnvelope(command KernelCommand) error {
 }
 
 func expectedLifecycleEpochMatches(command KernelCommand, snapshot Snapshot) bool {
-	if !commandRequiresLifecycleEpoch(command) {
+	switch command.Target.Kind {
+	case AggregateStory, AggregateTask:
+		if command.CommandType == "tekroo.command.story.create" || command.CommandType == "tekroo.command.task.create" || command.CommandType == "tekroo.command.record.correct" {
+			return command.ExpectedLifecycleEpoch == nil
+		}
+		if command.ExpectedRevision.MustNotExist || command.ExpectedLifecycleEpoch == nil || snapshot.State == nil {
+			return false
+		}
+		return *command.ExpectedLifecycleEpoch == snapshot.State.LifecycleEpoch
+	default:
 		return command.ExpectedLifecycleEpoch == nil
 	}
-	if command.ExpectedRevision.MustNotExist || command.ExpectedLifecycleEpoch == nil || snapshot.State == nil {
-		return false
-	}
-	return *command.ExpectedLifecycleEpoch == snapshot.State.LifecycleEpoch
 }
 
 func commandRequiresLifecycleEpoch(command KernelCommand) bool {
@@ -401,6 +411,9 @@ func preconditionsMatch(values []AggregatePrecondition, related map[AggregateRef
 }
 
 func actorAttributionValid(command KernelCommand, snapshot Snapshot, required bool) bool {
+	if command.Authority.Kind == PrincipalHuman && (command.ActorFQN != nil || command.Execution != nil) {
+		return false
+	}
 	if command.Authority.Kind == PrincipalActor {
 		if command.ActorFQN == nil || command.Authority.ID != string(*command.ActorFQN) {
 			return false
@@ -481,9 +494,42 @@ func evolveState(command KernelCommand, snapshot Snapshot, eventID UUIDv7) (*Agg
 			ID:             command.Target.ID,
 			Revision:       1,
 			LifecycleEpoch: 1,
+			ScopeRevision:  1,
 			Phase:          phase,
 			Condition:      ConditionRunnable,
 			Ownership:      Ownership{},
+		}
+		return state, 1, OutcomeApplied, reasonApplied
+	}
+	if isOperatorHumanContinuityCreation(command) {
+		state := &AggregateState{Kind: command.Target.Kind, ID: command.Target.ID, Revision: 1, LifecycleEpoch: 1, ScopeRevision: 1, Phase: PhaseDraft, Condition: ConditionRunnable}
+		switch command.CommandType {
+		case "tekroo.command.system.bind-operator-role":
+			profile, err := OperatorRoleFromPayload(command.Payload)
+			if err != nil {
+				return nil, 0, OutcomeRejectedInvalid, reasonInvalidPayload
+			}
+			state.OperatorRole = &profile
+		case "tekroo.command.system.configure-continuity":
+			continuity, err := TeamContinuityFromConfigurePayload(command.Payload, eventID, 1)
+			if err != nil {
+				return nil, 0, OutcomeRejectedInvalid, reasonInvalidPayload
+			}
+			state.Continuity = &continuity
+		case "tekroo.command.human-participant.bind-profile":
+			participant, err := HumanParticipantFromPayload(command.Payload, 1)
+			if err != nil {
+				return nil, 0, OutcomeRejectedInvalid, reasonInvalidPayload
+			}
+			state.Participant = &participant
+		case "tekroo.command.human-interaction.open":
+			interaction, err := HumanInteractionFromOpenPayload(command.Payload, 1)
+			if err != nil || interaction.InteractionID != command.Target.ID {
+				return nil, 0, OutcomeRejectedInvalid, reasonInvalidPayload
+			}
+			state.Interaction = &interaction
+		default:
+			return nil, 0, OutcomeRejectedInvalid, reasonInvalidPayload
 		}
 		return state, 1, OutcomeApplied, reasonApplied
 	}
@@ -522,6 +568,9 @@ func evolveState(command KernelCommand, snapshot Snapshot, eventID UUIDv7) (*Agg
 		state.LifecycleEpoch = result.LifecycleEpoch
 		if command.CommandType == "tekroo.command.work.reopen" {
 			object, _ := decodePayloadObject(command.Payload)
+			if scopeRevision, ok := uint64Field(object, "new_scope_revision"); ok {
+				state.ScopeRevision = scopeRevision
+			}
 			carry, _ := object["owner_carry_forward"].(bool)
 			if !carry {
 				state.Ownership.OwnerFQN = nil
@@ -531,6 +580,62 @@ func evolveState(command KernelCommand, snapshot Snapshot, eventID UUIDv7) (*Agg
 	}
 	if outcome, reason := applyOwnership(command, &state, eventID); outcome != OutcomeApplied {
 		return nil, 0, outcome, reason
+	}
+	syntheticEvent := DomainEvent{EventID: eventID, EventType: map[string]string{
+		"tekroo.command.system.request-quiescence":         "tekroo.event.system.quiescence-requested",
+		"tekroo.command.system.record-suspended":           "tekroo.event.system.suspended",
+		"tekroo.command.system.record-unexpected-outage":   "tekroo.event.system.unexpected-outage-recorded",
+		"tekroo.command.system.begin-reconciliation":       "tekroo.event.system.reconciliation-started",
+		"tekroo.command.system.resume":                     "tekroo.event.system.resumed",
+		"tekroo.command.human-interaction.record-delivery": "tekroo.event.human-interaction.delivery-recorded",
+		"tekroo.command.human-interaction.respond":         "tekroo.event.human-interaction.response-recorded",
+		"tekroo.command.human-interaction.close":           "tekroo.event.human-interaction.closed",
+		"tekroo.command.human-interaction.expire":          "tekroo.event.human-interaction.expired",
+	}[command.CommandType], Aggregate: command.Target, AggregateRevision: nextRevision, Payload: command.Payload}
+	if syntheticEvent.EventType != "" {
+		if state.Continuity != nil {
+			next, valid := ApplyContinuityEvent(*state.Continuity, syntheticEvent)
+			if !valid {
+				return nil, 0, OutcomeRejectedPolicy, reasonPolicy
+			}
+			state.Continuity = &next
+		} else if state.Interaction != nil {
+			next, valid := ApplyHumanInteractionEvent(*state.Interaction, syntheticEvent)
+			if !valid {
+				return nil, 0, OutcomeRejectedPolicy, reasonPolicy
+			}
+			state.Interaction = &next
+		}
+	}
+	if command.CommandType == "tekroo.command.human-participant.bind-profile" {
+		participant, err := HumanParticipantFromPayload(command.Payload, nextRevision)
+		if err != nil || state.Participant == nil || participant.Participant != state.Participant.Participant {
+			return nil, 0, OutcomeRejectedPolicy, reasonPolicy
+		}
+		state.Participant = &participant
+	}
+	if command.CommandType == "tekroo.command.human-participant.revoke" {
+		if state.Participant == nil || !state.Participant.Active {
+			return nil, 0, OutcomeRejectedPolicy, reasonPolicy
+		}
+		participant := state.Participant.Clone()
+		participant.Active = false
+		participant.Revision = nextRevision
+		state.Participant = &participant
+	}
+	if command.CommandType == "tekroo.command.system.bind-operator-role" {
+		profile, err := OperatorRoleFromPayload(command.Payload)
+		if err != nil || state.OperatorRole == nil || profile.ReplacesBindingID == nil || *profile.ReplacesBindingID != state.OperatorRole.BindingID {
+			return nil, 0, OutcomeRejectedPolicy, reasonPolicy
+		}
+		state.OperatorRole = &profile
+	}
+	if command.CommandType == "tekroo.command.system.configure-continuity" {
+		continuity, err := TeamContinuityFromConfigurePayload(command.Payload, eventID, nextRevision)
+		if err != nil || state.Continuity != nil && state.Continuity.ControlState != ContinuityActive {
+			return nil, 0, OutcomeRejectedPolicy, reasonPolicy
+		}
+		state.Continuity = &continuity
 	}
 	state.Revision = nextRevision
 	return &state, nextRevision, OutcomeApplied, reasonApplied
@@ -552,15 +657,37 @@ func terminalCommandProhibited(commandType string, phase Phase) bool {
 	}
 }
 
-func commandCreatesAggregate(commandType string) bool {
-	switch commandType {
+func commandCreatesAggregate(command KernelCommand) bool {
+	switch command.CommandType {
 	case "tekroo.command.story.create",
 		"tekroo.command.task.create",
 		"tekroo.command.evidence.register",
 		"tekroo.command.execution.register",
 		"tekroo.command.completion-review.open",
 		"tekroo.command.escalation.open",
-		"tekroo.command.release-plan.create":
+		"tekroo.command.release-plan.create",
+		"tekroo.command.variant-group.open",
+		"tekroo.command.human-interaction.open":
+		return true
+	case "tekroo.command.human-participant.bind-profile":
+		object, err := decodePayloadObject(command.Payload)
+		revision, ok := nonnegativeUint64Field(object, "expected_participant_revision")
+		return err == nil && ok && revision == 0
+	case "tekroo.command.system.bind-operator-role", "tekroo.command.system.configure-continuity":
+		object, err := decodePayloadObject(command.Payload)
+		revision, ok := nonnegativeUint64Field(object, "expected_system_revision")
+		return err == nil && ok && revision == 0
+	default:
+		return false
+	}
+}
+
+func isOperatorHumanContinuityCreation(command KernelCommand) bool {
+	if !commandCreatesAggregate(command) {
+		return false
+	}
+	switch command.CommandType {
+	case "tekroo.command.system.bind-operator-role", "tekroo.command.system.configure-continuity", "tekroo.command.human-participant.bind-profile", "tekroo.command.human-interaction.open":
 		return true
 	default:
 		return false

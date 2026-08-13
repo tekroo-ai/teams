@@ -413,6 +413,73 @@ func (s *Store) loadSnapshot(ctx context.Context, target kernel.AggregateRef, pr
 	}); err != nil {
 		return kernel.Snapshot{}, err
 	}
+	snapshot.WorkProfiles = make(map[kernel.AggregateRef]kernel.WorkProfileSnapshot)
+	if err := scan(ctx, s.db.Collection("work_profiles"), bson.D{}, func(document valueDocument) error {
+		var value struct {
+			Task    kernel.AggregateRef        `json:"task"`
+			Profile kernel.WorkProfileSnapshot `json:"profile"`
+		}
+		if err := decode(document.Data, &value); err != nil || value.Task.Kind != kernel.AggregateTask || !value.Profile.Valid() || value.Profile.Profile.TaskID != value.Task.ID || document.ID != aggregateKey(value.Task) {
+			return ErrCorruptAggregate
+		}
+		snapshot.WorkProfiles[value.Task] = value.Profile
+		return nil
+	}); err != nil {
+		return kernel.Snapshot{}, err
+	}
+	snapshot.QualifiedAssignments = make(map[kernel.AggregateRef]kernel.QualifiedAssignmentAuthorization)
+	if err := scan(ctx, s.db.Collection("qualified_assignments"), bson.D{}, func(document valueDocument) error {
+		var value struct {
+			Task          kernel.AggregateRef                     `json:"task"`
+			Authorization kernel.QualifiedAssignmentAuthorization `json:"authorization"`
+		}
+		if err := decode(document.Data, &value); err != nil || value.Task.Kind != kernel.AggregateTask || !value.Authorization.Valid() || value.Authorization.TaskID != value.Task.ID || document.ID != aggregateKey(value.Task) {
+			return ErrCorruptAggregate
+		}
+		snapshot.QualifiedAssignments[value.Task] = value.Authorization
+		return nil
+	}); err != nil {
+		return kernel.Snapshot{}, err
+	}
+	snapshot.VariantGroupKeys = make(map[kernel.VariantGroupKey]kernel.AggregateRef)
+	if err := scan(ctx, s.db.Collection("variant_group_keys"), bson.D{}, func(document valueDocument) error {
+		var value struct {
+			Key   kernel.VariantGroupKey `json:"key"`
+			Group kernel.AggregateRef    `json:"group"`
+		}
+		if err := decode(document.Data, &value); err != nil || !value.Key.Valid() || value.Group.Kind != kernel.AggregateVariantGroup || !value.Group.ID.Valid() || document.ID != variantGroupKey(value.Key) {
+			return ErrCorruptAggregate
+		}
+		snapshot.VariantGroupKeys[value.Key] = value.Group
+		return nil
+	}); err != nil {
+		return kernel.Snapshot{}, err
+	}
+	snapshot.VariantGroups = make(map[kernel.AggregateRef]kernel.VariantGroupSnapshot)
+	if err := scan(ctx, s.db.Collection("variant_groups"), bson.D{}, func(document valueDocument) error {
+		var value struct {
+			Group    kernel.AggregateRef         `json:"group"`
+			Progress kernel.VariantGroupSnapshot `json:"progress"`
+		}
+		if err := decode(document.Data, &value); err != nil || value.Group.Kind != kernel.AggregateVariantGroup || value.Group.ID != value.Progress.VariantGroupID || !value.Progress.Valid() || document.ID != aggregateKey(value.Group) {
+			return ErrCorruptAggregate
+		}
+		snapshot.VariantGroups[value.Group] = value.Progress
+		return nil
+	}); err != nil {
+		return kernel.Snapshot{}, err
+	}
+	for key, reference := range snapshot.VariantGroupKeys {
+		progress, found := snapshot.VariantGroups[reference]
+		if !found || progress.Key() != key {
+			return kernel.Snapshot{}, ErrCorruptAggregate
+		}
+	}
+	for reference, progress := range snapshot.VariantGroups {
+		if snapshot.VariantGroupKeys[progress.Key()] != reference {
+			return kernel.Snapshot{}, ErrCorruptAggregate
+		}
+	}
 	return snapshot, nil
 }
 
@@ -768,6 +835,15 @@ func (s *Store) checkGuards(ctx context.Context, expected kernel.Snapshot, decis
 			return err
 		}
 	}
+	for _, key := range decision.Guards.AbsentVariantKeys {
+		err := s.db.Collection("variant_group_keys").FindOne(ctx, bson.D{{Key: "_id", Value: variantGroupKey(key)}}).Err()
+		if err == nil {
+			return ErrConflict
+		}
+		if !errors.Is(err, driver.ErrNoDocuments) {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -808,6 +884,89 @@ func (s *Store) applyRegistryAndReview(ctx context.Context, event kernel.DomainE
 		}
 		_, err := s.db.Collection("evidence").InsertOne(ctx, evidenceDocument{ID: string(event.Aggregate.ID), SHA256: string(payload.SHA256), Available: payload.Availability == string(kernel.EvidenceAvailable)})
 		return "", err
+	case "tekroo.event.task.work-profile-bound":
+		if event.Aggregate.Kind != kernel.AggregateTask {
+			return "", ErrConflict
+		}
+		profile, err := kernel.WorkRiskProfileFromPayload(event.Payload)
+		if err != nil || profile.TaskID != event.Aggregate.ID {
+			return "", ErrConflict
+		}
+		progress := kernel.WorkProfileSnapshot{Profile: profile, BoundEventID: event.EventID, TaskRevision: event.AggregateRevision}
+		if !progress.Valid() {
+			return "", ErrConflict
+		}
+		data, err := encode(struct {
+			Task    kernel.AggregateRef        `json:"task"`
+			Profile kernel.WorkProfileSnapshot `json:"profile"`
+		}{event.Aggregate, progress})
+		if err != nil {
+			return "", err
+		}
+		_, err = s.db.Collection("work_profiles").ReplaceOne(ctx, bson.D{{Key: "_id", Value: aggregateKey(event.Aggregate)}}, valueDocument{ID: aggregateKey(event.Aggregate), Data: data}, options.Replace().SetUpsert(true))
+		return "", err
+	case "tekroo.event.task.qualified-assignment-authorized":
+		if event.Aggregate.Kind != kernel.AggregateTask {
+			return "", ErrConflict
+		}
+		authorization, err := kernel.QualifiedAssignmentAuthorizationFromPayload(event.Payload, event.EventID)
+		if err != nil || authorization.TaskID != event.Aggregate.ID || authorization.ExpectedTaskRevision+1 != event.AggregateRevision {
+			return "", ErrConflict
+		}
+		data, err := encode(struct {
+			Task          kernel.AggregateRef                     `json:"task"`
+			Authorization kernel.QualifiedAssignmentAuthorization `json:"authorization"`
+		}{event.Aggregate, authorization})
+		if err != nil {
+			return "", err
+		}
+		_, err = s.db.Collection("qualified_assignments").ReplaceOne(ctx, bson.D{{Key: "_id", Value: aggregateKey(event.Aggregate)}}, valueDocument{ID: aggregateKey(event.Aggregate), Data: data}, options.Replace().SetUpsert(true))
+		return "", err
+	case "tekroo.event.variant-group.opened":
+		if event.Aggregate.Kind != kernel.AggregateVariantGroup || event.AggregateRevision != 1 {
+			return "", ErrConflict
+		}
+		progress, err := kernel.VariantGroupFromOpenPayload(event.Payload, event.EventID)
+		if err != nil || progress.VariantGroupID != event.Aggregate.ID {
+			return "", ErrConflict
+		}
+		key := progress.Key()
+		if err := s.insertValue(ctx, "variant_group_keys", variantGroupKey(key), struct {
+			Key   kernel.VariantGroupKey `json:"key"`
+			Group kernel.AggregateRef    `json:"group"`
+		}{key, event.Aggregate}); err != nil {
+			return "", err
+		}
+		return "", s.insertValue(ctx, "variant_groups", aggregateKey(event.Aggregate), struct {
+			Group    kernel.AggregateRef         `json:"group"`
+			Progress kernel.VariantGroupSnapshot `json:"progress"`
+		}{event.Aggregate, progress})
+	case "tekroo.event.variant-group.candidate-submitted", "tekroo.event.variant-group.comparison-recorded", "tekroo.event.variant-group.selected":
+		var document valueDocument
+		if err := s.db.Collection("variant_groups").FindOne(ctx, bson.D{{Key: "_id", Value: aggregateKey(event.Aggregate)}}).Decode(&document); err != nil {
+			return "", err
+		}
+		var value struct {
+			Group    kernel.AggregateRef         `json:"group"`
+			Progress kernel.VariantGroupSnapshot `json:"progress"`
+		}
+		if err := decode(document.Data, &value); err != nil || value.Group != event.Aggregate || value.Progress.Revision+1 != event.AggregateRevision {
+			return "", ErrConflict
+		}
+		next, valid := kernel.ApplyVariantEvent(value.Progress, event)
+		if !valid || next.Revision != event.AggregateRevision {
+			return "", ErrConflict
+		}
+		value.Progress = next
+		data, err := encode(value)
+		if err != nil {
+			return "", err
+		}
+		result, err := s.db.Collection("variant_groups").ReplaceOne(ctx, bson.D{{Key: "_id", Value: aggregateKey(event.Aggregate)}}, valueDocument{ID: aggregateKey(event.Aggregate), Data: data})
+		if err != nil || result.ModifiedCount != 1 {
+			return "", ErrConflict
+		}
+		return "", nil
 	case "tekroo.event.completion-review.opened":
 		key, err := kernel.CompletionReviewKeyFromPayload(event.Payload)
 		if err != nil {
@@ -1115,6 +1274,12 @@ func escalationKey(key kernel.EscalationKey) string {
 }
 
 func releasePlanKey(key kernel.ReleasePlanKey) string {
+	data, _ := encode(key)
+	digest := sha256.Sum256(data)
+	return hex.EncodeToString(digest[:])
+}
+
+func variantGroupKey(key kernel.VariantGroupKey) string {
 	data, _ := encode(key)
 	digest := sha256.Sum256(data)
 	return hex.EncodeToString(digest[:])

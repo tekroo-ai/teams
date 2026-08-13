@@ -1,0 +1,35 @@
+{
+  "schema_version": "1.0.0",
+  "record_type": "IMPLEMENTATION_AUTHORIZATION",
+  "recorded_at": "2026-08-13T14:55:35Z",
+  "principal": {
+    "kind": "HUMAN",
+    "id": "paul"
+  },
+  "authorization_source": {
+    "verbatim": "Authorized. By the way the SMA team completed its turn.",
+    "conversation_context": "Authorization followed acceptance of tekroo.kernel.contracts/0.7.0 and the proposal to implement it provider-neutrally with forward requalification."
+  },
+  "contract_identity": "tekroo.kernel.contracts/0.7.0",
+  "accepted_manifest_sha256": "e2b9b5224a860a3eaa07451cf48fb5ac16a440b22b8dd592ff1662c1cff67f16",
+  "scope": {
+    "authorized": [
+      "provider-neutral kernel and application implementation",
+      "in-memory and MongoDB durable projections",
+      "protocol-surface support",
+      "deterministic tests and forward requalification"
+    ],
+    "not_authorized": [
+      "adoption or qualification of a concrete human communication channel",
+      "production deployment",
+      "SMA-Q1 or WP6 execution",
+      "commit or push"
+    ]
+  },
+  "constraints": [
+    "Do not modify accepted contract artifacts in place.",
+    "Do not claim 0.7.0 implementation conformance until its implementation gate passes.",
+    "Preserve human, actor, service, policy, and control-surface identity separation.",
+    "Keep host power mechanisms and concrete delivery providers outside the pure kernel."
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "artifact": "model-capability-contract-0.6.0-acceptance",
+  "recordedAt": "2026-08-13",
+  "status": "ACCEPTED_IMPLEMENTATION_AUTHORIZED",
+  "principalStatement": "Accepted and authorized",
+  "acceptedCandidate": {
+    "identity": "tekroo.kernel.contracts/0.6.0",
+    "schemaVersion": "1.5.0",
+    "manifestSha256": "eff818a5ea876e8be71d18d9555dd281298db6c667956602d6d7467d1c0ff9ed",
+    "candidateGate": "OUTPUT/phase-3/model-capability-contract-0.6.0-candidate-gate.json",
+    "structureReport": "OUTPUT/phase-3/model-capability-contract-0.6.0-structure-report.json",
+    "referenceReport": "OUTPUT/phase-3/model-capability-contract-0.6.0-reference-report.json"
+  },
+  "authorized": [
+    "provider-neutral implementation of contract 0.6.0",
+    "local deterministic tests and forward requalification",
+    "provider-neutral fake-profile qualification harness",
+    "standalone OpenHands-Q1 preregistration and read-only preexecution gate"
+  ],
+  "notAuthorized": [
+    "modifying accepted contract 0.6.0 in place",
+    "live OpenHands or provider execution",
+    "provider expenditure",
+    "production deployment",
+    "autonomous operation",
+    "historical data migration",
+    "pushing commits"
+  ],
+  "nextGate": "Implement and forward-requalify the provider-neutral kernel in the approved dependency order."
+}

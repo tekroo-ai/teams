@@ -2,11 +2,16 @@
 
 ## Governing authority
 
-The released package under `CONTRACTS/tekroo.kernel.contracts/0.2.0/` and its
-source-lineage decisions govern current implementation. The `0.1.0` package is
-preserved for historical replay and compatibility analysis. Do not edit either
-released package in place. If code and contract disagree, stop and report the
-disagreement; do not weaken fixtures to make code pass.
+The latest accepted package is
+`CONTRACTS/tekroo.kernel.contracts/0.7.0/`; its source-lineage decisions are
+binding successor requirements and govern the qualified provider-neutral local
+deterministic implementation. Packages `0.1.0` through `0.6.0` remain preserved
+for historical replay and compatibility analysis. Concrete human channels,
+provider adapters, host-power mechanisms, production deployment, SMA-Q1, and
+WP6 retain separate authorization and qualification gates. Do not edit an
+accepted or released package in place. If code and its governing contract
+disagree, stop and report the disagreement; do not weaken fixtures to make code
+pass.
 
 ## Scope boundaries
 

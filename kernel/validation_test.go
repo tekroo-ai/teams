@@ -203,14 +203,18 @@ func validationReviewInput() kernel.ValidationReviewInput {
 	evidenceID := kernel.UUIDv7("00000000-0000-7000-8000-000000000203")
 	return kernel.ValidationReviewInput{
 		ReviewID:         kernel.UUIDv7("00000000-0000-7000-8000-000000000501"),
-		Subject:          kernel.AggregateState{Kind: kernel.AggregateTask, ID: kernel.UUIDv7("00000000-0000-7000-8000-000000000101"), Revision: 3, LifecycleEpoch: 2, Phase: kernel.PhaseActive, Condition: kernel.ConditionRunnable},
+		Subject:          kernel.AggregateState{Kind: kernel.AggregateTask, ID: kernel.UUIDv7("00000000-0000-7000-8000-000000000101"), Revision: 3, LifecycleEpoch: 2, ScopeRevision: 1, Phase: kernel.PhaseActive, Condition: kernel.ConditionRunnable},
 		CriteriaRevision: 5, EvidenceSetDigest: kernel.Digest("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"), BranchPolicyRevision: 4,
 		RequiredBranchIDs: []string{"tests", "review"}, PartialResultPolicy: "WAIT_ALL",
 		Branches: []kernel.ReviewBranchSpec{
-			{BranchID: "tests", Validator: kernel.PrincipalRef{Kind: kernel.PrincipalService, ID: "test-validator"}, ResolutionOwnerFQN: kernel.ActorFQN("teams::coder-1"), AcceptanceCriteria: []string{"tests pass"}, InputEvidenceIDs: []kernel.UUIDv7{evidenceID}, DeadlineAt: deadline, RoundLimit: 2},
-			{BranchID: "review", Validator: kernel.PrincipalRef{Kind: kernel.PrincipalActor, ID: "teams::reviewer-1"}, ResolutionOwnerFQN: kernel.ActorFQN("teams::coder-1"), AcceptanceCriteria: []string{"review passes"}, InputEvidenceIDs: []kernel.UUIDv7{evidenceID}, DeadlineAt: deadline, RoundLimit: 2},
+			{BranchID: "tests", Validator: kernel.PrincipalRef{Kind: kernel.PrincipalService, ID: "test-validator"}, ResolutionOwnerFQN: kernel.ActorFQN("teams::coder-1"), AcceptanceCriteria: []string{"tests pass"}, InputEvidenceIDs: []kernel.UUIDv7{evidenceID}, DeadlineAt: deadline, RoundLimit: 2, RequiredIndependenceDimensions: []kernel.IndependenceDimension{kernel.IndependencePrincipal, kernel.IndependenceMethod}, RequiredMethodIDs: []string{"go-test"}},
+			{BranchID: "review", Validator: kernel.PrincipalRef{Kind: kernel.PrincipalActor, ID: "teams::reviewer-1"}, ResolutionOwnerFQN: kernel.ActorFQN("teams::coder-1"), AcceptanceCriteria: []string{"review passes"}, InputEvidenceIDs: []kernel.UUIDv7{evidenceID}, DeadlineAt: deadline, RoundLimit: 2, RequiredIndependenceDimensions: []kernel.IndependenceDimension{kernel.IndependencePrincipal, kernel.IndependenceActor, kernel.IndependenceExecution, kernel.IndependenceMethod}, RequiredMethodIDs: []string{"structured-review-v1"}},
 		},
-		Adjudication: kernel.ReviewAdjudication{Adjudicator: kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "review-chair"}, DeadlineAt: deadline.Add(24 * time.Hour), RoundLimit: 1},
-		Parents:      []kernel.DagParent{{ParentEventID: kernel.UUIDv7("00000000-0000-7000-8000-000000000201"), EdgeKind: kernel.EdgeCausal}, {ParentEventID: kernel.UUIDv7("00000000-0000-7000-8000-000000000202"), EdgeKind: kernel.EdgeDerivation}},
+		Adjudication:               kernel.ReviewAdjudication{Adjudicator: kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "review-chair"}, DeadlineAt: deadline.Add(24 * time.Hour), RoundLimit: 1},
+		WorkProfile:                kernel.WorkProfileBinding{ProfileID: "00000000-0000-7000-8000-000000000802", ProfileRevision: 1, ProfileDigest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", LifecycleEpoch: 2, ScopeRevision: 1},
+		CandidateArtifactDigest:    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+		Implementer:                kernel.WorkExecutionIdentity{Principal: kernel.PrincipalRef{Kind: kernel.PrincipalActor, ID: "teams::coder-1"}, ActorFQN: "teams::coder-1", ExecutionID: "00000000-0000-7000-8000-000000000804", FencingEpoch: 1, ModelProfileDigest: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", WorkspaceDigest: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", ContextDigest: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"},
+		VerificationTopologyDigest: "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+		Parents:                    []kernel.DagParent{{ParentEventID: kernel.UUIDv7("00000000-0000-7000-8000-000000000201"), EdgeKind: kernel.EdgeCausal}, {ParentEventID: kernel.UUIDv7("00000000-0000-7000-8000-000000000202"), EdgeKind: kernel.EdgeDerivation}},
 	}
 }

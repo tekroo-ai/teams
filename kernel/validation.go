@@ -10,31 +10,45 @@ const (
 )
 
 type ValidationReviewInput struct {
-	ReviewID             UUIDv7
-	Subject              AggregateState
-	CriteriaRevision     uint64
-	EvidenceSetDigest    Digest
-	BranchPolicyRevision uint64
-	RequiredBranchIDs    []string
-	Branches             []ReviewBranchSpec
-	Adjudication         ReviewAdjudication
-	PartialResultPolicy  string
-	Parents              []DagParent
+	ReviewID                   UUIDv7
+	Subject                    AggregateState
+	CriteriaRevision           uint64
+	EvidenceSetDigest          Digest
+	BranchPolicyRevision       uint64
+	RequiredBranchIDs          []string
+	Branches                   []ReviewBranchSpec
+	Adjudication               ReviewAdjudication
+	PartialResultPolicy        string
+	WorkProfile                WorkProfileBinding
+	CandidateArtifactDigest    Digest
+	Implementer                WorkExecutionIdentity
+	VerificationTopologyDigest Digest
+	VariantGroupID             *UUIDv7
+	VariantGroupRevision       uint64
+	VariantSelectionEventID    UUIDv7
+	Parents                    []DagParent
 }
 
 type ValidationReviewDecision struct {
-	Status               ValidationOpeningStatus
-	Reason               string
-	ReviewID             UUIDv7
-	Subject              AggregateState
-	CriteriaRevision     uint64
-	EvidenceSetDigest    Digest
-	BranchPolicyRevision uint64
-	RequiredBranchIDs    []string
-	Branches             []ReviewBranchSpec
-	Adjudication         ReviewAdjudication
-	PartialResultPolicy  string
-	Parents              []DagParent
+	Status                     ValidationOpeningStatus
+	Reason                     string
+	ReviewID                   UUIDv7
+	Subject                    AggregateState
+	CriteriaRevision           uint64
+	EvidenceSetDigest          Digest
+	BranchPolicyRevision       uint64
+	RequiredBranchIDs          []string
+	Branches                   []ReviewBranchSpec
+	Adjudication               ReviewAdjudication
+	PartialResultPolicy        string
+	WorkProfile                WorkProfileBinding
+	CandidateArtifactDigest    Digest
+	Implementer                WorkExecutionIdentity
+	VerificationTopologyDigest Digest
+	VariantGroupID             *UUIDv7
+	VariantGroupRevision       uint64
+	VariantSelectionEventID    UUIDv7
+	Parents                    []DagParent
 }
 
 type ValidationJoinDecision struct {
@@ -47,7 +61,7 @@ type ValidationJoinDecision struct {
 
 func PlanValidationReview(input ValidationReviewInput) ValidationReviewDecision {
 	decision := ValidationReviewDecision{Status: ValidationOpeningInvalid, Reason: "INVALID_VALIDATION_REVIEW_INPUT", ReviewID: input.ReviewID, Subject: input.Subject.Clone()}
-	if !input.ReviewID.Valid() || (input.Subject.Kind != AggregateTask && input.Subject.Kind != AggregateStory) || !input.Subject.ID.Valid() || input.Subject.Revision == 0 || input.Subject.LifecycleEpoch == 0 || input.Subject.Phase != PhaseActive || input.Subject.Condition != ConditionRunnable || input.CriteriaRevision == 0 || !input.EvidenceSetDigest.Valid() || input.BranchPolicyRevision == 0 || (input.PartialResultPolicy != "WAIT_ALL" && input.PartialResultPolicy != "FAIL_FAST") {
+	if !input.ReviewID.Valid() || (input.Subject.Kind != AggregateTask && input.Subject.Kind != AggregateStory) || !input.Subject.ID.Valid() || input.Subject.Revision == 0 || input.Subject.LifecycleEpoch == 0 || input.Subject.ScopeRevision == 0 || input.Subject.Phase != PhaseActive || input.Subject.Condition != ConditionRunnable || input.CriteriaRevision == 0 || !input.EvidenceSetDigest.Valid() || input.BranchPolicyRevision == 0 || (input.PartialResultPolicy != "WAIT_ALL" && input.PartialResultPolicy != "FAIL_FAST") || !input.WorkProfile.Valid() || input.WorkProfile.LifecycleEpoch != input.Subject.LifecycleEpoch || input.WorkProfile.ScopeRevision != input.Subject.ScopeRevision || !input.CandidateArtifactDigest.Valid() || !input.Implementer.Valid() || !input.VerificationTopologyDigest.Valid() || input.VariantGroupID != nil && (!input.VariantGroupID.Valid() || input.VariantGroupRevision == 0 || !input.VariantSelectionEventID.Valid()) || input.VariantGroupID == nil && (input.VariantGroupRevision != 0 || input.VariantSelectionEventID != "") {
 		return decision
 	}
 	branchSpecs, ok := canonicalReviewBranchSpecs(input.Branches)
@@ -80,6 +94,9 @@ func PlanValidationReview(input ValidationReviewInput) ValidationReviewDecision 
 	if !ok {
 		return decision
 	}
+	if input.VariantGroupID != nil && !containsDagParent(parents, input.VariantSelectionEventID, EdgeResponse) {
+		return decision
+	}
 	decision.CriteriaRevision = input.CriteriaRevision
 	decision.EvidenceSetDigest = input.EvidenceSetDigest
 	decision.BranchPolicyRevision = input.BranchPolicyRevision
@@ -87,6 +104,16 @@ func PlanValidationReview(input ValidationReviewInput) ValidationReviewDecision 
 	decision.Branches = branchSpecs
 	decision.Adjudication = input.Adjudication
 	decision.PartialResultPolicy = input.PartialResultPolicy
+	decision.WorkProfile = input.WorkProfile
+	decision.CandidateArtifactDigest = input.CandidateArtifactDigest
+	decision.Implementer = input.Implementer
+	decision.VerificationTopologyDigest = input.VerificationTopologyDigest
+	if input.VariantGroupID != nil {
+		value := *input.VariantGroupID
+		decision.VariantGroupID = &value
+		decision.VariantGroupRevision = input.VariantGroupRevision
+		decision.VariantSelectionEventID = input.VariantSelectionEventID
+	}
 	decision.Parents = parents
 	decision.Status, decision.Reason = ValidationOpeningReady, "READY_TO_OPEN"
 	return decision
@@ -99,7 +126,7 @@ func canonicalReviewBranchSpecs(values []ReviewBranchSpec) ([]ReviewBranchSpec, 
 	branches := append([]ReviewBranchSpec(nil), values...)
 	for index := range branches {
 		branch := &branches[index]
-		if branch.BranchID == "" || len(branch.BranchID) > 4096 || !branch.Validator.Valid() || !branch.ResolutionOwnerFQN.Valid() || len(branch.AcceptanceCriteria) == 0 || len(branch.AcceptanceCriteria) > 64 || !validUUIDSet(branch.InputEvidenceIDs, true) || branch.DeadlineAt.IsZero() || branch.RoundLimit == 0 || branch.RoundLimit > 1000 {
+		if branch.BranchID == "" || len(branch.BranchID) > 4096 || !branch.Validator.Valid() || !branch.ResolutionOwnerFQN.Valid() || len(branch.AcceptanceCriteria) == 0 || len(branch.AcceptanceCriteria) > 64 || !validUUIDSet(branch.InputEvidenceIDs, true) || branch.DeadlineAt.IsZero() || branch.RoundLimit == 0 || branch.RoundLimit > 1000 || !validUniqueDimensions(branch.RequiredIndependenceDimensions) || !validUniqueStrings(branch.RequiredMethodIDs, 1, 64) {
 			return nil, false
 		}
 		branch.AcceptanceCriteria = append([]string(nil), branch.AcceptanceCriteria...)

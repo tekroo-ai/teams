@@ -1,0 +1,128 @@
+{
+  "schemaVersion": "1.0.0",
+  "reportType": "OPERATOR_HUMAN_CONTINUITY_IMPLEMENTATION_GATE",
+  "status": "PASS_LOCAL_DETERMINISTIC_IMPLEMENTATION",
+  "resultClaim": "LOCAL_IMPLEMENTATION_QUALIFIED",
+  "contractIdentity": "tekroo.kernel.contracts/0.7.0",
+  "contractManifestSha256": "e2b9b5224a860a3eaa07451cf48fb5ac16a440b22b8dd592ff1662c1cff67f16",
+  "authorizationBoundary": {
+    "providerNeutralLocalImplementationAuthorized": true,
+    "concreteHumanChannelAdoptionAuthorized": false,
+    "productionAuthorized": false,
+    "smaQ1OrWp6Authorized": false,
+    "commitOrPushAuthorizedByThisGate": false
+  },
+  "assertions": [
+    {
+      "id": "OHC-IMPL-001-CONTRACT",
+      "status": "PASS",
+      "classification": "OBSERVED_AND_COMPUTED",
+      "evidence": [
+        "The immutable 0.7.0 manifest SHA-256 is e2b9b5224a860a3eaa07451cf48fb5ac16a440b22b8dd592ff1662c1cff67f16.",
+        "The package validator returned PASS for 3290 checks.",
+        "The independent reference runner returned PASS for 235 fixtures.",
+        "The Go conformance runner executed the same 235 frozen fixtures and passed."
+      ]
+    },
+    {
+      "id": "OHC-IMPL-002-IDENTITY-AND-HUMANS",
+      "status": "PASS",
+      "classification": "OBSERVED",
+      "evidence": [
+        "The kernel keeps HUMAN, ACTOR, SERVICE, POLICY, and control-surface presentation separate.",
+        "Operator role bindings retain content digests and exact signature-evidence identifiers without granting authority from the role name.",
+        "Human participant state retains exact scoped role, authentication, delivery, confidentiality, revision, supersession, and evidence bindings.",
+        "Human response acceptance requires exact selected HUMAN identity, active participant/profile/role/authentication bindings, a delivered question, matching question and response-specification revisions, and no actor execution attribution."
+      ]
+    },
+    {
+      "id": "OHC-IMPL-003-HUMAN-INTERACTION",
+      "status": "PASS",
+      "classification": "OBSERVED",
+      "evidence": [
+        "The finite interaction state machine implements OPEN, COLLECTING, SATISFIED, CLOSED, and EXPIRED.",
+        "Delivery does not satisfy a response policy, material rendering changes require equivalence evidence, silence cannot authorize, and close validates the exact accepted response-event and respondent sets.",
+        "Advisory/evidentiary effects cannot be promoted to authority; an authorized effect requires explicit authorization evidence among the retained evidence identifiers."
+      ]
+    },
+    {
+      "id": "OHC-IMPL-004-CONTINUITY",
+      "status": "PASS",
+      "classification": "OBSERVED",
+      "evidence": [
+        "The continuity state machine enforces ACTIVE to QUIESCING to SUSPENDED to RECONCILING to ACTIVE, monotonic power epochs, closed admission outside ACTIVE, complete suspension inventory, explicit preregistered dispositions, and exact reconciliation before resume.",
+        "The application continuity coordinator fails closed when durable continuity state is absent and quarantines old-epoch results.",
+        "Assignment checks continuity before issuing readiness, qualified-assignment, or dispatch commands; the reusable power-fenced command service covers organizational commands and exposes explicit assignment, model-dispatch, local-tool, provider-result, and organizational-command operation classes."
+      ]
+    },
+    {
+      "id": "OHC-IMPL-005-PERSISTENCE-AND-PROTOCOL",
+      "status": "PASS",
+      "classification": "OBSERVED",
+      "evidence": [
+        "The in-memory store round-trips and deep-clones the extended aggregate state.",
+        "BSON round-trip tests retain operator, participant, interaction, and continuity state.",
+        "The build-tagged Mongo suite passed against an isolated disposable local replica set, including transactions, projections, replay, and change-stream behavior.",
+        "Existing HTTP, MCP, channel, stdio, and protocol suites pass against contract 0.7.0; the protocol gateway requires the authenticated principal and actor/execution tuple to match the command envelope."
+      ]
+    },
+    {
+      "id": "OHC-IMPL-006-LIVE-BOUNDARIES",
+      "status": "NOT_RUN",
+      "classification": "OBSERVED",
+      "evidence": [
+        "No concrete email, Slack, Teams, SMS, web-portal, or other human delivery/authentication adapter was adopted or qualified.",
+        "No provider suspension/reconciliation adapter, closed-lid host mechanism, production deployment, SMA-Q1 run, or WP6 run was executed.",
+        "Provider-neutral ports exist for human delivery/authentication and suspension/reconciliation, but live implementations require separate authorization and qualification."
+      ]
+    }
+  ],
+  "validation": [
+    {
+      "command": "go test ./... -count=1",
+      "status": "PASS",
+      "exitCode": 0
+    },
+    {
+      "command": "go vet ./...",
+      "status": "PASS",
+      "exitCode": 0
+    },
+    {
+      "command": "go test -race ./... -count=1",
+      "status": "PASS",
+      "exitCode": 0
+    },
+    {
+      "command": "go test -tags=mongo_integration ./adapters/mongo -count=1",
+      "status": "PASS",
+      "exitCode": 0,
+      "scope": "isolated disposable local MongoDB replica set"
+    },
+    {
+      "command": "node CONTRACTS/tekroo.kernel.contracts/0.7.0/runner/validate-package.mjs OUTPUT/phase-3/operator-continuity-implementation-contract-structure.json",
+      "status": "PASS",
+      "exitCode": 0,
+      "executedChecks": 3290,
+      "runnerReportDigest": "1f25b8d4a860b98e0ff369ca4a931bfe35cb931ed9cc7afea112d6dd4cb7863e",
+      "reportFileSha256": "0d9e07ceaa0814d8ea82bda404fab00bca852fcd22571ea4af929d5051ce7e7b"
+    },
+    {
+      "command": "node CONTRACTS/tekroo.kernel.contracts/0.7.0/runner/reference-runner.mjs OUTPUT/phase-3/operator-continuity-implementation-contract-reference.json",
+      "status": "PASS",
+      "exitCode": 0,
+      "executedFixtures": 235,
+      "runnerReportDigest": "dfbcf729888d453e4df0f581fcbfb942cb1f7f925917d26ef3f8917014b1ae41",
+      "reportFileSha256": "393abca079b6cca7c66c9dd7e30c188f0e3ef87112915dc3df30c3ce914b4be3"
+    },
+    {
+      "command": "git diff --check",
+      "status": "PASS",
+      "exitCode": 0
+    }
+  ],
+  "qualificationBoundary": "PASS qualifies the provider-neutral local deterministic implementation against accepted contract 0.7.0. It does not qualify a concrete human channel, provider adapter, host power mechanism, production deployment, historical migration, SMA-Q1/WP6 execution, or autonomous operation.",
+  "nextGate": "Principal review and acceptance of this local implementation gate; concrete delivery/authentication, provider-continuity, host-continuity, and production qualification remain separately gated.",
+  "reportDigestMethod": "SHA-256 of RFC-8785-compatible sorted-key compact JSON with reportSha256 set to the empty string",
+  "reportSha256": "986accf7cf637162eda9d92d65c1842e367b88ddf4155c9be87b25c26708af3c"
+}

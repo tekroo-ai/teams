@@ -1,0 +1,150 @@
+{
+  "$defs": {
+    "Ownership": {
+      "additionalProperties": false,
+      "properties": {
+        "assigned_event_id": {
+          "anyOf": [
+            {
+              "$ref": "./core.schema.json#/$defs/UUIDv7"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "owner_fqn": {
+          "anyOf": [
+            {
+              "$ref": "./core.schema.json#/$defs/ActorFQN"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ownership_version": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "owner_fqn",
+        "ownership_version",
+        "assigned_event_id"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://contracts.tekroo.ai/tekroo.kernel.contracts/0.6.0/schemas/aggregate-state.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "oneOf": [
+    {
+      "additionalProperties": false,
+      "properties": {
+        "condition": {
+          "enum": [
+            "RUNNABLE",
+            "BLOCKED"
+          ]
+        },
+        "id": {
+          "$ref": "./core.schema.json#/$defs/UUIDv7"
+        },
+        "kind": {
+          "const": "story"
+        },
+        "lifecycle_epoch": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "ownership": {
+          "$ref": "#/$defs/Ownership"
+        },
+        "phase": {
+          "enum": [
+            "DRAFT",
+            "READY",
+            "PLANNING",
+            "ACTIVE",
+            "COMPLETED",
+            "ACCEPTED",
+            "CLOSED"
+          ]
+        },
+        "revision": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "scope_revision": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "condition",
+        "id",
+        "kind",
+        "lifecycle_epoch",
+        "ownership",
+        "phase",
+        "revision",
+        "scope_revision"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "condition": {
+          "enum": [
+            "RUNNABLE",
+            "BLOCKED"
+          ]
+        },
+        "id": {
+          "$ref": "./core.schema.json#/$defs/UUIDv7"
+        },
+        "kind": {
+          "const": "task"
+        },
+        "lifecycle_epoch": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "ownership": {
+          "$ref": "#/$defs/Ownership"
+        },
+        "phase": {
+          "enum": [
+            "PLANNED",
+            "READY",
+            "ACTIVE",
+            "COMPLETED",
+            "CLOSED"
+          ]
+        },
+        "revision": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "scope_revision": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "condition",
+        "id",
+        "kind",
+        "lifecycle_epoch",
+        "ownership",
+        "phase",
+        "revision",
+        "scope_revision"
+      ],
+      "type": "object"
+    }
+  ],
+  "title": "Story and task aggregate state"
+}

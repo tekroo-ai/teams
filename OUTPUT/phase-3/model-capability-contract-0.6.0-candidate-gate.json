@@ -1,0 +1,90 @@
+{
+  "artifact": "model-capability-contract-0.6.0-candidate-gate",
+  "recordedAt": "2026-08-13",
+  "status": "PASS_CANDIDATE_AWAITING_PRINCIPAL_ACCEPTANCE",
+  "authority": {
+    "source": "Decision 9 approved by principal on 2026-08-13",
+    "authorized": [
+      "generate and validate the tekroo.kernel.contracts/0.6.0 candidate",
+      "request principal candidate acceptance"
+    ],
+    "notAuthorized": [
+      "implementation before candidate acceptance",
+      "live OpenHands or provider execution",
+      "provider expenditure",
+      "production deployment",
+      "pushing commits"
+    ]
+  },
+  "candidate": {
+    "identity": "tekroo.kernel.contracts/0.6.0",
+    "schemaVersion": "1.5.0",
+    "status": "FROZEN_CANDIDATE",
+    "manifestSha256": "eff818a5ea876e8be71d18d9555dd281298db6c667956602d6d7467d1c0ff9ed",
+    "generator": {
+      "path": "scripts/generate_phase3_contract_0_6.mjs",
+      "sha256": "65afa1d5f30cc3d4a44740bd4db5dcd6b8dae42a82eabfbd6b1b19270edb2275"
+    },
+    "counts": {
+      "catalogueEntries": 84,
+      "commandTypes": 42,
+      "eventTypes": 42,
+      "schemas": 10,
+      "fixtures": 161,
+      "invariants": 27,
+      "traceabilityRequirements": 139,
+      "inventoriedPayloadFiles": 19
+    }
+  },
+  "observed": {
+    "structureGate": {
+      "status": "PASS",
+      "checks": 3004,
+      "passed": 3004,
+      "failed": 0,
+      "report": "OUTPUT/phase-3/model-capability-contract-0.6.0-structure-report.json",
+      "reportByteSha256": "6679a9739048f3b5ec5263675f25115844176f3a41b036303b0bb3b204ab2383",
+      "reportSemanticSha256": "708fcbdf86027cf02d2da38ee7ecc7126c156a0c4f9a49c29a67c200f8f74684"
+    },
+    "referenceGate": {
+      "status": "PASS",
+      "fixtures": 161,
+      "passed": 161,
+      "failed": 0,
+      "report": "OUTPUT/phase-3/model-capability-contract-0.6.0-reference-report.json",
+      "reportByteSha256": "07f50b984fb25644b94870f9878d87bf26a6738513655400a398e34423cadbd3",
+      "reportSemanticSha256": "d88109bec51599d5b851d674881bac697968e9155858b9e22a7a2742b61b4764"
+    },
+    "reproducibility": {
+      "status": "PASS",
+      "method": "Move the first generated package aside, run the checked-in generator again from the same inputs, and compare both package trees with diff -rq.",
+      "firstManifestSha256": "eff818a5ea876e8be71d18d9555dd281298db6c667956602d6d7467d1c0ff9ed",
+      "secondManifestSha256": "eff818a5ea876e8be71d18d9555dd281298db6c667956602d6d7467d1c0ff9ed",
+      "diffExitCode": 0,
+      "differences": []
+    }
+  },
+  "compatibilityBoundary": {
+    "predecessor": "tekroo.kernel.contracts/0.5.0",
+    "historicalReplay": "VERSION_GATED_RETAIN_0.5.0",
+    "unchangedMessageFamilies": "DECLARED_IDENTITY_1.4.0_TO_1.5.0",
+    "changedCompletionReviewFamilies": "CONTEXT_REQUIRED_NO_SILENT_UPCONVERSION",
+    "activeTaskAggregateMigration": "EXPLICIT_SCOPE_AND_WORK_PROFILE_BINDING_REQUIRED",
+    "newTypesDownconverted": false,
+    "releasedPackagesModified": false
+  },
+  "qualificationFloor": {
+    "observed": "The structure and reference-model gates passed for the generated contract package.",
+    "notEstablished": [
+      "Go implementation conformance",
+      "MongoDB integration",
+      "adapter conformance",
+      "live model-profile qualification",
+      "OpenHands-Q1",
+      "provider behavior",
+      "performance or economic superiority",
+      "production readiness"
+    ]
+  },
+  "recommendation": "ACCEPT_CONTRACT_CANDIDATE_AND_AUTHORIZE_PROVIDER_NEUTRAL_IMPLEMENTATION"
+}

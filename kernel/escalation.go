@@ -31,13 +31,23 @@ const (
 type EscalationTrigger string
 
 const (
-	EscalationRetryExhausted            EscalationTrigger = "RETRY_EXHAUSTED"
-	EscalationValidationConflict        EscalationTrigger = "VALIDATION_CONFLICT"
-	EscalationValidationInconclusive    EscalationTrigger = "VALIDATION_INCONCLUSIVE"
-	EscalationValidationBudgetExhausted EscalationTrigger = "VALIDATION_BUDGET_EXHAUSTED"
-	EscalationValidationDeadlineExpired EscalationTrigger = "VALIDATION_DEADLINE_EXPIRED"
-	EscalationHandoffCycleDetected      EscalationTrigger = "HANDOFF_CYCLE_DETECTED"
-	EscalationHandoffBudgetExhausted    EscalationTrigger = "HANDOFF_BUDGET_EXHAUSTED"
+	EscalationRetryExhausted                 EscalationTrigger = "RETRY_EXHAUSTED"
+	EscalationValidationConflict             EscalationTrigger = "VALIDATION_CONFLICT"
+	EscalationValidationInconclusive         EscalationTrigger = "VALIDATION_INCONCLUSIVE"
+	EscalationValidationBudgetExhausted      EscalationTrigger = "VALIDATION_BUDGET_EXHAUSTED"
+	EscalationValidationDeadlineExpired      EscalationTrigger = "VALIDATION_DEADLINE_EXPIRED"
+	EscalationHandoffCycleDetected           EscalationTrigger = "HANDOFF_CYCLE_DETECTED"
+	EscalationHandoffBudgetExhausted         EscalationTrigger = "HANDOFF_BUDGET_EXHAUSTED"
+	EscalationRequirementContradiction       EscalationTrigger = "REQUIREMENT_CONTRADICTION"
+	EscalationArchitectureAmbiguity          EscalationTrigger = "ARCHITECTURE_AMBIGUITY"
+	EscalationMaterialVariantDisagreement    EscalationTrigger = "MATERIAL_VARIANT_DISAGREEMENT"
+	EscalationCapabilityMismatch             EscalationTrigger = "CAPABILITY_MISMATCH"
+	EscalationRiskProfileBreach              EscalationTrigger = "RISK_PROFILE_BREACH"
+	EscalationBlastRadiusExceeded            EscalationTrigger = "BLAST_RADIUS_EXCEEDED"
+	EscalationSecurityClassificationElevated EscalationTrigger = "SECURITY_CLASSIFICATION_ELEVATED"
+	EscalationRootCauseUnresolved            EscalationTrigger = "ROOT_CAUSE_UNRESOLVED"
+	EscalationRequiredToolUnavailable        EscalationTrigger = "REQUIRED_TOOL_UNAVAILABLE"
+	EscalationNoveltyReclassified            EscalationTrigger = "NOVELTY_RECLASSIFIED"
 )
 
 func (trigger EscalationTrigger) Valid() bool {
@@ -48,7 +58,17 @@ func (trigger EscalationTrigger) Valid() bool {
 		EscalationValidationBudgetExhausted,
 		EscalationValidationDeadlineExpired,
 		EscalationHandoffCycleDetected,
-		EscalationHandoffBudgetExhausted:
+		EscalationHandoffBudgetExhausted,
+		EscalationRequirementContradiction,
+		EscalationArchitectureAmbiguity,
+		EscalationMaterialVariantDisagreement,
+		EscalationCapabilityMismatch,
+		EscalationRiskProfileBreach,
+		EscalationBlastRadiusExceeded,
+		EscalationSecurityClassificationElevated,
+		EscalationRootCauseUnresolved,
+		EscalationRequiredToolUnavailable,
+		EscalationNoveltyReclassified:
 		return true
 	default:
 		return false

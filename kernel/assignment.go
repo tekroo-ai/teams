@@ -1,6 +1,9 @@
 package kernel
 
-import "sort"
+import (
+	"sort"
+	"time"
+)
 
 type AssignmentStatus string
 
@@ -21,10 +24,16 @@ type DependencyRequirement struct {
 }
 
 type AssignmentCandidate struct {
-	ActorFQN          ActorFQN
-	Execution         ExecutionTuple
-	ActiveAssignments uint32
-	Eligible          bool
+	ActorFQN              ActorFQN
+	Execution             ExecutionTuple
+	ActiveAssignments     uint32
+	ModelProfileDigest    Digest
+	RuntimeIdentityDigest Digest
+	Qualification         ModelProfileQualification
+	HardConstraints       []HardConstraintResult
+	SelectionEvidence     []EvidenceRef
+	SelectionReasons      []string
+	ExpectedTotalCost     CostObservation
 }
 
 type AssignmentInput struct {
@@ -33,6 +42,10 @@ type AssignmentInput struct {
 	ReadinessParents        []DagParent
 	ReadiedEventID          UUIDv7
 	ReadinessPolicyRevision uint64
+	WorkProfile             WorkProfileSnapshot
+	SelectionPolicyRevision uint64
+	SelectionPolicyDigest   Digest
+	DecidedAt               time.Time
 	Candidates              []AssignmentCandidate
 }
 
@@ -46,13 +59,29 @@ type AssignmentDecision struct {
 	ReadinessParents        []DagParent
 	ActorFQN                *ActorFQN
 	Execution               *ExecutionTuple
+	WorkProfile             WorkProfileBinding
+	RequiredDecisionRoute   DecisionRoute
+	SelectedDecisionRoute   DecisionRoute
+	ModelProfileDigest      Digest
+	RuntimeIdentityDigest   Digest
+	Qualification           *ModelProfileQualification
+	SelectionPolicyRevision uint64
+	SelectionPolicyDigest   Digest
+	HardConstraints         []HardConstraintResult
+	SelectionEvidence       []EvidenceRef
+	SelectionReasons        []string
+	ExpectedTotalCost       CostObservation
 }
 
 func PlanAssignment(input AssignmentInput) AssignmentDecision {
 	decision := AssignmentDecision{Status: AssignmentInvalid, Reason: "INVALID_ASSIGNMENT_INPUT", Task: input.Task.Clone()}
-	if !validAssignmentTask(input.Task) || input.ReadinessPolicyRevision == 0 || len(input.Dependencies) > 64 || len(input.ReadinessParents) == 0 || len(input.ReadinessParents) > 64 || len(input.Candidates) > 64 {
+	if !validAssignmentTask(input.Task) || input.ReadinessPolicyRevision == 0 || input.SelectionPolicyRevision == 0 || !input.SelectionPolicyDigest.Valid() || input.DecidedAt.IsZero() || !input.WorkProfile.Valid() || input.WorkProfile.Profile.TaskID != input.Task.ID || input.WorkProfile.Profile.LifecycleEpoch != input.Task.LifecycleEpoch || input.WorkProfile.Profile.ScopeRevision != input.Task.ScopeRevision || !input.WorkProfile.Profile.MinimumDecisionRoute.ModelExecutable() || len(input.Dependencies) > 64 || len(input.ReadinessParents) == 0 || len(input.ReadinessParents) > 64 || len(input.Candidates) > 64 {
 		return decision
 	}
+	decision.WorkProfile = input.WorkProfile.Profile.Binding()
+	decision.RequiredDecisionRoute = input.WorkProfile.Profile.MinimumDecisionRoute
+	decision.SelectionPolicyRevision = input.SelectionPolicyRevision
+	decision.SelectionPolicyDigest = input.SelectionPolicyDigest
 	parents, ok := canonicalAssignmentParents(input.ReadinessParents)
 	if !ok {
 		return decision
@@ -106,14 +135,14 @@ func PlanAssignment(input AssignmentInput) AssignmentDecision {
 	eligible := make([]AssignmentCandidate, 0, len(input.Candidates))
 	seenActors := make(map[ActorFQN]struct{}, len(input.Candidates))
 	for _, candidate := range input.Candidates {
-		if !candidate.ActorFQN.Valid() || !candidate.Execution.Valid() {
+		if !candidate.ActorFQN.Valid() || !candidate.Execution.Valid() || !candidate.ModelProfileDigest.Valid() || !candidate.RuntimeIdentityDigest.Valid() {
 			return decision
 		}
 		if _, duplicate := seenActors[candidate.ActorFQN]; duplicate {
 			return decision
 		}
 		seenActors[candidate.ActorFQN] = struct{}{}
-		if candidate.Eligible {
+		if candidateEligible(candidate, input.WorkProfile.Profile, input.DecidedAt) {
 			eligible = append(eligible, candidate)
 		}
 	}
@@ -122,13 +151,29 @@ func PlanAssignment(input AssignmentInput) AssignmentDecision {
 		return decision
 	}
 	sort.Slice(eligible, func(i, j int) bool {
+		if eligible[i].ExpectedTotalCost.Reported != eligible[j].ExpectedTotalCost.Reported {
+			return eligible[i].ExpectedTotalCost.Reported
+		}
+		if eligible[i].ExpectedTotalCost.Reported && eligible[i].ExpectedTotalCost.Microunits != eligible[j].ExpectedTotalCost.Microunits {
+			return eligible[i].ExpectedTotalCost.Microunits < eligible[j].ExpectedTotalCost.Microunits
+		}
 		if eligible[i].ActiveAssignments != eligible[j].ActiveAssignments {
 			return eligible[i].ActiveAssignments < eligible[j].ActiveAssignments
 		}
 		return eligible[i].ActorFQN < eligible[j].ActorFQN
 	})
 	actor, execution := eligible[0].ActorFQN, eligible[0].Execution
+	selected := eligible[0]
 	decision.ActorFQN, decision.Execution = &actor, &execution
+	decision.SelectedDecisionRoute = selected.Qualification.DecisionRoute
+	decision.ModelProfileDigest = selected.ModelProfileDigest
+	decision.RuntimeIdentityDigest = selected.RuntimeIdentityDigest
+	qualification := selected.Qualification.Clone()
+	decision.Qualification = &qualification
+	decision.HardConstraints = cloneHardConstraints(selected.HardConstraints)
+	decision.SelectionEvidence = append([]EvidenceRef(nil), selected.SelectionEvidence...)
+	decision.SelectionReasons = append([]string(nil), selected.SelectionReasons...)
+	decision.ExpectedTotalCost = selected.ExpectedTotalCost
 	decision.NeedsReadiness = input.Task.Phase == PhasePlanned
 	if !decision.NeedsReadiness {
 		decision.ReadinessParents = []DagParent{{ParentEventID: input.ReadiedEventID, EdgeKind: EdgeCausal}}
@@ -138,7 +183,45 @@ func PlanAssignment(input AssignmentInput) AssignmentDecision {
 }
 
 func validAssignmentTask(task AggregateState) bool {
-	return task.Kind == AggregateTask && task.ID.Valid() && task.Revision > 0 && task.LifecycleEpoch > 0
+	return task.Kind == AggregateTask && task.ID.Valid() && task.Revision > 0 && task.LifecycleEpoch > 0 && task.ScopeRevision > 0
+}
+
+func candidateEligible(candidate AssignmentCandidate, profile WorkRiskProfile, decidedAt time.Time) bool {
+	if !candidate.Qualification.EligibleAt(decidedAt) || candidate.Qualification.ModelProfileDigest != candidate.ModelProfileDigest || !candidate.Qualification.DecisionRoute.ModelExecutable() || !candidate.Qualification.DecisionRoute.Satisfies(profile.MinimumDecisionRoute) || !containsWorkKind(candidate.Qualification.QualifiedWorkKinds, profile.WorkKind) || !validEvidenceSet(candidate.SelectionEvidence) || !validUniqueStrings(candidate.SelectionReasons, 1, 64) || len(candidate.HardConstraints) == 0 || len(candidate.HardConstraints) > 64 {
+		return false
+	}
+	for _, constraint := range candidate.HardConstraints {
+		if !constraint.Valid() || constraint.Outcome != ConstraintPass {
+			return false
+		}
+	}
+	return candidate.ExpectedTotalCost.Valid()
+}
+
+func validEvidenceSet(values []EvidenceRef) bool {
+	if len(values) == 0 || len(values) > 64 {
+		return false
+	}
+	seen := make(map[UUIDv7]struct{}, len(values))
+	for _, value := range values {
+		if !value.EvidenceID.Valid() || !value.SHA256.Valid() {
+			return false
+		}
+		if _, duplicate := seen[value.EvidenceID]; duplicate {
+			return false
+		}
+		seen[value.EvidenceID] = struct{}{}
+	}
+	return true
+}
+
+func containsWorkKind(values []WorkKind, target WorkKind) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
 }
 
 func terminalDependencyPhase(phase Phase) bool {

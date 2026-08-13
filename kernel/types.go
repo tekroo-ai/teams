@@ -6,9 +6,9 @@ import (
 )
 
 const (
-	ContractIdentity  = "tekroo.kernel.contracts/0.5.0"
-	SchemaVersion     = "1.4.0"
-	CatalogueRevision = uint64(5)
+	ContractIdentity  = "tekroo.kernel.contracts/0.7.0"
+	SchemaVersion     = "1.6.0"
+	CatalogueRevision = uint64(7)
 )
 
 var (
@@ -58,6 +58,9 @@ const (
 	AggregateCompletionReview AggregateKind = "completion-review"
 	AggregateEscalation       AggregateKind = "escalation"
 	AggregateReleasePlan      AggregateKind = "release-plan"
+	AggregateVariantGroup     AggregateKind = "variant-group"
+	AggregateHumanParticipant AggregateKind = "human-participant"
+	AggregateHumanInteraction AggregateKind = "human-interaction"
 	AggregateEvidence         AggregateKind = "evidence"
 	AggregateExecution        AggregateKind = "execution"
 	AggregateSystem           AggregateKind = "system"
@@ -65,7 +68,7 @@ const (
 
 func (k AggregateKind) Valid() bool {
 	switch k {
-	case AggregateStory, AggregateTask, AggregateCompletionReview, AggregateEscalation, AggregateReleasePlan, AggregateEvidence, AggregateExecution, AggregateSystem:
+	case AggregateStory, AggregateTask, AggregateCompletionReview, AggregateEscalation, AggregateReleasePlan, AggregateVariantGroup, AggregateHumanParticipant, AggregateHumanInteraction, AggregateEvidence, AggregateExecution, AggregateSystem:
 		return true
 	default:
 		return false
@@ -168,13 +171,18 @@ type Ownership struct {
 }
 
 type AggregateState struct {
-	Kind           AggregateKind `json:"kind"`
-	ID             UUIDv7        `json:"id"`
-	Revision       uint64        `json:"revision"`
-	LifecycleEpoch uint64        `json:"lifecycle_epoch"`
-	Phase          Phase         `json:"phase"`
-	Condition      Condition     `json:"condition"`
-	Ownership      Ownership     `json:"ownership"`
+	Kind           AggregateKind             `json:"kind"`
+	ID             UUIDv7                    `json:"id"`
+	Revision       uint64                    `json:"revision"`
+	LifecycleEpoch uint64                    `json:"lifecycle_epoch"`
+	ScopeRevision  uint64                    `json:"scope_revision"`
+	Phase          Phase                     `json:"phase"`
+	Condition      Condition                 `json:"condition"`
+	Ownership      Ownership                 `json:"ownership"`
+	OperatorRole   *OperatorRoleProfile      `json:"operator_role,omitempty"`
+	Participant    *HumanParticipantSnapshot `json:"human_participant,omitempty"`
+	Interaction    *HumanInteractionSnapshot `json:"human_interaction,omitempty"`
+	Continuity     *TeamContinuitySnapshot   `json:"team_continuity,omitempty"`
 }
 
 func (s AggregateState) Clone() AggregateState {
@@ -186,6 +194,22 @@ func (s AggregateState) Clone() AggregateState {
 	if s.Ownership.AssignedEventID != nil {
 		eventID := *s.Ownership.AssignedEventID
 		copy.Ownership.AssignedEventID = &eventID
+	}
+	if s.OperatorRole != nil {
+		value := s.OperatorRole.Clone()
+		copy.OperatorRole = &value
+	}
+	if s.Participant != nil {
+		value := s.Participant.Clone()
+		copy.Participant = &value
+	}
+	if s.Interaction != nil {
+		value := s.Interaction.Clone()
+		copy.Interaction = &value
+	}
+	if s.Continuity != nil {
+		value := s.Continuity.Clone()
+		copy.Continuity = &value
 	}
 	return copy
 }

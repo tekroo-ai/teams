@@ -58,7 +58,86 @@ func validateCommandPolicy(command KernelCommand, snapshot Snapshot, context Dec
 			return OutcomeRejectedConflict, reasonStaleLifecycleEpoch
 		}
 	}
+	if outcome, reason, handled := validateOperatorHumanContinuityCommand(command, snapshot, context); handled {
+		return outcome, reason
+	}
 	switch command.CommandType {
+	case "tekroo.command.task.bind-work-profile":
+		if command.Authority.Kind != PrincipalPolicy && command.Authority.Kind != PrincipalHuman || !payloadEvidenceFieldMatches(object, "classification_evidence_ids", command.EvidenceRefs) || snapshot.State == nil {
+			return OutcomeRejectedUnauthorized, reasonUnauthorized
+		}
+		profile, err := WorkRiskProfileFromPayload(command.Payload)
+		current, found := snapshot.WorkProfiles[command.Target]
+		var currentPointer *WorkProfileSnapshot
+		if found {
+			currentPointer = &current
+		}
+		if err != nil || profile.ClassificationPolicyRevision != command.ExpectedPolicyRevision {
+			return OutcomeRejectedInvalid, reasonInvalidPayload
+		}
+		if decision := PlanWorkProfileBinding(WorkProfileBindingInput{Task: *snapshot.State, Profile: profile, Current: currentPointer}); decision.Status != WorkProfileReady {
+			return OutcomeRejectedConflict, decision.Reason
+		}
+	case "tekroo.command.task.authorize-qualified-assignment":
+		authorization, err := QualifiedAssignmentAuthorizationFromPayload(command.Payload, context.EventID)
+		profile, profileFound := snapshot.WorkProfiles[command.Target]
+		currentExecution, executionFound := snapshot.CurrentExecutions[authorization.SelectedActorFQN]
+		if err != nil || snapshot.State == nil || authorization.TaskID != command.Target.ID || authorization.ExpectedTaskRevision != snapshot.Revision || authorization.WorkProfile.TaskBindingMatches(*snapshot.State) == false || !profileFound || !profile.Valid() || profile.Profile.Binding() != authorization.WorkProfile || authorization.RequiredDecisionRoute != profile.Profile.MinimumDecisionRoute || authorization.SelectionPolicyRevision != command.ExpectedPolicyRevision || !payloadEvidenceMatches(object, command.EvidenceRefs) {
+			return OutcomeRejectedConflict, reasonRevisionConflict
+		}
+		if !executionFound || currentExecution != authorization.SelectedExecution() {
+			return OutcomeRejectedStaleExecution, reasonStaleExecution
+		}
+	case "tekroo.command.task.dispatch":
+		authorization, found := snapshot.QualifiedAssignments[command.Target]
+		destination, destinationOK := object["destination"].(string)
+		profile, profileFound := snapshot.WorkProfiles[command.Target]
+		currentExecution, executionFound := snapshot.CurrentExecutions[authorization.SelectedActorFQN]
+		if !found || !authorization.Valid() || snapshot.State == nil || authorization.ExpectedTaskRevision+1 != snapshot.Revision || !authorization.WorkProfile.TaskBindingMatches(*snapshot.State) || !profileFound || !profile.Valid() || profile.Profile.Binding() != authorization.WorkProfile || !destinationOK || destination != string(authorization.SelectedActorFQN) || !containsDagParent(command.Causation, authorization.AuthorizationEventID, EdgeCausal) {
+			return OutcomeRejectedPolicy, reasonPolicy
+		}
+		if !executionFound || currentExecution != authorization.SelectedExecution() {
+			return OutcomeRejectedStaleExecution, reasonStaleExecution
+		}
+	case "tekroo.command.variant-group.open":
+		if command.Authority.Kind != PrincipalPolicy || !payloadEvidenceMatches(object, command.EvidenceRefs) {
+			return OutcomeRejectedUnauthorized, reasonUnauthorized
+		}
+		group, err := VariantGroupFromOpenPayload(command.Payload, context.EventID)
+		taskRef := AggregateRef{Kind: AggregateTask, ID: group.TaskID}
+		task, taskFound := snapshot.Related[taskRef]
+		profile, profileFound := snapshot.WorkProfiles[taskRef]
+		if err != nil || group.VariantGroupID != command.Target.ID || !taskFound || task.State == nil || task.State.LifecycleEpoch != group.WorkProfile.LifecycleEpoch || task.State.ScopeRevision != group.WorkProfile.ScopeRevision || !profileFound || profile.Profile.Binding() != group.WorkProfile || !containsAggregatePrecondition(command.Preconditions, taskRef) {
+			return OutcomeRejectedConflict, reasonRevisionConflict
+		}
+		if _, duplicate := snapshot.VariantGroupKeys[group.Key()]; duplicate {
+			return OutcomeRejectedConflict, reasonRevisionConflict
+		}
+	case "tekroo.command.variant-group.submit-candidate", "tekroo.command.variant-group.record-comparison", "tekroo.command.variant-group.select":
+		group, found := snapshot.VariantGroups[command.Target]
+		if !found || group.Revision != snapshot.Revision || !payloadEvidenceMatches(object, command.EvidenceRefs) {
+			return OutcomeRejectedConflict, reasonRevisionConflict
+		}
+		eventType := map[string]string{
+			"tekroo.command.variant-group.submit-candidate":  "tekroo.event.variant-group.candidate-submitted",
+			"tekroo.command.variant-group.record-comparison": "tekroo.event.variant-group.comparison-recorded",
+			"tekroo.command.variant-group.select":            "tekroo.event.variant-group.selected",
+		}[command.CommandType]
+		if command.CommandType == "tekroo.command.variant-group.submit-candidate" {
+			candidate, valid := variantCandidateFromPayload(command.Payload, context.EventID)
+			if !valid || command.ActorFQN == nil || command.Execution == nil || candidate.ActorFQN != *command.ActorFQN || candidate.Execution != *command.Execution {
+				return OutcomeRejectedUnauthorized, reasonUnauthorized
+			}
+		}
+		if command.CommandType == "tekroo.command.variant-group.record-comparison" && command.Authority != group.Comparator {
+			return OutcomeRejectedUnauthorized, reasonUnauthorized
+		}
+		if command.CommandType == "tekroo.command.variant-group.select" && command.Authority != group.Adjudicator {
+			return OutcomeRejectedUnauthorized, reasonUnauthorized
+		}
+		if _, valid := ApplyVariantEvent(group, DomainEvent{EventID: context.EventID, EventType: eventType, Aggregate: command.Target, AggregateRevision: snapshot.Revision + 1, CommittedAt: context.DecidedAt, Payload: command.Payload}); !valid {
+			return OutcomeRejectedPolicy, reasonPolicy
+		}
 	case "tekroo.command.story.approve-release":
 		var value struct {
 			StoryID               UUIDv7       `json:"story_id"`
@@ -197,8 +276,26 @@ func validateCommandPolicy(command KernelCommand, snapshot Snapshot, context Dec
 			return OutcomeRejectedInvalid, reasonInvalidPayload
 		}
 		related, found := snapshot.Related[subject]
-		if !found || related.State == nil || related.State.LifecycleEpoch != epoch || related.State.Phase != PhaseActive || !containsAggregatePrecondition(command.Preconditions, subject) {
+		review, reviewErr := CompletionReviewFromPayload(command.Payload)
+		if !found || related.State == nil || related.State.LifecycleEpoch != epoch || related.State.Phase != PhaseActive || !containsAggregatePrecondition(command.Preconditions, subject) || reviewErr != nil || review.Subject != subject || review.ScopeRevision != related.State.ScopeRevision {
 			return OutcomeRejectedConflict, reasonStaleLifecycleEpoch
+		}
+		if subject.Kind == AggregateTask {
+			profile, profileFound := snapshot.WorkProfiles[subject]
+			if !profileFound || !profile.Valid() || profile.Profile.Binding() != review.WorkProfile {
+				return OutcomeRejectedConflict, "STALE_WORK_PROFILE"
+			}
+		}
+		if review.VariantGroupID != nil {
+			groupRef := AggregateRef{Kind: AggregateVariantGroup, ID: *review.VariantGroupID}
+			group, groupFound := snapshot.VariantGroups[groupRef]
+			if !groupFound || group.State != VariantTerminal || group.Selection == nil || group.Selection.Outcome != VariantSelectCandidate || group.Selection.SelectedCandidateID == nil || !containsAggregatePrecondition(command.Preconditions, groupRef) || !containsDagParent(command.Causation, group.Selection.EventID, EdgeResponse) {
+				return OutcomeRejectedPolicy, reasonValidationIncomplete
+			}
+			candidate, candidateFound := group.Candidates[*group.Selection.SelectedCandidateID]
+			if !candidateFound || candidate.ArtifactDigest != review.CandidateArtifactDigest || group.WorkProfile != review.WorkProfile {
+				return OutcomeRejectedPolicy, reasonValidationIncomplete
+			}
 		}
 		key, err := CompletionReviewKeyFromPayload(command.Payload)
 		if err != nil {
@@ -219,6 +316,8 @@ func validateCommandPolicy(command KernelCommand, snapshot Snapshot, context Dec
 		branchResult.Authority = command.Authority
 		branchResult.EventID = context.EventID
 		branchResult.DecidedAt = context.DecidedAt
+		branchResult.ActorFQN = cloneActor(command.ActorFQN)
+		branchResult.Execution = cloneExecution(command.Execution)
 		if len(review.Branches) > 0 {
 			if reason := BoundedReviewResultReason(review, branchResult); reason != "" {
 				return OutcomeRejectedConflict, reason
@@ -243,7 +342,8 @@ func validateCommandPolicy(command KernelCommand, snapshot Snapshot, context Dec
 			return OutcomeRejectedInvalid, reasonInvalidEvidence
 		}
 		prior, ok := uint64Field(object, "prior_epoch")
-		if !ok || snapshot.State == nil || prior != snapshot.State.LifecycleEpoch {
+		newScopeRevision, scopeOK := uint64Field(object, "new_scope_revision")
+		if !ok || !scopeOK || snapshot.State == nil || prior != snapshot.State.LifecycleEpoch || newScopeRevision <= snapshot.State.ScopeRevision {
 			return OutcomeRejectedClosed, reasonStaleLifecycleEpoch
 		}
 	case "tekroo.command.work.create-successor":
@@ -265,7 +365,11 @@ func validateCommandPolicy(command KernelCommand, snapshot Snapshot, context Dec
 }
 
 func payloadEvidenceMatches(object map[string]any, references []EvidenceRef) bool {
-	ids, ok := uuidArrayField(object, "evidence_ids")
+	return payloadEvidenceFieldMatches(object, "evidence_ids", references)
+}
+
+func payloadEvidenceFieldMatches(object map[string]any, field string, references []EvidenceRef) bool {
+	ids, ok := uuidArrayField(object, field)
 	if !ok || len(ids) != len(references) {
 		return false
 	}
@@ -294,6 +398,15 @@ func uint64Field(object map[string]any, name string) (uint64, bool) {
 	}
 	value, err := number.Int64()
 	return uint64(value), err == nil && value > 0
+}
+
+func nonnegativeUint64Field(object map[string]any, name string) (uint64, bool) {
+	number, ok := object[name].(json.Number)
+	if !ok {
+		return 0, false
+	}
+	value, err := number.Int64()
+	return uint64(value), err == nil && value >= 0
 }
 
 func stringArrayField(object map[string]any, name string) ([]string, bool) {

@@ -35,29 +35,33 @@ const (
 )
 
 type Store struct {
-	mu                  sync.RWMutex
-	states              map[kernel.AggregateRef]kernel.AggregateState
-	revisions           map[kernel.AggregateRef]uint64
-	receipts            map[kernel.UUIDv7]kernel.CommandReceipt
-	commandBindings     map[kernel.UUIDv7]decisionIdentity
-	idempotency         map[kernel.Digest]decisionIdentity
-	events              map[kernel.UUIDv7]kernel.DomainEvent
-	executions          map[kernel.ActorFQN]kernel.ExecutionTuple
-	evidence            map[kernel.UUIDv7]kernel.EvidenceMetadata
-	authority           map[kernel.UUIDv7]kernel.AuthorityDecision
-	outbox              map[kernel.UUIDv7]kernel.OutboxIntent
-	identityConflicts   []kernel.IdentityConflictAudit
-	provenance          map[kernel.Digest]kernel.DecisionProvenance
-	authorizationPolicy kernel.AuthorizationPolicy
-	openReviews         map[kernel.CompletionReviewKey]kernel.AggregateRef
-	reviews             map[kernel.AggregateRef]kernel.CompletionReviewSnapshot
-	escalations         map[kernel.AggregateRef]kernel.EscalationSnapshot
-	escalationKeys      map[kernel.EscalationKey]kernel.AggregateRef
-	releasePlans        map[kernel.AggregateRef]kernel.ReleasePlanSnapshot
-	releasePlanKeys     map[kernel.ReleasePlanKey]kernel.AggregateRef
-	eventQualifications map[kernel.UUIDv7]string
-	attemptBudgets      map[kernel.AttemptBudgetKey]kernel.AttemptBudgetSnapshot
-	faultPoint          FaultPoint
+	mu                   sync.RWMutex
+	states               map[kernel.AggregateRef]kernel.AggregateState
+	revisions            map[kernel.AggregateRef]uint64
+	receipts             map[kernel.UUIDv7]kernel.CommandReceipt
+	commandBindings      map[kernel.UUIDv7]decisionIdentity
+	idempotency          map[kernel.Digest]decisionIdentity
+	events               map[kernel.UUIDv7]kernel.DomainEvent
+	executions           map[kernel.ActorFQN]kernel.ExecutionTuple
+	evidence             map[kernel.UUIDv7]kernel.EvidenceMetadata
+	authority            map[kernel.UUIDv7]kernel.AuthorityDecision
+	outbox               map[kernel.UUIDv7]kernel.OutboxIntent
+	identityConflicts    []kernel.IdentityConflictAudit
+	provenance           map[kernel.Digest]kernel.DecisionProvenance
+	authorizationPolicy  kernel.AuthorizationPolicy
+	openReviews          map[kernel.CompletionReviewKey]kernel.AggregateRef
+	reviews              map[kernel.AggregateRef]kernel.CompletionReviewSnapshot
+	escalations          map[kernel.AggregateRef]kernel.EscalationSnapshot
+	escalationKeys       map[kernel.EscalationKey]kernel.AggregateRef
+	releasePlans         map[kernel.AggregateRef]kernel.ReleasePlanSnapshot
+	releasePlanKeys      map[kernel.ReleasePlanKey]kernel.AggregateRef
+	eventQualifications  map[kernel.UUIDv7]string
+	attemptBudgets       map[kernel.AttemptBudgetKey]kernel.AttemptBudgetSnapshot
+	workProfiles         map[kernel.AggregateRef]kernel.WorkProfileSnapshot
+	qualifiedAssignments map[kernel.AggregateRef]kernel.QualifiedAssignmentAuthorization
+	variantGroups        map[kernel.AggregateRef]kernel.VariantGroupSnapshot
+	variantGroupKeys     map[kernel.VariantGroupKey]kernel.AggregateRef
+	faultPoint           FaultPoint
 }
 
 func (s *Store) RecordIdentityConflict(ctx context.Context, audit kernel.IdentityConflictAudit) error {
@@ -93,25 +97,29 @@ func NewStoreWithFault(point FaultPoint, policy ...kernel.AuthorizationPolicy) *
 
 func NewStore(policy ...kernel.AuthorizationPolicy) *Store {
 	store := &Store{
-		states:              make(map[kernel.AggregateRef]kernel.AggregateState),
-		revisions:           make(map[kernel.AggregateRef]uint64),
-		receipts:            make(map[kernel.UUIDv7]kernel.CommandReceipt),
-		commandBindings:     make(map[kernel.UUIDv7]decisionIdentity),
-		idempotency:         make(map[kernel.Digest]decisionIdentity),
-		events:              make(map[kernel.UUIDv7]kernel.DomainEvent),
-		executions:          make(map[kernel.ActorFQN]kernel.ExecutionTuple),
-		evidence:            make(map[kernel.UUIDv7]kernel.EvidenceMetadata),
-		authority:           make(map[kernel.UUIDv7]kernel.AuthorityDecision),
-		outbox:              make(map[kernel.UUIDv7]kernel.OutboxIntent),
-		provenance:          make(map[kernel.Digest]kernel.DecisionProvenance),
-		openReviews:         make(map[kernel.CompletionReviewKey]kernel.AggregateRef),
-		reviews:             make(map[kernel.AggregateRef]kernel.CompletionReviewSnapshot),
-		escalations:         make(map[kernel.AggregateRef]kernel.EscalationSnapshot),
-		escalationKeys:      make(map[kernel.EscalationKey]kernel.AggregateRef),
-		releasePlans:        make(map[kernel.AggregateRef]kernel.ReleasePlanSnapshot),
-		releasePlanKeys:     make(map[kernel.ReleasePlanKey]kernel.AggregateRef),
-		eventQualifications: make(map[kernel.UUIDv7]string),
-		attemptBudgets:      make(map[kernel.AttemptBudgetKey]kernel.AttemptBudgetSnapshot),
+		states:               make(map[kernel.AggregateRef]kernel.AggregateState),
+		revisions:            make(map[kernel.AggregateRef]uint64),
+		receipts:             make(map[kernel.UUIDv7]kernel.CommandReceipt),
+		commandBindings:      make(map[kernel.UUIDv7]decisionIdentity),
+		idempotency:          make(map[kernel.Digest]decisionIdentity),
+		events:               make(map[kernel.UUIDv7]kernel.DomainEvent),
+		executions:           make(map[kernel.ActorFQN]kernel.ExecutionTuple),
+		evidence:             make(map[kernel.UUIDv7]kernel.EvidenceMetadata),
+		authority:            make(map[kernel.UUIDv7]kernel.AuthorityDecision),
+		outbox:               make(map[kernel.UUIDv7]kernel.OutboxIntent),
+		provenance:           make(map[kernel.Digest]kernel.DecisionProvenance),
+		openReviews:          make(map[kernel.CompletionReviewKey]kernel.AggregateRef),
+		reviews:              make(map[kernel.AggregateRef]kernel.CompletionReviewSnapshot),
+		escalations:          make(map[kernel.AggregateRef]kernel.EscalationSnapshot),
+		escalationKeys:       make(map[kernel.EscalationKey]kernel.AggregateRef),
+		releasePlans:         make(map[kernel.AggregateRef]kernel.ReleasePlanSnapshot),
+		releasePlanKeys:      make(map[kernel.ReleasePlanKey]kernel.AggregateRef),
+		eventQualifications:  make(map[kernel.UUIDv7]string),
+		attemptBudgets:       make(map[kernel.AttemptBudgetKey]kernel.AttemptBudgetSnapshot),
+		workProfiles:         make(map[kernel.AggregateRef]kernel.WorkProfileSnapshot),
+		qualifiedAssignments: make(map[kernel.AggregateRef]kernel.QualifiedAssignmentAuthorization),
+		variantGroups:        make(map[kernel.AggregateRef]kernel.VariantGroupSnapshot),
+		variantGroupKeys:     make(map[kernel.VariantGroupKey]kernel.AggregateRef),
 	}
 	if len(policy) == 1 {
 		store.authorizationPolicy = cloneAuthorizationPolicy(policy[0])
@@ -202,6 +210,22 @@ func (s *Store) loadLocked(target kernel.AggregateRef, preconditions []kernel.Ag
 	snapshot.AttemptBudgets = make(map[kernel.AttemptBudgetKey]kernel.AttemptBudgetSnapshot, len(s.attemptBudgets))
 	for key, budget := range s.attemptBudgets {
 		snapshot.AttemptBudgets[key] = cloneAttemptBudgetSnapshot(budget)
+	}
+	snapshot.WorkProfiles = make(map[kernel.AggregateRef]kernel.WorkProfileSnapshot, len(s.workProfiles))
+	for task, profile := range s.workProfiles {
+		snapshot.WorkProfiles[task] = profile.Clone()
+	}
+	snapshot.QualifiedAssignments = make(map[kernel.AggregateRef]kernel.QualifiedAssignmentAuthorization, len(s.qualifiedAssignments))
+	for task, authorization := range s.qualifiedAssignments {
+		snapshot.QualifiedAssignments[task] = authorization.Clone()
+	}
+	snapshot.VariantGroups = make(map[kernel.AggregateRef]kernel.VariantGroupSnapshot, len(s.variantGroups))
+	for group, progress := range s.variantGroups {
+		snapshot.VariantGroups[group] = progress.Clone()
+	}
+	snapshot.VariantGroupKeys = make(map[kernel.VariantGroupKey]kernel.AggregateRef, len(s.variantGroupKeys))
+	for key, group := range s.variantGroupKeys {
+		snapshot.VariantGroupKeys[key] = group
 	}
 	return snapshot
 }
@@ -357,6 +381,11 @@ func (s *Store) Commit(ctx context.Context, expected kernel.Snapshot, decision k
 			return ErrConflict
 		}
 	}
+	for _, key := range decision.Guards.AbsentVariantKeys {
+		if _, found := s.variantGroupKeys[key]; found {
+			return ErrConflict
+		}
+	}
 	if decision.AttemptBudget != nil {
 		if err := validateAttemptBudgetCommit(s.attemptBudgets, *decision.AttemptBudget); err != nil {
 			return err
@@ -367,6 +396,14 @@ func (s *Store) Commit(ctx context.Context, expected kernel.Snapshot, decision k
 		return err
 	}
 	releaseProjections, err := s.prepareReleaseProjections(decision.Events)
+	if err != nil {
+		return err
+	}
+	capabilityProjections, err := s.prepareCapabilityProjections(decision.Events)
+	if err != nil {
+		return err
+	}
+	variantProjections, err := s.prepareVariantProjections(decision.Events)
 	if err != nil {
 		return err
 	}
@@ -395,6 +432,20 @@ func (s *Store) Commit(ctx context.Context, expected kernel.Snapshot, decision k
 		s.releasePlans[projection.reference] = projection.snapshot.Clone()
 		if projection.newKey != nil {
 			s.releasePlanKeys[*projection.newKey] = projection.reference
+		}
+	}
+	for _, projection := range capabilityProjections {
+		if projection.profile != nil {
+			s.workProfiles[projection.reference] = projection.profile.Clone()
+		}
+		if projection.authorization != nil {
+			s.qualifiedAssignments[projection.reference] = projection.authorization.Clone()
+		}
+	}
+	for _, projection := range variantProjections {
+		s.variantGroups[projection.reference] = projection.snapshot.Clone()
+		if projection.newKey != nil {
+			s.variantGroupKeys[*projection.newKey] = projection.reference
 		}
 	}
 	if decision.AttemptBudget != nil {
@@ -491,6 +542,81 @@ func (s *Store) prepareReleaseProjections(events []kernel.DomainEvent) ([]releas
 				return nil, ErrInvalidDecision
 			}
 			projections = append(projections, releaseProjection{reference: event.Aggregate, snapshot: next})
+		}
+	}
+	return projections, nil
+}
+
+type capabilityProjection struct {
+	reference     kernel.AggregateRef
+	profile       *kernel.WorkProfileSnapshot
+	authorization *kernel.QualifiedAssignmentAuthorization
+}
+
+func (s *Store) prepareCapabilityProjections(events []kernel.DomainEvent) ([]capabilityProjection, error) {
+	projections := make([]capabilityProjection, 0, len(events))
+	for _, event := range events {
+		switch event.EventType {
+		case "tekroo.event.task.work-profile-bound":
+			if event.Aggregate.Kind != kernel.AggregateTask {
+				return nil, ErrInvalidDecision
+			}
+			profile, err := kernel.WorkRiskProfileFromPayload(event.Payload)
+			if err != nil || profile.TaskID != event.Aggregate.ID {
+				return nil, ErrInvalidDecision
+			}
+			snapshot := kernel.WorkProfileSnapshot{Profile: profile, BoundEventID: event.EventID, TaskRevision: event.AggregateRevision}
+			if !snapshot.Valid() {
+				return nil, ErrInvalidDecision
+			}
+			projections = append(projections, capabilityProjection{reference: event.Aggregate, profile: &snapshot})
+		case "tekroo.event.task.qualified-assignment-authorized":
+			if event.Aggregate.Kind != kernel.AggregateTask {
+				return nil, ErrInvalidDecision
+			}
+			authorization, err := kernel.QualifiedAssignmentAuthorizationFromPayload(event.Payload, event.EventID)
+			if err != nil || authorization.TaskID != event.Aggregate.ID || authorization.ExpectedTaskRevision+1 != event.AggregateRevision {
+				return nil, ErrInvalidDecision
+			}
+			projections = append(projections, capabilityProjection{reference: event.Aggregate, authorization: &authorization})
+		}
+	}
+	return projections, nil
+}
+
+type variantProjection struct {
+	reference kernel.AggregateRef
+	snapshot  kernel.VariantGroupSnapshot
+	newKey    *kernel.VariantGroupKey
+}
+
+func (s *Store) prepareVariantProjections(events []kernel.DomainEvent) ([]variantProjection, error) {
+	projections := make([]variantProjection, 0, len(events))
+	for _, event := range events {
+		switch event.EventType {
+		case "tekroo.event.variant-group.opened":
+			if event.Aggregate.Kind != kernel.AggregateVariantGroup || event.AggregateRevision != 1 {
+				return nil, ErrInvalidDecision
+			}
+			group, err := kernel.VariantGroupFromOpenPayload(event.Payload, event.EventID)
+			if err != nil || group.VariantGroupID != event.Aggregate.ID {
+				return nil, ErrInvalidDecision
+			}
+			key := group.Key()
+			if _, exists := s.variantGroupKeys[key]; exists {
+				return nil, ErrConflict
+			}
+			projections = append(projections, variantProjection{reference: event.Aggregate, snapshot: group, newKey: &key})
+		case "tekroo.event.variant-group.candidate-submitted", "tekroo.event.variant-group.comparison-recorded", "tekroo.event.variant-group.selected":
+			current, found := s.variantGroups[event.Aggregate]
+			if !found || current.Revision+1 != event.AggregateRevision {
+				return nil, ErrInvalidDecision
+			}
+			next, valid := kernel.ApplyVariantEvent(current, event)
+			if !valid || next.Revision != event.AggregateRevision {
+				return nil, ErrInvalidDecision
+			}
+			projections = append(projections, variantProjection{reference: event.Aggregate, snapshot: next})
 		}
 	}
 	return projections, nil
