@@ -11,7 +11,7 @@
   "acceptedManifestSHA256": "c618371d571d5333aebd2bdc83d2db2559115f5ec3e1903b33e8e0ab157edf5d",
   "executionIdentity": {
     "path": "investigations/sma-q1/step-15-execution-identity-v2.json",
-    "sha256": "02fcc27167868cab09108f7c81dd419ddabd9ba21b7c4370f185519efdd5cd9a"
+    "sha256": "67668b7afe3710ce0a39fa7d76226e12d89c2b1e92baca6f253d3a08d49ee683"
   },
   "supersedes": {
     "artifact": "OUTPUT/phase-3/step-15-preexecution-gate.json",
@@ -78,5 +78,5 @@
   ],
   "nextGate": "Obtain and record an exclusive runtime window, repeat mutable identity and namespace checks, install observers, and then begin scenario 1 without changing the frozen corpus.",
   "reportDigestMethod": "SHA-256 of RFC-8785-compatible sorted-key compact JSON with reportSha256 set to the empty string",
-  "reportSha256": "0fd1cd1cc8c78e1a8cbec5bead543ce9aaa4a976731851dc241c2df5c90cbd61"
+  "reportSha256": "5c36e176b7fe48bfaa065c45c2cb8a98edd4589c2b0b21919db93dc1cb1c055e"
 }

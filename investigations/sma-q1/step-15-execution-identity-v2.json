@@ -16,8 +16,8 @@
     "manifest": "investigations/sma-q1/preregistration-native-v2.json",
     "manifestSHA256": "c618371d571d5333aebd2bdc83d2db2559115f5ec3e1903b33e8e0ab157edf5d",
     "acceptedAtTeamsCommit": "e105abb9215358df3470a6d295c1dd6afca6e5bb",
-    "currentTeamsCommit": "c0e0bf274397fb425567510e69b8f25dc5c3a1a4",
-    "currentTeamsTree": "4c7b2e84005239fc842f967437d83e496855b3fd",
+    "captureBaselineTeamsCommit": "c0e0bf274397fb425567510e69b8f25dc5c3a1a4",
+    "captureBaselineTeamsTree": "4c7b2e84005239fc842f967437d83e496855b3fd",
     "scenarioCorpusSHA256": "68125ee6cff1c2a594d6dc3b402eb498f90525dca7fd2892656e22777b94c9bc",
     "syntheticMemoryCorpusSHA256": "eed730c6f28a311955275af35b91becc81063087b9a9c8d9c16c00be5091706c",
     "scenarioCount": 18,
@@ -202,5 +202,5 @@
     ]
   },
   "reportDigestMethod": "SHA-256 of RFC-8785-compatible sorted-key compact JSON with reportSha256 set to the empty string",
-  "reportSha256": "85f44ddc0e9ba54e7006a2e4aa9fe9a3a9821568b57199af546991f870bca3ae"
+  "reportSha256": "7a0b1e72696fc3433357d26e1df05634dc4dd8d800d5bb59cda489aa467d5e95"
 }
