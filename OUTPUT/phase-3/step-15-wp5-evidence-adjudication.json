@@ -1,0 +1,56 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "WP5_EVIDENCE_ELIGIBILITY_ADJUDICATION",
+  "recordedOn": "2026-08-13",
+  "manifest": "investigations/sma-q1/preregistration-native-v2.json",
+  "manifestSHA256": "c618371d571d5333aebd2bdc83d2db2559115f5ec3e1903b33e8e0ab157edf5d",
+  "sources": [
+    {
+      "repository": "/Users/paul/work/tekroo-ai/sma",
+      "artifact": "docs/WP5_GATE5_RECEIPT.md",
+      "acceptedCommit": "df1fa34a58ad845ad17a5f61e8c2b7aa2d8ce20d"
+    },
+    {
+      "repository": "/Users/paul/work/tekroo-ai/sma",
+      "artifact": "docs/PRE_Q1_LATENCY_REMEDIATION_RECEIPT.json",
+      "artifactSHA256": "1dd97fb7764be78f436ffaacc48535f205cef63f80affcb114721bd492d1cb01",
+      "acceptedCommit": "0f2556f87f2985664ecd8d84cf26da5aafd40d0a"
+    }
+  ],
+  "eligibilityRule": "Evidence is reusable only when it names the exact accepted manifest digest and matches the frozen scenario ID, prompt, fault, expected result, repetition count, identities, thresholds, and raw-receipt method.",
+  "observations": {
+    "manifestDigestReferencesInSMAQ1Evidence": 0,
+    "exactSMAQ1NScenarioReceipts": 0,
+    "genericWP5PassAcceptedAsQ1": false,
+    "preQ1RemediationAcceptedAsQ1": false
+  },
+  "scenarioResults": [
+    {"id":"SMAQ1N-001-FIRST-PROMPT-EMPTY","repetitions":10,"status":"NOT_RUN"},
+    {"id":"SMAQ1N-002-SAME-PARTITION-RECALL","repetitions":10,"status":"NOT_RUN"},
+    {"id":"SMAQ1N-003-CROSS-PARTITION-DENIAL","repetitions":10,"status":"NOT_RUN"},
+    {"id":"SMAQ1N-004-CURRENT-INSTRUCTION-PRECEDENCE","repetitions":5,"status":"NOT_RUN"},
+    {"id":"SMAQ1N-005-RAW-INELIGIBLE","repetitions":3,"status":"NOT_RUN"},
+    {"id":"SMAQ1N-006-DUPLICATE-EVENT-CAPTURE","repetitions":3,"status":"NOT_RUN"},
+    {"id":"SMAQ1N-007-RETRIEVAL-OUTAGE","repetitions":5,"status":"NOT_RUN"},
+    {"id":"SMAQ1N-008-CAPTURE-OUTAGE-RECONCILIATION","repetitions":5,"status":"NOT_RUN"},
+    {"id":"SMAQ1N-009-ADDITIONAL-CONTEXT-INTEGRITY","repetitions":5,"status":"NOT_RUN"},
+    {"id":"SMAQ1N-010-HOOK-DEADLINE-AND-MALFORMED","repetitions":5,"status":"NOT_RUN"},
+    {"id":"SMAQ1N-011-PARENT-CHILD-PROVENANCE","repetitions":5,"status":"NOT_RUN"},
+    {"id":"SMAQ1N-012-RESTART-PARTITION-CONTINUITY","repetitions":3,"status":"NOT_RUN"},
+    {"id":"SMAQ1N-013-FOUR-CHANNEL-CONCURRENCY","repetitions":5,"status":"NOT_RUN"},
+    {"id":"SMAQ1N-014-FEEDBACK-LOOP-PREVENTION","repetitions":3,"status":"NOT_RUN"},
+    {"id":"SMAQ1N-015-SECRET-QUARANTINE","repetitions":3,"status":"NOT_RUN"},
+    {"id":"SMAQ1N-016-EMPTY-RESULT","repetitions":10,"status":"NOT_RUN"},
+    {"id":"SMAQ1N-017-OVERSIZED-CONTEXT-BOUND","repetitions":3,"status":"NOT_RUN"},
+    {"id":"SMAQ1N-018-CONDENSATION-REANCHOR","repetitions":3,"status":"NOT_RUN"}
+  ],
+  "totals": {
+    "scenarios": 18,
+    "repetitions": 96,
+    "eligibleFromWP5": 0,
+    "notRunScenarios": 18,
+    "notRunRepetitions": 96,
+    "executedDuringAdjudication": 0
+  },
+  "decision": "ALL_18_REMAIN_NOT_RUN"
+}

@@ -1,0 +1,127 @@
+{
+  "schemaVersion": "1.0.0",
+  "reportType": "PHASE_3_STEP_15_SMA_Q1_PREEXECUTION_GATE",
+  "status": "NO_GO_SMA_BOUND_REMEDIATION_REQUIRED",
+  "resultClaim": "NONE",
+  "executionState": "NOT_STARTED",
+  "executionAuthorized": false,
+  "scenarioExecutions": 0,
+  "scenarioRepetitionsRemaining": 96,
+  "acceptedManifestSHA256": "c618371d571d5333aebd2bdc83d2db2559115f5ec3e1903b33e8e0ab157edf5d",
+  "acceptedSMACommit": "0f2556f87f2985664ecd8d84cf26da5aafd40d0a",
+  "acceptedSMATree": "5d3badc0666249440ec51b6a1cde9bc819a9f95c",
+  "assertions": [
+    {
+      "id": "STEP15-PREFLIGHT-001-SMA-IMMUTABLE",
+      "status": "PASS",
+      "classification": "OBSERVED",
+      "evidence": [
+        "SMA HEAD and origin/master both equal 0f2556f87f2985664ecd8d84cf26da5aafd40d0a.",
+        "SMA worktree status is clean.",
+        "The sealed receipt SHA-256 is 1dd97fb7764be78f436ffaacc48535f205cef63f80affcb114721bd492d1cb01."
+      ]
+    },
+    {
+      "id": "STEP15-PREFLIGHT-002-WP5-EVIDENCE-FENCE",
+      "status": "PASS",
+      "classification": "COMPUTED_FROM_FROZEN_RULE",
+      "evidence": [
+        "OUTPUT/phase-3/step-15-wp5-evidence-adjudication.json"
+      ],
+      "evidenceFloor": "Zero WP5 receipt qualifies; all 18 scenarios and 96 repetitions remain NOT_RUN."
+    },
+    {
+      "id": "STEP15-PREFLIGHT-003-IDENTITY-CAPTURE",
+      "status": "PASS_CANDIDATE_ONLY",
+      "classification": "OBSERVED_AND_COMPUTED",
+      "evidence": [
+        "investigations/sma-q1/step-15-execution-identity-candidate.json"
+      ],
+      "qualification": "The candidate content-addresses the current runtime but is explicitly invalidated for execution because SMA source must change."
+    },
+    {
+      "id": "STEP15-PREFLIGHT-004-INBOUND-REQUEST-BOUND",
+      "status": "FAIL",
+      "classification": "OBSERVED",
+      "evidence": [
+        "The frozen manifest sets maximumInboundBridgeRequestBytes=1048576 and unboundedRequestResponseContextOrQueueCount=0.",
+        "Accepted SMA OpenHandsBridgeServer.java:498-499 reads the complete InputStream with Scanner and delimiter \\A without a byte cap."
+      ]
+    },
+    {
+      "id": "STEP15-PREFLIGHT-005-WORK-QUEUE-BOUND",
+      "status": "FAIL",
+      "classification": "OBSERVED",
+      "evidence": [
+        "The frozen manifest sets maximumConcurrentChannels=4, maximumQueuedOperations=8, and unboundedRequestResponseContextOrQueueCount=0.",
+        "Accepted SMA OpenHandsBridgeServer.java:210-211 constructs cached work and HTTP executors without the frozen fixed worker/queue limits or rejection telemetry."
+      ]
+    },
+    {
+      "id": "STEP15-PREFLIGHT-006-EXISTING-BOUNDS",
+      "status": "PASS",
+      "classification": "OBSERVED",
+      "evidence": [
+        "Accepted SMA source limits selected memories to 3, context to 4096 characters, and service time to 500 ms.",
+        "Those values are within the frozen maxima of 5 memories, 10000 characters, and 500 ms."
+      ]
+    },
+    {
+      "id": "STEP15-PREFLIGHT-007-AGENT-BINDING",
+      "status": "PASS_WITH_EXECUTION_RECHECK",
+      "classification": "OBSERVED",
+      "evidence": [
+        "The existing local-qwen3.6-35b-a3b-q8 Agent Profile is dangling and excluded.",
+        "The qwen3.6-fast secret-free API projection resolves to ollama_chat/qwen3.6:35b-a3b-q8_0 and SHA-256 a035211dc914b0c3a68dff434017c7b6f79a42b78c1af178bbb571f5ff3aed2b."
+      ],
+      "requiredRecheck": "Resolve direct agent_settings and re-match the secret-free projection after SMA remediation and before scenario 1."
+    },
+    {
+      "id": "STEP15-PREFLIGHT-008-NO-EXPERIMENT",
+      "status": "PASS",
+      "classification": "OBSERVED",
+      "evidenceFloor": "No SMAQ1N prompt, fault, scenario, or repetition was executed or claimed."
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "OUTPUT/phase-3/step-15-readiness.json",
+      "sha256": "a2e4d852e58d6f3111e8130d2501e5229b2acf516d3a47f1748127b167ba21ee"
+    },
+    {
+      "path": "OUTPUT/phase-3/step-15-wp5-evidence-adjudication.json",
+      "sha256": "e477c472db9fc72d70f2b86e8d47ff76a63785db1d76b0197f15a745906d1505"
+    },
+    {
+      "path": "investigations/sma-q1/step-15-execution-identity-candidate.json",
+      "sha256": "9bf63729cc8375b6a66dfac7766d4db70e4c78bb9b6e8ef7b708a57adb56cec0"
+    },
+    {
+      "path": "docs/architecture/019-step-15-readiness-and-wp5-alignment.md",
+      "sha256": "cb7a563214e25504dac6e84175d7f4a307713c440d0730f010fdb9a08e9f5748"
+    }
+  ],
+  "validation": {
+    "goTest": {
+      "command": "go test ./...",
+      "exitCode": 0,
+      "testCasesPassed": 405,
+      "testFailures": 0
+    },
+    "goVet": {
+      "command": "go vet ./...",
+      "exitCode": 0
+    },
+    "gitDiffCheck": {
+      "command": "git diff --check",
+      "exitCode": 0
+    },
+    "jsonDocumentsParsed": 4,
+    "duplicateJsonKeys": 0,
+    "scenarioIdsMatchedFrozenOrder": true,
+    "scenarioRepetitionTotalMatched": true
+  },
+  "nextGate": "Accept a bounded SMA resource-bound remediation, then repeat Step 15 preexecution identity capture and source inspection before requesting experiment authorization.",
+  "reportDigestMethod": "SHA-256 of canonical compact JSON with reportSha256 set to the empty string",
+  "reportSha256": "a310652e4ce02e8247fd04643daf522b09be587593cc79e0827f6d912221ca78"
+}

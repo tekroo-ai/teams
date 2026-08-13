@@ -1,69 +1,92 @@
 {
-  "schemaVersion": "1.0.0",
+  "schemaVersion": "2.0.0",
   "recordType": "STEP_READINESS_ASSESSMENT",
-  "recordedOn": "2026-08-12",
+  "recordedOn": "2026-08-13",
   "timePrecision": "DAY",
   "step": "STEP_15_SMA_Q1_NATIVE_EXECUTION_AND_ADJUDICATION",
-  "status": "WAITING_FOR_WP5_ALIGNMENT_AND_GATE5",
+  "status": "NO_GO_SMA_BOUND_REMEDIATION_REQUIRED",
+  "supersedes": {
+    "localCommit": "010dcba3bafca5b801028c517c4e2a48493c0e59",
+    "reason": "The prior local readiness record observed WP5 before completion. WP5, pre-Q1 remediation, evidence sealing, and new source-level preflight evidence now exist."
+  },
   "executionStarted": false,
   "scenarioExecutions": 0,
-  "authorityInterpretation": "The principal authorized progression to the next step. This does not waive the already accepted prerequisites or transform an active WP5 work package into accepted evidence.",
+  "scenarioResultClaim": "NONE",
   "acceptedPrerequisite": {
     "teamsCommit": "e105abb9215358df3470a6d295c1dd6afca6e5bb",
     "teamsTree": "ec126279b92ec46ed8c0237e41c625673d747c34",
     "manifest": "investigations/sma-q1/preregistration-native-v2.json",
-    "manifestSHA256": "c618371d571d5333aebd2bdc83d2db2559115f5ec3e1903b33e8e0ab157edf5d"
+    "manifestSHA256": "c618371d571d5333aebd2bdc83d2db2559115f5ec3e1903b33e8e0ab157edf5d",
+    "scenarioCorpusSHA256": "68125ee6cff1c2a594d6dc3b402eb498f90525dca7fd2892656e22777b94c9bc",
+    "syntheticMemoryCorpusSHA256": "eed730c6f28a311955275af35b91becc81063087b9a9c8d9c16c00be5091706c"
   },
-  "observedSMAState": {
+  "acceptedSMAState": {
     "repository": "/Users/paul/work/tekroo-ai/sma",
-    "baselineCommit": "d5d49ca18d5845b4ba172cf169d4d7b196c5b38d",
-    "baselineTree": "5f2ccb3734be6ae36d194ddabc91df4b002c90a2",
-    "taskStatus": "WP5 active; exact next action WP5-A1",
-    "gate5ReceiptObserved": false,
-    "wp5ExecutionDocument": "docs/WP5_EXECUTION.md",
-    "wp5ExecutionDocumentSHA256": "86ff3c0a187c550f00f9c9e27bd60409bdcbe95a063f1f55ad88e79c12da4e84",
-    "worktreeChangesObserved": [
-      "M TASK_STATUS.md",
-      "M docs/OPENHANDS_SMA_INTEGRATION_PLAN.md",
-      "?? docs/WP5_EXECUTION.md"
-    ]
+    "wp5Commit": "df1fa34a58ad845ad17a5f61e8c2b7aa2d8ce20d",
+    "wp5Tree": "9b79141020344bb85ccdd6bf0b7d13ed985a00cf",
+    "remediationCommit": "0924b0e9c1f7dc95e21dd70ea02673bffc594da2",
+    "remediationTree": "edc50f4eac81868f11e814221a1fc5921dc0671a",
+    "evidenceSealCommit": "0f2556f87f2985664ecd8d84cf26da5aafd40d0a",
+    "evidenceSealTree": "5d3badc0666249440ec51b6a1cde9bc819a9f95c",
+    "originMasterMatched": true,
+    "worktreeClean": true,
+    "sealedReceiptSHA256": "1dd97fb7764be78f436ffaacc48535f205cef63f80affcb114721bd492d1cb01"
   },
-  "alignmentFindings": [
-    {
-      "id": "STEP15-READY-001-MANIFEST-REFERENCE",
-      "classification": "OBSERVED",
-      "status": "OPEN",
-      "finding": "The current WP5 execution document does not reference the accepted native Q1 manifest, its SHA-256 digest, or any SMAQ1N scenario identifier.",
-      "requiredResolution": "Before a measured WP5 pass intended for Q1 reuse, the WP5 receipt protocol must name the exact manifest digest and scenario identifiers."
+  "wp5EvidenceAdjudication": {
+    "artifact": "OUTPUT/phase-3/step-15-wp5-evidence-adjudication.json",
+    "eligibleScenarioCount": 0,
+    "notRunScenarioCount": 18,
+    "notRunRepetitions": 96,
+    "reason": "No WP5 or remediation receipt names the frozen manifest digest and matches the exact prompt, fault, expected result, repetition count, and measurement method."
+  },
+  "sourcePreflight": {
+    "classification": "OBSERVED",
+    "frozenBounds": {
+      "unboundedRequestResponseContextOrQueueCount": 0,
+      "maximumInboundBridgeRequestBytes": 1048576,
+      "maximumConcurrentChannels": 4,
+      "maximumQueuedOperations": 8
     },
-    {
-      "id": "STEP15-READY-002-REPETITION-MATCH",
-      "classification": "OBSERVED",
-      "status": "OPEN",
-      "finding": "The WP5 work-package counts are not the frozen per-scenario Q1 repetition counts: examples include one first-prompt pass, one live adversarial prompt, at least 20 warm hits and misses, three contention rounds, and one restart sequence.",
-      "requiredResolution": "Either execute and label the exact frozen repetitions within WP5 or classify the corresponding Q1 scenarios NOT_RUN; do not infer exact coverage from a semantically similar WP5 pass."
-    },
-    {
-      "id": "STEP15-READY-003-GATE5",
-      "classification": "OBSERVED",
-      "status": "OPEN",
-      "finding": "WP5 is active at WP5-A1 and no WP5 Gate 5 receipt was observed.",
-      "requiredResolution": "Complete WP5 through an accepted Gate 5 receipt and freeze the accepted SMA implementation as a clean immutable commit and tree."
-    },
-    {
-      "id": "STEP15-READY-004-EVIDENCE-ADJUDICATION",
-      "classification": "INFERRED_FROM_ACCEPTED_RULES",
-      "status": "PENDING",
-      "finding": "No WP5 scenario can presently be credited to SMA-Q1-v2 because the required exact evidence mapping and accepted Gate 5 receipt do not yet exist.",
-      "requiredResolution": "After Gate 5 acceptance, adjudicate each of the eight potentially eligible scenarios individually and retain the other ten for Step 15 execution."
+    "acceptedSource": "src/main/java/ai/tekroo/sma/openhands/OpenHandsBridgeServer.java",
+    "findings": [
+      {
+        "id": "STEP15-BLOCK-001-INBOUND-BODY",
+        "status": "OPEN",
+        "classification": "OBSERVED",
+        "lines": [498, 499],
+        "finding": "The bridge Scanner consumes the full request body using a beginning-to-end delimiter with no byte cap.",
+        "contractConflict": "The frozen maximumInboundBridgeRequestBytes is 1,048,576 and the permitted unbounded count is zero."
+      },
+      {
+        "id": "STEP15-BLOCK-002-EXECUTOR-BOUND",
+        "status": "OPEN",
+        "classification": "OBSERVED",
+        "lines": [210, 211],
+        "finding": "Both bridge work and HTTP executors are cached thread pools rather than a fixed four-worker executor with a bounded queue and rejection telemetry.",
+        "contractConflict": "The frozen maximumConcurrentChannels is four, maximumQueuedOperations is eight, and the permitted unbounded count is zero."
+      }
+    ],
+    "alreadyConformingBounds": {
+      "maximumInjectedMemories": 3,
+      "maximumInjectedContextCharacters": 4096,
+      "contextServiceHardDeadlineMilliseconds": 500
     }
-  ],
-  "nextAuthorizedActionWithinTeams": "Receive the immutable accepted Gate 5 package, validate exact WP5 evidence eligibility against the accepted manifest, and generate the final Step 15 execution manifest for only the scenarios still NOT_RUN.",
+  },
+  "openHandsProfileFinding": {
+    "classification": "OBSERVED",
+    "storedProfile": "local-qwen3.6-35b-a3b-q8",
+    "materializationValid": false,
+    "error": "LLM profile 'ollama-qwen3.6-35b-a3b-q8' not found",
+    "executionPlan": "Do not use the dangling stored Agent Profile. Resolve direct agent_settings from the existing qwen3.6-fast LLM profile and verify its secret-free projection digest before scenario 1.",
+    "qwenFastSecretFreeProjectionSHA256": "a035211dc914b0c3a68dff434017c7b6f79a42b78c1af178bbb571f5ff3aed2b"
+  },
+  "identityCandidate": "investigations/sma-q1/step-15-execution-identity-candidate.json",
+  "nextRequiredAction": "Complete a bounded SMA remediation that enforces the one-MiB request limit and a four-worker/eight-queue execution boundary with observable rejection and fail-open behavior; then re-freeze every changed SMA artifact and repeat read-only Step 15 preflight.",
   "forbiddenUntilReady": [
-    "Claiming that WP5 or SMA-Q1 passed.",
-    "Counting a generic Gate 5 PASS as exact SMA-Q1 evidence.",
-    "Executing the ten Step-15-reserved scenarios.",
-    "Executing any of the eight WP5-eligible scenarios whose exact evidence status is still unknown.",
-    "Authorizing OpenHands-Q1, SMA-Q2, global enablement, production rollout, or historical migration."
+    "Executing any SMAQ1N scenario or repetition.",
+    "Claiming that SMA-Q1 passed or failed.",
+    "Changing any frozen prompt, fault, expected result, repetition, threshold, or evidence rule.",
+    "Treating the current identity candidate as the final execution identity after SMA source changes.",
+    "Authorizing OpenHands-Q1, SMA-Q2, global rollout, workspace expansion, or historical-memory backfill."
   ]
 }
