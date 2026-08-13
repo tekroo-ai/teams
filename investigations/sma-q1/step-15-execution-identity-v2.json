@@ -1,0 +1,206 @@
+{
+  "schemaVersion": "2.0.0",
+  "recordType": "SMA_Q1_EXECUTION_IDENTITY",
+  "recordedOn": "2026-08-13",
+  "timePrecision": "DAY",
+  "status": "SEALED_READY_PENDING_EXCLUSIVE_RUNTIME_WINDOW",
+  "executionAuthorized": true,
+  "executionStarted": false,
+  "scenariosExecuted": 0,
+  "supersedes": {
+    "artifact": "investigations/sma-q1/step-15-execution-identity-candidate.json",
+    "effect": "SUPERSEDED_FOR_FUTURE_EXECUTION_ONLY",
+    "preservation": "The earlier candidate remains an accurate invalidated pre-remediation receipt."
+  },
+  "frozenExperiment": {
+    "manifest": "investigations/sma-q1/preregistration-native-v2.json",
+    "manifestSHA256": "c618371d571d5333aebd2bdc83d2db2559115f5ec3e1903b33e8e0ab157edf5d",
+    "acceptedAtTeamsCommit": "e105abb9215358df3470a6d295c1dd6afca6e5bb",
+    "currentTeamsCommit": "c0e0bf274397fb425567510e69b8f25dc5c3a1a4",
+    "currentTeamsTree": "4c7b2e84005239fc842f967437d83e496855b3fd",
+    "scenarioCorpusSHA256": "68125ee6cff1c2a594d6dc3b402eb498f90525dca7fd2892656e22777b94c9bc",
+    "syntheticMemoryCorpusSHA256": "eed730c6f28a311955275af35b91becc81063087b9a9c8d9c16c00be5091706c",
+    "scenarioCount": 18,
+    "repetitionCount": 96,
+    "executionState": "NOT_RUN"
+  },
+  "sma": {
+    "executionWorktree": "/Users/paul/work/tekroo-ai/sma-step15",
+    "detachedCommit": "60a966234166ea75f767b25e3cbb7eaabe4064a2",
+    "detachedTree": "7aaa06a68d59dd6f13b0a3a2c6ae3cff845c1121",
+    "sourceFixCommit": "ea70423a9bf9b9ecd01091736b8a0720fbdb4644",
+    "sourceFixTree": "209a6371c2336d9f88c792b18dc5a5c8c50ab442",
+    "closureEvidenceCommit": "a444ba8b941cd56bfc0cb2f52458f38ec01a2085",
+    "closureEvidenceTree": "03028f159660488f7b31b15e54bfb3dbcfe739cb",
+    "worktreeClean": true,
+    "mavenVerifyExitCode": 0,
+    "artifacts": {
+      "serviceJarSHA256": "1892ab3b1468ebbc62b922c116965b3d42af1a754cde006b23b57a431460618c",
+      "rootPomSHA256": "998b00e30f7c21d72d3fec31da6b0d0db3699947106e968efccb2f1baaef150a",
+      "hookConfigSHA256": "c689320fbc54149d01d56c35c51cdb1b650ac7a9f0b29f76c18982f05c210a31",
+      "hookAdapterSHA256": "e50005e82ac6de4aa11efd552cbf1586a764dbf09fc6fd617cc462ba73b0d3d9",
+      "nativeHookProbeSHA256": "85b6b7b9c3f95e19face4dcfe000663dc2da4cd80b2ab44537bd79f8135b598d",
+      "keyFileWrapperSHA256": "4efe247ce41524d502de55a98368aa344a58b22e1029d5eec0f96022e736480f"
+    },
+    "preQ1Closure": {
+      "runId": "12cd48b4d9204f0f8608c245530f67e1",
+      "decision": "PASS_GO",
+      "receiptSHA256": "752645cf6bdbaa8836b8304b090de1113006e9a27b5aeed803a4e376b1cc5ddb",
+      "journalSHA256": "8220f177464caf1b3f2245f4d52d525a7b84df9152e1e8b1582eb0eeeda53093",
+      "auditCount": 31,
+      "terminalCount": 31,
+      "maximumApplicableExternalLatencyMilliseconds": 353.703125,
+      "qualifiesQ1ScenarioCredit": false
+    },
+    "verifiedBounds": {
+      "maximumInboundRequestBytes": 1048576,
+      "maximumActiveContextOperations": 4,
+      "maximumQueuedContextOperations": 8,
+      "maximumInjectedMemories": 3,
+      "maximumInjectedContextCharacters": 4096,
+      "bridgeServiceBudgetMilliseconds": 500,
+      "hookTimeoutMilliseconds": 1000
+    }
+  },
+  "openHands": {
+    "sdkVersion": "1.40.1",
+    "sourceRoot": "/Users/paul/.local/src/openhands-software-agent-sdk-1.40.1-parallel",
+    "baseCommit": "1af605e7044a8c18ede6cc545a43d16849e778d9",
+    "baseTree": "6a2a1a3456a7a2b364a20a93c078fc99cbe79d09",
+    "worktreeModified": true,
+    "gitStatusLineCount": 13,
+    "gitStatusSHA256": "c05c0b1a63994d826eb3da522406f6c0792c94a8cf947cebc9849348b310ca80",
+    "gitBinaryDiffSHA256": "3606d3ca28eb5feac312a26be3c1a784df6821f09dea3fdc395ec37beeb14cc6",
+    "runtimeCodeDigest": {
+      "algorithm": "SHA-256 over sorted POSIX relative paths with unsigned big-endian 64-bit path length, path bytes, content length, and content bytes; excludes __pycache__ and pyc",
+      "fileCount": 478,
+      "byteCount": 5314420,
+      "sha256": "748770023bfd43ab78a36e205eff8b464a58615154555f8e2ec5e1ddc3994fe4"
+    },
+    "dependencyLocks": {
+      "uvLockSHA256": "2522dec69ec862071bfe02271679314c3b330fb69a5dbc37c0c96cfcd3d0a1d2",
+      "pyprojectSHA256": "6ddf2465f2b0a7dc927af912709606337c798f56023ce10ca63ad0897572661b"
+    },
+    "health": {
+      "agentCanvas": "ok",
+      "agentServer": "ok"
+    },
+    "executionAgentBinding": {
+      "method": "DIRECT_AGENT_SETTINGS_FROM_PINNED_LLM_PROFILE",
+      "profile": "qwen3.6-fast",
+      "secretFreeProjectionMethod": "SHA-256 of sorted-key compact JSON over the profile API response after removing config.api_key; null fields retained",
+      "secretFreeProjectionSHA256": "ad5a617ddbf10d60e26cd220e692b5e22fc22d8094453272c4bc6f95af5c610a",
+      "apiKeySet": true,
+      "secretValueExcluded": true,
+      "model": "ollama_chat/qwen3.6:35b-a3b-q8_0",
+      "baseUrl": "http://127.0.0.1:11434",
+      "stream": false,
+      "think": false,
+      "reasoningEffort": "none",
+      "maximumInputTokens": 245760,
+      "maximumOutputTokens": 16384,
+      "partitionProfileComponent": "default",
+      "requiredRecheck": "Recompute this projection immediately before scenario 1 without persisting the API key."
+    },
+    "agentCanvas": {
+      "version": "1.12.0",
+      "packageJsonSHA256": "37f3c8f34d87a782c2db5b213c400ddb73daa9c8f8b2cc023bde5c93240a9c9d",
+      "entrypointSHA256": "133e26fb65434ddac2eee471bfc56cb8144c92452241aacd627a8cbcfde277e6",
+      "canvasToolSHA256": "dff26fb7a5b71231a417d70bde7131ce73cfc0c6cf373709a2319a694bffc97b",
+      "launchAgentSHA256": "db1e27ec052586c583f491b38c6459dd0705b9c242598d9ecec27942b639a52d",
+      "nodeVersion": "v26.7.0",
+      "nodeSHA256": "1ef99ea25fe70c9b67e7efe768ef8ee22148d3cabc703db6131b57aeb617d040"
+    }
+  },
+  "ollama": {
+    "version": "0.32.6",
+    "binarySHA256": "d771b29f029f0bd3a83755fb31e8c274699090141b6e93bcae08ee965e4122a0",
+    "launchAgentSHA256": "83722fc157c16647898249ab35fac06afe3fb0961e4eea202fe42d0ab0abd446",
+    "configuration": {
+      "host": "127.0.0.1:11434",
+      "contextLength": 262144,
+      "generalParallelism": 4,
+      "embeddingParallelism": 4,
+      "maximumLoadedModels": 3,
+      "keepAlive": "120m",
+      "flashAttention": true,
+      "kvCacheType": "q8_0"
+    },
+    "models": [
+      {
+        "name": "qwen3.6:35b-a3b-q8_0",
+        "manifestSHA256": "0218f872e86baa9c7610509f27db36a7bc52eea7afee24688f81ca74ffcb6c77",
+        "verifiedBlobSHA256": [
+          "f6c59ae62e44b9337c0c08f0597f69bf92a6e74afa9404725dea659a4560e2f2",
+          "7d8298ddcbce81ae5b237e42cd551db8352cf362564caa826b5ded02041fdfeb",
+          "5f3a3c817e78f5b8a4ad2d2c458a3e4b2cce470d6c12642c4eeb12cb8a9bf51d",
+          "86eff881e8d2c1caa3966ba775d007f76a693d8541d0973b1bd2aab4214a43"
+        ]
+      },
+      {
+        "name": "nomic-embed-text:v1.5",
+        "manifestSHA256": "0a109f422b47e3a30ba2b10eca18548e944e8a23073ee3f3e947efcf3c45e59f",
+        "verifiedBlobSHA256": [
+          "31df23ea7daa448f9ccdbbcecce6c14689c8552222b80defd3830707c0139d4f",
+          "970aa74c0a90ef7482477cf803618e776e173c007bf957f635f1015bfcfef0e6",
+          "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+          "ce4a164fc04605703b485251fe9f1a181688ba0eb6badb80cc6335c0de17ca0d"
+        ]
+      }
+    ]
+  },
+  "stores": {
+    "mongodb": {
+      "version": "8.3.4",
+      "gitVersion": "4b03e7daaa316c78b9bf433046dba81637d581c0",
+      "binarySHA256": "bf04491267299922930682f31cfc3dec4651b15b68b7e55007e9af1091ae99ba",
+      "configSHA256": "e3267164a4251fa9d5b3939290a5d18adfc85e6843549d8d2b415d159abb1147",
+      "launchAgentSHA256": "f902445426cbfcd01b4ddde225121865529918be4db76bb527f01fdc319940d9"
+    },
+    "qdrant": {
+      "version": "1.18.2",
+      "commit": "44ad62f8cd69642be5afa6441612525e24a0d063",
+      "binarySHA256": "835a9fd475f70c674df61bd5f453fb976e17cb35e3d827296db895ba92f4a3f5",
+      "launchAgentSHA256": "79cdc631cdbbd2ce149985b76b3e2a62ecd325bacdb5a538f62f8b7172519f1a"
+    }
+  },
+  "host": {
+    "operatingSystem": "macOS 26.5.2",
+    "build": "25F84",
+    "architecture": "arm64",
+    "javaVersion": "Temurin 21.0.12+8 LTS",
+    "javaBinarySHA256": "2579f3ee229a109fbcfb4c61f2b31091a70ad66968a078f725f6b4dd46f9668f",
+    "goVersion": "go1.26.4"
+  },
+  "plannedIsolation": {
+    "runId": "sma-q1n-step15-20260813-v2",
+    "mongodbDatabase": "sma_q1n_step15_20260813_v2",
+    "semanticCollection": "sma_sem_q1n_step15_20260813_v2",
+    "episodicCollection": "sma_epi_q1n_step15_20260813_v2",
+    "actorAlphaWorkspace": "/Users/paul/work/tekroo-ai/teams/target/sma-q1n-step15-20260813-v2/actor-alpha",
+    "actorBetaWorkspace": "/Users/paul/work/tekroo-ai/teams/target/sma-q1n-step15-20260813-v2/actor-beta",
+    "actorAlphaPartition": "openhands:8599823037dc8791a0192772:default",
+    "actorBetaPartition": "openhands:1928f6004e21ab6f1ce137a1:default",
+    "preflightObservedAbsent": {
+      "mongodbDatabase": true,
+      "semanticCollectionHttpStatus": 404,
+      "episodicCollectionHttpStatus": 404,
+      "actorAlphaWorkspace": true,
+      "actorBetaWorkspace": true
+    },
+    "productionOrHistoricalDataAllowed": false
+  },
+  "executionFence": {
+    "parallelTV4ADevelopmentAllowed": true,
+    "measuredRuntimeWhileTV4AActiveAllowed": false,
+    "exclusiveRuntimeWindowObserved": false,
+    "requiredBeforeScenario1": [
+      "Confirm the SMA TV4-A process is idle and no runtime-heavy SMA test is running.",
+      "Confirm no unrelated local OpenHands/Ollama model prompt is running.",
+      "Recheck every mutable service, model, profile, namespace, and worktree identity.",
+      "Install bounded receipt, cleanup, deadline, queue, memory-pressure, and stop-condition observers."
+    ]
+  },
+  "reportDigestMethod": "SHA-256 of RFC-8785-compatible sorted-key compact JSON with reportSha256 set to the empty string",
+  "reportSha256": "85f44ddc0e9ba54e7006a2e4aa9fe9a3a9821568b57199af546991f870bca3ae"
+}

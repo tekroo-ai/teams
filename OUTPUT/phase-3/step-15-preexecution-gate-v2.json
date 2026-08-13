@@ -1,0 +1,82 @@
+{
+  "schemaVersion": "2.0.0",
+  "reportType": "PHASE_3_STEP_15_SMA_Q1_PREEXECUTION_GATE_REFRESH",
+  "recordedOn": "2026-08-13",
+  "status": "READY_PENDING_EXCLUSIVE_RUNTIME_WINDOW",
+  "resultClaim": "NONE",
+  "executionState": "NOT_STARTED",
+  "executionAuthorized": true,
+  "scenarioExecutions": 0,
+  "scenarioRepetitionsRemaining": 96,
+  "acceptedManifestSHA256": "c618371d571d5333aebd2bdc83d2db2559115f5ec3e1903b33e8e0ab157edf5d",
+  "executionIdentity": {
+    "path": "investigations/sma-q1/step-15-execution-identity-v2.json",
+    "sha256": "02fcc27167868cab09108f7c81dd419ddabd9ba21b7c4370f185519efdd5cd9a"
+  },
+  "supersedes": {
+    "artifact": "OUTPUT/phase-3/step-15-preexecution-gate.json",
+    "effect": "SUPERSEDED_FOR_FUTURE_EXECUTION_ONLY",
+    "reason": "The bounded SMA remediation and its final production-shaped closure canary subsequently passed."
+  },
+  "assertions": [
+    {
+      "id": "STEP15-PREFLIGHT2-001-FROZEN-MANIFEST",
+      "status": "PASS",
+      "classification": "OBSERVED_AND_COMPUTED",
+      "evidence": "The immutable manifest remains SHA-256 c618371d571d5333aebd2bdc83d2db2559115f5ec3e1903b33e8e0ab157edf5d with 18 scenarios and 96 repetitions."
+    },
+    {
+      "id": "STEP15-PREFLIGHT2-002-WP5-EVIDENCE-FENCE",
+      "status": "PASS",
+      "classification": "COMPUTED_FROM_FROZEN_RULE",
+      "evidence": "OUTPUT/phase-3/step-15-wp5-evidence-adjudication.json retains zero eligible Q1 scenarios; all 18 scenarios and 96 repetitions remain NOT_RUN."
+    },
+    {
+      "id": "STEP15-PREFLIGHT2-003-SMA-IMMUTABLE",
+      "status": "PASS",
+      "classification": "OBSERVED",
+      "evidence": "The detached Step 15 worktree is clean at commit 60a966234166ea75f767b25e3cbb7eaabe4064a2 and tree 7aaa06a68d59dd6f13b0a3a2c6ae3cff845c1121; mvn -q verify exited zero."
+    },
+    {
+      "id": "STEP15-PREFLIGHT2-004-BOUND-BLOCKERS",
+      "status": "PASS",
+      "classification": "OBSERVED",
+      "evidence": "Current source bounds inbound bodies to 1,048,576 bytes plus one overflow probe and context execution to four active operations with an eight-entry queue and rejection telemetry."
+    },
+    {
+      "id": "STEP15-PREFLIGHT2-005-PREQ1-CLOSURE",
+      "status": "PASS",
+      "classification": "OBSERVED_AND_COMPUTED",
+      "evidence": "Final run 12cd48b4d9204f0f8608c245530f67e1 is PASS/GO with 31 audits, 31 terminals, exact bijection, and maximum applicable external latency 353.703125 ms; its receipt and journal hashes are pinned in the execution identity."
+    },
+    {
+      "id": "STEP15-PREFLIGHT2-006-RUNTIME-IDENTITY",
+      "status": "PASS_WITH_EXECUTION_RECHECK",
+      "classification": "OBSERVED_AND_COMPUTED",
+      "evidence": "OpenHands runtime, profile projection, Agent Canvas, Ollama binaries/models, MongoDB, Qdrant, host, and SMA artifacts are content-addressed in the v2 identity.",
+      "requiredRecheck": "Recompute mutable runtime identities immediately before scenario 1."
+    },
+    {
+      "id": "STEP15-PREFLIGHT2-007-DISPOSABLE-ISOLATION",
+      "status": "PASS_WITH_EXECUTION_RECHECK",
+      "classification": "OBSERVED",
+      "evidence": "The v2 MongoDB database, both Qdrant collections, and both actor workspaces were absent during preflight.",
+      "requiredRecheck": "Prove absence again immediately before creating any disposable resource."
+    },
+    {
+      "id": "STEP15-PREFLIGHT2-008-EXCLUSIVE-RUNTIME",
+      "status": "PENDING",
+      "classification": "OBSERVED",
+      "evidence": "SMA TV4-A development is currently active in a separate worktree. No measured scenario may start until that process is idle and unrelated local model activity is absent."
+    },
+    {
+      "id": "STEP15-PREFLIGHT2-009-NO-EXPERIMENT",
+      "status": "PASS",
+      "classification": "OBSERVED",
+      "evidence": "No SMAQ1N prompt, fault, scenario, or repetition was executed or claimed during this refresh."
+    }
+  ],
+  "nextGate": "Obtain and record an exclusive runtime window, repeat mutable identity and namespace checks, install observers, and then begin scenario 1 without changing the frozen corpus.",
+  "reportDigestMethod": "SHA-256 of RFC-8785-compatible sorted-key compact JSON with reportSha256 set to the empty string",
+  "reportSha256": "0fd1cd1cc8c78e1a8cbec5bead543ce9aaa4a976731851dc241c2df5c90cbd61"
+}
