@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "1.0.0-candidate",
+  "recordType": "SMA_S2_CANDIDATE_5_REMEDIATION_AUTHORIZATION",
+  "status": "AUTHORIZED_NOT_CONSUMED",
+  "recordedOn": "2026-08-14",
+  "principalStatement": "Authorized. How close are we, really?",
+  "triggeringReview": {
+    "path": "OUTPUT/phase-3/sma-s2-candidate-4-coordinator-review.json",
+    "sha256": "f6382fb741a0da5501cb4c975ee573ca92ebe67782370a0b78b18a8058336cfc"
+  },
+  "authorizedScope": [
+    "correct the five substantive candidate-4 oracle groups",
+    "create a successor driver and candidate-specific non-secret configuration",
+    "add evidence-field semantic mutation qualification",
+    "publish candidate 5 for a candidate-specific principal review decision"
+  ],
+  "preservedSemantics": {
+    "sourceSha256": "b7315835b6291d44d3d8cb918dbec1f16c1e64f2106fd70212c6a8f7ec678188",
+    "caseCount": 20,
+    "repetitionCount": 103,
+    "predicateCount": 59,
+    "requiredEvidenceCount": 10,
+    "thresholdsChanged": false,
+    "faultScheduleChanged": false,
+    "claimChanged": false,
+    "productCodeChanged": false
+  },
+  "notAuthorized": [
+    "modification of candidate 4 or an accepted artifact",
+    "live preflight",
+    "measured S2 execution",
+    "OpenHands conversation creation",
+    "SMA service invocation",
+    "deterministic stub network invocation",
+    "real model calls",
+    "production or historical data access"
+  ]
+}

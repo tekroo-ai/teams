@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_CANDIDATE_8_DRESS_REHEARSAL_AUTHORIZATION_CONSUMPTION",
+  "candidate": 8,
+  "status": "CONSUMED_BY_ONE_INCONCLUSIVE_DRESS_REHEARSAL",
+  "recordedAt": "2026-08-14T21:04:44Z",
+  "authorization": {
+    "path": "investigations/sma-q1/layered/sma-s2-candidate-8-dress-rehearsal-single-use-authorization-2.json",
+    "sha256": "34cf176268f173c1b9640b564873bce583c169554c507aad30906afbe7f775bf"
+  },
+  "hostPreflight": {
+    "path": "OUTPUT/phase-3/sma-s2-candidate-8-dress-rehearsal-live-preflight-2.json",
+    "sha256": "532efbe846553973e9d35f399e75d60d3a89e99382c0b10d6e7e525a2cc29a33",
+    "status": "PASS"
+  },
+  "dressRehearsal": {
+    "receiptPath": "OUTPUT/phase-3/sma-s2-candidate-8-dress-rehearsal-attempt-1/dress-rehearsal-receipt.json",
+    "receiptSha256": "f91a7f8c7c02cbb70be302dba78bdc1f8ca6ff2ed6b8ec1cb6df882d08a29cca",
+    "rawJournalPath": "OUTPUT/phase-3/sma-s2-candidate-8-dress-rehearsal-attempt-1/raw-evidence.jsonl",
+    "rawJournalSha256": "d97410588579c77c6bd43c1dfc09176a1ac4c843199d985315aa5889cb819e0f",
+    "status": "INCONCLUSIVE",
+    "plannedOperations": 34,
+    "completedOperations": 10,
+    "failureClass": "HARNESS",
+    "failureCaseId": "SMA-S2-002-SAME-PARTITION-DELIVERY",
+    "failureRepetition": 1,
+    "failureErrorType": "CalledProcessError",
+    "cleanupStatus": "PASS"
+  },
+  "consumption": {
+    "dressRehearsalAttempts": 1,
+    "completedDressOperations": 10,
+    "measuredCaseExecutions": 0,
+    "measuredRepetitionExecutions": 0,
+    "measuredCredit": 0,
+    "realModelCalls": 0,
+    "automaticReruns": 0,
+    "claim": null
+  },
+  "authorizationReusable": false,
+  "automaticRetryAuthorized": false,
+  "measuredExecutionAuthorized": false
+}

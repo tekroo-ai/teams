@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_CANDIDATE_6_LIVE_PREFLIGHT_AUTHORIZATION_CONSUMPTION",
+  "status": "CONSUMED_COMPLETE_NO_REUSE",
+  "recordedAt": "2026-08-14T17:40:25Z",
+  "authorization": {
+    "path": "investigations/sma-q1/layered/sma-s2-candidate-6-live-preflight-single-use-authorization.json",
+    "sha256": "d5ada6c8a7473e25c2211cf8708d7becb6cb2a1e6b30a1af5a0a1dda89e2ff25"
+  },
+  "executionIdentity": {
+    "path": "investigations/sma-q1/layered/sma-s2-candidate-6-execution-identity.json",
+    "sha256": "5640c60968261402bc1878204703845581e266cbce1b4cc7e135a3008f05e5a4"
+  },
+  "livePreflightReceipt": {
+    "path": "OUTPUT/phase-3/sma-s2-candidate-6-live-preflight-attempt-1/live-preflight-receipt.json",
+    "sha256": "8d479433e93599209c50b314aef481c75aaf1460e6c2b9db9806f7dcb4de0624",
+    "status": "PASS"
+  },
+  "consumedCounts": {
+    "livePreflightAttempts": 1,
+    "openhandsConversations": 1,
+    "deterministicStubRequests": 1,
+    "serviceRestarts": 0,
+    "measuredCaseExecutions": 0,
+    "measuredRepetitionExecutions": 0,
+    "realModelCalls": 0
+  },
+  "runtimePorts": {
+    "stubHost": "127.0.0.1",
+    "stubPort": 19126,
+    "bridgeHost": "127.0.0.1",
+    "bridgePort": 8130
+  },
+  "cleanupVerified": true,
+  "reusable": false
+}

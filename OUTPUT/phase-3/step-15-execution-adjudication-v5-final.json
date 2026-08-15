@@ -1,0 +1,88 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_Q1_STEP15_FINAL_V5_ADJUDICATION",
+  "recordedOn": "2026-08-13",
+  "timePrecision": "DAY",
+  "manifest": "investigations/sma-q1/preregistration-native-v5.json",
+  "manifestSHA256": "21030ef4a7004217401b0243e5bb7e94be6bc44ecb9869873a72f112fe676422",
+  "status": "INCONCLUSIVE",
+  "decision": "NO_GO",
+  "smaQ1ResultClaim": "NONE",
+  "attempts": [
+    {
+      "attempt": "V5_INITIAL",
+      "authorizationSHA256": "b4ba47abb322621539317cb5b1ea6d8825bebe867d9a2d10a659dacae25c445f",
+      "identitySHA256": "8ff6138b1a8a78418f1b19a63068398c22ea2f889ecd252aa87ff8a9b7387f1e",
+      "harnessSHA256": "45b9412e879d76d2beef957efdc23d7a9f7585e4e4820774ba5fb387c599872e",
+      "receiptSHA256": "b22d0b50306b5a5fc23a49c79da0aad5fc082129901a18ff806f0218c3b58a5a",
+      "rawJournalSHA256": "8a73cb7df41daeb90d48bf495adc1a5d44964544a8d0f8a37980d1cdad176da0",
+      "status": "INCONCLUSIVE",
+      "terminal": "QUALIFICATION_SAME_PARTITION_RETRIEVAL_EMPTY",
+      "startedScenarios": 0,
+      "startedRepetitions": 0,
+      "cleanupVerified": true
+    },
+    {
+      "attempt": "V5_TELEMETRY_CORRECTIVE_RERUN_1",
+      "authorizationSHA256": "cd284196b70951e6ab9123a2bfab051384005593c2a4384bd37890378a5cce9f",
+      "identitySHA256": "2b157d1431b1e7c0b7f4ec45bf8dad2d800c11d6306ff2954f0f62d0e3d1cd74",
+      "harnessSHA256": "c84e5557c6ca69362e2d57929a5b2536c381e447776f60a9c08da6160bd44494",
+      "receipt": "OUTPUT/phase-3/sma-q1n-step15-v5-rerun1/execution-receipt.json",
+      "receiptSHA256": "5e362942f589754ec62dd9b9d5fd351b3a16314de48f19b44b93fe0e69ba63bc",
+      "receiptCanonicalReportSHA256": "24d0629f10dc2e2592d9dfb6f402b8fbbdab3e97bffec95734a4bdbfb8717e48",
+      "rawJournal": "OUTPUT/phase-3/sma-q1n-step15-v5-rerun1/raw-receipts.jsonl",
+      "rawJournalSHA256": "883f127d72ebe040ef1db3d0eef6c10b501b4bdd61b3a5fb7e5770d62dc9367e",
+      "status": "INCONCLUSIVE",
+      "terminal": "PREFLIGHT_IDENTITY_SCHEMA_KEY_ERROR",
+      "failureType": "KeyError",
+      "failureMessage": "'executionFence'",
+      "startedScenarios": 0,
+      "startedRepetitions": 0,
+      "liveFixtureWorkStarted": false,
+      "cleanupVerified": true
+    }
+  ],
+  "correctiveFailure": {
+    "classification": "OBSERVED_COORDINATOR_PACKAGING_ERROR",
+    "expectedPreflightField": "executionFence",
+    "providedIdentityField": "rerunFence",
+    "mechanism": "The corrective identity schema did not satisfy the inherited V5 preflight reader. Static verification checked hashes and runner call shape but did not validate every identity field consumed by preflight.",
+    "smaFinding": false,
+    "telemetryQualificationRan": false,
+    "preventability": "This should have been caught by an offline identity/preflight contract check before authorization."
+  },
+  "retainedEvidenceFloor": {
+    "classification": "OBSERVED_FROM_V5_INITIAL_ATTEMPT",
+    "deterministicFixturePromotion": "PASS_ALL_THREE_ELIGIBLE_MEMORIES",
+    "controlledCorpusReadiness": "PASS",
+    "rawIneligibleDenial": "OBSERVED",
+    "crossPartitionDenial": "OBSERVED",
+    "samePartitionPositiveControl": "MISSED_ON_FIRST_RETRIEVAL",
+    "specificMissMechanism": "UNVERIFIED",
+    "scenarioCorpus": "NOT_RUN"
+  },
+  "corpusFloor": {
+    "startedScenarios": 0,
+    "completedScenarios": 0,
+    "notRunScenarios": 18,
+    "startedRepetitions": 0,
+    "completedRepetitions": 0,
+    "notRunRepetitions": 96
+  },
+  "cleanup": {
+    "allAttemptReceiptsVerified": true,
+    "postAdjudicationMongoV5Databases": [],
+    "v5QdrantCollectionsAbsent": true,
+    "bridgeListenerAbsent": true,
+    "qualificationRunRootAbsent": true,
+    "measuredRunRootAbsent": true,
+    "fixtureDriverBuildAbsent": true,
+    "smaExecutionWorktreeClean": true
+  },
+  "rerunPolicy": {
+    "v5InitialAttemptConsumed": true,
+    "v5CorrectiveRerunConsumed": true,
+    "additionalV5ExecutionPermitted": false
+  },
+  "nextValidAction": "Do not execute V5 again. Before proposing any V6 experiment, add an offline contract test that loads the exact identity and authorization artifacts through the same preflight field-access path and proves that preflight reaches—but does not cross—the first live-service operation. Carry the unresolved V5 initial retrieval miss forward unchanged. Then present a single prospective V6 package for explicit acceptance and separate execution authorization."
+}

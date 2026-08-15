@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_CANDIDATE_9_EXECUTION_IDENTITY_PREPARATION_AUTHORIZATION",
+  "status": "AUTHORIZED_CONSUMED_BY_IDENTITY_PREPARATION",
+  "recordedOn": "2026-08-14",
+  "principalStatement": "Authorized.",
+  "interpretedScope": "prepare one exact candidate-9 execution identity for separate principal review",
+  "acceptedCandidate": {
+    "preregistrationPath": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-9.json",
+    "preregistrationSha256": "d7680cc0b7b5ed501201e4b9dcc54b089071267c75ca43e3b9fab13b95b251a8",
+    "acceptancePath": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-9-acceptance.json",
+    "acceptanceSha256": "2579d877f36da0e5a90188db8a038fa8c2cf8aada529feb0047d4e13fce5332f"
+  },
+  "authorizedScope": [
+    "prepare one immutable candidate-9 execution-identity proposal",
+    "bind exact numeric loopback stub and bridge endpoints",
+    "bind the accepted candidate-9 package, workspace-isolation contract, Maven-promotion contract, product identity, dependencies, disposable namespaces, and attempt limits",
+    "run offline artifact, dependency, Maven-project, and source-identity correspondence validation without probing live service or port state and without invoking Maven",
+    "publish the exact identity for separate principal review"
+  ],
+  "notAuthorized": [
+    "principal acceptance or freeze of the execution identity by the coordinator",
+    "live endpoint availability or service-state preflight",
+    "service start, stop, or restart",
+    "Maven invocation",
+    "OpenHands conversation creation",
+    "SMA or deterministic-stub network invocation",
+    "live dress rehearsal",
+    "measured S2 execution",
+    "real model calls",
+    "production or historical data access",
+    "OPENHANDS_SMA_BOUNDARY_QUALIFIED claim"
+  ]
+}

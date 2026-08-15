@@ -1,0 +1,32 @@
+{
+  "classification": "COMPUTED",
+  "completedAt": "2026-08-13T21:55:13.861987+00:00",
+  "completedAttempts": 97,
+  "effectiveCapabilities": {
+    "autoAttachVisionInspectTool": false,
+    "configuredTools": [],
+    "includeDefaultTools": [
+      "FinishTool"
+    ],
+    "mcpConfig": {},
+    "temperature": 0.0
+  },
+  "exactResponseCount": 96,
+  "failedAttempts": 1,
+  "openhandsSources": {
+    "agentBaseSHA256": "839b5860d9face7792cf0e8e746795a4e9efd681dfba7846930cd8cc2a316d1f",
+    "settingsModelSHA256": "c8864f59185df3afe8a3478e666c74fd47a311cb56c72c681d442e5a72ea6a60"
+  },
+  "rawJournalSHA256": "beab8100ff74203d4a3567be1a298fba0677415df4050bfbae37d6cea7b28c3a",
+  "recordType": "OPENHANDS_EXACT_CAPABILITY_QUALIFICATION_RECEIPT",
+  "requiredAttempts": 128,
+  "runnerSHA256": "6237a21b4f780ac35401e935d80827e970c7c581d5db3f45314dd7a576a688bf",
+  "schemaVersion": "1.0.0",
+  "status": "FAIL",
+  "terminalCounts": {
+    "AGENT_MESSAGE": 1,
+    "FINISH_ACTION": 96
+  },
+  "unexpectedAgentToolNames": [],
+  "workspaceRemoved": true
+}

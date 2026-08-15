@@ -1,0 +1,81 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_CANDIDATE_7_EXECUTION_IDENTITY_ACCEPTANCE",
+  "acceptanceId": "SMA-S2-CANDIDATE-7-EXECUTION-IDENTITY-ACCEPTANCE",
+  "candidate": 7,
+  "status": "ACCEPTED_FROZEN",
+  "recordedOn": "2026-08-14",
+  "principalStatement": "ACCEPT/FREEZE the execution identity only.",
+  "acceptedExecutionIdentity": {
+    "path": "investigations/sma-q1/layered/sma-s2-candidate-7-execution-identity.json",
+    "sha256": "40235ba0eda978c497dc17740aab09ebeb8fe3852e961b0f4d522737f3c38f22",
+    "candidate": 7,
+    "runtimePorts": {
+      "stubHost": "127.0.0.1",
+      "stubPort": 19127,
+      "bridgeHost": "127.0.0.1",
+      "bridgePort": 8130
+    },
+    "acceptedFrozen": true,
+    "editableInPlace": false
+  },
+  "acceptedCandidate": {
+    "preregistration": {
+      "path": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-7.json",
+      "sha256": "66530bb10fe7e46f23e8f3f550c83a89203905cc844dba8732d8794dba9575d3"
+    },
+    "acceptance": {
+      "path": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-7-acceptance.json",
+      "sha256": "c93c8892d58995c86d4ed11cba340192037fc32725db82a2ad66b9e5783b3e0f"
+    }
+  },
+  "boundReview": {
+    "machineReview": {
+      "path": "OUTPUT/phase-3/sma-s2-candidate-7-execution-identity-preparation-review.json",
+      "sha256": "7b7a569bc0caf0c9bbd42b3410886ec045205d5ed448d517858539fad768ced2",
+      "status": "PASS_READY_FOR_PRINCIPAL_IDENTITY_REVIEW"
+    },
+    "reviewNarrative": {
+      "path": "docs/architecture/072-sma-s2-candidate-7-execution-identity-review.md",
+      "sha256": "c5731eb7b31a0c19a2705dbe7b8d779ee80bbc2187750f7162886fb78fc69cd3"
+    }
+  },
+  "independentReview": {
+    "reviewer": "WORKSPACE_PRINCIPAL",
+    "candidateSpecificContextBound": true,
+    "candidateSpecificDecision": "ACCEPT_FREEZE_EXECUTION_IDENTITY_ONLY"
+  },
+  "immutability": {
+    "acceptedExecutionIdentityMayBeEditedInPlace": false,
+    "boundReferencesMayBeEditedInPlace": false,
+    "successorIdentityRequiredForAnyCorrection": true
+  },
+  "authority": {
+    "executionIdentityAccepted": true,
+    "liveStatePreflightAuthorized": false,
+    "liveDressRehearsalAuthorizationPresent": false,
+    "liveDressRehearsalAuthorized": false,
+    "liveDressRehearsalState": "NOT_RUN",
+    "measuredAttemptAuthorizationPresent": false,
+    "measuredExecutionAuthorized": false,
+    "measuredExecutionState": "NOT_RUN",
+    "realModelCallsAuthorized": false,
+    "serviceRestartsAuthorized": false,
+    "productionDeploymentAuthorized": false
+  },
+  "excludedClaims": [
+    "runtime ports presently available",
+    "live service state acceptable",
+    "candidate-7 disposable namespaces absent",
+    "candidate-7 live dress rehearsal PASS",
+    "SMA-S2 measured PASS",
+    "OPENHANDS_SMA_BOUNDARY_QUALIFIED",
+    "production readiness"
+  ],
+  "nextSeparateGate": {
+    "requiredAction": "authorize one single-use candidate-7 34-operation zero-credit live dress rehearsal with immediate live-state, active-work, endpoint, and namespace checks",
+    "requiresSeparatePrincipalAuthorization": true,
+    "measuredExecutionStillRequiresPassingBoundDressRehearsalReceipt": true,
+    "measuredExecutionStillRequiresLaterSingleUseAuthorization": true
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "base_manifest_sha256": "c618371d571d5333aebd2bdc83d2db2559115f5ec3e1903b33e8e0ab157edf5d",
+  "cleanup": {
+    "conversation_count": 0,
+    "conversations": [],
+    "finished_at": "2026-08-13T19:49:22.659796+00:00",
+    "service": {
+      "already_stopped": true,
+      "listener": null
+    },
+    "started_at": "2026-08-13T19:49:21.767925+00:00",
+    "verified": {
+      "bridge_absent": true,
+      "episodic_absent": true,
+      "mongo_absent": true,
+      "run_root_absent": true,
+      "semantic_absent": true,
+      "service_absent": true
+    }
+  },
+  "completed_repetitions": 0,
+  "completed_scenario_ids": [],
+  "completed_scenarios": 0,
+  "decision": "NO_GO",
+  "failure": {
+    "classification": "HARNESS_OR_ENVIRONMENT",
+    "message": "fixture readiness mismatch: ['episodic_collection_count', 'mem-alpha-raw:episodic_ineligible_projection', 'mem-alpha-raw:ineligible_embedding_refs', 'mem-alpha-raw:semantic_ineligible_projection', 'semantic_collection_count']",
+    "message_sha256": "0404fa1f2bc6366181c0cea2df0b4297068d607ccb1672448562b78a1a7676e9",
+    "type": "RuntimeError"
+  },
+  "harness_sha256": "5175b053f3633744212923290b0ac2614412a516e9279649b166d1ab2957b3e2",
+  "manifest_sha256": "2178116c866e9abed9b5e83edd3c9c221f55f81e6f343a168205209f25834d23",
+  "not_run_repetitions": 96,
+  "not_run_scenario_ids": [
+    "SMAQ1N-001-FIRST-PROMPT-EMPTY",
+    "SMAQ1N-002-SAME-PARTITION-RECALL",
+    "SMAQ1N-003-CROSS-PARTITION-DENIAL",
+    "SMAQ1N-004-CURRENT-INSTRUCTION-PRECEDENCE",
+    "SMAQ1N-005-RAW-INELIGIBLE",
+    "SMAQ1N-006-DUPLICATE-EVENT-CAPTURE",
+    "SMAQ1N-007-RETRIEVAL-OUTAGE",
+    "SMAQ1N-008-CAPTURE-OUTAGE-RECONCILIATION",
+    "SMAQ1N-009-ADDITIONAL-CONTEXT-INTEGRITY",
+    "SMAQ1N-010-HOOK-DEADLINE-AND-MALFORMED",
+    "SMAQ1N-011-PARENT-CHILD-PROVENANCE",
+    "SMAQ1N-012-RESTART-PARTITION-CONTINUITY",
+    "SMAQ1N-013-FOUR-CHANNEL-CONCURRENCY",
+    "SMAQ1N-014-FEEDBACK-LOOP-PREVENTION",
+    "SMAQ1N-015-SECRET-QUARANTINE",
+    "SMAQ1N-016-EMPTY-RESULT",
+    "SMAQ1N-017-OVERSIZED-CONTEXT-BOUND",
+    "SMAQ1N-018-CONDENSATION-REANCHOR"
+  ],
+  "qualification": null,
+  "qualified_fixture": false,
+  "raw_journal_sha256": "7fa6a99f7106203a332d8ed548f0b06437738504a42b5b4d48c05d71465ca868",
+  "receipt_type": "SMA_Q1_NATIVE_STEP15_EXECUTION",
+  "recorded_at": "2026-08-13T19:49:22.661898+00:00",
+  "report_sha256": "9b5023a6c29a0b10ede149684ba61a955084bc0d76f881800da4b2f7666ea496",
+  "scenario_results": [],
+  "schema_version": "1.0.0",
+  "started_repetitions": 0,
+  "started_scenario_ids": [],
+  "started_scenarios": 0,
+  "status": "INCONCLUSIVE"
+}

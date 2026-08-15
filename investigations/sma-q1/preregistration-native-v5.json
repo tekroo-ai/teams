@@ -1,0 +1,161 @@
+{
+  "schemaVersion": "5.0.0",
+  "recordType": "INVESTIGATION_PREREGISTRATION_AMENDMENT",
+  "amendmentId": "SMA-Q1-NATIVE-OPENHANDS-VERTICAL-SLICE-V5",
+  "status": "FROZEN_ACCEPTED_NOT_EXECUTED",
+  "recordedOn": "2026-08-13",
+  "timePrecision": "DAY",
+  "purpose": "Prospectively remove cognition-model variability from controlled fixture preparation, distinguish vector projection from retrieval eligibility, and retain exact subprocess-failure evidence without changing the frozen scientific corpus.",
+  "supersession": {
+    "priorAmendmentId": "SMA-Q1-NATIVE-OPENHANDS-VERTICAL-SLICE-V4",
+    "priorManifest": "investigations/sma-q1/preregistration-native-v4.json",
+    "priorManifestSHA256": "2178116c866e9abed9b5e83edd3c9c221f55f81e6f343a168205209f25834d23",
+    "priorAdjudication": "OUTPUT/phase-3/step-15-execution-adjudication-v4.json",
+    "priorAdjudicationSHA256": "16d92426b6896c2ccdf9306d20fcee9ac11551ea18c935d13498b180ff4e7bb1",
+    "priorExecutionState": "INCONCLUSIVE",
+    "priorResultClaim": "NO_SMA_Q1_PASS",
+    "effectIfAccepted": "ACCEPTED_SUCCESSOR_FOR_FUTURE_EXECUTION_ONLY",
+    "preservation": "The v4 manifest, both v4 attempts, raw receipts, retained subprocess report, cleanup evidence, and adjudication remain immutable. No prior scenario or repetition is credited to v5."
+  },
+  "unchangedBase": {
+    "bindingManifest": "investigations/sma-q1/preregistration-native-v2.json",
+    "bindingManifestSHA256": "c618371d571d5333aebd2bdc83d2db2559115f5ec3e1903b33e8e0ab157edf5d",
+    "bindingPriorAmendments": "All accepted v3 and v4 amendments remain binding except the fixture-promotion, raw-projection, scheduler-isolation, and subprocess-evidence rules explicitly replaced below.",
+    "unchangedFields": [
+      "decisiveQuestion",
+      "architectureReconciliation",
+      "authorityBoundary",
+      "identityModel",
+      "syntheticMemoryCorpus",
+      "scenarioCorpus",
+      "wp5EvidenceMap",
+      "step15ReservedScenarioIds",
+      "evidenceEligibility",
+      "thresholds",
+      "requiredRawReceiptsPerScenario",
+      "stopConditions",
+      "adjudication.pass",
+      "adjudication.fail",
+      "adjudication.inconclusive",
+      "adjudication.defaultIfInconclusive",
+      "v3.amendments.fixtureQualificationBeforeScenarioOne",
+      "v3.amendments.measuredCorpusReadiness",
+      "v3.amendments.scenarioStartAccounting",
+      "v3.amendments.parentChildCriterion",
+      "v3.amendments.logicalRepetitionAccounting",
+      "v3.amendments.oversizedFixture",
+      "v3.amendments.latencyAggregation",
+      "v4.replacedExpectations.workspacePartitionIdentity",
+      "v4.replacedExpectations.projectionAndMongoReferences.eligibleRule"
+    ],
+    "scenarioCount": 18,
+    "repetitionCount": 96,
+    "scenarioCreditFromPriorAttempts": 0
+  },
+  "observedV4Evidence": {
+    "classification": "OBSERVED",
+    "initialAttempt": {
+      "startedScenarios": 0,
+      "startedRepetitions": 0,
+      "terminal": "CONTROLLED_FIXTURE_CONTAMINATED_BY_BACKGROUND_REPLAY",
+      "rawMemoryState": "raw",
+      "rawMemoryReasoningEligible": false,
+      "rawMemorySemanticPointCount": 1,
+      "rawMemoryEpisodicPointCount": 1,
+      "retrievalQualification": "NOT_RUN"
+    },
+    "correctiveRerun": {
+      "startedScenarios": 0,
+      "startedRepetitions": 0,
+      "terminal": "LIVE_COGNITIVE_FIXTURE_MARKER_ASSERTION_FAILURE",
+      "firstExplicitPromotion": "PASS",
+      "secondExplicitPromotion": "FAIL",
+      "failureLogicalMemoryId": "mem-alpha-adversarial",
+      "failureAssertion": "canonical output must retain the codename"
+    },
+    "sharedFloor": {
+      "staticExpectationSelfTest": "PASS_BOTH_ATTEMPTS",
+      "fullPreflight": "PASS_BOTH_ATTEMPTS",
+      "cleanup": "PASS_BOTH_ATTEMPTS",
+      "scenarioCorpus": "NOT_RUN"
+    }
+  },
+  "v5Amendments": {
+    "deterministicFixturePromotion": {
+      "classification": "PROSPECTIVE_HARNESS_CONTROL",
+      "fixtureDriver": "investigations/sma-q1/fixture-support/DeterministicReplayPromotion.java",
+      "fixtureDriverSHA256": "580f29edefc8c703e68adc3ba6536b58ba1b577a9ed0ca6969ff172eaacb8117",
+      "rule": "For preregistered eligible fixture memories only, invoke the pinned production ReplayWorker with production Mongo repositories, lifecycle policy, Ollama embedding service, and Qdrant vector store, but provide the frozen fixture text through a deterministic in-process CognitiveEngine. The fixture driver must begin from the captured raw memory and reach consistent reasoning eligibility through production replay transitions.",
+      "modelCallsDuringPromotion": 0,
+      "scopeExclusion": "This control prepares known synthetic fixtures. It does not qualify the production cognitive engine, autonomous interpretation quality, or endogenous replay scheduling, which retain their own evidence gates.",
+      "forbidden": [
+        "direct Mongo lifecycle mutation",
+        "direct reasoning_eligible mutation",
+        "direct Qdrant point injection",
+        "replacement of production persistence, lifecycle, embedding, vector, or retrieval components"
+      ]
+    },
+    "backgroundReplayIsolation": {
+      "classification": "PROSPECTIVE_HARNESS_CONTROL",
+      "rule": "Use a deliberately nonmatching SMA canary partition for every qualification and measured service start so the always-on background replay scheduler cannot mutate controlled corpus lifecycle state. Capture, reconciliation, retrieval, context assembly, native hooks, model delivery, restart, and fault behavior remain active.",
+      "reason": "Background replay is not the Step 15 dependent variable and altered the controlled raw fixture before retrieval eligibility could be tested.",
+      "receiptRequired": "Every service-start receipt records the configured nonmatching canary partition."
+    },
+    "rawProjectionSemantics": {
+      "classification": "PROSPECTIVE_EXPECTATION_CORRECTION",
+      "rule": "For a raw, reasoning-ineligible fixture, semantic or episodic point presence and Mongo embedding references are retained as observations but are not readiness failures and do not establish disclosure eligibility.",
+      "decisiveRule": "The actual direct context-service response must omit the raw memory ID and marker during disposable qualification, and every applicable measured direct, native-hook, model-context, response, and retrieval-event boundary must deny it under the frozen scenarios.",
+      "absoluteStop": "Any observed raw-ineligible disclosure remains FAIL under the frozen stop conditions."
+    },
+    "durableSubprocessEvidence": {
+      "classification": "PROSPECTIVE_EVIDENCE_HARDENING",
+      "rule": "Every fixture-driver build or execution records exit code plus stdout/stderr byte lengths and SHA-256 digests. On nonzero exit or timeout, exact stdout and stderr are copied into the immutable attempt output before cleanup, their paths and hashes are journaled, and the attempt is INCONCLUSIVE unless the evidence satisfies an existing absolute stop condition.",
+      "contentRule": "No fixture text is passed on the process command line or printed by the driver; it is supplied through stdin."
+    }
+  },
+  "staticExpectationSelfTest": {
+    "required": true,
+    "timing": "Before any service query, namespace creation, workspace creation, conversation creation, MongoDB write, Qdrant write, or model call.",
+    "requiredChecks": [
+      "All inherited v4 source and retained-v3 expectation checks pass.",
+      "The fixture-driver SHA-256 matches this manifest.",
+      "The fixture driver uses production ReplayWorker, Mongo repositories, LifecyclePolicy, OllamaEmbeddingService, and QdrantVectorStore.",
+      "The fixture driver does not reference OllamaCognitiveEngine or mutate Mongo lifecycle or Qdrant points directly.",
+      "The fixture driver compiles against the pinned SMA classes and resolved dependency classpath without starting or querying SMA services.",
+      "The v5 qualification and measured workspace paths produce their preregistered 24-character fingerprints."
+    ],
+    "terminal": "Any mismatch yields INCONCLUSIVE before live fixture work and consumes no scenario repetition."
+  },
+  "v5DisposableNamespaces": {
+    "qualification": {
+      "mongoDatabase": "sma_q1n_step15_v5_fixture_20260813",
+      "qdrantSemanticCollection": "sma_q1n_step15_v5_fixture_semantic_20260813",
+      "qdrantEpisodicCollection": "sma_q1n_step15_v5_fixture_episodic_20260813",
+      "runRoot": "/Users/paul/work/tekroo-ai/sma-step15/target/sma-q1n-step15-20260813-v5-fixture",
+      "actorAlphaFingerprint": "f45d75ea182fa6b20dd31a8d",
+      "actorBetaFingerprint": "c0b9791cd008ef719c7c6a05"
+    },
+    "measuredRun": {
+      "mongoDatabase": "sma_q1n_step15_20260813_v5",
+      "qdrantSemanticCollection": "sma_q1n_step15_v5_semantic_20260813",
+      "qdrantEpisodicCollection": "sma_q1n_step15_v5_episodic_20260813",
+      "runRoot": "/Users/paul/work/tekroo-ai/sma-step15/target/sma-q1n-step15-20260813-v5",
+      "actorAlphaFingerprint": "4d8627c381dc4e9a69dd2b69",
+      "actorBetaFingerprint": "07bd77aca857ae44a559c6d8"
+    }
+  },
+  "rerunPolicy": "No threshold, prompt, memory, expected SMA outcome, deterministic fixture text, scheduler-isolation rule, or evidence rule may change after v5 is accepted and frozen. One corrective v5 rerun is permitted only for a newly documented harness defect that could not have altered an SMA outcome; retain and adjudicate every attempt. Failure of the pre-live static expectation self-test does not authorize live probing.",
+  "acceptance": {
+    "classification": "OBSERVED_OPERATOR_DECISION",
+    "acceptedOn": "2026-08-13",
+    "timePrecision": "DAY",
+    "decision": "ACCEPT_AND_FREEZE_V5",
+    "source": "Explicit principal instruction in the coordinating Teams session: ACCEPT/FREEZE V5",
+    "executionAuthorizationEffect": "NONE_SEPARATE_AUTHORIZATION_REQUIRED"
+  },
+  "acceptanceState": "ACCEPTED_AND_FROZEN",
+  "executionState": "NOT_STARTED",
+  "scenarioResultClaimAuthorized": false,
+  "step15ExecutionAuthorized": false,
+  "executionAuthorizationArtifactRequired": true
+}

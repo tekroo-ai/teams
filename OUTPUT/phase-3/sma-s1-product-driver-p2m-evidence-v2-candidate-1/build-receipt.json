@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S1_PRODUCT_DRIVER_BUILD_RECEIPT",
+  "status": "PASS_ALL_FOURTEEN_HANDLERS_COMPILED",
+  "scope": "PROSPECTIVE_EVIDENCE_BOUNDARY_NO_MEASURED_S1_PRODUCT_CREDIT",
+  "recordedOn": "2026-08-14",
+  "compiler": "javac 21.0.12",
+  "jarTool": "jar 21.0.12",
+  "source": {
+    "path": "investigations/sma-q1/layered/driver-src-p2m-evidence-v2/ai/tekroo/sma/openhands/SmaS1QualificationDriver.java",
+    "sha256": "f748e28f91332609faf89d144df65de229bd5a9a0e239f2b7d595b85ae40b4b3"
+  },
+  "serviceArtifact": {
+    "path": "/Users/paul/work/tekroo-ai/sma-s1-p2m/target/sma-1.0-SNAPSHOT.jar",
+    "sha256": "c0ddb963798d45603c2e2685744892c40d3e841817f9c966ab7fad34f7e48765"
+  },
+  "compiledArtifact": {
+    "path": "OUTPUT/phase-3/sma-s1-product-driver-p2m-evidence-v2-candidate-1/sma-s1-product-driver-p2m-evidence-v2-candidate-1.jar",
+    "sha256": "20956a708a29665d0ee52023fab925b65c7dea5f5beed7c1eab28036d8138eb3"
+  },
+  "launcher": {
+    "path": "scripts/sma_s1_product_driver_p2m_evidence_v2.py",
+    "sha256": "402c4ab6df723db09ff8f46bf78d3826cd4838cc987bbfe64e54ddbd60ee9ed1"
+  },
+  "evidenceCorrections": [
+    "warm hit and warm no-hit monotonic latency receipts",
+    "exact runtime provenance identity values",
+    "separate operating-system-process restart phases and receipts",
+    "canonical inbound request and response byte lengths"
+  ],
+  "implementedHandlerCount": 14,
+  "smaProductSourceChanged": false,
+  "modelOrOpenHandsProcessUsed": false,
+  "measuredS1Execution": false,
+  "scientificRepetitionsExecuted": 0,
+  "byteReproducibleArchiveClaimed": false
+}

@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_CANDIDATE_6_MEASURED_PRINCIPAL_AUTHORITY_CONSUMPTION",
+  "status": "CONSUMED_INCONCLUSIVE_NO_REUSE",
+  "recordedAt": "2026-08-14T17:45:56Z",
+  "principalAuthority": {
+    "path": "investigations/sma-q1/layered/sma-s2-candidate-6-measured-execution-principal-authorization.json",
+    "sha256": "927d3479b4909895dbc56a43665beb810edec6b4c6abde6728978ced96f46c1b"
+  },
+  "measuredAuthorizationConsumption": {
+    "path": "investigations/sma-q1/layered/sma-s2-candidate-6-single-use-measured-authorization-consumption.json",
+    "sha256": "729f8c47d8b10ae886877fb8257b15a10129e6a7b1eeab994a83a24456965b0b",
+    "status": "CONSUMED_INCONCLUSIVE_NO_REUSE"
+  },
+  "limitsRespected": true,
+  "stopConditionTriggered": true,
+  "correctiveRerunAuthorized": false,
+  "claimEarned": false,
+  "reusable": false
+}

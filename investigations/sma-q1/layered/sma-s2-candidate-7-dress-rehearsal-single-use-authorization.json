@@ -1,0 +1,55 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_CANDIDATE_7_DRESS_REHEARSAL_AUTHORIZATION",
+  "authorizationId": "SMA-S2-CANDIDATE-7-DRESS-REHEARSAL-ATTEMPT-1",
+  "candidate": 7,
+  "status": "AUTHORIZED_NOT_CONSUMED",
+  "recordedOn": "2026-08-14",
+  "principalStatement": "You may proceed.",
+  "executionIdentitySha256": "40235ba0eda978c497dc17740aab09ebeb8fe3852e961b0f4d522737f3c38f22",
+  "executionIdentityAcceptance": {
+    "path": "investigations/sma-q1/layered/sma-s2-candidate-7-execution-identity-acceptance.json",
+    "sha256": "cf520fe891c218bfac60500a2625c399211be7be36c64b0c483332fb57e83055",
+    "status": "ACCEPTED_FROZEN"
+  },
+  "runtimePorts": {
+    "stubHost": "127.0.0.1",
+    "stubPort": 19127,
+    "bridgeHost": "127.0.0.1",
+    "bridgePort": 8130
+  },
+  "driverSha256": "b14d75aff7c43558828b354312961adfe9a7e038daef19971f4bc7b8990eb799",
+  "configurationSha256": "32bc3c3fd03256a7ef6c44c60f5086b36235f95074f48356ece2e223031b9719",
+  "preregistrationSha256": "66530bb10fe7e46f23e8f3f550c83a89203905cc844dba8732d8794dba9575d3",
+  "acceptanceSha256": "c93c8892d58995c86d4ed11cba340192037fc32725db82a2ad66b9e5783b3e0f",
+  "maximumDressRehearsalAttempts": 1,
+  "operationCount": 34,
+  "measuredCaseExecutions": 0,
+  "measuredRepetitionExecutions": 0,
+  "measuredCredit": 0,
+  "claimOnPass": null,
+  "realModelCallsAllowed": false,
+  "serviceRestartsAllowed": 0,
+  "preconditions": [
+    "accepted identity and every bound artifact still match",
+    "no unrelated OpenHands conversation is running, awaiting confirmation, stuck, or deleting",
+    "the preserved Tekroo Trader conversation remains paused",
+    "stub port 19127 and bridge port 8130 are unoccupied",
+    "candidate-7 disposable MongoDB, Qdrant, workspace, and output namespaces are absent",
+    "the SMA and OpenHands product identities still match the accepted execution identity"
+  ],
+  "stopConditions": [
+    "any precondition fails",
+    "any harness boundary failure occurs",
+    "cleanup cannot prove all candidate-owned resources absent",
+    "the single attempt is consumed"
+  ],
+  "notAuthorized": [
+    "automatic dress-rehearsal rerun",
+    "measured S2 execution",
+    "real model calls",
+    "service restart",
+    "production or historical data access",
+    "OPENHANDS_SMA_BOUNDARY_QUALIFIED claim"
+  ]
+}

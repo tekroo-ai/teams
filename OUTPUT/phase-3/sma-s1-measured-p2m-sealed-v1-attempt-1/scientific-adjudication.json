@@ -1,0 +1,125 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S1_SCIENTIFIC_ADJUDICATION",
+  "status": "INCONCLUSIVE",
+  "recordedAt": "2026-08-14T14:27:15Z",
+  "claimUnderInvestigation": "SMA_SEMANTICS_QUALIFIED",
+  "claimAuthorized": false,
+  "productFailureEstablished": false,
+  "classification": "INCONCLUSIVE_MINIMUM_PASS_EVIDENCE_INCOMPLETE",
+  "bindings": {
+    "manifestSHA256": "e663f5b732c22248adc5fab2f536dbf02dd72337f7c8428f225937e72d6a7f8c",
+    "identitySHA256": "f8bf0323680504df1afb14fe6184e87eaaa675170079c005ce827fcfdfe15e0e",
+    "offlineHarnessReceiptSHA256": "ca3c5aedebb05fe69fd88d4a2570ff6560c45f49cfe0e8d109591b9c95b7f076",
+    "authorizationSHA256": "31d34b1cbbb68a39c8eebc42824399d1dbf4b4ebf48a8f0df27e1c572eba68cc",
+    "harnessSHA256": "cbb3d1ac8b053817d84f8eb060af6ce28be7bc67abea77cc5a1b3993f29b0d92",
+    "driverSHA256": "3ec5390fa62f89c0304d3a37224ba425d9d29c98b074c17c7008c1b7e9ba54d7",
+    "executionReceiptSHA256": "3f7d16db5ded23f11b3baad1ea6e37faf6fb82890feeb8211c3b433f7a7ed9c2",
+    "journalSHA256": "e17eea8db45c89ebc11fa58095c2e26c7ff9221d34869741f6352a2d9cc0f538"
+  },
+  "observed": {
+    "harnessStatus": "PASS",
+    "completedRepetitions": 71,
+    "failedRepetitions": 0,
+    "harnessFailure": false,
+    "safetyStop": false,
+    "cleanupPassed": true,
+    "journalRecordCount": 149,
+    "caseAssertionPassCount": 71,
+    "caseAssertionFailCount": 0,
+    "caseAssertionInconclusiveCount": 0,
+    "predicateCount": 32,
+    "allApplicablePredicateObservationsPassed": true,
+    "journalSequenceContiguousAndUnique": true,
+    "postCleanupMongoDatabaseAbsent": true,
+    "postCleanupSemanticCollectionAbsent": true,
+    "postCleanupEpisodicCollectionAbsent": true
+  },
+  "computedThresholdResults": {
+    "samePartitionExpectedRecallAt5": 1.0,
+    "crossPartitionLeakCount": 0,
+    "rawMemoryInjectionCount": 0,
+    "duplicateCaptureCountPerSourceEventId": 0,
+    "feedbackLoopMemoryCount": 0,
+    "secretExposureSignalCount": 0,
+    "irrelevantQueryInjectionRate": 0.0,
+    "boundedCaseTerminationRate": 1.0,
+    "failOpenElapsedMillisecondsSorted": [
+      28.256083,
+      28.783084,
+      29.129791,
+      29.290416,
+      29.827291
+    ],
+    "failOpenMaximumElapsedMilliseconds": 29.827291,
+    "maximumReturnedMemoryCount": 1,
+    "maximumReturnedContextCharacters": 3183,
+    "midMemoryTruncationCount": 0,
+    "maximumObservedConcurrentRetrieverCalls": 4,
+    "maximumObservedQueuedWork": 4,
+    "maximumDriverResponseBytes": 2419
+  },
+  "minimumPassEvidenceGaps": [
+    {
+      "id": "S1-EVIDENCE-GAP-001",
+      "requirement": "raw monotonic durations and nearest-rank latency calculation inputs",
+      "affectedThresholds": [
+        "contextServiceWarmHitP95Milliseconds",
+        "contextServiceWarmNoHitP95Milliseconds"
+      ],
+      "observation": "The journal contains fail-open elapsed time and whole driver-process elapsed time, but no warm hit/no-hit context-service latency samples or nearest-rank p95 inputs.",
+      "classification": "UNMEASURED_NOT_FAILED"
+    },
+    {
+      "id": "S1-EVIDENCE-GAP-002",
+      "requirement": "exact source and provenance identities",
+      "affectedCases": [
+        "SMA-S1-007-PARENT-CHILD-PROVENANCE"
+      ],
+      "observation": "The retained response reports boolean presence and counts but does not retain the exact observed conversation, parent, event, sequence, workspace, profile, source, and partition identity values.",
+      "classification": "SUMMARY_ASSERTION_WITHOUT_REQUIRED_EXACT_VALUES"
+    },
+    {
+      "id": "S1-EVIDENCE-GAP-003",
+      "requirement": "restart receipts",
+      "affectedCases": [
+        "SMA-S1-004-DUPLICATE-CAPTURE",
+        "SMA-S1-008-RESTART-CONTINUITY",
+        "SMA-S1-014-CONDENSATION-REANCHOR-STATE"
+      ],
+      "observation": "The retained responses summarize restart outcomes and counts but do not retain discrete before/restart/after identity receipts required by the frozen minimum evidence rule.",
+      "classification": "SUMMARY_ASSERTION_WITHOUT_REQUIRED_RECEIPTS"
+    },
+    {
+      "id": "S1-EVIDENCE-GAP-004",
+      "requirement": "request and receipt bound measurements",
+      "affectedThresholds": [
+        "maximumInboundRequestBytes"
+      ],
+      "observation": "The journal retains each request SHA-256 but not its canonical byte length. Response byte lengths are retained and within their threshold.",
+      "classification": "REQUEST_BOUND_UNMEASURED_NOT_FAILED"
+    }
+  ],
+  "adjudication": {
+    "harnessPassAccepted": true,
+    "scientificPassRejected": true,
+    "scientificFailRejected": true,
+    "reason": "All executed assertions passed, but frozen minimum PASS evidence and quantitative threshold inputs are incomplete. The missing measurements cannot be reconstructed as runtime observations after cleanup, and post-observation regrading is prohibited.",
+    "floorClaim": "The exact P2-M implementation passed all 71 retained deterministic case assertions under this attempt; the broader frozen S1 scientific claim remains unqualified.",
+    "nextAction": "Prospectively revise the evidence-producing driver and harness, create and accept a new sealed identity and offline qualification, then request a new single-use authority. Do not modify this run or reuse its authorization."
+  },
+  "excludedClaims": [
+    "OpenHands boundary qualification",
+    "model behavior qualification",
+    "integrated runtime qualification",
+    "workflow or process-control authority",
+    "production readiness"
+  ],
+  "authority": {
+    "attemptsAuthorized": 1,
+    "attemptsConsumed": 1,
+    "additionalAttemptsAuthorized": 0,
+    "correctiveRerunsAuthorized": 0,
+    "authorizationReusable": false
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S1_IDENTITY_AND_OFFLINE_HARNESS_ACCEPTANCE",
+  "status": "ACCEPTED_FROZEN_NOT_AUTHORIZED_FOR_MEASURED_EXECUTION",
+  "acceptedOn": "2026-08-14",
+  "timePrecision": "DAY",
+  "principalStatement": "ACCEPT/FREEZE and proceed as you propose.",
+  "acceptedArtifacts": {
+    "executionIdentity": {
+      "path": "investigations/sma-q1/layered/sma-s1-execution-identity-p2m-candidate-7.json",
+      "sha256": "e67d731d4d4ab8936c3ccf8d89c336614f5049ee6294029c5fce94d27d28774f",
+      "disposition": "ACCEPTED_FROZEN"
+    },
+    "offlineHarnessQualification": {
+      "path": "OUTPUT/phase-3/sma-s1-p2m-candidate-7-offline-harness-qualification.json",
+      "sha256": "1174d5743b88be2f22210b448ebbbf80430164654daae4195d201b2d350eabe9",
+      "disposition": "ACCEPTED_FROZEN"
+    }
+  },
+  "boundSmaIdentity": {
+    "commit": "5d58be508c74ae8577d2fd31e3346be23a912ab3",
+    "tree": "7222410443a6041496a5c313b2549f16eb937458",
+    "serviceArtifactSHA256": "c0ddb963798d45603c2e2685744892c40d3e841817f9c966ab7fad34f7e48765"
+  },
+  "authorityBoundary": {
+    "identityAccepted": true,
+    "offlineHarnessAccepted": true,
+    "preflightAuthorized": true,
+    "measuredExecutionAuthorized": false,
+    "measuredExecutionAttemptsAuthorized": 0,
+    "measuredExecutionState": "NOT_RUN",
+    "singleUseAuthorizationStillRequired": true
+  }
+}

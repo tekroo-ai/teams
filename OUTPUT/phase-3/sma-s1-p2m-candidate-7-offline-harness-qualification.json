@@ -1,0 +1,46 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S1_OFFLINE_HARNESS_QUALIFICATION",
+  "status": "PASS_CANDIDATE_PENDING_PRINCIPAL_ACCEPTANCE",
+  "recordedOn": "2026-08-14",
+  "scope": "HARNESS_MECHANICS_ONLY_NO_SMA_PRODUCT_CREDIT",
+  "reviewer": {
+    "role": "TEAMS_QUALIFICATION_SPECIFICATION_AND_EVIDENCE_COORDINATOR",
+    "independentOfBoundSmaCodeChange": true
+  },
+  "bindings": {
+    "acceptedPreregistrationSHA256": "e663f5b732c22248adc5fab2f536dbf02dd72337f7c8428f225937e72d6a7f8c",
+    "executionIdentityPath": "investigations/sma-q1/layered/sma-s1-execution-identity-p2m-candidate-7.json",
+    "executionIdentitySHA256": "e67d731d4d4ab8936c3ccf8d89c336614f5049ee6294029c5fce94d27d28774f",
+    "harnessSHA256": "cbb3d1ac8b053817d84f8eb060af6ce28be7bc67abea77cc5a1b3993f29b0d92",
+    "fixtureDriverSHA256": "283a537f6bb8c1e4d59e0c74e16ca97f2c696820ea1793d0f650fd2852579235",
+    "driverProtocolSHA256": "24d28b526af7d533c1d551b6cdc3d0c15a16f07615945ea570af9dd401374cad",
+    "machineReceiptPath": "OUTPUT/phase-3/sma-s1-harness-p2m-candidate-7/self-test-receipt.json",
+    "machineReceiptSHA256": "715933557d86c606f12a0fe106157bd4efd5c419dc424b88a882a4f40a3352a5",
+    "journalPath": "OUTPUT/phase-3/sma-s1-harness-p2m-candidate-7/self-test-journal.jsonl",
+    "journalSHA256": "f60ea96a2ebc9b6916714b0ef5ca762c18a61997d75d308e2844aa4c9d3b0a21"
+  },
+  "computedResult": {
+    "requiredSelfTests": 10,
+    "passingSelfTests": 10,
+    "failingSelfTests": 0,
+    "measuredCasesExecuted": 0,
+    "executionAuthorityCreated": false,
+    "smaServiceStarted": false,
+    "mongoOrQdrantMutated": false,
+    "openhandsOrModelUsed": false
+  },
+  "qualifiedMechanics": [
+    "content address and execution fence",
+    "create-once output root",
+    "concurrent append, flush, fsync and journal order",
+    "positive and negative fault controls",
+    "pre-assertion persistence including deliberate assertion failure",
+    "timeout, cancellation and process termination",
+    "deterministic driver protocol",
+    "synthetic-secret operational-output exclusion",
+    "cleanup idempotency and inventory",
+    "receipt reconstruction from append-only journal"
+  ],
+  "conclusion": "The exact offline harness bound to execution identity e67d731d4d4ab8936c3ccf8d89c336614f5049ee6294029c5fce94d27d28774f is mechanically qualified as a candidate. This receipt does not accept the execution identity, create execution authority, or award SMA-S1 product credit."
+}

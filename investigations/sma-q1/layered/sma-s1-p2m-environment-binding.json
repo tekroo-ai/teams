@@ -1,0 +1,118 @@
+{
+  "schemaVersion": "1.0.0-candidate",
+  "recordType": "SMA_S1_ENVIRONMENT_AND_CONFIGURATION_BINDING",
+  "status": "CANDIDATE_NOT_ACCEPTED_NOT_AUTHORIZED",
+  "recordedOn": "2026-08-14",
+  "timePrecision": "DAY",
+  "sourceIdentity": {
+    "smaCommit": "5d58be508c74ae8577d2fd31e3346be23a912ab3",
+    "smaTree": "7222410443a6041496a5c313b2549f16eb937458",
+    "isolatedWorktree": "/Users/paul/work/tekroo-ai/sma-s1-p2m",
+    "worktreeMode": "DETACHED_EXACT_COMMIT",
+    "worktreeCleanAfterBuild": true
+  },
+  "host": {
+    "os": "macOS 26.5.2 build 25F84",
+    "architecture": "aarch64",
+    "physicalMemoryBytes": 137438953472,
+    "physicalCpuCount": 18,
+    "logicalCpuCount": 18,
+    "filesystemAvailableKiBAtObservation": 4736964664,
+    "java": "Eclipse Temurin OpenJDK 21.0.12+8 LTS aarch64",
+    "maven": "Apache Maven 3.9.16 commit 2bdd9fddda4b155ebf8000e807eb73fd829a51d5",
+    "locale": "en_US",
+    "encoding": "UTF-8"
+  },
+  "processLimits": {
+    "cpuTimeSeconds": "unlimited",
+    "fileSizeBlocks": "unlimited",
+    "dataSegmentKiB": "unlimited",
+    "stackKiB": 8176,
+    "coreFileBlocks": 0,
+    "addressSpaceKiB": "unlimited",
+    "lockedMemoryKiB": "unlimited",
+    "userProcesses": 10666,
+    "openFileDescriptors": 1048575,
+    "kernelMaxFiles": 491520,
+    "kernelMaxFilesPerProcess": 245760
+  },
+  "pressureBaselineObservation": {
+    "pageSizeBytes": 16384,
+    "pagesFree": 277052,
+    "pagesActive": 1959051,
+    "pagesInactive": 1812429,
+    "pagesSpeculative": 160077,
+    "pagesThrottled": 0,
+    "pagesWired": 357086,
+    "pagesOccupiedByCompressor": 3696211,
+    "refreshImmediatelyBeforeMeasuredExecutionRequired": true
+  },
+  "mongodb": {
+    "uri": "mongodb://127.0.0.1:27017",
+    "serverVersion": "8.3.4",
+    "serverGitVersion": "4b03e7daaa316c78b9bf433046dba81637d581c0",
+    "driverVersion": "5.3.1",
+    "topology": "SINGLE_MEMBER_REPLICA_SET",
+    "replicaSet": "rs0",
+    "primary": "127.0.0.1:27017",
+    "members": [
+      "127.0.0.1:27017"
+    ],
+    "bindIp": [
+      "127.0.0.1",
+      "::1"
+    ],
+    "ipv6": true,
+    "storageEngine": "wiredTiger",
+    "configurationPath": "/opt/homebrew/etc/mongod.conf",
+    "databasePath": "/opt/homebrew/var/mongodb",
+    "authorizationConfigurationObservation": "NOT_PRESENT_IN_GETCMDLINEOPTS"
+  },
+  "qdrant": {
+    "restEndpoint": "http://127.0.0.1:6333",
+    "grpcHost": "127.0.0.1",
+    "grpcPort": 6334,
+    "tls": false,
+    "serverVersion": "1.18.2",
+    "serverCommit": "44ad62f8cd69642be5afa6441612525e24a0d063",
+    "clientVersion": "1.17.0",
+    "clusterEnabled": false,
+    "recoveryMode": false,
+    "lowMemoryMode": "disabled",
+    "observedCoreCount": 18,
+    "observedRamKiB": 134217728,
+    "existingNonQualificationCollections": [
+      "episodic_embeddings",
+      "semantic_embeddings"
+    ],
+    "qualificationCollectionContract": {
+      "vectorDimension": 768,
+      "distance": "Cosine",
+      "shards": 1,
+      "replicationFactor": 1,
+      "writeConsistencyFactor": 1
+    }
+  },
+  "nonSecretProductConfiguration": {
+    "semanticAcceptanceThreshold": 0.5,
+    "maximumBridgeResults": 3,
+    "maximumBridgeContextCharacters": 4096,
+    "acceptedScientificMaximumInjectedMemories": 5,
+    "acceptedScientificMaximumInjectedContextCharacters": 10000,
+    "contextServiceHardDeadlineMilliseconds": 500,
+    "maximumConcurrentChannels": 4,
+    "maximumQueuedOperations": 8,
+    "embeddingFixture": "MODEL_FREE_ORTHOGONAL_BASIS_VECTOR_DIMENSION_768",
+    "clock": "FIXED_2026-08-13T00:00:00Z",
+    "modelOrOpenHandsAllowed": false,
+    "productionOrHistoricalDataAllowed": false,
+    "stderrPolicy": "CONTENT_FREE_AND_SUPPRESSED_BY_DRIVER"
+  },
+  "measuredExecutionFence": {
+    "measuredExecutionAuthorized": false,
+    "measuredExecutionState": "NOT_RUN",
+    "immediateServiceIdentityRecheckRequired": true,
+    "immediatePressureRefreshRequired": true,
+    "immediateNamespaceAbsenceProofRequired": true
+  }
+}

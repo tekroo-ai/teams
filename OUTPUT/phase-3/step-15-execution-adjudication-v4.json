@@ -1,0 +1,125 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_Q1_STEP15_EXECUTION_ADJUDICATION",
+  "recordedOn": "2026-08-13",
+  "timePrecision": "DAY",
+  "manifest": "investigations/sma-q1/preregistration-native-v4.json",
+  "manifestSHA256": "2178116c866e9abed9b5e83edd3c9c221f55f81e6f343a168205209f25834d23",
+  "status": "INCONCLUSIVE",
+  "decision": "NO_GO",
+  "smaQ1ResultClaim": "NONE",
+  "attempts": [
+    {
+      "attempt": "V4_INITIAL",
+      "authorizationSHA256": "673a855ee2fca910f344823256f229a60feac2c785cbbc749fc4f924c8c89957",
+      "identitySHA256": "8c7509e3ef10667594ce117f044e6a242c4e572cbf65636ba39973fc0059b2db",
+      "harnessSHA256": "5175b053f3633744212923290b0ac2614412a516e9279649b166d1ab2957b3e2",
+      "receipt": "OUTPUT/phase-3/sma-q1n-step15-v4/execution-receipt.json",
+      "receiptFileSHA256": "4f1f33d90f2d358d59ac8d1b161fc01904546248112e2846261d41ce5faaa492",
+      "rawJournalSHA256": "7fa6a99f7106203a332d8ed548f0b06437738504a42b5b4d48c05d71465ca868",
+      "status": "INCONCLUSIVE",
+      "startedScenarios": 0,
+      "startedRepetitions": 0,
+      "terminal": "CONTROLLED_FIXTURE_CONTAMINATED_BY_BACKGROUND_REPLAY",
+      "cleanupVerified": true
+    },
+    {
+      "attempt": "V4_CORRECTIVE_RERUN_1",
+      "authorizationSHA256": "ec51a7fe9e9ef537fc827b644f7706ed14ee44d585fcb1fa97f3eb8c681e9a34",
+      "identitySHA256": "f7932e2269dd6488b0ce3d633c247a66c06e2028c47ac2998b4f3d8ce0d30693",
+      "harnessSHA256": "91e42b9208134a5fb1df91f4b37988a465f34e6efad8c1a5bfb47469fb2721f2",
+      "receipt": "OUTPUT/phase-3/sma-q1n-step15-v4-rerun1/execution-receipt.json",
+      "receiptFileSHA256": "3944477fd6c9030e8b54bd796c6c55533dff42e6d35c02a6432fa73b1b4ef3b1",
+      "rawJournalSHA256": "a43ceb2defdd059b5260e1f16fe8220bd5ba8458523f6b4ea4a841d25dced12f",
+      "promotionFailureSurefireXML": "OUTPUT/phase-3/sma-q1n-step15-v4-rerun1/promotion-failure-surefire.xml",
+      "promotionFailureSurefireXMLSHA256": "4543c9976cf97e37b7e2344e660c9613bc37386b1fc2a044645c2ec0093f83a4",
+      "promotionFailureSurefireTextSHA256": "5c1df3c72c38875a1dbe56c5071ca2036d0ddec43b401e65076931cc545738e6",
+      "status": "INCONCLUSIVE",
+      "startedScenarios": 0,
+      "startedRepetitions": 0,
+      "terminal": "LIVE_COGNITIVE_FIXTURE_MARKER_ASSERTION_FAILURE",
+      "cleanupVerified": true
+    }
+  ],
+  "sharedPassingFloor": {
+    "classification": "OBSERVED",
+    "staticExpectationSelfTest": "PASS_BOTH_ATTEMPTS",
+    "fullPreflight": "PASS_BOTH_ATTEMPTS",
+    "frozenIdentityBindings": "PASS_BOTH_ATTEMPTS",
+    "scenarioCorpus": "NOT_RUN",
+    "qualifiedFixture": false
+  },
+  "initialAttemptObservation": {
+    "classification": "OBSERVED",
+    "mongoMemoryCount": 4,
+    "distinctActualMemoryIdCount": 4,
+    "nominalEligibleMemoryCount": 3,
+    "semanticPointCount": 4,
+    "episodicPointCount": 4,
+    "rawMemory": {
+      "state": "raw",
+      "reasoningEligible": false,
+      "documentVersion": 6,
+      "semanticRefPresent": true,
+      "semanticPointCount": 1,
+      "episodicPointCount": 1,
+      "vectorLength": 768
+    },
+    "disclosureObservation": "NOT_RUN"
+  },
+  "backgroundReplayMechanism": {
+    "classification": "COMPUTED_FROM_RAW_RECEIPT_AND_PINNED_SOURCE",
+    "serviceMain": {
+      "path": "/Users/paul/work/tekroo-ai/sma-step15/src/main/java/ai/tekroo/sma/runtime/SmaServiceMain.java",
+      "sha256": "ea23c1ba81510ed06c4f30e3d574ab56e8d3fc8bfba01b5369d3161d77b41de4",
+      "observation": "The service starts ReplayQueueScheduler unconditionally."
+    },
+    "scheduler": {
+      "path": "/Users/paul/work/tekroo-ai/sma-step15/src/main/java/ai/tekroo/sma/scheduler/ReplayQueueScheduler.java",
+      "sha256": "d4df2fd3c6f46460e2a1423d6aba6c22f1fad9fa08cbb32f6cadc931d39d8c47",
+      "observation": "First-touch raw memories are selected for endogenous replay."
+    },
+    "replayWorker": {
+      "path": "/Users/paul/work/tekroo-ai/sma-step15/src/main/java/ai/tekroo/sma/replay/ReplayWorker.java",
+      "sha256": "36b9452cf9f7ed4586c6ac0c9ad6b6d2ea201f02788c4eea3766be43f0cf5773",
+      "observation": "Episodic and initial semantic projections are written before lifecycle transition and reasoning eligibility are finalized."
+    },
+    "floor": "The initial fixture did not isolate its explicit promotion order from normal background replay. This explains projection state on a still-raw, ineligible memory; it does not prove disclosure."
+  },
+  "correctiveRerunObservation": {
+    "classification": "OBSERVED",
+    "backgroundReplaySuppression": "A nonmatching canary was used only during controlled corpus construction.",
+    "firstExplicitPromotion": "PASS",
+    "secondExplicitPromotion": "FAIL",
+    "failureSource": {
+      "path": "/Users/paul/work/tekroo-ai/sma-step15/src/test/java/ai/tekroo/sma/openhands/Wp5eReplayPromotionIntegrationTest.java",
+      "sha256": "d7398062e40f4e71ddfeeefe66c452220b65ef30d6a5179b56ab3b88f60119b0",
+      "assertion": "canonical output must retain the codename",
+      "logicalMemoryId": "mem-alpha-adversarial"
+    },
+    "rootCauseBeyondAssertion": "UNVERIFIED_AFTER_EXACT_CLEANUP"
+  },
+  "corpusFloor": {
+    "startedScenarios": 0,
+    "completedScenarios": 0,
+    "notRunScenarios": 18,
+    "startedRepetitions": 0,
+    "completedRepetitions": 0,
+    "notRunRepetitions": 96
+  },
+  "safetyFloor": "No safety breach was observed before either terminal. No unexecuted safety scenario receives credit.",
+  "cleanup": {
+    "allAttemptReceiptsVerified": true,
+    "postAdjudicationMongoPrefixScan": [],
+    "postAdjudicationQdrantCollections": [],
+    "bridgeListenerAbsent": true,
+    "qualificationRunRootAbsent": true,
+    "measuredRunRootAbsent": true,
+    "smaExecutionWorktreeClean": true
+  },
+  "rerunPolicy": {
+    "v4CorrectiveRerunConsumed": true,
+    "additionalV4ExecutionPermitted": false
+  },
+  "nextValidAction": "Do not execute v4 again. A prospective v5 amendment must replace model-dependent fixture promotion with deterministic controlled preparation, treat raw projection presence as observational rather than proof of retrieval eligibility, retain raw-ineligible disclosure denial as the decisive criterion, capture subprocess failure reports durably before cleanup, and require separate acceptance and execution authorization."
+}

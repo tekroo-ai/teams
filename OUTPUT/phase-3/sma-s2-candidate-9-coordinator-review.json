@@ -1,0 +1,111 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_CANDIDATE_9_COORDINATOR_REVIEW",
+  "candidate": 9,
+  "status": "PASS_READY_FOR_PRINCIPAL_REVIEW",
+  "recordedOn": "2026-08-14",
+  "recommendation": "GO_FOR_CANDIDATE_9_PRINCIPAL_ACCEPTANCE_FREEZE_ONLY",
+  "candidatePreregistration": {
+    "path": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-9.json",
+    "sha256": "d7680cc0b7b5ed501201e4b9dcc54b089071267c75ca43e3b9fab13b95b251a8"
+  },
+  "remediationAuthorization": {
+    "path": "investigations/sma-q1/layered/sma-s2-candidate-9-harness-working-directory-remediation-authorization.json",
+    "sha256": "5b853595ed68a32c15074458ea41c45d831a6224991f4353bc4d94f536604f79"
+  },
+  "finalArtifacts": {
+    "driver": {
+      "path": "scripts/sma_s2_measured_driver_candidate_7.py",
+      "sha256": "d97b5812472a3bd674d58ac266d24ac4be783aed65984ca055d69a449ebd92cc"
+    },
+    "configuration": {
+      "path": "investigations/sma-q1/layered/sma-s2-nonsecret-configuration-candidate-9.json",
+      "sha256": "88d9e3988f75e1521200b3afe61ee5440b1e67c5e376330e837343046f13ca3b"
+    },
+    "offlineHarness": {
+      "path": "scripts/sma_s2_measured_driver_offline_harness_candidate_7.py",
+      "sha256": "2a9d35837b00fe8e6b338399a282540f259f47da9bc97bfad095acb17b85863d"
+    },
+    "offlineReceipt": {
+      "path": "OUTPUT/phase-3/sma-s2-candidate-9-offline-working-directory-qualification-2/offline-working-directory-qualification-receipt.json",
+      "sha256": "710ebd41bb647cd3d7139afa6f8c3a12815a2029d23f87ee5e9df808af1d8da1"
+    }
+  },
+  "observed": [
+    "candidate 8 and its accepted identity, consumed dress authority, receipt, raw journal, and adjudication remain unmodified",
+    "candidate 9 preserves the dedicated actor-empty workspace and exact actor-alpha/actor-beta capture allowlist",
+    "every Maven promotion subprocess receives cwd=/Users/paul/work/tekroo-ai/sma-s1-p2m explicitly",
+    "the driver uses subprocess cwd rather than changing the parent process working directory",
+    "the exact project directory and pom.xml are validated before promotion",
+    "successful promotion receipts retain exit status and sanitized stdout/stderr lengths and digests",
+    "CalledProcessError, TimeoutExpired, and OSError paths retain sanitized failure evidence without raw stdout or stderr",
+    "future identity, dress authorization, dress receipt, and measured authorization fences require the exact Maven-promotion contract",
+    "the final optimized-Python offline harness passed 13 of 13 tests",
+    "offline qualification invoked no Maven process, network service, OpenHands conversation, SMA service, deterministic stub, live rehearsal, or measured execution"
+  ],
+  "computed": {
+    "semanticCaseCount": 20,
+    "plannedMeasuredRepetitionCount": 103,
+    "predicateCount": 59,
+    "requiredEvidenceCount": 10,
+    "dressRehearsalOperationCount": 34,
+    "candidate9OfflineTestCount": 13,
+    "candidate9OfflinePassCount": 13,
+    "candidate9OfflineFailCount": 0,
+    "artifactReferencesChecked": 31,
+    "artifactReferenceMismatchCount": 0,
+    "mavenInvocations": 0,
+    "liveDressRehearsalAttempts": 0,
+    "measuredExecutionAttempts": 0
+  },
+  "inferred": [
+    "the candidate-8 working-directory failure mechanism is closed at the offline contract level",
+    "candidate 9 is ready for a candidate-specific principal acceptance/freeze decision",
+    "acceptance alone must not be construed as authorization for execution-identity creation, live preflight, live dress rehearsal, or measured execution"
+  ],
+  "negativeControls": [
+    "missing Maven-promotion contract",
+    "mutated project directory",
+    "mutated pom.xml path",
+    "implicit subprocess working directory",
+    "permission to mutate the parent working directory",
+    "missing project directory",
+    "existing non-Maven directory",
+    "CalledProcessError with raw stdout/stderr leak canaries",
+    "TimeoutExpired with byte stdout/stderr",
+    "Maven-mutated execution identity",
+    "Maven-mutated dress authorization",
+    "Python optimization and default-deny bypass"
+  ],
+  "retainedZeroCreditReceipts": [
+    {
+      "path": "OUTPUT/phase-3/sma-s2-candidate-9-offline-working-directory-qualification/offline-working-directory-qualification-receipt.json",
+      "sha256": "e03482e1f1841bbac5be04b3870b7f51ebe293a122ff1bfc38a83ea7c2fdee5b",
+      "status": "FAIL_SUPERSEDED_WITHOUT_LIVE_OR_RESULT_CREDIT",
+      "reason": "the synthetic identity fixture used an empty dependency closure rejected by the production fence"
+    }
+  ],
+  "semanticChangeAssessment": {
+    "casePredicatesChanged": false,
+    "thresholdsChanged": false,
+    "faultScheduleChanged": false,
+    "claimChanged": false,
+    "productCodeChanged": false,
+    "qualificationWorkspaceIsolationChanged": false,
+    "qualificationMavenWorkingDirectoryChanged": true,
+    "qualificationFailureEvidenceChanged": true
+  },
+  "notAuthorized": [
+    "candidate-9 acceptance or freeze by the coordinator",
+    "execution-identity creation or acceptance",
+    "live state preflight",
+    "live dress rehearsal",
+    "measured execution",
+    "Maven invocation",
+    "OpenHands conversation creation",
+    "SMA or deterministic-stub invocation",
+    "real model calls",
+    "OPENHANDS_SMA_BOUNDARY_QUALIFIED claim"
+  ],
+  "nextDecision": "PRINCIPAL_ACCEPT_FREEZE_OR_REJECT_CANDIDATE_9"
+}

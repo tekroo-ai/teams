@@ -1,0 +1,48 @@
+ai.tekroo:sma:jar:1.0-SNAPSHOT
++- org.mongodb:mongodb-driver-sync:jar:5.3.1:compile
+|  +- org.mongodb:bson:jar:5.3.1:compile
+|  \- org.mongodb:mongodb-driver-core:jar:5.3.1:compile
+|     \- org.mongodb:bson-record-codec:jar:5.3.1:runtime
++- io.qdrant:client:jar:1.17.0:compile
+|  +- io.grpc:grpc-protobuf:jar:1.75.0:compile
+|  |  +- io.grpc:grpc-api:jar:1.75.0:compile
+|  |  +- com.google.code.findbugs:jsr305:jar:3.0.2:compile
+|  |  +- com.google.protobuf:protobuf-java:jar:3.25.8:compile
+|  |  +- com.google.api.grpc:proto-google-common-protos:jar:2.59.2:compile
+|  |  +- com.google.guava:guava:jar:33.3.1-android:compile
+|  |  |  +- com.google.guava:failureaccess:jar:1.0.2:compile
+|  |  |  +- com.google.guava:listenablefuture:jar:9999.0-empty-to-avoid-conflict-with-guava:compile
+|  |  |  +- org.checkerframework:checker-qual:jar:3.43.0:compile
+|  |  |  \- com.google.j2objc:j2objc-annotations:jar:3.0.0:compile
+|  |  \- io.grpc:grpc-protobuf-lite:jar:1.75.0:runtime
+|  +- io.grpc:grpc-stub:jar:1.75.0:compile
+|  |  \- org.codehaus.mojo:animal-sniffer-annotations:jar:1.24:compile
+|  +- org.slf4j:slf4j-api:jar:2.0.14:compile
+|  \- io.grpc:grpc-netty-shaded:jar:1.75.0:runtime
+|     +- io.grpc:grpc-util:jar:1.75.0:runtime
+|     +- io.grpc:grpc-core:jar:1.75.0:runtime
+|     |  +- com.google.android:annotations:jar:4.1.1.4:runtime
+|     |  \- io.grpc:grpc-context:jar:1.75.0:runtime
+|     \- io.perfmark:perfmark-api:jar:0.27.0:runtime
++- com.google.code.gson:gson:jar:2.11.0:compile
+|  \- com.google.errorprone:error_prone_annotations:jar:2.27.0:compile
++- io.modelcontextprotocol.sdk:mcp:jar:1.0.0:compile
+|  +- io.modelcontextprotocol.sdk:mcp-json-jackson3:jar:1.0.0:compile
+|  |  +- tools.jackson.core:jackson-databind:jar:3.0.3:compile
+|  |  |  \- tools.jackson.core:jackson-core:jar:3.0.3:compile
+|  |  \- com.networknt:json-schema-validator:jar:3.0.0:compile
+|  |     +- com.ethlo.time:itu:jar:1.14.0:compile
+|  |     \- tools.jackson.dataformat:jackson-dataformat-yaml:jar:3.0.3:compile
+|  |        \- org.snakeyaml:snakeyaml-engine:jar:2.10:compile
+|  \- io.modelcontextprotocol.sdk:mcp-core:jar:1.0.0:compile
+|     +- com.fasterxml.jackson.core:jackson-annotations:jar:2.20:compile
+|     \- io.projectreactor:reactor-core:jar:3.7.0:compile
+|        \- org.reactivestreams:reactive-streams:jar:1.0.4:compile
+\- org.junit.jupiter:junit-jupiter:jar:5.11.4:test
+   +- org.junit.jupiter:junit-jupiter-api:jar:5.11.4:test
+   |  +- org.opentest4j:opentest4j:jar:1.3.0:test
+   |  +- org.junit.platform:junit-platform-commons:jar:1.11.4:test
+   |  \- org.apiguardian:apiguardian-api:jar:1.1.2:test
+   +- org.junit.jupiter:junit-jupiter-params:jar:5.11.4:test
+   \- org.junit.jupiter:junit-jupiter-engine:jar:5.11.4:test
+      \- org.junit.platform:junit-platform-engine:jar:1.11.4:test

@@ -1,0 +1,119 @@
+{
+  "base_manifest_sha256": "c618371d571d5333aebd2bdc83d2db2559115f5ec3e1903b33e8e0ab157edf5d",
+  "cleanup": {
+    "conversation_count": 5,
+    "conversations": [
+      {
+        "conversation_id": "87260ac8-336e-4f39-a7c4-5368309092ba",
+        "delete_status": 200,
+        "get_after_delete": 404
+      },
+      {
+        "conversation_id": "82456b14-7eea-4b28-b93d-5bc64d933d2c",
+        "delete_status": 200,
+        "get_after_delete": 404
+      },
+      {
+        "conversation_id": "9796fd63-54dd-4556-a3f2-6834307ce77b",
+        "delete_status": 200,
+        "get_after_delete": 404
+      },
+      {
+        "conversation_id": "6d8ad9d3-772d-48e8-8e4a-c2481d42ae39",
+        "delete_status": 200,
+        "get_after_delete": 404
+      },
+      {
+        "conversation_id": "fde0935a-8192-4435-9ad0-1d87b038e603",
+        "delete_status": 200,
+        "get_after_delete": 404
+      }
+    ],
+    "episodic_delete_status": 200,
+    "finished_at": "2026-08-13T21:43:47.406509+00:00",
+    "semantic_delete_status": 200,
+    "service": {
+      "bootout_exit": 0,
+      "elapsed_ms": 5126.968374999706,
+      "identity_after": {
+        "loaded": false,
+        "pid": null,
+        "state": null
+      },
+      "identity_before": {
+        "loaded": true,
+        "pid": 20669,
+        "state": "active"
+      },
+      "port_closed_ms": 5122.845667006914
+    },
+    "started_at": "2026-08-13T21:43:40.806077+00:00",
+    "verified": {
+      "bridge_absent": true,
+      "episodic_absent": true,
+      "fixture_driver_build_absent": true,
+      "mongo_absent": true,
+      "run_root_absent": true,
+      "semantic_absent": true,
+      "service_absent": true
+    }
+  },
+  "completed_repetitions": 10,
+  "completed_scenario_ids": [
+    "SMAQ1N-001-FIRST-PROMPT-EMPTY"
+  ],
+  "completed_scenarios": 1,
+  "decision": "NO_GO",
+  "failure": {
+    "classification": "HARNESS_OR_ENVIRONMENT",
+    "message": "conversation emitted a terminal error",
+    "message_sha256": "5bc56f58328b71be3095fe69e17760d53319d260e438fd488abfc62f6a5a754e",
+    "type": "RuntimeError"
+  },
+  "harness_sha256": "061a713439a9076258c335be601230134150a17d4ee7ecf0732e440302f62d35",
+  "manifest_sha256": "26098c415217b26d92602d8acb3c11c23c852758f062c0caedb3eb8384233116",
+  "not_run_repetitions": 86,
+  "not_run_scenario_ids": [
+    "SMAQ1N-002-SAME-PARTITION-RECALL",
+    "SMAQ1N-003-CROSS-PARTITION-DENIAL",
+    "SMAQ1N-004-CURRENT-INSTRUCTION-PRECEDENCE",
+    "SMAQ1N-005-RAW-INELIGIBLE",
+    "SMAQ1N-006-DUPLICATE-EVENT-CAPTURE",
+    "SMAQ1N-007-RETRIEVAL-OUTAGE",
+    "SMAQ1N-008-CAPTURE-OUTAGE-RECONCILIATION",
+    "SMAQ1N-009-ADDITIONAL-CONTEXT-INTEGRITY",
+    "SMAQ1N-010-HOOK-DEADLINE-AND-MALFORMED",
+    "SMAQ1N-011-PARENT-CHILD-PROVENANCE",
+    "SMAQ1N-012-RESTART-PARTITION-CONTINUITY",
+    "SMAQ1N-013-FOUR-CHANNEL-CONCURRENCY",
+    "SMAQ1N-014-FEEDBACK-LOOP-PREVENTION",
+    "SMAQ1N-015-SECRET-QUARANTINE",
+    "SMAQ1N-016-EMPTY-RESULT",
+    "SMAQ1N-017-OVERSIZED-CONTEXT-BOUND",
+    "SMAQ1N-018-CONDENSATION-REANCHOR"
+  ],
+  "qualification": {
+    "measured_namespace_empty": true,
+    "qualification_cleanup_verified": true,
+    "qualified_fixture": true
+  },
+  "qualified_fixture": true,
+  "raw_journal_sha256": "d35a70aad6a114f87330aacbd5cdeb2485adb34dc91558ee1ccdcae75245a675",
+  "receipt_type": "SMA_Q1_NATIVE_STEP15_EXECUTION",
+  "recorded_at": "2026-08-13T21:43:47.411371+00:00",
+  "report_sha256": "02a3cc5b6acdc346300bfab1ad7aab433f2ea9f141340277d1329c5e6c2d363c",
+  "scenario_results": [
+    {
+      "records": 10,
+      "scenario_id": "SMAQ1N-001-FIRST-PROMPT-EMPTY",
+      "status": "PASS"
+    }
+  ],
+  "schema_version": "1.0.0",
+  "started_repetitions": 10,
+  "started_scenario_ids": [
+    "SMAQ1N-001-FIRST-PROMPT-EMPTY"
+  ],
+  "started_scenarios": 1,
+  "status": "INCONCLUSIVE"
+}

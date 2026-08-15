@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "1.0.0",
+  "contractIdentity": "tekroo.event-export.contracts/0.1.0",
+  "invariants": [
+    {"id": "EE-001", "text": "Export is read-only: opening, reading, timing out, disconnecting, resuming, and resynchronizing never claim, resolve, readdress, mutate, or delete an outbox intent or organizational record."},
+    {"id": "EE-002", "text": "Every successful response is authenticated and authorized for its exact source_id before any event bytes are disclosed."},
+    {"id": "EE-003", "text": "Every record carries the exact persisted DomainEvent bytes plus their SHA-256 digest and byte length; parsed metadata never substitutes for those bytes."},
+    {"id": "EE-004", "text": "EventID is the deduplication identity. Delivery is at-least-once; reconnect and resynchronization may repeat an EventID and must not silently omit an eligible event."},
+    {"id": "EE-005", "text": "An export cursor is opaque, integrity-protected, source-bound, principal-bound operational state. It never defines event identity, organizational order, causality, authority, acceptance, or completion."},
+    {"id": "EE-006", "text": "Initial convergence opens the live observation boundary before reading bounded backlog."},
+    {"id": "EE-007", "text": "Invalid, mismatched, tampered, expired, or history-lost cursor state never falls through to an apparently continuous stream; the response is RESYNC_REQUIRED or a closed failure."},
+    {"id": "EE-008", "text": "After RESYNC_REQUIRED, a consumer opens a fresh live boundary before replaying bounded backlog and deduplicates all repeated EventIDs."},
+    {"id": "EE-009", "text": "Each operation has a caller deadline, a server limit no greater than 1000 records, a wait no greater than 30 seconds, and observable terminal status."},
+    {"id": "EE-010", "text": "Telemetry is content-free: it may include counts, durations, status, source identity, cursor digest, event digest, and byte length, but not payload, prompt, response, secret, or event bytes."},
+    {"id": "EE-011", "text": "The source contract identity and exact source manifest SHA-256 accompany every successful response."},
+    {"id": "EE-012", "text": "The export boundary does not interpret payload meaning and does not upconvert an event into organizational truth beyond the immutable event record itself."}
+  ]
+}

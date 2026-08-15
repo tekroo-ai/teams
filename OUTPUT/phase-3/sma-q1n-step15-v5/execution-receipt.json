@@ -1,0 +1,67 @@
+{
+  "base_manifest_sha256": "c618371d571d5333aebd2bdc83d2db2559115f5ec3e1903b33e8e0ab157edf5d",
+  "cleanup": {
+    "conversation_count": 0,
+    "conversations": [],
+    "finished_at": "2026-08-13T20:18:09.816022+00:00",
+    "service": {
+      "already_stopped": true,
+      "listener": null
+    },
+    "started_at": "2026-08-13T20:18:08.922225+00:00",
+    "verified": {
+      "bridge_absent": true,
+      "episodic_absent": true,
+      "fixture_driver_build_absent": true,
+      "mongo_absent": true,
+      "run_root_absent": true,
+      "semantic_absent": true,
+      "service_absent": true
+    }
+  },
+  "completed_repetitions": 0,
+  "completed_scenario_ids": [],
+  "completed_scenarios": 0,
+  "decision": "NO_GO",
+  "failure": {
+    "classification": "HARNESS_OR_ENVIRONMENT",
+    "message": "qualification same-partition retrieval missed expected memory",
+    "message_sha256": "0b6da138dbd237766d1ce6802a6afaefe08f3c928b590f3b44141dc5a02e2a2e",
+    "type": "RuntimeError"
+  },
+  "harness_sha256": "45b9412e879d76d2beef957efdc23d7a9f7585e4e4820774ba5fb387c599872e",
+  "manifest_sha256": "21030ef4a7004217401b0243e5bb7e94be6bc44ecb9869873a72f112fe676422",
+  "not_run_repetitions": 96,
+  "not_run_scenario_ids": [
+    "SMAQ1N-001-FIRST-PROMPT-EMPTY",
+    "SMAQ1N-002-SAME-PARTITION-RECALL",
+    "SMAQ1N-003-CROSS-PARTITION-DENIAL",
+    "SMAQ1N-004-CURRENT-INSTRUCTION-PRECEDENCE",
+    "SMAQ1N-005-RAW-INELIGIBLE",
+    "SMAQ1N-006-DUPLICATE-EVENT-CAPTURE",
+    "SMAQ1N-007-RETRIEVAL-OUTAGE",
+    "SMAQ1N-008-CAPTURE-OUTAGE-RECONCILIATION",
+    "SMAQ1N-009-ADDITIONAL-CONTEXT-INTEGRITY",
+    "SMAQ1N-010-HOOK-DEADLINE-AND-MALFORMED",
+    "SMAQ1N-011-PARENT-CHILD-PROVENANCE",
+    "SMAQ1N-012-RESTART-PARTITION-CONTINUITY",
+    "SMAQ1N-013-FOUR-CHANNEL-CONCURRENCY",
+    "SMAQ1N-014-FEEDBACK-LOOP-PREVENTION",
+    "SMAQ1N-015-SECRET-QUARANTINE",
+    "SMAQ1N-016-EMPTY-RESULT",
+    "SMAQ1N-017-OVERSIZED-CONTEXT-BOUND",
+    "SMAQ1N-018-CONDENSATION-REANCHOR"
+  ],
+  "qualification": null,
+  "qualified_fixture": false,
+  "raw_journal_sha256": "8a73cb7df41daeb90d48bf495adc1a5d44964544a8d0f8a37980d1cdad176da0",
+  "receipt_type": "SMA_Q1_NATIVE_STEP15_EXECUTION",
+  "recorded_at": "2026-08-13T20:18:09.819302+00:00",
+  "report_sha256": "96f2243d11cf0fd7de250e3ba0a6d7f428cc0ca09e0dd857ae390dc8dcdc62e3",
+  "scenario_results": [],
+  "schema_version": "1.0.0",
+  "started_repetitions": 0,
+  "started_scenario_ids": [],
+  "started_scenarios": 0,
+  "status": "INCONCLUSIVE"
+}

@@ -1,0 +1,129 @@
+{
+  "base_manifest_sha256": "c618371d571d5333aebd2bdc83d2db2559115f5ec3e1903b33e8e0ab157edf5d",
+  "cleanup": {
+    "conversation_count": 7,
+    "conversations": [
+      {
+        "conversation_id": "6ba7ebda-7685-4432-baae-9b638c48dd4d",
+        "delete_status": 200,
+        "get_after_delete": 404
+      },
+      {
+        "conversation_id": "295742cb-206c-4d6a-9cff-82e5807da9d1",
+        "delete_status": 200,
+        "get_after_delete": 404
+      },
+      {
+        "conversation_id": "4acf071f-b5c9-47fc-bf16-fcab3a964ca6",
+        "delete_status": 200,
+        "get_after_delete": 404
+      },
+      {
+        "conversation_id": "c01e9cb0-c7e7-4073-9b3c-f17af86a462c",
+        "delete_status": 200,
+        "get_after_delete": 404
+      },
+      {
+        "conversation_id": "ff65e11d-064a-40b6-910f-b79fc0723f35",
+        "delete_status": 200,
+        "get_after_delete": 404
+      },
+      {
+        "conversation_id": "e62a5c30-2706-4ac0-b96a-d7d60b257b1e",
+        "delete_status": 200,
+        "get_after_delete": 404
+      },
+      {
+        "conversation_id": "0d7e029a-ba92-40a2-96f5-73e70d390211",
+        "delete_status": 200,
+        "get_after_delete": 404
+      }
+    ],
+    "episodic_delete_status": 200,
+    "finished_at": "2026-08-13T20:42:35.270359+00:00",
+    "semantic_delete_status": 200,
+    "service": {
+      "bootout_exit": 0,
+      "elapsed_ms": 5081.484500027727,
+      "identity_after": {
+        "loaded": false,
+        "pid": null,
+        "state": null
+      },
+      "identity_before": {
+        "loaded": true,
+        "pid": 4786,
+        "state": "active"
+      },
+      "port_closed_ms": 5076.606957998592
+    },
+    "started_at": "2026-08-13T20:42:28.322583+00:00",
+    "verified": {
+      "bridge_absent": true,
+      "episodic_absent": true,
+      "fixture_driver_build_absent": true,
+      "mongo_absent": true,
+      "run_root_absent": true,
+      "semantic_absent": true,
+      "service_absent": true
+    }
+  },
+  "completed_repetitions": 12,
+  "completed_scenario_ids": [
+    "SMAQ1N-001-FIRST-PROMPT-EMPTY"
+  ],
+  "completed_scenarios": 1,
+  "decision": "NO_GO",
+  "failure": {
+    "classification": "HARNESS_OR_ENVIRONMENT",
+    "message": "conversation emitted a terminal error",
+    "message_sha256": "5bc56f58328b71be3095fe69e17760d53319d260e438fd488abfc62f6a5a754e",
+    "type": "RuntimeError"
+  },
+  "harness_sha256": "495735e076958e3f1f8435ce1ff57f8c10568f9545c2033ba6b5ac71b40b2f51",
+  "manifest_sha256": "3b025b9adf135918ec0d955ef6cb59bbd46f26aec963611b1f846a2c0f15037e",
+  "not_run_repetitions": 84,
+  "not_run_scenario_ids": [
+    "SMAQ1N-003-CROSS-PARTITION-DENIAL",
+    "SMAQ1N-004-CURRENT-INSTRUCTION-PRECEDENCE",
+    "SMAQ1N-005-RAW-INELIGIBLE",
+    "SMAQ1N-006-DUPLICATE-EVENT-CAPTURE",
+    "SMAQ1N-007-RETRIEVAL-OUTAGE",
+    "SMAQ1N-008-CAPTURE-OUTAGE-RECONCILIATION",
+    "SMAQ1N-009-ADDITIONAL-CONTEXT-INTEGRITY",
+    "SMAQ1N-010-HOOK-DEADLINE-AND-MALFORMED",
+    "SMAQ1N-011-PARENT-CHILD-PROVENANCE",
+    "SMAQ1N-012-RESTART-PARTITION-CONTINUITY",
+    "SMAQ1N-013-FOUR-CHANNEL-CONCURRENCY",
+    "SMAQ1N-014-FEEDBACK-LOOP-PREVENTION",
+    "SMAQ1N-015-SECRET-QUARANTINE",
+    "SMAQ1N-016-EMPTY-RESULT",
+    "SMAQ1N-017-OVERSIZED-CONTEXT-BOUND",
+    "SMAQ1N-018-CONDENSATION-REANCHOR"
+  ],
+  "qualification": {
+    "measured_namespace_empty": true,
+    "qualification_cleanup_verified": true,
+    "qualified_fixture": true
+  },
+  "qualified_fixture": true,
+  "raw_journal_sha256": "f814086ef4dd917a63ab3487bf71888420d99de22308272de318fe54392177ea",
+  "receipt_type": "SMA_Q1_NATIVE_STEP15_EXECUTION",
+  "recorded_at": "2026-08-13T20:42:35.274165+00:00",
+  "report_sha256": "e774dcc035e09888c961fa733ab95d2b2d43e1f28d253d4e41d450c8b5ba6d5f",
+  "scenario_results": [
+    {
+      "records": 10,
+      "scenario_id": "SMAQ1N-001-FIRST-PROMPT-EMPTY",
+      "status": "PASS"
+    }
+  ],
+  "schema_version": "1.0.0",
+  "started_repetitions": 12,
+  "started_scenario_ids": [
+    "SMAQ1N-001-FIRST-PROMPT-EMPTY",
+    "SMAQ1N-002-SAME-PARTITION-RECALL"
+  ],
+  "started_scenarios": 2,
+  "status": "INCONCLUSIVE"
+}

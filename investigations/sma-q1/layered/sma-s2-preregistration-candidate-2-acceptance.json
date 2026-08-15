@@ -1,0 +1,88 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_PREREGISTRATION_ACCEPTANCE",
+  "acceptanceId": "SMA-S2-PREREGISTRATION-CANDIDATE-2-ACCEPTANCE",
+  "status": "ACCEPTED_FROZEN_PREREGISTRATION_MEASURED_EXECUTION_NOT_AUTHORIZED",
+  "recordedOn": "2026-08-14",
+  "principalStatement": "ACCEPT/FREEZE SMA-S2 preregistration candidate 2, identity b7315835b6291d44d3d8cb918dbec1f16c1e64f2106fd70212c6a8f7ec678188. This acceptance does not authorize measured S2 execution.",
+  "acceptedPreregistration": {
+    "path": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-2.json",
+    "sha256": "b7315835b6291d44d3d8cb918dbec1f16c1e64f2106fd70212c6a8f7ec678188",
+    "caseCount": 20,
+    "plannedRepetitionCount": 103,
+    "acceptedFrozen": true,
+    "editableInPlace": false
+  },
+  "boundPackage": {
+    "boundaryIdentity": {
+      "path": "investigations/sma-q1/layered/sma-s2-boundary-identity-candidate-2.json",
+      "sha256": "39114c2f217558a96496dea5e180e3e1c7d6ab02f293bf4e50de08293cbe6a0a"
+    },
+    "nonSecretConfiguration": {
+      "path": "investigations/sma-q1/layered/sma-s2-nonsecret-configuration-candidate-2.json",
+      "sha256": "09c78fdc1ca95c4277222ac1f106357af9df9fddb4099fcd83222a3df89291d1"
+    },
+    "successorReadiness": {
+      "path": "OUTPUT/phase-3/sma-s2-successor-preparation-readiness-candidate-2.json",
+      "sha256": "8cd66b662e89b78c34486b880356e977989d5a46e355a939a65b637cf1209d3d",
+      "status": "REMEDIATION_PASS_SUCCESSOR_READY_FOR_INDEPENDENT_REVIEW_NOT_ACCEPTED_NOT_AUTHORIZED"
+    },
+    "offlineQualification": {
+      "path": "OUTPUT/phase-3/sma-s2-successor-candidate-1-offline-harness/offline-harness-receipt.json",
+      "sha256": "e636595264bc7cb87bccb3a7d19372e8e4295bea27dbecee5796e0f64958eda0",
+      "status": "PASS",
+      "testCount": 9,
+      "passCount": 9,
+      "failCount": 0
+    },
+    "remediationAuthorizationConsumption": {
+      "path": "investigations/sma-q1/layered/sma-s2-successor-remediation-authorization-consumption.json",
+      "sha256": "7ae55971bd010acc48fc27deefc5dc9e5d86ba00dd89153f1f60d6b0d8f165e4",
+      "status": "CONSUMED_COMPLETE_NO_REUSE"
+    }
+  },
+  "independentReview": {
+    "reviewer": "WORKSPACE_PRINCIPAL",
+    "designation": {
+      "path": "investigations/sma-q1/layered/sma-s2-independent-reviewer-designation.json",
+      "sha256": "1afa7c23963c69b9a2eff4d79cb4694d1f819fef94164d87a50d13ad946ac8ac"
+    },
+    "candidate1Disposition": "NO_GO_REMEDIATED_BY_ACCEPTED_SUCCESSOR",
+    "candidate2Decision": "ACCEPT_FREEZE"
+  },
+  "acceptedScope": {
+    "layer": "SMA-S2",
+    "decisiveQuestion": "Does the frozen supported OpenHands integration preserve the current prompt, place bounded untrusted SMA context correctly, fail open, retain provenance, and terminate cleanly when model behavior is deterministic?",
+    "executionPlanAccepted": true,
+    "qualifiedClaimEarned": false,
+    "claimOnFuturePass": "OPENHANDS_SMA_BOUNDARY_QUALIFIED"
+  },
+  "excludedClaims": [
+    "SMA-S2 measured PASS",
+    "OPENHANDS_SMA_BOUNDARY_QUALIFIED",
+    "generative model behavior qualification",
+    "integrated runtime qualification",
+    "workflow or process-control authority",
+    "production readiness"
+  ],
+  "immutability": {
+    "acceptedPreregistrationMayBeEditedInPlace": false,
+    "boundPackageMayBeEditedInPlace": false,
+    "successorRecordRequiredForAnyCorrection": true,
+    "postObservationRegradingAllowed": false
+  },
+  "authority": {
+    "preregistrationAcceptedFrozen": true,
+    "executionIdentityPreparationAuthorized": false,
+    "preflightExecutionAuthorized": false,
+    "measuredAttemptAuthorizationPresent": false,
+    "measuredExecutionAuthorized": false,
+    "measuredExecutionState": "NOT_RUN",
+    "productionDeploymentAuthorized": false
+  },
+  "nextSeparateGate": {
+    "requiredAction": "prepare and seal one immediate S2 execution identity and preflight receipt against this frozen package",
+    "requiresSeparatePrincipalAuthorization": true,
+    "measuredExecutionStillRequiresLaterSingleUseAuthorization": true
+  }
+}

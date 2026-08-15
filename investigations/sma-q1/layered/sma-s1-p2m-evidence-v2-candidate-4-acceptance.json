@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S1_EVIDENCE_V2_CANDIDATE_ACCEPTANCE",
+  "acceptanceId": "SMA-S1-P2M-EVIDENCE-V2-CANDIDATE-4-ACCEPTANCE",
+  "status": "ACCEPTED_FROZEN_NOT_AUTHORIZED_FOR_MEASURED_EXECUTION",
+  "recordedOn": "2026-08-14",
+  "timePrecision": "DAY",
+  "principalStatement": "ACCEPT/FREEZE evidence-v2 candidate 4 identity d7a388816ccb4ea2c12db365de1116c445f6b8dd18eca8861f118afa7cfb8724 and offline qualification 1b54fa137a153964d6b07e9f244631e354d2ef1df1ce82c960de0bd3bb4831c1.",
+  "acceptedArtifacts": {
+    "candidateIdentity": {
+      "path": "investigations/sma-q1/layered/sma-s1-execution-identity-p2m-evidence-v2-candidate-4.json",
+      "sha256": "d7a388816ccb4ea2c12db365de1116c445f6b8dd18eca8861f118afa7cfb8724",
+      "acceptedFrozen": true
+    },
+    "offlineQualification": {
+      "path": "OUTPUT/phase-3/sma-s1-p2m-evidence-v2-candidate-4-offline-qualification.json",
+      "sha256": "1b54fa137a153964d6b07e9f244631e354d2ef1df1ce82c960de0bd3bb4831c1",
+      "acceptedFrozen": true
+    }
+  },
+  "authority": {
+    "createNonAuthorizingSealedSuccessor": true,
+    "runZeroCreditOfflineControls": true,
+    "performReadOnlyPreflight": true,
+    "measuredExecutionAuthorized": false,
+    "executionAttemptsAuthorized": 0,
+    "executionStarted": false,
+    "measuredCasesExecuted": 0,
+    "executionState": "NOT_RUN"
+  },
+  "immutability": {
+    "acceptedArtifactsMayBeEditedInPlace": false,
+    "successorIdentityRequired": true,
+    "newSingleUseAuthorizationRequiredForMeasuredExecution": true
+  }
+}

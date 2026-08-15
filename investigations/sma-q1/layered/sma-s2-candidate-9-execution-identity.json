@@ -1,0 +1,150 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_CANDIDATE_9_EXECUTION_IDENTITY",
+  "candidate": 9,
+  "status": "ACCEPTED_FROZEN_EXECUTION_IDENTITY",
+  "reviewStateAtPublication": "PREPARED_PENDING_SEPARATE_PRINCIPAL_ACCEPTANCE",
+  "effectiveOnlyWithSeparatePrincipalAcceptanceRecord": true,
+  "recordedAt": "2026-08-14T22:07:03Z",
+  "measuredExecutionAuthorized": false,
+  "sourceAuthority": {
+    "path": "investigations/sma-q1/layered/sma-s2-candidate-9-execution-identity-preparation-authorization.json",
+    "sha256": "67c4ea0f9542b1ed50a08a7b527d81b0a2b1df676028456546bf622b064b055d"
+  },
+  "driver": {
+    "path": "scripts/sma_s2_measured_driver_candidate_7.py",
+    "sha256": "d97b5812472a3bd674d58ac266d24ac4be783aed65984ca055d69a449ebd92cc"
+  },
+  "corpus": {
+    "path": "investigations/sma-q1/layered/sma-s2-measured-corpus-candidate-1.json",
+    "sha256": "c273c148a7b289f6650a26a82c38bda9680904701120e083543e9b7954b9a960"
+  },
+  "configuration": {
+    "path": "investigations/sma-q1/layered/sma-s2-nonsecret-configuration-candidate-9.json",
+    "sha256": "88d9e3988f75e1521200b3afe61ee5440b1e67c5e376330e837343046f13ca3b"
+  },
+  "oracleMatrix": {
+    "path": "investigations/sma-q1/layered/sma-s2-predicate-oracle-matrix-candidate-4.json",
+    "sha256": "806e12a59dd8dcbc8f248d0a8d486c1afb856fc310e1952f7855e9fdf955d4f4"
+  },
+  "stub": {
+    "path": "scripts/sma_s2_deterministic_model_stub_candidate_3.py",
+    "sha256": "fffbea327321af9f2a6c8deaa6d71088c88db58abda11eae0f4cc082b613831e"
+  },
+  "preregistration": {
+    "path": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-9.json",
+    "sha256": "d7680cc0b7b5ed501201e4b9dcc54b089071267c75ca43e3b9fab13b95b251a8"
+  },
+  "acceptance": {
+    "path": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-9-acceptance.json",
+    "sha256": "2579d877f36da0e5a90188db8a038fa8c2cf8aada529feb0047d4e13fce5332f"
+  },
+  "dependencies": [
+    {"role": "CANDIDATE_8_DRIVER_WORKSPACE_ISOLATION_LIBRARY_NO_RESULT_CREDIT", "path": "scripts/sma_s2_measured_driver_candidate_6.py", "sha256": "717d29b96107c7cc86c1aeceeeb9b32ab9aa8776bf6b3ec18496dd86a0305d38"},
+    {"role": "CANDIDATE_7_DRIVER_TERMINAL_AND_SEED_LIBRARY_NO_RESULT_CREDIT", "path": "scripts/sma_s2_measured_driver_candidate_5.py", "sha256": "b14d75aff7c43558828b354312961adfe9a7e038daef19971f4bc7b8990eb799"},
+    {"role": "CANDIDATE_6_DRIVER_ENDPOINT_IDENTITY_LIBRARY_NO_RESULT_CREDIT", "path": "scripts/sma_s2_measured_driver_candidate_4.py", "sha256": "b58c8621997b86347acb29d13b73c9167113cdfdd79c0041599f46b46b92bb1f"},
+    {"role": "CANDIDATE_5_DRIVER_SCIENTIFIC_OPERATION_LIBRARY_NO_RESULT_CREDIT", "path": "scripts/sma_s2_measured_driver_candidate_3.py", "sha256": "6bd0cc221b6161140f12ad664e18efd472298f5d235e37925f980f9faa0b5d46"},
+    {"role": "CANDIDATE_4_DRIVER_PRIMITIVE_LIBRARY_NO_RESULT_CREDIT", "path": "scripts/sma_s2_measured_driver_candidate_2.py", "sha256": "d6c00abd077be006caed64e3c534b9baf4b376f84a3f0b3a3094636bb89f0de2"},
+    {"role": "CANDIDATE_3_DRIVER_TRANSITIVE_PRIMITIVE_LIBRARY_NO_RESULT_CREDIT", "path": "scripts/sma_s2_measured_driver_candidate_1.py", "sha256": "5f69ed4d3b439bf1d4d342c75f05781efee326fc2e1c39ad5002a92ffcc7464a"},
+    {"role": "CANDIDATE_2_STUB_BASE_BEHAVIOR", "path": "scripts/sma_s2_deterministic_model_stub_candidate_2.py", "sha256": "8013ba1dcd5db6192abce075f95dbd255ef8ada8335093cfaf0f5962f884e0f9"},
+    {"role": "SERVICE_AND_API_PRIMITIVE_LIBRARY_NO_RESULT_CREDIT", "path": "scripts/smaq1_native_step15_v4.py", "sha256": "5175b053f3633744212923290b0ac2614412a516e9279649b166d1ab2957b3e2"},
+    {"role": "ACTUALLY_IMPORTED_SERVICE_SUPPORT_CODE", "path": "/Users/paul/work/tekroo-ai/sma-step15/scripts/wp5e_restart_recovery.py", "sha256": "73857ed0734e0607a8a3a80646589d58c26e0ba338a450ecbee73fef8656677b"},
+    {"role": "BOUND_SMA_WORKTREE_SUPPORT_CODE", "path": "/Users/paul/work/tekroo-ai/sma-s1-p2m/scripts/wp5e_restart_recovery.py", "sha256": "73857ed0734e0607a8a3a80646589d58c26e0ba338a450ecbee73fef8656677b"},
+    {"role": "CANDIDATE_5_OFFLINE_SEMANTIC_MUTATION_HARNESS", "path": "scripts/sma_s2_measured_driver_offline_harness_candidate_3.py", "sha256": "69d907eb8782e44bbf5bc588bc1bf15d5cd480a0c3f6067c0ff3cc08bfd4a933"},
+    {"role": "CANDIDATE_6_OFFLINE_ENDPOINT_IDENTITY_HARNESS", "path": "scripts/sma_s2_measured_driver_offline_harness_candidate_4.py", "sha256": "665d00001478ee147415514c22635412cc287a8eecec2c6e8acb4e2b266d1e1c"},
+    {"role": "CANDIDATE_7_OFFLINE_HARNESS_REMEDIATION_HARNESS", "path": "scripts/sma_s2_measured_driver_offline_harness_candidate_5.py", "sha256": "b0a67769223baf859be372859a314275cd9b5a749f53b194545f714ea53287f3"},
+    {"role": "CANDIDATE_8_OFFLINE_WORKSPACE_ISOLATION_HARNESS", "path": "scripts/sma_s2_measured_driver_offline_harness_candidate_6.py", "sha256": "2365421604e45518826dbed4b5b03fccd445943997873e9363d5c8c2db55cd62"},
+    {"role": "CANDIDATE_9_OFFLINE_WORKING_DIRECTORY_HARNESS", "path": "scripts/sma_s2_measured_driver_offline_harness_candidate_7.py", "sha256": "2a9d35837b00fe8e6b338399a282540f259f47da9bc97bfad095acb17b85863d"}
+  ],
+  "runtimePorts": {
+    "stubHost": "127.0.0.1",
+    "stubPort": 19129,
+    "bridgeHost": "127.0.0.1",
+    "bridgePort": 8130
+  },
+  "disposableNamespaces": {
+    "mongodbDatabase": "sma_s2_successor_candidate_9_measured_20260814",
+    "qdrantSemanticCollection": "sma_s2_successor_candidate_9_semantic_20260814",
+    "qdrantEpisodicCollection": "sma_s2_successor_candidate_9_episodic_20260814",
+    "conversationPrefix": "sma-s2-successor-candidate-9-",
+    "workspaceRoot": "/tmp/tekroo-sma-s2-successor-candidate-9",
+    "emptyWorkspace": "/tmp/tekroo-sma-s2-successor-candidate-9/actor-empty",
+    "alphaWorkspace": "/tmp/tekroo-sma-s2-successor-candidate-9/actor-alpha",
+    "betaWorkspace": "/tmp/tekroo-sma-s2-successor-candidate-9/actor-beta",
+    "dressRehearsalOutputRoot": "OUTPUT/phase-3/sma-s2-candidate-9-dress-rehearsal-attempt-1",
+    "measuredOutputRoot": "OUTPUT/phase-3/sma-s2-successor-candidate-9-measured-attempt-1",
+    "absenceProofRequiredImmediatelyBeforeEveryLiveMode": true,
+    "cleanupVerificationRequired": true
+  },
+  "workspaceIsolation": {
+    "case1WorkspaceRole": "EMPTY_UNCAPTURED",
+    "case1Workspace": "/tmp/tekroo-sma-s2-successor-candidate-9/actor-empty",
+    "corpusCaptureAllowlist": [
+      "/tmp/tekroo-sma-s2-successor-candidate-9/actor-alpha",
+      "/tmp/tekroo-sma-s2-successor-candidate-9/actor-beta"
+    ],
+    "emptyWorkspaceMustNotBeCaptureAllowlisted": true,
+    "case1ConversationReceiptsRetainedUntilCleanup": true,
+    "syntheticCorpusSourceCount": 4,
+    "allWorkspacesUnderCandidateRoot": true,
+    "cleanupMustRemoveEmptyWorkspace": true
+  },
+  "mavenPromotion": {
+    "projectDirectory": "/Users/paul/work/tekroo-ai/sma-s1-p2m",
+    "pomPath": "/Users/paul/work/tekroo-ai/sma-s1-p2m/pom.xml",
+    "subprocessWorkingDirectoryMustBeExplicit": true,
+    "parentWorkingDirectoryMayChange": false,
+    "failureEvidence": {
+      "exitStatusRequired": true,
+      "stdoutLengthRequired": true,
+      "stdoutSha256Required": true,
+      "stderrLengthRequired": true,
+      "stderrSha256Required": true,
+      "rawStdoutOrStderrProhibited": true
+    }
+  },
+  "boundProductIdentity": {
+    "smaWorktree": "/Users/paul/work/tekroo-ai/sma-s1-p2m",
+    "smaCommit": "5d58be508c74ae8577d2fd31e3346be23a912ab3",
+    "smaTree": "7222410443a6041496a5c313b2549f16eb937458",
+    "smaWorktreeCleanAtPreparation": true,
+    "mavenPomPath": "/Users/paul/work/tekroo-ai/sma-s1-p2m/pom.xml",
+    "mavenPomSha256": "998b00e30f7c21d72d3fec31da6b0d0db3699947106e968efccb2f1baaef150a",
+    "smaJarPath": "/Users/paul/work/tekroo-ai/sma-s1-p2m/target/sma-1.0-SNAPSHOT.jar",
+    "smaJarSha256": "c0ddb963798d45603c2e2685744892c40d3e841817f9c966ab7fad34f7e48765",
+    "openhandsWorktree": "/Users/paul/.local/src/openhands-software-agent-sdk-1.40.1-parallel",
+    "openhandsCommit": "a338ba9b6cbb529886b755a335bae3dee0004700",
+    "openhandsTree": "9e72f1b4ee0b857025d9f170600b9dce539b169a",
+    "openhandsWorktreeCleanAtPreparation": true,
+    "agentServerExecutablePath": "/Users/paul/.cache/uv/archive-v0/vKrvIz9VszwbxPTh/bin/agent-server",
+    "agentServerExecutableSha256": "9f1a91d9a58d13a27bc0e729eac36553bb9c977797c21f5483de3340cfa682bf",
+    "agentCanvasExecutablePath": "/opt/homebrew/lib/node_modules/@openhands/agent-canvas/bin/agent-canvas.mjs",
+    "agentCanvasExecutableSha256": "133e26fb65434ddac2eee471bfc56cb8144c92452241aacd627a8cbcfde277e6"
+  },
+  "offlinePreparationAudit": {
+    "artifactCorrespondence": "PASS",
+    "dependencyClosure": "PASS",
+    "workspaceIsolationCorrespondence": "PASS",
+    "mavenPromotionCorrespondence": "PASS",
+    "mavenPomIdentity": "PASS",
+    "runtimeEndpointShape": "PASS",
+    "productSourceIdentity": "PASS",
+    "productBinaryIdentity": "PASS",
+    "liveServiceState": "NOT_RUN_NOT_AUTHORIZED",
+    "runtimePortAvailability": "NOT_RUN_NOT_AUTHORIZED",
+    "namespaceAbsence": "NOT_RUN_REQUIRED_IMMEDIATELY_BEFORE_LIVE_MODE",
+    "activeConversationAudit": "NOT_RUN_REQUIRED_IMMEDIATELY_BEFORE_LIVE_MODE",
+    "mavenInvocation": "NOT_RUN_NOT_AUTHORIZED"
+  },
+  "limits": {
+    "dressRehearsalAttempts": 1,
+    "dressRehearsalOperations": 34,
+    "dressRehearsalMeasuredCredit": 0,
+    "openhandsConversationsMaximumForDressRehearsal": 34,
+    "measuredAttemptsAuthorized": 0,
+    "measuredCaseExecutionsAuthorized": 0,
+    "measuredRepetitionExecutionsAuthorized": 0,
+    "realModelCalls": 0,
+    "serviceRestartsAuthorized": 0
+  }
+}

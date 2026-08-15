@@ -1,0 +1,63 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "EVENT_EXPORT_BOUNDARY_IMPLEMENTATION_RECEIPT",
+  "recordedOn": "2026-08-13",
+  "status": "PASS",
+  "acceptanceStatus": "CANDIDATE_NOT_ACCEPTED",
+  "deploymentStatus": "NOT_RUN",
+  "liveShadowQualification": "NOT_RUN",
+  "contract": {
+    "identity": "tekroo.event-export.contracts/0.1.0",
+    "manifestSHA256": "4aa87278b6812f967331bef98b2c7e63585b6742b39d0b64c0ff693632aa9731",
+    "sourceIdentity": "tekroo.kernel.contracts/0.7.0",
+    "sourceManifestSHA256": "e2b9b5224a860a3eaa07451cf48fb5ac16a440b22b8dd592ff1662c1cff67f16",
+    "files": 6,
+    "invariants": 12,
+    "fixtures": 10,
+    "validator": "PASS"
+  },
+  "implementation": {
+    "protocolVersion": "1.0.0",
+    "path": "/v1/event-export",
+    "delivery": "AT_LEAST_ONCE",
+    "deduplicationIdentity": "event_id",
+    "cursor": "HMAC_SOURCE_IDENTITY_TTL_BOUND",
+    "initialConvergence": "OPEN_LIVE_BEFORE_BOUNDED_BACKLOG",
+    "historyLoss": "RESYNC_REQUIRED",
+    "maximumRecords": 1000,
+    "maximumWaitMillis": 30000,
+    "outboxAccess": false,
+    "persistentExportCheckpoints": false
+  },
+  "sourceSHA256": {
+    "eventexport/types.go": "147c1bb37ffd73f67a636d715a40413d4cf9048c279731db0388601c436756f1",
+    "eventexport/service.go": "eadc65df1d226f146423f008cd7957ff4d51f75ed9050702f708ef7b54596a7d",
+    "adapters/memory/event_export.go": "cf7dac13a1b698f39073f0e0174394cc84330b33977a9b01ee17bab315cdabfe",
+    "adapters/mongo/event_export.go": "1f903528d64f02e6d512e08e2793cadc74417dd9da21ad0b411f4bb1204caa6d",
+    "adapters/eventexporthttp/handler.go": "3e01fb385483de5e11778f05a3f1fbb2c901b9a19740719e80a0d6983d66d530",
+    "adapters/eventexporthttp/security.go": "ae0226fde21ef4f254f23b2c83c7afd740d6ab1f3f8f4ae715afb46c93959937",
+    "cmd/event-export-server/main.go": "e8ffb0b0fccfa3127b5114c50b29d58c45b4abe20663e65bddc3690f073be1bb"
+  },
+  "verification": [
+    {"command": "node CONTRACTS/tekroo.event-export.contracts/0.1.0/runner/validate-package.mjs", "status": "PASS"},
+    {"command": "go test ./...", "status": "PASS"},
+    {"command": "go vet ./...", "status": "PASS"},
+    {"command": "go test -race ./eventexport ./adapters/memory ./adapters/eventexporthttp ./adapters/mongo ./cmd/event-export-server", "status": "PASS"},
+    {"command": "go test -tags=mongo_integration ./adapters/mongo", "status": "PASS"}
+  ],
+  "observed": {
+    "exactPersistedBytesVerified": true,
+    "streamBeforeBacklogVerified": true,
+    "resumeWithoutOmissionVerified": true,
+    "initialResumeTokenNonemptyVerified": true,
+    "outboxRawBSONUnchangedVerified": true,
+    "exportCheckpointCount": 0,
+    "readOnlyConnectorCreatedCollections": false,
+    "acceptedKernelPackageModified": false
+  },
+  "recommendation": {
+    "teamsCandidateReview": "GO",
+    "smaClientImplementation": "GO",
+    "liveShadowPassClaim": "NO_GO_UNTIL_CROSS_REPOSITORY_QUALIFICATION"
+  }
+}

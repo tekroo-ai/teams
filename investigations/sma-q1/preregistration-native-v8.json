@@ -1,0 +1,68 @@
+{
+  "schemaVersion": "8.0.0",
+  "recordType": "INVESTIGATION_PREREGISTRATION_AMENDMENT",
+  "amendmentId": "SMA-Q1-NATIVE-OPENHANDS-VERTICAL-SLICE-V8",
+  "status": "ACCEPTED_AUTHORIZED_NOT_EXECUTED",
+  "recordedOn": "2026-08-13",
+  "timePrecision": "DAY",
+  "purpose": "Preserve V7 while separating the qualified one-second native hook SLA from the fresh-process interpreter and SDK-import supervision envelope.",
+  "supersession": {
+    "priorAmendmentId": "SMA-Q1-NATIVE-OPENHANDS-VERTICAL-SLICE-V7",
+    "priorManifest": "investigations/sma-q1/preregistration-native-v7.json",
+    "priorManifestSHA256": "3099916ff55c600b718995c7519bc595ea5a945ddbbc017767819f2897210e34",
+    "priorExecutionReceipt": "OUTPUT/phase-3/sma-q1n-step15-v7/execution-receipt.json",
+    "priorExecutionState": "INCONCLUSIVE",
+    "priorFailure": "The fresh native-hook probe process exceeded a five-second wrapper timeout before a hook receipt was returned.",
+    "preservation": "V7 and all prior artifacts remain immutable; no prior scenario or repetition is credited to V8."
+  },
+  "unchangedBase": {
+    "bindingManifest": "investigations/sma-q1/preregistration-native-v2.json",
+    "bindingManifestSHA256": "c618371d571d5333aebd2bdc83d2db2559115f5ec3e1903b33e8e0ab157edf5d",
+    "bindingPriorAmendments": "All accepted V3 through V7 scientific, fixture, telemetry, artifact, deterministic-model, tool-isolation, terminal-oracle, and failure-evidence requirements remain binding.",
+    "scenarioCount": 18,
+    "repetitionCount": 96,
+    "scenarioCreditFromPriorAttempts": 0,
+    "scenarioMutation": "NONE",
+    "thresholdMutation": "NONE",
+    "smaBehaviorMutation": "NONE",
+    "semanticHookDeadlineMs": 1000
+  },
+  "v8Amendment": {
+    "classification": "QUALIFIED_HARNESS_PROCESS_ENVELOPE",
+    "nativeProbeProcessTimeoutSeconds": 30,
+    "scope": "Fresh Python interpreter startup, OpenHands SDK imports, HookEventProcessor execution, result serialization, and process exit.",
+    "semanticHookDeadlineMs": 1000,
+    "semanticDeadlineMutation": "NONE",
+    "failureReceipt": "Before cleanup, retain process terminal, elapsed time, and stdout/stderr lengths and SHA-256 without bodies.",
+    "qualification": {
+      "receipt": "OUTPUT/phase-3/openhands-native-hook-lane-v1/execution-receipt.json",
+      "receiptSHA256": "b3859410dc2831f81df59afc3da964c3e9dbcbe8175aa3b8a290cb870db7ed87",
+      "attempts": 128,
+      "failures": 0,
+      "processElapsedMsMaximum": 2194.656,
+      "nativeHookElapsedMsMaximum": 62.325374979991466,
+      "smaServiceUsed": false,
+      "modelUsed": false
+    }
+  },
+  "disposableNamespaces": {
+    "qualificationMongoDatabase": "sma_q1n_step15_v8_fixture_20260813",
+    "qualificationSemanticCollection": "sma_q1n_step15_v8_fixture_semantic_20260813",
+    "qualificationEpisodicCollection": "sma_q1n_step15_v8_fixture_episodic_20260813",
+    "measuredMongoDatabase": "sma_q1n_step15_20260813_v8",
+    "measuredSemanticCollection": "sma_q1n_step15_v8_semantic_20260813",
+    "measuredEpisodicCollection": "sma_q1n_step15_v8_episodic_20260813",
+    "productionOrHistoricalDataAllowed": false
+  },
+  "executionPolicy": {
+    "attemptsAllowed": 1,
+    "correctiveRerunsAllowed": 0,
+    "stopOnFirstFailure": true,
+    "resultRule": "Only a complete 18-scenario, 96-repetition run may produce SMA-Q1 PASS or FAIL; incomplete execution is INCONCLUSIVE."
+  },
+  "operatorDecision": {
+    "classification": "OBSERVED_OPERATOR_INSTRUCTION",
+    "instruction": "Find the root cause and fix it completely.",
+    "effect": "AUTHORIZE_ONE_V8_EXECUTION_AFTER_BOTH_OPENHANDS_LANES_QUALIFY"
+  }
+}

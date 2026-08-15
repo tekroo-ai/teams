@@ -1,0 +1,92 @@
+{
+  "schemaVersion": "1.0.0-candidate",
+  "recordType": "SMA_S2_MEASURED_DRIVER_SUCCESSOR_READINESS",
+  "status": "REMEDIATION_PASS_SUCCESSOR_READY_FOR_INDEPENDENT_REVIEW_NOT_ACCEPTED_NOT_AUTHORIZED",
+  "recordedOn": "2026-08-14",
+  "scope": "AUTHORIZED_MEASURED_DRIVER_SUCCESSOR_REMEDIATION_ONLY",
+  "successorPreregistration": {
+    "path": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-3.json",
+    "sha256": "6271d240faa4ad88cbbe6048dfd35f55456b770a9be862adb2cad9ce059bb622",
+    "caseCount": 20,
+    "plannedRepetitionCount": 103
+  },
+  "exactCorpus": {
+    "path": "investigations/sma-q1/layered/sma-s2-measured-corpus-candidate-1.json",
+    "sha256": "c273c148a7b289f6650a26a82c38bda9680904701120e083543e9b7954b9a960",
+    "literalPromptCount": 20,
+    "syntheticMemoryCount": 4
+  },
+  "measuredDriver": {
+    "path": "scripts/sma_s2_measured_driver_candidate_1.py",
+    "sha256": "5f69ed4d3b439bf1d4d342c75f05781efee326fc2e1c39ad5002a92ffcc7464a",
+    "operationCount": 20,
+    "plannedRepetitionCount": 103,
+    "defaultExecution": "DENY",
+    "optimizationRemovableScientificAssertions": 0,
+    "immediateNamespaceAbsenceRecheck": true
+  },
+  "offlineQualification": {
+    "harness": {
+      "path": "scripts/sma_s2_measured_driver_offline_harness_candidate_1.py",
+      "sha256": "b5f7d4ff16819924e6f42cdfc357103f5477745d640cc72bf23d6a048b46a832"
+    },
+    "receipt": {
+      "path": "OUTPUT/phase-3/sma-s2-measured-driver-candidate-7-offline-qualification/offline-driver-qualification-receipt.json",
+      "sha256": "2b6af24e1c1058cd88ce898b4930ac3f678596d865334a58e7fd7eb090740645",
+      "status": "PASS",
+      "testCount": 10,
+      "passCount": 10,
+      "failCount": 0,
+      "pythonOptimizationEnabled": true,
+      "networkUse": "NONE_EPHEMERAL_FILES_ONLY"
+    },
+    "controlsPassed": [
+      "static contract",
+      "complete 20-case and 103-repetition map",
+      "create-once output",
+      "concurrent append and fsync journal",
+      "pre-assertion evidence survival after deliberate failure",
+      "positive and negative execution-authorization fence",
+      "model, hook, and cancellation fault schedules",
+      "synthetic-secret surface separation",
+      "103-repetition receipt reconstruction",
+      "idempotent owned-resource cleanup"
+    ]
+  },
+  "digestVerification": {
+    "boundArtifactChecks": 13,
+    "boundArtifactMatches": 13,
+    "status": "PASS"
+  },
+  "observed": [
+    "The exact corpus contains 20 ordered cases, 103 ordered repetitions, 20 literal prompts, four model-fault modes, three active-cancellation repetitions, and four synthetic memory fixtures.",
+    "The driver exposes one concrete operation handler for every corpus operation and denies execution unless an accepted execution identity and matching single-use authorization are supplied.",
+    "The final offline harness passed all ten controls under Python optimization mode with no network use.",
+    "All thirteen successor-bound artifact digests matched at readiness sealing."
+  ],
+  "computed": [
+    "Case count: 20.",
+    "Planned repetition count: 103.",
+    "Final offline pass rate: 10/10.",
+    "Measured cases executed: 0.",
+    "Measured repetitions executed: 0."
+  ],
+  "inferred": [
+    "The missing-driver and missing-literal-fixture blockers are prospectively corrected in candidate 3.",
+    "Candidate 3 is ready for independent review, but offline control qualification does not establish live OpenHands/SMA compatibility or earn the S2 claim."
+  ],
+  "authority": {
+    "candidateAcceptedFrozen": false,
+    "livePreflightAuthorized": false,
+    "executionIdentityAuthorized": false,
+    "measuredExecutionAuthorized": false,
+    "measuredExecutionState": "NOT_RUN",
+    "openhandsConversationsCreated": 0,
+    "deterministicStubInvocations": 0,
+    "realModelCalls": 0,
+    "serviceStartsOrRestarts": 0,
+    "measuredNamespacesCreated": 0,
+    "qualifiedClaimEarned": false
+  },
+  "recommendation": "INDEPENDENT_REVIEW_THEN_ACCEPT_FREEZE_CANDIDATE_3_IF_APPROVED"
+}

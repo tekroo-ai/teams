@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "OPENHANDS_RESPONSE_LANE_EXECUTION_AUTHORIZATION",
+  "authorizationId": "OPENHANDS-RESPONSE-LANE-V1-EXECUTION",
+  "recordedOn": "2026-08-13",
+  "timePrecision": "DAY",
+  "status": "AUTHORIZED_NOT_STARTED",
+  "principalInstruction": "We will proceed as you recommend.",
+  "manifest": "investigations/openhands-lane/qualification-v1.json",
+  "manifestSHA256": "9704c0b0e78023fefdeed67848bff233632cbb33a4683a7fa7c794d7199c8e7d",
+  "runner": "scripts/openhands_response_lane_qualification_v1.py",
+  "runnerSHA256": "8c071d3a71b42b0dfdcf0ed02025b164e75be1a5c62b50befc2dd4c3f6900301",
+  "authorizedScope": {
+    "responseOnlyOpenHandsLane": true,
+    "freshSequentialConversations": 128,
+    "smaService": false,
+    "smaBridge": false,
+    "smaQ1Execution": false,
+    "productionOrHistoricalData": false,
+    "additionalAttempt": false
+  },
+  "executionAuthorized": true,
+  "executionStarted": false
+}

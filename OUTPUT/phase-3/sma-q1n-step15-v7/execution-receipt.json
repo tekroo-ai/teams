@@ -1,0 +1,124 @@
+{
+  "base_manifest_sha256": "c618371d571d5333aebd2bdc83d2db2559115f5ec3e1903b33e8e0ab157edf5d",
+  "cleanup": {
+    "conversation_count": 6,
+    "conversations": [
+      {
+        "conversation_id": "f23da081-e3c3-4087-9951-a0d0e5e560e9",
+        "delete_status": 200,
+        "get_after_delete": 404
+      },
+      {
+        "conversation_id": "e49fbc26-8df0-4999-aace-bbf271f28071",
+        "delete_status": 200,
+        "get_after_delete": 404
+      },
+      {
+        "conversation_id": "645d81ca-243c-47fc-af1d-789096b46bac",
+        "delete_status": 200,
+        "get_after_delete": 404
+      },
+      {
+        "conversation_id": "46f912e6-6708-4f3d-8a98-4fa237b09b02",
+        "delete_status": 200,
+        "get_after_delete": 404
+      },
+      {
+        "conversation_id": "cff158cd-ea1d-4445-865a-945be5884cfc",
+        "delete_status": 200,
+        "get_after_delete": 404
+      },
+      {
+        "conversation_id": "c0ee5d9a-d495-4bdd-9519-22061e56beb3",
+        "delete_status": 200,
+        "get_after_delete": 404
+      }
+    ],
+    "episodic_delete_status": 200,
+    "finished_at": "2026-08-13T21:31:16.389341+00:00",
+    "semantic_delete_status": 200,
+    "service": {
+      "bootout_exit": 0,
+      "elapsed_ms": 5134.062958997674,
+      "identity_after": {
+        "loaded": false,
+        "pid": null,
+        "state": null
+      },
+      "identity_before": {
+        "loaded": true,
+        "pid": 16951,
+        "state": "active"
+      },
+      "port_closed_ms": 5129.193208995275
+    },
+    "started_at": "2026-08-13T21:31:09.754181+00:00",
+    "verified": {
+      "bridge_absent": true,
+      "episodic_absent": true,
+      "fixture_driver_build_absent": true,
+      "mongo_absent": true,
+      "run_root_absent": true,
+      "semantic_absent": true,
+      "service_absent": true
+    }
+  },
+  "completed_repetitions": 11,
+  "completed_scenario_ids": [
+    "SMAQ1N-001-FIRST-PROMPT-EMPTY"
+  ],
+  "completed_scenarios": 1,
+  "decision": "NO_GO",
+  "failure": {
+    "classification": "HARNESS_OR_ENVIRONMENT",
+    "message": "Command '['/Users/paul/.cache/uv/archive-v0/sx6_8DYmdKseZALr/bin/python', '/Users/paul/work/tekroo-ai/sma-step15/.openhands/hooks/native_hook_probe.py', '/Users/paul/work/tekroo-ai/sma-step15', 'f23da081-e3c3-4087-9951-a0d0e5e560e9', '/Users/paul/work/tekroo-ai/sma-step15/target/sma-q1n-step15-20260813-v7/actor-alpha', 'What API timeout applies to repository alpha? Answer with the number and unit only.']' timed out after 5 seconds",
+    "message_sha256": "dbf683ec4b1423df7536dd32df34f44aa3e3113b0c90ddf0e5bd0a11b756996b",
+    "type": "TimeoutExpired"
+  },
+  "harness_sha256": "be0c28a5b52cb10874148f0b0ed99451869c658ccf3a2d6a51f538f18d661145",
+  "manifest_sha256": "3099916ff55c600b718995c7519bc595ea5a945ddbbc017767819f2897210e34",
+  "not_run_repetitions": 85,
+  "not_run_scenario_ids": [
+    "SMAQ1N-003-CROSS-PARTITION-DENIAL",
+    "SMAQ1N-004-CURRENT-INSTRUCTION-PRECEDENCE",
+    "SMAQ1N-005-RAW-INELIGIBLE",
+    "SMAQ1N-006-DUPLICATE-EVENT-CAPTURE",
+    "SMAQ1N-007-RETRIEVAL-OUTAGE",
+    "SMAQ1N-008-CAPTURE-OUTAGE-RECONCILIATION",
+    "SMAQ1N-009-ADDITIONAL-CONTEXT-INTEGRITY",
+    "SMAQ1N-010-HOOK-DEADLINE-AND-MALFORMED",
+    "SMAQ1N-011-PARENT-CHILD-PROVENANCE",
+    "SMAQ1N-012-RESTART-PARTITION-CONTINUITY",
+    "SMAQ1N-013-FOUR-CHANNEL-CONCURRENCY",
+    "SMAQ1N-014-FEEDBACK-LOOP-PREVENTION",
+    "SMAQ1N-015-SECRET-QUARANTINE",
+    "SMAQ1N-016-EMPTY-RESULT",
+    "SMAQ1N-017-OVERSIZED-CONTEXT-BOUND",
+    "SMAQ1N-018-CONDENSATION-REANCHOR"
+  ],
+  "qualification": {
+    "measured_namespace_empty": true,
+    "qualification_cleanup_verified": true,
+    "qualified_fixture": true
+  },
+  "qualified_fixture": true,
+  "raw_journal_sha256": "91b993f7e43fb7251a3728ed1b1fa6d41711702abc41823177deea2c8c3e4c37",
+  "receipt_type": "SMA_Q1_NATIVE_STEP15_EXECUTION",
+  "recorded_at": "2026-08-13T21:31:16.394591+00:00",
+  "report_sha256": "fcca0da795f0aee31a309a091a894c2d5b16060dc127033fa0c5ec03fd7b8c07",
+  "scenario_results": [
+    {
+      "records": 10,
+      "scenario_id": "SMAQ1N-001-FIRST-PROMPT-EMPTY",
+      "status": "PASS"
+    }
+  ],
+  "schema_version": "1.0.0",
+  "started_repetitions": 11,
+  "started_scenario_ids": [
+    "SMAQ1N-001-FIRST-PROMPT-EMPTY",
+    "SMAQ1N-002-SAME-PARTITION-RECALL"
+  ],
+  "started_scenarios": 2,
+  "status": "INCONCLUSIVE"
+}

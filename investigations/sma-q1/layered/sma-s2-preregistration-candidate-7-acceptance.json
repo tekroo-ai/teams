@@ -1,0 +1,105 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_CANDIDATE_7_ACCEPTANCE",
+  "acceptanceId": "SMA-S2-PREREGISTRATION-CANDIDATE-7-ACCEPTANCE",
+  "candidate": 7,
+  "status": "ACCEPTED_FROZEN",
+  "recordedOn": "2026-08-14",
+  "principalStatement": "ACCEPT/FREEZE SMA-S2 candidate 7, identity 66530bb10fe7e46f23e8f3f550c83a89203905cc844dba8732d8794dba9575d3. This does not authorize execution-identity creation, live dress rehearsal, or measured execution.",
+  "candidatePreregistrationSha256": "66530bb10fe7e46f23e8f3f550c83a89203905cc844dba8732d8794dba9575d3",
+  "acceptedPreregistration": {
+    "path": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-7.json",
+    "sha256": "66530bb10fe7e46f23e8f3f550c83a89203905cc844dba8732d8794dba9575d3",
+    "caseCount": 20,
+    "plannedRepetitionCount": 103,
+    "predicateCount": 59,
+    "requiredEvidenceCount": 10,
+    "dressRehearsalOperationCount": 34,
+    "acceptedFrozen": true,
+    "editableInPlace": false
+  },
+  "boundPackage": {
+    "nonSecretConfiguration": {
+      "path": "investigations/sma-q1/layered/sma-s2-nonsecret-configuration-candidate-7.json",
+      "sha256": "32bc3c3fd03256a7ef6c44c60f5086b36235f95074f48356ece2e223031b9719"
+    },
+    "measuredAndDressRehearsalDriver": {
+      "path": "scripts/sma_s2_measured_driver_candidate_5.py",
+      "sha256": "b14d75aff7c43558828b354312961adfe9a7e038daef19971f4bc7b8990eb799"
+    },
+    "offlineHarnessRemediationHarness": {
+      "path": "scripts/sma_s2_measured_driver_offline_harness_candidate_5.py",
+      "sha256": "b0a67769223baf859be372859a314275cd9b5a749f53b194545f714ea53287f3"
+    },
+    "offlineQualification": {
+      "path": "OUTPUT/phase-3/sma-s2-candidate-7-offline-harness-qualification-2/offline-harness-qualification-receipt.json",
+      "sha256": "f1061561784e2fd6730e2370365e90e2057afa1a779afa056ca8f5fe87f942b0",
+      "status": "PASS",
+      "testCount": 11,
+      "passCount": 11,
+      "failCount": 0
+    },
+    "coordinatorReview": {
+      "path": "OUTPUT/phase-3/sma-s2-candidate-7-coordinator-review.json",
+      "sha256": "a9c01fe196ec66860ded155a7e862772adbef5e93f2bd270745de3db25482cf7",
+      "status": "PASS_READY_FOR_PRINCIPAL_REVIEW"
+    },
+    "reviewNarrative": {
+      "path": "docs/architecture/070-sma-s2-candidate-7-harness-remediation-review.md",
+      "sha256": "ae2a4adb2b323f5e124184844a4edae8d046aa66e69c8459b920083f1b6a6e7e"
+    }
+  },
+  "independentReview": {
+    "reviewer": "WORKSPACE_PRINCIPAL",
+    "candidateSpecificContextBound": true,
+    "candidateSpecificDecision": "ACCEPT_FREEZE",
+    "candidate6DesignationImported": false
+  },
+  "acceptedScope": {
+    "layer": "SMA-S2",
+    "executionPlanAccepted": true,
+    "stableTerminalObservationAccepted": true,
+    "candidateBoundCorpusSeedingAccepted": true,
+    "sanitizedFailureEvidenceAccepted": true,
+    "noCreditDressRehearsalGateAccepted": true,
+    "qualifiedClaimEarned": false,
+    "claimOnFutureMeasuredPass": "OPENHANDS_SMA_BOUNDARY_QUALIFIED"
+  },
+  "excludedClaims": [
+    "candidate-7 execution identity created or accepted",
+    "candidate-7 live dress rehearsal PASS",
+    "SMA-S2 measured PASS",
+    "OPENHANDS_SMA_BOUNDARY_QUALIFIED",
+    "generative model behavior qualification",
+    "integrated runtime qualification",
+    "production readiness"
+  ],
+  "immutability": {
+    "acceptedPreregistrationMayBeEditedInPlace": false,
+    "boundPackageMayBeEditedInPlace": false,
+    "successorRecordRequiredForAnyCorrection": true,
+    "postObservationRegradingAllowed": false
+  },
+  "authority": {
+    "preregistrationAcceptedFrozen": true,
+    "executionIdentityPreparationAuthorized": false,
+    "executionIdentityCreated": false,
+    "executionIdentityAccepted": false,
+    "liveDressRehearsalAuthorized": false,
+    "liveDressRehearsalState": "NOT_RUN",
+    "measuredAttemptAuthorizationPresent": false,
+    "measuredExecutionAuthorized": false,
+    "measuredExecutionState": "NOT_RUN",
+    "realModelCallsAuthorized": false,
+    "productionDeploymentAuthorized": false
+  },
+  "measuredExecutionAuthorized": false,
+  "nextSeparateGate": {
+    "requiredAction": "authorize preparation of one exact candidate-7 execution identity for separate review",
+    "requiresSeparatePrincipalAuthorization": true,
+    "liveDressRehearsalRequiresLaterSingleUseAuthorization": true,
+    "liveDressRehearsalMustPassAtZeroCredit": true,
+    "measuredExecutionStillRequiresPassingBoundDressRehearsalReceipt": true,
+    "measuredExecutionStillRequiresLaterSingleUseAuthorization": true
+  }
+}

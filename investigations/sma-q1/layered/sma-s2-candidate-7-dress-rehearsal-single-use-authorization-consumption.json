@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_CANDIDATE_7_DRESS_REHEARSAL_AUTHORIZATION_CONSUMPTION",
+  "status": "CONSUMED",
+  "recordedOn": "2026-08-14",
+  "authorization": {
+    "path": "investigations/sma-q1/layered/sma-s2-candidate-7-dress-rehearsal-single-use-authorization.json",
+    "sha256": "c768d5c242e69f6603f2df66703cd2bad852b3905b4aeb3b29409b174f483017",
+    "maximumDressRehearsalAttempts": 1
+  },
+  "livePreflight": {
+    "path": "OUTPUT/phase-3/sma-s2-candidate-7-dress-rehearsal-live-preflight.json",
+    "sha256": "6b13cf050b8a6674233942ed1b09129feaa365dd546bc6b22450bb3eb819985b",
+    "status": "PASS"
+  },
+  "attempt": {
+    "attemptNumber": 1,
+    "executionIdentitySha256": "40235ba0eda978c497dc17740aab09ebeb8fe3852e961b0f4d522737f3c38f22",
+    "receipt": {
+      "path": "OUTPUT/phase-3/sma-s2-candidate-7-dress-rehearsal-attempt-1/dress-rehearsal-receipt.json",
+      "sha256": "82b5db3ec445cd9b22be484f48f26a03758f8f8587e4dc86c93ae588e0702dcf",
+      "status": "INCONCLUSIVE"
+    },
+    "rawJournalSha256": "7286a8b133e94b545f02eec3ba9d406b48b783c2262f170dd84b9e10b7316185",
+    "completedOperations": 10,
+    "plannedOperations": 34,
+    "measuredCaseExecutions": 0,
+    "measuredRepetitionExecutions": 0,
+    "measuredCredit": 0,
+    "claim": null,
+    "cleanupStatus": "PASS"
+  },
+  "remainingAuthority": {
+    "dressRehearsalAttempts": 0,
+    "automaticReruns": 0,
+    "measuredExecutionAttempts": 0,
+    "realModelCalls": 0,
+    "serviceRestarts": 0
+  }
+}

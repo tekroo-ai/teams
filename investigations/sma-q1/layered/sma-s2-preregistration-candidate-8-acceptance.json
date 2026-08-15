@@ -1,0 +1,112 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_CANDIDATE_8_ACCEPTANCE",
+  "acceptanceId": "SMA-S2-PREREGISTRATION-CANDIDATE-8-ACCEPTANCE",
+  "candidate": 8,
+  "status": "ACCEPTED_FROZEN",
+  "recordedOn": "2026-08-14",
+  "principalStatement": "ACCEPT/FREEZE SMA-S2 candidate 8, identity d81f6878a0b06462b792e50d7bd3e8708e971ce888d22a95751127ccbaa35231. This does not authorize execution-identity creation, live state preflight, live dress rehearsal, or measured execution.",
+  "candidatePreregistrationSha256": "d81f6878a0b06462b792e50d7bd3e8708e971ce888d22a95751127ccbaa35231",
+  "acceptedPreregistration": {
+    "path": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-8.json",
+    "sha256": "d81f6878a0b06462b792e50d7bd3e8708e971ce888d22a95751127ccbaa35231",
+    "caseCount": 20,
+    "plannedRepetitionCount": 103,
+    "predicateCount": 59,
+    "requiredEvidenceCount": 10,
+    "dressRehearsalOperationCount": 34,
+    "acceptedFrozen": true,
+    "editableInPlace": false
+  },
+  "boundPackage": {
+    "nonSecretConfiguration": {
+      "path": "investigations/sma-q1/layered/sma-s2-nonsecret-configuration-candidate-8.json",
+      "sha256": "3cc553c6a618b2e4ca6151906c700805303012ef0cb49d270c33291edd517f44"
+    },
+    "measuredAndDressRehearsalDriver": {
+      "path": "scripts/sma_s2_measured_driver_candidate_6.py",
+      "sha256": "717d29b96107c7cc86c1aeceeeb9b32ab9aa8776bf6b3ec18496dd86a0305d38"
+    },
+    "offlineWorkspaceIsolationHarness": {
+      "path": "scripts/sma_s2_measured_driver_offline_harness_candidate_6.py",
+      "sha256": "2365421604e45518826dbed4b5b03fccd445943997873e9363d5c8c2db55cd62"
+    },
+    "offlineQualification": {
+      "path": "OUTPUT/phase-3/sma-s2-candidate-8-offline-workspace-isolation-qualification-2/offline-workspace-isolation-qualification-receipt.json",
+      "sha256": "c2ae00d8e23944f9e7fb62ba706bc3b2afe9c24929021904b5d466e8bb990175",
+      "status": "PASS",
+      "testCount": 13,
+      "passCount": 13,
+      "failCount": 0
+    },
+    "coordinatorReview": {
+      "path": "OUTPUT/phase-3/sma-s2-candidate-8-coordinator-review.json",
+      "sha256": "78d4cdfabcd92681cfbee9a57307145f8c8bf34e9cc0e7dcaf3110f2e4f91a87",
+      "status": "PASS_READY_FOR_PRINCIPAL_REVIEW"
+    },
+    "reviewNarrative": {
+      "path": "docs/architecture/075-sma-s2-candidate-8-workspace-isolation-review.md",
+      "sha256": "d764d8ce680d6cbe4c2d4b4435fae183b4aa59fec0f2007d3c516fe36414332a"
+    }
+  },
+  "independentReview": {
+    "reviewer": "WORKSPACE_PRINCIPAL",
+    "candidateSpecificContextBound": true,
+    "candidateSpecificDecision": "ACCEPT_FREEZE",
+    "candidate7DesignationImported": false
+  },
+  "acceptedScope": {
+    "layer": "SMA-S2",
+    "executionPlanAccepted": true,
+    "workspaceIsolationContractAccepted": true,
+    "case1DedicatedEmptyWorkspaceAccepted": true,
+    "emptyWorkspaceCaptureAllowlistExclusionAccepted": true,
+    "candidateBoundCorpusSeedingAccepted": true,
+    "stableTerminalObservationAccepted": true,
+    "sanitizedFailureEvidenceAccepted": true,
+    "noCreditDressRehearsalGateAccepted": true,
+    "qualifiedClaimEarned": false,
+    "claimOnFutureMeasuredPass": "OPENHANDS_SMA_BOUNDARY_QUALIFIED"
+  },
+  "excludedClaims": [
+    "candidate-8 execution identity created or accepted",
+    "candidate-8 live state preflight PASS",
+    "candidate-8 live dress rehearsal PASS",
+    "SMA-S2 measured PASS",
+    "OPENHANDS_SMA_BOUNDARY_QUALIFIED",
+    "generative model behavior qualification",
+    "integrated runtime qualification",
+    "production readiness"
+  ],
+  "immutability": {
+    "acceptedPreregistrationMayBeEditedInPlace": false,
+    "boundPackageMayBeEditedInPlace": false,
+    "successorRecordRequiredForAnyCorrection": true,
+    "postObservationRegradingAllowed": false
+  },
+  "authority": {
+    "preregistrationAcceptedFrozen": true,
+    "executionIdentityPreparationAuthorized": false,
+    "executionIdentityCreated": false,
+    "executionIdentityAccepted": false,
+    "liveStatePreflightAuthorized": false,
+    "liveStatePreflightState": "NOT_RUN",
+    "liveDressRehearsalAuthorized": false,
+    "liveDressRehearsalState": "NOT_RUN",
+    "measuredAttemptAuthorizationPresent": false,
+    "measuredExecutionAuthorized": false,
+    "measuredExecutionState": "NOT_RUN",
+    "realModelCallsAuthorized": false,
+    "productionDeploymentAuthorized": false
+  },
+  "measuredExecutionAuthorized": false,
+  "nextSeparateGate": {
+    "requiredAction": "authorize preparation of one exact candidate-8 execution identity for separate review",
+    "requiresSeparatePrincipalAuthorization": true,
+    "liveStatePreflightRequiresLaterSeparateAuthorization": true,
+    "liveDressRehearsalRequiresLaterSingleUseAuthorization": true,
+    "liveDressRehearsalMustPassAtZeroCredit": true,
+    "measuredExecutionStillRequiresPassingBoundDressRehearsalReceipt": true,
+    "measuredExecutionStillRequiresLaterSingleUseAuthorization": true
+  }
+}

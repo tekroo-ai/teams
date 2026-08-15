@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_CANDIDATE_6_EXECUTION_IDENTITY_LIVE_PREFLIGHT_AUTHORITY_CONSUMPTION",
+  "status": "CONSUMED_COMPLETE_NO_REUSE",
+  "recordedAt": "2026-08-14T17:40:25Z",
+  "sourceAuthority": {
+    "path": "investigations/sma-q1/layered/sma-s2-candidate-6-execution-identity-live-preflight-authorization.json",
+    "sha256": "52b25c05e2bff520c6d184fb628fce5e7b93d9bb1101c18f1d22c2e17495229e"
+  },
+  "producedExecutionIdentity": {
+    "path": "investigations/sma-q1/layered/sma-s2-candidate-6-execution-identity.json",
+    "sha256": "5640c60968261402bc1878204703845581e266cbce1b4cc7e135a3008f05e5a4"
+  },
+  "consumedLivePreflightAuthority": {
+    "path": "investigations/sma-q1/layered/sma-s2-candidate-6-live-preflight-single-use-authorization-consumption.json",
+    "sha256": "601e7f504a735ebc15dadb66875df9218d5d9b627a84aeffbbd1b994ca4b9a2f",
+    "status": "CONSUMED_COMPLETE_NO_REUSE"
+  },
+  "limitsRespected": true,
+  "stopConditionTriggered": false,
+  "measuredExecutionAuthorized": false,
+  "reusable": false
+}

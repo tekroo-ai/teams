@@ -1,0 +1,126 @@
+{
+  "schemaVersion": "1.0.0-candidate",
+  "recordType": "SMA_S2_INDEPENDENT_REVIEW_RECOMMENDATION",
+  "status": "NO_GO_REMEDIATION_REQUIRED_BEFORE_REVIEWER_ATTESTATION_OR_ACCEPTANCE",
+  "recordedOn": "2026-08-14",
+  "reviewerDesignation": {
+    "path": "investigations/sma-q1/layered/sma-s2-independent-reviewer-designation.json",
+    "sha256": "1afa7c23963c69b9a2eff4d79cb4694d1f819fef94164d87a50d13ad946ac8ac",
+    "reviewer": "WORKSPACE_PRINCIPAL"
+  },
+  "reviewSubject": {
+    "path": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-1.json",
+    "sha256": "fcdfa6a6fc85ea5c8aebe4340e10642007f4cd1df85cea1a0e47f7ef278e62fe"
+  },
+  "coordinatorVerification": {
+    "status": "PASS_WITH_SUBSTANTIVE_REVIEW_FINDINGS",
+    "semanticChecks": 16,
+    "semanticChecksPassed": 16,
+    "boundDigestChecks": 8,
+    "boundDigestChecksPassed": 8,
+    "offlineHarness": {
+      "status": "PASS",
+      "testRecords": 8,
+      "failures": 0
+    },
+    "sourceTestEvidence": {
+      "openhandsTestcaseElements": 3,
+      "hookTestcaseElements": 8,
+      "testcaseElementFailures": 0,
+      "testcaseElementErrors": 0,
+      "junitAggregateAnomaly": "The hook suite has eight testcase elements and pytest reported eight collected tests, while its JUnit aggregate tests attribute is 15. The review uses the eight emitted testcase records as its evidence floor."
+    }
+  },
+  "findings": [
+    {
+      "id": "S2-REVIEW-001-RUNNING-SCHEMA-SOURCE-MISMATCH",
+      "severity": "SUBSTANTIVE_BLOCKER",
+      "classification": "OBSERVED_AND_COMPUTED",
+      "observed": [
+        "The running agent-server process PID 23948 started on 2026-08-13 at 15:56:43 local time.",
+        "The semantic-message source commit 35838c946f80f3fc8fa2dd6dba6749cc7b673b52 was committed at 2026-08-13T19:43:50-06:00.",
+        "The bound HEAD a338ba9b6cbb529886b755a335bae3dee0004700 was committed at 2026-08-13T19:48:23-06:00.",
+        "The running server's frozen OpenAPI MessageEvent schema omits authorship_origin, semantic_purpose, and agent_response_finality.",
+        "The bound source MessageEvent and targeted source tests contain those semantic fields."
+      ],
+      "computed": "The running process predates the semantic commit by 3 hours, 47 minutes, and 7 seconds and predates bound HEAD by 3 hours, 51 minutes, and 40 seconds.",
+      "impact": "Candidate 1 binds current source files and a stale executing process/schema as though they were one runtime identity. S2-014 feedback-loop eligibility and semantic provenance cannot be accepted against this mismatch.",
+      "requiredRemediation": [
+        "obtain explicit authority for a controlled Agent Canvas/agent-server restart",
+        "prove no protected OpenHands work will be interrupted or obtain operator approval for the interruption",
+        "restart from the exact clean bound source identity",
+        "fetch and freeze a new OpenAPI/event-schema snapshot",
+        "prove the live MessageEvent schema contains the three semantic fields",
+        "bind process start identity and live schema into a successor S2 package"
+      ]
+    },
+    {
+      "id": "S2-REVIEW-002-STUB-FAULTS-NOT-MAPPED-TO-CASES",
+      "severity": "SUBSTANTIVE_BLOCKER",
+      "classification": "OBSERVED_AND_INFERRED",
+      "observed": [
+        "The stub contract supports TIMEOUT, CANCELLATION_OR_CLIENT_DISCONNECT, MALFORMED_RESPONSE, HTTP_503, and TRANSPORT_FAILURE.",
+        "The 18-case preregistration schedules only one timeout/malformed fault matrix, and that matrix is explicitly the hook/bridge fault case.",
+        "No measured case or repetition maps the model-stub timeout, malformed response, HTTP 503, transport failure, or active cancellation controls.",
+        "The non-secret OpenHands configuration does not bind numRetries, retry waits, model timeout, or a per-case fault activation schedule.",
+        "The bound OpenHands LLM source defaults num_retries to 5 and timeout to 300 seconds."
+      ],
+      "inferred": "The current preregistration can offline-prove that fault controls exist but cannot prospectively prove which measured repetition activates them, how many model requests are permitted, or that cancellation and shutdown complete within a frozen deadline.",
+      "impact": "The design requirement that the deterministic stub support and measure timeout, cancellation, malformed, and transport failures is not reproducibly scheduled. Default retries could also violate one-request evidence and wall-clock bounds.",
+      "requiredRemediation": [
+        "add prospectively frozen model-stub fault and cancellation cases or an equally explicit repetition schedule",
+        "bind numRetries=0 for qualification",
+        "bind exact model timeout and retry waits",
+        "bind the case-to-mode activation channel and expected request count",
+        "define cancellation trigger, future-completion deadline, client-disconnect evidence, process inventory, and cleanup oracle",
+        "repeat offline qualification against the successor configuration and harness"
+      ]
+    },
+    {
+      "id": "S2-REVIEW-003-JUNIT-COUNT-ANOMALY",
+      "severity": "NON_BLOCKING_EVIDENCE_DISCLOSURE",
+      "classification": "OBSERVED",
+      "observed": [
+        "The hook JUnit suite contains eight testcase elements and zero failure/error elements.",
+        "The same suite's aggregate tests attribute is 15, although pytest reported eight collected tests."
+      ],
+      "impact": "This does not negate the eight emitted passing testcase records, but the raw discrepancy must be disclosed rather than reported as an unqualified aggregate count.",
+      "requiredRemediation": [
+        "retain the raw JUnit file",
+        "report testcase-element and aggregate counts separately",
+        "do not claim 15 independently emitted hook test records"
+      ]
+    }
+  ],
+  "reviewDecision": {
+    "candidate1AcceptFreezeRecommendation": "NO_GO",
+    "reviewerPassAttestationRecommended": false,
+    "successorRemediationRecommended": true,
+    "measuredExecutionRecommended": false
+  },
+  "interruptionPrecheck": {
+    "classification": "OBSERVED_READ_ONLY",
+    "runningConversationCount": 0,
+    "waitingForConfirmationConversationCount": 0,
+    "stuckConversationCount": 0,
+    "pausedConversations": [
+      {
+        "conversationId": "4c2e5f84-ecd3-4971-b375-a0fa9905a058",
+        "title": "Tekroo Trader",
+        "executionStatus": "paused",
+        "createdAt": "2026-08-09T19:52:16.454058Z",
+        "updatedAt": "2026-08-13T17:38:02.080929Z"
+      }
+    ],
+    "restartConclusion": "NO_ACTIVE_EXECUTION_OBSERVED_BUT_EXPLICIT_AUTHORITY_REQUIRED_TO_RESTART_AROUND_ONE_PERSISTED_PAUSED_CONVERSATION"
+  },
+  "authority": {
+    "reviewerHasNotYetAttested": true,
+    "candidateAcceptedFrozen": false,
+    "serviceRestartAuthorized": false,
+    "successorPackageRemediationAuthorized": false,
+    "executionIdentityAuthorized": false,
+    "measuredExecutionAuthorized": false,
+    "measuredExecutionState": "NOT_RUN"
+  }
+}

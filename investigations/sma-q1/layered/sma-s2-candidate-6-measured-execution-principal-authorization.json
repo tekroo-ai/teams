@@ -1,0 +1,58 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_CANDIDATE_6_MEASURED_EXECUTION_PRINCIPAL_AUTHORIZATION",
+  "authorizationId": "SMA-S2-CANDIDATE-6-MEASURED-ATTEMPT-1-PRINCIPAL-AUTHORITY",
+  "status": "AUTHORIZED_NOT_CONSUMED",
+  "recordedOn": "2026-08-14",
+  "principalStatement": "Go.",
+  "acceptedCandidate": {
+    "preregistrationPath": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-6.json",
+    "preregistrationSha256": "06e7a689d46dfc759d07ca2f1099854c42e0c21e4dc84cd1fde0a0f612ae6cee",
+    "acceptancePath": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-6-acceptance.json",
+    "acceptanceSha256": "1887f810a88c49d83a8ecfc4d3de9e25ac476e689a8c9e2b2f86c14573005f75"
+  },
+  "sealedExecutionIdentity": {
+    "path": "investigations/sma-q1/layered/sma-s2-candidate-6-execution-identity.json",
+    "sha256": "5640c60968261402bc1878204703845581e266cbce1b4cc7e135a3008f05e5a4"
+  },
+  "passingLivePreflight": {
+    "path": "OUTPUT/phase-3/sma-s2-candidate-6-live-preflight-attempt-1/live-preflight-receipt.json",
+    "sha256": "8d479433e93599209c50b314aef481c75aaf1460e6c2b9db9806f7dcb4de0624",
+    "status": "PASS"
+  },
+  "authorizedScope": {
+    "maximumMeasuredAttempts": 1,
+    "caseCount": 20,
+    "repetitionCount": 103,
+    "predicateCount": 59,
+    "requiredEvidenceCount": 10,
+    "runtimePorts": {
+      "stubHost": "127.0.0.1",
+      "stubPort": 19126,
+      "bridgeHost": "127.0.0.1",
+      "bridgePort": 8130
+    },
+    "deterministicStubOnly": true,
+    "realModelCallsAllowed": false,
+    "serviceRestartsAllowed": 0,
+    "automaticCorrectiveReruns": 0,
+    "hiddenHarnessRetries": 0,
+    "postObservationRegradingAllowed": false
+  },
+  "stopConditions": [
+    "active OpenHands conversation or protected work is found",
+    "bound artifact, product, service, endpoint, identity, or preflight digest mismatch",
+    "candidate-6 measured namespace or output root already exists",
+    "execution fence rejects",
+    "harness or safety failure occurs"
+  ],
+  "notAuthorized": [
+    "a second measured attempt",
+    "corrective rerun",
+    "modification of candidate 6 or any accepted artifact",
+    "real model invocation",
+    "service restart",
+    "production or historical data access",
+    "claim issuance without complete passing evidence and cleanup"
+  ]
+}

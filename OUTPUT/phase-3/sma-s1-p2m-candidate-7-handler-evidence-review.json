@@ -1,0 +1,132 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S1_HANDLER_AND_EVIDENCE_REVIEW",
+  "status": "PASS_CANDIDATE_NO_MEASURED_PRODUCT_CREDIT",
+  "recordedOn": "2026-08-14",
+  "reviewer": {
+    "role": "TEAMS_QUALIFICATION_SPECIFICATION_AND_EVIDENCE_COORDINATOR",
+    "independenceBoundary": "REVIEWER_DID_NOT_IMPLEMENT_OR_MODIFY_BOUND_SMA_P2M_SOURCE",
+    "smaImplementationOwner": "SMA_TEAM"
+  },
+  "bindings": {
+    "acceptedPreregistrationSHA256": "e663f5b732c22248adc5fab2f536dbf02dd72337f7c8428f225937e72d6a7f8c",
+    "smaCommit": "5d58be508c74ae8577d2fd31e3346be23a912ab3",
+    "smaTree": "7222410443a6041496a5c313b2549f16eb937458",
+    "serviceArtifactSHA256": "c0ddb963798d45603c2e2685744892c40d3e841817f9c966ab7fad34f7e48765",
+    "driverSourceSHA256": "f7bba094682d48444d687b77935c5f00c9a8651c9b4b38d6c29bcf6e232fc6d3",
+    "driverArtifactSHA256": "c181d7d2958b8dcfda2633fbc9cc60314d1e95a98e8c2c973b91a3cb816fdf6f",
+    "handlerCheckReceiptSHA256": "99c1128af41904e0e361176732c7015df7d008d0fa9123c2463b976ec2781955",
+    "handlerCheckJournalSHA256": "0cacfb4d12a95313710f9d354ca940837a741febec0ee773ea926e2fa28fb1fc"
+  },
+  "protocolReview": {
+    "exactRequestFieldValidation": "PASS",
+    "disposableNamespaceValidation": "PASS",
+    "productionOrHistoricalNamespaceRejection": "PASS",
+    "oneCanonicalResponse": "PASS",
+    "contentFreeFailureChannel": "PASS",
+    "modelOrOpenHandsProcessExclusion": "PASS"
+  },
+  "caseMappings": [
+    {
+      "caseId": "SMA-S1-001-SAME-PARTITION-SELECTION",
+      "productBoundary": "SmaRetrievalService plus Mongo and Qdrant adapters",
+      "directEvidence": "selected IDs, rank, marker presence, retrieval-event provenance",
+      "review": "PASS"
+    },
+    {
+      "caseId": "SMA-S1-002-CROSS-PARTITION-ISOLATION",
+      "productBoundary": "partition-filtered retrieval, Mongo projection, Qdrant payload filter, retrieval event",
+      "directEvidence": "four independently inspected result/projection surfaces",
+      "review": "PASS"
+    },
+    {
+      "caseId": "SMA-S1-003-RAW-INELIGIBLE",
+      "productBoundary": "raw lifecycle and reasoning-eligibility filters",
+      "directEvidence": "raw state, exclusion reason, result/context/event absence",
+      "review": "PASS"
+    },
+    {
+      "caseId": "SMA-S1-004-DUPLICATE-CAPTURE",
+      "productBoundary": "OpenHandsEventIntakeService with persistent Mongo repository",
+      "directEvidence": "same-process replay, new-intake-instance replay, exact source-reference count",
+      "review": "PASS"
+    },
+    {
+      "caseId": "SMA-S1-005-RETRIEVAL-FAIL-OPEN",
+      "productBoundary": "OpenHandsBridgeServer context service with deterministic unavailable retriever",
+      "directEvidence": "HTTP outcome, elapsed nanoseconds, empty context, content-free fault metrics",
+      "review": "PASS"
+    },
+    {
+      "caseId": "SMA-S1-006-CAPTURE-OUTAGE-RECOVERY",
+      "productBoundary": "OpenHandsEventIntakeService reconciliation over durable loopback event source",
+      "directEvidence": "outage/recovery/replay capture counts and exact source-reference count",
+      "review": "PASS"
+    },
+    {
+      "caseId": "SMA-S1-007-PARENT-CHILD-PROVENANCE",
+      "productBoundary": "typed OpenHands provenance persisted by MemoryDocumentMapper",
+      "directEvidence": "conversation, parent, event, sequence, workspace, profile, source and partition fields",
+      "review": "PASS"
+    },
+    {
+      "caseId": "SMA-S1-008-RESTART-CONTINUITY",
+      "productBoundary": "two independently constructed bridge/resolver instances over persistent adapters",
+      "directEvidence": "resolved partition identities, recall before/after reconstruction, stored-memory count",
+      "review": "PASS"
+    },
+    {
+      "caseId": "SMA-S1-009-FOUR-CHANNEL-CONCURRENCY",
+      "productBoundary": "bounded bridge executor and metrics",
+      "directEvidence": "four terminated calls, distinct partitions, elapsed bounds, queue/rejection/timeout metrics",
+      "review": "PASS"
+    },
+    {
+      "caseId": "SMA-S1-010-FEEDBACK-LOOP-PREVENTION",
+      "productBoundary": "supported semantic event discriminator in OpenHandsEventIntakeService",
+      "directEvidence": "primary P1 metadata fields, rejected capture count, second-cycle and stored-memory counts",
+      "review": "PASS"
+    },
+    {
+      "caseId": "SMA-S1-011-SECRET-QUARANTINE",
+      "productBoundary": "SyntheticSecretDetector, ProtectedRawCaptureVault, MongoSafetyDecisionRepository",
+      "directEvidence": "matched frozen detector, protected write/link, content-free policy record, zero ordinary/vector/retrieval deltas, ordinary Mongo scan",
+      "review": "PASS"
+    },
+    {
+      "caseId": "SMA-S1-012-EMPTY-RESULT",
+      "productBoundary": "configured semantic acceptance threshold",
+      "directEvidence": "orthogonal embedding, selected IDs/count and empty context character count",
+      "review": "PASS"
+    },
+    {
+      "caseId": "SMA-S1-013-OVERSIZED-CONTEXT",
+      "productBoundary": "OpenHandsBridgeServer whole-frame context budget",
+      "directEvidence": "returned complete-frame lengths, frame markers, omission/count/character bounds",
+      "review": "PASS"
+    },
+    {
+      "caseId": "SMA-S1-014-CONDENSATION-REANCHOR-STATE",
+      "productBoundary": "DeliveryManifestService with MongoDeliveryManifestRepository",
+      "directEvidence": "epoch transition, delivered-state invalidation, snapshot requirement, restart idempotency and re-anchored cards",
+      "review": "PASS"
+    }
+  ],
+  "computedChecks": {
+    "handlerCount": 14,
+    "handlerMechanicsPassCount": 14,
+    "frozenPredicateCount": 32,
+    "frozenPredicatePassCount": 32,
+    "frozenPredicateFailCount": 0,
+    "lifecycleControlPassCount": 5,
+    "measuredScientificRepetitions": 0,
+    "singleUseAuthorizationConsumed": false
+  },
+  "scopeLimitations": [
+    "The check is one non-creditable invocation per handler and does not execute the frozen repetition schedule.",
+    "Case 011 qualifies deterministic SMA safety components, not their later live OpenHands wiring; supported integration remains S2 scope.",
+    "Case 005 proves the S1 context-service fail-open return, not end-to-end prompt submission through OpenHands; that remains S2 scope.",
+    "No model behavior, OpenHands boundary, integrated runtime, deployment, or production-readiness claim is made."
+  ],
+  "conclusion": "The fourteen handlers and their evidence mappings are suitable for an exact-identity offline harness qualification. Measured S1 remains NOT_RUN and NOT_AUTHORIZED."
+}

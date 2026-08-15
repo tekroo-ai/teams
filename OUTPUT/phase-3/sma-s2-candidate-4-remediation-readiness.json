@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1.0.0-candidate",
+  "recordType": "SMA_S2_CANDIDATE_4_REMEDIATION_READINESS",
+  "recordedOn": "2026-08-14",
+  "status": "READY_FOR_INDEPENDENT_REVIEW_NOT_ACCEPTED_NOT_AUTHORIZED",
+  "candidate": {
+    "path": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-4.json",
+    "sha256": "5875ec59ec1cb0e8d8d20f18bc0429e1324a160eed827222dcfb4c0cabc6d0ae"
+  },
+  "semanticCoverage": {"caseCount": 20, "predicateCount": 59, "requiredEvidenceCount": 10, "repetitionCount": 103},
+  "negativeControls": {"singleFalseRejected": 201, "singleMissingRejected": 201},
+  "offlineQualification": {
+    "path": "OUTPUT/phase-3/sma-s2-candidate-4-offline-qualification-2/offline-qualification-receipt.json",
+    "sha256": "fba8ae0cad35f240faa92c11d56257f3c4709d688bc78dec92199b143f5a6a8b",
+    "status": "PASS",
+    "passCount": 10,
+    "failCount": 0,
+    "networkUse": "NONE"
+  },
+  "candidate3Unchanged": true,
+  "livePreflightState": "NOT_RUN",
+  "measuredExecutionState": "NOT_RUN",
+  "recommendation": "INDEPENDENT_REVIEW_THEN_PRINCIPAL_ACCEPT_FREEZE_IF_SATISFIED",
+  "notAuthorized": ["live preflight", "measured execution", "real model calls"]
+}

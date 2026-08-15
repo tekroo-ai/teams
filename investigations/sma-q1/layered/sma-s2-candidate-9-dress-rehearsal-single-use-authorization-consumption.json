@@ -1,0 +1,68 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_CANDIDATE_9_DRESS_REHEARSAL_AUTHORIZATION_CONSUMPTION",
+  "candidate": 9,
+  "status": "CONSUMED_BY_ONE_INCONCLUSIVE_DRESS_REHEARSAL",
+  "recordedAt": "2026-08-14T22:32:51Z",
+  "authorization": {
+    "path": "investigations/sma-q1/layered/sma-s2-candidate-9-dress-rehearsal-single-use-authorization.json",
+    "sha256": "3d264701e2be63c8f53e20d00a331840909233fe08b153d2dc79a59aeb1469a1"
+  },
+  "hostPreflight": {
+    "path": "OUTPUT/phase-3/sma-s2-candidate-9-dress-rehearsal-live-preflight.json",
+    "sha256": "10a71376c5182afddac424ec3cf0ba967ffb4cf86a5031e93400d1903efcf00e",
+    "status": "PASS"
+  },
+  "dressRehearsal": {
+    "receiptPath": "OUTPUT/phase-3/sma-s2-candidate-9-dress-rehearsal-attempt-1/dress-rehearsal-receipt.json",
+    "receiptSha256": "87a39bdd06d673787729b51aec6941b803d0e45c813491f49852ad72794e406d",
+    "rawJournalPath": "OUTPUT/phase-3/sma-s2-candidate-9-dress-rehearsal-attempt-1/raw-evidence.jsonl",
+    "rawJournalSha256": "671ab38c487abcaf2f8da04c059422de9494e655a5261af80e3c91020bb299b3",
+    "status": "INCONCLUSIVE",
+    "plannedOperations": 34,
+    "completedOperations": 14,
+    "passingOperations": 10,
+    "substantiveOracleFailureOperations": 4,
+    "failureClass": "HARNESS",
+    "failureCaseId": "SMA-S2-006-DUPLICATE-PERSISTED-EVENT",
+    "failureRepetition": 1,
+    "failureErrorType": "RuntimeError",
+    "failureMessageSha256": "80e58f78bd89087dc11c7fb2a1a010437413e13b141a172689a05202683e67b6",
+    "cleanupStatus": "PASS"
+  },
+  "mavenPromotionConsumption": {
+    "maximumAuthorizedInvocations": 6,
+    "actualInvocations": 3,
+    "successfulInvocations": 3,
+    "failedInvocations": 0,
+    "otherMavenInvocations": 0,
+    "allUsedExplicitBoundProjectDirectory": true,
+    "allMatchedBoundPom": true,
+    "parentWorkingDirectoryRemainedUnchanged": true
+  },
+  "consumption": {
+    "dressRehearsalAttempts": 1,
+    "completedDressOperations": 14,
+    "measuredCaseExecutions": 0,
+    "measuredRepetitionExecutions": 0,
+    "measuredCredit": 0,
+    "realModelCalls": 0,
+    "automaticReruns": 0,
+    "claim": null
+  },
+  "postRunIndependentChecks": {
+    "ownedServiceAbsent": true,
+    "stubPortAvailable": true,
+    "bridgePortAvailable": true,
+    "mongodbDatabaseAbsent": true,
+    "semanticCollectionAbsent": true,
+    "episodicCollectionAbsent": true,
+    "workspaceRootAbsent": true,
+    "measuredOutputAbsent": true,
+    "activeConversationCount": 0,
+    "preservedTekrooTraderStatus": "paused"
+  },
+  "authorizationReusable": false,
+  "automaticRetryAuthorized": false,
+  "measuredExecutionAuthorized": false
+}

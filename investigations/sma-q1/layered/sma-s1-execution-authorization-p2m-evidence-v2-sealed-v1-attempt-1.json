@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S1_EXECUTION_AUTHORIZATION",
+  "authorizationId": "SMA-S1-P2M-EVIDENCE-V2-SEALED-V1-ATTEMPT-1",
+  "recordedAt": "2026-08-14T14:56:15Z",
+  "status": "AUTHORIZED_UNUSED",
+  "principalInstruction": "AUTHORIZE one single-use measured SMA-S1 evidence-v2 execution against sealed identity 139b38628e049ce2c0b04400014eacb2dd6ba9b4e9306c1347f4f0d3d12d3e36 and offline receipt e57ae8a21a01a7b1955dcf95332fb9129cdf585f903538c4eb3a7301b64565e3.",
+  "executionAuthorized": true,
+  "attemptsAllowed": 1,
+  "correctiveRerunsAllowed": 0,
+  "outputRoot": "OUTPUT/phase-3/sma-s1-measured-p2m-evidence-v2-sealed-v1-attempt-1",
+  "bindings": {
+    "manifestSHA256": "e663f5b732c22248adc5fab2f536dbf02dd72337f7c8428f225937e72d6a7f8c",
+    "identitySHA256": "139b38628e049ce2c0b04400014eacb2dd6ba9b4e9306c1347f4f0d3d12d3e36",
+    "harnessSHA256": "14850c72cbcb9b76dac5af208f360b1bcd526b211cb8d38e67a448b0ed92f9c5",
+    "driverSHA256": "4100c923d2419441ff22f09c6d3299e4aae50c40b8dc186e30f912770bf0f000",
+    "offlineHarnessReceiptSHA256": "e57ae8a21a01a7b1955dcf95332fb9129cdf585f903538c4eb3a7301b64565e3"
+  },
+  "scope": {
+    "measuredCases": 14,
+    "measuredRepetitions": 71,
+    "disposableNamespacesOnly": true,
+    "productionOrHistoricalDataAllowed": false,
+    "modelOrOpenHandsAllowed": false,
+    "safetyStopRequired": true,
+    "cleanupRequired": true
+  },
+  "executionFence": {
+    "executionStarted": false,
+    "attemptsConsumed": 0,
+    "executionState": "NOT_RUN",
+    "reuseProhibited": true
+  }
+}

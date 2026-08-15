@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "1.0.0",
+  "contractIdentity": "tekroo.event-export.contracts/0.1.0",
+  "transportProfile": "HTTP_JSON_PAGE",
+  "method": "POST",
+  "mediaType": "application/json",
+  "path": "/v1/event-export",
+  "authentication": "TRUSTED_ADAPTER_INJECTED",
+  "authorization": "EXACT_PRINCIPAL_AND_SOURCE",
+  "delivery": "AT_LEAST_ONCE",
+  "deduplicationIdentity": "event_id",
+  "maximumLimit": 1000,
+  "maximumWaitMillis": 30000,
+  "cursor": "OPAQUE_INTEGRITY_PROTECTED_SOURCE_AND_PRINCIPAL_BOUND",
+  "historyLoss": "RESYNC_REQUIRED",
+  "initialConvergence": "OPEN_LIVE_BEFORE_BOUNDED_BACKLOG"
+}

@@ -1,0 +1,48 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_MEASURED_DRIVER_SUCCESSOR_REMEDIATION_AUTHORIZATION",
+  "authorizationId": "SMA-S2-MEASURED-DRIVER-SUCCESSOR-REMEDIATION-20260814",
+  "status": "AUTHORIZED_NOT_CONSUMED",
+  "recordedOn": "2026-08-14",
+  "principalStatement": "Authorize S2 successor remediation to implement and offline-qualify the exact 20-case/103-repetition measured driver, then bind it and its receipt into a successor preregistration. This does not authorize live preflight or measured S2 execution.",
+  "sourceFinding": {
+    "path": "OUTPUT/phase-3/sma-s2-execution-identity-preparation-candidate-1.json",
+    "sha256": "bd5260fa13c2bb54e9c2e7c6fc4e5056069ce848cccbe898e7a469097d1b3855",
+    "primaryClass": "HARNESS"
+  },
+  "acceptedPredecessor": {
+    "path": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-2.json",
+    "sha256": "b7315835b6291d44d3d8cb918dbec1f16c1e64f2106fd70212c6a8f7ec678188",
+    "immutable": true
+  },
+  "authorizedActions": [
+    "implement one successor measured S2 driver for the accepted 20-case and 103-repetition corpus",
+    "implement and run offline-only driver-control qualification",
+    "retain failed driver and harness candidates if any",
+    "bind the exact driver, dependency closure, and passing offline receipt into one successor preregistration candidate",
+    "produce a successor readiness receipt and review document"
+  ],
+  "notAuthorized": [
+    "edit accepted preregistration candidate 2 or any artifact bound by it",
+    "create an OpenHands conversation",
+    "invoke the deterministic stub through OpenHands",
+    "start or restart Agent Canvas, agent-server, SMA, MongoDB, or Qdrant",
+    "create a measured MongoDB database, Qdrant collection, workspace, or output root",
+    "run any measured S2 case or repetition",
+    "invoke a real model",
+    "perform live preflight",
+    "seal an execution identity",
+    "claim OPENHANDS_SMA_BOUNDARY_QUALIFIED"
+  ],
+  "limits": {
+    "successorPreregistrationCandidates": 1,
+    "livePreflightAttempts": 0,
+    "openhandsConversations": 0,
+    "measuredCases": 0,
+    "measuredRepetitions": 0,
+    "realModelCalls": 0,
+    "serviceRestarts": 0
+  },
+  "measuredExecutionAuthorized": false,
+  "measuredExecutionState": "NOT_RUN"
+}

@@ -1,0 +1,87 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_Q1_STEP15_FINAL_V6_ADJUDICATION",
+  "recordedOn": "2026-08-13",
+  "timePrecision": "DAY",
+  "manifest": "investigations/sma-q1/preregistration-native-v6.json",
+  "manifestSHA256": "3b025b9adf135918ec0d955ef6cb59bbd46f26aec963611b1f846a2c0f15037e",
+  "authorization": "investigations/sma-q1/step-15-execution-authorization-v6.json",
+  "authorizationSHA256": "500f4bf53116939732cc6e491cbc1938a85606e7df724b6a34e27a2d3b7bcbd2",
+  "identity": "investigations/sma-q1/step-15-execution-identity-v6.json",
+  "identitySHA256": "c90aea8a836e3d8526e00ec3f17b961fc8398c18c3a7f91a4ab4170400cd461f",
+  "harness": "scripts/smaq1_native_step15_v6.py",
+  "harnessSHA256": "495735e076958e3f1f8435ce1ff57f8c10568f9545c2033ba6b5ac71b40b2f51",
+  "executionReceipt": "OUTPUT/phase-3/sma-q1n-step15-v6/execution-receipt.json",
+  "executionReceiptSHA256": "78953d704a363c21dfea736714efb1fbed4e1686aa628fb776acd758ca61c158",
+  "rawJournal": "OUTPUT/phase-3/sma-q1n-step15-v6/raw-receipts.jsonl",
+  "rawJournalSHA256": "f814086ef4dd917a63ab3487bf71888420d99de22308272de318fe54392177ea",
+  "status": "INCONCLUSIVE",
+  "decision": "NO_GO",
+  "smaQ1ResultClaim": "NONE",
+  "offlineAuthorizationContract": {
+    "status": "PASS",
+    "boundary": "OFFLINE_PREFLIGHT_REACHED_FIRST_LIVE_SERVICE_OPERATION",
+    "liveServiceCalls": 0,
+    "manifestIdentityRunnerAuthorizationHashesMatched": true,
+    "scenarioCount": 18,
+    "repetitionCount": 96
+  },
+  "fixtureQualification": {
+    "status": "PASS",
+    "deterministicEligiblePromotions": 3,
+    "rawIneligibleDisclosureObserved": false,
+    "crossPartitionLeakageObserved": false,
+    "samePartitionEligibleMemoryCount": 2,
+    "addedRetrievalCalls": 0,
+    "qualificationCleanupVerified": true
+  },
+  "corpusFloor": {
+    "startedScenarios": 2,
+    "completedScenarios": 1,
+    "notStartedScenarios": 16,
+    "startedRepetitions": 12,
+    "completedRepetitions": 12,
+    "notRunRepetitions": 84,
+    "completedScenarioResults": [
+      {
+        "scenarioId": "SMAQ1N-001-FIRST-PROMPT-EMPTY",
+        "repetitions": 10,
+        "status": "PASS"
+      }
+    ],
+    "partialScenario": {
+      "scenarioId": "SMAQ1N-002-SAME-PARTITION-RECALL",
+      "completedRepetitionsBeforeTerminal": 2,
+      "completedRepetitionFaults": ["NONE", "NONE"],
+      "scenarioResult": "NOT_ADJUDICATED_INCOMPLETE"
+    }
+  },
+  "terminal": {
+    "runnerClassification": "HARNESS_OR_ENVIRONMENT",
+    "runnerMessage": "conversation emitted a terminal error",
+    "observedOpenHandsCondition": "AGENT_REACHED_MAXIMUM_ITERATIONS_LIMIT_3",
+    "observedTaskStatus": "error",
+    "sourceEvidence": "OUTPUT/phase-3/sma-q1n-step15-v6/openhands-terminal-evidence.json",
+    "attributableToSMA": false,
+    "specificModelBehaviorCause": "UNVERIFIED",
+    "adjudicationRule": "The required finite corpus could not complete for an observed OpenHands terminal condition not attributable to SMA behavior; the frozen manifest therefore requires INCONCLUSIVE."
+  },
+  "cleanup": {
+    "runnerVerifiedAllDisposableResourcesAbsent": true,
+    "temporaryConversationsDeletedAnd404Verified": 7,
+    "postRunLaunchdServiceAbsent": true,
+    "postRunBridgePort8130ListenerAbsent": true,
+    "postRunMongoV6DatabasesAbsent": true,
+    "postRunQdrantV6CollectionsAbsent": true,
+    "qualificationRunRootAbsent": true,
+    "measuredRunRootAbsent": true,
+    "fixtureDriverBuildAbsent": true,
+    "smaExecutionWorktreeClean": true
+  },
+  "rerunPolicy": {
+    "v6AttemptConsumed": true,
+    "additionalV6ExecutionPermitted": false
+  },
+  "finalConclusion": "V6 fixed the coordinator-side artifact-contract defect and resolved the prior qualification retrieval uncertainty, but it did not complete the frozen corpus. SMA-Q1 and Step 15 do not pass.",
+  "nextValidAction": "Do not create or execute V7 as another immediate experiment amendment. First qualify the OpenHands evaluation lane so a fixed response-only prompt can complete substantially more than 96 consecutive conversations without a maximum-iteration terminal. Then decide separately whether one final evidence-bearing SMA-Q1 execution is warranted. Until then retain the native fail-open no-memory route and do not authorize wider workspace visibility."
+}

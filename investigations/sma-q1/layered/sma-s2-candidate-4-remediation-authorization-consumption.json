@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "1.0.0-candidate",
+  "recordType": "SMA_S2_CANDIDATE_4_REMEDIATION_AUTHORIZATION_CONSUMPTION",
+  "status": "CONSUMED_COMPLETE_NO_REUSE",
+  "recordedOn": "2026-08-14",
+  "authorization": {
+    "path": "investigations/sma-q1/layered/sma-s2-candidate-4-remediation-authorization.json",
+    "sha256": "c939a8b7c533f1fdfce98bcf0d65be8a0924b4690c5a6648607421d415140891"
+  },
+  "completedScope": [
+    "candidate-4 configuration",
+    "predicate-to-oracle matrix",
+    "successor deterministic fixture",
+    "successor measured driver",
+    "offline negative-control harness and qualification",
+    "candidate-4 preregistration and readiness package"
+  ],
+  "livePreflightPerformed": false,
+  "measuredExecutionPerformed": false,
+  "realModelCallsPerformed": false
+}

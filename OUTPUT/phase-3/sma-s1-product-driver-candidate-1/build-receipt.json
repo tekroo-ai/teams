@@ -1,0 +1,48 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S1_PRODUCT_DRIVER_BUILD_RECEIPT",
+  "status": "PASS_COMPILED_CONTROLS_CANDIDATE",
+  "scope": "PRODUCT_DRIVER_LIFECYCLE_CONTROLS_IMPLEMENTED_EXECUTE_CASE_FAILS_CLOSED",
+  "recordedOn": "2026-08-13",
+  "compiler": "javac 21.0.12",
+  "jarTool": "jar 21.0.12",
+  "compileCommand": "javac -cp /Users/paul/work/tekroo-ai/sma/target/sma-1.0-SNAPSHOT.jar -d OUTPUT/phase-3/sma-s1-product-driver-candidate-1/classes investigations/sma-q1/layered/driver-src/ai/tekroo/sma/openhands/SmaS1QualificationDriver.java",
+  "archiveCommand": "jar --create --file OUTPUT/phase-3/sma-s1-product-driver-candidate-1/sma-s1-product-driver-candidate-1.jar -C OUTPUT/phase-3/sma-s1-product-driver-candidate-1/classes .",
+  "source": {
+    "path": "investigations/sma-q1/layered/driver-src/ai/tekroo/sma/openhands/SmaS1QualificationDriver.java",
+    "sha256": "727c08f80b76d2a6619249ac6cde9855c2e339ccb55f643c67c94a300cb05648"
+  },
+  "serviceArtifact": {
+    "path": "/Users/paul/work/tekroo-ai/sma/target/sma-1.0-SNAPSHOT.jar",
+    "sha256": "ead8c0c5d9e3fd37b61318d2bdb8a97ef5c4c7481c11ed453777492f39f71042"
+  },
+  "compiledArtifact": {
+    "path": "OUTPUT/phase-3/sma-s1-product-driver-candidate-1/sma-s1-product-driver-candidate-1.jar",
+    "sha256": "6809ccd8aa106e43c268e3809a35c36c0c3eca39815f0e861f43a1f23d6bad58"
+  },
+  "classes": [
+    {
+      "name": "SmaS1QualificationDriver$CorpusMemory.class",
+      "sha256": "d4e8fc8edc0ed051cc44e711fe39dea03d8619c90e7a7e2da9e2a27eb5629e30"
+    },
+    {
+      "name": "SmaS1QualificationDriver$Inventory.class",
+      "sha256": "c2c37023dcbaa0a3fc6fe38a63698dde1d70fd6c43a6969a27910e8ab285fb07"
+    },
+    {
+      "name": "SmaS1QualificationDriver$Namespaces.class",
+      "sha256": "864d4fd809db766818d9ffea4bded7a749273dafcdeb3e7564e258d730714054"
+    },
+    {
+      "name": "SmaS1QualificationDriver$Response.class",
+      "sha256": "8df8b0b3371d7f2135a8b3b402d66905b1dfd4978ba00371c7ba9cc3b974c8c1"
+    },
+    {
+      "name": "SmaS1QualificationDriver.class",
+      "sha256": "9fe293018e14f0878a9cc31e170c1d4a955299c90150133b2230eac1b6490c2e"
+    }
+  ],
+  "modelOrOpenHandsUsed": false,
+  "measuredCasesExecuted": 0,
+  "byteReproducibleArchiveClaimed": false
+}

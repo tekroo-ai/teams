@@ -1,0 +1,58 @@
+{
+  "conversation_count": 5,
+  "conversations": [
+    {
+      "conversation_id": "a39d5ad5-ee7e-4e84-8e7c-ce9117a1dd22",
+      "delete_status": 200,
+      "get_after_delete": 404
+    },
+    {
+      "conversation_id": "054c3124-b77f-4543-83d0-8664fd324935",
+      "delete_status": 200,
+      "get_after_delete": 404
+    },
+    {
+      "conversation_id": "92fefffc-2c4b-4a8b-85f4-aa7bbea0d0cc",
+      "delete_status": 200,
+      "get_after_delete": 404
+    },
+    {
+      "conversation_id": "312552ee-626e-4405-94b1-66e483364558",
+      "delete_status": 200,
+      "get_after_delete": 404
+    },
+    {
+      "conversation_id": "94d6bcc1-05d3-460c-92d9-a32805854bf4",
+      "delete_status": 200,
+      "get_after_delete": 404
+    }
+  ],
+  "episodic_delete_status": 200,
+  "finished_at": "2026-08-13T22:16:38.878767+00:00",
+  "semantic_delete_status": 200,
+  "service": {
+    "bootout_exit": 0,
+    "elapsed_ms": 5086.644458991941,
+    "identity_after": {
+      "loaded": false,
+      "pid": null,
+      "state": null
+    },
+    "identity_before": {
+      "loaded": true,
+      "pid": 28944,
+      "state": "active"
+    },
+    "port_closed_ms": 5082.587416982278
+  },
+  "started_at": "2026-08-13T22:16:32.374966+00:00",
+  "verified": {
+    "bridge_absent": true,
+    "episodic_absent": true,
+    "fixture_driver_build_absent": true,
+    "mongo_absent": true,
+    "run_root_absent": true,
+    "semantic_absent": true,
+    "service_absent": true
+  }
+}

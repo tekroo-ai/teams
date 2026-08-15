@@ -1,0 +1,158 @@
+{
+  "schemaVersion": "1.0.0-candidate",
+  "recordType": "LAYERED_QUALIFICATION_PREREGISTRATION",
+  "lineageId": "SMA-S2",
+  "candidate": 7,
+  "status": "SUCCESSOR_CANDIDATE_NOT_ACCEPTED_NOT_AUTHORIZED",
+  "recordedOn": "2026-08-14",
+  "purpose": "Harness-corrected successor preserving the accepted SMA-S2 science while stabilizing terminal-event observation and binding corpus seeding to deterministic candidate settings.",
+  "decisiveQuestion": "Does the frozen supported OpenHands integration preserve the current prompt, place bounded untrusted SMA context correctly, fail open, retain provenance, and terminate cleanly under a deterministic model after every harness primitive passes a no-credit dress rehearsal?",
+  "claimOnPass": "OPENHANDS_SMA_BOUNDARY_QUALIFIED",
+  "requiredUpstreamClaim": "SMA_SEMANTICS_QUALIFIED",
+  "semanticRequirements": {
+    "source": {"path": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-2.json", "sha256": "b7315835b6291d44d3d8cb918dbec1f16c1e64f2106fd70212c6a8f7ec678188"},
+    "caseCount": 20,
+    "predicateCount": 59,
+    "requiredEvidenceCount": 10,
+    "repetitionCount": 103,
+    "casePredicatesChanged": false,
+    "thresholdsChanged": false,
+    "modelFaultScheduleChanged": false,
+    "continuationPolicyChanged": false,
+    "claimChanged": false
+  },
+  "predecessor": {
+    "candidate6": {"path": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-6.json", "sha256": "06e7a689d46dfc759d07ca2f1099854c42e0c21e4dc84cd1fde0a0f612ae6cee"},
+    "candidate6Acceptance": {"path": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-6-acceptance.json", "sha256": "1887f810a88c49d83a8ecfc4d3de9e25ac476e689a8c9e2b2f86c14573005f75"},
+    "candidate6ExecutionIdentity": {"path": "investigations/sma-q1/layered/sma-s2-candidate-6-execution-identity.json", "sha256": "5640c60968261402bc1878204703845581e266cbce1b4cc7e135a3008f05e5a4"},
+    "candidate6LivePreflight": {"path": "OUTPUT/phase-3/sma-s2-candidate-6-live-preflight-attempt-1/live-preflight-receipt.json", "sha256": "8d479433e93599209c50b314aef481c75aaf1460e6c2b9db9806f7dcb4de0624", "status": "PASS"},
+    "candidate6MeasuredReceipt": {"path": "OUTPUT/phase-3/sma-s2-successor-candidate-6-measured-attempt-1/execution-receipt.json", "sha256": "62226fd8658dece27e282400dc311813565aca334a1957f31e9b128b55575933", "status": "INCONCLUSIVE", "credit": 0},
+    "candidate6Adjudication": {"path": "OUTPUT/phase-3/sma-s2-candidate-6-measured-adjudication.json", "sha256": "fcd2d436bd13b64919942b8f21fe397376f9cf00a9abb8e5a7b59e7687126991"},
+    "immutabilityPreserved": true,
+    "measuredCreditImported": 0
+  },
+  "remediationAuthorization": {
+    "path": "investigations/sma-q1/layered/sma-s2-candidate-7-harness-remediation-authorization.json",
+    "sha256": "324f48993f463ede378b07b74246ee1cada349e177ef64c15027020379fe642b"
+  },
+  "prospectiveCorrections": [
+    "success observations require the exact agent terminal MessageEvent and failure observations require a ConversationErrorEvent",
+    "the required terminal event population must be identical across two consecutive fetches before grading",
+    "corpus-source conversations use the candidate-bound deterministic constructor with no default profile, default tools, encrypted secrets, or real-model execution",
+    "the inherited corpus source factory is rebound only within seeding and restored in a finally block",
+    "HTTP boundary failures retain sanitized phase, status, response digest, response length, and hashed server error identity",
+    "a 34-operation no-credit dress rehearsal covers ten fast-terminal repetitions, every case, all model fault modes, and all cancellation repetitions",
+    "a future measured fence requires a passing identity- and endpoint-bound dress-rehearsal receipt"
+  ],
+  "exactMeasuredCorpus": {
+    "path": "investigations/sma-q1/layered/sma-s2-measured-corpus-candidate-1.json",
+    "sha256": "c273c148a7b289f6650a26a82c38bda9680904701120e083543e9b7954b9a960",
+    "caseCount": 20,
+    "plannedRepetitionCount": 103,
+    "literalPromptsFrozen": true,
+    "syntheticOnly": true
+  },
+  "oracleMatrix": {
+    "path": "investigations/sma-q1/layered/sma-s2-predicate-oracle-matrix-candidate-4.json",
+    "sha256": "806e12a59dd8dcbc8f248d0a8d486c1afb856fc310e1952f7855e9fdf955d4f4",
+    "predicateOracleCount": 59,
+    "requiredEvidenceOracleCount": 10,
+    "semanticMutationControls": 25,
+    "semanticsChanged": false
+  },
+  "nonSecretConfiguration": {
+    "path": "investigations/sma-q1/layered/sma-s2-nonsecret-configuration-candidate-7.json",
+    "sha256": "32bc3c3fd03256a7ef6c44c60f5086b36235f95074f48356ece2e223031b9719"
+  },
+  "measuredDriver": {
+    "path": "scripts/sma_s2_measured_driver_candidate_5.py",
+    "sha256": "b14d75aff7c43558828b354312961adfe9a7e038daef19971f4bc7b8990eb799",
+    "defaultExecution": "DENY",
+    "dressRehearsalMode": "SEPARATELY_AUTHORIZED_NO_CREDIT",
+    "measuredMode": "SEPARATELY_AUTHORIZED_AFTER_PASSING_DRESS_RECEIPT",
+    "realModelCallsAllowed": false
+  },
+  "deterministicStub": {
+    "path": "scripts/sma_s2_deterministic_model_stub_candidate_3.py",
+    "sha256": "fffbea327321af9f2a6c8deaa6d71088c88db58abda11eae0f4cc082b613831e",
+    "behaviorChangedFromCandidate6": false
+  },
+  "driverDependencyClosure": [
+    {"role": "CANDIDATE_6_DRIVER_ENDPOINT_IDENTITY_LIBRARY_NO_RESULT_CREDIT", "path": "scripts/sma_s2_measured_driver_candidate_4.py", "sha256": "b58c8621997b86347acb29d13b73c9167113cdfdd79c0041599f46b46b92bb1f"},
+    {"role": "CANDIDATE_5_DRIVER_SCIENTIFIC_OPERATION_LIBRARY_NO_RESULT_CREDIT", "path": "scripts/sma_s2_measured_driver_candidate_3.py", "sha256": "6bd0cc221b6161140f12ad664e18efd472298f5d235e37925f980f9faa0b5d46"},
+    {"role": "CANDIDATE_4_DRIVER_PRIMITIVE_LIBRARY_NO_RESULT_CREDIT", "path": "scripts/sma_s2_measured_driver_candidate_2.py", "sha256": "d6c00abd077be006caed64e3c534b9baf4b376f84a3f0b3a3094636bb89f0de2"},
+    {"role": "CANDIDATE_3_DRIVER_TRANSITIVE_PRIMITIVE_LIBRARY_NO_RESULT_CREDIT", "path": "scripts/sma_s2_measured_driver_candidate_1.py", "sha256": "5f69ed4d3b439bf1d4d342c75f05781efee326fc2e1c39ad5002a92ffcc7464a"},
+    {"role": "CANDIDATE_2_STUB_BASE_BEHAVIOR", "path": "scripts/sma_s2_deterministic_model_stub_candidate_2.py", "sha256": "8013ba1dcd5db6192abce075f95dbd255ef8ada8335093cfaf0f5962f884e0f9"},
+    {"role": "SERVICE_AND_API_PRIMITIVE_LIBRARY_NO_RESULT_CREDIT", "path": "scripts/smaq1_native_step15_v4.py", "sha256": "5175b053f3633744212923290b0ac2614412a516e9279649b166d1ab2957b3e2"},
+    {"role": "ACTUALLY_IMPORTED_SERVICE_SUPPORT_CODE", "path": "/Users/paul/work/tekroo-ai/sma-step15/scripts/wp5e_restart_recovery.py", "sha256": "73857ed0734e0607a8a3a80646589d58c26e0ba338a450ecbee73fef8656677b"},
+    {"role": "BOUND_SMA_WORKTREE_SUPPORT_CODE", "path": "/Users/paul/work/tekroo-ai/sma-s1-p2m/scripts/wp5e_restart_recovery.py", "sha256": "73857ed0734e0607a8a3a80646589d58c26e0ba338a450ecbee73fef8656677b"},
+    {"role": "CANDIDATE_5_OFFLINE_SEMANTIC_MUTATION_HARNESS", "path": "scripts/sma_s2_measured_driver_offline_harness_candidate_3.py", "sha256": "69d907eb8782e44bbf5bc588bc1bf15d5cd480a0c3f6067c0ff3cc08bfd4a933"},
+    {"role": "CANDIDATE_6_OFFLINE_ENDPOINT_IDENTITY_HARNESS", "path": "scripts/sma_s2_measured_driver_offline_harness_candidate_4.py", "sha256": "665d00001478ee147415514c22635412cc287a8eecec2c6e8acb4e2b266d1e1c"},
+    {"role": "CANDIDATE_7_OFFLINE_HARNESS_REMEDIATION_HARNESS", "path": "scripts/sma_s2_measured_driver_offline_harness_candidate_5.py", "sha256": "b0a67769223baf859be372859a314275cd9b5a749f53b194545f714ea53287f3"}
+  ],
+  "offlineQualification": {
+    "status": "PASS",
+    "receipt": {
+      "path": "OUTPUT/phase-3/sma-s2-candidate-7-offline-harness-qualification-2/offline-harness-qualification-receipt.json",
+      "sha256": "f1061561784e2fd6730e2370365e90e2057afa1a779afa056ca8f5fe87f942b0"
+    },
+    "testCount": 11,
+    "passCount": 11,
+    "failCount": 0,
+    "networkUse": "NONE",
+    "dressRehearsalAttempts": 0,
+    "measuredExecutionAttempts": 0,
+    "credit": 0,
+    "retainedFailedQualification": {
+      "path": "OUTPUT/phase-3/sma-s2-candidate-7-offline-harness-qualification/offline-harness-qualification-receipt.json",
+      "sha256": "ec2dd48bd5a46e6e6ee2f6f015c28cf32788cf22f64eea3ca0f20217b866b65f",
+      "status": "FAIL",
+      "passCount": 10,
+      "failCount": 1,
+      "credit": 0,
+      "cause": "synthetic regression fixture omitted the frozen literalPrompt field"
+    }
+  },
+  "futureDressRehearsalContract": {
+    "recordType": "SMA_S2_CANDIDATE_7_DRESS_REHEARSAL_RECEIPT",
+    "operationCount": 34,
+    "measuredCredit": 0,
+    "claim": null,
+    "mustBindExecutionIdentityAndRuntimePorts": true,
+    "cleanupStatusRequired": "PASS",
+    "singleUseAuthorizationRequired": true
+  },
+  "futureMeasuredAuthorizationContract": {
+    "recordType": "SMA_S2_CANDIDATE_7_SINGLE_USE_MEASURED_AUTHORIZATION",
+    "maximumMeasuredAttempts": 1,
+    "mustBindPassingDressRehearsalReceiptPathAndSha256": true,
+    "caseCount": 20,
+    "repetitionCount": 103,
+    "realModelCallsAllowed": false
+  },
+  "boundProductIdentity": {
+    "smaCommit": "5d58be508c74ae8577d2fd31e3346be23a912ab3",
+    "smaTree": "7222410443a6041496a5c313b2549f16eb937458",
+    "openhandsCommit": "a338ba9b6cbb529886b755a335bae3dee0004700",
+    "openhandsTree": "9e72f1b4ee0b857025d9f170600b9dce539b169a"
+  },
+  "reviewPolicy": {
+    "independentReviewer": "WORKSPACE_PRINCIPAL",
+    "candidateSpecificDecisionRequired": true,
+    "coordinatorMayAcceptOrFreeze": false
+  },
+  "executionPolicy": {
+    "candidateAccepted": false,
+    "executionIdentityAuthorized": false,
+    "dressRehearsalAuthorized": false,
+    "measuredExecutionAuthorized": false,
+    "automaticCorrectiveReruns": 0
+  },
+  "excludedClaims": [
+    "candidate-7 dress rehearsal PASS",
+    "SMA-S2 measured PASS",
+    "OPENHANDS_SMA_BOUNDARY_QUALIFIED",
+    "production readiness"
+  ],
+  "nextGate": "WORKSPACE_PRINCIPAL_CANDIDATE_7_ACCEPT_FREEZE_DECISION"
+}

@@ -1,0 +1,51 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "OPENHANDS_RESPONSE_LANE_DIAGNOSTIC_EVIDENCE",
+  "recordedOn": "2026-08-13",
+  "classification": "OBSERVED_AND_COMPUTED",
+  "failedConversation": {
+    "conversationId": "57b3a839-0080-49eb-9023-b411e1e5adb4",
+    "ordinal": 1,
+    "terminal": "TIMEOUT",
+    "configuredDeadlineMilliseconds": 120000,
+    "observedWallMilliseconds": 120071.321583,
+    "deleteStatus": 200,
+    "getAfterDeleteStatus": 404
+  },
+  "agentCanvasLog": {
+    "path": "/Users/paul/.openhands/agent-canvas/logs/agent-canvas.2026-08-13.log",
+    "sha256ObservedDuringAdjudication": "5c1451864a7b533351a86c7b9c94fb0de69e69869624214d3aa847f34230ef78",
+    "observations": [
+      {"line": 5687, "value": "Conversation created."},
+      {"line": 5690, "value": "OpenHands loaded 0 tools from the explicit tool specification."},
+      {"line": 5691, "value": "OpenHands loaded the qwen3.6-fast profile."},
+      {"line": 5695, "value": "Prompt event submission returned HTTP 200."},
+      {"line": 6793, "value": "Conversation deletion succeeded after the qualification deadline."},
+      {"line": 6795, "value": "Post-deletion GET returned HTTP 404."}
+    ],
+    "targetedErrorSearch": "No OpenHands ERROR or WARNING entry associated with this conversation was found between creation and deletion."
+  },
+  "postCleanupDirectOllamaControl": {
+    "classification": "OBSERVED_AFTER_THE_FAILED_WINDOW",
+    "endpoint": "http://127.0.0.1:11434/api/chat",
+    "model": "qwen3.6:35b-a3b-q8_0",
+    "httpStatus": 200,
+    "responseExact": true,
+    "responseSHA256": "0e12790311c59226294b3aa12b874791421609db07841efedc3fcee983ff2ec7",
+    "totalDurationNanoseconds": 866599833,
+    "promptEvalCount": 21,
+    "evalCount": 5,
+    "causalLimit": "This proves that Ollama responded after conversation cleanup. It does not prove whether Ollama or OpenHands was blocked during the preceding 120-second window."
+  },
+  "mechanism": {
+    "observedFloor": "OpenHands accepted the prompt but emitted neither a terminal error nor an agent message before the frozen deadline.",
+    "specificCause": "UNVERIFIED",
+    "notSupportedAsFact": [
+      "Ollama was unavailable during the window",
+      "the model generated an excessively long response",
+      "the request was queued behind another generation",
+      "OpenHands failed to schedule the LLM request",
+      "OpenHands received a completion but failed to terminalize it"
+    ]
+  }
+}

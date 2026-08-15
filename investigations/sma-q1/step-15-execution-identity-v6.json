@@ -1,0 +1,72 @@
+{
+  "schemaVersion": "6.0.0",
+  "recordType": "SMA_Q1_EXECUTION_IDENTITY",
+  "recordedOn": "2026-08-13",
+  "timePrecision": "DAY",
+  "status": "SEALED_ACCEPTED_NOT_AUTHORIZED_NOT_STARTED",
+  "executionAuthorized": false,
+  "executionStarted": false,
+  "scenariosExecuted": 0,
+  "frozenExperiment": {
+    "manifest": "investigations/sma-q1/preregistration-native-v6.json",
+    "manifestSHA256": "3b025b9adf135918ec0d955ef6cb59bbd46f26aec963611b1f846a2c0f15037e",
+    "baseManifest": "investigations/sma-q1/preregistration-native-v2.json",
+    "baseManifestSHA256": "c618371d571d5333aebd2bdc83d2db2559115f5ec3e1903b33e8e0ab157edf5d",
+    "scenarioCount": 18,
+    "repetitionCount": 96,
+    "priorScenarioCredit": 0,
+    "executionState": "NOT_RUN"
+  },
+  "harness": {
+    "path": "scripts/smaq1_native_step15_v6.py",
+    "sha256": "495735e076958e3f1f8435ce1ff57f8c10568f9545c2033ba6b5ac71b40b2f51",
+    "telemetryParent": "scripts/smaq1_native_step15_v5_rerun1.py",
+    "telemetryParentSHA256": "c84e5557c6ca69362e2d57929a5b2536c381e447776f60a9c08da6160bd44494",
+    "fixtureDriver": "investigations/sma-q1/fixture-support/DeterministicReplayPromotion.java",
+    "fixtureDriverSHA256": "580f29edefc8c703e68adc3ba6536b58ba1b577a9ed0ca6969ff172eaacb8117",
+    "validation": {
+      "pythonCompile": "PASS",
+      "noServiceStaticExpectationSelfTest": "PASS",
+      "exactOfflinePreflightContract": "PASS_REACHED_FIRST_LIVE_SERVICE_SENTINEL_WITH_ZERO_LIVE_CALLS",
+      "liveFixtureQualification": "NOT_RUN",
+      "measuredExecution": "NOT_RUN"
+    }
+  },
+  "sma": {
+    "executionWorktree": "/Users/paul/work/tekroo-ai/sma-step15",
+    "detachedCommit": "60a966234166ea75f767b25e3cbb7eaabe4064a2",
+    "detachedTree": "7aaa06a68d59dd6f13b0a3a2c6ae3cff845c1121",
+    "worktreeMustBeClean": true,
+    "serviceJarSHA256": "1892ab3b1468ebbc62b922c116965b3d42af1a754cde006b23b57a431460618c"
+  },
+  "plannedIsolation": {
+    "qualification": {
+      "mongodbDatabase": "sma_q1n_step15_v6_fixture_20260813",
+      "semanticCollection": "sma_q1n_step15_v6_fixture_semantic_20260813",
+      "episodicCollection": "sma_q1n_step15_v6_fixture_episodic_20260813",
+      "actorAlphaPartition": "openhands:6bebf627d656f88fbc585279:default",
+      "actorBetaPartition": "openhands:5c48db35135e7bd1e1b448ad:default"
+    },
+    "measuredRun": {
+      "mongodbDatabase": "sma_q1n_step15_20260813_v6",
+      "semanticCollection": "sma_q1n_step15_v6_semantic_20260813",
+      "episodicCollection": "sma_q1n_step15_v6_episodic_20260813",
+      "actorAlphaPartition": "openhands:feaf8bfe0cb7f5752b657132:default",
+      "actorBetaPartition": "openhands:bea92737d4d6748ec0fe7f26:default"
+    },
+    "productionOrHistoricalDataAllowed": false
+  },
+  "executionFence": {
+    "freezeAccepted": true,
+    "exclusiveRuntimeWindowObserved": false,
+    "qualificationAuthorized": false,
+    "measuredExecutionAuthorized": false,
+    "authorizationRule": "This sealed identity is non-authorizing. One separate authorization artifact must bind the final manifest, identity, and runner hashes."
+  },
+  "authorization": {
+    "artifact": "investigations/sma-q1/step-15-execution-authorization-v6.json",
+    "template": "investigations/sma-q1/step-15-execution-authorization-v6.template.json",
+    "sha256": null,
+    "status": "NOT_CREATED_NOT_AUTHORIZED"
+  }
+}

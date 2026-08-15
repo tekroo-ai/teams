@@ -1,0 +1,69 @@
+{
+  "schemaVersion": "1.0.0-candidate",
+  "recordType": "SMA_S1_EXECUTION_IDENTITY",
+  "identityId": "SMA-S1-EXECUTION-IDENTITY-P2M-EVIDENCE-V2-CANDIDATE-3",
+  "status": "CANDIDATE_NOT_ACCEPTED_NOT_AUTHORIZING_NOT_STARTED",
+  "recordedOn": "2026-08-14",
+  "timePrecision": "DAY",
+  "scientificPreregistration": {
+    "path": "investigations/sma-q1/layered/sma-s1-preregistration.json",
+    "sha256": "e663f5b732c22248adc5fab2f536dbf02dd72337f7c8428f225937e72d6a7f8c",
+    "status": "ACCEPTED_FROZEN_NOT_AUTHORIZED"
+  },
+  "prospectiveLineage": {
+    "priorSealedIdentitySHA256": "f8bf0323680504df1afb14fe6184e87eaaa675170079c005ce827fcfdfe15e0e",
+    "priorExecutionReceiptSHA256": "3f7d16db5ded23f11b3baad1ea6e37faf6fb82890feeb8211c3b433f7a7ed9c2",
+    "priorScientificAdjudicationSHA256": "7d140cf9d1a34e533a9d5f531f533a2e03682070d11916e6d4257f592600ca96",
+    "priorScientificStatus": "INCONCLUSIVE_MINIMUM_PASS_EVIDENCE_INCOMPLETE",
+    "priorMeasuredCreditImported": 0,
+    "priorAuthorizationReusable": false,
+    "evidenceV2Candidate1Disposition": "ZERO_CREDIT_HANDLER_CHECK_FAIL",
+    "evidenceV2Candidate1Gap": "EXACT_PROVENANCE_IDENTITY_FIELDS_INVALID",
+    "evidenceV2Candidate2Disposition": "ZERO_CREDIT_HANDLER_CHECK_FAIL",
+    "evidenceV2Candidate2Gap": "INTENTIONAL_NULL_PARENT_IDENTITY_OMITTED_BY_SERIALIZER"
+  },
+  "boundImplementation": {
+    "smaCommit": "5d58be508c74ae8577d2fd31e3346be23a912ab3",
+    "smaTree": "7222410443a6041496a5c313b2549f16eb937458",
+    "serviceArtifactSHA256": "c0ddb963798d45603c2e2685744892c40d3e841817f9c966ab7fad34f7e48765",
+    "sourcesArtifactSHA256": "d48f9629588cce161b228511fd5307e0dcf839318d9dc5d8f32c450dfc2ac5fb",
+    "productDriverSource": "investigations/sma-q1/layered/driver-src-p2m-evidence-v2-candidate-3/ai/tekroo/sma/openhands/SmaS1QualificationDriver.java",
+    "productDriverSourceSHA256": "cb2374f6942249fd874f44aff633551c0b0986d4cb126d00ebda394e89741aff",
+    "productDriverArtifact": "OUTPUT/phase-3/sma-s1-product-driver-p2m-evidence-v2-candidate-3/sma-s1-product-driver-p2m-evidence-v2-candidate-3.jar",
+    "productDriverArtifactSHA256": "a21614b1833a569675d5d1e7f82c3bf0b027bcc7c503853b3377b5e6470b8725",
+    "productDriverLauncher": "scripts/sma_s1_product_driver_p2m_evidence_v2_candidate_3.py",
+    "productDriverLauncherSHA256": "e9e4eec96e9e1ff491990a608417ab05a6bbc845177c97379f61895a4556efd4",
+    "productDriverBuildReceiptSHA256": "27d0f2a1d92255b13b931a40980761ebd2d94feff68563247e097674a30a0a12",
+    "harness": "scripts/sma_s1_harness_evidence_v2.py",
+    "harnessSHA256": "49e251b9043f7cafd7f642991d007bdcc2be4f006fe9b1b1ff6bb73a5715d221",
+    "driverProtocolSHA256": "24d28b526af7d533c1d551b6cdc3d0c15a16f07615945ea570af9dd401374cad",
+    "environmentBindingSHA256": "46af2cba3ea00e0852a0ad034450705b7d3a02098925625d6e61e4709b5380c0"
+  },
+  "evidenceBoundary": {
+    "warmHitAndNoHitLatencySamples": true,
+    "nearestRankP95CalculationInputs": true,
+    "exactRuntimeProvenanceIdentities": true,
+    "separateOperatingSystemProcessRestartPhases": true,
+    "beforeAndAfterRestartReceipts": true,
+    "canonicalRequestAndResponseByteLengths": true,
+    "postObservationRegradingOfPriorRun": false
+  },
+  "plannedIsolation": {
+    "measuredMongoDatabase": "sma_s1_measured_20260814_p2m_evidence_v2_candidate_3",
+    "measuredSemanticCollection": "sma_s1_measured_semantic_20260814_p2m_evidence_v2_candidate_3",
+    "measuredEpisodicCollection": "sma_s1_measured_episodic_20260814_p2m_evidence_v2_candidate_3",
+    "actorAlphaPartition": "sma-s1-measured-actor-alpha-p2m-evidence-v2-candidate-3",
+    "actorBetaPartition": "sma-s1-measured-actor-beta-p2m-evidence-v2-candidate-3",
+    "productionOrHistoricalDataAllowed": false
+  },
+  "executionFence": {
+    "identityAccepted": false,
+    "offlineHarnessCandidateAccepted": false,
+    "singleUseExecutionAuthorizationPresent": false,
+    "executionAuthorized": false,
+    "executionAttemptsAuthorized": 0,
+    "executionStarted": false,
+    "casesExecuted": 0,
+    "executionState": "NOT_RUN"
+  }
+}

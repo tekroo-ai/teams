@@ -1,0 +1,236 @@
+{
+  "base_manifest_sha256": "c618371d571d5333aebd2bdc83d2db2559115f5ec3e1903b33e8e0ab157edf5d",
+  "cleanup": {
+    "conversation_count": 5,
+    "conversations": [
+      {
+        "conversation_id": "f67b7fc6-46d1-4dce-a875-c5a8ce3cfcc0",
+        "delete_status": 200,
+        "get_after_delete": 404
+      },
+      {
+        "conversation_id": "10a165d7-4ca7-4e52-882c-da1757d97318",
+        "delete_status": 200,
+        "get_after_delete": 404
+      },
+      {
+        "conversation_id": "31a7b28c-6ad7-49ba-9a71-8c50aae2cefe",
+        "delete_status": 200,
+        "get_after_delete": 404
+      },
+      {
+        "conversation_id": "137db9d7-37fe-4f97-85d8-bc012b659cbb",
+        "delete_status": 200,
+        "get_after_delete": 404
+      },
+      {
+        "conversation_id": "e65cd997-2fea-4039-ae2f-c3c5361c4381",
+        "delete_status": 200,
+        "get_after_delete": 404
+      }
+    ],
+    "episodic_delete_status": 200,
+    "finished_at": "2026-08-13T22:40:41.381758+00:00",
+    "semantic_delete_status": 200,
+    "service": {
+      "already_stopped": true,
+      "listener": null
+    },
+    "started_at": "2026-08-13T22:40:39.896325+00:00",
+    "verified": {
+      "bridge_absent": true,
+      "episodic_absent": true,
+      "fixture_driver_build_absent": true,
+      "mongo_absent": true,
+      "run_root_absent": true,
+      "semantic_absent": true,
+      "service_absent": true
+    }
+  },
+  "completed_repetitions": 41,
+  "completed_scenario_ids": [
+    "SMAQ1N-001-FIRST-PROMPT-EMPTY",
+    "SMAQ1N-002-SAME-PARTITION-RECALL",
+    "SMAQ1N-003-CROSS-PARTITION-DENIAL",
+    "SMAQ1N-004-CURRENT-INSTRUCTION-PRECEDENCE",
+    "SMAQ1N-005-RAW-INELIGIBLE",
+    "SMAQ1N-006-DUPLICATE-EVENT-CAPTURE"
+  ],
+  "completed_scenarios": 6,
+  "decision": "NO_GO",
+  "failure": {
+    "classification": "SUBSTANTIVE_COUNTEREXAMPLE",
+    "message": "model response omitted expected marker",
+    "message_sha256": "1c71b3d9acff6828c1da546a23d268553985033511ca72d3b20483ddc04ebc38",
+    "type": "SubstantiveCounterexample"
+  },
+  "harness_sha256": "168cd0e8fb6c0a59396e63bcfbee207efcb471281502f2de55aa1fce9ecd8c88",
+  "manifest_sha256": "2e97230c4f423b10cc6b98be1d9f02d6e3a97c71e13c67f6b585623b01e1c195",
+  "not_run_repetitions": 55,
+  "not_run_scenario_ids": [
+    "SMAQ1N-007-RETRIEVAL-OUTAGE",
+    "SMAQ1N-008-CAPTURE-OUTAGE-RECONCILIATION",
+    "SMAQ1N-009-ADDITIONAL-CONTEXT-INTEGRITY",
+    "SMAQ1N-010-HOOK-DEADLINE-AND-MALFORMED",
+    "SMAQ1N-011-PARENT-CHILD-PROVENANCE",
+    "SMAQ1N-012-RESTART-PARTITION-CONTINUITY",
+    "SMAQ1N-013-FOUR-CHANNEL-CONCURRENCY",
+    "SMAQ1N-014-FEEDBACK-LOOP-PREVENTION",
+    "SMAQ1N-015-SECRET-QUARANTINE",
+    "SMAQ1N-016-EMPTY-RESULT",
+    "SMAQ1N-017-OVERSIZED-CONTEXT-BOUND",
+    "SMAQ1N-018-CONDENSATION-REANCHOR"
+  ],
+  "qualification": {
+    "measured_namespace_empty": true,
+    "qualification_cleanup_verified": true,
+    "qualified_fixture": true
+  },
+  "qualified_fixture": true,
+  "raw_journal_sha256": "8438e9ff85f7d97c8c3f760fc707cba1927fbb62d2a3059991799ad4b1771207",
+  "receipt_type": "SMA_Q1_NATIVE_STEP15_EXECUTION",
+  "recorded_at": "2026-08-13T22:40:41.387896+00:00",
+  "report_sha256": "4c093d21a097f1b362e8f52920833e033cff67a2931bf5e3473465baa646d131",
+  "scenario_results": [
+    {
+      "records": 10,
+      "scenario_id": "SMAQ1N-001-FIRST-PROMPT-EMPTY",
+      "status": "PASS"
+    },
+    {
+      "records": 10,
+      "scenario_id": "SMAQ1N-002-SAME-PARTITION-RECALL",
+      "status": "PASS"
+    },
+    {
+      "records": 10,
+      "scenario_id": "SMAQ1N-003-CROSS-PARTITION-DENIAL",
+      "status": "PASS"
+    },
+    {
+      "records": 5,
+      "scenario_id": "SMAQ1N-004-CURRENT-INSTRUCTION-PRECEDENCE",
+      "status": "PASS"
+    },
+    {
+      "records": 3,
+      "scenario_id": "SMAQ1N-005-RAW-INELIGIBLE",
+      "status": "PASS"
+    },
+    {
+      "memory_count_after": 10,
+      "memory_count_before": 4,
+      "records": 3,
+      "restart": {
+        "capture": true,
+        "health": {
+          "bridge_url": "http://127.0.0.1:8130",
+          "context_active_work": 0,
+          "context_avg_latency_us": 0,
+          "context_cancelled_requests": 0,
+          "context_completed_requests": 0,
+          "context_disclosed_response_writes": 0,
+          "context_disclosure_terminals": 0,
+          "context_empty_fail_open_responses": 0,
+          "context_failures": 0,
+          "context_hard_deadline_breaches": 0,
+          "context_hits": 0,
+          "context_http_active": 1,
+          "context_http_queued": 0,
+          "context_malformed_requests": 0,
+          "context_max_observed_active_work": 0,
+          "context_max_observed_http_active": 1,
+          "context_max_observed_http_queued": 1,
+          "context_max_observed_queued_work": 0,
+          "context_non_disclosed_terminals": 0,
+          "context_oversized_requests": 0,
+          "context_queued_work": 0,
+          "context_readiness_misses": 0,
+          "context_rejected_requests": 0,
+          "context_requests": 0,
+          "context_response_headroom_ms": 250,
+          "context_response_write_failures": 0,
+          "context_retrievals_prepared": 0,
+          "context_service_hard_deadline_ms": 500,
+          "context_shutdown_cancellations": 0,
+          "context_shutdown_requested": 0,
+          "context_side_effect_leases_at_cancellation": 0,
+          "context_stage_resolution_avg_latency_us": 0,
+          "context_stage_resolution_count": 0,
+          "context_stage_resolution_timeouts": 0,
+          "context_stage_response_build_avg_latency_us": 0,
+          "context_stage_response_build_count": 0,
+          "context_stage_response_build_timeouts": 0,
+          "context_stage_retrieval_avg_latency_us": 0,
+          "context_stage_retrieval_count": 0,
+          "context_stage_retrieval_timeouts": 0,
+          "context_terminalization_failures": 0,
+          "context_timeouts": 0,
+          "context_work_budget_ms": 250,
+          "context_work_cancellations": 0,
+          "context_work_exceptions": 0,
+          "context_work_successes": 0,
+          "embedding_failed_probes": 0,
+          "embedding_last_application_latency_us": -1,
+          "embedding_last_probe_latency_us": 328452,
+          "embedding_last_success_age_ms": 280,
+          "embedding_probe_in_flight": false,
+          "embedding_ready": true,
+          "embedding_successful_probes": 1,
+          "embedding_timed_out_probes": 0,
+          "http_executor_shutdown": false,
+          "http_executor_terminated": false,
+          "maximum_active_context_operations": 4,
+          "maximum_http_threads": 16,
+          "maximum_inbound_request_bytes": 1048576,
+          "maximum_queued_context_operations": 8,
+          "maximum_queued_http_exchanges": 16,
+          "status": "ok",
+          "work_executor_shutdown": false,
+          "work_executor_terminated": false
+        },
+        "replay_canary": "smaq1:v5:controlled-no-background-replay",
+        "retrieval": true,
+        "startup": {
+          "embedding_ready": true,
+          "health_status": "ok",
+          "identity": {
+            "loaded": true,
+            "pid": 33886,
+            "state": "active"
+          },
+          "listener_pid": 33886
+        }
+      },
+      "scenario_id": "SMAQ1N-006-DUPLICATE-EVENT-CAPTURE",
+      "status": "PASS",
+      "stop": {
+        "bootout_exit": 0,
+        "elapsed_ms": 5101.276832981966,
+        "identity_after": {
+          "loaded": false,
+          "pid": null,
+          "state": null
+        },
+        "identity_before": {
+          "loaded": true,
+          "pid": 33694,
+          "state": "active"
+        },
+        "port_closed_ms": 5097.3219579900615
+      }
+    }
+  ],
+  "schema_version": "1.0.0",
+  "started_repetitions": 41,
+  "started_scenario_ids": [
+    "SMAQ1N-001-FIRST-PROMPT-EMPTY",
+    "SMAQ1N-002-SAME-PARTITION-RECALL",
+    "SMAQ1N-003-CROSS-PARTITION-DENIAL",
+    "SMAQ1N-004-CURRENT-INSTRUCTION-PRECEDENCE",
+    "SMAQ1N-005-RAW-INELIGIBLE",
+    "SMAQ1N-006-DUPLICATE-EVENT-CAPTURE"
+  ],
+  "started_scenarios": 6,
+  "status": "FAIL"
+}

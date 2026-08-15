@@ -1,0 +1,22 @@
+{
+  "completed_attempts": 128,
+  "failed_attempts": 0,
+  "native_hook_elapsed_ms": {
+    "maximum": 62.325374979991466,
+    "minimum": 48.31195896258578
+  },
+  "passed_attempts": 128,
+  "process_elapsed_ms": {
+    "maximum": 2194.656,
+    "minimum": 1882.440083
+  },
+  "process_timeout_seconds": 30,
+  "raw_journal_sha256": "324ae230edc9a4a317e8f86d63b9fea3dcb70fd84636dd61f41d600893994b17",
+  "receipt_type": "OPENHANDS_NATIVE_HOOK_LANE_QUALIFICATION",
+  "recorded_at": "2026-08-13T21:37:42.082245+00:00",
+  "required_attempts": 128,
+  "schema_version": "1.0.0",
+  "semantic_hook_deadline_ms": 1000,
+  "sma_q1_claim": "NONE",
+  "status": "PASS"
+}

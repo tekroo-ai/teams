@@ -1,0 +1,93 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S1_IDENTITY_OBSERVATION",
+  "recordedOn": "2026-08-13",
+  "timePrecision": "DAY",
+  "classification": "OBSERVED_READ_ONLY_CANDIDATE_EVIDENCE",
+  "executionOrQualificationPerformed": false,
+  "repository": {
+    "path": "/Users/paul/work/tekroo-ai/sma",
+    "statusCommand": "git status --short --branch",
+    "statusOutput": "## master...origin/master [ahead 1]",
+    "worktreeClean": true,
+    "branch": "master",
+    "head": "e89ff9e0bab192689122d5e7b9d36d16cae5d368",
+    "tree": "1ff9816967d1ea6378947c2cfc23a0a92308a770",
+    "originMaster": "60a966234166ea75f767b25e3cbb7eaabe4064a2",
+    "originContainsHead": false,
+    "headCommitSubject": "fix(mcp): terminate stdio server on client EOF",
+    "headDeltaFromOrigin": {
+      "files": [
+        "src/main/java/ai/tekroo/sma/mcp/SmaMemoryIntakeMcpServer.java",
+        "src/main/java/ai/tekroo/sma/mcp/TerminationAwareInputStream.java",
+        "src/test/java/ai/tekroo/sma/mcp/TerminationAwareInputStreamTest.java"
+      ],
+      "insertions": 159,
+      "deletions": 7
+    }
+  },
+  "sourceAndDependencyFiles": {
+    "pom.xml": "998b00e30f7c21d72d3fec31da6b0d0db3699947106e968efccb2f1baaef150a",
+    "proxy/pom.xml": "52c4691e6941568edae7ce78a5df55bf80e8c496de1d02cadedf6424bda09ced",
+    "docs/WP5_EXECUTION.md": "4c90608bc03ce4e69fe71399271070b9bc519c4f0768cc4a70a55d7cedf298f2",
+    "docs/WP5_GATE5_RECEIPT.md": "a733549325f32b594ec224222a153ecc6d76e3ea98be029b2e2409a907d2a8af",
+    "mongodbDriverVersion": "5.3.1",
+    "qdrantClientVersion": "1.17.0",
+    "gsonVersion": "2.11.0",
+    "mcpSdkVersion": "1.0.0",
+    "junitVersion": "5.11.4"
+  },
+  "existingArtifacts": {
+    "target/sma-1.0-SNAPSHOT.jar": {
+      "sha256": "a7fcc18448132e93c3c6a92e0c1c2186d5b0d8fe52d29bbf8ba331fd86d03e4d",
+      "manifestMainClass": "ai.tekroo.sma.runtime.SmaServiceMain",
+      "manifestJavaVersion": "21",
+      "sourceCommitEmbedded": false,
+      "qualificationUseAllowed": false,
+      "reason": "The existing artifact does not prove which source commit produced it."
+    },
+    "proxy/target/sma-proxy-1.0-SNAPSHOT.jar": {
+      "sha256": "8a5e5aa5b8cc86c4c9bcfa3123b3a7e6f5226783119df98f5b95f0548ab91bd1",
+      "sourceCommitEmbedded": "NOT_INSPECTED",
+      "qualificationUseAllowed": false,
+      "reason": "S1 excludes the proxy and the existing artifact has no sealed S1 build receipt."
+    }
+  },
+  "localToolchain": {
+    "java": "Eclipse Temurin OpenJDK 21.0.12+8 LTS, aarch64",
+    "maven": "Apache Maven 3.9.16 commit 2bdd9fddda4b155ebf8000e807eb73fd829a51d5",
+    "os": "macOS 26.5.2 aarch64",
+    "defaultLocale": "en_US",
+    "platformEncoding": "UTF-8"
+  },
+  "localServices": {
+    "mongodb": {
+      "processObserved": true,
+      "serverVersion": "8.3.4",
+      "clientVersion": "mongosh 2.8.3",
+      "configurationDigest": "UNBOUND"
+    },
+    "qdrant": {
+      "processObserved": true,
+      "serverVersion": "1.18.2",
+      "serverCommit": "44ad62f8cd69642be5afa6441612525e24a0d063",
+      "configurationDigest": "UNBOUND"
+    },
+    "docker": {
+      "daemonAvailable": false,
+      "observation": "The configured Docker API socket did not exist; MongoDB and Qdrant were observed as native processes."
+    }
+  },
+  "unresolved": [
+    "principal selection of e89ff9e0 as the S1 implementation candidate",
+    "whether the local commit must be pushed before identity freeze",
+    "reproducible clean build and artifact digests",
+    "transitive dependency artifact digests",
+    "deterministic embedding or cognition fixture identity",
+    "S1 harness and journal-writer identities",
+    "independent harness reviewer",
+    "MongoDB and Qdrant configuration digests",
+    "non-secret S1 configuration",
+    "disposable qualification and measured namespaces"
+  ]
+}

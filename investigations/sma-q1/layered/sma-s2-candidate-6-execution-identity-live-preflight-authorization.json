@@ -1,0 +1,55 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_CANDIDATE_6_EXECUTION_IDENTITY_LIVE_PREFLIGHT_AUTHORIZATION",
+  "authorizationId": "SMA-S2-CANDIDATE-6-IDENTITY-LIVE-PREFLIGHT-20260814",
+  "status": "AUTHORIZED_NOT_CONSUMED",
+  "recordedOn": "2026-08-14",
+  "principalStatement": "Please proceed.",
+  "acceptedPreregistration": {
+    "path": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-6.json",
+    "sha256": "06e7a689d46dfc759d07ca2f1099854c42e0c21e4dc84cd1fde0a0f612ae6cee"
+  },
+  "acceptance": {
+    "path": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-6-acceptance.json",
+    "sha256": "1887f810a88c49d83a8ecfc4d3de9e25ac476e689a8c9e2b2f86c14573005f75"
+  },
+  "authorizedActions": [
+    "perform one immediate read-only active-work and bound-service identity audit",
+    "prove accepted artifact and dependency digest correspondence",
+    "prove candidate-6 namespaces and output root absent",
+    "select and availability-check one numeric loopback stub port while preserving bridge port 8130",
+    "prepare and seal one candidate-6 execution identity binding both exact endpoints",
+    "create one identity-bound single-use live-preflight authorization",
+    "perform at most one candidate-6 live preflight with one OpenHands conversation and one deterministic-stub request",
+    "clean and verify every preflight-owned resource",
+    "publish a measured-authorization GO or NO-GO recommendation"
+  ],
+  "limits": {
+    "maximumExecutionIdentityCandidates": 1,
+    "maximumLivePreflightAttempts": 1,
+    "maximumOpenHandsPreflightConversations": 1,
+    "maximumDeterministicStubPreflightRequests": 1,
+    "maximumServiceRestarts": 0,
+    "measuredCaseExecutions": 0,
+    "measuredRepetitionExecutions": 0
+  },
+  "stopConditions": [
+    "active OpenHands conversation or other protected work is found",
+    "accepted artifact, dependency, product, executable, or service identity mismatch",
+    "candidate-6 namespace or output root already exists",
+    "bound stub or bridge port is occupied",
+    "required service is unavailable and remediation would require a restart",
+    "any execution fence or cleanup predicate fails"
+  ],
+  "notAuthorized": [
+    "modify candidate 6 or any accepted artifact",
+    "run any measured S2 case or repetition",
+    "invoke a real model",
+    "restart Agent Canvas, agent-server, SMA, MongoDB, or Qdrant",
+    "issue or consume measured-attempt authorization",
+    "claim OPENHANDS_SMA_BOUNDARY_QUALIFIED",
+    "production or historical data access"
+  ],
+  "measuredExecutionAuthorized": false,
+  "measuredExecutionState": "NOT_RUN"
+}

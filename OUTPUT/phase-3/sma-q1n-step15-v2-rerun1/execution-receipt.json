@@ -1,0 +1,67 @@
+{
+  "cleanup": {
+    "conversation_count": 4,
+    "conversations": [
+      {
+        "conversation_id": "fa58b447-d4f6-400e-bc87-37995ec78724",
+        "delete_status": 200,
+        "get_after_delete": 404
+      },
+      {
+        "conversation_id": "6279b067-6cee-4fe7-9e15-0521cc3bd68e",
+        "delete_status": 200,
+        "get_after_delete": 404
+      },
+      {
+        "conversation_id": "56fcc1b7-355a-489e-9eee-66cf0ceb5fc5",
+        "delete_status": 200,
+        "get_after_delete": 404
+      },
+      {
+        "conversation_id": "9ed8c58c-9767-4eae-8e70-22e682a53457",
+        "delete_status": 200,
+        "get_after_delete": 404
+      }
+    ],
+    "episodic_delete_status": 200,
+    "finished_at": "2026-08-13T18:34:21.735149+00:00",
+    "semantic_delete_status": 200,
+    "service": {
+      "already_stopped": true,
+      "listener": null
+    },
+    "started_at": "2026-08-13T18:34:20.193239+00:00",
+    "verified": {
+      "bridge_absent": true,
+      "episodic_absent": true,
+      "mongo_absent": true,
+      "run_root_absent": true,
+      "semantic_absent": true,
+      "service_absent": true
+    }
+  },
+  "completed_scenarios": 1,
+  "decision": "NO_GO",
+  "failure": {
+    "classification": "HARNESS_OR_ENVIRONMENT",
+    "message": "seed vector cardinality mismatch",
+    "message_sha256": "4ccb5a79436976a98a21f104c785d30749735733aabf94fe3a31a478016fd152",
+    "type": "RuntimeError"
+  },
+  "harness_sha256": "491f093caac6018ab712986d068dca3f64d0062e05c93311070087b6b87dfce6",
+  "manifest_sha256": "c618371d571d5333aebd2bdc83d2db2559115f5ec3e1903b33e8e0ab157edf5d",
+  "raw_journal_sha256": "772cb3d46f74b86110dedc8e2fa07491a03720d6be079aae53deb0b0e43b5226",
+  "receipt_type": "SMA_Q1_NATIVE_STEP15_EXECUTION",
+  "recorded_at": "2026-08-13T18:34:21.736736+00:00",
+  "report_sha256": "24402919ad00cdd92e045ba37926798240daa7788d985b0724404bb0204dd6a1",
+  "scenario_results": [
+    {
+      "records": 10,
+      "scenario_id": "SMAQ1N-001-FIRST-PROMPT-EMPTY",
+      "status": "PASS"
+    }
+  ],
+  "schema_version": "1.0.0",
+  "started_scenarios": 2,
+  "status": "INCONCLUSIVE"
+}

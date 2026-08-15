@@ -1,0 +1,66 @@
+{
+  "base_manifest_sha256": "c618371d571d5333aebd2bdc83d2db2559115f5ec3e1903b33e8e0ab157edf5d",
+  "cleanup": {
+    "conversation_count": 0,
+    "conversations": [],
+    "finished_at": "2026-08-13T19:13:01.260827+00:00",
+    "service": {
+      "already_stopped": true,
+      "listener": null
+    },
+    "started_at": "2026-08-13T19:13:00.335036+00:00",
+    "verified": {
+      "bridge_absent": true,
+      "episodic_absent": true,
+      "mongo_absent": true,
+      "run_root_absent": true,
+      "semantic_absent": true,
+      "service_absent": true
+    }
+  },
+  "completed_repetitions": 0,
+  "completed_scenario_ids": [],
+  "completed_scenarios": 0,
+  "decision": "NO_GO",
+  "failure": {
+    "classification": "HARNESS_OR_ENVIRONMENT",
+    "message": "fixture readiness mismatch: ['mem-alpha-adversarial:episodic_projection', 'mem-alpha-adversarial:mongo_agent', 'mem-alpha-adversarial:mongo_embedding_refs', 'mem-alpha-adversarial:semantic_projection', 'mem-alpha-raw:mongo_agent', 'mem-alpha-timeout:episodic_projection', 'mem-alpha-timeout:mongo_agent', 'mem-alpha-timeout:mongo_embedding_refs', 'mem-alpha-timeout:semantic_projection', 'mem-beta-port:episodic_projection', 'mem-beta-port:mongo_agent', 'mem-beta-port:mongo_embedding_refs', 'mem-bet",
+    "message_sha256": "f6310aa3034f028cda9b8f1fc1475d7303fbe395ce926793d34d59759eb36ed5",
+    "type": "RuntimeError"
+  },
+  "harness_sha256": "e7cdcc4161f7ed868c756463615073c43706c92f3d50cf713f1b9cb55f9f5087",
+  "manifest_sha256": "6b683faf7437a454395c9691ab29f71cdcb1e221e19679fba471b9671c99ecc9",
+  "not_run_repetitions": 96,
+  "not_run_scenario_ids": [
+    "SMAQ1N-001-FIRST-PROMPT-EMPTY",
+    "SMAQ1N-002-SAME-PARTITION-RECALL",
+    "SMAQ1N-003-CROSS-PARTITION-DENIAL",
+    "SMAQ1N-004-CURRENT-INSTRUCTION-PRECEDENCE",
+    "SMAQ1N-005-RAW-INELIGIBLE",
+    "SMAQ1N-006-DUPLICATE-EVENT-CAPTURE",
+    "SMAQ1N-007-RETRIEVAL-OUTAGE",
+    "SMAQ1N-008-CAPTURE-OUTAGE-RECONCILIATION",
+    "SMAQ1N-009-ADDITIONAL-CONTEXT-INTEGRITY",
+    "SMAQ1N-010-HOOK-DEADLINE-AND-MALFORMED",
+    "SMAQ1N-011-PARENT-CHILD-PROVENANCE",
+    "SMAQ1N-012-RESTART-PARTITION-CONTINUITY",
+    "SMAQ1N-013-FOUR-CHANNEL-CONCURRENCY",
+    "SMAQ1N-014-FEEDBACK-LOOP-PREVENTION",
+    "SMAQ1N-015-SECRET-QUARANTINE",
+    "SMAQ1N-016-EMPTY-RESULT",
+    "SMAQ1N-017-OVERSIZED-CONTEXT-BOUND",
+    "SMAQ1N-018-CONDENSATION-REANCHOR"
+  ],
+  "qualification": null,
+  "qualified_fixture": false,
+  "raw_journal_sha256": "ff7817e4123aa784ad3bb09b4a9df13b35094919f050f273fb3069d7e5e743b8",
+  "receipt_type": "SMA_Q1_NATIVE_STEP15_EXECUTION",
+  "recorded_at": "2026-08-13T19:13:01.262781+00:00",
+  "report_sha256": "2dd9492bba161d6831169beb57da3241c4b9f61eca905c43c582d3104c852ffe",
+  "scenario_results": [],
+  "schema_version": "1.0.0",
+  "started_repetitions": 0,
+  "started_scenario_ids": [],
+  "started_scenarios": 0,
+  "status": "INCONCLUSIVE"
+}

@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_Q1_EXECUTION_AUTHORIZATION",
+  "authorizationId": "SMA-Q1-NATIVE-STEP15-V10-EXECUTION",
+  "recordedOn": "2026-08-13",
+  "timePrecision": "DAY",
+  "status": "AUTHORIZED_NOT_STARTED",
+  "principalInstruction": "Find the root cause and fix it completely.",
+  "frozenManifest": "investigations/sma-q1/preregistration-native-v10.json",
+  "frozenManifestSHA256": "3f0609110746d1d462ad1109a162a7d5a3d1ee033a1a179473c32b47ac03b5f2",
+  "executionIdentity": "investigations/sma-q1/step-15-execution-identity-v10.json",
+  "executionIdentitySHA256": "e15eb5ccafa435c1264b83a8c816a7eacf51d010701689a5509588c2d3306fca",
+  "harness": "scripts/smaq1_native_step15_v10.py",
+  "harnessSHA256": "4194eda466bc96d9b76262d30874bc4509c2995a7830a8accec46856b8e0820c",
+  "baseManifest": "investigations/sma-q1/preregistration-native-v2.json",
+  "baseManifestSHA256": "c618371d571d5333aebd2bdc83d2db2559115f5ec3e1903b33e8e0ab157edf5d",
+  "authorizedScope": {
+    "fixtureQualification": true,
+    "measuredScenarioCorpus": true,
+    "scenarioCount": 18,
+    "repetitionCount": 96,
+    "disposableNamespacesOnly": true,
+    "productionOrHistoricalDataAllowed": false,
+    "scenarioMutationAllowed": false,
+    "thresholdMutationAllowed": false,
+    "attemptsAllowed": 1,
+    "correctiveRerunsAllowed": 0
+  },
+  "executionAuthorized": true,
+  "executionStarted": false,
+  "scenarioResultClaimAuthorized": true
+}

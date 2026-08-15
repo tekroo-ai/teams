@@ -1,0 +1,118 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_Q1_STEP15_EXECUTION_ADJUDICATION",
+  "recordedOn": "2026-08-13",
+  "timePrecision": "DAY",
+  "manifest": "investigations/sma-q1/preregistration-native-v5.json",
+  "manifestSHA256": "21030ef4a7004217401b0243e5bb7e94be6bc44ecb9869873a72f112fe676422",
+  "executionIdentity": "investigations/sma-q1/step-15-execution-identity-v5.json",
+  "executionIdentitySHA256": "8ff6138b1a8a78418f1b19a63068398c22ea2f889ecd252aa87ff8a9b7387f1e",
+  "authorization": "investigations/sma-q1/step-15-execution-authorization-v5.json",
+  "authorizationSHA256": "b4ba47abb322621539317cb5b1ea6d8825bebe867d9a2d10a659dacae25c445f",
+  "harnessSHA256": "45b9412e879d76d2beef957efdc23d7a9f7585e4e4820774ba5fb387c599872e",
+  "status": "INCONCLUSIVE",
+  "decision": "NO_GO",
+  "smaQ1ResultClaim": "NONE",
+  "attempt": {
+    "ordinal": 1,
+    "receipt": "OUTPUT/phase-3/sma-q1n-step15-v5/execution-receipt.json",
+    "receiptFileSHA256": "b22d0b50306b5a5fc23a49c79da0aad5fc082129901a18ff806f0218c3b58a5a",
+    "receiptCanonicalReportSHA256": "96f2243d11cf0fd7de250e3ba0a6d7f428cc0ca09e0dd857ae390dc8dcdc62e3",
+    "rawJournal": "OUTPUT/phase-3/sma-q1n-step15-v5/raw-receipts.jsonl",
+    "rawJournalSHA256": "8a73cb7df41daeb90d48bf495adc1a5d44964544a8d0f8a37980d1cdad176da0",
+    "terminal": "QUALIFICATION_SAME_PARTITION_RETRIEVAL_EMPTY",
+    "startedScenarios": 0,
+    "startedRepetitions": 0,
+    "cleanupVerified": true
+  },
+  "passingFloor": {
+    "classification": "OBSERVED",
+    "staticExpectationSelfTest": "PASS",
+    "fullPreflight": "PASS",
+    "frozenIdentityBindings": "PASS",
+    "deterministicFixturePromotions": {
+      "mem-alpha-timeout": "PASS",
+      "mem-alpha-adversarial": "PASS",
+      "mem-beta-port": "PASS"
+    },
+    "mongoMemoryCount": 4,
+    "distinctActualMemoryIdCount": 4,
+    "eligibleMemoryCount": 3,
+    "semanticPointCount": 3,
+    "episodicPointCount": 3,
+    "rawMemory": {
+      "state": "raw",
+      "reasoningEligible": false,
+      "semanticRefPresent": false,
+      "semanticPointCount": 0,
+      "episodicPointCount": 0
+    },
+    "scenarioCorpus": "NOT_RUN"
+  },
+  "retrievalQualificationObservation": {
+    "classification": "OBSERVED",
+    "samePartition": {
+      "query": "What API timeout applies to repository alpha?",
+      "expectedLogicalMemoryId": "mem-alpha-timeout",
+      "observedMemoryIds": [],
+      "contextSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result": "EXPECTED_ELIGIBLE_MEMORY_MISSED"
+    },
+    "crossPartition": {
+      "query": "What API timeout applies to repository alpha?",
+      "observedLogicalPartition": "actor-beta",
+      "observedMemoryIds": [
+        "oh_f60afb84b874f0892f6f3e6b47a4e78b01fc2a71f0223b453b1373579b36decc"
+      ],
+      "forbiddenAlphaMemoryObserved": false
+    },
+    "rawIneligible": {
+      "query": "Which secret port does repository alpha use?",
+      "observedMemoryIds": [
+        "oh_79cf624fbd7dba05369776d291e8789baf45934e27da0346b46639a1098a021d",
+        "oh_4758882a786ae73b3f958d631ad133e3cc3f7a40ee5c6257490c7e01a07bd5e2"
+      ],
+      "rawMemoryObserved": false,
+      "result": "RAW_INELIGIBLE_DENIAL_OBSERVED"
+    }
+  },
+  "causalFloor": {
+    "classification": "COMPUTED_AND_INFERRED",
+    "computedFromPinnedSource": [
+      "The bridge may return an empty context when conversation resolution is absent, workspace validation fails, vector candidates are empty, or a bounded retrieval fails or exceeds its deadline.",
+      "The retrieval service embeds each query urgently, performs partition-filtered Qdrant search, then filters Mongo results for exact agent identity and reasoning eligibility."
+    ],
+    "inference": "The first empty same-partition result followed by successful partition-correct retrievals in the same service instance is consistent with a transient first-request path, including but not limited to a cold-path deadline.",
+    "verificationState": "UNVERIFIED",
+    "missingReceipt": "The qualification receipt retained IDs and context hashes but omitted each direct call's elapsed_ms, hit_count, trace_id, and before/after bridge telemetry. Cleanup correctly removed runtime logs and the disposable namespace, so the specific mechanism cannot now be proven."
+  },
+  "corpusFloor": {
+    "startedScenarios": 0,
+    "completedScenarios": 0,
+    "notRunScenarios": 18,
+    "startedRepetitions": 0,
+    "completedRepetitions": 0,
+    "notRunRepetitions": 96
+  },
+  "safetyFloor": "Raw-ineligible denial and cross-partition denial were observed during disposable qualification. No measured safety scenario ran and none receives credit.",
+  "cleanup": {
+    "receiptVerified": true,
+    "postAdjudicationMongoV5Databases": [],
+    "postAdjudicationQdrantCollections": [
+      "episodic_embeddings",
+      "semantic_embeddings"
+    ],
+    "v5QdrantCollectionsAbsent": true,
+    "bridgeListenerAbsent": true,
+    "qualificationRunRootAbsent": true,
+    "measuredRunRootAbsent": true,
+    "fixtureDriverBuildAbsent": true,
+    "smaExecutionWorktreeClean": true
+  },
+  "rerunPolicy": {
+    "v5InitialAttemptConsumed": true,
+    "v5CorrectiveRerunConsumed": false,
+    "correctiveRerunRequires": "A content-addressed telemetry-only runner correction that cannot alter an SMA outcome, retained adjudication of this attempt, and separate principal authorization."
+  },
+  "nextValidAction": "Do not claim SMA-Q1 PASS and do not execute the same V5 runner again. Prepare a telemetry-only V5 corrective runner that preserves all calls and outcomes but durably records direct-call timing, trace identity, hit count, and before/after bridge counters during qualification; then request separate authorization for the single permitted corrective rerun."
+}

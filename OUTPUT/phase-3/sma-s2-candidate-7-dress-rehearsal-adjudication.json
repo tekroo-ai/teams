@@ -1,0 +1,88 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_CANDIDATE_7_DRESS_REHEARSAL_ADJUDICATION",
+  "candidate": 7,
+  "status": "INCONCLUSIVE_HARNESS_WORKSPACE_ISOLATION_FAILURE",
+  "recordedOn": "2026-08-14",
+  "recommendation": "NO_GO_FOR_MEASURED_EXECUTION_CREATE_CANDIDATE_8_SUCCESSOR",
+  "executionIdentitySha256": "40235ba0eda978c497dc17740aab09ebeb8fe3852e961b0f4d522737f3c38f22",
+  "authorization": {
+    "path": "investigations/sma-q1/layered/sma-s2-candidate-7-dress-rehearsal-single-use-authorization.json",
+    "sha256": "c768d5c242e69f6603f2df66703cd2bad852b3905b4aeb3b29409b174f483017"
+  },
+  "authorizationConsumption": {
+    "path": "investigations/sma-q1/layered/sma-s2-candidate-7-dress-rehearsal-single-use-authorization-consumption.json",
+    "sha256": "7401dc5b5eb7393bcc184b2297bc0ab29ca1b9bf8487272d03305667d2ffb941",
+    "status": "CONSUMED"
+  },
+  "livePreflight": {
+    "path": "OUTPUT/phase-3/sma-s2-candidate-7-dress-rehearsal-live-preflight.json",
+    "sha256": "6b13cf050b8a6674233942ed1b09129feaa365dd546bc6b22450bb3eb819985b",
+    "status": "PASS"
+  },
+  "dressRehearsalReceipt": {
+    "path": "OUTPUT/phase-3/sma-s2-candidate-7-dress-rehearsal-attempt-1/dress-rehearsal-receipt.json",
+    "sha256": "82b5db3ec445cd9b22be484f48f26a03758f8f8587e4dc86c93ae588e0702dcf",
+    "status": "INCONCLUSIVE",
+    "rawJournalSha256": "7286a8b133e94b545f02eec3ba9d406b48b783c2262f170dd84b9e10b7316185"
+  },
+  "observed": [
+    "the immediate live preflight passed before the attempt",
+    "all ten repetitions of SMA-S2-001-FIRST-PROMPT-EMPTY passed with exact agent terminal events",
+    "the attempt stopped during corpus seeding for SMA-S2-002-SAME-PARTITION-DELIVERY repetition 1",
+    "the durable failure class is HARNESS with RuntimeError and message digest 42aceb4995e5adee6ccccb7f4abf223522506f5f21ad06b88d909d0c57241844",
+    "the source journal contains CORPUS_SOURCE_EVENTS for four candidate-bound deterministic source conversations followed by SERVICE_START and then the failure",
+    "the receipt completed 10 of 34 operations and awarded zero measured credit and no claim",
+    "cleanup passed both global cleanup oracles and deleted all 14 candidate-created conversations",
+    "post-cleanup verification found the original eight conversations, zero active conversations, and the Tekroo Trader conversation paused with unchanged timestamps",
+    "all candidate-7 service, port, MongoDB, Qdrant, and workspace resources were absent after cleanup"
+  ],
+  "computed": {
+    "completedDressOperations": 10,
+    "plannedDressOperations": 34,
+    "completedFraction": 0.29411764705882354,
+    "measuredCaseExecutions": 0,
+    "measuredRepetitionExecutions": 0,
+    "measuredCredit": 0,
+    "claim": null,
+    "cleanupStatus": "PASS",
+    "failureDigestMatchesExactDriverLiteral": true,
+    "matchedFailureLiteral": "memory count exceeded expected 4: 10",
+    "precedingFastSuccessOperationCount": 10,
+    "expectedSyntheticCorpusMemoryCount": 4,
+    "candidateCreatedConversationCleanupCount": 14,
+    "remainingDressRehearsalAuthority": 0,
+    "remainingMeasuredAuthority": 0
+  },
+  "inferred": [
+    "the four-memory seed was not isolated from the ten already-persisted fast-success events in the same candidate capture-allowlisted workspace population",
+    "when capture started during case 2, the preexisting event population caused the memory count to jump above the seed oracle before corpus readiness could be established",
+    "this is a dress-harness workspace-isolation and ordering defect, not evidence that an SMA-S2 semantic predicate failed"
+  ],
+  "rootCause": {
+    "class": "HARNESS_WORKSPACE_CAPTURE_CONTAMINATION",
+    "failedBoundary": "EXACT_FOUR_MEMORY_CORPUS_SEED_CARDINALITY",
+    "evidenceFloor": "The exact RuntimeError reports ten memories where the seed requires four; ten case-1 operations preceded capture in the same candidate workspace population.",
+    "notEstablished": [
+      "which exact ten event identities became memories because the failed driver retained only the count and message digest",
+      "SMA semantic correctness or incorrectness for cases 2 through 20",
+      "candidate-7 dress PASS",
+      "SMA-S2 measured PASS"
+    ]
+  },
+  "requiredSuccessorCorrection": [
+    "create candidate 8 without modifying candidate 7 or its accepted identity",
+    "give first-prompt-empty repetitions a dedicated empty workspace partition excluded from the corpus capture allowlist",
+    "retain the alpha and beta allowlisted workspaces exclusively for the four-source corpus and subsequent capture/retrieval cases",
+    "bind the additional empty workspace into the candidate-8 identity and cleanup oracle",
+    "add offline structural controls proving case-1 workspace exclusion, exact four-source seeding, and cleanup coverage",
+    "repeat the same 34-operation zero-credit dress rehearsal only after candidate-8 review, acceptance, identity binding, and a new single-use authorization"
+  ],
+  "authority": {
+    "candidate7MayBeEdited": false,
+    "candidate7MayBeRerun": false,
+    "candidate8RemediationAuthorized": false,
+    "measuredExecutionAuthorized": false,
+    "qualifiedClaimEarned": false
+  }
+}

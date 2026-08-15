@@ -1,0 +1,94 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_CANDIDATE_8_EXECUTION_IDENTITY_ACCEPTANCE",
+  "acceptanceId": "SMA-S2-CANDIDATE-8-EXECUTION-IDENTITY-ACCEPTANCE",
+  "candidate": 8,
+  "status": "ACCEPTED_FROZEN",
+  "recordedOn": "2026-08-14",
+  "principalStatement": "ACCEPT/FREEZE the candidate-8 execution identity 285ef6fefa5fb5b4b71afe1ff368a119c80a5b3b839467d06883a9cb7e31cdcb only. This does not authorize live-state preflight, live dress rehearsal, or measured execution.",
+  "acceptedExecutionIdentity": {
+    "path": "investigations/sma-q1/layered/sma-s2-candidate-8-execution-identity.json",
+    "sha256": "285ef6fefa5fb5b4b71afe1ff368a119c80a5b3b839467d06883a9cb7e31cdcb",
+    "candidate": 8,
+    "runtimePorts": {
+      "stubHost": "127.0.0.1",
+      "stubPort": 19128,
+      "bridgeHost": "127.0.0.1",
+      "bridgePort": 8130
+    },
+    "workspaceIsolation": {
+      "case1WorkspaceRole": "EMPTY_UNCAPTURED",
+      "case1Workspace": "/tmp/tekroo-sma-s2-successor-candidate-8/actor-empty",
+      "corpusCaptureAllowlist": [
+        "/tmp/tekroo-sma-s2-successor-candidate-8/actor-alpha",
+        "/tmp/tekroo-sma-s2-successor-candidate-8/actor-beta"
+      ],
+      "emptyWorkspaceMustNotBeCaptureAllowlisted": true,
+      "case1ConversationReceiptsRetainedUntilCleanup": true,
+      "syntheticCorpusSourceCount": 4,
+      "allWorkspacesUnderCandidateRoot": true,
+      "cleanupMustRemoveEmptyWorkspace": true
+    },
+    "acceptedFrozen": true,
+    "editableInPlace": false
+  },
+  "acceptedCandidate": {
+    "preregistration": {
+      "path": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-8.json",
+      "sha256": "d81f6878a0b06462b792e50d7bd3e8708e971ce888d22a95751127ccbaa35231"
+    },
+    "acceptance": {
+      "path": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-8-acceptance.json",
+      "sha256": "73cdc08aae12fb1b4dd10d9296e267181d42a16d227bd2efe776988c4b211f18"
+    }
+  },
+  "boundReview": {
+    "reviewNarrative": {
+      "path": "docs/architecture/077-sma-s2-candidate-8-execution-identity-review.md",
+      "sha256": "675753411b46929eb56cd02790f6c96f06dfad61bec0c82398f64ffc0aa7b970",
+      "status": "PASS_READY_FOR_PRINCIPAL_IDENTITY_REVIEW"
+    }
+  },
+  "independentReview": {
+    "reviewer": "WORKSPACE_PRINCIPAL",
+    "candidateSpecificContextBound": true,
+    "candidateSpecificDecision": "ACCEPT_FREEZE_EXECUTION_IDENTITY_ONLY"
+  },
+  "immutability": {
+    "acceptedExecutionIdentityMayBeEditedInPlace": false,
+    "boundReferencesMayBeEditedInPlace": false,
+    "successorIdentityRequiredForAnyCorrection": true
+  },
+  "authority": {
+    "executionIdentityAccepted": true,
+    "liveStatePreflightAuthorized": false,
+    "liveStatePreflightState": "NOT_RUN",
+    "liveDressRehearsalAuthorizationPresent": false,
+    "liveDressRehearsalAuthorized": false,
+    "liveDressRehearsalState": "NOT_RUN",
+    "measuredAttemptAuthorizationPresent": false,
+    "measuredExecutionAuthorized": false,
+    "measuredExecutionState": "NOT_RUN",
+    "realModelCallsAuthorized": false,
+    "serviceRestartsAuthorized": false,
+    "productionDeploymentAuthorized": false
+  },
+  "excludedClaims": [
+    "runtime ports presently available",
+    "live service state acceptable",
+    "active-work state acceptable",
+    "candidate-8 disposable namespaces absent",
+    "candidate-8 live state preflight PASS",
+    "candidate-8 live dress rehearsal PASS",
+    "SMA-S2 measured PASS",
+    "OPENHANDS_SMA_BOUNDARY_QUALIFIED",
+    "production readiness"
+  ],
+  "nextSeparateGate": {
+    "requiredAction": "authorize one single-use candidate-8 34-operation zero-credit live dress rehearsal beginning with immediate live-state, active-work, endpoint, namespace, and workspace-isolation checks",
+    "requiresSeparatePrincipalAuthorization": true,
+    "preflightFailureMustConsumeAuthorityWithoutStartingRehearsal": true,
+    "measuredExecutionStillRequiresPassingBoundDressRehearsalReceipt": true,
+    "measuredExecutionStillRequiresLaterSingleUseAuthorization": true
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_CANDIDATE_7_HARNESS_REMEDIATION_AUTHORIZATION",
+  "status": "AUTHORIZED_CONSUMED_BY_CANDIDATE_7_PREPARATION",
+  "recordedOn": "2026-08-14",
+  "principalStatement": "Authorized.",
+  "triggeringAdjudication": {
+    "path": "OUTPUT/phase-3/sma-s2-candidate-6-measured-adjudication.json",
+    "sha256": "fcd2d436bd13b64919942b8f21fe397376f9cf00a9abb8e5a7b59e7687126991",
+    "status": "INCONCLUSIVE"
+  },
+  "authorizedScope": [
+    "create an immutable candidate-7 successor without modifying candidate 6",
+    "make terminal observation wait for the required agent terminal event or terminal error and prove stable event visibility",
+    "route every corpus-seed conversation through candidate-bound deterministic settings",
+    "prohibit default profiles, default tools, encrypted-secret configuration, and real-model execution in corpus seeding",
+    "durably record sanitized harness boundary failures",
+    "implement a 34-operation no-credit dress rehearsal covering ten fast-terminal repetitions and every distinct case/fault primitive",
+    "require a passing identity-bound dress-rehearsal receipt before any future measured authorization can open",
+    "offline-qualify the successor and publish it for principal review"
+  ],
+  "preservedSemantics": {
+    "sourceSha256": "b7315835b6291d44d3d8cb918dbec1f16c1e64f2106fd70212c6a8f7ec678188",
+    "caseCount": 20,
+    "repetitionCount": 103,
+    "predicateCount": 59,
+    "requiredEvidenceCount": 10,
+    "thresholdsChanged": false,
+    "faultScheduleChanged": false,
+    "claimChanged": false,
+    "productCodeChanged": false
+  },
+  "notAuthorized": [
+    "modification of candidate 6 or any accepted artifact",
+    "candidate-7 acceptance or freeze",
+    "candidate-7 execution-identity creation",
+    "live dress rehearsal",
+    "measured S2 execution or rerun",
+    "OpenHands conversation creation",
+    "SMA service or deterministic-stub network invocation",
+    "real model calls",
+    "service restart",
+    "production or historical data access"
+  ]
+}

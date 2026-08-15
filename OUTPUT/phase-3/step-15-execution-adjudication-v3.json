@@ -1,0 +1,92 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_Q1_STEP15_EXECUTION_ADJUDICATION",
+  "recordedOn": "2026-08-13",
+  "timePrecision": "DAY",
+  "manifest": "investigations/sma-q1/preregistration-native-v3.json",
+  "manifestSHA256": "6b683faf7437a454395c9691ab29f71cdcb1e221e19679fba471b9671c99ecc9",
+  "status": "INCONCLUSIVE",
+  "decision": "NO_GO",
+  "smaQ1ResultClaim": "NONE",
+  "attempts": [
+    {
+      "attempt": "V3_INITIAL",
+      "status": "INCONCLUSIVE",
+      "harnessSHA256": "59ea7d1b3bc5562993e801a361620c1a748be8423f78c579e486b27270e5fef7",
+      "rawJournalSHA256": "250200bb95e8a4d7ab0b0f7e0fe1645b65e2370234dacd4fef5582db10318811",
+      "startedScenarios": 0,
+      "startedRepetitions": 0,
+      "terminal": "DOCUMENTED_HARNESS_SETUP_AND_RECEIPT_DEFECT",
+      "cleanupVerified": true
+    },
+    {
+      "attempt": "V3_CORRECTIVE_RERUN_1",
+      "status": "INCONCLUSIVE",
+      "harnessSHA256": "e7cdcc4161f7ed868c756463615073c43706c92f3d50cf713f1b9cb55f9f5087",
+      "receipt": "OUTPUT/phase-3/sma-q1n-step15-v3-rerun1/execution-receipt.json",
+      "receiptFileSHA256": "4cefb8910930e5e627ef407fe8d0fc41983549d10cf303522f445d4b19926a6b",
+      "rawJournalSHA256": "ff7817e4123aa784ad3bb09b4a9df13b35094919f050f273fb3069d7e5e743b8",
+      "startedScenarios": 0,
+      "startedRepetitions": 0,
+      "terminal": "HARNESS_EXPECTATION_MISMATCH_DURING_FIXTURE_QUALIFICATION",
+      "cleanupVerified": true
+    }
+  ],
+  "observedQualificationEvidence": {
+    "classification": "OBSERVED",
+    "mongoMemoryCount": 4,
+    "distinctActualMemoryIdCount": 4,
+    "eligibleMemoryCount": 3,
+    "semanticPointCount": 3,
+    "episodicPointCount": 3,
+    "eligiblePointReceipts": {
+      "semantic": "Each eligible memory had exactly one point at its deterministic UUID, with matching memory_id, matching observed agent_id, and vector length 768.",
+      "episodic": "Each eligible memory had exactly one point at its deterministic UUID, with matching memory_id, matching observed agent_id, and vector length 768."
+    },
+    "ineligiblePointReceipts": "The raw ineligible memory's deterministic UUID was absent from both collections.",
+    "mongoLifecycle": "Three eligible memories were consistent and reasoning-eligible; the fourth memory was raw and ineligible.",
+    "retrievalQualification": "NOT_RUN",
+    "scenarioCorpus": "NOT_RUN"
+  },
+  "computedHarnessMismatch": {
+    "classification": "COMPUTED_FROM_RAW_RECEIPTS_AND_PINNED_SOURCE",
+    "workspaceIdentity": {
+      "source": "/Users/paul/work/tekroo-ai/sma-step15/src/main/java/ai/tekroo/sma/openhands/OpenHandsEventIntakeService.java",
+      "sourceSHA256": "21a0d02ff42f42351c3a90c49118ca5c7c35fa67947fd7a2d2498f17b99a7fbc",
+      "sourceRule": "The workspace fingerprint is the first 24 hexadecimal characters of the canonical workspace SHA-256.",
+      "runnerError": "The runner expected the full 64-character SHA-256 as the partition workspace component.",
+      "observedAlphaFingerprint": "dbfd91ad7c3cb780074cef7f",
+      "observedBetaFingerprint": "ac05a773e7285e334529d704"
+    },
+    "episodicReference": {
+      "source": "/Users/paul/work/tekroo-ai/sma-step15/src/main/java/ai/tekroo/sma/replay/ReplayWorker.java",
+      "sourceSHA256": "36b9452cf9f7ed4586c6ac0c9ad6b6d2ea201f02788c4eea3766be43f0cf5773",
+      "sourceRule": "The episodic vector is upserted into Qdrant only; the canonical update persists the semantic reference.",
+      "runnerError": "The runner required both episodic_ref and semantic_ref in the Mongo memory document."
+    },
+    "projectionFlags": "The point-level Qdrant receipts themselves matched deterministic IDs, actual memory IDs, actual 24-character partitions, and non-empty vectors. Their failure flags were downstream consequences of the incorrect full-hash expected agent ID."
+  },
+  "corpusFloor": {
+    "startedScenarios": 0,
+    "completedScenarios": 0,
+    "notRunScenarios": 18,
+    "startedRepetitions": 0,
+    "completedRepetitions": 0,
+    "notRunRepetitions": 96
+  },
+  "safetyFloor": "No safety breach was observed before either harness terminal. No unexecuted safety scenario receives credit.",
+  "cleanup": {
+    "allAttemptReceiptsVerified": true,
+    "postAdjudicationMongoPrefixScan": [],
+    "postAdjudicationQdrantCollections": [],
+    "bridgeListenerAbsent": true,
+    "qualificationRunRootAbsent": true,
+    "measuredRunRootAbsent": true,
+    "smaExecutionWorktreeClean": true
+  },
+  "rerunPolicy": {
+    "v3CorrectiveRerunConsumed": true,
+    "additionalV3ExecutionPermitted": false
+  },
+  "nextValidAction": "A prospective v4 amendment may correct only the source-grounded 24-character workspace fingerprint and Qdrant-only episodic-reference expectations, add a no-service static expectation self-test, retain both v3 attempts without scenario credit, and require separate acceptance and execution authorization."
+}

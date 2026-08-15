@@ -1,0 +1,60 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S1_SCIENTIFIC_ADJUDICATION_ACCEPTANCE",
+  "acceptanceId": "SMA-S1-EVIDENCE-V2-SCIENTIFIC-ADJUDICATION-ACCEPTANCE",
+  "status": "ACCEPTED_FROZEN_SMA_SEMANTICS_QUALIFIED_NOT_AUTHORIZING_DOWNSTREAM_EXECUTION",
+  "recordedAt": "2026-08-14T15:03:22Z",
+  "principalStatement": "ACCEPT/FREEZE SMA-S1 evidence-v2 scientific adjudication 0e5ace0acbe6e2441755ae656de36096e38b2364d27fb45ee844f2422abf2f7d.",
+  "acceptedAdjudication": {
+    "path": "OUTPUT/phase-3/sma-s1-measured-p2m-evidence-v2-sealed-v1-attempt-1/scientific-adjudication.json",
+    "sha256": "0e5ace0acbe6e2441755ae656de36096e38b2364d27fb45ee844f2422abf2f7d",
+    "status": "PASS",
+    "classification": "PASS_FROZEN_SMA_SEMANTICS_QUALIFIED",
+    "claim": "SMA_SEMANTICS_QUALIFIED",
+    "acceptedFrozen": true,
+    "editableInPlace": false
+  },
+  "boundEvidence": {
+    "executionReceipt": {
+      "path": "OUTPUT/phase-3/sma-s1-measured-p2m-evidence-v2-sealed-v1-attempt-1/execution-receipt.json",
+      "sha256": "485152e2fe74b62c426d0c2c35769379f1d05a5da7c94148bdffc5b27fdcadf3"
+    },
+    "rawJournal": {
+      "path": "OUTPUT/phase-3/sma-s1-measured-p2m-evidence-v2-sealed-v1-attempt-1/raw-receipts.jsonl",
+      "sha256": "334d5e1e1845a7445f623ed88be957c7b433e5e5321c0d086a3c07715f91f5b4"
+    },
+    "postCleanupVerification": {
+      "path": "OUTPUT/phase-3/sma-s1-measured-p2m-evidence-v2-sealed-v1-attempt-1/post-cleanup-verification.json",
+      "sha256": "8693073ad3b80034e64c19574dcc8dfe77d058e08c4faa0fbf3346cd96c5f345"
+    },
+    "authorizationConsumption": {
+      "path": "investigations/sma-q1/layered/sma-s1-execution-authorization-p2m-evidence-v2-sealed-v1-attempt-1-consumption.json",
+      "sha256": "771fe27b8c31006e73952d7638d860af54dcdeaf2292b20f1e93e1580b838eea",
+      "status": "CONSUMED_NO_REUSE"
+    }
+  },
+  "acceptedScope": {
+    "decisiveQuestion": "Does the frozen SMA implementation capture, select, isolate, bound, recover, and fail open correctly through deterministic service interfaces and declared persistence adapters?",
+    "answer": "PASS",
+    "qualifiedClaim": "SMA_SEMANTICS_QUALIFIED"
+  },
+  "excludedClaims": [
+    "OpenHands boundary qualification",
+    "model behavior qualification",
+    "integrated runtime qualification",
+    "workflow or process-control authority",
+    "production readiness"
+  ],
+  "authority": {
+    "measuredAttemptAuthorizationConsumed": true,
+    "measuredAttemptAuthorizationReusable": false,
+    "additionalMeasuredAttemptAuthorized": false,
+    "downstreamExecutionAuthorized": false,
+    "productionDeploymentAuthorized": false
+  },
+  "immutability": {
+    "acceptedAdjudicationMayBeEditedInPlace": false,
+    "acceptedEvidenceMayBeEditedInPlace": false,
+    "successorRecordRequiredForAnyNewClaim": true
+  }
+}

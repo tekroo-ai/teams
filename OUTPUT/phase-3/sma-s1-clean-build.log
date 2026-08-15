@@ -1,0 +1,257 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] ---------------------------< ai.tekroo:sma >----------------------------
+[INFO] Building sma 1.0-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- clean:3.2.0:clean (default-clean) @ sma ---
+[INFO] Deleting /Users/paul/work/tekroo-ai/sma/target
+[INFO] 
+[INFO] --- resources:3.4.0:resources (default-resources) @ sma ---
+[INFO] Copying 0 resource from src/main/resources to target/classes
+[INFO] 
+[INFO] --- compiler:3.15.0:compile (default-compile) @ sma ---
+[INFO] Recompiling the module because of changed source code.
+[INFO] Compiling 113 source files with javac [debug target 21] to target/classes
+[INFO] /Users/paul/work/tekroo-ai/sma/src/main/java/ai/tekroo/sma/vector/QdrantVectorStore.java: /Users/paul/work/tekroo-ai/sma/src/main/java/ai/tekroo/sma/vector/QdrantVectorStore.java uses or overrides a deprecated API.
+[INFO] /Users/paul/work/tekroo-ai/sma/src/main/java/ai/tekroo/sma/vector/QdrantVectorStore.java: Recompile with -Xlint:deprecation for details.
+[INFO] 
+[INFO] --- resources:3.4.0:testResources (default-testResources) @ sma ---
+[INFO] skip non existing resourceDirectory /Users/paul/work/tekroo-ai/sma/src/test/resources
+[INFO] 
+[INFO] --- compiler:3.15.0:testCompile (default-testCompile) @ sma ---
+[INFO] Recompiling the module because of changed dependency.
+[INFO] Compiling 53 source files with javac [debug target 21] to target/test-classes
+[INFO] /Users/paul/work/tekroo-ai/sma/src/test/java/ai/tekroo/sma/mongo/ConsolidationJobStateRepositoryTest.java: /Users/paul/work/tekroo-ai/sma/src/test/java/ai/tekroo/sma/mongo/ConsolidationJobStateRepositoryTest.java uses unchecked or unsafe operations.
+[INFO] /Users/paul/work/tekroo-ai/sma/src/test/java/ai/tekroo/sma/mongo/ConsolidationJobStateRepositoryTest.java: Recompile with -Xlint:unchecked for details.
+[INFO] 
+[INFO] --- surefire:3.5.2:test (default-test) @ sma ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running ai.tekroo.sma.cognitive.CognitiveEngineResponseParserTest
+[INFO] Tests run: 12, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.042 s -- in ai.tekroo.sma.cognitive.CognitiveEngineResponseParserTest
+[INFO] Running ai.tekroo.sma.cognitive.OllamaCognitiveEngineTransportTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.118 s -- in ai.tekroo.sma.cognitive.OllamaCognitiveEngineTransportTest
+[INFO] Running ai.tekroo.sma.cognitive.CognitiveEnginePromptBuilderTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.003 s -- in ai.tekroo.sma.cognitive.CognitiveEnginePromptBuilderTest
+[INFO] Running ai.tekroo.sma.config.SemanticMemoryConfigTest
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.002 s -- in ai.tekroo.sma.config.SemanticMemoryConfigTest
+[INFO] Running ai.tekroo.sma.runtime.RuntimeEnvironmentTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.002 s -- in ai.tekroo.sma.runtime.RuntimeEnvironmentTest
+[INFO] Running ai.tekroo.sma.runtime.ConsolidationLoopTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.001 s -- in ai.tekroo.sma.runtime.ConsolidationLoopTest
+[INFO] Running ai.tekroo.sma.scheduler.ReplayQueueSchedulerTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.003 s -- in ai.tekroo.sma.scheduler.ReplayQueueSchedulerTest
+[INFO] Running ai.tekroo.sma.mcp.MemoryIntakeFactoryTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.001 s -- in ai.tekroo.sma.mcp.MemoryIntakeFactoryTest
+[INFO] Running ai.tekroo.sma.mcp.TerminationAwareInputStreamTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.001 s -- in ai.tekroo.sma.mcp.TerminationAwareInputStreamTest
+[INFO] Running ai.tekroo.sma.mcp.SaveMemoryToolHandlerTest
+sma-mcp: write_failure memoryId=dfdda128-c56b-455a-8d6a-72db448605ad errorClass=MongoException message=connection timeout
+[INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.005 s -- in ai.tekroo.sma.mcp.SaveMemoryToolHandlerTest
+[INFO] Running ai.tekroo.sma.observability.MetricsLogJobTest
+[INFO] Tests run: 10, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.006 s -- in ai.tekroo.sma.observability.MetricsLogJobTest
+[INFO] Running ai.tekroo.sma.openhands.OpenHandsEventIntakeServiceTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.019 s -- in ai.tekroo.sma.openhands.OpenHandsEventIntakeServiceTest
+[INFO] Running ai.tekroo.sma.openhands.OpenHandsHttpClientFactoryTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0 s -- in ai.tekroo.sma.openhands.OpenHandsHttpClientFactoryTest
+[INFO] Running ai.tekroo.sma.openhands.OpenHandsBridgeDisclosureLifecycleTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.002 s -- in ai.tekroo.sma.openhands.OpenHandsBridgeDisclosureLifecycleTest
+[INFO] Running ai.tekroo.sma.openhands.OpenHandsBridgeServerResourceBoundsTest
+sma-openhands-bridge: response write failed (IOException)
+sma-openhands-bridge: response write failed (IOException)
+sma-openhands-bridge: response write failed (IOException)
+sma-openhands-bridge: response write failed (IOException)
+sma-openhands-bridge: response write failed (IOException)
+sma-openhands-bridge: response write failed (IOException)
+sma-openhands-bridge: response write failed (IOException)
+sma-openhands-bridge: response write failed (IOException)
+sma-openhands-bridge: response write failed (IOException)
+sma-openhands-bridge: response write failed (IOException)
+sma-openhands-bridge: response write failed (IOException)
+sma-openhands-bridge: response write failed (IOException)
+[INFO] Tests run: 17, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.018 s -- in ai.tekroo.sma.openhands.OpenHandsBridgeServerResourceBoundsTest
+[INFO] Running ai.tekroo.sma.openhands.OpenHandsBridgeServerContractTest
+bridge-deadline elapsed_ms=257.228 timeout_before=0 timeout_after=1 status=200 hits=0
+sma-openhands-bridge: context request failed (ctx_304d83f5) (ExecutionException)
+sma-openhands-bridge: context request failed (ctx_3197c916) (ExecutionException)
+sma-openhands-bridge: context request failed (ctx_70f8ae9c) (ExecutionException)
+sma-openhands-bridge: context request failed (ctx_727513e0) (ExecutionException)
+sma-openhands-bridge: context request failed (ctx_08665f27) (ExecutionException)
+[INFO] Tests run: 11, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.950 s -- in ai.tekroo.sma.openhands.OpenHandsBridgeServerContractTest
+[INFO] Running ai.tekroo.sma.openhands.ManagedCaptureLoopTest
+sma-service: capture_cycle agent=capture-test new_memories=1
+sma-service: capture_cycle agent=capture-test new_memories=1
+sma-service: capture_cycle agent=test-stop new_memories=1
+sma-service: capture_cycle agent=test-success new_memories=1
+sma-service: capture_cycle agent=test-success new_memories=1
+sma-service: capture_cycle agent=test-success new_memories=1
+sma-service: capture_cycle attempt 1/2 failed (agent=test-fail): injected capture failure
+sma-service: capture_cycle attempt 2/2 failed (agent=test-fail): injected capture failure
+sma-service: capture_cycle attempt 1/2 failed (agent=test-fail): injected capture failure
+sma-service: capture_cycle attempt 2/2 failed (agent=test-fail): injected capture failure
+sma-service: capture_cycle attempt 1/2 failed (agent=test-fail): injected capture failure
+sma-service: capture_cycle attempt 2/2 failed (agent=test-fail): injected capture failure
+sma-service: capture_cycle attempt 1/2 failed (agent=test-fail): injected capture failure
+sma-service: capture_cycle attempt 2/2 failed (agent=test-fail): injected capture failure
+[INFO] Tests run: 11, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.564 s -- in ai.tekroo.sma.openhands.ManagedCaptureLoopTest
+[INFO] Running ai.tekroo.sma.openhands.OpenHandsFailOpenContextProviderTest
+[INFO] Tests run: 14, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.650 s -- in ai.tekroo.sma.openhands.OpenHandsFailOpenContextProviderTest
+[INFO] Running ai.tekroo.sma.openhands.OpenHandsBridgeServerTest
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.082 s -- in ai.tekroo.sma.openhands.OpenHandsBridgeServerTest
+[INFO] Running ai.tekroo.sma.archival.TierTransitionJobTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.002 s -- in ai.tekroo.sma.archival.TierTransitionJobTest
+[INFO] Running ai.tekroo.sma.retrieval.SmaRetrievalServiceTextTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.001 s -- in ai.tekroo.sma.retrieval.SmaRetrievalServiceTextTest
+[INFO] Running ai.tekroo.sma.retrieval.SmaRetrievalServiceTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.002 s -- in ai.tekroo.sma.retrieval.SmaRetrievalServiceTest
+[INFO] Running ai.tekroo.sma.mongo.MongoCollectionInitializerTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.008 s -- in ai.tekroo.sma.mongo.MongoCollectionInitializerTest
+[INFO] Running ai.tekroo.sma.mongo.ConsolidationJobStateRepositoryTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.017 s -- in ai.tekroo.sma.mongo.ConsolidationJobStateRepositoryTest
+[INFO] Running ai.tekroo.sma.mongo.MemoryDocumentMapperTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.002 s -- in ai.tekroo.sma.mongo.MemoryDocumentMapperTest
+[INFO] Running ai.tekroo.sma.mongo.MemoryQueryBuildersTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.001 s -- in ai.tekroo.sma.mongo.MemoryQueryBuildersTest
+[INFO] Running ai.tekroo.sma.mongo.MemoryUpdateBuildersTest
+[INFO] Tests run: 15, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.004 s -- in ai.tekroo.sma.mongo.MemoryUpdateBuildersTest
+[INFO] Running ai.tekroo.sma.replay.RegressionPolicyTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.002 s -- in ai.tekroo.sma.replay.RegressionPolicyTest
+[INFO] Running ai.tekroo.sma.replay.LifecyclePolicyTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.001 s -- in ai.tekroo.sma.replay.LifecyclePolicyTest
+[INFO] Running ai.tekroo.sma.replay.ReplayWorkerTest
+[INFO] Tests run: 17, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.010 s -- in ai.tekroo.sma.replay.ReplayWorkerTest
+[INFO] Running ai.tekroo.sma.replay.PressureCalculatorTest
+[INFO] Tests run: 19, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.003 s -- in ai.tekroo.sma.replay.PressureCalculatorTest
+[INFO] Running ai.tekroo.sma.replay.ReplayWorkerSemanticDeltaContractTest
+[INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.005 s -- in ai.tekroo.sma.replay.ReplayWorkerSemanticDeltaContractTest
+[INFO] Running ai.tekroo.sma.consolidation.EdgeHealthJobTest
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.004 s -- in ai.tekroo.sma.consolidation.EdgeHealthJobTest
+[INFO] Running ai.tekroo.sma.consolidation.TrainingCandidacyEvaluatorTest
+[INFO] Tests run: 13, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.003 s -- in ai.tekroo.sma.consolidation.TrainingCandidacyEvaluatorTest
+[INFO] Running ai.tekroo.sma.consolidation.EmbeddingThemeAssignerTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.002 s -- in ai.tekroo.sma.consolidation.EmbeddingThemeAssignerTest
+[INFO] Running ai.tekroo.sma.consolidation.EntityMergerTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.002 s -- in ai.tekroo.sma.consolidation.EntityMergerTest
+[INFO] Running ai.tekroo.sma.consolidation.HdbscanThemeAssignerTest
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.006 s -- in ai.tekroo.sma.consolidation.HdbscanThemeAssignerTest
+[INFO] Running ai.tekroo.sma.consolidation.ConsolidationJobTest
+[INFO] Tests run: 13, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.006 s -- in ai.tekroo.sma.consolidation.ConsolidationJobTest
+[INFO] Running ai.tekroo.sma.consolidation.SensoryPressureComputerTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.002 s -- in ai.tekroo.sma.consolidation.SensoryPressureComputerTest
+[INFO] Running ai.tekroo.sma.vector.OllamaEmbeddingServiceTransportTest
+SLF4J(W): No SLF4J providers were found.
+SLF4J(W): Defaulting to no-operation (NOP) logger implementation
+SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
+[INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.391 s -- in ai.tekroo.sma.vector.OllamaEmbeddingServiceTransportTest
+[INFO] Running ai.tekroo.sma.vector.EmbeddingReadinessServiceTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.085 s -- in ai.tekroo.sma.vector.EmbeddingReadinessServiceTest
+[INFO] Running ai.tekroo.sma.vector.OllamaResponseParserTest
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.004 s -- in ai.tekroo.sma.vector.OllamaResponseParserTest
+[INFO] 
+[INFO] Results:
+[INFO] 
+[INFO] Tests run: 304, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] 
+[INFO] --- jar:3.5.0:jar (default-jar) @ sma ---
+[INFO] Building jar: /Users/paul/work/tekroo-ai/sma/target/sma-1.0-SNAPSHOT.jar
+[INFO] 
+[INFO] --- shade:3.6.0:shade (default) @ sma ---
+[INFO] Including org.mongodb:mongodb-driver-sync:jar:5.3.1 in the shaded jar.
+[INFO] Including org.mongodb:bson:jar:5.3.1 in the shaded jar.
+[INFO] Including org.mongodb:mongodb-driver-core:jar:5.3.1 in the shaded jar.
+[INFO] Including org.mongodb:bson-record-codec:jar:5.3.1 in the shaded jar.
+[INFO] Including io.qdrant:client:jar:1.17.0 in the shaded jar.
+[INFO] Including io.grpc:grpc-protobuf:jar:1.75.0 in the shaded jar.
+[INFO] Including io.grpc:grpc-api:jar:1.75.0 in the shaded jar.
+[INFO] Including com.google.code.findbugs:jsr305:jar:3.0.2 in the shaded jar.
+[INFO] Including com.google.protobuf:protobuf-java:jar:3.25.8 in the shaded jar.
+[INFO] Including com.google.api.grpc:proto-google-common-protos:jar:2.59.2 in the shaded jar.
+[INFO] Including com.google.guava:guava:jar:33.3.1-android in the shaded jar.
+[INFO] Including com.google.guava:failureaccess:jar:1.0.2 in the shaded jar.
+[INFO] Including com.google.guava:listenablefuture:jar:9999.0-empty-to-avoid-conflict-with-guava in the shaded jar.
+[WARNING] Could not get sources for com.google.guava:listenablefuture:jar:9999.0-empty-to-avoid-conflict-with-guava:compile
+[INFO] Including org.checkerframework:checker-qual:jar:3.43.0 in the shaded jar.
+[INFO] Including com.google.j2objc:j2objc-annotations:jar:3.0.0 in the shaded jar.
+[INFO] Including io.grpc:grpc-protobuf-lite:jar:1.75.0 in the shaded jar.
+[INFO] Including io.grpc:grpc-stub:jar:1.75.0 in the shaded jar.
+[INFO] Including org.codehaus.mojo:animal-sniffer-annotations:jar:1.24 in the shaded jar.
+[INFO] Including org.slf4j:slf4j-api:jar:2.0.14 in the shaded jar.
+[INFO] Including io.grpc:grpc-netty-shaded:jar:1.75.0 in the shaded jar.
+[INFO] Including io.grpc:grpc-util:jar:1.75.0 in the shaded jar.
+[INFO] Including io.grpc:grpc-core:jar:1.75.0 in the shaded jar.
+[INFO] Including com.google.android:annotations:jar:4.1.1.4 in the shaded jar.
+[INFO] Including io.grpc:grpc-context:jar:1.75.0 in the shaded jar.
+[INFO] Including io.perfmark:perfmark-api:jar:0.27.0 in the shaded jar.
+[INFO] Including com.google.code.gson:gson:jar:2.11.0 in the shaded jar.
+[INFO] Including com.google.errorprone:error_prone_annotations:jar:2.27.0 in the shaded jar.
+[INFO] Including io.modelcontextprotocol.sdk:mcp:jar:1.0.0 in the shaded jar.
+[WARNING] Could not get sources for io.modelcontextprotocol.sdk:mcp:jar:1.0.0:compile
+[INFO] Including io.modelcontextprotocol.sdk:mcp-json-jackson3:jar:1.0.0 in the shaded jar.
+[INFO] Including tools.jackson.core:jackson-databind:jar:3.0.3 in the shaded jar.
+[INFO] Including tools.jackson.core:jackson-core:jar:3.0.3 in the shaded jar.
+[INFO] Including com.networknt:json-schema-validator:jar:3.0.0 in the shaded jar.
+[INFO] Including com.ethlo.time:itu:jar:1.14.0 in the shaded jar.
+[INFO] Including tools.jackson.dataformat:jackson-dataformat-yaml:jar:3.0.3 in the shaded jar.
+[INFO] Including org.snakeyaml:snakeyaml-engine:jar:2.10 in the shaded jar.
+[INFO] Including io.modelcontextprotocol.sdk:mcp-core:jar:1.0.0 in the shaded jar.
+[INFO] Including com.fasterxml.jackson.core:jackson-annotations:jar:2.20 in the shaded jar.
+[INFO] Including io.projectreactor:reactor-core:jar:3.7.0 in the shaded jar.
+[INFO] Including org.reactivestreams:reactive-streams:jar:1.0.4 in the shaded jar.
+[WARNING] Discovered module-info.class. Shading will break its strong encapsulation.
+[WARNING] Discovered module-info.class. Shading will break its strong encapsulation.
+[WARNING] Discovered module-info.class. Shading will break its strong encapsulation.
+[WARNING] Discovered module-info.class. Shading will break its strong encapsulation.
+[WARNING] error_prone_annotations-2.27.0.jar, gson-2.11.0.jar, itu-1.14.0.jar, j2objc-annotations-3.0.0.jar, json-schema-validator-3.0.0.jar, slf4j-api-2.0.14.jar define 1 overlapping classes: 
+[WARNING]   - META-INF.versions.9.module-info
+[WARNING] checker-qual-3.43.0.jar, grpc-netty-shaded-1.75.0.jar, slf4j-api-2.0.14.jar define 1 overlapping resource: 
+[WARNING]   - META-INF/LICENSE.txt
+[WARNING] jackson-annotations-2.20.jar, jackson-core-3.0.3.jar, jackson-databind-3.0.3.jar, jackson-dataformat-yaml-3.0.3.jar define 2 overlapping resources: 
+[WARNING]   - META-INF/LICENSE
+[WARNING]   - META-INF/NOTICE
+[WARNING] animal-sniffer-annotations-1.24.jar, annotations-4.1.1.4.jar, bson-5.3.1.jar, bson-record-codec-5.3.1.jar, checker-qual-3.43.0.jar, client-1.17.0.jar, error_prone_annotations-2.27.0.jar, failureaccess-1.0.2.jar, grpc-api-1.75.0.jar, grpc-context-1.75.0.jar, grpc-core-1.75.0.jar, grpc-netty-shaded-1.75.0.jar, grpc-protobuf-1.75.0.jar, grpc-protobuf-lite-1.75.0.jar, grpc-stub-1.75.0.jar, grpc-util-1.75.0.jar, gson-2.11.0.jar, guava-33.3.1-android.jar, itu-1.14.0.jar, j2objc-annotations-3.0.0.jar, jackson-annotations-2.20.jar, jackson-core-3.0.3.jar, jackson-databind-3.0.3.jar, jackson-dataformat-yaml-3.0.3.jar, json-schema-validator-3.0.0.jar, jsr305-3.0.2.jar, listenablefuture-9999.0-empty-to-avoid-conflict-with-guava.jar, mcp-1.0.0.jar, mcp-core-1.0.0.jar, mcp-json-jackson3-1.0.0.jar, mongodb-driver-core-5.3.1.jar, mongodb-driver-sync-5.3.1.jar, perfmark-api-0.27.0.jar, proto-google-common-protos-2.59.2.jar, protobuf-java-3.25.8.jar, reactive-streams-1.0.4.jar, reactor-core-3.7.0.jar, slf4j-api-2.0.14.jar, sma-1.0-SNAPSHOT.jar, snakeyaml-engine-2.10.jar define 1 overlapping resource: 
+[WARNING]   - META-INF/MANIFEST.MF
+[WARNING] grpc-netty-shaded-1.75.0.jar, snakeyaml-engine-2.10.jar define 1 overlapping classes: 
+[WARNING]   - META-INF.versions.11.module-info
+[WARNING] bson-5.3.1.jar, mongodb-driver-core-5.3.1.jar define 2 overlapping resources: 
+[WARNING]   - META-INF/native-image/native-image.properties
+[WARNING]   - META-INF/native-image/reflect-config.json
+[WARNING] maven-shade-plugin has detected that some files are
+[WARNING] present in two or more JARs. When this happens, only one
+[WARNING] single version of the file is copied to the uber jar.
+[WARNING] Usually this is not harmful and you can skip these warnings,
+[WARNING] otherwise try to manually exclude artifacts based on
+[WARNING] mvn dependency:tree -Ddetail=true and the above output.
+[WARNING] See https://maven.apache.org/plugins/maven-shade-plugin/
+[WARNING] jackson-annotations-2.20-sources.jar, jackson-core-3.0.3-sources.jar, jackson-databind-3.0.3-sources.jar, jackson-dataformat-yaml-3.0.3-sources.jar define 1 overlapping resource: 
+[WARNING]   - META-INF/LICENSE
+[WARNING] animal-sniffer-annotations-1.24-sources.jar, annotations-4.1.1.4-sources.jar, bson-5.3.1-sources.jar, bson-record-codec-5.3.1-sources.jar, checker-qual-3.43.0-sources.jar, client-1.17.0-sources.jar, error_prone_annotations-2.27.0-sources.jar, failureaccess-1.0.2-sources.jar, grpc-api-1.75.0-sources.jar, grpc-context-1.75.0-sources.jar, grpc-core-1.75.0-sources.jar, grpc-netty-shaded-1.75.0-sources.jar, grpc-protobuf-1.75.0-sources.jar, grpc-protobuf-lite-1.75.0-sources.jar, grpc-stub-1.75.0-sources.jar, grpc-util-1.75.0-sources.jar, gson-2.11.0-sources.jar, guava-33.3.1-android-sources.jar, itu-1.14.0-sources.jar, j2objc-annotations-3.0.0-sources.jar, jackson-annotations-2.20-sources.jar, jackson-core-3.0.3-sources.jar, jackson-databind-3.0.3-sources.jar, jackson-dataformat-yaml-3.0.3-sources.jar, json-schema-validator-3.0.0-sources.jar, jsr305-3.0.2-sources.jar, mcp-core-1.0.0-sources.jar, mcp-json-jackson3-1.0.0-sources.jar, mongodb-driver-core-5.3.1-sources.jar, mongodb-driver-sync-5.3.1-sources.jar, perfmark-api-0.27.0-sources.jar, proto-google-common-protos-2.59.2-sources.jar, protobuf-java-3.25.8-sources.jar, reactive-streams-1.0.4-sources.jar, reactor-core-3.7.0-sources.jar, slf4j-api-2.0.14-sources.jar, snakeyaml-engine-2.10-sources.jar define 1 overlapping resource: 
+[WARNING]   - META-INF/MANIFEST.MF
+[WARNING] checker-qual-3.43.0-sources.jar, slf4j-api-2.0.14-sources.jar define 1 overlapping resource: 
+[WARNING]   - META-INF/LICENSE.txt
+[WARNING] error_prone_annotations-2.27.0-sources.jar, gson-2.11.0-sources.jar, j2objc-annotations-3.0.0-sources.jar, jackson-core-3.0.3-sources.jar, jackson-databind-3.0.3-sources.jar, jackson-dataformat-yaml-3.0.3-sources.jar define 1 overlapping resource: 
+[WARNING]   - module-info.java
+[WARNING] jackson-annotations-2.20-sources.jar, jackson-databind-3.0.3-sources.jar, jackson-dataformat-yaml-3.0.3-sources.jar define 1 overlapping resource: 
+[WARNING]   - META-INF/NOTICE
+[WARNING] maven-shade-plugin has detected that some files are
+[WARNING] present in two or more JARs. When this happens, only one
+[WARNING] single version of the file is copied to the uber jar.
+[WARNING] Usually this is not harmful and you can skip these warnings,
+[WARNING] otherwise try to manually exclude artifacts based on
+[WARNING] mvn dependency:tree -Ddetail=true and the above output.
+[WARNING] See https://maven.apache.org/plugins/maven-shade-plugin/
+[INFO] Replacing original artifact with shaded artifact.
+[INFO] Replacing /Users/paul/work/tekroo-ai/sma/target/sma-1.0-SNAPSHOT.jar with /Users/paul/work/tekroo-ai/sma/target/sma-1.0-SNAPSHOT-shaded.jar
+[INFO] Replacing original source artifact with shaded source artifact.
+[INFO] Replacing /Users/paul/work/tekroo-ai/sma/target/sma-1.0-SNAPSHOT-sources.jar with /Users/paul/work/tekroo-ai/sma/target/sma-1.0-SNAPSHOT-shaded-sources.jar
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  13.471 s
+[INFO] Finished at: 2026-08-13T17:30:07-06:00
+[INFO] ------------------------------------------------------------------------

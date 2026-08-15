@@ -1,0 +1,90 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_CANDIDATE_8_OPENHANDS_HOST_VERIFICATION_CORRECTION",
+  "status": "PASS_SUPERSEDES_SANDBOX_DERIVED_NO_GO",
+  "recordedAt": "2026-08-14T20:55:17Z",
+  "authority": {
+    "path": "investigations/sma-q1/layered/sma-s2-candidate-8-openhands-service-start-authorization.json",
+    "sha256": "0b4b6c79aef0f16e606984ebd796b5a69fcd332ad1d8ac627fcb1bc6bf1d686a"
+  },
+  "supersededEvidence": {
+    "preflightReceipt": {
+      "path": "OUTPUT/phase-3/sma-s2-candidate-8-dress-rehearsal-live-preflight.json",
+      "sha256": "02eca6b2587492428bf5a2df8bc9d514f0a14eaef6a961944e36da1cefc35a2d",
+      "priorStatus": "NO_GO"
+    },
+    "authorizationConsumption": {
+      "path": "investigations/sma-q1/layered/sma-s2-candidate-8-dress-rehearsal-single-use-authorization-consumption.json",
+      "sha256": "2364ad52c16fc10396e96b6406f3803c6e387d790c62e8e3bd9c4a19b1b284dd",
+      "priorStatus": "CONSUMED_PREFLIGHT_NO_GO"
+    },
+    "reason": "the localhost curl probes ran inside a restricted network sandbox and therefore did not observe the host network namespace"
+  },
+  "rawHostEvidence": {
+    "launchd": {
+      "label": "com.tekroo.openhands-agent-canvas",
+      "domain": "gui/501",
+      "state": "running",
+      "activeCount": 1,
+      "program": "/opt/homebrew/bin/node",
+      "entrypoint": "/opt/homebrew/lib/node_modules/@openhands/agent-canvas/bin/agent-canvas.mjs",
+      "configuredPort": 8000,
+      "reportedPid": 46541,
+      "lastExitCode": 0
+    },
+    "listener": {
+      "command": "node",
+      "pid": 46737,
+      "address": "127.0.0.1:8000",
+      "state": "LISTEN"
+    },
+    "hostNetworkHealth": {
+      "executionBoundary": "UNSANDBOXED_HOST_LOCALHOST_READ_ONLY",
+      "agentCanvasEndpoint": "http://127.0.0.1:8000/health",
+      "agentCanvasHttpStatus": 200,
+      "agentServerEndpoint": "http://127.0.0.1:18000/health",
+      "agentServerHttpStatus": 200
+    },
+    "conversationAudit": {
+      "searchHttpStatus": 200,
+      "conversationCount": 8,
+      "statusCounts": {
+        "error": 1,
+        "finished": 6,
+        "paused": 1
+      },
+      "activeConversationCount": 0,
+      "preservedPausedTekrooTrader": {
+        "conversationId": "4c2e5f84-ecd3-4971-b375-a0fa9905a058",
+        "executionStatus": "paused",
+        "detailHttpStatus": 200,
+        "createdAt": "2026-08-09T19:52:16.454058Z",
+        "updatedAt": "2026-08-13T17:38:02.080929Z"
+      }
+    }
+  },
+  "actionsPerformed": {
+    "serviceStarts": 0,
+    "serviceStops": 0,
+    "serviceRestarts": 0,
+    "conversationMutations": 0,
+    "dressRehearsalAttempts": 0,
+    "measuredExecutionAttempts": 0,
+    "realModelCalls": 0
+  },
+  "correctedFindings": {
+    "frozenAgentCanvasAndAgentServerHealthy": true,
+    "activeWorkClear": true,
+    "preservedTekrooTraderPaused": true,
+    "serviceStartRequired": false,
+    "candidate8DressRehearsalAuthorized": false,
+    "measuredExecutionAuthorized": false
+  },
+  "scientificEffect": {
+    "candidate8DesignChanged": false,
+    "candidate8ExecutionIdentityChanged": false,
+    "candidate8DressResultCredit": 0,
+    "qualificationClaim": null
+  },
+  "nextGate": "NEW_SINGLE_USE_CANDIDATE_8_ZERO_CREDIT_DRESS_REHEARSAL_AUTHORIZATION"
+}

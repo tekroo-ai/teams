@@ -1,0 +1,63 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_CANDIDATE_8_DRESS_REHEARSAL_LIVE_PREFLIGHT_RECEIPT",
+  "status": "NO_GO",
+  "recordedAt": "2026-08-14T19:28:41Z",
+  "executionIdentitySha256": "285ef6fefa5fb5b4b71afe1ff368a119c80a5b3b839467d06883a9cb7e31cdcb",
+  "executionIdentityAcceptanceSha256": "669c186c27e5240eef3cdf94a34a531253cc4d4db6adb7ce59fddf8f544ef5db",
+  "authorization": {
+    "path": "investigations/sma-q1/layered/sma-s2-candidate-8-dress-rehearsal-single-use-authorization.json",
+    "sha256": "3051d37b768a500e5df887277e555add531f89550804c32d95c7f6fee17a1044"
+  },
+  "immutableArtifactRecheck": {
+    "status": "PASS",
+    "executionIdentityMatched": true,
+    "executionIdentityAcceptanceMatched": true,
+    "authorizationMatched": true,
+    "driverMatched": true,
+    "configurationMatched": true
+  },
+  "serviceHealth": {
+    "status": "FAIL",
+    "agentCanvas": {
+      "endpoint": "http://127.0.0.1:8000/health",
+      "curlExitCode": 7,
+      "httpStatus": 0,
+      "rawDiagnostic": "Failed to connect to 127.0.0.1 port 8000: Couldn't connect to server"
+    },
+    "agentServer": {
+      "endpoint": "http://127.0.0.1:18000/health",
+      "curlExitCode": 7,
+      "httpStatus": 0,
+      "rawDiagnostic": "Failed to connect to 127.0.0.1 port 18000: Couldn't connect to server"
+    }
+  },
+  "conversationAudit": {
+    "status": "NOT_RUN_SERVICE_UNAVAILABLE",
+    "activeConversationCount": null,
+    "preservedPausedTekrooTraderConfirmed": false
+  },
+  "remainingMutableChecks": {
+    "runtimePortAvailability": "NOT_RUN_AFTER_DECISIVE_FAILURE",
+    "namespaceAbsence": "NOT_RUN_AFTER_DECISIVE_FAILURE",
+    "workspaceIsolation": "NOT_RUN_AFTER_DECISIVE_FAILURE",
+    "productIdentity": "NOT_RUN_AFTER_DECISIVE_FAILURE"
+  },
+  "authorizedActionCounts": {
+    "livePreflightAttempts": 1,
+    "dressRehearsalAttempts": 0,
+    "dressRehearsalOperations": 0,
+    "measuredCaseExecutions": 0,
+    "measuredRepetitionExecutions": 0,
+    "realModelCalls": 0,
+    "serviceRestarts": 0
+  },
+  "dressRehearsalOutput": {
+    "path": "OUTPUT/phase-3/sma-s2-candidate-8-dress-rehearsal-attempt-1",
+    "absentAfterPreflight": true
+  },
+  "failureClassification": "REQUIRED_OPENHANDS_LOCAL_SERVICES_UNAVAILABLE",
+  "authorityConsumptionRequired": true,
+  "automaticRetryAuthorized": false,
+  "disposition": "STOP_NO_DRESS_REHEARSAL_NO_CREDIT_NO_CLAIM"
+}

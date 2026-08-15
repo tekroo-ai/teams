@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_CANDIDATE_8_DRESS_REHEARSAL_AUTHORIZATION_CONSUMPTION",
+  "candidate": 8,
+  "status": "CONSUMED_PREFLIGHT_NO_GO",
+  "recordedOn": "2026-08-14",
+  "authorization": {
+    "path": "investigations/sma-q1/layered/sma-s2-candidate-8-dress-rehearsal-single-use-authorization.json",
+    "sha256": "3051d37b768a500e5df887277e555add531f89550804c32d95c7f6fee17a1044",
+    "maximumDressRehearsalAttempts": 1
+  },
+  "livePreflight": {
+    "path": "OUTPUT/phase-3/sma-s2-candidate-8-dress-rehearsal-live-preflight.json",
+    "sha256": "02eca6b2587492428bf5a2df8bc9d514f0a14eaef6a961944e36da1cefc35a2d",
+    "status": "NO_GO",
+    "failureClassification": "REQUIRED_OPENHANDS_LOCAL_SERVICES_UNAVAILABLE"
+  },
+  "consumption": {
+    "livePreflightAttempts": 1,
+    "dressRehearsalAttempts": 0,
+    "dressRehearsalOperations": 0,
+    "measuredCaseExecutions": 0,
+    "measuredRepetitionExecutions": 0,
+    "measuredCredit": 0,
+    "realModelCalls": 0,
+    "serviceRestarts": 0,
+    "claim": null
+  },
+  "stopConditionApplied": "required Agent Canvas and agent-server health surfaces were unavailable",
+  "automaticRetryAuthorized": false,
+  "authorizationReusable": false,
+  "nextAuthorityRequired": "separate principal authority for one controlled start of the accepted Agent Canvas/agent-server services, followed by a separately authorized successor candidate-8 zero-credit dress rehearsal"
+}

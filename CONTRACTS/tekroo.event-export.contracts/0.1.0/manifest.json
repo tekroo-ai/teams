@@ -1,0 +1,72 @@
+{
+  "schemaVersion": "1.0.0",
+  "contract": {
+    "identity": "tekroo.event-export.contracts/0.1.0",
+    "name": "tekroo.event-export.contracts",
+    "version": "0.1.0",
+    "status": "CANDIDATE_NOT_ACCEPTED"
+  },
+  "source": {
+    "identity": "tekroo.kernel.contracts/0.7.0",
+    "manifestSHA256": "e2b9b5224a860a3eaa07451cf48fb5ac16a440b22b8dd592ff1662c1cff67f16"
+  },
+  "authority": {
+    "decisionAuthority": "Principal",
+    "implementationAuthority": "AUTHORIZED_CANDIDATE",
+    "productionAuthority": "NONE"
+  },
+  "semantics": {
+    "access": "AUTHENTICATED_AUTHORIZED_READ_ONLY",
+    "delivery": "AT_LEAST_ONCE",
+    "deduplicationIdentity": "event_id",
+    "cursorRole": "OPERATIONAL_ONLY",
+    "initialConvergence": "OPEN_LIVE_BEFORE_BOUNDED_BACKLOG",
+    "historyLoss": "RESYNC_REQUIRED"
+  },
+  "counts": {
+    "files": 6,
+    "invariants": 12,
+    "fixtures": 10,
+    "schemas": 1
+  },
+  "files": [
+    {
+      "path": "compatibility/teams-kernel-0.7.0.json",
+      "bytes": 849,
+      "sha256": "7482c2fc58d13ec08f8f68a4b04b107ad07d0ff43cf3a229109397e28dd33f24"
+    },
+    {
+      "path": "fixtures/conformance.json",
+      "bytes": 2242,
+      "sha256": "914f61dde83077e2e1807eb39d225a29e442a988c8ab9873d6612657ddf83149"
+    },
+    {
+      "path": "invariants/invariants.json",
+      "bytes": 2338,
+      "sha256": "58b97883a91ecdf6b8113c68cce852f30da010f434eeccaec9929ca9193a3256"
+    },
+    {
+      "path": "runner/protocol.json",
+      "bytes": 603,
+      "sha256": "0ae28568c13ffbf020ed189cffc418546e3d79d25b7d43fccbe73578fc24684c"
+    },
+    {
+      "path": "runner/validate-package.mjs",
+      "bytes": 3092,
+      "sha256": "c706eac803d554315ee3c2ceab9dcf2cf051f313149711ecd0b918474972de65"
+    },
+    {
+      "path": "schemas/event-export.schema.json",
+      "bytes": 3384,
+      "sha256": "e7a8dc3710d2b2b2d535d7aa2d024e6e480b76df8e80be25c85e931c6cf9cd10"
+    }
+  ],
+  "canonicalization": {
+    "textEncoding": "UTF-8",
+    "byteOrderMark": false,
+    "lineEnding": "LF",
+    "byteDigest": "SHA-256",
+    "manifestDigest": "detached manifest.sha256"
+  },
+  "inventoryBoundary": "files lists every normative payload asset; manifest.json is identified by detached manifest.sha256 and manifest.sha256 is not self-listed."
+}

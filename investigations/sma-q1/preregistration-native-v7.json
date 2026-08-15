@@ -1,0 +1,94 @@
+{
+  "schemaVersion": "7.0.0",
+  "recordType": "INVESTIGATION_PREREGISTRATION_AMENDMENT",
+  "amendmentId": "SMA-Q1-NATIVE-OPENHANDS-VERTICAL-SLICE-V7",
+  "status": "ACCEPTED_AUTHORIZED_NOT_EXECUTED",
+  "recordedOn": "2026-08-13",
+  "timePrecision": "DAY",
+  "purpose": "Preserve the V6 SMA-Q1 corpus while correcting the OpenHands evaluator defects established by raw V6 and response-lane evidence.",
+  "supersession": {
+    "priorAmendmentId": "SMA-Q1-NATIVE-OPENHANDS-VERTICAL-SLICE-V6",
+    "priorManifest": "investigations/sma-q1/preregistration-native-v6.json",
+    "priorManifestSHA256": "3b025b9adf135918ec0d955ef6cb59bbd46f26aec963611b1f846a2c0f15037e",
+    "priorFinalAdjudication": "OUTPUT/phase-3/step-15-execution-adjudication-v6-final.json",
+    "priorExecutionState": "INCONCLUSIVE",
+    "priorResultClaim": "NO_SMA_Q1_PASS",
+    "preservation": "V6 and all prior artifacts remain immutable; no prior scenario or repetition is credited to V7."
+  },
+  "unchangedBase": {
+    "bindingManifest": "investigations/sma-q1/preregistration-native-v2.json",
+    "bindingManifestSHA256": "c618371d571d5333aebd2bdc83d2db2559115f5ec3e1903b33e8e0ab157edf5d",
+    "bindingPriorAmendments": "All accepted V3 through V6 scientific, fixture, telemetry, and artifact-contract requirements remain binding unless explicitly superseded below.",
+    "scenarioCount": 18,
+    "repetitionCount": 96,
+    "scenarioCreditFromPriorAttempts": 0,
+    "scenarioMutation": "NONE",
+    "thresholdMutation": "NONE",
+    "smaBehaviorMutation": "NONE"
+  },
+  "rootCauseEvidence": {
+    "v6Terminal": "OpenHands reached maximum iterations 3 during the third repetition of SMAQ1N-002; the deleted conversation did not retain the causal action sequence.",
+    "v1OracleDefect": "The response-lane and inherited Step 15 evaluators waited only for agent MessageEvent despite OpenHands supporting both FinishAction and MessageEvent terminal responses.",
+    "v2ObservedVariance": "With the terminal oracle corrected, 59 conversations passed and conversation 60 completed normally but returned a non-exact 271-character MessageEvent.",
+    "ollamaSampling": {
+      "temperature": 1,
+      "topP": 0.95,
+      "topK": 20,
+      "presencePenalty": 1.5,
+      "classification": "OBSERVED_FROM_OLLAMA_MODELFILE"
+    },
+    "causalLimit": "The exact V6 maximum-iteration action sequence and the exact V2 divergent response body were deleted by their runners; their content remains unverified."
+  },
+  "v7Amendments": {
+    "modelLane": {
+      "temperature": 0,
+      "tools": [],
+      "enableSubAgents": false,
+      "enableSwitchLlmTool": false,
+      "mcpConfig": {},
+      "maxIterations": 3,
+      "scope": "EVALUATION_CONVERSATIONS_ONLY",
+      "normalEngineeringProfileMutation": "NONE"
+    },
+    "terminalOracle": {
+      "source": "openhands.sdk.conversation.get_agent_final_response",
+      "acceptedForms": [
+        "agent ActionEvent with tool_name=finish and FinishAction.message",
+        "agent MessageEvent text"
+      ],
+      "requiresExecutionStatus": "finished",
+      "finishActionPrecedence": true
+    },
+    "failureEvidence": {
+      "retainBeforeCleanup": true,
+      "retainedFields": [
+        "conversation ID",
+        "event ID, kind, source, and tool name",
+        "action kind",
+        "response length and SHA-256"
+      ],
+      "responseBodiesPersisted": false,
+      "credentialsPersisted": false
+    }
+  },
+  "disposableNamespaces": {
+    "qualificationMongoDatabase": "sma_q1n_step15_v7_fixture_20260813",
+    "qualificationSemanticCollection": "sma_q1n_step15_v7_fixture_semantic_20260813",
+    "qualificationEpisodicCollection": "sma_q1n_step15_v7_fixture_episodic_20260813",
+    "measuredMongoDatabase": "sma_q1n_step15_20260813_v7",
+    "measuredSemanticCollection": "sma_q1n_step15_v7_semantic_20260813",
+    "measuredEpisodicCollection": "sma_q1n_step15_v7_episodic_20260813",
+    "productionOrHistoricalDataAllowed": false
+  },
+  "executionPolicy": {
+    "attemptsAllowed": 1,
+    "correctiveRerunsAllowed": 0,
+    "stopOnFirstFailure": true,
+    "resultRule": "Only a complete 18-scenario, 96-repetition run may produce SMA-Q1 PASS or FAIL; incomplete execution is INCONCLUSIVE."
+  },
+  "operatorDecision": {
+    "classification": "OBSERVED_OPERATOR_INSTRUCTION",
+    "instruction": "Find the root cause and fix it completely.",
+    "effect": "AUTHORIZE_ONE_V7_REMEDIATION_EXECUTION"
+  }
+}

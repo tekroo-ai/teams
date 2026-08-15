@@ -1,0 +1,161 @@
+{
+  "schemaVersion": "4.0.0",
+  "recordType": "INVESTIGATION_PREREGISTRATION_AMENDMENT",
+  "amendmentId": "SMA-Q1-NATIVE-OPENHANDS-VERTICAL-SLICE-V4",
+  "status": "FROZEN_ACCEPTED_NOT_EXECUTED",
+  "recordedOn": "2026-08-13",
+  "timePrecision": "DAY",
+  "purpose": "Prospectively correct exactly the two source-grounded v3 harness expectation errors and require a no-service expectation self-test before any live fixture work, without changing the frozen scientific corpus.",
+  "supersession": {
+    "priorAmendmentId": "SMA-Q1-NATIVE-OPENHANDS-VERTICAL-SLICE-V3",
+    "priorManifest": "investigations/sma-q1/preregistration-native-v3.json",
+    "priorManifestSHA256": "6b683faf7437a454395c9691ab29f71cdcb1e221e19679fba471b9671c99ecc9",
+    "priorAdjudication": "OUTPUT/phase-3/step-15-execution-adjudication-v3.json",
+    "priorAdjudicationSHA256": "ef83f4c180a419837ff46f331f47e27889cbabbf7ae1acda6d897c23455e1967",
+    "effectIfAccepted": "ACCEPTED_SUCCESSOR_FOR_FUTURE_EXECUTION_ONLY",
+    "priorExecutionState": "INCONCLUSIVE",
+    "priorResultClaim": "NO_SMA_Q1_PASS",
+    "preservation": "The v3 manifest, both v3 attempts, raw receipts, cleanup evidence, and adjudication remain immutable. No v3 scenario or repetition is credited to v4."
+  },
+  "unchangedBase": {
+    "bindingManifest": "investigations/sma-q1/preregistration-native-v2.json",
+    "bindingManifestSHA256": "c618371d571d5333aebd2bdc83d2db2559115f5ec3e1903b33e8e0ab157edf5d",
+    "bindingV3Amendments": "All accepted v3 amendments remain binding except the two expectations explicitly replaced below.",
+    "unchangedFields": [
+      "decisiveQuestion",
+      "architectureReconciliation",
+      "authorityBoundary",
+      "identityModel",
+      "syntheticMemoryCorpus",
+      "scenarioCorpus",
+      "wp5EvidenceMap",
+      "step15ReservedScenarioIds",
+      "evidenceEligibility",
+      "thresholds",
+      "requiredRawReceiptsPerScenario",
+      "stopConditions",
+      "adjudication.pass",
+      "adjudication.fail",
+      "adjudication.inconclusive",
+      "adjudication.defaultIfInconclusive",
+      "v3.amendments.fixtureQualificationBeforeScenarioOne",
+      "v3.amendments.measuredCorpusReadiness",
+      "v3.amendments.scenarioStartAccounting",
+      "v3.amendments.parentChildCriterion",
+      "v3.amendments.logicalRepetitionAccounting",
+      "v3.amendments.oversizedFixture",
+      "v3.amendments.latencyAggregation"
+    ],
+    "scenarioCount": 18,
+    "repetitionCount": 96,
+    "scenarioCreditFromPriorAttempts": 0
+  },
+  "observedV3Evidence": {
+    "classification": "OBSERVED",
+    "initialAttempt": {
+      "harnessSHA256": "59ea7d1b3bc5562993e801a361620c1a748be8423f78c579e486b27270e5fef7",
+      "rawJournalSHA256": "250200bb95e8a4d7ab0b0f7e0fe1645b65e2370234dacd4fef5582db10318811",
+      "startedScenarios": 0,
+      "startedRepetitions": 0,
+      "terminal": "DOCUMENTED_HARNESS_SETUP_AND_RECEIPT_DEFECT"
+    },
+    "correctiveRerun": {
+      "harnessSHA256": "e7cdcc4161f7ed868c756463615073c43706c92f3d50cf713f1b9cb55f9f5087",
+      "receipt": "OUTPUT/phase-3/sma-q1n-step15-v3-rerun1/execution-receipt.json",
+      "receiptFileSHA256": "4cefb8910930e5e627ef407fe8d0fc41983549d10cf303522f445d4b19926a6b",
+      "rawJournalSHA256": "ff7817e4123aa784ad3bb09b4a9df13b35094919f050f273fb3069d7e5e743b8",
+      "startedScenarios": 0,
+      "startedRepetitions": 0,
+      "terminal": "HARNESS_EXPECTATION_MISMATCH_DURING_FIXTURE_QUALIFICATION"
+    },
+    "qualificationFloor": {
+      "mongoMemoryCount": 4,
+      "distinctActualMemoryIdCount": 4,
+      "eligibleMemoryCount": 3,
+      "semanticPointCount": 3,
+      "episodicPointCount": 3,
+      "eligiblePointLevelReceiptsMatchedObservedIdentityAndVectorPresence": true,
+      "rawIneligibleAbsentFromBothCollections": true,
+      "retrievalQualification": "NOT_RUN",
+      "scenarioCorpus": "NOT_RUN"
+    }
+  },
+  "replacedExpectations": {
+    "workspacePartitionIdentity": {
+      "classification": "COMPUTED_FROM_PINNED_SOURCE",
+      "source": "/Users/paul/work/tekroo-ai/sma-step15/src/main/java/ai/tekroo/sma/openhands/OpenHandsEventIntakeService.java",
+      "sourceSHA256": "21a0d02ff42f42351c3a90c49118ca5c7c35fa67947fd7a2d2498f17b99a7fbc",
+      "sourceRule": "canonical workspace fingerprint = first 24 lowercase hexadecimal characters of SHA-256 over the canonical absolute normalized workspace path",
+      "agentIdRule": "openhands:<24-character-workspace-fingerprint>:default",
+      "replaces": "v3 runner expectation of the full 64-character workspace SHA-256",
+      "knownV3QualificationObservations": {
+        "actorAlphaFingerprint": "dbfd91ad7c3cb780074cef7f",
+        "actorBetaFingerprint": "ac05a773e7285e334529d704"
+      }
+    },
+    "projectionAndMongoReferences": {
+      "classification": "COMPUTED_FROM_PINNED_SOURCE",
+      "replayWorker": {
+        "source": "/Users/paul/work/tekroo-ai/sma-step15/src/main/java/ai/tekroo/sma/replay/ReplayWorker.java",
+        "sourceSHA256": "36b9452cf9f7ed4586c6ac0c9ad6b6d2ea201f02788c4eea3766be43f0cf5773"
+      },
+      "qdrantVectorStore": {
+        "source": "/Users/paul/work/tekroo-ai/sma-step15/src/main/java/ai/tekroo/sma/vector/QdrantVectorStore.java",
+        "sourceSHA256": "ebde338949a6267809f35712ed7fd10267d6f95aae0fb1232a079c7134e32e93"
+      },
+      "eligibleRule": "Require exactly one semantic and one episodic Qdrant point at the Java name-UUID of the actual memory ID, each with the actual memory_id, expected agent_id, and a non-empty vector; require Mongo semantic_ref to equal that point ID and Mongo episodic_ref to be absent under the pinned implementation.",
+      "ineligibleRule": "Require no semantic or episodic Qdrant point and no Mongo semantic_ref or episodic_ref.",
+      "replaces": "v3 runner expectation that both semantic_ref and episodic_ref are persisted in MongoDB"
+    }
+  },
+  "staticExpectationSelfTest": {
+    "required": true,
+    "timing": "Before any service query, namespace creation, workspace creation, conversation creation, MongoDB write, Qdrant write, or model call.",
+    "inputs": [
+      "the three pinned SMA source files and their SHA-256 identities",
+      "the v3 corrective-rerun raw journal and its SHA-256 identity",
+      "the v4 disposable absolute workspace paths",
+      "the Java UUID.nameUUIDFromBytes-compatible point-ID function"
+    ],
+    "requiredChecks": [
+      "The pinned intake source contains the 24-character canonical-workspace fingerprint rule.",
+      "The pinned replay source performs episodic Qdrant upsert but passes only semanticRef to updateCanonical.",
+      "The v4 qualification and measured workspace paths produce their preregistered 24-character fingerprints.",
+      "The retained v3 qualification observation passes the corrected agent, point, vector, lifecycle, eligibility, and Mongo-reference expectations.",
+      "The retained v3 observation fails the superseded full-hash and Mongo-episodic-ref expectations, proving the self-test discriminates the corrections."
+    ],
+    "terminal": "Any mismatch yields INCONCLUSIVE before live fixture work and does not consume a scenario repetition."
+  },
+  "v4DisposableNamespaces": {
+    "qualification": {
+      "mongoDatabase": "sma_q1n_step15_v4_fixture_20260813",
+      "qdrantSemanticCollection": "sma_q1n_step15_v4_fixture_semantic_20260813",
+      "qdrantEpisodicCollection": "sma_q1n_step15_v4_fixture_episodic_20260813",
+      "runRoot": "/Users/paul/work/tekroo-ai/sma-step15/target/sma-q1n-step15-20260813-v4-fixture",
+      "actorAlphaFingerprint": "4c95b7daff6686d709f08cfc",
+      "actorBetaFingerprint": "78dfa54e08fa120a30768237"
+    },
+    "measuredRun": {
+      "mongoDatabase": "sma_q1n_step15_20260813_v4",
+      "qdrantSemanticCollection": "sma_q1n_step15_v4_semantic_20260813",
+      "qdrantEpisodicCollection": "sma_q1n_step15_v4_episodic_20260813",
+      "runRoot": "/Users/paul/work/tekroo-ai/sma-step15/target/sma-q1n-step15-20260813-v4",
+      "actorAlphaFingerprint": "5836d69e6762db4d4baf87cc",
+      "actorBetaFingerprint": "f7a4c51724a73ed846a7d4dc"
+    }
+  },
+  "rerunPolicy": "No threshold, prompt, memory, expected SMA outcome, or evidence rule may change after v4 is frozen. One corrective v4 rerun is permitted only for a newly documented harness defect that could not have altered an SMA outcome; retain and adjudicate every attempt. Failure of the pre-live static expectation self-test does not authorize live probing.",
+  "acceptance": {
+    "classification": "OBSERVED_OPERATOR_DECISION",
+    "acceptedOn": "2026-08-13",
+    "timePrecision": "DAY",
+    "decision": "ACCEPT_AND_FREEZE_V4",
+    "source": "Explicit principal instruction in the coordinating Teams session",
+    "executionAuthorizationEffect": "NONE"
+  },
+  "acceptanceState": "ACCEPTED_AND_FROZEN",
+  "executionState": "NOT_STARTED",
+  "scenarioResultClaimAuthorized": false,
+  "step15ExecutionAuthorized": false,
+  "executionAuthorizationArtifactRequired": true
+}

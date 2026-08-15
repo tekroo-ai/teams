@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_CANDIDATE_6_MEASURED_AUTHORIZATION_CONSUMPTION",
+  "status": "CONSUMED_INCONCLUSIVE_NO_REUSE",
+  "recordedAt": "2026-08-14T17:45:56Z",
+  "authorization": {
+    "path": "investigations/sma-q1/layered/sma-s2-candidate-6-single-use-measured-authorization.json",
+    "sha256": "a642a27b9f3267722b85fb5eff988d007ff917167e0f7f6166a3620618dcf822"
+  },
+  "executionIdentitySha256": "5640c60968261402bc1878204703845581e266cbce1b4cc7e135a3008f05e5a4",
+  "livePreflightReceiptSha256": "8d479433e93599209c50b314aef481c75aaf1460e6c2b9db9806f7dcb4de0624",
+  "executionReceipt": {
+    "path": "OUTPUT/phase-3/sma-s2-successor-candidate-6-measured-attempt-1/execution-receipt.json",
+    "sha256": "62226fd8658dece27e282400dc311813565aca334a1957f31e9b128b55575933",
+    "status": "INCONCLUSIVE"
+  },
+  "rawJournalSha256": "fcbf7acb83379d13a48567181df9c3a37ee586f011667e62efc2a697982b3b70",
+  "consumedCounts": {
+    "measuredAttempts": 1,
+    "completedRepetitions": 10,
+    "substantiveFailures": 10,
+    "harnessFailures": 1,
+    "automaticCorrectiveReruns": 0,
+    "hiddenHarnessRetries": 0,
+    "realModelCalls": 0,
+    "serviceRestarts": 0
+  },
+  "cleanupVerified": true,
+  "claimEarned": false,
+  "reusable": false
+}

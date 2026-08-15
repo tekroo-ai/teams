@@ -1,0 +1,35 @@
+{
+  "cleanup": {
+    "all_conversations_deleted_and_404_verified": true,
+    "verified_conversation_count": 1,
+    "workspace_absent": true
+  },
+  "completed_conversations": 1,
+  "decision": "NO_GO",
+  "failed_conversations": 1,
+  "first_failure": {
+    "conversation_id": "57b3a839-0080-49eb-9023-b411e1e5adb4",
+    "creation_ms": 28.603,
+    "ordinal": 1,
+    "status": "FAIL",
+    "terminal": "TIMEOUT",
+    "wall_ms": 120071.321583
+  },
+  "latency_ms": {
+    "maximum": 120071.321583,
+    "minimum": 120071.321583,
+    "p50": 120071.321583,
+    "p95": 120071.321583,
+    "p99": 120071.321583
+  },
+  "manifest_sha256": "9704c0b0e78023fefdeed67848bff233632cbb33a4683a7fa7c794d7199c8e7d",
+  "passed_conversations": 0,
+  "raw_journal_sha256": "a2f748b9f95a791926c38a298af6c891a79e5d81aabfe50d324bc12c2a7059d7",
+  "receipt_type": "OPENHANDS_RESPONSE_LANE_QUALIFICATION",
+  "recorded_at": "2026-08-13T20:54:05.283554+00:00",
+  "required_conversations": 128,
+  "runner_sha256": "8c071d3a71b42b0dfdcf0ed02025b164e75be1a5c62b50befc2dd4c3f6900301",
+  "schema_version": "1.0.0",
+  "sma_q1_claim": "NONE",
+  "status": "FAIL"
+}

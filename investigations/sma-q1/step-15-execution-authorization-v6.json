@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_Q1_EXECUTION_AUTHORIZATION",
+  "authorizationId": "SMA-Q1-NATIVE-STEP15-V6-EXECUTION",
+  "recordedOn": "2026-08-13",
+  "timePrecision": "DAY",
+  "status": "AUTHORIZED_NOT_STARTED",
+  "principalInstruction": "Accept V6 and Step 15 is authorized.",
+  "frozenManifest": "investigations/sma-q1/preregistration-native-v6.json",
+  "frozenManifestSHA256": "3b025b9adf135918ec0d955ef6cb59bbd46f26aec963611b1f846a2c0f15037e",
+  "executionIdentity": "investigations/sma-q1/step-15-execution-identity-v6.json",
+  "executionIdentitySHA256": "c90aea8a836e3d8526e00ec3f17b961fc8398c18c3a7f91a4ab4170400cd461f",
+  "harness": "scripts/smaq1_native_step15_v6.py",
+  "harnessSHA256": "495735e076958e3f1f8435ce1ff57f8c10568f9545c2033ba6b5ac71b40b2f51",
+  "baseManifest": "investigations/sma-q1/preregistration-native-v2.json",
+  "baseManifestSHA256": "c618371d571d5333aebd2bdc83d2db2559115f5ec3e1903b33e8e0ab157edf5d",
+  "authorizedScope": {
+    "fixtureQualification": true,
+    "measuredScenarioCorpus": true,
+    "scenarioCount": 18,
+    "repetitionCount": 96,
+    "disposableNamespacesOnly": true,
+    "productionOrHistoricalDataAllowed": false,
+    "scenarioMutationAllowed": false,
+    "thresholdMutationAllowed": false,
+    "additionalV6RerunAllowed": false
+  },
+  "attempt": {
+    "ordinal": 1,
+    "correctiveRerun": false,
+    "onlyV6Attempt": true
+  },
+  "executionAuthorized": true,
+  "executionStarted": false,
+  "scenarioResultClaimAuthorized": true
+}

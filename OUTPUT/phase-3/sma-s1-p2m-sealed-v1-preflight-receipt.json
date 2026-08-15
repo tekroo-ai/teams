@@ -1,0 +1,134 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S1_IMMEDIATE_PREFLIGHT_RECEIPT",
+  "status": "PASS_READY_FOR_SINGLE_USE_AUTHORIZATION_REQUEST",
+  "recordedAt": "2026-08-14T14:21:29Z",
+  "scope": "READ_ONLY_IMMEDIATE_PREFLIGHT_NO_MEASURED_EXECUTION_AUTHORITY",
+  "acceptedLineage": {
+    "candidateIdentity": {
+      "path": "investigations/sma-q1/layered/sma-s1-execution-identity-p2m-candidate-7.json",
+      "sha256": "e67d731d4d4ab8936c3ccf8d89c336614f5049ee6294029c5fce94d27d28774f"
+    },
+    "candidateOfflineHarnessQualification": {
+      "path": "OUTPUT/phase-3/sma-s1-p2m-candidate-7-offline-harness-qualification.json",
+      "sha256": "1174d5743b88be2f22210b448ebbbf80430164654daae4195d201b2d350eabe9"
+    },
+    "acceptanceRecord": {
+      "path": "investigations/sma-q1/layered/sma-s1-p2m-candidate-7-acceptance.json",
+      "sha256": "0f646dae2359a766cd725dd7e85f732fce57508be1d779ab459db37836f0e67b"
+    }
+  },
+  "authorizationCompatibleBindings": {
+    "manifest": {
+      "path": "investigations/sma-q1/layered/sma-s1-preregistration.json",
+      "sha256": "e663f5b732c22248adc5fab2f536dbf02dd72337f7c8428f225937e72d6a7f8c"
+    },
+    "sealedIdentity": {
+      "path": "investigations/sma-q1/layered/sma-s1-execution-identity-p2m-sealed-v1.json",
+      "sha256": "f8bf0323680504df1afb14fe6184e87eaaa675170079c005ce827fcfdfe15e0e"
+    },
+    "harness": {
+      "path": "scripts/sma_s1_harness.py",
+      "sha256": "cbb3d1ac8b053817d84f8eb060af6ce28be7bc67abea77cc5a1b3993f29b0d92"
+    },
+    "productDriverLauncher": {
+      "path": "scripts/sma_s1_product_driver_p2m.py",
+      "sha256": "3ec5390fa62f89c0304d3a37224ba425d9d29c98b074c17c7008c1b7e9ba54d7"
+    },
+    "postSealOfflineHarnessReceipt": {
+      "path": "OUTPUT/phase-3/sma-s1-harness-p2m-sealed-v1/self-test-receipt.json",
+      "sha256": "ca3c5aedebb05fe69fd88d4a2570ff6560c45f49cfe0e8d109591b9c95b7f076",
+      "status": "PASS",
+      "tests": 10,
+      "measuredCasesExecuted": 0,
+      "mongoOrQdrantMutated": false
+    }
+  },
+  "observed": {
+    "source": {
+      "isolatedWorktree": "/Users/paul/work/tekroo-ai/sma-s1-p2m",
+      "head": "5d58be508c74ae8577d2fd31e3346be23a912ab3",
+      "tree": "7222410443a6041496a5c313b2549f16eb937458",
+      "remoteRef": "refs/remotes/origin/codex/sma-p2-m-release-mtls",
+      "remoteCommit": "5d58be508c74ae8577d2fd31e3346be23a912ab3",
+      "worktreePorcelain": "",
+      "worktreeClean": true
+    },
+    "builtArtifacts": {
+      "serviceArtifactSHA256": "c0ddb963798d45603c2e2685744892c40d3e841817f9c966ab7fad34f7e48765",
+      "sourcesArtifactSHA256": "d48f9629588cce161b228511fd5307e0dcf839318d9dc5d8f32c450dfc2ac5fb",
+      "productDriverSourceSHA256": "f7bba094682d48444d687b77935c5f00c9a8651c9b4b38d6c29bcf6e232fc6d3",
+      "productDriverArtifactSHA256": "c181d7d2958b8dcfda2633fbc9cc60314d1e95a98e8c2c973b91a3cb816fdf6f"
+    },
+    "mongodb": {
+      "uri": "mongodb://127.0.0.1:27017",
+      "serverVersion": "8.3.4",
+      "replicaSet": "rs0",
+      "primary": "127.0.0.1:27017",
+      "isWritablePrimary": true,
+      "measuredDatabase": "sma_s1_measured_20260814_p2m_candidate_7",
+      "measuredDatabaseListResult": [],
+      "measuredDatabaseAbsent": true
+    },
+    "qdrant": {
+      "restEndpoint": "http://127.0.0.1:6333",
+      "serverVersion": "1.18.2",
+      "serverCommit": "44ad62f8cd69642be5afa6441612525e24a0d063",
+      "semanticCollection": "sma_s1_measured_semantic_20260814_p2m_candidate_7",
+      "semanticCollectionHttpStatus": 404,
+      "semanticCollectionAbsent": true,
+      "episodicCollection": "sma_s1_measured_episodic_20260814_p2m_candidate_7",
+      "episodicCollectionHttpStatus": 404,
+      "episodicCollectionAbsent": true
+    },
+    "output": {
+      "root": "OUTPUT/phase-3/sma-s1-measured-p2m-sealed-v1-attempt-1",
+      "rootAbsent": true
+    },
+    "host": {
+      "physicalMemoryBytes": 137438953472,
+      "systemWideMemoryFreePercent": 51,
+      "swapTotalMiB": 2048,
+      "swapUsedMiB": 356,
+      "swapFreeMiB": 1692,
+      "loadAverage": [
+        2.84,
+        3.34,
+        3.28
+      ],
+      "filesystemAvailableKiB": 4736882184,
+      "filesystemCapacityUsedPercent": 40
+    }
+  },
+  "computed": {
+    "exactIdentityHashMatch": true,
+    "exactOfflineHarnessHashMatch": true,
+    "exactHarnessHashMatch": true,
+    "exactDriverHashMatch": true,
+    "exactSmaCommitTreeAndRemoteMatch": true,
+    "allMeasuredNamespacesAbsent": true,
+    "measuredOutputRootAbsent": true,
+    "declaredImmediatePreflightChecksPassed": true
+  },
+  "inferred": {
+    "recommendation": "REQUEST_EXPLICIT_SINGLE_USE_MEASURED_EXECUTION_AUTHORIZATION",
+    "basis": "The exact accepted lineage, sealed execution identity, post-seal offline harness receipt, implementation identity, services, isolation namespaces, output root, and current host observations satisfy the immediate preflight boundary."
+  },
+  "executionFence": {
+    "singleUseExecutionAuthorizationPresent": false,
+    "executionAuthorized": false,
+    "executionAttemptsAuthorized": 0,
+    "executionStarted": false,
+    "measuredCasesExecuted": 0,
+    "mongoOrQdrantMutatedByThisPreflight": false,
+    "openhandsOrModelUsed": false,
+    "executionState": "NOT_RUN"
+  },
+  "invalidationRules": [
+    "Any change to a bound content hash invalidates this receipt.",
+    "Any change to the bound SMA commit, tree, or remote commit invalidates this receipt.",
+    "Presence of any measured MongoDB database, Qdrant collection, or output root before execution invalidates this receipt.",
+    "A measured attempt requires a separate single-use authorization bound to the exact manifest, sealed identity, harness, product-driver launcher, and post-seal offline-harness receipt hashes.",
+    "The measured harness must repeat its own exact-hash, service, namespace, and create-once output checks at execution time."
+  ]
+}

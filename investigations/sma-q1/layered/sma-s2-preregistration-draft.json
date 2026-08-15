@@ -1,0 +1,310 @@
+{
+  "schemaVersion": "1.0.0-draft",
+  "recordType": "LAYERED_QUALIFICATION_PREREGISTRATION",
+  "lineageId": "SMA-S2",
+  "status": "DRAFT_NOT_ACCEPTED_NOT_AUTHORIZED",
+  "recordedOn": "2026-08-13",
+  "purpose": "Qualify the supported OpenHands-to-SMA boundary with a deterministic stub model.",
+  "governingDesign": {
+    "path": "docs/architecture/041-step-15-layered-qualification-specification.md",
+    "sha256": "1700db925d2b8a42cc3df073b9d678dd971dc0d604bb6f01d2b35488350ebfff",
+    "acceptanceRecord": "docs/architecture/042-step-15-layered-design-acceptance.md"
+  },
+  "historicalBoundary": {
+    "terminatedLineage": "SMA-Q1-NATIVE-OPENHANDS-VERTICAL-SLICE-V12",
+    "terminalResult": "FAIL_NO_GO",
+    "creditImported": 0,
+    "v13Allowed": false
+  },
+  "decisiveQuestion": "Does the frozen supported OpenHands integration preserve the current prompt, place bounded untrusted SMA context correctly, fail open, retain provenance, and terminate cleanly when model behavior is deterministic?",
+  "claimOnPass": "OPENHANDS_SMA_BOUNDARY_QUALIFIED",
+  "requiredUpstreamClaim": "SMA_SEMANTICS_QUALIFIED",
+  "excludedClaims": [
+    "generative model behavior qualification",
+    "integrated runtime qualification",
+    "workflow or process-control authority",
+    "production readiness"
+  ],
+  "owners": {
+    "boundaryImplementation": [
+      "SMA_INTEGRATION_OWNER",
+      "OPENHANDS_ADAPTER_OWNER"
+    ],
+    "stubAndQualificationHarness": "TEAMS_COORDINATOR",
+    "independentHarnessReviewer": "UNBOUND",
+    "acceptance": "PRINCIPAL_OR_EXPLICIT_DELEGATE"
+  },
+  "identityBindings": {
+    "acceptedS1Receipt": "UNBOUND",
+    "smaCommitAndTree": "UNBOUND",
+    "openhandsCommitAndTree": "UNBOUND",
+    "agentServerArtifact": "UNBOUND",
+    "hookAndPluginAssets": "UNBOUND",
+    "bridgeArtifact": "UNBOUND",
+    "eventSchema": "UNBOUND",
+    "deterministicStubArtifact": "UNBOUND",
+    "harness": "UNBOUND",
+    "nonSecretConfiguration": "UNBOUND",
+    "disposableNamespaces": "UNBOUND"
+  },
+  "stubContract": {
+    "generativeReasoning": false,
+    "requestCapture": "EXACT_SYNTHETIC_REQUEST_WITH_DIGEST_AND_LENGTH",
+    "successResponse": "STUB_OK:<case-id>:<repetition>",
+    "supportedFaults": [
+      "TIMEOUT",
+      "CANCELLATION",
+      "MALFORMED_RESPONSE",
+      "TRANSPORT_FAILURE"
+    ],
+    "semanticResponseGrading": "PROHIBITED"
+  },
+  "cases": [
+    {
+      "id": "SMA-S2-001-FIRST-PROMPT-EMPTY",
+      "sourceScenario": "SMAQ1N-001-FIRST-PROMPT-EMPTY",
+      "repetitions": 10,
+      "fault": "NEW_CONVERSATION_WITH_EMPTY_MEMORY_PARTITION",
+      "predicates": [
+        "the hook is installed before the first prompt",
+        "no memory block is emitted",
+        "the current prompt is byte-identical at every defined boundary",
+        "the stub receives one request and returns one terminal"
+      ]
+    },
+    {
+      "id": "SMA-S2-002-SAME-PARTITION-DELIVERY",
+      "sourceScenario": "SMAQ1N-002-SAME-PARTITION-RECALL",
+      "repetitions": 10,
+      "fault": "NONE",
+      "predicates": [
+        "mem-alpha-timeout occurs exactly once in bounded additionalContext",
+        "the context is framed as untrusted evidence",
+        "the current prompt remains byte-identical"
+      ]
+    },
+    {
+      "id": "SMA-S2-003-CROSS-PARTITION-DELIVERY-DENIAL",
+      "sourceScenario": "SMAQ1N-003-CROSS-PARTITION-DENIAL",
+      "repetitions": 10,
+      "fault": "NONE",
+      "predicates": [
+        "no actor-alpha memory identity or marker occurs in actor-beta hook output, model request, log, or capture surface"
+      ]
+    },
+    {
+      "id": "SMA-S2-004-UNTRUSTED-CONTEXT-PLACEMENT",
+      "sourceScenario": "SMAQ1N-004-CURRENT-INSTRUCTION-PRECEDENCE",
+      "repetitions": 5,
+      "fault": "ADVERSARIAL_ELIGIBLE_MEMORY",
+      "predicates": [
+        "the adversarial memory is delimited as untrusted evidence",
+        "it is never spliced into the current instruction",
+        "the prompt is byte-identical"
+      ]
+    },
+    {
+      "id": "SMA-S2-005-RAW-INELIGIBLE-ABSENCE",
+      "sourceScenario": "SMAQ1N-005-RAW-INELIGIBLE",
+      "repetitions": 3,
+      "fault": "NONE",
+      "predicates": [
+        "mem-alpha-raw and marker 9999 are absent from hook output, model request, logs, and capture"
+      ]
+    },
+    {
+      "id": "SMA-S2-006-DUPLICATE-PERSISTED-EVENT",
+      "sourceScenario": "SMAQ1N-006-DUPLICATE-EVENT-CAPTURE",
+      "repetitions": 3,
+      "fault": "RECONCILE_IDENTICAL_PERSISTED_OPENHANDS_EVENT",
+      "predicates": [
+        "the exact conversation and event identity reaches SMA on initial intake and reconciliation",
+        "the qualified S1 deduplication result remains one memory after lifecycle restart"
+      ]
+    },
+    {
+      "id": "SMA-S2-007-RETRIEVAL-OUTAGE",
+      "sourceScenario": "SMAQ1N-007-RETRIEVAL-OUTAGE",
+      "repetitions": 5,
+      "fault": "CONTEXT_BRIDGE_OR_RETRIEVAL_UNAVAILABLE",
+      "predicates": [
+        "one valid no-context hook result completes within the deadline",
+        "the unchanged prompt reaches the stub and receives a terminal",
+        "the outage is observable without prompt or memory bodies"
+      ]
+    },
+    {
+      "id": "SMA-S2-008-CAPTURE-OUTAGE",
+      "sourceScenario": "SMAQ1N-008-CAPTURE-OUTAGE-RECONCILIATION",
+      "repetitions": 5,
+      "fault": "SMA_INTAKE_UNAVAILABLE_DURING_PERSISTED_EVENT",
+      "predicates": [
+        "the unchanged prompt reaches the stub and receives a terminal",
+        "the persisted event remains available for bounded reconciliation",
+        "recovery produces exactly one capture without a recursive loop"
+      ]
+    },
+    {
+      "id": "SMA-S2-009-ADDITIONAL-CONTEXT-INTEGRITY",
+      "sourceScenario": "SMAQ1N-009-ADDITIONAL-CONTEXT-INTEGRITY",
+      "repetitions": 5,
+      "fault": "NONE",
+      "predicates": [
+        "the submitted current prompt is byte-identical before and after the hook",
+        "one bounded untrusted context block carries mem-alpha-timeout",
+        "delivery provenance is complete"
+      ]
+    },
+    {
+      "id": "SMA-S2-010-HOOK-FAULT-MATRIX",
+      "sourceScenario": "SMAQ1N-010-HOOK-DEADLINE-AND-MALFORMED",
+      "repetitions": 5,
+      "fault": "PROSPECTIVELY_ROTATED_TIMEOUT_MALFORMED_NON2XX_AND_BRIDGE_DOWN",
+      "predicates": [
+        "every frozen fault exits the hook successfully within its hard timeout",
+        "no context is injected",
+        "exactly one valid hook result is emitted",
+        "the prompt reaches the stub"
+      ]
+    },
+    {
+      "id": "SMA-S2-011-PARENT-CHILD-PROVENANCE",
+      "sourceScenario": "SMAQ1N-011-PARENT-CHILD-PROVENANCE",
+      "repetitions": 5,
+      "fault": "ONE_PARENT_AND_ONE_DELEGATED_CHILD_CONVERSATION",
+      "predicates": [
+        "actual conversation IDs, parent-child lineage, sequence, workspace, and profile are retained at the OpenHands and SMA boundaries",
+        "neither event is attributed to an unrelated partition"
+      ]
+    },
+    {
+      "id": "SMA-S2-012-RESTART-CONTINUITY",
+      "sourceScenario": "SMAQ1N-012-RESTART-PARTITION-CONTINUITY",
+      "repetitions": 3,
+      "fault": "RESTART_BRIDGE_AND_SMA_LIFECYCLE",
+      "predicates": [
+        "authenticated metadata resolves the same partition after restart",
+        "recall remains correct",
+        "reconciliation creates no duplicate"
+      ]
+    },
+    {
+      "id": "SMA-S2-013-FOUR-CHANNEL-CONCURRENCY",
+      "sourceScenario": "SMAQ1N-013-FOUR-CHANNEL-CONCURRENCY",
+      "repetitions": 5,
+      "fault": "FOUR_CONCURRENT_OPENHANDS_CHANNELS_WITH_BACKGROUND_SMA_WORK",
+      "predicates": [
+        "all prompts receive the correct deterministic stub terminal within bounds",
+        "partitions remain isolated",
+        "queue, timeout, rejection, and resource telemetry is complete"
+      ]
+    },
+    {
+      "id": "SMA-S2-014-FEEDBACK-LOOP-PREVENTION",
+      "sourceScenario": "SMAQ1N-014-FEEDBACK-LOOP-PREVENTION",
+      "repetitions": 3,
+      "fault": "RECONCILE_HOOK_CONTEXT_REASONING_TOOL_AND_UTILITY_EVENTS",
+      "predicates": [
+        "ineligible OpenHands events create no memory",
+        "no second delivery or capture loop occurs"
+      ]
+    },
+    {
+      "id": "SMA-S2-015-SECRET-DELIVERY-ABSENCE",
+      "sourceScenario": "SMAQ1N-015-SECRET-QUARANTINE",
+      "repetitions": 3,
+      "fault": "SYNTHETIC_CREDENTIAL_INPUT",
+      "predicates": [
+        "the synthetic credential is absent from operational logs, additionalContext, model request context, retrieval events, and derived projections",
+        "permitted raw evidence follows the frozen sensitivity policy"
+      ]
+    },
+    {
+      "id": "SMA-S2-016-EMPTY-RESULT",
+      "sourceScenario": "SMAQ1N-016-EMPTY-RESULT",
+      "repetitions": 10,
+      "fault": "NONE",
+      "predicates": [
+        "no irrelevant memory block is injected",
+        "the unchanged prompt reaches the stub and receives a terminal"
+      ]
+    },
+    {
+      "id": "SMA-S2-017-OVERSIZED-CONTEXT",
+      "sourceScenario": "SMAQ1N-017-OVERSIZED-CONTEXT-BOUND",
+      "repetitions": 3,
+      "fault": "ELIGIBLE_RESULTS_EXCEED_COUNT_AND_CHARACTER_BUDGETS",
+      "predicates": [
+        "the hook receives valid context truncated only at memory boundaries",
+        "framing is valid and configured count and character limits are not exceeded"
+      ]
+    },
+    {
+      "id": "SMA-S2-018-CONDENSATION-REANCHOR",
+      "sourceScenario": "SMAQ1N-018-CONDENSATION-REANCHOR",
+      "repetitions": 3,
+      "fault": "OPENHANDS_CONDENSATION_BETWEEN_PROMPTS",
+      "predicates": [
+        "the next prompt receives a bounded re-anchored context result",
+        "generic summary text is not treated as exact delivery state",
+        "the prompt reaches the stub and receives a terminal"
+      ]
+    }
+  ],
+  "thresholds": {
+    "crossPartitionLeakCount": 0,
+    "secretExposureCount": 0,
+    "rawMemoryInjectionCount": 0,
+    "feedbackLoopMemoryCount": 0,
+    "lostRawProvenanceCount": 0,
+    "healthyPromptSubmissionRate": 1.0,
+    "retrievalOutagePromptSubmissionRate": 1.0,
+    "captureOutagePromptSubmissionRate": 1.0,
+    "promptByteIdentityRate": 1.0,
+    "boundedCaseTerminationRate": 1.0,
+    "hookHardTimeoutMilliseconds": 1000,
+    "residentHookOverheadP95Milliseconds": 500,
+    "caseWallClockMaximumMilliseconds": 120000,
+    "maximumInjectedMemories": 5,
+    "maximumInjectedContextCharacters": 10000,
+    "maximumInboundBridgeRequestBytes": 1048576,
+    "maximumReceiptPayloadBytes": 2097152,
+    "maximumConcurrentChannels": 4,
+    "maximumQueuedOperations": 8,
+    "automaticRawEvidenceCharacters": 0
+  },
+  "requiredEvidence": [
+    "pre-assertion append-only record for every case and repetition",
+    "exact prompt digest and length at submission, hook return, and defined model boundary",
+    "exact additionalContext digest, length, framing, selected memory identities, and provenance",
+    "deterministic stub request and response receipts",
+    "OpenHands conversation, event, sequence, parent-child, workspace, profile, hook, and terminal identities",
+    "fault activation, independent observation, and raw monotonic timing",
+    "process, conversation, workspace, and resource cleanup inventory",
+    "successful cleanup receipt"
+  ],
+  "failureClasses": [
+    "SUBSTANTIVE",
+    "HARNESS",
+    "ENVIRONMENT"
+  ],
+  "executionPolicy": {
+    "executionAuthorized": false,
+    "executionAttemptsAuthorized": 0,
+    "plannedAttemptsPerFutureAuthorization": 1,
+    "hiddenHarnessRetries": 0,
+    "automaticCorrectiveReruns": 0,
+    "safeSubstantiveFailureContinuesCorpus": true,
+    "safetyFailureStopsImmediately": true,
+    "resumeRequiresProspectiveBoundaryAndSeparateAuthority": true,
+    "postObservationRegradingAllowed": false
+  },
+  "acceptanceState": {
+    "principalAccepted": false,
+    "upstreamS1AcceptedAndCurrent": false,
+    "identityBound": false,
+    "offlineHarnessQualified": false,
+    "singleUseExecutionAuthorizationPresent": false,
+    "executionState": "NOT_RUN"
+  }
+}

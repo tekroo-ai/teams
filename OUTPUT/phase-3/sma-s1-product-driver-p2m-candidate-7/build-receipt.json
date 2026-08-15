@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S1_PRODUCT_DRIVER_BUILD_RECEIPT",
+  "status": "PASS_ALL_FOURTEEN_HANDLERS_COMPILED",
+  "scope": "PRODUCT_DRIVER_PREPARATION_NO_MEASURED_S1_PRODUCT_CREDIT",
+  "recordedOn": "2026-08-14",
+  "compiler": "javac 21.0.12",
+  "jarTool": "jar 21.0.12",
+  "source": {
+    "path": "investigations/sma-q1/layered/driver-src/ai/tekroo/sma/openhands/SmaS1QualificationDriver.java",
+    "sha256": "f7bba094682d48444d687b77935c5f00c9a8651c9b4b38d6c29bcf6e232fc6d3"
+  },
+  "serviceArtifact": {
+    "path": "/Users/paul/work/tekroo-ai/sma-s1-p2m/target/sma-1.0-SNAPSHOT.jar",
+    "sha256": "c0ddb963798d45603c2e2685744892c40d3e841817f9c966ab7fad34f7e48765"
+  },
+  "compiledArtifact": {
+    "path": "OUTPUT/phase-3/sma-s1-product-driver-p2m-candidate-7/sma-s1-product-driver-p2m-candidate-7.jar",
+    "sha256": "c181d7d2958b8dcfda2633fbc9cc60314d1e95a98e8c2c973b91a3cb816fdf6f"
+  },
+  "launcher": {
+    "path": "scripts/sma_s1_product_driver_p2m.py",
+    "sha256": "3ec5390fa62f89c0304d3a37224ba425d9d29c98b074c17c7008c1b7e9ba54d7"
+  },
+  "implementedHandlerCount": 14,
+  "declaredPersistenceAdapters": [
+    "MongoMemoryRepository",
+    "MongoRetrievalEventRepository",
+    "MongoSafetyDecisionRepository",
+    "MongoDeliveryManifestRepository",
+    "QdrantVectorStore",
+    "ProtectedRawCaptureVault"
+  ],
+  "modelOrOpenHandsProcessUsed": false,
+  "measuredS1Execution": false,
+  "scientificRepetitionsExecuted": 0,
+  "byteReproducibleArchiveClaimed": false
+}

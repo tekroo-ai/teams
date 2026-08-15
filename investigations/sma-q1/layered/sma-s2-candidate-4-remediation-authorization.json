@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "1.0.0-candidate",
+  "recordType": "SMA_S2_CANDIDATE_4_REMEDIATION_AUTHORIZATION",
+  "status": "AUTHORIZED_NOT_CONSUMED",
+  "recordedOn": "2026-08-14",
+  "principalStatement": "You may proceed.",
+  "triggeringRecommendation": {
+    "path": "OUTPUT/phase-3/sma-s2-candidate-3-coordinator-review.json",
+    "sha256": "5adaf4028d663a7629c8e62cee6cd34937f6bc10a6d02fa3acf0533a6c781c1f"
+  },
+  "authorizedScope": [
+    "create a candidate-4-specific non-secret configuration",
+    "freeze a machine-checkable predicate-to-oracle matrix",
+    "create a successor measured driver without modifying candidate 3",
+    "add missing evidence and predicate oracles",
+    "create and run offline negative-control qualification",
+    "publish candidate 4 for independent review"
+  ],
+  "preservedSemantics": {
+    "caseCount": 20,
+    "repetitionCount": 103,
+    "casePredicatesChanged": false,
+    "thresholdsChanged": false,
+    "faultScheduleChanged": false,
+    "claimChanged": false
+  },
+  "notAuthorized": [
+    "live preflight",
+    "measured S2 execution",
+    "real model calls",
+    "production or historical data access",
+    "modification of candidate 3 or any accepted artifact"
+  ]
+}

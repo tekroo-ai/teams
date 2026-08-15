@@ -1,0 +1,111 @@
+{
+  "schemaVersion": "3.0.0",
+  "recordType": "SMA_Q1_EXECUTION_IDENTITY",
+  "recordedOn": "2026-08-13",
+  "timePrecision": "DAY",
+  "status": "SEALED_AND_AUTHORIZED_NOT_STARTED",
+  "executionAuthorized": true,
+  "executionStarted": false,
+  "scenariosExecuted": 0,
+  "supersession": {
+    "priorIdentity": "investigations/sma-q1/step-15-execution-identity-v2.json",
+    "priorIdentitySHA256": "67668b7afe3710ce0a39fa7d76226e12d89c2b1e92baca6f253d3a08d49ee683",
+    "effect": "PROPOSED_SUCCESSOR_FOR_FUTURE_EXECUTION_ONLY",
+    "priorExecutionAdjudication": "OUTPUT/phase-3/step-15-execution-adjudication-v2.json",
+    "priorExecutionAdjudicationSHA256": "90853e00440efff3be1f63977e5b3e6b815ab8c601891901f8ee0a1c2bbf1ea0",
+    "priorResult": "INCONCLUSIVE_NO_GO",
+    "runtimeInheritance": "All SMA, OpenHands, Agent Canvas, Ollama, MongoDB, Qdrant, host, model, profile, dependency, and binary identities in the v2 identity remain binding unless a prospective successor identity explicitly replaces them."
+  },
+  "frozenExperiment": {
+    "manifest": "investigations/sma-q1/preregistration-native-v3.json",
+    "manifestSHA256": "6b683faf7437a454395c9691ab29f71cdcb1e221e19679fba471b9671c99ecc9",
+    "baseManifest": "investigations/sma-q1/preregistration-native-v2.json",
+    "baseManifestSHA256": "c618371d571d5333aebd2bdc83d2db2559115f5ec3e1903b33e8e0ab157edf5d",
+    "scenarioCorpusSHA256": "68125ee6cff1c2a594d6dc3b402eb498f90525dca7fd2892656e22777b94c9bc",
+    "syntheticMemoryCorpusSHA256": "eed730c6f28a311955275af35b91becc81063087b9a9c8d9c16c00be5091706c",
+    "scenarioCount": 18,
+    "repetitionCount": 96,
+    "priorScenarioCredit": 0,
+    "executionState": "NOT_RUN"
+  },
+  "harness": {
+    "path": "scripts/smaq1_native_step15_v3.py",
+    "sha256": "e7cdcc4161f7ed868c756463615073c43706c92f3d50cf713f1b9cb55f9f5087",
+    "childTool": "investigations/sma-q1/launch-child-conversation-client-tool.json",
+    "childToolSHA256": "89575b6d659666f45b51c3d963b421cd174fd23e84b394714b2580b1a74e2c29",
+    "childToolCanonicalSHA256": "8e54d11695c82a423478420405a40388f125c240ddac0a786e6d7f829a14f290",
+    "validation": {
+      "pythonCompile": "PASS",
+      "ruff": "NOT_RUN_TOOL_UNAVAILABLE",
+      "pyflakes": "NOT_RUN_MODULE_UNAVAILABLE",
+      "measuredExecution": "NOT_RUN"
+    },
+    "correctiveRerun": {
+      "permittedBy": "frozen v3 rerunPolicy",
+      "attempt": 1,
+      "originalHarness": "scripts/smaq1_native_step15_v3_attempt1.py",
+      "originalHarnessSHA256": "59ea7d1b3bc5562993e801a361620c1a748be8423f78c579e486b27270e5fef7",
+      "originalJournal": "OUTPUT/phase-3/sma-q1n-step15-v3/raw-receipts.jsonl",
+      "originalJournalSHA256": "250200bb95e8a4d7ab0b0f7e0fe1645b65e2370234dacd4fef5582db10318811",
+      "scenarioRepetitionsStarted": 0,
+      "classification": "DOCUMENTED_HARNESS_SETUP_AND_RECEIPT_DEFECT"
+    }
+  },
+  "sma": {
+    "executionWorktree": "/Users/paul/work/tekroo-ai/sma-step15",
+    "detachedCommit": "60a966234166ea75f767b25e3cbb7eaabe4064a2",
+    "detachedTree": "7aaa06a68d59dd6f13b0a3a2c6ae3cff845c1121",
+    "worktreeMustBeClean": true,
+    "serviceJarSHA256": "1892ab3b1468ebbc62b922c116965b3d42af1a754cde006b23b57a431460618c"
+  },
+  "sourceEvidence": {
+    "replayWorkerSHA256": "36b9452cf9f7ed4586c6ac0c9ad6b6d2ea201f02788c4eea3766be43f0cf5773",
+    "qdrantVectorStoreSHA256": "ebde338949a6267809f35712ed7fd10267d6f95aae0fb1232a079c7134e32e93",
+    "agentCanvasChildToolSource": "/Users/paul/.local/src/OpenHands-agent-canvas-1.12.0-wp5/src/api/launch-child-conversation-client-tool.ts",
+    "agentCanvasChildLaunchSource": "/Users/paul/.local/src/OpenHands-agent-canvas-1.12.0-wp5/src/services/child-conversation-launch.ts",
+    "registeredClientToolObservation": "EXACT_CANONICAL_MATCH"
+  },
+  "plannedIsolation": {
+    "qualification": {
+      "runId": "sma-q1n-step15-20260813-v3-fixture",
+      "mongodbDatabase": "sma_q1n_step15_v3_fixture_20260813",
+      "semanticCollection": "sma_q1n_step15_v3_fixture_semantic_20260813",
+      "episodicCollection": "sma_q1n_step15_v3_fixture_episodic_20260813",
+      "actorAlphaWorkspace": "/Users/paul/work/tekroo-ai/sma-step15/target/sma-q1n-step15-20260813-v3-fixture/actor-alpha",
+      "actorBetaWorkspace": "/Users/paul/work/tekroo-ai/sma-step15/target/sma-q1n-step15-20260813-v3-fixture/actor-beta",
+      "actorAlphaPartition": "openhands:dbfd91ad7c3cb780074cef7f546c4f8d6ac615d74dfbc4a4a439cd7cd9273c14:default",
+      "actorBetaPartition": "openhands:ac05a773e7285e334529d704ff0a85d0bc13fa81741ea21ad98dd7a114c1d45f:default",
+      "scenarioCredit": 0
+    },
+    "measuredRun": {
+      "runId": "sma-q1n-step15-20260813-v3",
+      "mongodbDatabase": "sma_q1n_step15_20260813_v3",
+      "semanticCollection": "sma_q1n_step15_v3_semantic_20260813",
+      "episodicCollection": "sma_q1n_step15_v3_episodic_20260813",
+      "actorAlphaWorkspace": "/Users/paul/work/tekroo-ai/sma-step15/target/sma-q1n-step15-20260813-v3/actor-alpha",
+      "actorBetaWorkspace": "/Users/paul/work/tekroo-ai/sma-step15/target/sma-q1n-step15-20260813-v3/actor-beta",
+      "actorAlphaPartition": "openhands:082ca3026844670f26b92920a4b3ec2a179cb8e0ba1be2b632f1f9c086c1d50a:default",
+      "actorBetaPartition": "openhands:0aea37e546dc121130e7dc3cd821e29d92f5e1a3ffc09ad391e20f5b149dcdcb:default"
+    },
+    "productionOrHistoricalDataAllowed": false
+  },
+  "requiredPreflight": [
+    "Recompute the v3 amendment, v2 base, corrected runner, child-tool artifact, SMA commit/tree, service JAR, OpenHands runtime, profile, service, model, database, vector-store, and host identities.",
+    "Verify both qualification and measured namespaces absent.",
+    "Verify no unrelated active OpenHands conversation or runtime-heavy SMA task.",
+    "Verify the launch_child_conversation client-tool schema matches the already registered Agent Server schema.",
+    "Install the bounded durable journal and cleanup observer before qualification starts."
+  ],
+  "executionFence": {
+    "freezeAccepted": true,
+    "exclusiveRuntimeWindowObserved": false,
+    "qualificationAuthorized": true,
+    "measuredExecutionAuthorized": true,
+    "authorizationRule": "Execution is authorized only when the separate content-addressed authorization artifact and all preflight identities match."
+  },
+  "authorization": {
+    "artifact": "investigations/sma-q1/step-15-execution-authorization-v3.json",
+    "sha256": "af7d933c023b7b9766769b00de6fede2e8f6f2b87c4951faadcb488f5b70db0b",
+    "status": "AUTHORIZED_NOT_STARTED"
+  }
+}

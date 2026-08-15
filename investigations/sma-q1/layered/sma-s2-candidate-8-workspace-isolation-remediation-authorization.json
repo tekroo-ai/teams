@@ -1,0 +1,47 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_CANDIDATE_8_WORKSPACE_ISOLATION_REMEDIATION_AUTHORIZATION",
+  "status": "AUTHORIZED_CONSUMED_BY_CANDIDATE_8_PREPARATION",
+  "recordedOn": "2026-08-14",
+  "principalStatement": "authorize a bounded candidate-8 workspace-isolation remediation. Case 1 should use a dedicated empty workspace excluded from the alpha/beta corpus capture allowlist, with new offline controls before another zero-credit rehearsal.",
+  "triggeringAdjudication": {
+    "path": "OUTPUT/phase-3/sma-s2-candidate-7-dress-rehearsal-adjudication.json",
+    "sha256": "3f499ec0bd3f60d036d2c274444b0da94a6ae029de1f64572f9f6ac6f3ebb6da",
+    "status": "INCONCLUSIVE_HARNESS_WORKSPACE_ISOLATION_FAILURE"
+  },
+  "authorizedScope": [
+    "create an immutable candidate-8 successor without modifying candidate 7 or its accepted execution identity",
+    "route all first-prompt-empty repetitions through one dedicated empty workspace",
+    "exclude the dedicated empty workspace from the alpha/beta corpus capture allowlist",
+    "bind the empty workspace into candidate-8 configuration, evidence, future identity, and cleanup contracts",
+    "add positive and mutated offline workspace-isolation controls",
+    "preserve the accepted SMA-S2 science, deterministic fault schedule, product identity, and 34-operation zero-credit dress plan",
+    "offline-qualify candidate 8 and publish it for principal review"
+  ],
+  "preservedSemantics": {
+    "sourceSha256": "b7315835b6291d44d3d8cb918dbec1f16c1e64f2106fd70212c6a8f7ec678188",
+    "caseCount": 20,
+    "repetitionCount": 103,
+    "predicateCount": 59,
+    "requiredEvidenceCount": 10,
+    "dressRehearsalOperationCount": 34,
+    "thresholdsChanged": false,
+    "faultScheduleChanged": false,
+    "claimChanged": false,
+    "productCodeChanged": false
+  },
+  "notAuthorized": [
+    "modification of candidate 7 or any accepted artifact",
+    "candidate-8 acceptance or freeze",
+    "candidate-8 execution-identity creation or acceptance",
+    "live state preflight",
+    "live dress rehearsal",
+    "measured S2 execution",
+    "OpenHands conversation creation",
+    "SMA or deterministic-stub network invocation",
+    "real model calls",
+    "service restart",
+    "production or historical data access",
+    "OPENHANDS_SMA_BOUNDARY_QUALIFIED claim"
+  ]
+}

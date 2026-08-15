@@ -1,0 +1,50 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_CANDIDATE_5_REMEDIATION_READINESS",
+  "recordedOn": "2026-08-14",
+  "status": "READY_FOR_CANDIDATE_SPECIFIC_PRINCIPAL_REVIEW",
+  "recommendation": "GO_FOR_PRINCIPAL_ACCEPT_FREEZE_REVIEW",
+  "candidate": {
+    "path": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-5.json",
+    "sha256": "2afe7930e20a95dd40d7477c4a7d4ee638477d0ea0a339b3742ff2b39446f939",
+    "bindingCount": 21,
+    "bindingMismatches": 0
+  },
+  "semanticIdentity": {
+    "sourceSha256": "b7315835b6291d44d3d8cb918dbec1f16c1e64f2106fd70212c6a8f7ec678188",
+    "caseCount": 20,
+    "repetitionCount": 103,
+    "predicateCount": 59,
+    "requiredEvidenceCount": 10,
+    "changed": false
+  },
+  "finalOfflineQualification": {
+    "path": "OUTPUT/phase-3/sma-s2-candidate-5-offline-semantic-qualification-3/offline-semantic-qualification-receipt.json",
+    "sha256": "6437c515fca3742a784d90ba7c2eba4d8d675016a2e92ad07266492fb8890e90",
+    "status": "PASS",
+    "testCount": 11,
+    "passCount": 11,
+    "failCount": 0,
+    "semanticEvidenceMutations": 25,
+    "singleFalseBundlesRejected": 201,
+    "singleMissingBundlesRejected": 201,
+    "pythonOptimizationEnabled": true,
+    "networkUse": "NONE"
+  },
+  "closedCandidate4Blockers": [
+    "non-empty context without provenance",
+    "case-7 hard-coded body-free evidence",
+    "case-11 capture cardinality and sequence comparison",
+    "case-18 summary identifier-domain mismatch",
+    "case-20 future timing and repetition-owned cleanup",
+    "candidate-specific review decision requirement"
+  ],
+  "productRemediationIndicated": false,
+  "principalDecisionRequired": true,
+  "candidate1DesignationImported": false,
+  "executionIdentityPrepared": false,
+  "livePreflightPerformed": false,
+  "measuredExecutionPerformed": false,
+  "realModelCallsPerformed": false,
+  "nextGate": "PRINCIPAL_ACCEPT_FREEZE_CANDIDATE_5_BY_EXACT_SHA256"
+}

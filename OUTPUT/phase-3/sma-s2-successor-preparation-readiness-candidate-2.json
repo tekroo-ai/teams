@@ -1,0 +1,132 @@
+{
+  "schemaVersion": "1.0.0-candidate",
+  "recordType": "SMA_S2_SUCCESSOR_PREPARATION_READINESS",
+  "status": "REMEDIATION_PASS_SUCCESSOR_READY_FOR_INDEPENDENT_REVIEW_NOT_ACCEPTED_NOT_AUTHORIZED",
+  "recordedAt": "2026-08-14T15:35:34Z",
+  "scope": "AUTHORIZED_S2_SUCCESSOR_REMEDIATION_ONLY",
+  "successorPreregistration": {
+    "path": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-2.json",
+    "sha256": "b7315835b6291d44d3d8cb918dbec1f16c1e64f2106fd70212c6a8f7ec678188",
+    "caseCount": 20,
+    "plannedRepetitionCount": 103
+  },
+  "successorBoundaryIdentity": {
+    "path": "investigations/sma-q1/layered/sma-s2-boundary-identity-candidate-2.json",
+    "sha256": "39114c2f217558a96496dea5e180e3e1c7d6ab02f293bf4e50de08293cbe6a0a"
+  },
+  "successorConfiguration": {
+    "path": "investigations/sma-q1/layered/sma-s2-nonsecret-configuration-candidate-2.json",
+    "sha256": "09c78fdc1ca95c4277222ac1f106357af9df9fddb4099fcd83222a3df89291d1",
+    "modelRetries": 0,
+    "modelTimeoutMilliseconds": 1000,
+    "stubTimeoutDelayMilliseconds": 5000,
+    "cancellationTriggerDelayMilliseconds": 250,
+    "cancellationFutureMaximumMilliseconds": 10000,
+    "stubDisconnectMaximumMilliseconds": 10000,
+    "ownedProcessShutdownMaximumMilliseconds": 15000
+  },
+  "successorControls": {
+    "stub": {
+      "path": "scripts/sma_s2_deterministic_model_stub_candidate_2.py",
+      "sha256": "8013ba1dcd5db6192abce075f95dbd255ef8ada8335093cfaf0f5962f884e0f9"
+    },
+    "harness": {
+      "path": "scripts/sma_s2_offline_harness_candidate_5.py",
+      "sha256": "7236b8b1c1fd52adffea58e1e5e1d0f689211a565964fb370b4fdf7a77c7d534"
+    },
+    "offlineReceipt": {
+      "path": "OUTPUT/phase-3/sma-s2-successor-candidate-1-offline-harness/offline-harness-receipt.json",
+      "sha256": "e636595264bc7cb87bccb3a7d19372e8e4295bea27dbecee5796e0f64958eda0",
+      "status": "PASS",
+      "testCount": 9,
+      "passCount": 9,
+      "failCount": 0
+    },
+    "ruffStatus": "PASS",
+    "pythonCompilationStatus": "PASS",
+    "clientDisconnectOutcomeObserved": "CLIENT_DISCONNECTED"
+  },
+  "controlledRestart": {
+    "authorization": {
+      "path": "investigations/sma-q1/layered/sma-s2-successor-remediation-authorization.json",
+      "sha256": "e0f2b4843ebf3797b80457d9d051410b046afd66594fe0d88e566dc7e952f6c4"
+    },
+    "consumption": {
+      "path": "investigations/sma-q1/layered/sma-s2-successor-remediation-authorization-consumption.json",
+      "sha256": "7ae55971bd010acc48fc27deefc5dc9e5d86ba00dd89153f1f60d6b0d8f165e4"
+    },
+    "authorizedCount": 1,
+    "performedCount": 1,
+    "remainingCount": 0,
+    "preRestartRunning": 0,
+    "preRestartWaitingForConfirmation": 0,
+    "preRestartStuck": 0,
+    "preRestartDeleting": 0,
+    "postRestartAgentServerPid": 46569,
+    "postRestartAgentServerStartedLocal": "2026-08-14T09:34:20-06:00",
+    "postRestartHealthStatus": 200
+  },
+  "liveRuntimeCorrespondence": {
+    "sourceCommit": "a338ba9b6cbb529886b755a335bae3dee0004700",
+    "sourceTree": "9e72f1b4ee0b857025d9f170600b9dce539b169a",
+    "sourceWorktreeClean": true,
+    "agentServerExecutableSha256": "9f1a91d9a58d13a27bc0e729eac36553bb9c977797c21f5483de3340cfa682bf",
+    "liveOpenApi": {
+      "path": "investigations/sma-q1/layered/sma-s2-openhands-openapi-candidate-2.json",
+      "sha256": "b3000ea03830bc375df30772b34f9b30357b10bded62b411b2ed446d83e187bb"
+    },
+    "liveEventSchemas": {
+      "path": "investigations/sma-q1/layered/sma-s2-openhands-event-schemas-candidate-2.json",
+      "sha256": "49d30377c6f8b69e77e9231c39ff1d327c8a33c5ef859cc9ef8306a0536605b0"
+    },
+    "semanticMessageFieldsPresent": [
+      "authorship_origin",
+      "semantic_purpose",
+      "agent_response_finality"
+    ],
+    "semanticMessageFieldsMissing": [],
+    "serverReportedVersion": "1.40.1",
+    "serverReportedBuildGitSha": "unknown",
+    "identityEvidenceFloor": "post-commit process start, exact editable-source command path, clean commit/tree, executable digest, server version, and live schema"
+  },
+  "pausedConversationPreservation": {
+    "conversationId": "4c2e5f84-ecd3-4971-b375-a0fa9905a058",
+    "title": "Tekroo Trader",
+    "executionStatusBefore": "paused",
+    "executionStatusAfter": "paused",
+    "createdAtBeforeAndAfter": "2026-08-09T19:52:16.454058Z",
+    "updatedAtBeforeAndAfter": "2026-08-13T17:38:02.080929Z",
+    "preserved": true
+  },
+  "verification": {
+    "successorSemanticChecks": 16,
+    "successorSemanticChecksPassed": 16,
+    "boundSuccessorArtifactsChecked": 6,
+    "boundSuccessorArtifactsMatched": 6,
+    "status": "PASS"
+  },
+  "observed": [
+    "The successor offline harness passed nine controls, including an actual TCP reset recorded as CLIENT_DISCONNECTED.",
+    "The immediate restart guard contained no running, waiting-for-confirmation, stuck, or deleting conversation.",
+    "One authorized Agent Canvas restart was performed and the authorization has no remaining restart use.",
+    "The post-restart live MessageEvent schema contains all three semantic fields missing from candidate 1.",
+    "The paused Tekroo Trader conversation retained its identity, status, and timestamps."
+  ],
+  "computed": [
+    "The successor preregistration contains 20 cases and 103 planned repetitions.",
+    "All 16 successor semantic checks and all six bound-successor artifact digest checks passed."
+  ],
+  "inferred": [
+    "Both independent-review blockers from candidate 1 are prospectively remediated in candidate 2.",
+    "Candidate 2 is ready for the designated principal's independent review, but no acceptance or execution authority follows from this readiness receipt."
+  ],
+  "authority": {
+    "successorAcceptedFrozen": false,
+    "executionIdentityAuthorized": false,
+    "measuredExecutionAuthorized": false,
+    "measuredExecutionState": "NOT_RUN",
+    "realModelInvoked": false,
+    "deterministicModelInvokedThroughOpenHands": false,
+    "measuredSmaNamespaceCreated": false
+  }
+}

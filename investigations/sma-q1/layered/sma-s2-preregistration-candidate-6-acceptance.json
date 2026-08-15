@@ -1,0 +1,97 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_CANDIDATE_6_ACCEPTANCE",
+  "acceptanceId": "SMA-S2-PREREGISTRATION-CANDIDATE-6-ACCEPTANCE",
+  "candidate": 6,
+  "status": "ACCEPTED_FROZEN",
+  "recordedOn": "2026-08-14",
+  "principalStatement": "GO for ACCEPT/FREEZE candidate 6 only",
+  "candidatePreregistrationSha256": "06e7a689d46dfc759d07ca2f1099854c42e0c21e4dc84cd1fde0a0f612ae6cee",
+  "acceptedPreregistration": {
+    "path": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-6.json",
+    "sha256": "06e7a689d46dfc759d07ca2f1099854c42e0c21e4dc84cd1fde0a0f612ae6cee",
+    "caseCount": 20,
+    "plannedRepetitionCount": 103,
+    "predicateCount": 59,
+    "requiredEvidenceCount": 10,
+    "acceptedFrozen": true,
+    "editableInPlace": false
+  },
+  "boundPackage": {
+    "nonSecretConfiguration": {
+      "path": "investigations/sma-q1/layered/sma-s2-nonsecret-configuration-candidate-6.json",
+      "sha256": "c85b83f6707edb86f2f71fafdb4fd404db03f70d0c16529c413b93bccb8e94c2"
+    },
+    "measuredAndPreflightDriver": {
+      "path": "scripts/sma_s2_measured_driver_candidate_4.py",
+      "sha256": "b58c8621997b86347acb29d13b73c9167113cdfdd79c0041599f46b46b92bb1f"
+    },
+    "offlineHarnessIdentityHarness": {
+      "path": "scripts/sma_s2_measured_driver_offline_harness_candidate_4.py",
+      "sha256": "665d00001478ee147415514c22635412cc287a8eecec2c6e8acb4e2b266d1e1c"
+    },
+    "offlineQualification": {
+      "path": "OUTPUT/phase-3/sma-s2-candidate-6-offline-harness-identity-qualification-3/offline-harness-identity-qualification-receipt.json",
+      "sha256": "8d43341fd59f447222f629422139e59d2e275ef37e3ae6e0bc9f2856111314e6",
+      "status": "PASS",
+      "testCount": 13,
+      "passCount": 13,
+      "failCount": 0
+    },
+    "coordinatorReview": {
+      "path": "OUTPUT/phase-3/sma-s2-candidate-6-coordinator-review.json",
+      "sha256": "c4a8c38be06dc334e6fedbac24684740c2a31da4a1e30314922d74633446be6c",
+      "status": "PASS_READY_FOR_PRINCIPAL_REVIEW"
+    },
+    "reviewNarrative": {
+      "path": "docs/architecture/066-sma-s2-candidate-6-harness-identity-review.md",
+      "sha256": "8b647bbf8bc1507ce6a0545de56e71d10fac733908aacb0b7d30d6c0bc135218"
+    }
+  },
+  "independentReview": {
+    "reviewer": "WORKSPACE_PRINCIPAL",
+    "candidateSpecificContextBound": true,
+    "candidateSpecificDecision": "ACCEPT_FREEZE",
+    "candidate5DesignationImported": false
+  },
+  "acceptedScope": {
+    "layer": "SMA-S2",
+    "executionPlanAccepted": true,
+    "harnessIdentityClosureAccepted": true,
+    "qualifiedClaimEarned": false,
+    "claimOnFutureMeasuredPass": "OPENHANDS_SMA_BOUNDARY_QUALIFIED"
+  },
+  "excludedClaims": [
+    "live preflight PASS",
+    "SMA-S2 measured PASS",
+    "OPENHANDS_SMA_BOUNDARY_QUALIFIED",
+    "generative model behavior qualification",
+    "integrated runtime qualification",
+    "production readiness"
+  ],
+  "immutability": {
+    "acceptedPreregistrationMayBeEditedInPlace": false,
+    "boundPackageMayBeEditedInPlace": false,
+    "successorRecordRequiredForAnyCorrection": true,
+    "postObservationRegradingAllowed": false
+  },
+  "authority": {
+    "preregistrationAcceptedFrozen": true,
+    "executionIdentityPreparationAuthorized": false,
+    "executionIdentityAccepted": false,
+    "livePreflightAuthorized": false,
+    "livePreflightState": "NOT_RUN",
+    "measuredAttemptAuthorizationPresent": false,
+    "measuredExecutionAuthorized": false,
+    "measuredExecutionState": "NOT_RUN",
+    "realModelCallsAuthorized": false,
+    "productionDeploymentAuthorized": false
+  },
+  "measuredExecutionAuthorized": false,
+  "nextSeparateGate": {
+    "requiredAction": "prepare one exact numeric endpoint execution identity and request one distinct single-use live-preflight authorization",
+    "requiresSeparatePrincipalAuthorization": true,
+    "measuredExecutionStillRequiresPassingBoundLivePreflightReceipt": true,
+    "measuredExecutionStillRequiresLaterSingleUseAuthorization": true
+  }
+}

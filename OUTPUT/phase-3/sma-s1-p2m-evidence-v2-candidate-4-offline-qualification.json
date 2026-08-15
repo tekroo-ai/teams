@@ -1,0 +1,107 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S1_EVIDENCE_V2_OFFLINE_QUALIFICATION",
+  "status": "PASS_CANDIDATE_NOT_ACCEPTED_NOT_AUTHORIZED",
+  "recordedOn": "2026-08-14",
+  "scope": "PROSPECTIVE_EVIDENCE_BOUNDARY_ZERO_MEASURED_REPETITIONS",
+  "scientificPreregistration": {
+    "path": "investigations/sma-q1/layered/sma-s1-preregistration.json",
+    "sha256": "e663f5b732c22248adc5fab2f536dbf02dd72337f7c8428f225937e72d6a7f8c",
+    "changed": false
+  },
+  "executionIdentityCandidate": {
+    "path": "investigations/sma-q1/layered/sma-s1-execution-identity-p2m-evidence-v2-candidate-4.json",
+    "sha256": "d7a388816ccb4ea2c12db365de1116c445f6b8dd18eca8861f118afa7cfb8724",
+    "status": "CANDIDATE_NOT_ACCEPTED_NOT_AUTHORIZING_NOT_STARTED"
+  },
+  "boundSma": {
+    "commit": "5d58be508c74ae8577d2fd31e3346be23a912ab3",
+    "tree": "7222410443a6041496a5c313b2549f16eb937458",
+    "worktreeClean": true,
+    "serviceArtifactSHA256": "c0ddb963798d45603c2e2685744892c40d3e841817f9c966ab7fad34f7e48765",
+    "productSourceChanged": false
+  },
+  "driver": {
+    "sourceSHA256": "184fa7bc9bc468b55a9c94d134841161938b9572a7e359265620d84358ed7667",
+    "artifactSHA256": "65c7a477a6666f5ca72cb7da0f0aa197e4f6fa8cb66e12df3055299e00d06019",
+    "launcherSHA256": "4100c923d2419441ff22f09c6d3299e4aae50c40b8dc186e30f912770bf0f000",
+    "buildReceiptSHA256": "f0f01a035f166f4712844486407f81137390b7992a5ea407352a2958aa25cac6"
+  },
+  "handlerQualification": {
+    "receiptSHA256": "ae3d3ed521b1133bc38ead3cd406d982d159738a406a92a282377ef1d141c189",
+    "journalSHA256": "ad676731a15516223dab9f37e000da9a0e8c2a74a6296f18b6644119ef9363a3",
+    "status": "PASS",
+    "handlerCount": 14,
+    "handlerPassCount": 14,
+    "predicateCount": 32,
+    "predicatePassCount": 32,
+    "predicateFailCount": 0,
+    "lifecycleControlPassCount": 5,
+    "scientificRepetitionsExecuted": 0
+  },
+  "offlineHarnessQualification": {
+    "harnessSHA256": "14850c72cbcb9b76dac5af208f360b1bcd526b211cb8d38e67a448b0ed92f9c5",
+    "receiptSHA256": "46f63aff66b10e07272e5fcb3e02adcfb8d634aea212e786ec9506e9698dfabb",
+    "journalSHA256": "3f0acab725147ad552ce1cf520a4b9e0ffa29b15a09fc9215255dd64566ddbd2",
+    "status": "PASS",
+    "testCount": 12,
+    "measuredCasesExecuted": 0,
+    "executionAuthorityCreated": false,
+    "mongoOrQdrantMutated": false
+  },
+  "observedEvidenceClosure": {
+    "warmHitLatencyReceiptPresent": true,
+    "warmNoHitLatencyReceiptPresent": true,
+    "monotonicClockIdentified": true,
+    "sameServiceWarmupAndMeasurementIdentified": true,
+    "nearestRankP95PositiveAndNegativeControlsPassed": true,
+    "exactParentChildRuntimeIdentitiesPresent": true,
+    "intentionalAbsentParentStateExplicit": true,
+    "case004DistinctOperatingSystemProcesses": true,
+    "case008DistinctOperatingSystemProcesses": true,
+    "case014DistinctOperatingSystemProcesses": true,
+    "canonicalRequestByteLengthRetained": true,
+    "canonicalResponseByteLengthRetained": true,
+    "minimumEvidencePositiveAndNegativeControlsPassed": true,
+    "cleanupPassed": true,
+    "disposableNamespacesAbsentAfterCheck": true
+  },
+  "retainedNegativeControls": [
+    {
+      "candidate": 1,
+      "receiptSHA256": "b2489580e926282b485484bfab2cfeaa109079f69e8a3f09a57bd7d64bad7223",
+      "status": "FAIL",
+      "gap": "EVENT_SEQUENCE_NOT_RETAINED"
+    },
+    {
+      "candidate": 2,
+      "receiptSHA256": "9262ca35d16887519de4de6c1f7f7347e6f49eff405a70516cb523d66895b2fa",
+      "status": "FAIL",
+      "gap": "INTENTIONAL_NULL_PARENT_IDENTITY_OMITTED"
+    },
+    {
+      "candidate": 3,
+      "receiptSHA256": "7412bd5942dc03680f603b0e26dbf4af2227ac25f87161390e9f642ee7ddf018",
+      "status": "FAIL",
+      "gap": "JSON_NULL_SUPPRESSED_BY_MAP_SERIALIZER"
+    }
+  ],
+  "computed": {
+    "priorFourMinimumPassEvidenceGapsClosedProspectively": true,
+    "priorMeasuredRunRegraded": false,
+    "priorMeasuredCreditImported": 0,
+    "measuredS1ExecutionPerformed": false
+  },
+  "recommendation": {
+    "disposition": "ACCEPT_FREEZE_CANDIDATE_4_IDENTITY_AND_OFFLINE_QUALIFICATION",
+    "nextAfterAcceptance": "CREATE_NON_AUTHORIZING_SEALED_SUCCESSOR_THEN_RUN_IMMEDIATE_READ_ONLY_PREFLIGHT",
+    "measuredExecutionAuthorizationRequestedByThisRecord": false
+  },
+  "authorityFence": {
+    "identityAccepted": false,
+    "offlineQualificationAccepted": false,
+    "measuredExecutionAuthorized": false,
+    "measuredExecutionAttemptsAuthorized": 0,
+    "executionState": "NOT_RUN"
+  }
+}

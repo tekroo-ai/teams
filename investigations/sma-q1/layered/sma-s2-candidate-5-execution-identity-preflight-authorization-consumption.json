@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_EXECUTION_IDENTITY_PREFLIGHT_AUTHORIZATION_CONSUMPTION",
+  "status": "CONSUMED_TERMINAL_NO_GO_NO_REUSE",
+  "recordedOn": "2026-08-14",
+  "authorization": {
+    "path": "investigations/sma-q1/layered/sma-s2-candidate-5-execution-identity-preflight-authorization.json",
+    "sha256": "895f3bca4445115c2c4c1cd5024dd53d90d5effe0f9d2c2b282783addfa232a9"
+  },
+  "terminalReceipt": {
+    "path": "OUTPUT/phase-3/sma-s2-candidate-5-execution-identity-preflight-no-go.json",
+    "sha256": "13a02df0a7e9a32c7bb742f6b84caa4b97f50d92a148e2c3f24c2b34a14835d8"
+  },
+  "executionIdentitySealed": false,
+  "livePreflightConsumed": false,
+  "openhandsPreflightConversationsCreated": 0,
+  "deterministicStubPreflightRequests": 0,
+  "serviceRestarts": 0,
+  "measuredCasesExecuted": 0,
+  "measuredRepetitionsExecuted": 0,
+  "measuredExecutionState": "NOT_RUN",
+  "reusable": false
+}

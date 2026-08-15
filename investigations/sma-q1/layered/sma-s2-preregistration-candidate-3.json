@@ -1,0 +1,209 @@
+{
+  "schemaVersion": "1.0.0-candidate",
+  "recordType": "LAYERED_QUALIFICATION_PREREGISTRATION",
+  "lineageId": "SMA-S2",
+  "status": "SUCCESSOR_CANDIDATE_NOT_ACCEPTED_NOT_AUTHORIZED",
+  "recordedOn": "2026-08-14",
+  "purpose": "Prospective successor that preserves accepted candidate-2 S2 semantics while freezing the previously missing literal corpus and measured executor.",
+  "decisiveQuestion": "Does the frozen supported OpenHands integration preserve the current prompt, place bounded untrusted SMA context correctly, fail open, retain provenance, and terminate cleanly when model behavior is deterministic?",
+  "claimOnPass": "OPENHANDS_SMA_BOUNDARY_QUALIFIED",
+  "requiredUpstreamClaim": "SMA_SEMANTICS_QUALIFIED",
+  "predecessor": {
+    "acceptedPreregistration": {
+      "path": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-2.json",
+      "sha256": "b7315835b6291d44d3d8cb918dbec1f16c1e64f2106fd70212c6a8f7ec678188"
+    },
+    "acceptance": {
+      "path": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-2-acceptance.json",
+      "sha256": "1c0cd9a01717b5e351bedde6971626d8104a482ac31bd95222ea1d53c408db9c"
+    },
+    "immutabilityPreserved": true,
+    "measuredCreditImported": 0,
+    "measuredExecutionState": "NOT_RUN"
+  },
+  "successorAuthorization": {
+    "path": "investigations/sma-q1/layered/sma-s2-measured-driver-successor-remediation-authorization.json",
+    "sha256": "f8dc89e172815436e4224c94e3f7bfe01dc458a7472ad484a81fe9b48f0fb4d5",
+    "scope": "DRIVER_IMPLEMENTATION_OFFLINE_QUALIFICATION_AND_SUCCESSOR_BINDING_ONLY"
+  },
+  "prospectiveCorrections": [
+    "freeze every literal prompt, synthetic memory fixture, control-tag construction rule, operation, partition, repetition, model-fault mode, and cancellation delay",
+    "freeze one executable measured driver with a default-deny execution fence and complete 20-case/103-repetition operation map",
+    "freeze the driver's runtime primitive dependency closure",
+    "offline-qualify create-once output, concurrent append and fsync, pre-assertion survival, authorization rejection, exact fault schedules, secret separation, receipt reconstruction, and idempotent cleanup",
+    "replace optimization-removable Python assert predicates in the measured driver and its harness with explicit failures"
+  ],
+  "semanticRequirements": {
+    "source": "ACCEPTED_CANDIDATE_2",
+    "sourceSha256": "b7315835b6291d44d3d8cb918dbec1f16c1e64f2106fd70212c6a8f7ec678188",
+    "casePredicatesChanged": false,
+    "thresholdsChanged": false,
+    "faultScheduleChanged": false,
+    "continuationPolicyChanged": false,
+    "claimChanged": false
+  },
+  "exactMeasuredCorpus": {
+    "path": "investigations/sma-q1/layered/sma-s2-measured-corpus-candidate-1.json",
+    "sha256": "c273c148a7b289f6650a26a82c38bda9680904701120e083543e9b7954b9a960",
+    "caseCount": 20,
+    "plannedRepetitionCount": 103,
+    "caseOrder": "ASCENDING_CASE_ID_THEN_ASCENDING_REPETITION",
+    "literalPromptsFrozen": true,
+    "syntheticMemoryBodiesFrozen": true,
+    "syntheticOnly": true
+  },
+  "measuredDriver": {
+    "path": "scripts/sma_s2_measured_driver_candidate_1.py",
+    "sha256": "5f69ed4d3b439bf1d4d342c75f05781efee326fc2e1c39ad5002a92ffcc7464a",
+    "defaultExecution": "DENY",
+    "requiredLiveArguments": [
+      "--execute",
+      "--execution-identity",
+      "--authorization",
+      "--output"
+    ],
+    "executionFence": {
+      "acceptedFrozenExecutionIdentityRequired": true,
+      "singleUseAuthorizationRequired": true,
+      "driverDigestCorrespondenceRequired": true,
+      "corpusDigestCorrespondenceRequired": true,
+      "stubDigestCorrespondenceRequired": true,
+      "caseCount": 20,
+      "repetitionCount": 103,
+      "realModelCallsAllowed": false
+    },
+    "evidenceControls": [
+      "create-once output root and receipt",
+      "append, flush, and fsync before every scientific predicate",
+      "exact prompt digest and byte length at submission, persisted prompt, hook input, and model-request segment zero",
+      "exact hook, persisted extended context, and model-request segment-one correspondence",
+      "stub raw request and terminal correlation by request identity",
+      "explicit non-optimized predicate failures",
+      "safe substantive continuation and harness stop",
+      "owned service, conversation, stub, MongoDB, Qdrant, workspace, and output cleanup evidence"
+    ]
+  },
+  "driverDependencyClosure": [
+    {
+      "role": "DETERMINISTIC_MODEL_STUB",
+      "path": "scripts/sma_s2_deterministic_model_stub_candidate_2.py",
+      "sha256": "8013ba1dcd5db6192abce075f95dbd255ef8ada8335093cfaf0f5962f884e0f9"
+    },
+    {
+      "role": "SERVICE_AND_API_PRIMITIVE_LIBRARY_NO_IMPORTED_RESULT_CREDIT",
+      "path": "scripts/smaq1_native_step15_v4.py",
+      "sha256": "5175b053f3633744212923290b0ac2614412a516e9279649b166d1ab2957b3e2"
+    },
+    {
+      "role": "ACTUALLY_IMPORTED_SERVICE_SUPPORT_CODE",
+      "path": "/Users/paul/work/tekroo-ai/sma-step15/scripts/wp5e_restart_recovery.py",
+      "sha256": "73857ed0734e0607a8a3a80646589d58c26e0ba338a450ecbee73fef8656677b"
+    },
+    {
+      "role": "BOUND_SMA_WORKTREE_SUPPORT_CODE_BYTE_EQUIVALENT_TO_IMPORTED_COPY",
+      "path": "/Users/paul/work/tekroo-ai/sma-s1-p2m/scripts/wp5e_restart_recovery.py",
+      "sha256": "73857ed0734e0607a8a3a80646589d58c26e0ba338a450ecbee73fef8656677b"
+    },
+    {
+      "role": "OFFLINE_DRIVER_CONTROL_HARNESS",
+      "path": "scripts/sma_s2_measured_driver_offline_harness_candidate_1.py",
+      "sha256": "b5f7d4ff16819924e6f42cdfc357103f5477745d640cc72bf23d6a048b46a832"
+    }
+  ],
+  "offlineDriverQualification": {
+    "path": "OUTPUT/phase-3/sma-s2-measured-driver-candidate-7-offline-qualification/offline-driver-qualification-receipt.json",
+    "sha256": "2b6af24e1c1058cd88ce898b4930ac3f678596d865334a58e7fd7eb090740645",
+    "status": "PASS",
+    "testCount": 10,
+    "passCount": 10,
+    "failCount": 0,
+    "pythonOptimizationMode": true,
+    "networkUse": "NONE"
+  },
+  "retainedNonqualifyingInterimReceipts": [
+    {
+      "path": "OUTPUT/phase-3/sma-s2-measured-driver-candidate-1-offline-qualification/offline-driver-qualification-receipt.json",
+      "sha256": "e47fe06dd834d634a8cb4cc5c9ed3e9567f28531337c13a808d8962ab6da822f",
+      "credit": 0,
+      "reason": "driver changed before freeze after explicit-predicate review"
+    },
+    {
+      "path": "OUTPUT/phase-3/sma-s2-measured-driver-candidate-2-offline-qualification/offline-driver-qualification-receipt.json",
+      "sha256": "6895fa64bb2db80c2d79c1686809535770b8ca4ed32efa3ab4bf29b3bfcc0344",
+      "credit": 0,
+      "reason": "harness changed before freeze to remove optimization-removable assertions"
+    },
+    {
+      "path": "OUTPUT/phase-3/sma-s2-measured-driver-candidate-3-offline-qualification/offline-driver-qualification-receipt.json",
+      "sha256": "a075474cac9d6f4a19573d4769a4da158516d75162386ed51de3863ad570ae7d",
+      "credit": 0,
+      "reason": "driver evidence oracles were strengthened before freeze"
+    },
+    {
+      "path": "OUTPUT/phase-3/sma-s2-measured-driver-candidate-4-offline-qualification/offline-driver-qualification-receipt.json",
+      "sha256": "725df6542590732d5748a96bb9d617a3c1f936c18407fa1a0da5a3a851f1247a",
+      "credit": 0,
+      "reason": "receipt lacked an explicit Python optimization-mode observation"
+    },
+    {
+      "path": "OUTPUT/phase-3/sma-s2-measured-driver-candidate-5-offline-qualification/offline-driver-qualification-receipt.json",
+      "sha256": "88dc92042e3e134296023560b0852e76b12da0dce23721449a497ec1217edc1f",
+      "credit": 0,
+      "reason": "execution fence was strengthened to verify preregistration, configuration, and dependency closure"
+    },
+    {
+      "path": "OUTPUT/phase-3/sma-s2-measured-driver-candidate-6-offline-qualification/offline-driver-qualification-receipt.json",
+      "sha256": "b10ff42d156b59b7077fa7f48cdf808ebd009e1c5f17c2116dded5a67a6b2e42",
+      "credit": 0,
+      "reason": "driver was strengthened to re-prove measured namespace absence at execution start"
+    }
+  ],
+  "boundProductIdentity": {
+    "boundaryIdentity": {
+      "path": "investigations/sma-q1/layered/sma-s2-boundary-identity-candidate-2.json",
+      "sha256": "39114c2f217558a96496dea5e180e3e1c7d6ab02f293bf4e50de08293cbe6a0a"
+    },
+    "nonSecretConfiguration": {
+      "path": "investigations/sma-q1/layered/sma-s2-nonsecret-configuration-candidate-2.json",
+      "sha256": "09c78fdc1ca95c4277222ac1f106357af9df9fddb4099fcd83222a3df89291d1"
+    },
+    "smaCommit": "5d58be508c74ae8577d2fd31e3346be23a912ab3",
+    "smaTree": "7222410443a6041496a5c313b2549f16eb937458",
+    "acceptedS1AdjudicationSha256": "0e5ace0acbe6e2441755ae656de36096e38b2364d27fb45ee844f2422abf2f7d",
+    "openhandsCommit": "a338ba9b6cbb529886b755a335bae3dee0004700",
+    "openhandsTree": "9e72f1b4ee0b857025d9f170600b9dce539b169a"
+  },
+  "disposableNamespaces": {
+    "mongodbDatabase": "sma_s2_successor_candidate_3_measured_20260814",
+    "qdrantSemanticCollection": "sma_s2_successor_candidate_3_semantic_20260814",
+    "qdrantEpisodicCollection": "sma_s2_successor_candidate_3_episodic_20260814",
+    "conversationPrefix": "sma-s2-successor-candidate-3-",
+    "workspaceRoot": "/tmp/tekroo-sma-s2-successor-candidate-3",
+    "outputRoot": "OUTPUT/phase-3/sma-s2-successor-candidate-3-measured-attempt-1"
+  },
+  "executionPolicy": {
+    "executionAuthorized": false,
+    "executionAttemptsAuthorized": 0,
+    "hiddenHarnessRetries": 0,
+    "automaticCorrectiveReruns": 0,
+    "safeSubstantiveFailureContinuesCorpus": true,
+    "harnessOrSafetyFailureStops": true,
+    "postObservationRegradingAllowed": false
+  },
+  "acceptanceState": {
+    "principalAccepted": false,
+    "independentReviewCompleted": false,
+    "offlineDriverQualified": true,
+    "executionIdentityPrepared": false,
+    "singleUseExecutionAuthorizationPresent": false,
+    "measuredExecutionState": "NOT_RUN"
+  },
+  "excludedClaims": [
+    "SMA-S2 measured PASS",
+    "OPENHANDS_SMA_BOUNDARY_QUALIFIED",
+    "generative model behavior qualification",
+    "integrated runtime qualification",
+    "production readiness"
+  ],
+  "nextGate": "INDEPENDENT_REVIEW_AND_PRINCIPAL_ACCEPT_FREEZE_OF_CANDIDATE_3"
+}

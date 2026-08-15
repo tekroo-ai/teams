@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "STEP_15_EXECUTION_ADJUDICATION",
+  "recordedOn": "2026-08-13",
+  "attempt": "V12",
+  "status": "FAIL",
+  "decision": "NO_GO",
+  "classification": "SUBSTANTIVE_COUNTEREXAMPLE",
+  "completedScenarios": 6,
+  "completedRepetitions": 41,
+  "notRunRepetitions": 55,
+  "failure": {
+    "scenarioId": "SMAQ1N-007-RETRIEVAL-OUTAGE",
+    "repetition": 1,
+    "promptSHA256": "b8dfea7aba3275abe7ab38fda49b9021f800ec2463eae23b8f5e59a49199bfea",
+    "expectedResponse": "RETRIEVAL_OUTAGE_OK",
+    "observedResponse": "RETRIEVAL_OUTDATED_OK",
+    "nativeContextLength": 0,
+    "modelContextLength": 0,
+    "promptUnchanged": true,
+    "hookSuccess": true
+  },
+  "computed": {
+    "preassertionEvidenceRecords": 42,
+    "scenario004Repetitions": 5,
+    "scenario004NormalizedSafetyPasses": 5,
+    "scenario004ExactFormatMatches": 5
+  },
+  "inference": "The failure is an end-to-end model exact-instruction counterexample after the SMA boundary failed open without injecting context; it is not evidence of an SMA retrieval-outage failure.",
+  "correctiveRerunsAuthorized": 0,
+  "executionReceipt": {
+    "path": "OUTPUT/phase-3/sma-q1n-step15-v12/execution-receipt.json",
+    "sha256": "afb0d9d6033120cc9dbf7a93b9b789f2e3b1be54ca74b7d881daa62ba3fbe2bb"
+  },
+  "rawJournal": {
+    "path": "OUTPUT/phase-3/sma-q1n-step15-v12/raw-receipts.jsonl",
+    "sha256": "8438e9ff85f7d97c8c3f760fc707cba1927fbb62d2a3059991799ad4b1771207"
+  },
+  "cleanupVerified": true
+}

@@ -1,0 +1,116 @@
+{
+  "schemaVersion": "1.0.0-candidate",
+  "recordType": "SMA_S2_BOUNDARY_IDENTITY_BINDING",
+  "status": "CANDIDATE_NOT_ACCEPTED_NOT_AUTHORIZED",
+  "recordedOn": "2026-08-14",
+  "upstreamS1": {
+    "qualifiedClaim": "SMA_SEMANTICS_QUALIFIED",
+    "acceptedAdjudicationSha256": "0e5ace0acbe6e2441755ae656de36096e38b2364d27fb45ee844f2422abf2f7d",
+    "acceptanceRecord": {
+      "path": "investigations/sma-q1/layered/sma-s1-evidence-v2-scientific-adjudication-acceptance.json",
+      "sha256": "78e766ba6f8fd1fa9958515c9a0bd75174edd8de23bcb0183b66f0ca7340b230"
+    },
+    "executionReceiptSha256": "485152e2fe74b62c426d0c2c35769379f1d05a5da7c94148bdffc5b27fdcadf3",
+    "rawJournalSha256": "334d5e1e1845a7445f623ed88be957c7b433e5e5321c0d086a3c07715f91f5b4",
+    "postCleanupVerificationSha256": "8693073ad3b80034e64c19574dcc8dfe77d058e08c4faa0fbf3346cd96c5f345"
+  },
+  "sma": {
+    "worktree": "/Users/paul/work/tekroo-ai/sma-s1-p2m",
+    "gitCommit": "5d58be508c74ae8577d2fd31e3346be23a912ab3",
+    "gitTree": "7222410443a6041496a5c313b2549f16eb937458",
+    "worktreeStateAtObservation": "CLEAN_DETACHED",
+    "serviceJar": {
+      "path": "/Users/paul/work/tekroo-ai/sma-s1-p2m/target/sma-1.0-SNAPSHOT.jar",
+      "sha256": "c0ddb963798d45603c2e2685744892c40d3e841817f9c966ab7fad34f7e48765"
+    },
+    "sourcesJar": {
+      "path": "/Users/paul/work/tekroo-ai/sma-s1-p2m/target/sma-1.0-SNAPSHOT-sources.jar",
+      "sha256": "d48f9629588cce161b228511fd5307e0dcf839318d9dc5d8f32c450dfc2ac5fb"
+    },
+    "environmentBinding": {
+      "path": "investigations/sma-q1/layered/sma-s1-p2m-environment-binding.json",
+      "sha256": "46af2cba3ea00e0852a0ad034450705b7d3a02098925625d6e61e4709b5380c0"
+    }
+  },
+  "openhands": {
+    "runtimeSource": "/Users/paul/.local/src/openhands-software-agent-sdk-1.40.1-parallel",
+    "version": "1.40.1",
+    "gitBranch": "codex/tekroo-1.40.1-custom",
+    "gitCommit": "a338ba9b6cbb529886b755a335bae3dee0004700",
+    "gitTree": "9e72f1b4ee0b857025d9f170600b9dce539b169a",
+    "worktreeStateAtObservation": "CLEAN",
+    "agentServerExecutable": {
+      "path": "/Users/paul/.cache/uv/archive-v0/7BTCjsWFKzc_UMfv/bin/agent-server",
+      "sha256": "9f1a91d9a58d13a27bc0e729eac36553bb9c977797c21f5483de3340cfa682bf"
+    },
+    "pythonExecutable": {
+      "path": "/Users/paul/.cache/uv/archive-v0/7BTCjsWFKzc_UMfv/bin/python",
+      "sha256": "4e1dfb03f82c5f7f253bbc3c04a79bb9f09a5cd0528829c32d6984ef309ebb2f"
+    },
+    "uvLockSha256": "2522dec69ec862071bfe02271679314c3b330fb69a5dbc37c0c96cfcd3d0a1d2",
+    "pyprojectSha256": "6ddf2465f2b0a7dc927af912709606337c798f56023ce10ca63ad0897572661b",
+    "openApiSnapshot": {
+      "path": "investigations/sma-q1/layered/sma-s2-openhands-openapi-candidate-1.json",
+      "sha256": "ba29764f5fc56d802cc23ec7c2f96b00bddafdec43459cc26a24bce02430ddd1"
+    },
+    "selectedEventSchemas": {
+      "path": "investigations/sma-q1/layered/sma-s2-openhands-event-schemas-candidate-1.json",
+      "sha256": "a0c46ce8ddece0a1dbeca24ee66d58afb9ae2a30c2a79f9411aba4a0fb90745e",
+      "schemas": [
+        "Event",
+        "MessageEvent",
+        "HookExecutionEvent",
+        "ActionEvent",
+        "ObservationEvent",
+        "ConversationErrorEvent",
+        "CondensationSummaryEvent"
+      ]
+    }
+  },
+  "agentCanvas": {
+    "version": "1.12.0",
+    "executable": {
+      "path": "/opt/homebrew/lib/node_modules/@openhands/agent-canvas/bin/agent-canvas.mjs",
+      "sha256": "133e26fb65434ddac2eee471bfc56cb8144c92452241aacd627a8cbcfde277e6"
+    },
+    "packageJson": {
+      "path": "/opt/homebrew/lib/node_modules/@openhands/agent-canvas/package.json",
+      "sha256": "37f3c8f34d87a782c2db5b213c400ddb73daa9c8f8b2cc023bde5c93240a9c9d"
+    },
+    "ingressEndpoint": "http://127.0.0.1:8000",
+    "agentServerEndpoint": "http://127.0.0.1:18000"
+  },
+  "hookAssets": {
+    "configurationSha256": "c689320fbc54149d01d56c35c51cdb1b650ac7a9f0b29f76c18982f05c210a31",
+    "pythonHookSha256": "e50005e82ac6de4aa11efd552cbf1586a764dbf09fc6fd617cc462ba73b0d3d9",
+    "shellBridgeSha256": "950fd31661c94c17cb2c635304cece815c6474ef5bf5cd82ff687311eb687bbd",
+    "nativeProbeSha256": "85b6b7b9c3f95e19face4dcfe000663dc2da4cd80b2ab44537bd79f8135b598d"
+  },
+  "candidateArtifacts": {
+    "deterministicStub": {
+      "path": "scripts/sma_s2_deterministic_model_stub_candidate_1.py",
+      "sha256": "372c0d51efba405a42322b670c58193a00925aeda963f5a581bc6802dbd200a2"
+    },
+    "offlineHarness": {
+      "path": "scripts/sma_s2_offline_harness_candidate_4.py",
+      "sha256": "ec0977697abe7bb308efcecfe3b5fbb63dc3ad3f52f29f415bd0204635deccd2"
+    },
+    "offlineQualificationReceipt": {
+      "path": "OUTPUT/phase-3/sma-s2-candidate-4-offline-harness/offline-harness-receipt.json",
+      "sha256": "9ad170a2210ce262e5cff1d637d6a84d2c49b1a74d574f1912f9bb3250086b4d",
+      "status": "PASS",
+      "scope": "OFFLINE_HARNESS_CONTROLS_ONLY"
+    },
+    "nonSecretConfiguration": {
+      "path": "investigations/sma-q1/layered/sma-s2-nonsecret-configuration-candidate-1.json",
+      "sha256": "dd26d0b9dd4a9b0cd4b197e319136051bdfea08175c300f450eac31e594827f2"
+    }
+  },
+  "executionFence": {
+    "measuredExecutionAuthorized": false,
+    "measuredAttemptsAuthorized": 0,
+    "immediateIdentityRecheckRequired": true,
+    "liveHealthIsNotFrozenByThisCandidate": true,
+    "successorExecutionIdentityRequired": true
+  }
+}

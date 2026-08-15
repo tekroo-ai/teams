@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S1_POST_CLEANUP_READ_ONLY_VERIFICATION",
+  "status": "PASS",
+  "recordedAt": "2026-08-14T15:01:21Z",
+  "scope": "READ_ONLY_NAMESPACE_ABSENCE_VERIFICATION",
+  "bindings": {
+    "executionReceiptSHA256": "485152e2fe74b62c426d0c2c35769379f1d05a5da7c94148bdffc5b27fdcadf3",
+    "journalSHA256": "334d5e1e1845a7445f623ed88be957c7b433e5e5321c0d086a3c07715f91f5b4"
+  },
+  "observed": {
+    "mongodb": {
+      "uri": "mongodb://127.0.0.1:27017",
+      "database": "sma_s1_measured_20260814_p2m_evidence_v2_candidate_4",
+      "listDatabasesCommandOk": 1,
+      "matchingDatabases": [],
+      "databaseAbsent": true
+    },
+    "qdrant": {
+      "restEndpoint": "http://127.0.0.1:6333",
+      "semanticCollection": "sma_s1_measured_semantic_20260814_p2m_evidence_v2_candidate_4",
+      "semanticCollectionResponse": "Not found: Collection `sma_s1_measured_semantic_20260814_p2m_evidence_v2_candidate_4` doesn't exist!",
+      "semanticCollectionHttpStatus": 404,
+      "semanticCollectionAbsent": true,
+      "episodicCollection": "sma_s1_measured_episodic_20260814_p2m_evidence_v2_candidate_4",
+      "episodicCollectionResponse": "Not found: Collection `sma_s1_measured_episodic_20260814_p2m_evidence_v2_candidate_4` doesn't exist!",
+      "episodicCollectionHttpStatus": 404,
+      "episodicCollectionAbsent": true
+    }
+  },
+  "computed": {
+    "allDisposableNamespacesAbsent": true
+  },
+  "executionAuthorityCreated": false,
+  "measuredCasesExecutedByVerification": 0,
+  "mongoOrQdrantMutatedByVerification": false
+}

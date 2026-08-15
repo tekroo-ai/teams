@@ -1,0 +1,97 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_PREREGISTRATION_ACCEPTANCE",
+  "acceptanceId": "SMA-S2-PREREGISTRATION-CANDIDATE-5-ACCEPTANCE",
+  "status": "ACCEPTED_FROZEN_PREFLIGHT_AND_MEASURED_EXECUTION_NOT_AUTHORIZED",
+  "recordedOn": "2026-08-14",
+  "principalStatement": "ACCEPT/FREEZE SMA-S2 candidate 5, identity 2afe7930e20a95dd40d7477c4a7d4ee638477d0ea0a339b3742ff2b39446f939. This does not authorize live preflight or measured execution.",
+  "acceptedPreregistration": {
+    "path": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-5.json",
+    "sha256": "2afe7930e20a95dd40d7477c4a7d4ee638477d0ea0a339b3742ff2b39446f939",
+    "caseCount": 20,
+    "plannedRepetitionCount": 103,
+    "predicateCount": 59,
+    "requiredEvidenceCount": 10,
+    "acceptedFrozen": true,
+    "editableInPlace": false
+  },
+  "boundPackage": {
+    "nonSecretConfiguration": {
+      "path": "investigations/sma-q1/layered/sma-s2-nonsecret-configuration-candidate-5.json",
+      "sha256": "080b8325f1c44f2f78079d07439be5cec1f07355661c4ceeb11103a2e9cff579"
+    },
+    "measuredDriver": {
+      "path": "scripts/sma_s2_measured_driver_candidate_3.py",
+      "sha256": "6bd0cc221b6161140f12ad664e18efd472298f5d235e37925f980f9faa0b5d46"
+    },
+    "semanticMutationHarness": {
+      "path": "scripts/sma_s2_measured_driver_offline_harness_candidate_3.py",
+      "sha256": "69d907eb8782e44bbf5bc588bc1bf15d5cd480a0c3f6067c0ff3cc08bfd4a933"
+    },
+    "offlineQualification": {
+      "path": "OUTPUT/phase-3/sma-s2-candidate-5-offline-semantic-qualification-3/offline-semantic-qualification-receipt.json",
+      "sha256": "6437c515fca3742a784d90ba7c2eba4d8d675016a2e92ad07266492fb8890e90",
+      "status": "PASS",
+      "testCount": 11,
+      "passCount": 11,
+      "failCount": 0,
+      "semanticEvidenceMutations": 25
+    },
+    "readiness": {
+      "path": "OUTPUT/phase-3/sma-s2-candidate-5-remediation-readiness.json",
+      "sha256": "77dffc7145232faf4da8c99692906266298e1ada41ece65ad0bf8555dd0ac54a",
+      "status": "READY_FOR_CANDIDATE_SPECIFIC_PRINCIPAL_REVIEW"
+    },
+    "remediationAuthorizationConsumption": {
+      "path": "investigations/sma-q1/layered/sma-s2-candidate-5-remediation-authorization-consumption.json",
+      "sha256": "262006cfcd02a8ec8c270f806e0af7535e5ad2ea5a75a0b42c84b8648cd8c211",
+      "status": "CONSUMED_COMPLETE_NO_REUSE"
+    }
+  },
+  "independentReview": {
+    "reviewer": "WORKSPACE_PRINCIPAL",
+    "independenceBasis": [
+      "the principal did not implement the SMA boundary",
+      "the principal did not implement the OpenHands adapter",
+      "the principal did not author the qualification harness"
+    ],
+    "candidateSpecificIdentityNamed": true,
+    "candidate1DesignationImported": false,
+    "candidate5Decision": "ACCEPT_FREEZE"
+  },
+  "acceptedScope": {
+    "layer": "SMA-S2",
+    "decisiveQuestion": "Does the frozen supported OpenHands integration preserve the current prompt, place bounded untrusted SMA context correctly, fail open, retain provenance, and terminate cleanly when model behavior is deterministic?",
+    "executionPlanAccepted": true,
+    "qualifiedClaimEarned": false,
+    "claimOnFuturePass": "OPENHANDS_SMA_BOUNDARY_QUALIFIED"
+  },
+  "excludedClaims": [
+    "SMA-S2 measured PASS",
+    "OPENHANDS_SMA_BOUNDARY_QUALIFIED",
+    "generative model behavior qualification",
+    "integrated runtime qualification",
+    "production readiness"
+  ],
+  "immutability": {
+    "acceptedPreregistrationMayBeEditedInPlace": false,
+    "boundPackageMayBeEditedInPlace": false,
+    "successorRecordRequiredForAnyCorrection": true,
+    "postObservationRegradingAllowed": false
+  },
+  "authority": {
+    "preregistrationAcceptedFrozen": true,
+    "executionIdentityPreparationAuthorized": false,
+    "livePreflightAuthorized": false,
+    "measuredAttemptAuthorizationPresent": false,
+    "measuredExecutionAuthorized": false,
+    "measuredExecutionState": "NOT_RUN",
+    "realModelCallsAuthorized": false,
+    "productionDeploymentAuthorized": false
+  },
+  "nextSeparateGate": {
+    "requiredAction": "authorize preparation of one sealed candidate-5 execution identity and one live preflight",
+    "requiresSeparatePrincipalAuthorization": true,
+    "measuredExecutionStillRequiresLaterSingleUseAuthorization": true
+  }
+}

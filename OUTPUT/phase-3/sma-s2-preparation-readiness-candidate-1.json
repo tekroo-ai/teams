@@ -1,0 +1,115 @@
+{
+  "schemaVersion": "1.0.0-candidate",
+  "recordType": "SMA_S2_PREPARATION_READINESS_RECEIPT",
+  "status": "PREPARATION_PASS_CANDIDATE_NOT_ACCEPTED_NOT_AUTHORIZED",
+  "recordedOn": "2026-08-14",
+  "scope": "S2_PREPARATION_AND_OFFLINE_HARNESS_CONTROLS_ONLY",
+  "preregistration": {
+    "path": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-1.json",
+    "sha256": "fcdfa6a6fc85ea5c8aebe4340e10642007f4cd1df85cea1a0e47f7ef278e62fe",
+    "caseCount": 18,
+    "plannedRepetitionCount": 96
+  },
+  "boundaryIdentity": {
+    "path": "investigations/sma-q1/layered/sma-s2-boundary-identity-candidate-1.json",
+    "sha256": "a76e834f8310e693ed52c289efc033c3e17e46060836ce86a9da2b34d2247052"
+  },
+  "nonSecretConfiguration": {
+    "path": "investigations/sma-q1/layered/sma-s2-nonsecret-configuration-candidate-1.json",
+    "sha256": "dd26d0b9dd4a9b0cd4b197e319136051bdfea08175c300f450eac31e594827f2"
+  },
+  "offlineQualification": {
+    "passingCandidate": 4,
+    "harnessSha256": "ec0977697abe7bb308efcecfe3b5fbb63dc3ad3f52f29f415bd0204635deccd2",
+    "stubSha256": "372c0d51efba405a42322b670c58193a00925aeda963f5a581bc6802dbd200a2",
+    "receipt": {
+      "path": "OUTPUT/phase-3/sma-s2-candidate-4-offline-harness/offline-harness-receipt.json",
+      "sha256": "9ad170a2210ce262e5cff1d637d6a84d2c49b1a74d574f1912f9bb3250086b4d",
+      "status": "PASS",
+      "testCount": 8,
+      "passCount": 8,
+      "failCount": 0
+    },
+    "retainedFailedCandidates": [
+      {
+        "candidate": 1,
+        "receiptSha256": "c9d44cb6260cf3d921543a9c30d1b8e202b438a9c5ac9c071fc37fb2f8c1d728",
+        "classification": "HARNESS_ORACLE_FAILURE"
+      },
+      {
+        "candidate": 2,
+        "receiptSha256": "9abc902147065921b5727e433181ecd44e2cca9ffc25e7930b2c50859c3583c4",
+        "classification": "HARNESS_ORACLE_FAILURE"
+      }
+    ],
+    "supersededPassingCandidate": {
+      "candidate": 3,
+      "receiptSha256": "508fa5bf872d5168bdfd698ab407146eba037215a3cb649ff626ba3c45e62351",
+      "reason": "Behaviorally passing but superseded prospectively to remove two unused imports before freeze."
+    }
+  },
+  "targetedSourceTests": [
+    {
+      "subject": "OpenHands persisted extended-content and message serialization",
+      "path": "OUTPUT/phase-3/sma-s2-openhands-targeted-source-tests-candidate-1.xml",
+      "sha256": "5c89b35f8e2a9afeb8dbc10580881ba6cb8fc749205071d20f6ad094c0055e84",
+      "status": "PASS",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0
+    },
+    {
+      "subject": "SMA fail-open context hook",
+      "path": "OUTPUT/phase-3/sma-s2-hook-tests-candidate-1.xml",
+      "sha256": "399f5c2d0a65b13ccec6c4dbb78904c2a1011ddef044cba876836d398bc47801",
+      "status": "PASS",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0
+    }
+  ],
+  "observed": [
+    "The live Agent Canvas installation identifies version 1.12.0 and points to the clean OpenHands 1.40.1 custom source checkout bound in the identity candidate.",
+    "MessageEvent stores the current prompt in llm_message and hook context in extended_content; to_llm_message appends extended_content after current content.",
+    "The bound hook is user_prompt_submit, has a one-second outer timeout, uses a 750-millisecond internal deadline, and returns allow/continue on faults.",
+    "The bound SMA bridge and hook enforce a maximum of three results and 4096 context characters.",
+    "The offline stub/harness candidate 4 passed all eight control tests using ephemeral loopback only and passed Ruff static checks."
+  ],
+  "computed": [
+    "The candidate contains 18 cases and 96 prospectively planned repetitions.",
+    "Targeted source verification contains 11 passing tests and zero failures or errors.",
+    "The final offline harness receipt contains eight passes and zero failures."
+  ],
+  "inferred": [
+    "The S2 package is ready for independent review and principal acceptance as a preregistration candidate.",
+    "The package is not ready for measured execution until a reviewer is designated, a successor package is accepted and frozen, an immediate execution identity is sealed, and one single-use authorization is issued."
+  ],
+  "prospectiveCorrectionsFromHistoricalDraft": [
+    {
+      "issue": "The historical secret predicate simultaneously required byte-identical prompt delivery and absence of the prompt credential from the entire model request.",
+      "resolution": "The candidate permits the synthetic marker only in immutable current-prompt segment 0 and sealed raw evidence; it remains prohibited from SMA context segment 1, derived surfaces, and operational logs."
+    },
+    {
+      "issue": "The historical oversized-context predicate used only the scientific ceilings of five memories and 10000 characters.",
+      "resolution": "The candidate measures the bound product's stricter three-result and 4096-character limits and separately retains the scientific ceilings."
+    },
+    {
+      "issue": "The historical draft did not define the exact model-boundary prompt field and permitted serializer ambiguity.",
+      "resolution": "The candidate requires list serialization, current prompt in segment 0, context in segment 1, and treats string flattening as failure."
+    }
+  ],
+  "remainingGates": {
+    "independentReviewerDesignated": false,
+    "principalAcceptedFrozenPreregistration": false,
+    "successorExecutionIdentitySealed": false,
+    "singleUseMeasuredAuthorizationPresent": false,
+    "measuredExecutionState": "NOT_RUN"
+  },
+  "authority": {
+    "measuredExecutionAuthorized": false,
+    "liveConversationCreated": false,
+    "modelInvoked": false,
+    "smaMeasuredNamespaceCreated": false,
+    "productionOrHistoricalDataAccessed": false
+  }
+}

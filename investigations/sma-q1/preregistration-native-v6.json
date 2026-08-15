@@ -1,0 +1,122 @@
+{
+  "schemaVersion": "6.0.0",
+  "recordType": "INVESTIGATION_PREREGISTRATION_AMENDMENT",
+  "amendmentId": "SMA-Q1-NATIVE-OPENHANDS-VERTICAL-SLICE-V6",
+  "status": "FROZEN_ACCEPTED_NOT_EXECUTED",
+  "recordedOn": "2026-08-13",
+  "timePrecision": "DAY",
+  "purpose": "Carry the unresolved V5 retrieval observation forward unchanged while making exact identity and authorization compatibility an offline prerequisite to execution authorization.",
+  "supersession": {
+    "priorAmendmentId": "SMA-Q1-NATIVE-OPENHANDS-VERTICAL-SLICE-V5",
+    "priorManifest": "investigations/sma-q1/preregistration-native-v5.json",
+    "priorManifestSHA256": "21030ef4a7004217401b0243e5bb7e94be6bc44ecb9869873a72f112fe676422",
+    "priorFinalAdjudication": "OUTPUT/phase-3/step-15-execution-adjudication-v5-final.json",
+    "priorFinalAdjudicationSHA256": "e5e0e0b3ab786704d0e3dc38579e2aaf84fa3f5e995e7cc8ec0b99cee5e4f39d",
+    "priorExecutionState": "INCONCLUSIVE",
+    "priorResultClaim": "NO_SMA_Q1_PASS",
+    "effectIfAccepted": "ACCEPTED_SUCCESSOR_FOR_ONE_FUTURE_EXECUTION_ONLY",
+    "preservation": "All V5 artifacts and both attempts remain immutable. No prior scenario or repetition is credited to V6."
+  },
+  "unchangedBase": {
+    "bindingManifest": "investigations/sma-q1/preregistration-native-v2.json",
+    "bindingManifestSHA256": "c618371d571d5333aebd2bdc83d2db2559115f5ec3e1903b33e8e0ab157edf5d",
+    "bindingPriorAmendments": "All accepted V3 through V5 scientific and fixture amendments remain binding. V6 changes artifact validation and retained telemetry only.",
+    "unchangedFields": [
+      "decisiveQuestion",
+      "architectureReconciliation",
+      "authorityBoundary",
+      "identityModel",
+      "syntheticMemoryCorpus",
+      "scenarioCorpus",
+      "wp5EvidenceMap",
+      "step15ReservedScenarioIds",
+      "evidenceEligibility",
+      "thresholds",
+      "requiredRawReceiptsPerScenario",
+      "stopConditions",
+      "adjudication.pass",
+      "adjudication.fail",
+      "adjudication.inconclusive",
+      "adjudication.defaultIfInconclusive",
+      "all accepted V3 amendments",
+      "all accepted V4 expectation corrections",
+      "all accepted V5 deterministic-fixture, scheduler-isolation, raw-disclosure, and subprocess-evidence rules"
+    ],
+    "scenarioCount": 18,
+    "repetitionCount": 96,
+    "scenarioCreditFromPriorAttempts": 0
+  },
+  "retainedV5Evidence": {
+    "classification": "OBSERVED",
+    "deterministicFixturePromotion": "PASS_ALL_THREE_ELIGIBLE_MEMORIES",
+    "controlledCorpusReadiness": "PASS",
+    "rawIneligibleDenial": "OBSERVED",
+    "crossPartitionDenial": "OBSERVED",
+    "samePartitionPositiveControl": "MISSED_ON_FIRST_RETRIEVAL",
+    "specificMissMechanism": "UNVERIFIED",
+    "scenarioCorpus": "NOT_RUN"
+  },
+  "v6Amendments": {
+    "exactArtifactPreflightContract": {
+      "classification": "PROSPECTIVE_HARNESS_GUARD",
+      "rule": "Before acceptance or execution authorization, load the exact manifest, runner, identity, and authorization-template artifacts through the same preflight field-access function used at runtime, substitute a sentinel for the first live-service operation, and require the sentinel boundary to be reached without KeyError, schema error, hash mismatch, or earlier exception.",
+      "postAuthorizationRule": "After the final authorization artifact is created, repeat the same offline boundary test against that exact authorization file before live execution.",
+      "requiredBoundary": "OFFLINE_PREFLIGHT_REACHED_FIRST_LIVE_SERVICE_OPERATION",
+      "forbidden": "No live service, OpenHands, MongoDB, Qdrant, or model query is allowed during the offline contract test."
+    },
+    "qualificationTelemetry": {
+      "classification": "PROSPECTIVE_EVIDENCE_HARDENING",
+      "existingRetrievalCalls": 3,
+      "addedRetrievalCalls": 0,
+      "retryAdded": false,
+      "warmupAdded": false,
+      "delayAdded": false,
+      "retainedPerCall": [
+        "elapsed_ms",
+        "HTTP status",
+        "hit count",
+        "memory IDs",
+        "context length and SHA-256",
+        "trace ID",
+        "resolved agent, workspace fingerprint, and profile",
+        "decision and over-capacity flags"
+      ],
+      "aggregateTelemetry": "One bridge-health snapshot only after all three existing qualification retrieval outcomes have returned."
+    }
+  },
+  "v6DisposableNamespaces": {
+    "qualification": {
+      "mongoDatabase": "sma_q1n_step15_v6_fixture_20260813",
+      "qdrantSemanticCollection": "sma_q1n_step15_v6_fixture_semantic_20260813",
+      "qdrantEpisodicCollection": "sma_q1n_step15_v6_fixture_episodic_20260813",
+      "runRoot": "/Users/paul/work/tekroo-ai/sma-step15/target/sma-q1n-step15-20260813-v6-fixture",
+      "actorAlphaFingerprint": "6bebf627d656f88fbc585279",
+      "actorBetaFingerprint": "5c48db35135e7bd1e1b448ad"
+    },
+    "measuredRun": {
+      "mongoDatabase": "sma_q1n_step15_20260813_v6",
+      "qdrantSemanticCollection": "sma_q1n_step15_v6_semantic_20260813",
+      "qdrantEpisodicCollection": "sma_q1n_step15_v6_episodic_20260813",
+      "runRoot": "/Users/paul/work/tekroo-ai/sma-step15/target/sma-q1n-step15-20260813-v6",
+      "actorAlphaFingerprint": "feaf8bfe0cb7f5752b657132",
+      "actorBetaFingerprint": "bea92737d4d6748ec0fe7f26"
+    }
+  },
+  "executionPolicy": {
+    "initialAttemptsAllowed": 1,
+    "correctiveRerunsAllowed": 0,
+    "reason": "V6 must either produce an evidence-bearing terminal result or stop. No further amendment-by-amendment execution cycle is permitted under V6."
+  },
+  "acceptance": {
+    "classification": "OBSERVED_OPERATOR_DECISION",
+    "acceptedOn": "2026-08-13",
+    "decision": "ACCEPT_AND_FREEZE_V6",
+    "source": "Explicit principal instruction: Accept V6 and Step 15 is authorized.",
+    "executionAuthorizationEffect": "NONE_SEPARATE_AUTHORIZATION_RECORDED"
+  },
+  "acceptanceState": "ACCEPTED_AND_FROZEN",
+  "executionState": "NOT_STARTED",
+  "scenarioResultClaimAuthorized": false,
+  "step15ExecutionAuthorized": false,
+  "executionAuthorizationArtifactRequired": true
+}

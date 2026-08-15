@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_CANDIDATE_7_EXECUTION_IDENTITY_PREPARATION_AUTHORIZATION",
+  "status": "AUTHORIZED_CONSUMED_BY_IDENTITY_PREPARATION",
+  "recordedOn": "2026-08-14",
+  "principalStatement": "You may proceed.",
+  "interpretedScope": "prepare one exact candidate-7 execution identity for separate principal review",
+  "acceptedCandidate": {
+    "preregistrationPath": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-7.json",
+    "preregistrationSha256": "66530bb10fe7e46f23e8f3f550c83a89203905cc844dba8732d8794dba9575d3",
+    "acceptancePath": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-7-acceptance.json",
+    "acceptanceSha256": "c93c8892d58995c86d4ed11cba340192037fc32725db82a2ad66b9e5783b3e0f"
+  },
+  "authorizedScope": [
+    "prepare one immutable candidate-7 execution-identity proposal",
+    "bind exact numeric loopback stub and bridge endpoints",
+    "bind the accepted candidate-7 package, product identity, dependencies, disposable namespaces, and attempt limits",
+    "run offline identity and dependency-correspondence validation",
+    "publish the exact identity for separate principal review"
+  ],
+  "notAuthorized": [
+    "principal acceptance or freeze of the execution identity by the coordinator",
+    "live endpoint availability or service-state preflight",
+    "service start, stop, or restart",
+    "OpenHands conversation creation",
+    "SMA or deterministic-stub network invocation",
+    "live dress rehearsal",
+    "measured S2 execution",
+    "real model calls",
+    "production or historical data access",
+    "OPENHANDS_SMA_BOUNDARY_QUALIFIED claim"
+  ]
+}

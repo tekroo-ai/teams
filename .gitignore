@@ -8,3 +8,5 @@ build/
 coverage/
 dist/
 tmp/
+__pycache__/
+*.py[cod]

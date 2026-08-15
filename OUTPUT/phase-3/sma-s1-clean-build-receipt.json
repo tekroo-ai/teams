@@ -1,0 +1,50 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S1_CANDIDATE_CLEAN_BUILD_RECEIPT",
+  "recordedOn": "2026-08-13",
+  "status": "PASS_BUILD_ONLY_NO_S1_PRODUCT_CREDIT",
+  "repository": "/Users/paul/work/tekroo-ai/sma",
+  "branch": "master",
+  "commit": "e89ff9e0bab192689122d5e7b9d36d16cae5d368",
+  "tree": "1ff9816967d1ea6378947c2cfc23a0a92308a770",
+  "originMasterAfterPush": "e89ff9e0bab192689122d5e7b9d36d16cae5d368",
+  "worktreeCleanBeforeBuild": true,
+  "command": "mvn --log-file ../teams/OUTPUT/phase-3/sma-s1-clean-build.log clean verify",
+  "toolchain": {
+    "java": "Eclipse Temurin OpenJDK 21.0.12+8 LTS aarch64",
+    "maven": "Apache Maven 3.9.16 commit 2bdd9fddda4b155ebf8000e807eb73fd829a51d5"
+  },
+  "result": {
+    "build": "SUCCESS",
+    "testsRun": 304,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "finishedAt": "2026-08-13T17:30:07-06:00"
+  },
+  "artifacts": {
+    "buildLog": {
+      "path": "OUTPUT/phase-3/sma-s1-clean-build.log",
+      "sha256": "b96fad6ce18cfec1e45e47e20691e3cc9429045a51de992917d307db610031dd"
+    },
+    "dependencyTree": {
+      "path": "OUTPUT/phase-3/sma-s1-dependency-tree.txt",
+      "sha256": "f603ec323a0d961b19792bc6ee55f51c2a2bb66bfea87e018d63fb565e1adb46"
+    },
+    "serviceJar": {
+      "path": "/Users/paul/work/tekroo-ai/sma/target/sma-1.0-SNAPSHOT.jar",
+      "sha256": "ead8c0c5d9e3fd37b61318d2bdb8a97ef5c4c7481c11ed453777492f39f71042"
+    },
+    "sourcesJar": {
+      "path": "/Users/paul/work/tekroo-ai/sma/target/sma-1.0-SNAPSHOT-sources.jar",
+      "sha256": "61db400f0bdcf24d21f72ed00e62bd4c6310c8a49ce7aa5f04af0c39b6beb139"
+    }
+  },
+  "reproducibilityBoundary": {
+    "exactFinalArtifactsBound": true,
+    "byteIdenticalAcrossIndependentBuildsClaimed": false,
+    "reason": "The Maven artifacts contain build-time metadata; this receipt binds the exact logged final build rather than claiming byte-reproducible JAR generation."
+  },
+  "measuredS1CasesExecuted": 0,
+  "executionAuthorityCreated": false
+}

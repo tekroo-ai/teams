@@ -1,0 +1,71 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_CANDIDATE_6_MEASURED_ADJUDICATION",
+  "candidate": 6,
+  "status": "INCONCLUSIVE",
+  "recordedAt": "2026-08-14T17:45:56Z",
+  "recommendation": "NO_GO_FOR_CLAIM_OR_RERUN; PREPARE_SEPARATELY_AUTHORIZED_SUCCESSOR_HARNESS",
+  "executionIdentitySha256": "5640c60968261402bc1878204703845581e266cbce1b4cc7e135a3008f05e5a4",
+  "executionReceipt": {
+    "path": "OUTPUT/phase-3/sma-s2-successor-candidate-6-measured-attempt-1/execution-receipt.json",
+    "sha256": "62226fd8658dece27e282400dc311813565aca334a1957f31e9b128b55575933",
+    "rawJournalSha256": "fcbf7acb83379d13a48567181df9c3a37ee586f011667e62efc2a697982b3b70"
+  },
+  "observed": [
+    "the only authorized measured attempt was consumed",
+    "the receipt status is INCONCLUSIVE and the qualified claim is null",
+    "all ten SMA-S2-001 repetitions recorded one raw stub request, one terminal stub record, CLIENT_RECEIVED, and OpenHands execution_status finished",
+    "all ten SMA-S2-001 repetitions lacked an agent MessageEvent in the event snapshot used for grading and failed deterministic success terminal validation",
+    "the ten substantive failures share message SHA-256 e6b1e4529a1460b98ffb71077aea4a07c228fa4488de37d77588ea5f1762eaed, which matches deterministic success terminal mismatch",
+    "SMA-S2-002 repetition 1 stopped on a RuntimeError with message SHA-256 54616a815b6792b0022e1a999f50b5f3e6144209338c0b41bdb18dd9b57d46a9, which matches prompt submission failed: HTTP 500",
+    "the Agent Canvas log records the corresponding POST failure with error ID a99d9dd5186649b7a7a4eb84096a9b20 but no underlying exception text",
+    "cleanup deleted all eleven attempt conversations and verified all global cleanup oracles",
+    "independent post-run checks found zero active conversations and no candidate service, listener, database, collection, or workspace",
+    "Tekroo Trader remained paused with unchanged timestamps"
+  ],
+  "computed": {
+    "plannedRepetitions": 103,
+    "receiptCompletedRepetitions": 10,
+    "substantiveFailureRecords": 10,
+    "harnessFailureRecords": 1,
+    "rawStubRequests": 10,
+    "stubTerminalRecords": 10,
+    "cleanupFailures": 0,
+    "claimCredit": 0,
+    "remainingAuthorizedAttempts": 0
+  },
+  "verifiedHarnessRootCauses": [
+    {
+      "id": "C6-H1-EVENT-VISIBILITY-RACE",
+      "classification": "HARNESS_GRADING_RACE",
+      "evidence": "wait_observation exits when user, hook, stub request, stub terminal, and conversation terminal status exist; its exit predicate does not require the agent MessageEvent that one_prompt grades immediately afterward",
+      "source": "scripts/sma_s2_measured_driver_candidate_1.py:399-421",
+      "effect": "a fast stub can make conversation status terminal before the agent event appears in the fetched event page, producing a false deterministic-terminal failure"
+    },
+    {
+      "id": "C6-H2-UNBOUND-SEED-CONVERSATION-PATH",
+      "classification": "HARNESS_CONSTRUCTION_DIVERGENCE",
+      "evidence": "seed_corpus calls module-global create_raw_source, which calls module-global create_conversation using default OpenHands settings, secrets_encrypted true, max_iterations 3, and the default tool/profile set instead of Candidate6Runtime.create_conversation and its bound deterministic settings",
+      "source": "scripts/smaq1_native_step15_v4.py:447-458,887-891",
+      "effect": "the first seed-source prompt entered an unbound full-agent path and returned HTTP 500 before corpus readiness evidence existed"
+    }
+  ],
+  "unverified": [
+    "the internal exception that caused Agent Server error ID a99d9dd5186649b7a7a4eb84096a9b20; the retained server log contains no traceback or exception message",
+    "SMA-S2 product semantics beyond the point reached by this incomplete attempt"
+  ],
+  "requiredSuccessorCorrections": [
+    "make terminal observation wait for the required agent terminal event or a terminal error event, then refetch and prove stable event visibility before grading",
+    "route every corpus-seed conversation through the candidate-bound deterministic conversation factory and prohibit default profiles, tools, and secrets-encrypted configuration",
+    "persist sanitized HTTP failure status, response/error identifier, and boundary phase in the durable journal",
+    "add repeated fast-terminal integration controls and a complete corpus-seeding canary",
+    "require a broader no-credit dress rehearsal covering every distinct harness primitive before another 103-repetition authorization"
+  ],
+  "authorityState": {
+    "measuredAuthorityConsumed": true,
+    "rerunAuthorized": false,
+    "qualifiedClaimEarned": false,
+    "OPENHANDS_SMA_BOUNDARY_QUALIFIED": false
+  },
+  "nextSeparateGate": "PRINCIPAL_AUTHORIZATION_FOR_BOUNDED_CANDIDATE_7_HARNESS_REMEDIATION_ONLY"
+}

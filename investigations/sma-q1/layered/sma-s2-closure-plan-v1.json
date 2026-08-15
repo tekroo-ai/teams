@@ -1,0 +1,130 @@
+{
+  "schemaVersion": "1.0.0-proposal",
+  "recordType": "SMA_S2_CLOSURE_PLAN",
+  "lineageId": "SMA-S2",
+  "status": "PROPOSED_NOT_AUTHORIZED",
+  "recordedOn": "2026-08-14",
+  "plan": {
+    "path": "docs/architecture/087-sma-s2-closure-plan.md",
+    "sha256": "787a770dfa8e46f38dd5489579f902eb1c26548cd0cc4608e5a926b9c261bbdf"
+  },
+  "currentResult": {
+    "candidate": 9,
+    "dressStatus": "INCONCLUSIVE",
+    "completedOperations": 14,
+    "plannedOperations": 34,
+    "measuredCredit": 0,
+    "cleanupStatus": "PASS",
+    "dressReceipt": {
+      "path": "OUTPUT/phase-3/sma-s2-candidate-9-dress-rehearsal-attempt-1/dress-rehearsal-receipt.json",
+      "sha256": "87a39bdd06d673787729b51aec6941b803d0e45c813491f49852ad72794e406d"
+    },
+    "rawJournal": {
+      "path": "OUTPUT/phase-3/sma-s2-candidate-9-dress-rehearsal-attempt-1/raw-evidence.jsonl",
+      "sha256": "671ab38c487abcaf2f8da04c059422de9494e655a5261af80e3c91020bb299b3"
+    },
+    "adjudication": {
+      "path": "OUTPUT/phase-3/sma-s2-candidate-9-dress-rehearsal-adjudication.json",
+      "sha256": "ba34d0aee52ac677f9e37e76b2857ab74386e1438c252d4434193726488e3394"
+    }
+  },
+  "acceptedSciencePreserved": {
+    "caseCount": 20,
+    "measuredRepetitionCount": 103,
+    "scientificPredicateCount": 59,
+    "requiredEvidenceClassCount": 10,
+    "modelRetries": 0,
+    "automaticReruns": 0
+  },
+  "closureCandidate": {
+    "candidate": 10,
+    "implementationShape": "CONSOLIDATED_NEW_HARNESS",
+    "predecessorMeasuredDriverImportsAllowed": false,
+    "moduleGlobalRuntimeRebindingAllowed": false,
+    "scientificTotalMemoryCountWaitsAllowed": false,
+    "sharedUnconditionalTrueEvidenceAllowed": false,
+    "requiredFailureClasses": [
+      "SCIENTIFIC",
+      "HARNESS",
+      "ENVIRONMENT",
+      "SAFETY"
+    ],
+    "captureIdentityKey": [
+      "conversation_id",
+      "event_id"
+    ]
+  },
+  "offlineH0Exit": {
+    "dressOperationsTerminal": "34/34",
+    "measuredRepetitionsTerminal": "103/103",
+    "caseHandlersReached": "20/20",
+    "scientificOracleMutationCoverage": "59/59",
+    "requiredEvidenceMutationCoverage": "10/10",
+    "allLifecycleAndRecoveryBranchesExercised": true,
+    "allInjectedFailuresTyped": true,
+    "allInjectedFailuresCleaned": true,
+    "normalAndOptimizedCanonicalOutcomeEqual": true,
+    "independentReviewRequired": true,
+    "anythingLess": "NOT_READY_NO_LIVE_AUTHORITY"
+  },
+  "gates": [
+    {
+      "id": "H0",
+      "name": "BUILD_AND_OFFLINE_QUALIFY_CANDIDATE_10",
+      "requiresPrincipalAuthority": true,
+      "liveWorkAllowed": false
+    },
+    {
+      "id": "F1",
+      "name": "ACCEPT_FREEZE_PACKAGE_AND_NONAUTHORIZING_IDENTITY",
+      "entry": "H0_PASS_AND_INDEPENDENT_REVIEW_PASS"
+    },
+    {
+      "id": "D1",
+      "name": "SINGLE_USE_ZERO_CREDIT_34_OPERATION_DRESS",
+      "entry": "F1_ACCEPTED",
+      "requiresSeparateAuthority": true
+    },
+    {
+      "id": "S2M",
+      "name": "SINGLE_USE_103_REPETITION_MEASURED_EXECUTION",
+      "entry": "D1_PASS",
+      "requiresSeparateAuthority": true
+    },
+    {
+      "id": "A1",
+      "name": "SCIENTIFIC_ADJUDICATION",
+      "entry": "M1_TERMINAL"
+    }
+  ],
+  "attemptBudget": {
+    "additionalHarnessCandidates": 1,
+    "normalCandidate10DressAttempts": 1,
+    "environmentOnlyContingencyDressAttempts": 1,
+    "maximumCandidate10DressAttemptsIncludingContingency": 2,
+    "measuredAttempts": 1,
+    "automaticReruns": 0,
+    "postH0LiveHarnessDefectsTolerated": 0
+  },
+  "hardStops": {
+    "candidate10LiveHarnessDefect": "TERMINAL_NO_GO_HARNESS_ARCHITECTURE_NO_CANDIDATE_11",
+    "completeScientificFailure": "FAIL_NO_GO_PRODUCT_BOUNDARY",
+    "unprovenEnvironmentFailure": "NO_RERUN",
+    "measuredExecutionBeforeDressPass": "PROHIBITED"
+  },
+  "nextAuthorityRequested": {
+    "scope": "CANDIDATE_10_HARNESS_REMEDIATION_AND_H0_OFFLINE_QUALIFICATION_ONLY",
+    "livePreflightAllowed": false,
+    "serviceStartAllowed": false,
+    "openhandsConversationsAllowed": 0,
+    "mavenInvocationsAllowed": 0,
+    "dressAttemptsAllowed": 0,
+    "measuredAttemptsAllowed": 0,
+    "productChangesAllowed": false,
+    "realModelCallsAllowed": false
+  },
+  "authority": {
+    "thisRecordAuthorizesWork": false,
+    "principalAcceptanceRequired": true
+  }
+}

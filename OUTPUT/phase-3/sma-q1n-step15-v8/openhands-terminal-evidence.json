@@ -1,0 +1,127 @@
+{
+  "classification": "OBSERVED",
+  "contentPolicy": "Bodies omitted; lengths and SHA-256 retained.",
+  "conversationId": "87260ac8-336e-4f39-a7c4-5368309092ba",
+  "events": [
+    {
+      "action_kind": null,
+      "id": "5ff5364e-a9cf-4e1d-91cb-701f10b058fb",
+      "kind": "ConversationStateUpdateEvent",
+      "response_length": 0,
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source": "environment",
+      "tool_name": null
+    },
+    {
+      "action_kind": null,
+      "id": "7cb80c26-cbd8-4491-ac4e-3e243bff05a1",
+      "kind": "ConversationStateUpdateEvent",
+      "response_length": 0,
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source": "environment",
+      "tool_name": null
+    },
+    {
+      "action_kind": "ThinkAction",
+      "id": "2b2b77d8-312f-44f7-a4ae-d225a2d3febf",
+      "kind": "ActionEvent",
+      "response_length": 0,
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source": "agent",
+      "tool_name": "think"
+    },
+    {
+      "action_kind": null,
+      "id": "473bca20-53f4-43c7-bdb0-4a432922eacc",
+      "kind": "ObservationEvent",
+      "response_length": 0,
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source": "environment",
+      "tool_name": "think"
+    },
+    {
+      "action_kind": null,
+      "id": "3acdc45d-7af5-4c28-a26c-f93e35661607",
+      "kind": "ConversationStateUpdateEvent",
+      "response_length": 0,
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source": "environment",
+      "tool_name": null
+    },
+    {
+      "action_kind": "VisionInspectAction",
+      "id": "48c2de2b-f3a7-4b0b-b3b5-f24bd8ab508c",
+      "kind": "ActionEvent",
+      "response_length": 0,
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source": "agent",
+      "tool_name": "inspect_image_with_vision"
+    },
+    {
+      "action_kind": null,
+      "id": "5e66339b-0515-49b6-859e-5aa63dd13353",
+      "kind": "ObservationEvent",
+      "response_length": 0,
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source": "environment",
+      "tool_name": "inspect_image_with_vision"
+    },
+    {
+      "action_kind": null,
+      "id": "14dd26f2-d5ec-4627-bbec-5d34200e3c40",
+      "kind": "ConversationStateUpdateEvent",
+      "response_length": 0,
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source": "environment",
+      "tool_name": null
+    },
+    {
+      "action_kind": "ThinkAction",
+      "id": "1dda300b-e651-42b6-95b3-692b3833363c",
+      "kind": "ActionEvent",
+      "response_length": 0,
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source": "agent",
+      "tool_name": "think"
+    },
+    {
+      "action_kind": null,
+      "id": "ad5caf02-7ced-4e53-a53c-c700aae54402",
+      "kind": "ObservationEvent",
+      "response_length": 0,
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source": "environment",
+      "tool_name": "think"
+    },
+    {
+      "action_kind": null,
+      "id": "4fa3ff86-4140-4287-b4fe-c31f4b752e9f",
+      "kind": "ConversationStateUpdateEvent",
+      "response_length": 0,
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source": "environment",
+      "tool_name": null
+    },
+    {
+      "action_kind": null,
+      "id": "cbd11640-cbf3-4ba7-84a2-39e09776a99b",
+      "kind": "ConversationErrorEvent",
+      "response_length": 0,
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source": "environment",
+      "tool_name": null
+    },
+    {
+      "action_kind": null,
+      "id": "e82ec051-15b1-4da5-a5d8-582d90fa15a6",
+      "kind": "ConversationStateUpdateEvent",
+      "response_length": 0,
+      "response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source": "environment",
+      "tool_name": null
+    }
+  ],
+  "reason": "CONVERSATION_ERROR_EVENT",
+  "recordType": "OPENHANDS_TERMINAL_EVIDENCE",
+  "schemaVersion": "2.0.0"
+}

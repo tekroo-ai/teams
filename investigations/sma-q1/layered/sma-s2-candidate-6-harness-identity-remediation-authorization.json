@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "1.0.0-candidate",
+  "recordType": "SMA_S2_CANDIDATE_6_HARNESS_IDENTITY_REMEDIATION_AUTHORIZATION",
+  "status": "AUTHORIZED_CONSUMED_BY_CANDIDATE_6_PREPARATION",
+  "recordedOn": "2026-08-14",
+  "principalStatement": "Authorize one bounded SMA-S2 candidate-6 harness-identity remediation: bind and enforce the numeric stub and bridge ports, add missing/mutated/occupied/mismatched-port offline controls, and publish candidate 6 for review. This does not authorize live preflight or measured execution. Please get it right this time.",
+  "triggeringNoGo": {
+    "path": "OUTPUT/phase-3/sma-s2-candidate-5-execution-identity-preflight-no-go.json",
+    "sha256": "13a02df9c205de549eced208f9421d123f44a7d0ef5647aa1e8f4e12e9f28152"
+  },
+  "authorizedScope": [
+    "create an immutable candidate-6 successor without modifying candidate 5",
+    "bind numeric loopback stub and bridge ports into the future execution identity",
+    "require the measured authorization to repeat the exact endpoint identity",
+    "launch the deterministic stub only on the identity-bound numeric stub port",
+    "require a passing live-preflight receipt bound to the exact identity and endpoints before a measured fence can open",
+    "offline-qualify positive, missing, mutated, occupied, and mismatched endpoint controls",
+    "publish candidate 6 for principal review"
+  ],
+  "preservedSemantics": {
+    "sourceSha256": "b7315835b6291d44d3d8cb918dbec1f16c1e64f2106fd70212c6a8f7ec678188",
+    "caseCount": 20,
+    "repetitionCount": 103,
+    "predicateCount": 59,
+    "requiredEvidenceCount": 10,
+    "thresholdsChanged": false,
+    "faultScheduleChanged": false,
+    "claimChanged": false,
+    "productCodeChanged": false
+  },
+  "notAuthorized": [
+    "modification of candidate 5 or any accepted artifact",
+    "creation or acceptance of a live execution identity",
+    "live preflight",
+    "measured S2 execution",
+    "OpenHands conversation creation",
+    "SMA service invocation",
+    "deterministic stub network invocation",
+    "real model calls",
+    "production or historical data access"
+  ]
+}

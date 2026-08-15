@@ -1,0 +1,73 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S1_DRIVER_PROTOCOL",
+  "status": "CANDIDATE_NOT_ACCEPTED_NOT_AUTHORIZED",
+  "transport": "ONE_CANONICAL_JSON_REQUEST_ON_STDIN_ONE_CANONICAL_JSON_RESPONSE_ON_STDOUT",
+  "modelOrOpenHandsAllowed": false,
+  "request": {
+    "requiredFields": [
+      "protocolVersion",
+      "operation",
+      "runId",
+      "caseId",
+      "repetition",
+      "manifestSHA256",
+      "identitySHA256",
+      "fault",
+      "fixture",
+      "namespaces"
+    ],
+    "operationValues": [
+      "SELF_TEST",
+      "PREPARE",
+      "EXECUTE_CASE",
+      "INVENTORY",
+      "CLEANUP"
+    ]
+  },
+  "response": {
+    "requiredFields": [
+      "protocolVersion",
+      "operation",
+      "runId",
+      "caseId",
+      "repetition",
+      "driverIdentity",
+      "terminalState",
+      "faultActivation",
+      "faultObservation",
+      "predicateResults",
+      "evidence",
+      "safetyStop",
+      "cleanupCorrelationId"
+    ],
+    "terminalStateValues": [
+      "SUCCEEDED",
+      "FAILED",
+      "TIMED_OUT",
+      "CANCELLED"
+    ],
+    "predicateResultFields": [
+      "predicate",
+      "passed",
+      "attributedComponent",
+      "evidenceIds"
+    ]
+  },
+  "evidencePolicy": {
+    "syntheticBodiesOnOperationalStdout": false,
+    "secretBodiesOnAnyOutput": false,
+    "bodyRepresentation": "SHA256_LENGTH_CLASSIFICATION_ONLY",
+    "stderr": "CONTENT_FREE_DIAGNOSTICS_ONLY",
+    "unknownFields": "REJECT"
+  },
+  "driverRequirements": [
+    "The driver performs no generative-model call and starts no OpenHands process.",
+    "Every predicate is evaluated mechanically by the driver from direct component observations.",
+    "Fault activation and observation are separate fields and both must identify the requested fault.",
+    "The driver performs zero hidden retries.",
+    "The driver never creates or selects a namespace not supplied in the request.",
+    "The driver emits exactly one response and exits within the harness deadline.",
+    "Cleanup is a separately invoked idempotent operation with an inventory receipt."
+  ]
+}

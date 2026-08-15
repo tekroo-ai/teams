@@ -1,0 +1,46 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_EXECUTION_IDENTITY_PREFLIGHT_AUTHORIZATION",
+  "authorizationId": "SMA-S2-EXECUTION-IDENTITY-PREFLIGHT-20260814",
+  "status": "AUTHORIZED_NOT_CONSUMED",
+  "recordedOn": "2026-08-14",
+  "principalStatement": "Authorized. You may proceed.",
+  "acceptedPreregistration": {
+    "path": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-2.json",
+    "sha256": "b7315835b6291d44d3d8cb918dbec1f16c1e64f2106fd70212c6a8f7ec678188"
+  },
+  "acceptance": {
+    "path": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-2-acceptance.json",
+    "sha256": "1c0cd9a01717b5e351bedde6971626d8104a482ac31bd95222ea1d53c408db9c"
+  },
+  "authorizedActions": [
+    "perform one immediate read-only active-work and service-identity audit",
+    "prove accepted artifact digest correspondence",
+    "prove disposable measured namespace absence without creating those namespaces",
+    "prepare and offline-check the exact measured S2 driver if it is missing",
+    "perform bounded preflight-only hook installation and deterministic request-shape probes in a separately named preflight workspace and conversation",
+    "invoke only the sealed deterministic stub through OpenHands for the minimum preflight request needed to prove prompt/context list-segment shape",
+    "clean every preflight-only resource",
+    "seal one execution identity candidate and preflight receipt"
+  ],
+  "limits": {
+    "maximumExecutionIdentityCandidates": 1,
+    "maximumPreflightAttempts": 1,
+    "maximumOpenHandsPreflightConversations": 1,
+    "maximumDeterministicStubPreflightRequests": 1,
+    "maximumServiceRestarts": 0,
+    "measuredCaseExecutions": 0,
+    "measuredRepetitionExecutions": 0
+  },
+  "notAuthorized": [
+    "run any of the 20 measured S2 cases",
+    "run any of the 103 measured repetitions",
+    "create any accepted measured MongoDB or Qdrant namespace",
+    "invoke any real model",
+    "restart Agent Canvas, agent-server, SMA, MongoDB, or Qdrant",
+    "issue or consume a measured-attempt authorization",
+    "claim OPENHANDS_SMA_BOUNDARY_QUALIFIED"
+  ],
+  "measuredExecutionAuthorized": false,
+  "measuredExecutionState": "NOT_RUN"
+}

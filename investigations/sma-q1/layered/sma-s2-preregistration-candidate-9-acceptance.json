@@ -1,0 +1,117 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_CANDIDATE_9_ACCEPTANCE",
+  "acceptanceId": "SMA-S2-PREREGISTRATION-CANDIDATE-9-ACCEPTANCE",
+  "candidate": 9,
+  "status": "ACCEPTED_FROZEN",
+  "recordedOn": "2026-08-14",
+  "principalStatement": "ACCEPT/FREEZE SMA-S2 candidate 9, identity d7680cc0b7b5ed501201e4b9dcc54b089071267c75ca43e3b9fab13b95b251a8. This does not authorize execution-identity creation, live-state preflight, live dress rehearsal, Maven invocation, or measured execution.",
+  "candidatePreregistrationSha256": "d7680cc0b7b5ed501201e4b9dcc54b089071267c75ca43e3b9fab13b95b251a8",
+  "acceptedPreregistration": {
+    "path": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-9.json",
+    "sha256": "d7680cc0b7b5ed501201e4b9dcc54b089071267c75ca43e3b9fab13b95b251a8",
+    "caseCount": 20,
+    "plannedRepetitionCount": 103,
+    "predicateCount": 59,
+    "requiredEvidenceCount": 10,
+    "dressRehearsalOperationCount": 34,
+    "acceptedFrozen": true,
+    "editableInPlace": false
+  },
+  "boundPackage": {
+    "nonSecretConfiguration": {
+      "path": "investigations/sma-q1/layered/sma-s2-nonsecret-configuration-candidate-9.json",
+      "sha256": "88d9e3988f75e1521200b3afe61ee5440b1e67c5e376330e837343046f13ca3b"
+    },
+    "measuredAndDressRehearsalDriver": {
+      "path": "scripts/sma_s2_measured_driver_candidate_7.py",
+      "sha256": "d97b5812472a3bd674d58ac266d24ac4be783aed65984ca055d69a449ebd92cc"
+    },
+    "offlineWorkingDirectoryHarness": {
+      "path": "scripts/sma_s2_measured_driver_offline_harness_candidate_7.py",
+      "sha256": "2a9d35837b00fe8e6b338399a282540f259f47da9bc97bfad095acb17b85863d"
+    },
+    "offlineQualification": {
+      "path": "OUTPUT/phase-3/sma-s2-candidate-9-offline-working-directory-qualification-2/offline-working-directory-qualification-receipt.json",
+      "sha256": "710ebd41bb647cd3d7139afa6f8c3a12815a2029d23f87ee5e9df808af1d8da1",
+      "status": "PASS",
+      "testCount": 13,
+      "passCount": 13,
+      "failCount": 0
+    },
+    "coordinatorReview": {
+      "path": "OUTPUT/phase-3/sma-s2-candidate-9-coordinator-review.json",
+      "sha256": "ca58c846dc64f8523af55d5c216b4f9bcb699335b4587c68ff61e690a134c7e9",
+      "status": "PASS_READY_FOR_PRINCIPAL_REVIEW"
+    },
+    "reviewNarrative": {
+      "path": "docs/architecture/082-sma-s2-candidate-9-working-directory-remediation-review.md",
+      "sha256": "90b3264d83a8fc6e0898b18fc2f75a50bffcf800f181bb2029f5298840205b75"
+    }
+  },
+  "independentReview": {
+    "reviewer": "WORKSPACE_PRINCIPAL",
+    "candidateSpecificContextBound": true,
+    "candidateSpecificDecision": "ACCEPT_FREEZE",
+    "candidate8DesignationImported": false
+  },
+  "acceptedScope": {
+    "layer": "SMA-S2",
+    "executionPlanAccepted": true,
+    "workspaceIsolationContractAccepted": true,
+    "case1DedicatedEmptyWorkspaceAccepted": true,
+    "emptyWorkspaceCaptureAllowlistExclusionAccepted": true,
+    "mavenPromotionProjectDirectoryAccepted": "/Users/paul/work/tekroo-ai/sma-s1-p2m",
+    "explicitSubprocessWorkingDirectoryAccepted": true,
+    "parentWorkingDirectoryImmutabilityAccepted": true,
+    "sanitizedSubprocessFailureEvidenceAccepted": true,
+    "candidateBoundCorpusSeedingAccepted": true,
+    "stableTerminalObservationAccepted": true,
+    "noCreditDressRehearsalGateAccepted": true,
+    "qualifiedClaimEarned": false,
+    "claimOnFutureMeasuredPass": "OPENHANDS_SMA_BOUNDARY_QUALIFIED"
+  },
+  "excludedClaims": [
+    "candidate-9 execution identity created or accepted",
+    "candidate-9 live state preflight PASS",
+    "candidate-9 live dress rehearsal PASS",
+    "Maven promotion executed successfully",
+    "SMA-S2 measured PASS",
+    "OPENHANDS_SMA_BOUNDARY_QUALIFIED",
+    "generative model behavior qualification",
+    "integrated runtime qualification",
+    "production readiness"
+  ],
+  "immutability": {
+    "acceptedPreregistrationMayBeEditedInPlace": false,
+    "boundPackageMayBeEditedInPlace": false,
+    "successorRecordRequiredForAnyCorrection": true,
+    "postObservationRegradingAllowed": false
+  },
+  "authority": {
+    "preregistrationAcceptedFrozen": true,
+    "executionIdentityPreparationAuthorized": false,
+    "executionIdentityCreated": false,
+    "executionIdentityAccepted": false,
+    "liveStatePreflightAuthorized": false,
+    "liveStatePreflightState": "NOT_RUN",
+    "liveDressRehearsalAuthorized": false,
+    "liveDressRehearsalState": "NOT_RUN",
+    "mavenInvocationAuthorized": false,
+    "measuredAttemptAuthorizationPresent": false,
+    "measuredExecutionAuthorized": false,
+    "measuredExecutionState": "NOT_RUN",
+    "realModelCallsAuthorized": false,
+    "productionDeploymentAuthorized": false
+  },
+  "measuredExecutionAuthorized": false,
+  "nextSeparateGate": {
+    "requiredAction": "authorize preparation of one exact candidate-9 execution identity for separate review",
+    "requiresSeparatePrincipalAuthorization": true,
+    "liveStatePreflightRequiresLaterSeparateAuthorization": true,
+    "liveDressRehearsalRequiresLaterSingleUseAuthorization": true,
+    "liveDressRehearsalMustPassAtZeroCredit": true,
+    "measuredExecutionStillRequiresPassingBoundDressRehearsalReceipt": true,
+    "measuredExecutionStillRequiresLaterSingleUseAuthorization": true
+  }
+}

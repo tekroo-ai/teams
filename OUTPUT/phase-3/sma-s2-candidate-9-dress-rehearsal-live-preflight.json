@@ -1,0 +1,98 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_CANDIDATE_9_DRESS_REHEARSAL_LIVE_PREFLIGHT_RECEIPT",
+  "status": "PASS",
+  "recordedAt": "2026-08-14T22:25:02Z",
+  "executionBoundary": "HOST_LOCAL_UNSANDBOXED",
+  "executionIdentitySha256": "a52d19eba7cdfd219f0a4977361c3d06054300e5669671f292523428cf894cfd",
+  "executionIdentityAcceptanceSha256": "90e9e8ffe90cec8a526cb9f0406c757200b17d04dde4e8531147bcf9b6c0e4fd",
+  "authorization": {
+    "path": "investigations/sma-q1/layered/sma-s2-candidate-9-dress-rehearsal-single-use-authorization.json",
+    "sha256": "3d264701e2be63c8f53e20d00a331840909233fe08b153d2dc79a59aeb1469a1"
+  },
+  "authorizationFence": {
+    "status": "PASS",
+    "identityCheckCount": 16,
+    "authorizationCheckCount": 15,
+    "failedCheckCount": 0,
+    "staticContract": "PASS"
+  },
+  "serviceHealth": {
+    "agentCanvasEndpoint": "http://127.0.0.1:8000/health",
+    "agentCanvasHttpStatus": 200,
+    "agentServerEndpoint": "http://127.0.0.1:18000/health",
+    "agentServerHttpStatus": 200
+  },
+  "conversationAudit": {
+    "searchHttpStatus": 200,
+    "conversationCount": 8,
+    "statusCounts": {
+      "error": 1,
+      "finished": 6,
+      "paused": 1
+    },
+    "activeConversationCount": 0,
+    "preservedPausedTekrooTrader": {
+      "conversationId": "4c2e5f84-ecd3-4971-b375-a0fa9905a058",
+      "status": "paused",
+      "createdAt": "2026-08-09T19:52:16.454058Z",
+      "updatedAt": "2026-08-13T17:38:02.080929Z"
+    }
+  },
+  "runtimeAndNamespaceChecks": {
+    "ownedServiceAbsent": true,
+    "bridgePortAvailable": true,
+    "stubPortAvailable": true,
+    "mongodbDatabaseAbsent": true,
+    "semanticCollectionAbsent": true,
+    "episodicCollectionAbsent": true,
+    "workspaceRootAbsent": true,
+    "emptyWorkspaceAbsent": true,
+    "dressOutputAbsent": true,
+    "measuredOutputAbsent": true
+  },
+  "workspaceIsolation": {
+    "case1WorkspaceRole": "EMPTY_UNCAPTURED",
+    "case1Workspace": "/tmp/tekroo-sma-s2-successor-candidate-9/actor-empty",
+    "corpusCaptureAllowlist": [
+      "/tmp/tekroo-sma-s2-successor-candidate-9/actor-alpha",
+      "/tmp/tekroo-sma-s2-successor-candidate-9/actor-beta"
+    ],
+    "emptyWorkspaceExcludedFromCaptureAllowlist": true,
+    "contractMatchesExecutionIdentity": true
+  },
+  "mavenProject": {
+    "projectDirectory": "/Users/paul/work/tekroo-ai/sma-s1-p2m",
+    "projectDirectoryExists": true,
+    "pomPath": "/Users/paul/work/tekroo-ai/sma-s1-p2m/pom.xml",
+    "pomExists": true,
+    "pomSha256": "998b00e30f7c21d72d3fec31da6b0d0db3699947106e968efccb2f1baaef150a",
+    "contractMatchesExecutionIdentity": true,
+    "subprocessWorkingDirectoryExplicit": true,
+    "parentWorkingDirectoryMayChange": false,
+    "maximumAuthorizedPromotionInvocations": 6,
+    "mavenInvocationsBeforeRun": 0
+  },
+  "productIdentity": {
+    "smaCommit": "5d58be508c74ae8577d2fd31e3346be23a912ab3",
+    "smaTree": "7222410443a6041496a5c313b2549f16eb937458",
+    "smaWorktreeClean": true,
+    "smaJarSha256": "c0ddb963798d45603c2e2685744892c40d3e841817f9c966ab7fad34f7e48765",
+    "openhandsCommit": "a338ba9b6cbb529886b755a335bae3dee0004700",
+    "openhandsTree": "9e72f1b4ee0b857025d9f170600b9dce539b169a",
+    "openhandsWorktreeClean": true,
+    "agentServerExecutableSha256": "9f1a91d9a58d13a27bc0e729eac36553bb9c977797c21f5483de3340cfa682bf",
+    "agentCanvasExecutableSha256": "133e26fb65434ddac2eee471bfc56cb8144c92452241aacd627a8cbcfde277e6",
+    "allMatchExecutionIdentity": true
+  },
+  "authorizedActionCountsBeforeRun": {
+    "dressRehearsalAttempts": 0,
+    "dressRehearsalOperations": 0,
+    "mavenPromotionInvocations": 0,
+    "measuredCaseExecutions": 0,
+    "measuredRepetitionExecutions": 0,
+    "realModelCalls": 0,
+    "serviceRestarts": 0
+  },
+  "disposition": "GO_FOR_ONE_AUTHORIZED_34_OPERATION_ZERO_CREDIT_DRESS_REHEARSAL"
+}

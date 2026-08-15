@@ -1,0 +1,67 @@
+{
+  "schemaVersion": "9.0.0",
+  "recordType": "SMA_Q1_EXECUTION_IDENTITY",
+  "recordedOn": "2026-08-13",
+  "timePrecision": "DAY",
+  "status": "SEALED_ACCEPTED_NOT_AUTHORIZING_NOT_STARTED",
+  "executionAuthorized": false,
+  "executionStarted": false,
+  "scenariosExecuted": 0,
+  "frozenExperiment": {
+    "manifest": "investigations/sma-q1/preregistration-native-v9.json",
+    "manifestSHA256": "7077c843e31ea3b897c612e6de700fea63b46ac7f8cf7c6c30e29ea204050b2a",
+    "baseManifest": "investigations/sma-q1/preregistration-native-v2.json",
+    "baseManifestSHA256": "c618371d571d5333aebd2bdc83d2db2559115f5ec3e1903b33e8e0ab157edf5d",
+    "scenarioCount": 18,
+    "repetitionCount": 96,
+    "priorScenarioCredit": 0,
+    "executionState": "NOT_RUN"
+  },
+  "harness": {
+    "path": "scripts/smaq1_native_step15_v9.py",
+    "sha256": "afa0c0848d6ddc7b6a78f5f9494b253f2ebd36595359fea7c4da13aca7f81b7e",
+    "sealedParent": "scripts/smaq1_native_step15_v8.py",
+    "fixtureDriver": "investigations/sma-q1/fixture-support/DeterministicReplayPromotion.java",
+    "fixtureDriverSHA256": "580f29edefc8c703e68adc3ba6536b58ba1b577a9ed0ca6969ff172eaacb8117",
+    "deterministicTemperature": 0,
+    "deterministicSeed": 20260813,
+    "configuredTools": [],
+    "includeDefaultTools": ["FinishTool"],
+    "autoAttachVisionInspectTool": false,
+    "supportedTerminalForms": ["FINISH_ACTION", "AGENT_MESSAGE"],
+    "semanticHookDeadlineMs": 1000,
+    "nativeProbeProcessTimeoutSeconds": 30,
+    "exactCapabilityQualificationSHA256": "cf3c371079330ea52dc1f8417bbfffe1845f10bc0aaab1cc835e635c8abb63fa"
+  },
+  "sma": {
+    "executionWorktree": "/Users/paul/work/tekroo-ai/sma-step15",
+    "detachedCommit": "60a966234166ea75f767b25e3cbb7eaabe4064a2",
+    "detachedTree": "7aaa06a68d59dd6f13b0a3a2c6ae3cff845c1121",
+    "worktreeClean": true,
+    "serviceJarSHA256": "1892ab3b1468ebbc62b922c116965b3d42af1a754cde006b23b57a431460618c"
+  },
+  "plannedIsolation": {
+    "qualification": {
+      "mongodbDatabase": "sma_q1n_step15_v9_fixture_20260813",
+      "semanticCollection": "sma_q1n_step15_v9_fixture_semantic_20260813",
+      "episodicCollection": "sma_q1n_step15_v9_fixture_episodic_20260813",
+      "actorAlphaPartition": "openhands:4d415f9b8a64a20e176db26b:default",
+      "actorBetaPartition": "openhands:cd91da053f1d5ea8766d55be:default"
+    },
+    "measuredRun": {
+      "mongodbDatabase": "sma_q1n_step15_20260813_v9",
+      "semanticCollection": "sma_q1n_step15_v9_semantic_20260813",
+      "episodicCollection": "sma_q1n_step15_v9_episodic_20260813",
+      "actorAlphaPartition": "openhands:571c583cff76952ea93c5c32:default",
+      "actorBetaPartition": "openhands:b5e22b001f794f0e7d6817e6:default"
+    },
+    "productionOrHistoricalDataAllowed": false
+  },
+  "executionFence": {
+    "freezeAccepted": true,
+    "exclusiveRuntimeWindowObserved": false,
+    "qualificationAuthorized": false,
+    "measuredExecutionAuthorized": false,
+    "authorizationRule": "This identity is non-authorizing; the separate V9 authorization binds its hash."
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "OPENHANDS_RESPONSE_LANE_QUALIFICATION",
+  "qualificationId": "OPENHANDS-RESPONSE-LANE-V1",
+  "recordedOn": "2026-08-13",
+  "timePrecision": "DAY",
+  "status": "FROZEN_AUTHORIZED_NOT_EXECUTED",
+  "purpose": "Qualify the local OpenHands response-only evaluation lane independently of SMA before considering any further SMA-Q1 execution.",
+  "authorization": {
+    "classification": "OBSERVED_OPERATOR_DECISION",
+    "principalInstruction": "We will proceed as you recommend.",
+    "authorizedOn": "2026-08-13",
+    "attemptsAllowed": 1,
+    "correctiveRerunsAllowed": 0
+  },
+  "pinnedLane": {
+    "ingress": "http://127.0.0.1:8000",
+    "agentServer": "http://127.0.0.1:18000",
+    "profile": "qwen3.6-fast",
+    "model": "ollama_chat/qwen3.6:35b-a3b-q8_0",
+    "secretFreeProfileSHA256": "ad5a617ddbf10d60e26cd220e692b5e22fc22d8094453272c4bc6f95af5c610a",
+    "maxIterations": 8,
+    "agentSettingsOverrides": {
+      "tools": [],
+      "enableSubAgents": false,
+      "enableSwitchLlmTool": false,
+      "mcpConfig": {}
+    },
+    "hookConfigSupplied": false,
+    "smaServiceAllowed": false,
+    "smaBridgeAllowed": false,
+    "workspace": "/Users/paul/work/tekroo-ai/teams/target/openhands-response-lane-v1"
+  },
+  "fixedProbe": {
+    "prompt": "Respond with exactly OPENHANDS_LANE_OK. Do not inspect files. Use only the required finish mechanism.",
+    "expectedResponse": "OPENHANDS_LANE_OK",
+    "conversationCount": 128,
+    "execution": "SEQUENTIAL_FRESH_CONVERSATIONS",
+    "conversationTimeoutSeconds": 120,
+    "deleteAndVerify404AfterEachConversation": true
+  },
+  "adjudication": {
+    "pass": "All 128 consecutive fresh conversations return exactly OPENHANDS_LANE_OK, with no ConversationErrorEvent, timeout, creation/submission failure, hook event, non-built-in environment action, or cleanup failure.",
+    "fail": "Any required conversation fails, times out, returns a non-exact response, emits a hook event, exposes an environment tool action, or cannot be deleted and verified absent.",
+    "stopOnFirstFailure": true,
+    "inconclusive": "The pinned profile or model differs before execution, another conversation is running, SMA or its bridge is active, an artifact hash mismatches, or the host lane is unavailable before the first probe.",
+    "effectOfPass": "The response-only OpenHands lane is eligible for use in a separately authorized final SMA-Q1 design. This is not an SMA-Q1 pass.",
+    "effectOfFail": "Do not propose or execute another SMA-Q1 run until the observed OpenHands failure is remediated and a new lane qualification is separately authorized."
+  },
+  "evidence": {
+    "durableJournal": "OUTPUT/phase-3/openhands-response-lane-v1/raw-receipts.jsonl",
+    "terminalReceipt": "OUTPUT/phase-3/openhands-response-lane-v1/execution-receipt.json",
+    "contentPolicy": "Persist lengths, hashes, identities, event kinds, action names, timing, and exact-match booleans; do not persist credentials or model-response bodies."
+  },
+  "executionState": "NOT_STARTED"
+}

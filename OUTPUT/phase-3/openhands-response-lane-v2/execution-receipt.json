@@ -1,0 +1,48 @@
+{
+  "cleanup": {
+    "all_conversations_deleted_and_404_verified": true,
+    "verified_conversation_count": 60,
+    "workspace_absent": true
+  },
+  "completed_conversations": 60,
+  "decision": "NO_GO",
+  "failed_conversations": 1,
+  "first_failure": {
+    "action_count": 0,
+    "action_names": [],
+    "actions_are_allowed_builtins": true,
+    "agent_event_id": "8fb0a789-400c-45d9-9091-e45764005558",
+    "conversation_id": "e62cf0ca-4232-421d-8eb5-a496190d4122",
+    "creation_ms": 47.849375,
+    "execution_status": "finished",
+    "hook_event_count": 0,
+    "ordinal": 60,
+    "prompt_sha256": "11c790cfc7f8e4d2ae0e66439e69b3ad132c9cc6f99fc9f433fc536dffb88392",
+    "prompt_unchanged": true,
+    "response_exact": false,
+    "response_length": 271,
+    "response_sha256": "021b7c4c6a95037c792bb46be7b96049aa64f1aabcc8df917006aa5f37360f3a",
+    "status": "FAIL",
+    "submission_ms": 13.294083,
+    "terminal": "AGENT_MESSAGE",
+    "user_event_id": "a34c7c86-c603-4cf5-9659-ddbaacd46604",
+    "wall_ms": 6090.251417
+  },
+  "latency_ms": {
+    "maximum": 6090.251417,
+    "minimum": 1637.27825,
+    "p50": 2076.847,
+    "p95": 2415.763917,
+    "p99": 6090.251417
+  },
+  "manifest_sha256": "c5fa9e62e15c35a6cdbaeeb32bb28698636ff6fb8033209e3530c6e303cd1e74",
+  "passed_conversations": 59,
+  "raw_journal_sha256": "6bde59a0cb2007fc337872d0e9bf43c617bd2fddb1c2e6f81423103d16fb8acf",
+  "receipt_type": "OPENHANDS_RESPONSE_LANE_QUALIFICATION",
+  "recorded_at": "2026-08-13T21:12:10.213801+00:00",
+  "required_conversations": 128,
+  "runner_sha256": "8414e1ee9ba2b441a1b4a015792f6b4498f61397c5a4d80607e3855e95e7cd68",
+  "schema_version": "1.0.0",
+  "sma_q1_claim": "NONE",
+  "status": "FAIL"
+}

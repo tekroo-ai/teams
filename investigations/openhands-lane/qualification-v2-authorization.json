@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "2.0.0",
+  "recordType": "OPENHANDS_RESPONSE_LANE_EXECUTION_AUTHORIZATION",
+  "authorizationId": "OPENHANDS-RESPONSE-LANE-V2-EXECUTION",
+  "recordedOn": "2026-08-13",
+  "timePrecision": "DAY",
+  "status": "AUTHORIZED_NOT_STARTED",
+  "principalInstruction": "Find the root cause and fix it completely.",
+  "manifest": "investigations/openhands-lane/qualification-v2.json",
+  "manifestSHA256": "c5fa9e62e15c35a6cdbaeeb32bb28698636ff6fb8033209e3530c6e303cd1e74",
+  "runner": "scripts/openhands_response_lane_qualification_v2.py",
+  "runnerSHA256": "812c39e6cac3ebc454d5d4417983e4a333906e834c2ed42c0a878e437f03ca1f",
+  "implementation": "scripts/openhands_response_lane_qualification_v1.py",
+  "implementationSHA256": "8414e1ee9ba2b441a1b4a015792f6b4498f61397c5a4d80607e3855e95e7cd68",
+  "authorizedScope": {
+    "responseOnlyOpenHandsLane": true,
+    "freshSequentialConversations": 128,
+    "correctedTerminalOracle": true,
+    "smaService": false,
+    "smaBridge": false,
+    "smaQ1Execution": false,
+    "productionOrHistoricalData": false,
+    "additionalAttempt": true
+  },
+  "executionAuthorized": true,
+  "executionStarted": false
+}

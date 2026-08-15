@@ -1,0 +1,81 @@
+{
+  "schemaVersion": "1.0.0-candidate",
+  "recordType": "SMA_S2_PREREGISTRATION_COORDINATOR_REVIEW",
+  "recordedOn": "2026-08-14",
+  "subject": {
+    "path": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-3.json",
+    "sha256": "6271d240faa4ad88cbbe6048dfd35f55456b770a9be862adb2cad9ce059bb622"
+  },
+  "reviewRole": "QUALIFICATION_HARNESS_AUTHOR_COORDINATOR_VERIFICATION_NOT_INDEPENDENT_REVIEW",
+  "recommendation": "NO_GO_FOR_PRINCIPAL_ACCEPTANCE_FREEZE",
+  "measuredExecutionState": "NOT_RUN",
+  "livePreflightState": "NOT_RUN",
+  "offlineObservation": {
+    "driverSha256": "5f69ed4d3b439bf1d4d342c75f05781efee326fc2e1c39ad5002a92ffcc7464a",
+    "corpusSha256": "c273c148a7b289f6650a26a82c38bda9680904701120e083543e9b7954b9a960",
+    "caseCount": 20,
+    "repetitionCount": 103,
+    "offlineContractReproduced": true,
+    "existingOfflineQualificationReceiptSha256": "2b6af24e1c1058cd88ce898b4930ac3f678596d865334a58e7fd7eb090740645",
+    "existingOfflineQualificationScope": "OFFLINE_DRIVER_CONTROLS_ONLY",
+    "existingOfflineQualificationStatus": "PASS"
+  },
+  "gateBlockingFindings": [
+    {
+      "id": "S2-C3-REVIEW-001",
+      "class": "BOUND_CONFIGURATION_EFFECTIVE_NAMESPACE_MISMATCH",
+      "falsePositivePassPossible": true
+    },
+    {
+      "id": "S2-C3-REVIEW-002",
+      "class": "REQUIRED_PER_REPETITION_IDENTITY_AND_PROVENANCE_EVIDENCE_MISSING",
+      "falsePositivePassPossible": true
+    },
+    {
+      "id": "S2-C3-REVIEW-003",
+      "class": "CASE_002_EXACTLY_ONCE_AND_FRAMING_NOT_ASSERTED",
+      "falsePositivePassPossible": true
+    },
+    {
+      "id": "S2-C3-REVIEW-004",
+      "class": "CASE_003_AND_005_SURFACE_ABSENCE_INCOMPLETE",
+      "falsePositivePassPossible": true
+    },
+    {
+      "id": "S2-C3-REVIEW-005",
+      "class": "CASE_007_010_013_OBSERVABILITY_TIMING_AND_TELEMETRY_INCOMPLETE",
+      "falsePositivePassPossible": true
+    },
+    {
+      "id": "S2-C3-REVIEW-006",
+      "class": "CASE_011_012_014_PROVENANCE_RESTART_AND_LOOP_ORACLES_INCOMPLETE",
+      "falsePositivePassPossible": true
+    },
+    {
+      "id": "S2-C3-REVIEW-007",
+      "class": "CASE_017_018_BOUNDARY_FRAMING_AND_SECOND_PROMPT_ORACLES_INCOMPLETE",
+      "falsePositivePassPossible": true
+    },
+    {
+      "id": "S2-C3-REVIEW-008",
+      "class": "CASE_019_020_TERMINAL_TIMING_FUTURE_AND_PER_REPETITION_SHUTDOWN_EVIDENCE_INCOMPLETE",
+      "falsePositivePassPossible": true
+    }
+  ],
+  "conclusions": {
+    "offlinePassValidWithinDeclaredScope": true,
+    "candidate3AcceptanceReady": false,
+    "candidate3MeasuredExecutionShouldBeAuthorized": false,
+    "candidate3Modified": false,
+    "candidate3MeasuredCredit": 0,
+    "successorRequired": true,
+    "recommendedSuccessor": "SMA-S2_PREREGISTRATION_CANDIDATE_4"
+  },
+  "excludedClaims": [
+    "independent review completed",
+    "candidate 3 rejected by principal",
+    "live preflight performed",
+    "measured S2 execution performed",
+    "OPENHANDS_SMA_BOUNDARY_QUALIFIED"
+  ]
+}

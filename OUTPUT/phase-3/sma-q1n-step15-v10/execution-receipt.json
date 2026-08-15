@@ -1,0 +1,131 @@
+{
+  "base_manifest_sha256": "c618371d571d5333aebd2bdc83d2db2559115f5ec3e1903b33e8e0ab157edf5d",
+  "cleanup": {
+    "conversation_count": 5,
+    "conversations": [
+      {
+        "conversation_id": "6d3b0daf-3320-4a1b-be6e-a7bc508cfcd1",
+        "delete_status": 200,
+        "get_after_delete": 404
+      },
+      {
+        "conversation_id": "78f3eda0-11ac-49df-bcde-148b3069bc02",
+        "delete_status": 200,
+        "get_after_delete": 404
+      },
+      {
+        "conversation_id": "d02e51b3-18ff-40fe-b01f-dfbec4ab3fc8",
+        "delete_status": 200,
+        "get_after_delete": 404
+      },
+      {
+        "conversation_id": "43f050f2-226f-4208-b995-9ce13c65729c",
+        "delete_status": 200,
+        "get_after_delete": 404
+      },
+      {
+        "conversation_id": "9b70765e-64b8-4183-86aa-2ded00ab0e14",
+        "delete_status": 200,
+        "get_after_delete": 404
+      }
+    ],
+    "episodic_delete_status": 200,
+    "finished_at": "2026-08-13T22:13:24.867484+00:00",
+    "semantic_delete_status": 200,
+    "service": {
+      "bootout_exit": 0,
+      "elapsed_ms": 5086.323917028494,
+      "identity_after": {
+        "loaded": false,
+        "pid": null,
+        "state": null
+      },
+      "identity_before": {
+        "loaded": true,
+        "pid": 27688,
+        "state": "active"
+      },
+      "port_closed_ms": 5081.514541991055
+    },
+    "started_at": "2026-08-13T22:13:18.325683+00:00",
+    "verified": {
+      "bridge_absent": true,
+      "episodic_absent": true,
+      "fixture_driver_build_absent": true,
+      "mongo_absent": true,
+      "run_root_absent": true,
+      "semantic_absent": true,
+      "service_absent": true
+    }
+  },
+  "completed_repetitions": 30,
+  "completed_scenario_ids": [
+    "SMAQ1N-001-FIRST-PROMPT-EMPTY",
+    "SMAQ1N-002-SAME-PARTITION-RECALL",
+    "SMAQ1N-003-CROSS-PARTITION-DENIAL"
+  ],
+  "completed_scenarios": 3,
+  "decision": "NO_GO",
+  "failure": {
+    "classification": "HARNESS_OR_ENVIRONMENT",
+    "message": "model response omitted expected marker",
+    "message_sha256": "1c71b3d9acff6828c1da546a23d268553985033511ca72d3b20483ddc04ebc38",
+    "type": "AssertionError"
+  },
+  "harness_sha256": "4194eda466bc96d9b76262d30874bc4509c2995a7830a8accec46856b8e0820c",
+  "manifest_sha256": "3f0609110746d1d462ad1109a162a7d5a3d1ee033a1a179473c32b47ac03b5f2",
+  "not_run_repetitions": 66,
+  "not_run_scenario_ids": [
+    "SMAQ1N-004-CURRENT-INSTRUCTION-PRECEDENCE",
+    "SMAQ1N-005-RAW-INELIGIBLE",
+    "SMAQ1N-006-DUPLICATE-EVENT-CAPTURE",
+    "SMAQ1N-007-RETRIEVAL-OUTAGE",
+    "SMAQ1N-008-CAPTURE-OUTAGE-RECONCILIATION",
+    "SMAQ1N-009-ADDITIONAL-CONTEXT-INTEGRITY",
+    "SMAQ1N-010-HOOK-DEADLINE-AND-MALFORMED",
+    "SMAQ1N-011-PARENT-CHILD-PROVENANCE",
+    "SMAQ1N-012-RESTART-PARTITION-CONTINUITY",
+    "SMAQ1N-013-FOUR-CHANNEL-CONCURRENCY",
+    "SMAQ1N-014-FEEDBACK-LOOP-PREVENTION",
+    "SMAQ1N-015-SECRET-QUARANTINE",
+    "SMAQ1N-016-EMPTY-RESULT",
+    "SMAQ1N-017-OVERSIZED-CONTEXT-BOUND",
+    "SMAQ1N-018-CONDENSATION-REANCHOR"
+  ],
+  "qualification": {
+    "measured_namespace_empty": true,
+    "qualification_cleanup_verified": true,
+    "qualified_fixture": true
+  },
+  "qualified_fixture": true,
+  "raw_journal_sha256": "39a5172e17842264cef6396769562d35ccec23967e9eb1a57e2a5f47472cc3ba",
+  "receipt_type": "SMA_Q1_NATIVE_STEP15_EXECUTION",
+  "recorded_at": "2026-08-13T22:13:24.872656+00:00",
+  "report_sha256": "a5270f2e6e1e00d049a947418f0795c24bb8652538a84939a76493ee722c0782",
+  "scenario_results": [
+    {
+      "records": 10,
+      "scenario_id": "SMAQ1N-001-FIRST-PROMPT-EMPTY",
+      "status": "PASS"
+    },
+    {
+      "records": 10,
+      "scenario_id": "SMAQ1N-002-SAME-PARTITION-RECALL",
+      "status": "PASS"
+    },
+    {
+      "records": 10,
+      "scenario_id": "SMAQ1N-003-CROSS-PARTITION-DENIAL",
+      "status": "PASS"
+    }
+  ],
+  "schema_version": "1.0.0",
+  "started_repetitions": 30,
+  "started_scenario_ids": [
+    "SMAQ1N-001-FIRST-PROMPT-EMPTY",
+    "SMAQ1N-002-SAME-PARTITION-RECALL",
+    "SMAQ1N-003-CROSS-PARTITION-DENIAL"
+  ],
+  "started_scenarios": 3,
+  "status": "INCONCLUSIVE"
+}

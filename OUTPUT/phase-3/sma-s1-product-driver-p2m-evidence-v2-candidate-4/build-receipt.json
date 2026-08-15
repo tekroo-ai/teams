@@ -1,0 +1,39 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S1_PRODUCT_DRIVER_BUILD_RECEIPT",
+  "status": "PASS_ALL_FOURTEEN_HANDLERS_COMPILED",
+  "scope": "PROSPECTIVE_EVIDENCE_BOUNDARY_NO_MEASURED_S1_PRODUCT_CREDIT",
+  "recordedOn": "2026-08-14",
+  "compiler": "javac 21.0.12",
+  "jarTool": "jar 21.0.12",
+  "predecessor": {
+    "candidate": 3,
+    "handlerCheckStatus": "FAIL",
+    "gap": "JSON_NULL_SUPPRESSED_BY_MAP_SERIALIZER",
+    "measuredCreditImported": 0
+  },
+  "source": {
+    "path": "investigations/sma-q1/layered/driver-src-p2m-evidence-v2-candidate-4/ai/tekroo/sma/openhands/SmaS1QualificationDriver.java",
+    "sha256": "184fa7bc9bc468b55a9c94d134841161938b9572a7e359265620d84358ed7667"
+  },
+  "serviceArtifact": {
+    "path": "/Users/paul/work/tekroo-ai/sma-s1-p2m/target/sma-1.0-SNAPSHOT.jar",
+    "sha256": "c0ddb963798d45603c2e2685744892c40d3e841817f9c966ab7fad34f7e48765"
+  },
+  "compiledArtifact": {
+    "path": "OUTPUT/phase-3/sma-s1-product-driver-p2m-evidence-v2-candidate-4/sma-s1-product-driver-p2m-evidence-v2-candidate-4.jar",
+    "sha256": "65c7a477a6666f5ca72cb7da0f0aa197e4f6fa8cb66e12df3055299e00d06019"
+  },
+  "launcher": {
+    "path": "scripts/sma_s1_product_driver_p2m_evidence_v2_candidate_4.py",
+    "sha256": "4100c923d2419441ff22f09c6d3299e4aae50c40b8dc186e30f912770bf0f000"
+  },
+  "harnessSHA256": "14850c72cbcb9b76dac5af208f360b1bcd526b211cb8d38e67a448b0ed92f9c5",
+  "prospectiveCorrection": "Parent identity is a typed presence/value object, preserving observed absence without relying on null serialization.",
+  "implementedHandlerCount": 14,
+  "smaProductSourceChanged": false,
+  "modelOrOpenHandsProcessUsed": false,
+  "measuredS1Execution": false,
+  "scientificRepetitionsExecuted": 0,
+  "byteReproducibleArchiveClaimed": false
+}

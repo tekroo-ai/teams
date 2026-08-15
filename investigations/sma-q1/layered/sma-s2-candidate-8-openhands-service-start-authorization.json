@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_CANDIDATE_8_OPENHANDS_SERVICE_START_AUTHORIZATION",
+  "candidate": 8,
+  "status": "AUTHORIZED_CONSUMED_NO_START_REQUIRED",
+  "recordedOn": "2026-08-14",
+  "principalStatement": "AUTHORIZE one controlled start of the frozen Agent Canvas/agent-server services, preserving the paused Tekroo Trader conversation, followed only by health and active-work verification. This does not authorize the candidate-8 dress rehearsal or measured execution.",
+  "authorizedScope": [
+    "perform at most one controlled start of the frozen Agent Canvas/agent-server services if they are not already running",
+    "verify Agent Canvas and agent-server health",
+    "verify no unrelated OpenHands work is active",
+    "verify the preserved Tekroo Trader conversation remains paused"
+  ],
+  "notAuthorized": [
+    "candidate-8 dress rehearsal",
+    "measured execution",
+    "SMA or deterministic-stub invocation",
+    "real model calls",
+    "production or historical data access",
+    "OPENHANDS_SMA_BOUNDARY_QUALIFIED claim"
+  ],
+  "consumption": {
+    "controlledStartsPerformed": 0,
+    "reasonNoStartPerformed": "launchd reported the frozen Agent Canvas service running and host-level health checks returned HTTP 200 for both Agent Canvas and agent-server",
+    "healthVerificationsPerformed": 1,
+    "activeWorkAuditsPerformed": 1,
+    "dressRehearsalAttempts": 0,
+    "measuredExecutionAttempts": 0
+  }
+}

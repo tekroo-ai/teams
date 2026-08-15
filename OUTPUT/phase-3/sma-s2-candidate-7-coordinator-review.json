@@ -1,0 +1,107 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_CANDIDATE_7_COORDINATOR_REVIEW",
+  "candidate": 7,
+  "status": "PASS_READY_FOR_PRINCIPAL_REVIEW",
+  "recordedOn": "2026-08-14",
+  "recommendation": "GO_FOR_CANDIDATE_7_PRINCIPAL_ACCEPTANCE_FREEZE_ONLY",
+  "candidatePreregistration": {
+    "path": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-7.json",
+    "sha256": "66530bb10fe7e46f23e8f3f550c83a89203905cc844dba8732d8794dba9575d3"
+  },
+  "remediationAuthorization": {
+    "path": "investigations/sma-q1/layered/sma-s2-candidate-7-harness-remediation-authorization.json",
+    "sha256": "324f48993f463ede378b07b74246ee1cada349e177ef64c15027020379fe642b"
+  },
+  "finalArtifacts": {
+    "driver": {
+      "path": "scripts/sma_s2_measured_driver_candidate_5.py",
+      "sha256": "b14d75aff7c43558828b354312961adfe9a7e038daef19971f4bc7b8990eb799"
+    },
+    "configuration": {
+      "path": "investigations/sma-q1/layered/sma-s2-nonsecret-configuration-candidate-7.json",
+      "sha256": "32bc3c3fd03256a7ef6c44c60f5086b36235f95074f48356ece2e223031b9719"
+    },
+    "offlineHarness": {
+      "path": "scripts/sma_s2_measured_driver_offline_harness_candidate_5.py",
+      "sha256": "b0a67769223baf859be372859a314275cd9b5a749f53b194545f714ea53287f3"
+    },
+    "offlineReceipt": {
+      "path": "OUTPUT/phase-3/sma-s2-candidate-7-offline-harness-qualification-2/offline-harness-qualification-receipt.json",
+      "sha256": "f1061561784e2fd6730e2370365e90e2057afa1a779afa056ca8f5fe87f942b0"
+    }
+  },
+  "observed": [
+    "candidate 6 and every accepted predecessor remain unmodified",
+    "success observations require the exact deterministic agent MessageEvent after the submitted user event",
+    "fault observations require a ConversationErrorEvent after the submitted user event",
+    "the complete terminal observation signature must remain identical across two consecutive fetches",
+    "corpus seeding uses the candidate-bound deterministic conversation constructor with max_iterations 1 and without default profiles, default tools, encrypted-secret configuration, or real-model execution",
+    "HTTP boundary failures retain sanitized status and digest evidence without copying response bodies or secrets",
+    "the future measured fence requires a passing identity-bound 34-operation no-credit dress-rehearsal receipt",
+    "the final offline harness passed 11 of 11 tests under optimized Python",
+    "the final offline harness made no network call, OpenHands conversation, SMA or stub invocation, dress-rehearsal attempt, or measured attempt"
+  ],
+  "computed": {
+    "semanticCaseCount": 20,
+    "plannedRepetitionCount": 103,
+    "predicateCount": 59,
+    "requiredEvidenceCount": 10,
+    "dressRehearsalOperationCount": 34,
+    "fastTerminalDressRepetitions": 10,
+    "candidate7OfflineTestCount": 11,
+    "candidate7OfflinePassCount": 11,
+    "candidate7OfflineFailCount": 0,
+    "retainedNonqualifyingReceiptCount": 1,
+    "dressRehearsalAttempts": 0,
+    "measuredExecutionAttempts": 0
+  },
+  "inferred": [
+    "the two identified candidate-6 harness omissions are closed at the offline contract level",
+    "candidate 7 is ready for a candidate-specific principal acceptance/freeze decision",
+    "acceptance alone must not be construed as authorization for execution-identity creation, a live dress rehearsal, or measured execution"
+  ],
+  "negativeControls": [
+    "success terminal status without the exact agent terminal event",
+    "wrong deterministic terminal message",
+    "fault operation without a ConversationErrorEvent",
+    "single-fetch terminal event visibility",
+    "unbound corpus source constructor",
+    "corpus seed factory not restored",
+    "unsanitized HTTP boundary failure",
+    "incomplete dress-rehearsal plan",
+    "identity or endpoint mismatch",
+    "missing, mutated, failing, unclean, credit-bearing, or claim-bearing dress receipt",
+    "mutated acceptance or dependency closure",
+    "Python optimization and default-deny bypass"
+  ],
+  "retainedZeroCreditReceipts": [
+    {
+      "path": "OUTPUT/phase-3/sma-s2-candidate-7-offline-harness-qualification/offline-harness-qualification-receipt.json",
+      "sha256": "ec2dd48bd5a46e6e6ee2f6f015c28cf32788cf22f64eea3ca0f20217b866b65f",
+      "status": "FAIL",
+      "reason": "the synthetic fast-terminal regression fixture omitted the frozen literalPrompt field"
+    }
+  ],
+  "semanticChangeAssessment": {
+    "casePredicatesChanged": false,
+    "thresholdsChanged": false,
+    "faultScheduleChanged": false,
+    "claimChanged": false,
+    "productCodeChanged": false,
+    "qualificationHarnessObservationChanged": true,
+    "qualificationCorpusConstructionChanged": true,
+    "qualificationPrerequisiteCoverageChanged": true
+  },
+  "notAuthorized": [
+    "candidate-7 acceptance or freeze by the coordinator",
+    "execution-identity creation or acceptance",
+    "live dress rehearsal",
+    "measured execution",
+    "OpenHands conversation creation",
+    "SMA or deterministic-stub network invocation",
+    "real model calls",
+    "OPENHANDS_SMA_BOUNDARY_QUALIFIED claim"
+  ],
+  "nextDecision": "PRINCIPAL_ACCEPT_FREEZE_OR_REJECT_CANDIDATE_7"
+}

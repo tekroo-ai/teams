@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_Q1_EXECUTION_ATTEMPT_ADJUDICATION",
+  "attempt": "V3_INITIAL",
+  "classification": "COMPUTED_FROM_RETAINED_RAW_JOURNAL",
+  "status": "INCONCLUSIVE",
+  "decision": "NO_GO",
+  "manifestSHA256": "6b683faf7437a454395c9691ab29f71cdcb1e221e19679fba471b9671c99ecc9",
+  "harnessSHA256": "59ea7d1b3bc5562993e801a361620c1a748be8423f78c579e486b27270e5fef7",
+  "rawJournalSHA256": "250200bb95e8a4d7ab0b0f7e0fe1645b65e2370234dacd4fef5582db10318811",
+  "preflight": "PASS",
+  "fixtureQualification": "NOT_STARTED_BEYOND_EMPTY_NAMESPACE_CHECK",
+  "startedScenarioIds": [],
+  "startedRepetitions": 0,
+  "notRunScenarios": 18,
+  "notRunRepetitions": 96,
+  "terminal": {
+    "primaryDefect": "Qualification workspaces lacked the repository .openhands hook symlink, so hook discovery stopped before source conversation creation.",
+    "receiptDefect": "The final receipt referenced qualification_result before assignment, preventing the original harness from writing execution-receipt.json."
+  },
+  "cleanup": {
+    "qualificationCleanupVerified": true,
+    "measuredCleanupVerified": true,
+    "conversationsCreated": 0,
+    "serviceAbsent": true,
+    "bridgeAbsent": true,
+    "mongoAbsent": true,
+    "semanticCollectionAbsent": true,
+    "episodicCollectionAbsent": true,
+    "runRootAbsent": true
+  },
+  "scenarioResultClaim": "NONE",
+  "correctiveRerunPermitted": true
+}

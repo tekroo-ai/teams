@@ -1,0 +1,51 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_MEASURED_DRIVER_SUCCESSOR_REMEDIATION_AUTHORIZATION_CONSUMPTION",
+  "consumptionId": "SMA-S2-MEASURED-DRIVER-SUCCESSOR-REMEDIATION-20260814-CONSUMPTION",
+  "status": "CONSUMED_COMPLETE_NO_REUSE",
+  "recordedOn": "2026-08-14",
+  "authorization": {
+    "path": "investigations/sma-q1/layered/sma-s2-measured-driver-successor-remediation-authorization.json",
+    "sha256": "f8dc89e172815436e4224c94e3f7bfe01dc458a7472ad484a81fe9b48f0fb4d5"
+  },
+  "successorPreregistration": {
+    "path": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-3.json",
+    "sha256": "6271d240faa4ad88cbbe6048dfd35f55456b770a9be862adb2cad9ce059bb622",
+    "status": "SUCCESSOR_CANDIDATE_NOT_ACCEPTED_NOT_AUTHORIZED"
+  },
+  "readinessReceipt": {
+    "path": "OUTPUT/phase-3/sma-s2-measured-driver-successor-readiness-candidate-3.json",
+    "sha256": "383e8b9c037026f604f8d84ad7ab37186b404fcb6b0933936b6b4013fc01445b",
+    "status": "REMEDIATION_PASS_SUCCESSOR_READY_FOR_INDEPENDENT_REVIEW_NOT_ACCEPTED_NOT_AUTHORIZED"
+  },
+  "reviewDocument": {
+    "path": "docs/architecture/059-sma-s2-measured-driver-successor-readiness.md",
+    "sha256": "b40ec3e457b8186f5558c89ab5991a43990343acc25e44346225c87d667076a9"
+  },
+  "performed": {
+    "exactCorpusImplemented": true,
+    "measuredDriverImplemented": true,
+    "offlineDriverQualificationPerformed": true,
+    "successorPreregistrationBound": true,
+    "finalOfflineTests": 10,
+    "finalOfflinePasses": 10,
+    "finalOfflineFailures": 0,
+    "livePreflightAttempts": 0,
+    "openhandsConversations": 0,
+    "deterministicStubInvocations": 0,
+    "serviceStartsOrRestarts": 0,
+    "measuredCases": 0,
+    "measuredRepetitions": 0,
+    "realModelCalls": 0,
+    "measuredNamespacesCreated": 0
+  },
+  "authority": {
+    "authorizationReusable": false,
+    "candidateAcceptedFrozen": false,
+    "livePreflightAuthorized": false,
+    "executionIdentityAuthorized": false,
+    "measuredExecutionAuthorized": false,
+    "measuredExecutionState": "NOT_RUN",
+    "nextGate": "INDEPENDENT_REVIEW_AND_PRINCIPAL_ACCEPT_FREEZE_OF_CANDIDATE_3"
+  }
+}

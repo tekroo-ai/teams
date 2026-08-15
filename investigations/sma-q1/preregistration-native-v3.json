@@ -1,0 +1,167 @@
+{
+  "schemaVersion": "3.0.0",
+  "recordType": "INVESTIGATION_PREREGISTRATION_AMENDMENT",
+  "amendmentId": "SMA-Q1-NATIVE-OPENHANDS-VERTICAL-SLICE-V3",
+  "status": "FROZEN_ACCEPTED_NOT_EXECUTED",
+  "recordedOn": "2026-08-13",
+  "timePrecision": "DAY",
+  "purpose": "Repair the Step 15 fixture-readiness and receipt defects prospectively without changing the frozen v2 scientific question, scenario corpus, prompts, faults, repetitions, thresholds, stop conditions, or adjudication meanings.",
+  "supersession": {
+    "priorAmendmentId": "SMA-Q1-NATIVE-OPENHANDS-VERTICAL-SLICE-V2",
+    "priorManifest": "investigations/sma-q1/preregistration-native-v2.json",
+    "priorManifestSHA256": "c618371d571d5333aebd2bdc83d2db2559115f5ec3e1903b33e8e0ab157edf5d",
+    "effect": "ACCEPTED_SUCCESSOR_FOR_FUTURE_EXECUTION_ONLY",
+    "priorExecutionState": "INCONCLUSIVE",
+    "priorResultClaim": "NO_SMA_Q1_PASS",
+    "preservation": "The v2 manifest, both v2 execution attempts, their cleanup evidence, and the v2 adjudication remain immutable historical records. No v2 repetition is credited to v3."
+  },
+  "unchangedBase": {
+    "bindingManifest": "investigations/sma-q1/preregistration-native-v2.json",
+    "bindingManifestSHA256": "c618371d571d5333aebd2bdc83d2db2559115f5ec3e1903b33e8e0ab157edf5d",
+    "unchangedFields": [
+      "decisiveQuestion",
+      "architectureReconciliation",
+      "authorityBoundary",
+      "identityModel",
+      "syntheticMemoryCorpus",
+      "scenarioCorpus",
+      "wp5EvidenceMap",
+      "step15ReservedScenarioIds",
+      "evidenceEligibility",
+      "thresholds",
+      "requiredRawReceiptsPerScenario",
+      "stopConditions",
+      "adjudication.pass",
+      "adjudication.fail",
+      "adjudication.inconclusive",
+      "adjudication.defaultIfInconclusive"
+    ],
+    "scenarioCount": 18,
+    "repetitionCount": 96,
+    "scenarioCreditFromPriorAttempts": 0
+  },
+  "observedV2Evidence": {
+    "classification": "OBSERVED",
+    "initialAttempt": {
+      "receipt": "OUTPUT/phase-3/sma-q1n-step15-v2/execution-receipt.json",
+      "receiptFileSHA256": "ae59bac40d650d421c6a56494d6df888b012a892eefd1d202628a1c18d46d767",
+      "rawJournalSHA256": "bf8c4ecdb9c82c37cb5a4bac64748c32cc29c56d7ff6f5f5dc03bb38ded419ae",
+      "terminal": "HARNESS_FIXTURE_DEFECT"
+    },
+    "correctiveRerun": {
+      "receipt": "OUTPUT/phase-3/sma-q1n-step15-v2-rerun1/execution-receipt.json",
+      "receiptFileSHA256": "28d25f57631c3c8061ab5f2aca0f4fc442c4aced6362542194b50e0cf3b0760c",
+      "rawJournalSHA256": "772cb3d46f74b86110dedc8e2fa07491a03720d6be079aae53deb0b0e43b5226",
+      "terminal": "OPAQUE_FIXTURE_CARDINALITY_ASSERTION"
+    },
+    "completedScenarioFloor": {
+      "scenarioId": "SMAQ1N-001-FIRST-PROMPT-EMPTY",
+      "repetitionsObservedPassingPerAttempt": 10,
+      "v3Credit": 0
+    },
+    "notRunFloor": {
+      "scenarioCount": 17,
+      "repetitionCount": 86
+    },
+    "safetyClaim": "No v2 safety breach was observed before either harness terminal. This is not evidence that the unexecuted safety scenarios pass."
+  },
+  "sourceGroundedProjectionRule": {
+    "classification": "COMPUTED_FROM_PINNED_SOURCE",
+    "smaCommit": "60a966234166ea75f767b25e3cbb7eaabe4064a2",
+    "smaTree": "7aaa06a68d59dd6f13b0a3a2c6ae3cff845c1121",
+    "replayWorker": {
+      "path": "/Users/paul/work/tekroo-ai/sma-step15/src/main/java/ai/tekroo/sma/replay/ReplayWorker.java",
+      "sha256": "36b9452cf9f7ed4586c6ac0c9ad6b6d2ea201f02788c4eea3766be43f0cf5773",
+      "rule": "A successful eligible replay always upserts the memory into the episodic collection and a first successful replay bootstraps a semantic upsert."
+    },
+    "qdrantVectorStore": {
+      "path": "/Users/paul/work/tekroo-ai/sma-step15/src/main/java/ai/tekroo/sma/vector/QdrantVectorStore.java",
+      "sha256": "ebde338949a6267809f35712ed7fd10267d6f95aae0fb1232a079c7134e32e93",
+      "rule": "Each point ID is Java UUID.nameUUIDFromBytes over the actual memory ID; each point payload retains memory_id and agent_id; repeat upserts for the same memory replace the same point."
+    },
+    "fixtureConsequence": "For the three distinct eligible synthetic memories, fixture readiness requires three identified semantic points and three identified episodic points. The raw ineligible memory requires no point in either collection. Collection totals are a derived cross-check, not the primary receipt."
+  },
+  "amendments": {
+    "fixtureQualificationBeforeScenarioOne": {
+      "required": true,
+      "scenarioCredit": 0,
+      "isolation": "Use dedicated disposable qualification MongoDB, Qdrant, workspace, conversation, launchd, and receipt namespaces distinct from the measured-run namespaces.",
+      "steps": [
+        "Verify every qualification namespace absent before use.",
+        "Create the exact four synthetic source events through authenticated persisted OpenHands events.",
+        "Observe four raw MongoDB memories with their actual memory IDs, source references, agent partitions, lifecycle states, eligibility flags, and document versions.",
+        "Promote exactly the three eligible memories using the same pinned replay path used by the measured run.",
+        "Before any cleanup, retrieve each expected semantic and episodic point by its deterministic point ID and retain its actual payload, vector-presence indicator, collection, and HTTP result.",
+        "Before any cleanup, prove the ineligible raw memory's deterministic point ID is absent from both collections.",
+        "Before any cleanup, retain exact collection counts and reconcile them against the per-memory receipts.",
+        "Exercise one same-partition retrieval, one cross-partition no-hit, and one raw-ineligible no-hit without granting scenario credit.",
+        "Delete every qualification artifact and verify every qualification namespace absent.",
+        "Reverify every measured-run namespace absent before scenario 1."
+      ],
+      "terminal": "Any missing, contradictory, or unrecorded qualification receipt yields INCONCLUSIVE before scenario 1; cleanup still runs."
+    },
+    "measuredCorpusReadiness": {
+      "required": true,
+      "timing": "Scenario 1 remains an empty-partition measurement. The measured synthetic corpus is created only after scenario 1 and before scenario 2.",
+      "receipts": "Repeat the same per-memory MongoDB and Qdrant receipts used in qualification. Persist observed values before evaluating readiness and before cleanup.",
+      "cardinality": "Derive expected totals from the set of distinct successfully replayed eligible memory IDs; never emit an assertion that omits the observed totals and point-level evidence."
+    },
+    "scenarioStartAccounting": {
+      "rule": "A scenario is started only when its first SCENARIO_REPETITION record is durably appended. Fixture setup, qualification, and a terminal before the first repetition do not increment started_scenarios.",
+      "requiredSummaryFields": [
+        "qualified_fixture",
+        "started_scenario_ids",
+        "completed_scenario_ids",
+        "not_run_scenario_ids",
+        "started_repetitions",
+        "completed_repetitions",
+        "not_run_repetitions"
+      ]
+    },
+    "parentChildCriterion": {
+      "rule": "SMAQ1N-011 may pass only when the raw OpenHands transcript contains actual delegated-child causation, not merely an API-created child topology.",
+      "clientToolArtifact": "investigations/sma-q1/launch-child-conversation-client-tool.json",
+      "clientToolArtifactSHA256": "89575b6d659666f45b51c3d963b421cd174fd23e84b394714b2580b1a74e2c29",
+      "clientToolCanonicalSHA256": "8e54d11695c82a423478420405a40388f125c240ddac0a786e6d7f829a14f290",
+      "clientToolSourceObservation": "The pinned artifact exactly matched the launch_child_conversation client_tools entry returned by the authenticated Agent Server conversation detail API on 2026-08-13.",
+      "requiredEvidence": [
+        "parent model action or supported task/delegate tool invocation that requests the child",
+        "child conversation ID and parent conversation ID",
+        "parent sub-conversation membership",
+        "child persisted event identities and ordering",
+        "workspace, profile, and resolved partition for parent and child",
+        "the client launch result containing the child identity persisted in the parent transcript; the child task output is not required because this Canvas tool is explicitly asynchronous"
+      ],
+      "unsupportedOutcome": "If the pinned profile/runtime cannot perform actual delegation, report SMAQ1N-011 INCONCLUSIVE; do not relabel API topology as delegation."
+    },
+    "logicalRepetitionAccounting": {
+      "rule": "A logical scenario repetition may contain one direct bridge probe, one native hook probe, and one OpenHands model-boundary probe when the frozen measurement requires all three. Record each probe separately and count the logical repetition once in scenario totals."
+    },
+    "oversizedFixture": {
+      "rule": "SMAQ1N-017 may create only the minimum deterministic eligible synthetic memories needed to exceed the frozen count or character bound. Record their full synthetic identities and delete them during cleanup; they are fault fixtures, not additions to the four-memory base corpus."
+    },
+    "latencyAggregation": {
+      "rule": "Every preregistered latency class retains all raw durations and warm/cold labels. The final receipt names the included scenario/probe set and applies the frozen nearest-rank method. Missing durations are not imputed."
+    }
+  },
+  "v3DisposableNamespaces": {
+    "qualification": {
+      "mongoDatabase": "sma_q1n_step15_v3_fixture_20260813",
+      "qdrantSemanticCollection": "sma_q1n_step15_v3_fixture_semantic_20260813",
+      "qdrantEpisodicCollection": "sma_q1n_step15_v3_fixture_episodic_20260813",
+      "runRoot": "/Users/paul/work/tekroo-ai/sma-step15/target/sma-q1n-step15-20260813-v3-fixture"
+    },
+    "measuredRun": {
+      "mongoDatabase": "sma_q1n_step15_20260813_v3",
+      "qdrantSemanticCollection": "sma_q1n_step15_v3_semantic_20260813",
+      "qdrantEpisodicCollection": "sma_q1n_step15_v3_episodic_20260813",
+      "runRoot": "/Users/paul/work/tekroo-ai/sma-step15/target/sma-q1n-step15-20260813-v3"
+    }
+  },
+  "rerunPolicy": "No threshold, prompt, memory, expected result, or evidence rule may change after v3 is frozen. One corrective v3 rerun is permitted only for a newly documented harness defect that could not have altered an SMA outcome; retain and adjudicate every attempt. Qualification failure does not authorize repeated probing outside this rule.",
+  "acceptanceState": "ACCEPTED_AND_FROZEN",
+  "executionState": "NOT_STARTED",
+  "scenarioResultClaimAuthorized": false,
+  "step15ExecutionAuthorized": false,
+  "executionAuthorizationArtifactRequired": true
+}

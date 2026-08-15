@@ -1,0 +1,44 @@
+{
+  "name": "launch_child_conversation",
+  "description": "Start a NEW, independent conversation to work on a well-scoped task in parallel with this one, without the user having to run any CLI command. The new conversation is recorded as a child of this one.\n\nThe child runs on its own. It does not block you, you do not see its output,\nand it cannot see this conversation's history — everything it needs must be in\nthe task brief.\n\nChoosing target:\n\n* target=\"local\" — runs on the same machine, in this conversation's workspace.\n  Fast, no repository clone, no sandbox provisioning. Use this by default when\n  the work is on code that is already checked out here.\n\n* target=\"cloud\" — runs on OpenHands Cloud in its own isolated sandbox, from a\n  git repository. Use this when the work should not touch the user's machine or\n  when it needs a repository that is not checked out locally. Requires the user\n  to have an OpenHands Cloud backend connected in Agent Canvas; if none is\n  connected you will be told so and should fall back to target=\"local\".\n\nWriting the task brief:\n\n* Put everything the child needs in \"task\": the goal, the relevant file paths,\n  the constraints, the expected deliverable, and how it should report back.\n* Keep each child's scope independent of its siblings so parallel children do\n  not fight over the same files.\n* One call per delegated task. Do NOT call this tool twice for the same task.\n\nParameter rules (a call that breaks one of these launches nothing and comes\nback with corrective guidance):\n\n* \"repository\" and \"branch\" apply to target=\"cloud\" only. A local child always\n  inherits this conversation's workspace, so do not pass them with\n  target=\"local\".\n* \"isolation\" applies to target=\"local\" only. Cloud sandboxes are always\n  isolated, so do not pass it with target=\"cloud\".\n* isolation=\"worktree\" (the default) gives the child its own git worktree and\n  branch, cut from the repository's default branch — it will NOT see this\n  conversation's uncommitted or committed work. isolation=\"shared\" puts the\n  child in this conversation's exact directory; only choose it when the child\n  genuinely must see work in progress, and expect the two agents to conflict.\n\nWhat comes back: this tool is acknowledged immediately, before the conversation\nexists. The real outcome arrives moments later as a follow-up message starting\nwith \"[child-conversation]\" that carries the child's\nconversation id, URL, target and initial status — or an error with guidance.\nWait for it, then tell the user what you launched and give them the URL. If it\nreports an error, fix the parameters and call this tool again.",
+  "parameters": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "target": {
+        "type": "string",
+        "enum": ["local", "cloud"],
+        "description": "Where the child runs. 'local' reuses this machine and this conversation's workspace; 'cloud' runs in an isolated OpenHands Cloud sandbox."
+      },
+      "task": {
+        "type": "string",
+        "description": "Self-contained task brief, sent as the child's first message. The child cannot see this conversation, so state the goal, constraints, expected output and handoff criteria."
+      },
+      "title": {
+        "type": "string",
+        "description": "Optional short title for the child conversation. Omit to let it title itself from the task."
+      },
+      "repository": {
+        "type": "string",
+        "description": "target='cloud' only. Repository to clone into the sandbox, as 'owner/repo'. Defaults to this conversation's repository when it has one."
+      },
+      "branch": {
+        "type": "string",
+        "description": "target='cloud' only, and only together with 'repository'. Defaults to the repository's default branch."
+      },
+      "isolation": {
+        "type": "string",
+        "enum": ["worktree", "shared"],
+        "description": "target='local' only. 'worktree' (default) gives the child its own git worktree and branch; 'shared' runs it in this conversation's exact directory."
+      }
+    },
+    "required": ["target", "task"]
+  },
+  "annotations": {
+    "title": null,
+    "readOnlyHint": false,
+    "destructiveHint": false,
+    "idempotentHint": false,
+    "openWorldHint": true
+  }
+}

@@ -1,0 +1,111 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_CANDIDATE_8_COORDINATOR_REVIEW",
+  "candidate": 8,
+  "status": "PASS_READY_FOR_PRINCIPAL_REVIEW",
+  "recordedOn": "2026-08-14",
+  "recommendation": "GO_FOR_CANDIDATE_8_PRINCIPAL_ACCEPTANCE_FREEZE_ONLY",
+  "candidatePreregistration": {
+    "path": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-8.json",
+    "sha256": "d81f6878a0b06462b792e50d7bd3e8708e971ce888d22a95751127ccbaa35231"
+  },
+  "remediationAuthorization": {
+    "path": "investigations/sma-q1/layered/sma-s2-candidate-8-workspace-isolation-remediation-authorization.json",
+    "sha256": "b25ce461723310bfa4fa4604356c229efffacf188f24d6fd6a3a179d2ef833da"
+  },
+  "finalArtifacts": {
+    "driver": {
+      "path": "scripts/sma_s2_measured_driver_candidate_6.py",
+      "sha256": "717d29b96107c7cc86c1aeceeeb9b32ab9aa8776bf6b3ec18496dd86a0305d38"
+    },
+    "configuration": {
+      "path": "investigations/sma-q1/layered/sma-s2-nonsecret-configuration-candidate-8.json",
+      "sha256": "3cc553c6a618b2e4ca6151906c700805303012ef0cb49d270c33291edd517f44"
+    },
+    "offlineHarness": {
+      "path": "scripts/sma_s2_measured_driver_offline_harness_candidate_6.py",
+      "sha256": "2365421604e45518826dbed4b5b03fccd445943997873e9363d5c8c2db55cd62"
+    },
+    "offlineReceipt": {
+      "path": "OUTPUT/phase-3/sma-s2-candidate-8-offline-workspace-isolation-qualification-2/offline-workspace-isolation-qualification-receipt.json",
+      "sha256": "c2ae00d8e23944f9e7fb62ba706bc3b2afe9c24929021904b5d466e8bb990175"
+    }
+  },
+  "observed": [
+    "candidate 7, its accepted execution identity, consumed dress authority, receipt, raw journal, and adjudication remain unmodified",
+    "all case-1 repetitions are routed through /tmp/tekroo-sma-s2-successor-candidate-8/actor-empty",
+    "the exact SMA capture allowlist contains only actor-alpha and actor-beta",
+    "case 1 fails closed if the candidate SMA bridge or service is active",
+    "case-1 evidence retains the EMPTY_UNCAPTURED role and hashed workspace/allowlist identities",
+    "the four-source corpus continues to use candidate-bound deterministic source construction inherited from candidate 7",
+    "future identity, dress authorization, dress receipt, and measured authorization fences require the exact workspace-isolation object",
+    "cleanup adds C8-WORKSPACE-CLEANUP and emptyWorkspaceAbsent evidence",
+    "the final optimized-Python offline harness passed 13 of 13 tests",
+    "offline qualification made no network call, OpenHands conversation, SMA or stub invocation, live dress attempt, or measured attempt"
+  ],
+  "computed": {
+    "semanticCaseCount": 20,
+    "plannedMeasuredRepetitionCount": 103,
+    "predicateCount": 59,
+    "requiredEvidenceCount": 10,
+    "dressRehearsalOperationCount": 34,
+    "case1DressRepetitionCount": 10,
+    "syntheticCorpusSourceCount": 4,
+    "captureAllowlistWorkspaceCount": 2,
+    "candidate8OfflineTestCount": 13,
+    "candidate8OfflinePassCount": 13,
+    "candidate8OfflineFailCount": 0,
+    "artifactReferencesChecked": 29,
+    "artifactReferenceMismatchCount": 0,
+    "liveDressRehearsalAttempts": 0,
+    "measuredExecutionAttempts": 0
+  },
+  "inferred": [
+    "the candidate-7 10-plus-4 workspace capture-contamination mechanism is closed at the offline contract level",
+    "candidate 8 is ready for a candidate-specific principal acceptance/freeze decision",
+    "acceptance alone must not be construed as authorization for execution-identity creation, a live dress rehearsal, or measured execution"
+  ],
+  "negativeControls": [
+    "case-1 workspace equal to actor-alpha",
+    "actor-empty added to the capture allowlist",
+    "actor-alpha omitted from the capture allowlist",
+    "case-1 workspace outside the candidate-owned root",
+    "synthetic corpus source count changed from four",
+    "runtime allowlist contains actor-empty",
+    "case 1 runs with candidate service or bridge active",
+    "historical ten-case-1 plus four-seed shared-workspace population",
+    "workspace-mutated execution identity",
+    "workspace-mutated dress authorization",
+    "workspace-mutated dress receipt",
+    "Python optimization and default-deny bypass"
+  ],
+  "retainedZeroCreditReceipts": [
+    {
+      "path": "OUTPUT/phase-3/sma-s2-candidate-8-offline-workspace-isolation-qualification/offline-workspace-isolation-qualification-receipt.json",
+      "sha256": "036bfbdbd4ab4e56b9f09c7fe2558c6d9962c5e548dce288855732a9a6c37149",
+      "status": "PASS_SUPERSEDED_WITHOUT_LIVE_OR_RESULT_CREDIT",
+      "reason": "superseded when the exact historical 10-plus-4 contamination simulation was added"
+    }
+  ],
+  "semanticChangeAssessment": {
+    "casePredicatesChanged": false,
+    "thresholdsChanged": false,
+    "faultScheduleChanged": false,
+    "claimChanged": false,
+    "productCodeChanged": false,
+    "qualificationWorkspaceIsolationChanged": true,
+    "qualificationEvidenceAndCleanupChanged": true
+  },
+  "notAuthorized": [
+    "candidate-8 acceptance or freeze by the coordinator",
+    "execution-identity creation or acceptance",
+    "live state preflight",
+    "live dress rehearsal",
+    "measured execution",
+    "OpenHands conversation creation",
+    "SMA or deterministic-stub network invocation",
+    "real model calls",
+    "OPENHANDS_SMA_BOUNDARY_QUALIFIED claim"
+  ],
+  "nextDecision": "PRINCIPAL_ACCEPT_FREEZE_OR_REJECT_CANDIDATE_8"
+}

@@ -1,0 +1,111 @@
+{
+  "schema": "tekroo.sma.s1.advance-gap-adjudication.v1",
+  "created_at_utc": "2026-08-14T00:09:29Z",
+  "claim_labels": {
+    "runtime_inputs": "OBSERVED",
+    "source_comparison": "COMPUTED",
+    "measured_s1_result": "NOT_RUN"
+  },
+  "scope": {
+    "purpose": "prospective remediation adjudication before measured SMA-S1 execution",
+    "measured_s1_authorized": false,
+    "measured_s1_executed": false,
+    "sma_production_mutated_by_teams_coordinator": false,
+    "product_credit_awarded": false
+  },
+  "bound_identity": {
+    "sma_commit": "e89ff9e0bab192689122d5e7b9d36d16cae5d368",
+    "sma_service_jar_sha256": "ead8c0c5d9e3fd37b61318d2bdb8a97ef5c4c7481c11ed453777492f39f71042",
+    "accepted_s1_preregistration_sha256": "e663f5b732c22248adc5fab2f536dbf02dd72337f7c8428f225937e72d6a7f8c",
+    "layered_qualification_design_sha256": "1700db925d2b8a42cc3df073b9d678dd971dc0d604bb6f01d2b35488350ebfff",
+    "handler_check_receipt_sha256": "2a65784dd8565f287090aaee58b59790cfb175882515120c109c9c4bdbd2f612",
+    "handler_check_journal_sha256": "12588e0ef8b1d00da1f5019313a2f2d039f450fd1bf4b914c37595ab0c045b4b"
+  },
+  "source_evidence": [
+    {
+      "path": "/Users/paul/work/tekroo-ai/sma/src/main/java/ai/tekroo/sma/openhands/OpenHandsEventIntakeService.java",
+      "sha256": "21a0d02ff42f42351c3a90c49118ca5c7c35fa67947fd7a2d2498f17b99a7fbc"
+    },
+    {
+      "path": "/Users/paul/work/tekroo-ai/sma/src/main/java/ai/tekroo/sma/retrieval/SmaRetrievalService.java",
+      "sha256": "2df39555d4eb1be01c9915843bb780f5f3490f6174f6f6e36bd899579cbf709c"
+    },
+    {
+      "path": "/Users/paul/work/tekroo-ai/sma/src/main/java/ai/tekroo/sma/openhands/OpenHandsBridgeServer.java",
+      "sha256": "ed66268d08e98d80ba6ac1c054f64bd599d953ac97763ba7ddea6f9e3c0b078b"
+    },
+    {
+      "path": "/Users/paul/work/tekroo-ai/sma/src/main/java/ai/tekroo/sma/domain/Memory.java",
+      "sha256": "3fb416691beddafcce76771f0c67855d69159d38b59f6431d3e738f5947175cb"
+    },
+    {
+      "path": "/Users/paul/work/tekroo-ai/sma/docs/OPENHANDS_SMA_INTEGRATION_PLAN.md",
+      "sha256": "8bc32fe52eefc56583259a0e8c207719ac03369d8ce4a4b549190a58fec6ccd4"
+    },
+    {
+      "path": "/Users/paul/work/tekroo-ai/sma/docs/PROGRAMMING_MEMORY_ADAPTER_AND_CONTEXT_PROTOCOL.md",
+      "sha256": "e93482d443aed5acf66346b34c4450048e7fd9b3f73ccc5b0adda83b2114eafb"
+    }
+  ],
+  "cases": [
+    {
+      "case_id": "007",
+      "subject": "parent-child provenance",
+      "adjudication": "CONFIRMED_PRODUCT_GAP",
+      "action": "REMEDIATE_PROSPECTIVELY",
+      "remediation_id": "R1"
+    },
+    {
+      "case_id": "010",
+      "subject": "feedback-loop prevention",
+      "adjudication": "INCONCLUSIVE_FIXTURE_CONTRACT_UNBOUND",
+      "action": "BIND_SUPPORTED_OPENHANDS_EVENT_DISCRIMINATOR",
+      "prerequisite_id": "P1"
+    },
+    {
+      "case_id": "011",
+      "subject": "secret quarantine",
+      "adjudication": "INCONCLUSIVE_POLICY_UNBOUND",
+      "action": "FREEZE_SENSITIVITY_AND_RAW_RETENTION_POLICY",
+      "prerequisite_id": "P2"
+    },
+    {
+      "case_id": "012",
+      "subject": "irrelevant-query rejection",
+      "adjudication": "CONFIRMED_PRODUCT_GAP",
+      "action": "REMEDIATE_PROSPECTIVELY",
+      "remediation_id": "R2"
+    },
+    {
+      "case_id": "013",
+      "subject": "whole-memory context budgeting",
+      "adjudication": "CONFIRMED_PRODUCT_GAP",
+      "action": "REMEDIATE_PROSPECTIVELY",
+      "remediation_id": "R3"
+    },
+    {
+      "case_id": "014",
+      "subject": "delivery manifest and condensation re-anchor",
+      "adjudication": "CONFIRMED_PRODUCT_GAP",
+      "action": "REMEDIATE_PROSPECTIVELY",
+      "remediation_id": "R4"
+    }
+  ],
+  "totals": {
+    "cases_reviewed": 6,
+    "confirmed_product_gaps": 4,
+    "inconclusive_prerequisite_bindings": 2
+  },
+  "gate": {
+    "measured_s1": "NO_GO",
+    "sma_remediation_handoff": "READY_FOR_INDEPENDENT_EXECUTION",
+    "requirements_before_new_s1_identity": [
+      "review and accept a prospective SMA commit implementing R1 through R4",
+      "resolve P1 from exact supported OpenHands primary evidence",
+      "freeze P2 sensitivity and raw-retention policy",
+      "revise affected driver fixtures prospectively",
+      "repeat non-creditable clean-build, control, and handler checks",
+      "complete all environment and configuration identity bindings"
+    ]
+  }
+}

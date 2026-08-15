@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "OPENHANDS_TERMINAL_ERROR_EVIDENCE",
+  "recordedOn": "2026-08-13",
+  "classification": "OBSERVED",
+  "conversationId": "6ba7ebda-7685-4432-baae-9b638c48dd4d",
+  "sourceLog": "/Users/paul/.openhands/agent-canvas/logs/agent-canvas.2026-08-13.log",
+  "sourceLogSHA256ObservedAfterCleanup": "07c4bfc5ef1c8a18d6293ef7d26d2775248a115f980d1c78778038b336d43157",
+  "sourceLocations": [
+    {
+      "line": 5156,
+      "observation": "OpenHands created conversation 6ba7ebda-7685-4432-baae-9b638c48dd4d."
+    },
+    {
+      "line": 5549,
+      "observation": "OpenHands logged: Agent reached maximum iterations limit (3)."
+    },
+    {
+      "line": 5550,
+      "observation": "OpenHands logged task_00000001 stopped with status error."
+    },
+    {
+      "line": 5636,
+      "observation": "OpenHands again logged: Agent reached maximum iterations limit (3)."
+    }
+  ],
+  "runnerObservation": {
+    "rawJournalKind": "RUN_FAILURE",
+    "message": "conversation emitted a terminal error",
+    "messageSHA256": "5bc56f58328b71be3095fe69e17760d53319d260e438fd488abfc62f6a5a754e"
+  },
+  "computedLinkage": "The conversation created at log line 5156 is the temporary conversation deleted in the V6 cleanup receipt and is the conversation active when the maximum-iteration terminal events were logged.",
+  "causalLimit": "The receipts establish the OpenHands maximum-iteration terminal condition. They do not establish why the model used all three iterations."
+}

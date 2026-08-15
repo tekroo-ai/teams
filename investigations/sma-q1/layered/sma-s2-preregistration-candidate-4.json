@@ -1,0 +1,156 @@
+{
+  "schemaVersion": "1.0.0-candidate",
+  "recordType": "LAYERED_QUALIFICATION_PREREGISTRATION",
+  "lineageId": "SMA-S2",
+  "status": "SUCCESSOR_CANDIDATE_NOT_ACCEPTED_NOT_AUTHORIZED",
+  "recordedOn": "2026-08-14",
+  "purpose": "Prospective successor that binds every accepted S2 predicate and required-evidence clause to an explicit negative-controlled oracle.",
+  "decisiveQuestion": "Does the frozen supported OpenHands integration preserve the current prompt, place bounded untrusted SMA context correctly, fail open, retain provenance, and terminate cleanly when model behavior is deterministic?",
+  "claimOnPass": "OPENHANDS_SMA_BOUNDARY_QUALIFIED",
+  "requiredUpstreamClaim": "SMA_SEMANTICS_QUALIFIED",
+  "semanticRequirements": {
+    "source": {
+      "path": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-2.json",
+      "sha256": "b7315835b6291d44d3d8cb918dbec1f16c1e64f2106fd70212c6a8f7ec678188"
+    },
+    "acceptance": {
+      "path": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-2-acceptance.json",
+      "sha256": "1c0cd9a01717b5e351bedde6971626d8104a482ac31bd95222ea1d53c408db9c"
+    },
+    "caseCount": 20,
+    "predicateCount": 59,
+    "requiredEvidenceCount": 10,
+    "repetitionCount": 103,
+    "casePredicatesChanged": false,
+    "thresholdsChanged": false,
+    "modelFaultScheduleChanged": false,
+    "continuationPolicyChanged": false,
+    "claimChanged": false
+  },
+  "predecessor": {
+    "candidate3": {
+      "path": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-3.json",
+      "sha256": "6271d240faa4ad88cbbe6048dfd35f55456b770a9be862adb2cad9ce059bb622"
+    },
+    "coordinatorReview": {
+      "path": "OUTPUT/phase-3/sma-s2-candidate-3-coordinator-review.json",
+      "sha256": "5adaf4028d663a7629c8e62cee6cd34937f6bc10a6d02fa3acf0533a6c781c1f",
+      "recommendation": "NO_GO_FOR_PRINCIPAL_ACCEPTANCE_FREEZE"
+    },
+    "immutabilityPreserved": true,
+    "measuredCreditImported": 0,
+    "measuredExecutionState": "NOT_RUN"
+  },
+  "remediationAuthorization": {
+    "path": "investigations/sma-q1/layered/sma-s2-candidate-4-remediation-authorization.json",
+    "sha256": "c939a8b7c533f1fdfce98bcf0d65be8a0924b4690c5a6648607421d415140891"
+  },
+  "prospectiveCorrections": [
+    "bind effective candidate-4 disposable namespaces in one configuration",
+    "map all 59 accepted predicates and all 10 required-evidence clauses to mandatory oracle IDs",
+    "reject a repetition when any applicable oracle is absent or false",
+    "record selected memory identities, context provenance class, OpenHands identities, sequence ordinals, workspace, profile, fault timing, and cleanup evidence",
+    "scan every required absence surface",
+    "measure hook, model-fault, cancellation, future, disconnect, and owned-work bounds",
+    "add deterministic non-generative delegation and ineligible-event fixture modes for cases 11 and 14",
+    "retain explicit predicates under Python optimization"
+  ],
+  "exactMeasuredCorpus": {
+    "path": "investigations/sma-q1/layered/sma-s2-measured-corpus-candidate-1.json",
+    "sha256": "c273c148a7b289f6650a26a82c38bda9680904701120e083543e9b7954b9a960",
+    "caseCount": 20,
+    "plannedRepetitionCount": 103,
+    "literalPromptsFrozen": true,
+    "syntheticOnly": true
+  },
+  "oracleMatrix": {
+    "path": "investigations/sma-q1/layered/sma-s2-predicate-oracle-matrix-candidate-4.json",
+    "sha256": "806e12a59dd8dcbc8f248d0a8d486c1afb856fc310e1952f7855e9fdf955d4f4",
+    "predicateOracleCount": 59,
+    "requiredEvidenceOracleCount": 10,
+    "singleFalseNegativeControls": 201,
+    "singleMissingNegativeControls": 201
+  },
+  "nonSecretConfiguration": {
+    "path": "investigations/sma-q1/layered/sma-s2-nonsecret-configuration-candidate-4.json",
+    "sha256": "7342c814ffd589b304e2dd22ea47843de178cc7925daf44604a327701a25a9ea"
+  },
+  "measuredDriver": {
+    "path": "scripts/sma_s2_measured_driver_candidate_2.py",
+    "sha256": "d6c00abd077be006caed64e3c534b9baf4b376f84a3f0b3a3094636bb89f0de2",
+    "defaultExecution": "DENY",
+    "safeSubstantiveFailureContinuesCorpus": true,
+    "harnessOrSafetyFailureStops": true,
+    "realModelCallsAllowed": false
+  },
+  "deterministicStub": {
+    "path": "scripts/sma_s2_deterministic_model_stub_candidate_3.py",
+    "sha256": "fffbea327321af9f2a6c8deaa6d71088c88db58abda11eae0f4cc082b613831e",
+    "generativeReasoning": false,
+    "candidate2BehaviorPreserved": true,
+    "additionalFixtureModes": ["DELEGATION_TOOL", "INELIGIBLE_TOOL_TRAFFIC"]
+  },
+  "driverDependencyClosure": [
+    {"role": "CANDIDATE_3_DRIVER_PRIMITIVE_LIBRARY_NO_RESULT_CREDIT", "path": "scripts/sma_s2_measured_driver_candidate_1.py", "sha256": "5f69ed4d3b439bf1d4d342c75f05781efee326fc2e1c39ad5002a92ffcc7464a"},
+    {"role": "CANDIDATE_2_STUB_BASE_BEHAVIOR", "path": "scripts/sma_s2_deterministic_model_stub_candidate_2.py", "sha256": "8013ba1dcd5db6192abce075f95dbd255ef8ada8335093cfaf0f5962f884e0f9"},
+    {"role": "SERVICE_AND_API_PRIMITIVE_LIBRARY_NO_RESULT_CREDIT", "path": "scripts/smaq1_native_step15_v4.py", "sha256": "5175b053f3633744212923290b0ac2614412a516e9279649b166d1ab2957b3e2"},
+    {"role": "ACTUALLY_IMPORTED_SERVICE_SUPPORT_CODE", "path": "/Users/paul/work/tekroo-ai/sma-step15/scripts/wp5e_restart_recovery.py", "sha256": "73857ed0734e0607a8a3a80646589d58c26e0ba338a450ecbee73fef8656677b"},
+    {"role": "BOUND_SMA_WORKTREE_SUPPORT_CODE", "path": "/Users/paul/work/tekroo-ai/sma-s1-p2m/scripts/wp5e_restart_recovery.py", "sha256": "73857ed0734e0607a8a3a80646589d58c26e0ba338a450ecbee73fef8656677b"},
+    {"role": "OFFLINE_NEGATIVE_CONTROL_HARNESS", "path": "scripts/sma_s2_measured_driver_offline_harness_candidate_2.py", "sha256": "1681956d9b6dd62f6e36b555bc9952cd4a98b93514e65c8132b3e42c8bddf50c"}
+  ],
+  "offlineQualification": {
+    "path": "OUTPUT/phase-3/sma-s2-candidate-4-offline-qualification-2/offline-qualification-receipt.json",
+    "sha256": "fba8ae0cad35f240faa92c11d56257f3c4709d688bc78dec92199b143f5a6a8b",
+    "status": "PASS",
+    "testCount": 10,
+    "passCount": 10,
+    "failCount": 0,
+    "pythonOptimizationMode": true,
+    "networkUse": "NONE"
+  },
+  "retainedNonqualifyingInterimReceipt": {
+    "path": "OUTPUT/phase-3/sma-s2-candidate-4-offline-qualification/offline-qualification-receipt.json",
+    "sha256": "f6d787e2af811fe7c805ea3383cd7714f2c05b74950cc078fd718e0dbc4d02ed",
+    "credit": 0,
+    "reason": "driver provenance and fence oracles and harness self-identity were strengthened before candidate freeze"
+  },
+  "boundProductIdentity": {
+    "boundaryIdentity": {"path": "investigations/sma-q1/layered/sma-s2-boundary-identity-candidate-2.json", "sha256": "39114c2f217558a96496dea5e180e3e1c7d6ab02f293bf4e50de08293cbe6a0a"},
+    "smaCommit": "5d58be508c74ae8577d2fd31e3346be23a912ab3",
+    "smaTree": "7222410443a6041496a5c313b2549f16eb937458",
+    "acceptedS1AdjudicationSha256": "0e5ace0acbe6e2441755ae656de36096e38b2364d27fb45ee844f2422abf2f7d",
+    "openhandsCommit": "a338ba9b6cbb529886b755a335bae3dee0004700",
+    "openhandsTree": "9e72f1b4ee0b857025d9f170600b9dce539b169a"
+  },
+  "disposableNamespaces": {
+    "mongodbDatabase": "sma_s2_successor_candidate_4_measured_20260814",
+    "qdrantSemanticCollection": "sma_s2_successor_candidate_4_semantic_20260814",
+    "qdrantEpisodicCollection": "sma_s2_successor_candidate_4_episodic_20260814",
+    "conversationPrefix": "sma-s2-successor-candidate-4-",
+    "workspaceRoot": "/tmp/tekroo-sma-s2-successor-candidate-4",
+    "outputRoot": "OUTPUT/phase-3/sma-s2-successor-candidate-4-measured-attempt-1"
+  },
+  "executionPolicy": {
+    "executionAuthorized": false,
+    "executionAttemptsAuthorized": 0,
+    "hiddenHarnessRetries": 0,
+    "automaticCorrectiveReruns": 0,
+    "postObservationRegradingAllowed": false
+  },
+  "acceptanceState": {
+    "principalAccepted": false,
+    "independentReviewCompleted": false,
+    "offlineDriverQualified": true,
+    "executionIdentityPrepared": false,
+    "singleUseExecutionAuthorizationPresent": false,
+    "measuredExecutionState": "NOT_RUN"
+  },
+  "excludedClaims": [
+    "SMA-S2 measured PASS",
+    "OPENHANDS_SMA_BOUNDARY_QUALIFIED",
+    "generative model behavior qualification",
+    "integrated runtime qualification",
+    "production readiness"
+  ],
+  "nextGate": "INDEPENDENT_REVIEW_AND_PRINCIPAL_ACCEPT_FREEZE_OF_CANDIDATE_4"
+}

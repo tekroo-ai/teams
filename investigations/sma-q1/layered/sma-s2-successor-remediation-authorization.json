@@ -1,0 +1,45 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_SUCCESSOR_REMEDIATION_AUTHORIZATION",
+  "authorizationId": "SMA-S2-SUCCESSOR-REMEDIATION-20260814",
+  "status": "AUTHORIZED_NOT_CONSUMED",
+  "recordedOn": "2026-08-14",
+  "principalStatement": "Authorize S2 successor remediation: bind the missing fault, retry, timeout, and cancellation controls; preserve the paused Tekroo Trader conversation; perform one controlled Agent Canvas/agent-server restart if the immediate active-work check remains clear; rebind the live schema and process identity; and repeat offline qualification. This does not authorize measured S2 execution.",
+  "reviewFinding": {
+    "path": "OUTPUT/phase-3/sma-s2-independent-review-recommendation-candidate-1.json",
+    "sha256": "9df172927bd96f82f882c0fd5018f1bdff8fc1d1eb071339fedda603d29b94db"
+  },
+  "authorizedActions": [
+    "create successor S2 preregistration, identity, configuration, stub, and harness artifacts",
+    "bind zero model retries, exact retry waits, model timeout, and fault activation schedule",
+    "bind active cancellation, client-disconnect, future-completion, process-inventory, and cleanup oracles",
+    "repeat offline-only qualification",
+    "perform an immediate read-only active-work check",
+    "perform one controlled Agent Canvas and agent-server restart only if no conversation is running or awaiting confirmation",
+    "preserve and verify paused Tekroo Trader conversation 4c2e5f84-ecd3-4971-b375-a0fa9905a058",
+    "fetch and bind the successor live OpenAPI and event-schema snapshots",
+    "verify live process and source identity correspondence"
+  ],
+  "restartGuard": {
+    "maximumAuthorizedRestarts": 1,
+    "restartConsumed": false,
+    "requiredZeroStatuses": [
+      "running",
+      "waiting_for_confirmation",
+      "stuck",
+      "deleting"
+    ],
+    "pausedConversationMustSurvive": "4c2e5f84-ecd3-4971-b375-a0fa9905a058",
+    "stopIfGuardFails": true
+  },
+  "notAuthorized": [
+    "accept or freeze the successor package",
+    "create or seal a measured execution identity",
+    "run any measured S2 case or repetition",
+    "invoke a real or deterministic model through OpenHands",
+    "create a measured SMA namespace",
+    "access production or historical data"
+  ],
+  "measuredExecutionAuthorized": false,
+  "measuredExecutionState": "NOT_RUN"
+}

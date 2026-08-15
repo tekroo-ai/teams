@@ -1,0 +1,58 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_SUCCESSOR_REMEDIATION_AUTHORIZATION_CONSUMPTION",
+  "status": "CONSUMED_COMPLETE_NO_REUSE",
+  "recordedAt": "2026-08-14T15:35:34Z",
+  "authorization": {
+    "path": "investigations/sma-q1/layered/sma-s2-successor-remediation-authorization.json",
+    "sha256": "e0f2b4843ebf3797b80457d9d051410b046afd66594fe0d88e566dc7e952f6c4"
+  },
+  "consumption": {
+    "successorStaticRemediationCompleted": true,
+    "offlineQualificationCompleted": true,
+    "controlledRestartCount": 1,
+    "maximumAuthorizedRestartCount": 1,
+    "restartAuthorityRemaining": 0,
+    "liveSchemaRebound": true,
+    "pausedConversationPreserved": true
+  },
+  "restartGuardObservation": {
+    "running": 0,
+    "waiting_for_confirmation": 0,
+    "stuck": 0,
+    "deleting": 0,
+    "pausedConversationId": "4c2e5f84-ecd3-4971-b375-a0fa9905a058",
+    "pausedConversationTitle": "Tekroo Trader"
+  },
+  "postRestartObservation": {
+    "agentServerPid": 46569,
+    "agentServerStartedLocal": "2026-08-14T09:34:20-06:00",
+    "agentServerHealthStatus": 200,
+    "agentServerVersion": "1.40.1",
+    "agentServerExecutableSha256": "9f1a91d9a58d13a27bc0e729eac36553bb9c977797c21f5483de3340cfa682bf",
+    "sourceCommit": "a338ba9b6cbb529886b755a335bae3dee0004700",
+    "sourceTree": "9e72f1b4ee0b857025d9f170600b9dce539b169a",
+    "liveOpenApiSha256": "b3000ea03830bc375df30772b34f9b30357b10bded62b411b2ed446d83e187bb",
+    "liveEventSchemasSha256": "49d30377c6f8b69e77e9231c39ff1d327c8a33c5ef859cc9ef8306a0536605b0",
+    "liveSemanticMessageFieldsPresent": [
+      "authorship_origin",
+      "semantic_purpose",
+      "agent_response_finality"
+    ],
+    "pausedConversationIdentityAndTimestampsUnchanged": true
+  },
+  "offlineQualification": {
+    "path": "OUTPUT/phase-3/sma-s2-successor-candidate-1-offline-harness/offline-harness-receipt.json",
+    "sha256": "e636595264bc7cb87bccb3a7d19372e8e4295bea27dbecee5796e0f64958eda0",
+    "status": "PASS",
+    "testCount": 9,
+    "passCount": 9,
+    "failCount": 0
+  },
+  "authority": {
+    "successorAcceptedFrozen": false,
+    "executionIdentityAuthorized": false,
+    "measuredExecutionAuthorized": false,
+    "measuredExecutionState": "NOT_RUN"
+  }
+}

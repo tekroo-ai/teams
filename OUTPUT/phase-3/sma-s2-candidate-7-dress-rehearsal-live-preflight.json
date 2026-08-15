@@ -1,0 +1,66 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_CANDIDATE_7_DRESS_REHEARSAL_LIVE_PREFLIGHT_RECEIPT",
+  "status": "PASS",
+  "recordedAt": "2026-08-14T18:11:11Z",
+  "executionIdentitySha256": "40235ba0eda978c497dc17740aab09ebeb8fe3852e961b0f4d522737f3c38f22",
+  "executionIdentityAcceptanceSha256": "cf520fe891c218bfac60500a2625c399211be7be36c64b0c483332fb57e83055",
+  "authorization": {
+    "path": "investigations/sma-q1/layered/sma-s2-candidate-7-dress-rehearsal-single-use-authorization.json",
+    "sha256": "c768d5c242e69f6603f2df66703cd2bad852b3905b4aeb3b29409b174f483017"
+  },
+  "authorizationFence": {
+    "status": "PASS",
+    "checkCount": 13,
+    "failedCheckCount": 0
+  },
+  "serviceHealth": {
+    "agentCanvasHttpStatus": 200,
+    "agentServerHttpStatus": 200
+  },
+  "conversationAudit": {
+    "searchHttpStatus": 200,
+    "conversationCount": 8,
+    "statusCounts": {
+      "error": 1,
+      "finished": 6,
+      "paused": 1
+    },
+    "activeConversationCount": 0,
+    "preservedPausedTekrooTrader": {
+      "conversationId": "4c2e5f84-ecd3-4971-b375-a0fa9905a058",
+      "status": "paused",
+      "createdAt": "2026-08-09T19:52:16.454058Z",
+      "updatedAt": "2026-08-13T17:38:02.080929Z"
+    }
+  },
+  "runtimeAndNamespaceChecks": {
+    "ownedServiceAbsent": true,
+    "bridgePortAvailable": true,
+    "stubPortAvailable": true,
+    "mongodbDatabaseAbsent": true,
+    "semanticCollectionAbsent": true,
+    "episodicCollectionAbsent": true,
+    "workspaceRootAbsent": true,
+    "dressOutputAbsent": true,
+    "measuredOutputAbsent": true
+  },
+  "productIdentity": {
+    "smaCommitAndTreeMatch": true,
+    "smaWorktreeClean": true,
+    "smaJarMatches": true,
+    "openhandsCommitAndTreeMatch": true,
+    "openhandsWorktreeClean": true,
+    "agentServerExecutableMatches": true,
+    "agentCanvasExecutableMatches": true
+  },
+  "authorizedActionCountsBeforeRun": {
+    "dressRehearsalAttempts": 0,
+    "dressRehearsalOperations": 0,
+    "measuredCaseExecutions": 0,
+    "measuredRepetitionExecutions": 0,
+    "realModelCalls": 0,
+    "serviceRestarts": 0
+  },
+  "disposition": "GO_FOR_ONE_AUTHORIZED_ZERO_CREDIT_DRESS_REHEARSAL_ATTEMPT"
+}

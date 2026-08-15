@@ -1,0 +1,112 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_CANDIDATE_9_EXECUTION_IDENTITY_ACCEPTANCE",
+  "acceptanceId": "SMA-S2-CANDIDATE-9-EXECUTION-IDENTITY-ACCEPTANCE",
+  "candidate": 9,
+  "status": "ACCEPTED_FROZEN",
+  "recordedOn": "2026-08-14",
+  "principalStatement": "ACCEPT/FREEZE the candidate-9 execution identity a52d19eba7cdfd219f0a4977361c3d06054300e5669671f292523428cf894cfd only. This does not authorize live-state preflight, live dress rehearsal, Maven invocation, or measured execution.",
+  "acceptedExecutionIdentity": {
+    "path": "investigations/sma-q1/layered/sma-s2-candidate-9-execution-identity.json",
+    "sha256": "a52d19eba7cdfd219f0a4977361c3d06054300e5669671f292523428cf894cfd",
+    "candidate": 9,
+    "runtimePorts": {
+      "stubHost": "127.0.0.1",
+      "stubPort": 19129,
+      "bridgeHost": "127.0.0.1",
+      "bridgePort": 8130
+    },
+    "workspaceIsolation": {
+      "case1WorkspaceRole": "EMPTY_UNCAPTURED",
+      "case1Workspace": "/tmp/tekroo-sma-s2-successor-candidate-9/actor-empty",
+      "corpusCaptureAllowlist": [
+        "/tmp/tekroo-sma-s2-successor-candidate-9/actor-alpha",
+        "/tmp/tekroo-sma-s2-successor-candidate-9/actor-beta"
+      ],
+      "emptyWorkspaceMustNotBeCaptureAllowlisted": true,
+      "case1ConversationReceiptsRetainedUntilCleanup": true,
+      "syntheticCorpusSourceCount": 4,
+      "allWorkspacesUnderCandidateRoot": true,
+      "cleanupMustRemoveEmptyWorkspace": true
+    },
+    "mavenPromotion": {
+      "projectDirectory": "/Users/paul/work/tekroo-ai/sma-s1-p2m",
+      "pomPath": "/Users/paul/work/tekroo-ai/sma-s1-p2m/pom.xml",
+      "subprocessWorkingDirectoryMustBeExplicit": true,
+      "parentWorkingDirectoryMayChange": false,
+      "failureEvidence": {
+        "exitStatusRequired": true,
+        "stdoutLengthRequired": true,
+        "stdoutSha256Required": true,
+        "stderrLengthRequired": true,
+        "stderrSha256Required": true,
+        "rawStdoutOrStderrProhibited": true
+      }
+    },
+    "acceptedFrozen": true,
+    "editableInPlace": false
+  },
+  "acceptedCandidate": {
+    "preregistration": {
+      "path": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-9.json",
+      "sha256": "d7680cc0b7b5ed501201e4b9dcc54b089071267c75ca43e3b9fab13b95b251a8"
+    },
+    "acceptance": {
+      "path": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-9-acceptance.json",
+      "sha256": "2579d877f36da0e5a90188db8a038fa8c2cf8aada529feb0047d4e13fce5332f"
+    }
+  },
+  "boundReview": {
+    "reviewNarrative": {
+      "path": "docs/architecture/084-sma-s2-candidate-9-execution-identity-review.md",
+      "sha256": "368edc3d6f972289d2568fba24ae5d3f75895e9114a6d967918d3248d0e811d8",
+      "status": "PASS_READY_FOR_PRINCIPAL_IDENTITY_REVIEW"
+    }
+  },
+  "independentReview": {
+    "reviewer": "WORKSPACE_PRINCIPAL",
+    "candidateSpecificContextBound": true,
+    "candidateSpecificDecision": "ACCEPT_FREEZE_EXECUTION_IDENTITY_ONLY"
+  },
+  "immutability": {
+    "acceptedExecutionIdentityMayBeEditedInPlace": false,
+    "boundReferencesMayBeEditedInPlace": false,
+    "successorIdentityRequiredForAnyCorrection": true
+  },
+  "authority": {
+    "executionIdentityAccepted": true,
+    "liveStatePreflightAuthorized": false,
+    "liveStatePreflightState": "NOT_RUN",
+    "liveDressRehearsalAuthorizationPresent": false,
+    "liveDressRehearsalAuthorized": false,
+    "liveDressRehearsalState": "NOT_RUN",
+    "mavenInvocationAuthorized": false,
+    "measuredAttemptAuthorizationPresent": false,
+    "measuredExecutionAuthorized": false,
+    "measuredExecutionState": "NOT_RUN",
+    "realModelCallsAuthorized": false,
+    "serviceRestartsAuthorized": false,
+    "productionDeploymentAuthorized": false
+  },
+  "excludedClaims": [
+    "runtime ports presently available",
+    "live service state acceptable",
+    "active-work state acceptable",
+    "candidate-9 disposable namespaces absent",
+    "candidate-9 Maven promotion succeeds",
+    "candidate-9 live state preflight PASS",
+    "candidate-9 live dress rehearsal PASS",
+    "SMA-S2 measured PASS",
+    "OPENHANDS_SMA_BOUNDARY_QUALIFIED",
+    "production readiness"
+  ],
+  "nextSeparateGate": {
+    "requiredAction": "authorize one single-use candidate-9 34-operation zero-credit live dress rehearsal beginning with immediate host-boundary live-state, active-work, endpoint, namespace, workspace-isolation, and Maven-project checks",
+    "requiresSeparatePrincipalAuthorization": true,
+    "authorizationMustPermitOnlyTheBoundMavenPromotionsRequiredByTheDressRehearsal": true,
+    "preflightFailureMustConsumeAuthorityWithoutStartingRehearsal": true,
+    "automaticRerunsAuthorized": 0,
+    "measuredExecutionStillRequiresPassingBoundDressRehearsalReceipt": true,
+    "measuredExecutionStillRequiresLaterSingleUseAuthorization": true
+  }
+}

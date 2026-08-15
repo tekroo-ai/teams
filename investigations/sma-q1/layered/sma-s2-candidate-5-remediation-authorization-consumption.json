@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "1.0.0-candidate",
+  "recordType": "SMA_S2_CANDIDATE_5_REMEDIATION_AUTHORIZATION_CONSUMPTION",
+  "status": "CONSUMED_COMPLETE_NO_REUSE",
+  "recordedOn": "2026-08-14",
+  "authorization": {
+    "path": "investigations/sma-q1/layered/sma-s2-candidate-5-remediation-authorization.json",
+    "sha256": "0ceafb03eef3a211d4b3d35e5913ced864f91fea58140a2785ff8b722dca1598"
+  },
+  "completedScope": [
+    "candidate-5 non-secret configuration",
+    "successor measured driver",
+    "semantic evidence-field mutation harness",
+    "offline semantic qualification",
+    "candidate-5 preregistration and readiness package"
+  ],
+  "livePreflightPerformed": false,
+  "measuredExecutionPerformed": false,
+  "openhandsConversationCreated": false,
+  "smaServiceInvoked": false,
+  "stubNetworkInvoked": false,
+  "realModelCallsPerformed": false
+}

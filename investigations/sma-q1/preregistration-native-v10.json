@@ -1,0 +1,70 @@
+{
+  "schemaVersion": "10.0.0",
+  "recordType": "INVESTIGATION_PREREGISTRATION_AMENDMENT",
+  "amendmentId": "SMA-Q1-NATIVE-OPENHANDS-VERTICAL-SLICE-V10",
+  "status": "ACCEPTED_AUTHORIZED_NOT_EXECUTED",
+  "recordedOn": "2026-08-13",
+  "timePrecision": "DAY",
+  "purpose": "Preserve V9's preflight-only stop and bind the qualified OpenHands repair as a local commit without weakening the original dirty-tree runtime fence.",
+  "supersession": {
+    "priorAmendmentId": "SMA-Q1-NATIVE-OPENHANDS-VERTICAL-SLICE-V9",
+    "priorManifest": "investigations/sma-q1/preregistration-native-v9.json",
+    "priorManifestSHA256": "7077c843e31ea3b897c612e6de700fea63b46ac7f8cf7c6c30e29ea204050b2a",
+    "priorExecutionReceipt": "OUTPUT/phase-3/sma-q1n-step15-v9/execution-receipt.json",
+    "priorExecutionReceiptSHA256": "518c8fd6f2559b896461fad09bed49a110092509657cfbbf8d59af806ba51829",
+    "priorExecutionState": "INCONCLUSIVE",
+    "priorCompletedScenarios": 0,
+    "priorFailure": "The preflight runtime fence detected the six uncommitted OpenHands repair paths in addition to the 13 pre-existing paths.",
+    "preservation": "V9 and all prior artifacts remain immutable; no fixture, scenario, or repetition is credited to V10."
+  },
+  "unchangedBase": {
+    "bindingManifest": "investigations/sma-q1/preregistration-native-v2.json",
+    "bindingManifestSHA256": "c618371d571d5333aebd2bdc83d2db2559115f5ec3e1903b33e8e0ab157edf5d",
+    "bindingPriorAmendments": "All accepted V3 through V9 requirements remain binding.",
+    "scenarioCount": 18,
+    "repetitionCount": 96,
+    "scenarioCreditFromPriorAttempts": 0,
+    "scenarioMutation": "NONE",
+    "thresholdMutation": "NONE",
+    "smaBehaviorMutation": "NONE",
+    "semanticHookDeadlineMs": 1000
+  },
+  "v10Amendment": {
+    "classification": "QUALIFIED_SOURCE_COMMIT_AND_RUNTIME_IDENTITY_RESTORATION",
+    "openhandsRepairCommit": "3e05292b0ba5bccedd6e94f73f48b9f721a7d1dc",
+    "committedRepairPathCount": 6,
+    "postCommitDirtyPathCount": 13,
+    "postCommitStatusSHA256": "c05c0b1a63994d826eb3da522406f6c0792c94a8cf947cebc9849348b310ca80",
+    "postCommitBinaryDiffSHA256": "3606d3ca28eb5feac312a26be3c1a784df6821f09dea3fdc395ec37beeb14cc6",
+    "runtimeFenceMutation": "NONE",
+    "functionalControls": {
+      "configuredTools": [],
+      "includeDefaultTools": ["FinishTool"],
+      "autoAttachVisionInspectTool": false,
+      "temperature": 0,
+      "seed": 20260813
+    },
+    "qualificationReceipt": "OUTPUT/phase-3/openhands-exact-capability-v2/execution-receipt.json",
+    "qualificationReceiptSHA256": "cf3c371079330ea52dc1f8417bbfffe1845f10bc0aaab1cc835e635c8abb63fa"
+  },
+  "disposableNamespaces": {
+    "qualificationMongoDatabase": "sma_q1n_step15_v10_fixture_20260813",
+    "qualificationSemanticCollection": "sma_q1n_step15_v10_fixture_semantic_20260813",
+    "qualificationEpisodicCollection": "sma_q1n_step15_v10_fixture_episodic_20260813",
+    "measuredMongoDatabase": "sma_q1n_step15_20260813_v10",
+    "measuredSemanticCollection": "sma_q1n_step15_v10_semantic_20260813",
+    "measuredEpisodicCollection": "sma_q1n_step15_v10_episodic_20260813",
+    "productionOrHistoricalDataAllowed": false
+  },
+  "executionPolicy": {
+    "attemptsAllowed": 1,
+    "correctiveRerunsAllowed": 0,
+    "stopOnFirstFailure": true,
+    "resultRule": "Only a complete 18-scenario, 96-repetition run may produce SMA-Q1 PASS or FAIL; incomplete execution is INCONCLUSIVE."
+  },
+  "operatorDecision": {
+    "classification": "OBSERVED_OPERATOR_INSTRUCTION",
+    "instruction": "Find the root cause and fix it completely.",
+    "effect": "AUTHORIZE_ONE_V10_EXECUTION_AFTER_COMMITTING_THE_QUALIFIED_REPAIR"
+  }
+}

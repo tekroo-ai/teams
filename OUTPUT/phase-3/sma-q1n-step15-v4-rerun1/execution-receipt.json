@@ -1,0 +1,66 @@
+{
+  "base_manifest_sha256": "c618371d571d5333aebd2bdc83d2db2559115f5ec3e1903b33e8e0ab157edf5d",
+  "cleanup": {
+    "conversation_count": 0,
+    "conversations": [],
+    "finished_at": "2026-08-13T19:53:39.514305+00:00",
+    "service": {
+      "already_stopped": true,
+      "listener": null
+    },
+    "started_at": "2026-08-13T19:53:38.650856+00:00",
+    "verified": {
+      "bridge_absent": true,
+      "episodic_absent": true,
+      "mongo_absent": true,
+      "run_root_absent": true,
+      "semantic_absent": true,
+      "service_absent": true
+    }
+  },
+  "completed_repetitions": 0,
+  "completed_scenario_ids": [],
+  "completed_scenarios": 0,
+  "decision": "NO_GO",
+  "failure": {
+    "classification": "HARNESS_OR_ENVIRONMENT",
+    "message": "Command '('mvn', '-q', '-Dunit.excludedGroups=', '-Dtest=Wp5eReplayPromotionIntegrationTest', '-Dwp5e.database=sma_q1n_step15_v4_fixture_20260813', '-Dwp5e.semanticCollection=sma_q1n_step15_v4_fixture_semantic_20260813', '-Dwp5e.episodicCollection=sma_q1n_step15_v4_fixture_episodic_20260813', '-Dwp5e.memoryId=oh_32762aafc91aa68a0543615ab2866e3bfc1be09e2a05d9d0ac6a9347fd3de52f', '-Dwp5e.code=DELETE_CONFIRMED', '-Dwp5e.checksum=DELETE_CONFIRMED', 'test')' returned non-zero exit status 1.",
+    "message_sha256": "b7a34bf08d52d4d4f464dbfbae6c399802d8b7d197f6b1f6c5cd11419175ec06",
+    "type": "CalledProcessError"
+  },
+  "harness_sha256": "91e42b9208134a5fb1df91f4b37988a465f34e6efad8c1a5bfb47469fb2721f2",
+  "manifest_sha256": "2178116c866e9abed9b5e83edd3c9c221f55f81e6f343a168205209f25834d23",
+  "not_run_repetitions": 96,
+  "not_run_scenario_ids": [
+    "SMAQ1N-001-FIRST-PROMPT-EMPTY",
+    "SMAQ1N-002-SAME-PARTITION-RECALL",
+    "SMAQ1N-003-CROSS-PARTITION-DENIAL",
+    "SMAQ1N-004-CURRENT-INSTRUCTION-PRECEDENCE",
+    "SMAQ1N-005-RAW-INELIGIBLE",
+    "SMAQ1N-006-DUPLICATE-EVENT-CAPTURE",
+    "SMAQ1N-007-RETRIEVAL-OUTAGE",
+    "SMAQ1N-008-CAPTURE-OUTAGE-RECONCILIATION",
+    "SMAQ1N-009-ADDITIONAL-CONTEXT-INTEGRITY",
+    "SMAQ1N-010-HOOK-DEADLINE-AND-MALFORMED",
+    "SMAQ1N-011-PARENT-CHILD-PROVENANCE",
+    "SMAQ1N-012-RESTART-PARTITION-CONTINUITY",
+    "SMAQ1N-013-FOUR-CHANNEL-CONCURRENCY",
+    "SMAQ1N-014-FEEDBACK-LOOP-PREVENTION",
+    "SMAQ1N-015-SECRET-QUARANTINE",
+    "SMAQ1N-016-EMPTY-RESULT",
+    "SMAQ1N-017-OVERSIZED-CONTEXT-BOUND",
+    "SMAQ1N-018-CONDENSATION-REANCHOR"
+  ],
+  "qualification": null,
+  "qualified_fixture": false,
+  "raw_journal_sha256": "a43ceb2defdd059b5260e1f16fe8220bd5ba8458523f6b4ea4a841d25dced12f",
+  "receipt_type": "SMA_Q1_NATIVE_STEP15_EXECUTION",
+  "recorded_at": "2026-08-13T19:53:39.516366+00:00",
+  "report_sha256": "a5800e59f4e531432dda8eef3529a5b8e8217808456d38124aba06638e4b9a3f",
+  "scenario_results": [],
+  "schema_version": "1.0.0",
+  "started_repetitions": 0,
+  "started_scenario_ids": [],
+  "started_scenarios": 0,
+  "status": "INCONCLUSIVE"
+}

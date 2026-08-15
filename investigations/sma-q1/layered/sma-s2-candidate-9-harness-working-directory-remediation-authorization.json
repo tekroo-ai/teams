@@ -1,0 +1,39 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_CANDIDATE_9_HARNESS_WORKING_DIRECTORY_REMEDIATION_AUTHORIZATION",
+  "candidate": 9,
+  "status": "AUTHORIZED_OFFLINE_REMEDIATION_ONLY",
+  "recordedOn": "2026-08-14",
+  "principalStatement": "AUTHORIZE one bounded candidate-9 harness-working-directory remediation: preserve candidate-8 workspace isolation; bind Maven promotion to /Users/paul/work/tekroo-ai/sma-s1-p2m; retain sanitized subprocess exit, stdout, and stderr evidence on failure; add missing, mutated, non-Maven-directory, and cwd-restoration offline controls; and publish candidate 9 for review. This does not authorize live preflight, dress rehearsal, or measured execution.",
+  "predecessorEvidence": {
+    "candidate8DressReceipt": {
+      "path": "OUTPUT/phase-3/sma-s2-candidate-8-dress-rehearsal-attempt-1/dress-rehearsal-receipt.json",
+      "sha256": "f91a7f8c7c02cbb70be302dba78bdc1f8ca6ff2ed6b8ec1cb6df882d08a29cca",
+      "status": "INCONCLUSIVE"
+    },
+    "candidate8Adjudication": {
+      "path": "OUTPUT/phase-3/sma-s2-candidate-8-dress-rehearsal-adjudication.json",
+      "sha256": "c0e1dd3cef5f33864630b61ea9a20f900c844f5eef29f9ed003b977fd3aa63b8"
+    }
+  },
+  "authorizedScope": [
+    "preserve the candidate-8 isolated actor-empty workspace and exact alpha/beta capture allowlist",
+    "bind every Maven promotion subprocess to /Users/paul/work/tekroo-ai/sma-s1-p2m using an explicit subprocess working-directory argument",
+    "retain sanitized subprocess exit status and stdout/stderr lengths and SHA-256 digests on failure",
+    "add offline positive and mutation controls for missing, altered, non-Maven, and cwd-restoration behavior",
+    "publish a candidate-9 preregistration and offline review packet"
+  ],
+  "notAuthorized": [
+    "candidate-9 acceptance or freeze",
+    "execution-identity creation",
+    "live state preflight",
+    "live dress rehearsal",
+    "measured execution",
+    "OpenHands conversation creation",
+    "SMA, Maven, or deterministic-stub live invocation",
+    "network use",
+    "real model calls",
+    "production or historical data access",
+    "OPENHANDS_SMA_BOUNDARY_QUALIFIED claim"
+  ]
+}

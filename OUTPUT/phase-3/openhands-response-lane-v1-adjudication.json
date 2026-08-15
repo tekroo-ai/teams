@@ -1,0 +1,62 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "OPENHANDS_RESPONSE_LANE_V1_ADJUDICATION",
+  "recordedOn": "2026-08-13",
+  "timePrecision": "DAY",
+  "manifest": "investigations/openhands-lane/qualification-v1.json",
+  "manifestSHA256": "9704c0b0e78023fefdeed67848bff233632cbb33a4683a7fa7c794d7199c8e7d",
+  "authorization": "investigations/openhands-lane/qualification-v1-authorization.json",
+  "authorizationSHA256": "eb6ab4050ccb8a0c93f5d7b409d707fca28cd87df8674cbf8ba8a8eca766f7cf",
+  "runner": "scripts/openhands_response_lane_qualification_v1.py",
+  "runnerSHA256": "8c071d3a71b42b0dfdcf0ed02025b164e75be1a5c62b50befc2dd4c3f6900301",
+  "executionReceipt": "OUTPUT/phase-3/openhands-response-lane-v1/execution-receipt.json",
+  "executionReceiptSHA256": "d145531844f9c832beeb42330e3bda5183f54e42cf934914049aa6e1f9a23b5b",
+  "rawJournal": "OUTPUT/phase-3/openhands-response-lane-v1/raw-receipts.jsonl",
+  "rawJournalFinalSHA256": "1a4b770331d75b8bd301b44926377a972b6fc25bc42b2add021da5a88e41719e",
+  "status": "FAIL",
+  "decision": "NO_GO_FINAL_SMA_Q1_EXECUTION",
+  "smaQ1ResultClaim": "NONE",
+  "preflight": {
+    "offlineContract": "PASS",
+    "liveIdentity": "PASS",
+    "unrelatedRunningConversations": 0,
+    "smaLaunchdLabels": [],
+    "smaBridgeActive": false,
+    "environmentToolsExposed": 0,
+    "hooksSupplied": false
+  },
+  "execution": {
+    "requiredConversations": 128,
+    "attemptedConversations": 1,
+    "passedConversations": 0,
+    "failedConversations": 1,
+    "notRunConversations": 127,
+    "firstFailure": "TIMEOUT_AT_120071_MILLISECONDS_WITHOUT_AGENT_MESSAGE_OR_CONVERSATION_ERROR",
+    "stopOnFirstFailureApplied": true
+  },
+  "cleanup": {
+    "conversationDeleted": true,
+    "postDelete404Verified": true,
+    "workspaceAbsent": true,
+    "smaWasNotStarted": true
+  },
+  "diagnosis": {
+    "evidence": "OUTPUT/phase-3/openhands-response-lane-v1/diagnostic-evidence.json",
+    "observedFloor": "The failure reproduced with SMA, hooks, environment tools, sub-agents, MCP, and model switching absent. The blocker is therefore in the OpenHands/model evaluation lane rather than SMA retrieval or memory behavior.",
+    "specificInternalCause": "UNVERIFIED",
+    "postCleanupOllamaControl": "PASS_IN_UNDER_ONE_SECOND"
+  },
+  "artifactAnomaly": {
+    "classification": "COMPUTED_NONDECISIVE_PACKAGING_DEFECT",
+    "detail": "The execution receipt recorded the journal hash before the terminal journal line was appended. rawJournalFinalSHA256 in this adjudication is the final file hash. This does not change the observed first-probe timeout."
+  },
+  "attemptPolicy": {
+    "v1AttemptConsumed": true,
+    "additionalV1AttemptPermitted": false
+  },
+  "recommendedRemediation": {
+    "configuration": "Create a dedicated non-default OpenHands response-canary profile with bounded LLM timeout, bounded output tokens, zero retries, thinking disabled, and the existing bare-agent restrictions. Do not mutate the shared qwen3.6-fast profile.",
+    "instrumentation": "Before deleting a failed conversation, retain content-free event-kind counts, execution status transitions, LLM request start/finish timing if exposed, and Ollama active/queued state so a timeout is attributable.",
+    "nextGate": "A new qualification requires separate acceptance and authorization. It must again require at least 128 consecutive fresh conversations and must pass before any final SMA-Q1 execution is proposed."
+  }
+}

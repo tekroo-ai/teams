@@ -1,0 +1,56 @@
+{
+  "schemaVersion": "1.0.0-candidate",
+  "recordType": "SMA_S2_PREDICATE_ORACLE_MATRIX",
+  "status": "SUCCESSOR_CANDIDATE_NOT_ACCEPTED_NOT_AUTHORIZED",
+  "recordedOn": "2026-08-14",
+  "semanticSource": {
+    "path": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-2.json",
+    "sha256": "b7315835b6291d44d3d8cb918dbec1f16c1e64f2106fd70212c6a8f7ec678188",
+    "casePredicatesChanged": false,
+    "thresholdsChanged": false
+  },
+  "oracleRule": "Every source predicate index and required-evidence index has exactly one stable mandatory oracle ID. A repetition cannot PASS if any applicable oracle is absent or false.",
+  "deterministicFixtureModes": {
+    "SMA-S2-011-PARENT-CHILD-PROVENANCE": "DELEGATION_TOOL",
+    "SMA-S2-014-FEEDBACK-LOOP-PREVENTION": "INELIGIBLE_TOOL_TRAFFIC"
+  },
+  "commonPerRepetitionEvidenceOracleIds": ["E-001", "E-002", "E-003", "E-004", "E-005", "E-007", "E-008"],
+  "conditionalEvidenceOracleIds": {
+    "E-006": ["SMA-S2-019-MODEL-STUB-FAULT-MATRIX", "SMA-S2-020-ACTIVE-CANCELLATION-AND-SHUTDOWN"]
+  },
+  "globalEvidenceOracleIds": ["E-009", "E-010"],
+  "requiredEvidenceIndex": [
+    {"index": 1, "oracleId": "E-001"},
+    {"index": 2, "oracleId": "E-002"},
+    {"index": 3, "oracleId": "E-003"},
+    {"index": 4, "oracleId": "E-004"},
+    {"index": 5, "oracleId": "E-005"},
+    {"index": 6, "oracleId": "E-006"},
+    {"index": 7, "oracleId": "E-007"},
+    {"index": 8, "oracleId": "E-008"},
+    {"index": 9, "oracleId": "E-009"},
+    {"index": 10, "oracleId": "E-010"}
+  ],
+  "cases": [
+    {"caseId": "SMA-S2-001-FIRST-PROMPT-EMPTY", "predicateOracleIds": ["S2-001-P1", "S2-001-P2", "S2-001-P3", "S2-001-P4"]},
+    {"caseId": "SMA-S2-002-SAME-PARTITION-DELIVERY", "predicateOracleIds": ["S2-002-P1", "S2-002-P2", "S2-002-P3"]},
+    {"caseId": "SMA-S2-003-CROSS-PARTITION-DELIVERY-DENIAL", "predicateOracleIds": ["S2-003-P1"]},
+    {"caseId": "SMA-S2-004-UNTRUSTED-CONTEXT-PLACEMENT", "predicateOracleIds": ["S2-004-P1", "S2-004-P2", "S2-004-P3"]},
+    {"caseId": "SMA-S2-005-RAW-INELIGIBLE-ABSENCE", "predicateOracleIds": ["S2-005-P1"]},
+    {"caseId": "SMA-S2-006-DUPLICATE-PERSISTED-EVENT", "predicateOracleIds": ["S2-006-P1", "S2-006-P2"]},
+    {"caseId": "SMA-S2-007-RETRIEVAL-OUTAGE", "predicateOracleIds": ["S2-007-P1", "S2-007-P2", "S2-007-P3"]},
+    {"caseId": "SMA-S2-008-CAPTURE-OUTAGE", "predicateOracleIds": ["S2-008-P1", "S2-008-P2", "S2-008-P3"]},
+    {"caseId": "SMA-S2-009-ADDITIONAL-CONTEXT-INTEGRITY", "predicateOracleIds": ["S2-009-P1", "S2-009-P2", "S2-009-P3"]},
+    {"caseId": "SMA-S2-010-HOOK-FAULT-MATRIX", "predicateOracleIds": ["S2-010-P1", "S2-010-P2", "S2-010-P3", "S2-010-P4"]},
+    {"caseId": "SMA-S2-011-PARENT-CHILD-PROVENANCE", "predicateOracleIds": ["S2-011-P1", "S2-011-P2"]},
+    {"caseId": "SMA-S2-012-RESTART-CONTINUITY", "predicateOracleIds": ["S2-012-P1", "S2-012-P2", "S2-012-P3"]},
+    {"caseId": "SMA-S2-013-FOUR-CHANNEL-CONCURRENCY", "predicateOracleIds": ["S2-013-P1", "S2-013-P2", "S2-013-P3"]},
+    {"caseId": "SMA-S2-014-FEEDBACK-LOOP-PREVENTION", "predicateOracleIds": ["S2-014-P1", "S2-014-P2"]},
+    {"caseId": "SMA-S2-015-SECRET-DELIVERY-ABSENCE", "predicateOracleIds": ["S2-015-P1", "S2-015-P2", "S2-015-P3"]},
+    {"caseId": "SMA-S2-016-EMPTY-RESULT", "predicateOracleIds": ["S2-016-P1", "S2-016-P2"]},
+    {"caseId": "SMA-S2-017-OVERSIZED-CONTEXT", "predicateOracleIds": ["S2-017-P1", "S2-017-P2", "S2-017-P3"]},
+    {"caseId": "SMA-S2-018-CONDENSATION-REANCHOR", "predicateOracleIds": ["S2-018-P1", "S2-018-P2", "S2-018-P3"]},
+    {"caseId": "SMA-S2-019-MODEL-STUB-FAULT-MATRIX", "predicateOracleIds": ["S2-019-P1", "S2-019-P2", "S2-019-P3", "S2-019-P4", "S2-019-P5"]},
+    {"caseId": "SMA-S2-020-ACTIVE-CANCELLATION-AND-SHUTDOWN", "predicateOracleIds": ["S2-020-P1", "S2-020-P2", "S2-020-P3", "S2-020-P4", "S2-020-P5", "S2-020-P6"]}
+  ]
+}

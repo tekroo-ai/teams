@@ -1,0 +1,76 @@
+{
+  "schemaVersion": "12.0.0",
+  "recordType": "SMA_Q1_EXECUTION_IDENTITY",
+  "recordedOn": "2026-08-13",
+  "timePrecision": "DAY",
+  "status": "SEALED_ACCEPTED_NOT_AUTHORIZING_NOT_STARTED",
+  "executionAuthorized": false,
+  "executionStarted": false,
+  "scenariosExecuted": 0,
+  "frozenExperiment": {
+    "manifest": "investigations/sma-q1/preregistration-native-v12.json",
+    "manifestSHA256": "2e97230c4f423b10cc6b98be1d9f02d6e3a97c71e13c67f6b585623b01e1c195",
+    "baseManifest": "investigations/sma-q1/preregistration-native-v2.json",
+    "baseManifestSHA256": "c618371d571d5333aebd2bdc83d2db2559115f5ec3e1903b33e8e0ab157edf5d",
+    "scenarioCount": 18,
+    "repetitionCount": 96,
+    "priorScenarioCredit": 0,
+    "executionState": "NOT_RUN"
+  },
+  "harness": {
+    "path": "scripts/smaq1_native_step15_v12.py",
+    "sha256": "168cd0e8fb6c0a59396e63bcfbee207efcb471281502f2de55aa1fce9ecd8c88",
+    "sealedParent": "scripts/smaq1_native_step15_v11.py",
+    "fixtureDriver": "investigations/sma-q1/fixture-support/DeterministicReplayPromotion.java",
+    "fixtureDriverSHA256": "580f29edefc8c703e68adc3ba6536b58ba1b577a9ed0ca6969ff172eaacb8117",
+    "deterministicTemperature": 0,
+    "deterministicSeed": 20260813,
+    "configuredTools": [],
+    "includeDefaultTools": ["FinishTool"],
+    "autoAttachVisionInspectTool": false,
+    "semanticHookDeadlineMs": 1000,
+    "nativeProbeProcessTimeoutSeconds": 30,
+    "preassertionEvidence": "REDACTED_RAW_SYNTHETIC_BODIES",
+    "normalizedSafetyOracle": "NFKC_CASEFOLD_NONALNUM_TO_SPACE",
+    "journalWriter": "SHARED_LOCK_APPEND_FLUSH_FSYNC"
+  },
+  "openhands": {
+    "sourceRoot": "/Users/paul/.local/src/openhands-software-agent-sdk-1.40.1-parallel",
+    "repairCommit": "3e05292b0ba5bccedd6e94f73f48b9f721a7d1dc",
+    "expectedDirtyPathCount": 13,
+    "expectedStatusSHA256": "c05c0b1a63994d826eb3da522406f6c0792c94a8cf947cebc9849348b310ca80",
+    "expectedBinaryDiffSHA256": "3606d3ca28eb5feac312a26be3c1a784df6821f09dea3fdc395ec37beeb14cc6"
+  },
+  "sma": {
+    "executionWorktree": "/Users/paul/work/tekroo-ai/sma-step15",
+    "detachedCommit": "60a966234166ea75f767b25e3cbb7eaabe4064a2",
+    "detachedTree": "7aaa06a68d59dd6f13b0a3a2c6ae3cff845c1121",
+    "worktreeClean": true,
+    "serviceJarSHA256": "1892ab3b1468ebbc62b922c116965b3d42af1a754cde006b23b57a431460618c"
+  },
+  "plannedIsolation": {
+    "qualification": {
+      "mongodbDatabase": "sma_q1n_step15_v12_fixture_20260813",
+      "semanticCollection": "sma_q1n_step15_v12_fixture_semantic_20260813",
+      "episodicCollection": "sma_q1n_step15_v12_fixture_episodic_20260813",
+      "actorAlphaPartition": "openhands:58cd06d12c6b53e43453cb08:default",
+      "actorBetaPartition": "openhands:847fc694c8ca5c192cfd31cc:default"
+    },
+    "measuredRun": {
+      "mongodbDatabase": "sma_q1n_step15_20260813_v12",
+      "semanticCollection": "sma_q1n_step15_v12_semantic_20260813",
+      "episodicCollection": "sma_q1n_step15_v12_episodic_20260813",
+      "actorAlphaPartition": "openhands:8565f4561b48843b294e9305:default",
+      "actorBetaPartition": "openhands:5e1854bd3238fa63bebafe60:default"
+    },
+    "productionOrHistoricalDataAllowed": false
+  },
+  "executionFence": {
+    "freezeAccepted": true,
+    "appendWriterConcurrencyTest": "PASS_8_THREADS_8_CANONICAL_RECORDS",
+    "exclusiveRuntimeWindowObserved": false,
+    "qualificationAuthorized": false,
+    "measuredExecutionAuthorized": false,
+    "authorizationRule": "This identity is non-authorizing; the separate V12 authorization binds its hash."
+  }
+}

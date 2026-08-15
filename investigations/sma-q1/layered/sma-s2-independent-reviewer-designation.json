@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_INDEPENDENT_REVIEWER_DESIGNATION",
+  "designationId": "SMA-S2-PRINCIPAL-INDEPENDENT-REVIEWER",
+  "status": "DESIGNATED_REVIEW_AUTHORIZED_ACCEPTANCE_NOT_YET_GRANTED",
+  "recordedOn": "2026-08-14",
+  "principalStatement": "Approved. Please proceed as outlined.",
+  "designatedReviewer": {
+    "role": "PRINCIPAL",
+    "identity": "WORKSPACE_PRINCIPAL",
+    "independenceBasis": [
+      "The principal is not the SMA boundary implementation owner.",
+      "The principal is not the OpenHands adapter implementation owner.",
+      "The principal did not author the deterministic stub or qualification harness."
+    ]
+  },
+  "reviewSubject": {
+    "path": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-1.json",
+    "sha256": "fcdfa6a6fc85ea5c8aebe4340e10642007f4cd1df85cea1a0e47f7ef278e62fe"
+  },
+  "authorizedActions": [
+    "verify the bound S2 candidate package",
+    "prepare an independent-review decision packet",
+    "present the explicit acceptance decision to the principal"
+  ],
+  "notAuthorized": [
+    "accept or freeze the preregistration without the principal's explicit decision",
+    "create or seal a measured execution identity",
+    "authorize or run a measured S2 attempt",
+    "create an OpenHands conversation",
+    "invoke any model",
+    "create any measured SMA namespace"
+  ],
+  "reviewState": "AUTHORIZED_NOT_YET_ADJUDICATED"
+}

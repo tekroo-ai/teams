@@ -1,0 +1,70 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_CANDIDATE_8_DRESS_REHEARSAL_AUTHORIZATION",
+  "authorizationId": "SMA-S2-CANDIDATE-8-DRESS-REHEARSAL-ATTEMPT-1",
+  "candidate": 8,
+  "status": "AUTHORIZED_NOT_CONSUMED",
+  "recordedOn": "2026-08-14",
+  "principalStatement": "Approved. You may proceed.",
+  "interpretedScope": "one candidate-8 34-operation zero-credit dress rehearsal beginning with immediate live-state, active-work, endpoint, namespace, and workspace-isolation checks",
+  "executionIdentitySha256": "285ef6fefa5fb5b4b71afe1ff368a119c80a5b3b839467d06883a9cb7e31cdcb",
+  "executionIdentityAcceptance": {
+    "path": "investigations/sma-q1/layered/sma-s2-candidate-8-execution-identity-acceptance.json",
+    "sha256": "669c186c27e5240eef3cdf94a34a531253cc4d4db6adb7ce59fddf8f544ef5db",
+    "status": "ACCEPTED_FROZEN"
+  },
+  "runtimePorts": {
+    "stubHost": "127.0.0.1",
+    "stubPort": 19128,
+    "bridgeHost": "127.0.0.1",
+    "bridgePort": 8130
+  },
+  "workspaceIsolation": {
+    "case1WorkspaceRole": "EMPTY_UNCAPTURED",
+    "case1Workspace": "/tmp/tekroo-sma-s2-successor-candidate-8/actor-empty",
+    "corpusCaptureAllowlist": [
+      "/tmp/tekroo-sma-s2-successor-candidate-8/actor-alpha",
+      "/tmp/tekroo-sma-s2-successor-candidate-8/actor-beta"
+    ],
+    "emptyWorkspaceMustNotBeCaptureAllowlisted": true,
+    "case1ConversationReceiptsRetainedUntilCleanup": true,
+    "syntheticCorpusSourceCount": 4,
+    "allWorkspacesUnderCandidateRoot": true,
+    "cleanupMustRemoveEmptyWorkspace": true
+  },
+  "driverSha256": "717d29b96107c7cc86c1aeceeeb9b32ab9aa8776bf6b3ec18496dd86a0305d38",
+  "configurationSha256": "3cc553c6a618b2e4ca6151906c700805303012ef0cb49d270c33291edd517f44",
+  "preregistrationSha256": "d81f6878a0b06462b792e50d7bd3e8708e971ce888d22a95751127ccbaa35231",
+  "acceptanceSha256": "73cdc08aae12fb1b4dd10d9296e267181d42a16d227bd2efe776988c4b211f18",
+  "maximumDressRehearsalAttempts": 1,
+  "operationCount": 34,
+  "measuredCaseExecutions": 0,
+  "measuredRepetitionExecutions": 0,
+  "measuredCredit": 0,
+  "claimOnPass": null,
+  "realModelCallsAllowed": false,
+  "serviceRestartsAllowed": 0,
+  "preconditions": [
+    "accepted identity and every bound artifact still match",
+    "no unrelated OpenHands conversation is running, awaiting confirmation, stuck, or deleting",
+    "the preserved Tekroo Trader conversation remains paused",
+    "stub port 19128 and bridge port 8130 are unoccupied",
+    "candidate-8 disposable MongoDB, Qdrant, workspace, and output namespaces are absent",
+    "actor-empty is absent before setup and excluded from the exact actor-alpha/actor-beta capture allowlist",
+    "the SMA and OpenHands product identities still match the accepted execution identity"
+  ],
+  "stopConditions": [
+    "any precondition fails",
+    "any harness boundary failure occurs",
+    "cleanup cannot prove all candidate-owned resources absent",
+    "the single attempt is consumed"
+  ],
+  "notAuthorized": [
+    "automatic dress-rehearsal rerun",
+    "measured S2 execution",
+    "real model calls",
+    "service restart",
+    "production or historical data access",
+    "OPENHANDS_SMA_BOUNDARY_QUALIFIED claim"
+  ]
+}

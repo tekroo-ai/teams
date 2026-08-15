@@ -1,0 +1,200 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_EXECUTION_IDENTITY_PREPARATION_RECEIPT",
+  "receiptId": "SMA-S2-EXECUTION-IDENTITY-PREPARATION-CANDIDATE-1",
+  "status": "FAIL_NO_GO_BEFORE_LIVE_PREFLIGHT",
+  "recordedAt": "2026-08-14T15:52:56Z",
+  "scope": "AUTHORIZED_EXECUTION_IDENTITY_PREPARATION_ONLY",
+  "acceptedPreregistration": {
+    "path": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-2.json",
+    "sha256": "b7315835b6291d44d3d8cb918dbec1f16c1e64f2106fd70212c6a8f7ec678188",
+    "caseCount": 20,
+    "plannedRepetitionCount": 103
+  },
+  "authorization": {
+    "path": "investigations/sma-q1/layered/sma-s2-execution-identity-preflight-authorization.json",
+    "sha256": "4094ebc71061d490573eff80c3ced721192c3506e2c7d43c3248caf9f0f1ce6f"
+  },
+  "artifactCorrespondence": {
+    "status": "PASS",
+    "checks": [
+      {
+        "name": "boundaryIdentity",
+        "path": "investigations/sma-q1/layered/sma-s2-boundary-identity-candidate-2.json",
+        "expectedSha256": "39114c2f217558a96496dea5e180e3e1c7d6ab02f293bf4e50de08293cbe6a0a",
+        "actualSha256": "39114c2f217558a96496dea5e180e3e1c7d6ab02f293bf4e50de08293cbe6a0a",
+        "match": true
+      },
+      {
+        "name": "deterministicStub",
+        "path": "scripts/sma_s2_deterministic_model_stub_candidate_2.py",
+        "expectedSha256": "8013ba1dcd5db6192abce075f95dbd255ef8ada8335093cfaf0f5962f884e0f9",
+        "actualSha256": "8013ba1dcd5db6192abce075f95dbd255ef8ada8335093cfaf0f5962f884e0f9",
+        "match": true
+      },
+      {
+        "name": "offlineHarness",
+        "path": "scripts/sma_s2_offline_harness_candidate_5.py",
+        "expectedSha256": "7236b8b1c1fd52adffea58e1e5e1d0f689211a565964fb370b4fdf7a77c7d534",
+        "actualSha256": "7236b8b1c1fd52adffea58e1e5e1d0f689211a565964fb370b4fdf7a77c7d534",
+        "match": true
+      },
+      {
+        "name": "offlineQualificationReceipt",
+        "path": "OUTPUT/phase-3/sma-s2-successor-candidate-1-offline-harness/offline-harness-receipt.json",
+        "expectedSha256": "e636595264bc7cb87bccb3a7d19372e8e4295bea27dbecee5796e0f64958eda0",
+        "actualSha256": "e636595264bc7cb87bccb3a7d19372e8e4295bea27dbecee5796e0f64958eda0",
+        "match": true
+      },
+      {
+        "name": "nonSecretConfiguration",
+        "path": "investigations/sma-q1/layered/sma-s2-nonsecret-configuration-candidate-2.json",
+        "expectedSha256": "09c78fdc1ca95c4277222ac1f106357af9df9fddb4099fcd83222a3df89291d1",
+        "actualSha256": "09c78fdc1ca95c4277222ac1f106357af9df9fddb4099fcd83222a3df89291d1",
+        "match": true
+      },
+      {
+        "name": "eventSchema",
+        "path": "investigations/sma-q1/layered/sma-s2-openhands-event-schemas-candidate-2.json",
+        "expectedSha256": "49d30377c6f8b69e77e9231c39ff1d327c8a33c5ef859cc9ef8306a0536605b0",
+        "actualSha256": "49d30377c6f8b69e77e9231c39ff1d327c8a33c5ef859cc9ef8306a0536605b0",
+        "match": true
+      }
+    ]
+  },
+  "runtimeAudit": {
+    "status": "PASS_FOR_READ_ONLY_PREPARATION",
+    "openhandsSource": {
+      "path": "/Users/paul/.local/src/openhands-software-agent-sdk-1.40.1-parallel",
+      "gitCommit": "a338ba9b6cbb529886b755a335bae3dee0004700",
+      "gitTree": "9e72f1b4ee0b857025d9f170600b9dce539b169a",
+      "worktreeClean": true
+    },
+    "agentServer": {
+      "pid": 46569,
+      "startedLocal": "2026-08-14T09:34:20-06:00",
+      "healthHttpStatus": 200,
+      "healthBody": {
+        "status": "ok"
+      },
+      "artifactSha256": "9f1a91d9a58d13a27bc0e729eac36553bb9c977797c21f5483de3340cfa682bf"
+    },
+    "agentCanvasIngress": {
+      "pid": 46737,
+      "startedLocal": "2026-08-14T09:34:51-06:00",
+      "listener": "127.0.0.1:8000"
+    },
+    "smaServiceJar": {
+      "path": "/Users/paul/work/tekroo-ai/sma-s1-p2m/target/sma-1.0-SNAPSHOT.jar",
+      "sha256": "c0ddb963798d45603c2e2685744892c40d3e841817f9c966ab7fad34f7e48765"
+    },
+    "smaBridgeListener8130Present": false,
+    "activeConversationCounts": {
+      "running": 0,
+      "waiting_for_confirmation": 0,
+      "stuck": 0,
+      "deleting": 0
+    },
+    "preservedPausedConversation": {
+      "conversationId": "4c2e5f84-ecd3-4971-b375-a0fa9905a058",
+      "title": "Tekroo Trader",
+      "executionStatus": "paused",
+      "createdAt": "2026-08-09T19:52:16.454058Z",
+      "updatedAt": "2026-08-13T17:38:02.080929Z"
+    },
+    "ordinarySettingsObservedWithoutSecretValues": {
+      "model": "ollama_chat/qwen3.6:35b-a3b-q8_0",
+      "baseUrl": "http://127.0.0.1:11434",
+      "numRetries": 5,
+      "timeoutSeconds": 1800,
+      "nativeToolCalling": true,
+      "forceStringSerializer": null
+    }
+  },
+  "measuredNamespaceAbsence": {
+    "status": "PASS",
+    "mongodbDatabase": {
+      "name": "sma_s2_successor_candidate_2_measured_20260814",
+      "matchingListDatabasesRecords": 0
+    },
+    "qdrantSemanticCollection": {
+      "name": "sma_s2_successor_candidate_2_semantic_20260814",
+      "httpStatus": 404,
+      "exists": false
+    },
+    "qdrantEpisodicCollection": {
+      "name": "sma_s2_successor_candidate_2_episodic_20260814",
+      "httpStatus": 404,
+      "exists": false
+    },
+    "workspaceRoot": {
+      "path": "/tmp/tekroo-sma-s2-successor-candidate-2",
+      "exists": false
+    },
+    "outputRoot": {
+      "path": "OUTPUT/phase-3/sma-s2-successor-candidate-2-measured-attempt-1",
+      "exists": false
+    }
+  },
+  "blockingFinding": {
+    "primaryClass": "HARNESS",
+    "attributedComponent": "SMA_S2_QUALIFICATION_PACKAGE",
+    "failedPredicate": "The exact harness that will execute and measure the accepted 20-case, 103-repetition corpus must be frozen and offline-qualified before an execution identity can be sealed.",
+    "observed": [
+      "The accepted preregistration binds scripts/sma_s2_offline_harness_candidate_5.py as offlineHarnessSha256 7236b8b1c1fd52adffea58e1e5e1d0f689211a565964fb370b4fdf7a77c7d534.",
+      "That bound script explicitly states that it never contacts OpenHands, SMA, MongoDB, Qdrant, or a model and its command-line interface accepts only --stub and --output.",
+      "The bound offline receipt contains nine offline-control tests, not 103 measured-repetition handlers.",
+      "The repository's SMA-S2-named source files consist of deterministic-stub candidates and offline-harness candidates; no SMA-S2 measured driver is present.",
+      "The accepted preregistration has no measured-driver path or digest binding."
+    ],
+    "computed": [
+      "Accepted cases: 20.",
+      "Accepted planned repetitions: 103.",
+      "Frozen measured-driver identities: 0.",
+      "Executable mappings from the accepted 103 repetitions to measured handlers: 0."
+    ],
+    "inferred": [
+      "A one-request live serializer probe could show only that one request shape works; it could not prove that an unfrozen driver will execute the preregistered corpus, fault schedule, pre-assertion journal, continuation policy, and cleanup protocol.",
+      "Sealing an execution identity around a driver introduced after acceptance would violate the governing requirement that the exact harness identity be frozen before execution."
+    ]
+  },
+  "authorizedActionCounts": {
+    "readOnlyAuditPerformed": 1,
+    "executionIdentityCandidatesSealed": 0,
+    "livePreflightAttempts": 0,
+    "openhandsPreflightConversationsCreated": 0,
+    "deterministicStubPreflightRequests": 0,
+    "serviceRestarts": 0,
+    "measuredCasesExecuted": 0,
+    "measuredRepetitionsExecuted": 0,
+    "realModelCalls": 0,
+    "measuredNamespacesCreated": 0
+  },
+  "disposition": {
+    "executionIdentitySealed": false,
+    "livePreflightConsumed": false,
+    "measuredExecutionState": "NOT_RUN",
+    "qualifiedClaimEarned": false,
+    "claim": "OPENHANDS_SMA_BOUNDARY_QUALIFIED",
+    "recommendation": "NO_GO_FOR_MEASURED_AUTHORIZATION",
+    "requiredSuccessorCorrection": [
+      "implement one exact measured S2 driver that owns all 20 cases and 103 repetitions without importing result credit from the terminated V12 lineage",
+      "add offline driver self-tests for the complete case map, ordering, append-before-assertion behavior, deliberate assertion failure, fault activation and observation, cancellation, create-once output, journal reconstruction, secret scanning, and idempotent cleanup",
+      "bind the measured-driver path and SHA-256 plus its passing offline receipt into a prospectively reviewed successor preregistration",
+      "accept and freeze that successor before a new immediate execution-identity preflight authority is issued"
+    ]
+  },
+  "rawAuditCommands": [
+    "git rev-parse HEAD",
+    "git rev-parse HEAD^{tree}",
+    "git status --porcelain",
+    "lsof -nP -iTCP:8000 -sTCP:LISTEN",
+    "lsof -nP -iTCP:18000 -sTCP:LISTEN",
+    "lsof -nP -iTCP:8130 -sTCP:LISTEN",
+    "curl -sS -i http://127.0.0.1:18000/health",
+    "mongosh mongodb://127.0.0.1:27017/admin --quiet --eval <list exact measured database>",
+    "curl -sS -i http://127.0.0.1:6333/collections/sma_s2_successor_candidate_2_semantic_20260814",
+    "curl -sS -i http://127.0.0.1:6333/collections/sma_s2_successor_candidate_2_episodic_20260814",
+    "rg --files -g *sma_s2*"
+  ]
+}

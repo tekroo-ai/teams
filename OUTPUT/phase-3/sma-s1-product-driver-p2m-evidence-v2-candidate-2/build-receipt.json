@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S1_PRODUCT_DRIVER_BUILD_RECEIPT",
+  "status": "PASS_ALL_FOURTEEN_HANDLERS_COMPILED",
+  "scope": "PROSPECTIVE_EVIDENCE_BOUNDARY_NO_MEASURED_S1_PRODUCT_CREDIT",
+  "recordedOn": "2026-08-14",
+  "compiler": "javac 21.0.12",
+  "jarTool": "jar 21.0.12",
+  "predecessor": {
+    "candidate": 1,
+    "handlerCheckStatus": "FAIL",
+    "gap": "EXACT_PROVENANCE_IDENTITY_FIELDS_INVALID",
+    "measuredCreditImported": 0
+  },
+  "source": {
+    "path": "investigations/sma-q1/layered/driver-src-p2m-evidence-v2-candidate-2/ai/tekroo/sma/openhands/SmaS1QualificationDriver.java",
+    "sha256": "63e98243d9ff9c47a099ac2e4c181ec524485477a4c51b4959fbb0c8295489a1"
+  },
+  "serviceArtifact": {
+    "path": "/Users/paul/work/tekroo-ai/sma-s1-p2m/target/sma-1.0-SNAPSHOT.jar",
+    "sha256": "c0ddb963798d45603c2e2685744892c40d3e841817f9c966ab7fad34f7e48765"
+  },
+  "compiledArtifact": {
+    "path": "OUTPUT/phase-3/sma-s1-product-driver-p2m-evidence-v2-candidate-2/sma-s1-product-driver-p2m-evidence-v2-candidate-2.jar",
+    "sha256": "4946f714d9c17b05021d17be826c7d821843dbed699d4a41113b518a8a5fb89f"
+  },
+  "launcher": {
+    "path": "scripts/sma_s1_product_driver_p2m_evidence_v2_candidate_2.py",
+    "sha256": "a08b6e3a93e8a68845850cf41f38a6519fe8177203506bbbf88a769f4eaa4e4c"
+  },
+  "prospectiveCorrection": "The synthetic OpenHands event now supplies an explicit deterministic sequence value so the exact persisted provenance receipt cannot omit it as null.",
+  "implementedHandlerCount": 14,
+  "smaProductSourceChanged": false,
+  "modelOrOpenHandsProcessUsed": false,
+  "measuredS1Execution": false,
+  "scientificRepetitionsExecuted": 0,
+  "byteReproducibleArchiveClaimed": false
+}

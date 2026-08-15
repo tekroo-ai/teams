@@ -1,0 +1,98 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_CANDIDATE_4_COORDINATOR_REVIEW",
+  "recordedOn": "2026-08-14",
+  "reviewRole": "TEAMS_COORDINATOR_NON_INDEPENDENT",
+  "candidate": {
+    "path": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-4.json",
+    "sha256": "5875ec59ec1cb0e8d8d20f18bc0429e1324a160eed827222dcfb4c0cabc6d0ae",
+    "bindingCount": 19,
+    "bindingMismatches": 0
+  },
+  "decision": "NO_GO_FOR_PRINCIPAL_ACCEPTANCE_FREEZE",
+  "measuredCredit": 0,
+  "executionState": "NOT_RUN",
+  "offlineVerification": {
+    "driverOfflineContractReproduced": true,
+    "pythonOptimizationEnabled": true,
+    "caseCount": 20,
+    "repetitionCount": 103,
+    "predicateSlotCount": 59,
+    "requiredEvidenceSlotCount": 10,
+    "offlineReceipt": {
+      "path": "OUTPUT/phase-3/sma-s2-candidate-4-offline-qualification-2/offline-qualification-receipt.json",
+      "sha256": "fba8ae0cad35f240faa92c11d56257f3c4709d688bc78dec92199b143f5a6a8b",
+      "status": "PASS",
+      "scope": "OFFLINE_MATRIX_DRIVER_AND_FIXTURE_CONTROLS_ONLY"
+    }
+  },
+  "candidate3CorrectionsVerified": [
+    "candidate-4 effective namespace configuration is internally consistent",
+    "all 59 predicate slots and 10 required-evidence slots are mapped",
+    "missing and false oracle bundles are rejected",
+    "predicates survive Python optimization",
+    "deterministic tool stimuli exist for cases 11 and 14",
+    "cases 2, 3, 5, 9, 10, 12, 13, and 17 contain material oracle strengthening"
+  ],
+  "blockers": [
+    {
+      "id": "C4-B01-REVIEW-DESIGNATION-SUBJECT",
+      "classification": "GOVERNANCE",
+      "finding": "The independent-reviewer designation identifies candidate 1 rather than candidate 4.",
+      "falsePositiveRisk": false
+    },
+    {
+      "id": "C4-B02-NONEMPTY-CONTEXT-WITHOUT-PROVENANCE",
+      "classification": "SCIENTIFIC_ORACLE",
+      "finding": "E-003 permits EXPLICIT_FAIL_OPEN_EMPTY for a non-empty context lacking an SMA trace.",
+      "falsePositiveRisk": true
+    },
+    {
+      "id": "C4-B03-CASE7-BODYFREE-LITERAL",
+      "classification": "SCIENTIFIC_ORACLE",
+      "finding": "Case 7 hard-codes bodyFree true instead of scanning the frozen operational surfaces.",
+      "falsePositiveRisk": true
+    },
+    {
+      "id": "C4-B04-CASE11-CARDINALITY-AND-SEQUENCE",
+      "classification": "HARNESS_AND_SCIENTIFIC_ORACLE",
+      "finding": "Case 11 waits for two captures although its parent/child fixture produces three eligible messages, and it does not compare actual OpenHands sequence values to SMA provenance.",
+      "falsePositiveRisk": true,
+      "falseNegativeOrHarnessStopRisk": true
+    },
+    {
+      "id": "C4-B05-CASE18-SUMMARY-DOMAIN-MISMATCH",
+      "classification": "SCIENTIFIC_ORACLE",
+      "finding": "Case 18 compares condensation event IDs with recalled memory IDs rather than testing generic summary text as delivery state.",
+      "falsePositiveRisk": true
+    },
+    {
+      "id": "C4-B06-CASE20-FUTURE-AND-CLEANUP",
+      "classification": "SCIENTIFIC_ORACLE",
+      "finding": "Case 20 substitutes the stub completion timestamp for OpenHands future completion and omits per-repetition workspace and namespace absence.",
+      "falsePositiveRisk": true
+    }
+  ],
+  "rootCause": "Offline controls prove oracle-bundle structure and Boolean rejection, but do not prove that each Boolean is a faithful implementation of its semantic predicate.",
+  "requiredSuccessor": {
+    "candidate": 5,
+    "semanticSourceUnchanged": true,
+    "caseCountUnchanged": true,
+    "repetitionCountUnchanged": true,
+    "thresholdsUnchanged": true,
+    "claimUnchanged": true,
+    "productRemediationIndicated": false,
+    "evidenceFieldMutationTestsRequired": true
+  },
+  "notAuthorized": [
+    "principal acceptance or freeze of candidate 4",
+    "execution identity preparation",
+    "live preflight",
+    "measured S2 execution",
+    "OpenHands conversation creation",
+    "SMA service invocation",
+    "deterministic stub network invocation",
+    "real model call"
+  ],
+  "recommendation": "AUTHORIZE_ONE_BOUNDED_CANDIDATE_5_HARNESS_REMEDIATION"
+}

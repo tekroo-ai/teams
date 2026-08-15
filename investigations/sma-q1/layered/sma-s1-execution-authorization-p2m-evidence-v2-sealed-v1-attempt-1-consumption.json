@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S1_EXECUTION_AUTHORIZATION_CONSUMPTION",
+  "status": "CONSUMED_NO_REUSE",
+  "recordedAt": "2026-08-14T15:00:12Z",
+  "authorization": {
+    "path": "investigations/sma-q1/layered/sma-s1-execution-authorization-p2m-evidence-v2-sealed-v1-attempt-1.json",
+    "sha256": "ea8d1b69fac1b50d5a9420e155d1159644556185921114a76e77cae8dacbfa92",
+    "authorizationId": "SMA-S1-P2M-EVIDENCE-V2-SEALED-V1-ATTEMPT-1",
+    "attemptsAllowed": 1,
+    "correctiveRerunsAllowed": 0
+  },
+  "consumption": {
+    "attemptsConsumed": 1,
+    "executionStarted": true,
+    "executionCompleted": true,
+    "reuseProhibited": true,
+    "outputRoot": "OUTPUT/phase-3/sma-s1-measured-p2m-evidence-v2-sealed-v1-attempt-1",
+    "executionReceiptSHA256": "485152e2fe74b62c426d0c2c35769379f1d05a5da7c94148bdffc5b27fdcadf3",
+    "journalSHA256": "334d5e1e1845a7445f623ed88be957c7b433e5e5321c0d086a3c07715f91f5b4",
+    "scientificAdjudicationSHA256": "0e5ace0acbe6e2441755ae656de36096e38b2364d27fb45ee844f2422abf2f7d"
+  },
+  "outcome": {
+    "harnessStatus": "PASS",
+    "scientificGateStatus": "PASS",
+    "scientificClassification": "PASS_FROZEN_SMA_SEMANTICS_QUALIFIED",
+    "productFailureEstablished": false,
+    "claimOnPassAuthorized": true,
+    "cleanupPassed": true
+  },
+  "authorityBoundary": {
+    "additionalAttemptAuthorized": false,
+    "correctiveRerunAuthorized": false,
+    "authorizationReusable": false,
+    "newProspectiveBoundaryAndSeparateAuthorityRequired": true
+  }
+}

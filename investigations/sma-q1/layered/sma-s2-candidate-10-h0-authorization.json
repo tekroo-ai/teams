@@ -1,0 +1,48 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_CANDIDATE_10_H0_AUTHORIZATION",
+  "lineageId": "SMA-S2",
+  "candidate": 10,
+  "status": "AUTHORIZED_NOT_CONSUMED",
+  "recordedOn": "2026-08-14",
+  "authority": "WORKSPACE_PRINCIPAL",
+  "closurePlan": {
+    "path": "docs/architecture/087-sma-s2-closure-plan.md",
+    "sha256": "787a770dfa8e46f38dd5489579f902eb1c26548cd0cc4608e5a926b9c261bbdf"
+  },
+  "machineClosurePlan": {
+    "path": "investigations/sma-q1/layered/sma-s2-closure-plan-v1.json",
+    "sha256": "86b612b7138367d95e8dc58fc21e5c0d7160df8e57476a2b05febb37bcb83e92"
+  },
+  "authorizedScope": {
+    "consolidatedHarnessImplementation": true,
+    "injectedOfflineAdapters": true,
+    "completeDressPlanOfflineWalk": 34,
+    "completeMeasuredPlanOfflineWalk": 103,
+    "scientificPredicateMutationControls": 59,
+    "requiredEvidenceMutationControls": 10,
+    "retainedOfflineReceipts": true,
+    "independentReview": true,
+    "maximumPublishedH0QualificationAttempts": 1,
+    "internalOfflineDevelopmentRuns": "BOUNDED_UNTIL_PUBLICATION_GATE"
+  },
+  "prohibitedScope": {
+    "productChanges": true,
+    "livePreflight": true,
+    "serviceStart": true,
+    "openhandsConversations": true,
+    "mavenInvocation": true,
+    "dressRehearsal": true,
+    "measuredExecution": true,
+    "realModelCalls": true,
+    "networkUse": true,
+    "acceptedArtifactMutation": true
+  },
+  "effect": {
+    "candidateAcceptance": false,
+    "executionIdentityCreation": false,
+    "liveAuthority": false,
+    "measuredCredit": 0,
+    "qualificationClaimAllowed": false
+  }
+}

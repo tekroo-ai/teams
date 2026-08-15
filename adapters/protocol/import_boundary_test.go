@@ -24,6 +24,11 @@ func TestThinAdapterProductionImportsRemainWithinBoundary(t *testing.T) {
 		"stdio":   {"github.com/tekroo-ai/teams/adapters/protocol": true},
 		"daemon":  {"github.com/tekroo-ai/teams/adapters/stdio": true},
 		"httpapi": {"github.com/tekroo-ai/teams/adapters/protocol": true},
+		"eventexporthttp": {
+			"github.com/tekroo-ai/teams/adapters/httpapi":  true,
+			"github.com/tekroo-ai/teams/adapters/protocol": true,
+			"github.com/tekroo-ai/teams/eventexport":       true,
+		},
 		"mcp": {
 			"github.com/tekroo-ai/teams/adapters/httpapi":  true,
 			"github.com/tekroo-ai/teams/adapters/protocol": true,

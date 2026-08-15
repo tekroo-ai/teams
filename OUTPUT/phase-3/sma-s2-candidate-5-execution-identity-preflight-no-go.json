@@ -1,0 +1,110 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_CANDIDATE_5_EXECUTION_IDENTITY_PREFLIGHT_RECEIPT",
+  "recordedOn": "2026-08-14",
+  "status": "FAIL_NO_GO_BEFORE_EXECUTION_IDENTITY_AND_LIVE_PREFLIGHT",
+  "scope": "AUTHORIZED_EXECUTION_IDENTITY_PREPARATION_AND_ONE_LIVE_PREFLIGHT",
+  "acceptedPreregistration": {
+    "path": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-5.json",
+    "sha256": "2afe7930e20a95dd40d7477c4a7d4ee638477d0ea0a339b3742ff2b39446f939"
+  },
+  "acceptance": {
+    "path": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-5-acceptance.json",
+    "sha256": "30d83e68bfdfb391d5afa69c45871cb73aebe482fef4bc58fa87827c9bf8e1f8"
+  },
+  "authorization": {
+    "path": "investigations/sma-q1/layered/sma-s2-candidate-5-execution-identity-preflight-authorization.json",
+    "sha256": "895f3bca4445115c2c4c1cd5024dd53d90d5effe0f9d2c2b282783addfa232a9"
+  },
+  "artifactCorrespondence": {
+    "status": "PASS_FOR_FILES_CHECKED_BEFORE_DECISIVE_STOP",
+    "checks": [
+      {"name": "acceptedCandidate", "expectedSha256": "2afe7930e20a95dd40d7477c4a7d4ee638477d0ea0a339b3742ff2b39446f939", "actualSha256": "2afe7930e20a95dd40d7477c4a7d4ee638477d0ea0a339b3742ff2b39446f939", "match": true},
+      {"name": "measuredDriver", "expectedSha256": "6bd0cc221b6161140f12ad664e18efd472298f5d235e37925f980f9faa0b5d46", "actualSha256": "6bd0cc221b6161140f12ad664e18efd472298f5d235e37925f980f9faa0b5d46", "match": true},
+      {"name": "semanticMutationHarness", "expectedSha256": "69d907eb8782e44bbf5bc588bc1bf15d5cd480a0c3f6067c0ff3cc08bfd4a933", "actualSha256": "69d907eb8782e44bbf5bc588bc1bf15d5cd480a0c3f6067c0ff3cc08bfd4a933", "match": true},
+      {"name": "offlineQualification", "expectedSha256": "6437c515fca3742a784d90ba7c2eba4d8d675016a2e92ad07266492fb8890e90", "actualSha256": "6437c515fca3742a784d90ba7c2eba4d8d675016a2e92ad07266492fb8890e90", "match": true},
+      {"name": "nonSecretConfiguration", "expectedSha256": "080b8325f1c44f2f78079d07439be5cec1f07355661c4ceeb11103a2e9cff579", "actualSha256": "080b8325f1c44f2f78079d07439be5cec1f07355661c4ceeb11103a2e9cff579", "match": true},
+      {"name": "oracleMatrix", "expectedSha256": "806e12a59dd8dcbc8f248d0a8d486c1afb856fc310e1952f7855e9fdf955d4f4", "actualSha256": "806e12a59dd8dcbc8f248d0a8d486c1afb856fc310e1952f7855e9fdf955d4f4", "match": true}
+    ]
+  },
+  "runtimeAudit": {
+    "status": "PARTIAL_READ_ONLY_PASS_STOPPED_ON_STATIC_IDENTITY_BLOCKER",
+    "agentServer": {
+      "listener": "127.0.0.1:18000",
+      "pid": 46569,
+      "healthHttpStatus": 200,
+      "healthBody": {"status": "ok"},
+      "artifactSha256": "9f1a91d9a58d13a27bc0e729eac36553bb9c977797c21f5483de3340cfa682bf"
+    },
+    "agentCanvasIngress": {
+      "listener": "127.0.0.1:8000",
+      "pid": 46737
+    },
+    "smaBridgeListener8130Present": false,
+    "smaServiceJarSha256": "c0ddb963798d45603c2e2685744892c40d3e841817f9c966ab7fad34f7e48765",
+    "openhands": {
+      "commit": "a338ba9b6cbb529886b755a335bae3dee0004700",
+      "tree": "9e72f1b4ee0b857025d9f170600b9dce539b169a",
+      "worktreeClean": true
+    },
+    "activeConversationAudit": "NOT_COMPLETED_BECAUSE_STATIC_IDENTITY_BLOCKER_WAS_ALREADY_DECISIVE"
+  },
+  "measuredNamespaceAbsence": {
+    "status": "PASS",
+    "mongodbDatabase": {"name": "sma_s2_successor_candidate_5_measured_20260814", "matchingRecords": 0},
+    "qdrantSemanticCollection": {"name": "sma_s2_successor_candidate_5_semantic_20260814", "httpStatus": 404, "exists": false},
+    "qdrantEpisodicCollection": {"name": "sma_s2_successor_candidate_5_episodic_20260814", "httpStatus": 404, "exists": false},
+    "workspaceRoot": {"path": "/tmp/tekroo-sma-s2-successor-candidate-5", "exists": false},
+    "outputRoot": {"path": "OUTPUT/phase-3/sma-s2-successor-candidate-5-measured-attempt-1", "exists": false}
+  },
+  "blockingFinding": {
+    "primaryClass": "HARNESS_IDENTITY_FENCE",
+    "attributedComponent": "SMA_S2_CANDIDATE_5_MEASURED_DRIVER",
+    "failedPredicate": "The numeric ephemeral deterministic-stub port and fixed bridge port must be bound by the successor execution identity and enforced by the measured driver.",
+    "observed": [
+      "Candidate-5 configuration sets stubPortMustBeBoundInSuccessorExecutionIdentity and bridgePortMustBeBoundInSuccessorExecutionIdentity to true.",
+      "The accepted driver inherits start_stub, which launches the deterministic stub without a --port argument.",
+      "The deterministic stub therefore uses its parser default port 0 and the driver learns the OS-selected port from the later ready file.",
+      "The accepted execution fence validates file hashes, authorization identity, scope, and real-model prohibition but reads no stubPort or bridgePort field.",
+      "Measured handlers use self.stub_port learned after launch rather than a port frozen in the execution identity."
+    ],
+    "computed": [
+      "Required execution-identity port bindings: 2.",
+      "Port bindings enforced by the accepted execution fence: 0.",
+      "Numeric stub ports supplied by the accepted driver at launch: 0."
+    ],
+    "inferred": [
+      "A candidate-5 execution identity could name arbitrary port values and still pass the accepted fence while the measured process uses a different OS-selected stub port.",
+      "Sealing such an identity would falsely claim that the measured runtime endpoint was prospectively frozen."
+    ]
+  },
+  "authorizedActionCounts": {
+    "readOnlyAuditStarted": 1,
+    "executionIdentityCandidatesSealed": 0,
+    "livePreflightAttempts": 0,
+    "openhandsPreflightConversationsCreated": 0,
+    "deterministicStubPreflightRequests": 0,
+    "serviceRestarts": 0,
+    "measuredCasesExecuted": 0,
+    "measuredRepetitionsExecuted": 0,
+    "realModelCalls": 0,
+    "measuredNamespacesCreated": 0
+  },
+  "disposition": {
+    "executionIdentitySealed": false,
+    "livePreflightConsumed": false,
+    "measuredExecutionState": "NOT_RUN",
+    "qualifiedClaimEarned": false,
+    "claim": "OPENHANDS_SMA_BOUNDARY_QUALIFIED",
+    "recommendation": "NO_GO_FOR_MEASURED_AUTHORIZATION",
+    "productRemediationIndicated": false,
+    "requiredSuccessorCorrection": [
+      "create candidate 6 without editing candidate 5",
+      "add required numeric stubPort and bridgePort fields to the execution identity and single-use authorization contracts",
+      "make the driver launch the stub on the bound numeric stubPort and require the ready receipt to report that same port",
+      "make the execution fence require identity and authorization port equality and bridgePort 8130",
+      "offline-test correct bindings plus missing, mutated, occupied, and ready-receipt-mismatch port failures",
+      "bind, review, and accept/freeze candidate 6 before another live-preflight authority"
+    ]
+  }
+}

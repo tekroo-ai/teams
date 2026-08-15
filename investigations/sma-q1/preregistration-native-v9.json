@@ -1,0 +1,75 @@
+{
+  "schemaVersion": "9.0.0",
+  "recordType": "INVESTIGATION_PREREGISTRATION_AMENDMENT",
+  "amendmentId": "SMA-Q1-NATIVE-OPENHANDS-VERTICAL-SLICE-V9",
+  "status": "ACCEPTED_AUTHORIZED_NOT_EXECUTED",
+  "recordedOn": "2026-08-13",
+  "timePrecision": "DAY",
+  "purpose": "Preserve V8 while eliminating implicit OpenHands capabilities and forwarding the model seed required by the existing deterministic setting.",
+  "supersession": {
+    "priorAmendmentId": "SMA-Q1-NATIVE-OPENHANDS-VERTICAL-SLICE-V8",
+    "priorManifest": "investigations/sma-q1/preregistration-native-v8.json",
+    "priorManifestSHA256": "26098c415217b26d92602d8acb3c11c23c852758f062c0caedb3eb8384233116",
+    "priorExecutionReceipt": "OUTPUT/phase-3/sma-q1n-step15-v8/execution-receipt.json",
+    "priorExecutionState": "INCONCLUSIVE",
+    "priorFailure": "The model exhausted three iterations on ThinkAction, auto-attached VisionInspectAction, and ThinkAction without producing a final response.",
+    "preservation": "V8 and all prior artifacts remain immutable; no prior scenario or repetition is credited to V9."
+  },
+  "unchangedBase": {
+    "bindingManifest": "investigations/sma-q1/preregistration-native-v2.json",
+    "bindingManifestSHA256": "c618371d571d5333aebd2bdc83d2db2559115f5ec3e1903b33e8e0ab157edf5d",
+    "bindingPriorAmendments": "All accepted V3 through V8 scientific, fixture, telemetry, artifact, terminal-oracle, failure-evidence, and process-envelope requirements remain binding.",
+    "scenarioCount": 18,
+    "repetitionCount": 96,
+    "scenarioCreditFromPriorAttempts": 0,
+    "scenarioMutation": "NONE",
+    "thresholdMutation": "NONE",
+    "smaBehaviorMutation": "NONE",
+    "semanticHookDeadlineMs": 1000
+  },
+  "v9Amendment": {
+    "classification": "QUALIFIED_EXACT_CAPABILITY_AND_DETERMINISM_REPAIR",
+    "configuredTools": [],
+    "includeDefaultTools": ["FinishTool"],
+    "autoAttachVisionInspectTool": false,
+    "enableSubAgents": false,
+    "enableSwitchLLMTool": false,
+    "mcpConfig": {},
+    "temperature": 0,
+    "seed": 20260813,
+    "maxIterations": 3,
+    "sourceRepairs": [
+      "OpenHands settings now accept an exact built-in tool set and explicit automatic-vision policy.",
+      "OpenHands chat options now forward the existing LLM seed to the provider."
+    ],
+    "qualification": {
+      "receipt": "OUTPUT/phase-3/openhands-exact-capability-v2/execution-receipt.json",
+      "receiptSHA256": "cf3c371079330ea52dc1f8417bbfffe1845f10bc0aaab1cc835e635c8abb63fa",
+      "attempts": 128,
+      "exactResponses": 128,
+      "finishActionTerminals": 128,
+      "unexpectedAgentToolNames": [],
+      "smaServiceUsed": false
+    }
+  },
+  "disposableNamespaces": {
+    "qualificationMongoDatabase": "sma_q1n_step15_v9_fixture_20260813",
+    "qualificationSemanticCollection": "sma_q1n_step15_v9_fixture_semantic_20260813",
+    "qualificationEpisodicCollection": "sma_q1n_step15_v9_fixture_episodic_20260813",
+    "measuredMongoDatabase": "sma_q1n_step15_20260813_v9",
+    "measuredSemanticCollection": "sma_q1n_step15_v9_semantic_20260813",
+    "measuredEpisodicCollection": "sma_q1n_step15_v9_episodic_20260813",
+    "productionOrHistoricalDataAllowed": false
+  },
+  "executionPolicy": {
+    "attemptsAllowed": 1,
+    "correctiveRerunsAllowed": 0,
+    "stopOnFirstFailure": true,
+    "resultRule": "Only a complete 18-scenario, 96-repetition run may produce SMA-Q1 PASS or FAIL; incomplete execution is INCONCLUSIVE."
+  },
+  "operatorDecision": {
+    "classification": "OBSERVED_OPERATOR_INSTRUCTION",
+    "instruction": "Find the root cause and fix it completely.",
+    "effect": "AUTHORIZE_ONE_V9_EXECUTION_AFTER_EXACT_CAPABILITY_LANE_QUALIFIES"
+  }
+}

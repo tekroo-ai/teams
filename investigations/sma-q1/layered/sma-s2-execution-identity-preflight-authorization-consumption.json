@@ -1,0 +1,49 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_EXECUTION_IDENTITY_PREFLIGHT_AUTHORIZATION_CONSUMPTION",
+  "consumptionId": "SMA-S2-EXECUTION-IDENTITY-PREFLIGHT-20260814-CONSUMPTION",
+  "status": "CONSUMED_STOPPED_BEFORE_LIVE_PREFLIGHT_NO_REUSE",
+  "recordedOn": "2026-08-14",
+  "authorization": {
+    "path": "investigations/sma-q1/layered/sma-s2-execution-identity-preflight-authorization.json",
+    "sha256": "4094ebc71061d490573eff80c3ced721192c3506e2c7d43c3248caf9f0f1ce6f"
+  },
+  "preparationReceipt": {
+    "path": "OUTPUT/phase-3/sma-s2-execution-identity-preparation-candidate-1.json",
+    "sha256": "bd5260fa13c2bb54e9c2e7c6fc4e5056069ce848cccbe898e7a469097d1b3855",
+    "status": "FAIL_NO_GO_BEFORE_LIVE_PREFLIGHT"
+  },
+  "review": {
+    "path": "docs/architecture/058-sma-s2-execution-identity-preparation-no-go.md",
+    "sha256": "5e4d8b9dc66c8f8038251f59c1f8f616137da8a0e17395dbd53540c0b33d7fa6"
+  },
+  "actions": {
+    "readOnlyAuditPerformed": 1,
+    "artifactCorrespondenceChecks": 6,
+    "artifactCorrespondenceMatches": 6,
+    "driverAvailabilityAuditPerformed": 1,
+    "driverOfflineQualificationsPerformed": 0,
+    "livePreflightAttempts": 0,
+    "openhandsPreflightConversationsCreated": 0,
+    "deterministicStubPreflightRequests": 0,
+    "serviceRestarts": 0,
+    "measuredCasesExecuted": 0,
+    "measuredRepetitionsExecuted": 0,
+    "realModelCalls": 0,
+    "measuredNamespacesCreated": 0
+  },
+  "stopReason": {
+    "primaryClass": "HARNESS",
+    "summary": "The accepted package contains no frozen measured S2 driver and the bound offline harness cannot execute the measured corpus.",
+    "safeToContinueLivePreflight": false,
+    "executionIdentityCanBeSealed": false
+  },
+  "authority": {
+    "authorizationReusable": false,
+    "executionIdentitySealed": false,
+    "measuredExecutionAuthorized": false,
+    "measuredExecutionState": "NOT_RUN",
+    "successorPreparationRequiresNewAuthority": true,
+    "futureLivePreflightRequiresNewAuthority": true
+  }
+}

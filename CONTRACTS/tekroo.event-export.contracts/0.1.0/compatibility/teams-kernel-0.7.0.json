@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "1.0.0",
+  "contractIdentity": "tekroo.event-export.contracts/0.1.0",
+  "source": {
+    "contractIdentity": "tekroo.kernel.contracts/0.7.0",
+    "manifestSHA256": "e2b9b5224a860a3eaa07451cf48fb5ac16a440b22b8dd592ff1662c1cff67f16",
+    "domainEventSchema": "CONTRACTS/tekroo.kernel.contracts/0.7.0/schemas/domain-event.schema.json"
+  },
+  "compatibilityClaim": "READ_ONLY_EXACT_EVENT_BYTES_ADDITIVE_BOUNDARY",
+  "organizationalSemanticsChanged": false,
+  "outboxSemanticsChanged": false,
+  "historicalReplay": "SOURCE_VERSION_GATED",
+  "prohibitedDependencies": [
+    "Consumers reading private MongoDB event documents",
+    "Consumers claiming the delivery outbox to observe events",
+    "Cursor or insertion order treated as organizational causality",
+    "Parsed projections substituted for exact persisted event bytes"
+  ]
+}

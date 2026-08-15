@@ -1,0 +1,95 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_CANDIDATE_9_DRESS_REHEARSAL_AUTHORIZATION",
+  "authorizationId": "SMA-S2-CANDIDATE-9-DRESS-REHEARSAL-ATTEMPT-1",
+  "candidate": 9,
+  "status": "AUTHORIZED_NOT_CONSUMED",
+  "recordedOn": "2026-08-14",
+  "principalStatement": "AUTHORIZE one single-use candidate-9 34-operation, zero-credit live dress rehearsal against execution identity a52d19eba7cdfd219f0a4977361c3d06054300e5669671f292523428cf894cfd. Begin with host-boundary live-state, active-work, endpoint, namespace, workspace-isolation, and exact Maven-project checks. Authorize only the Maven promotions required by this rehearsal. Preserve the paused Tekroo Trader conversation, prohibit automatic reruns and real-model calls, and stop on any failed precondition. This does not authorize measured execution.",
+  "executionIdentitySha256": "a52d19eba7cdfd219f0a4977361c3d06054300e5669671f292523428cf894cfd",
+  "executionIdentityAcceptance": {
+    "path": "investigations/sma-q1/layered/sma-s2-candidate-9-execution-identity-acceptance.json",
+    "sha256": "90e9e8ffe90cec8a526cb9f0406c757200b17d04dde4e8531147bcf9b6c0e4fd",
+    "status": "ACCEPTED_FROZEN"
+  },
+  "runtimePorts": {
+    "stubHost": "127.0.0.1",
+    "stubPort": 19129,
+    "bridgeHost": "127.0.0.1",
+    "bridgePort": 8130
+  },
+  "workspaceIsolation": {
+    "case1WorkspaceRole": "EMPTY_UNCAPTURED",
+    "case1Workspace": "/tmp/tekroo-sma-s2-successor-candidate-9/actor-empty",
+    "corpusCaptureAllowlist": [
+      "/tmp/tekroo-sma-s2-successor-candidate-9/actor-alpha",
+      "/tmp/tekroo-sma-s2-successor-candidate-9/actor-beta"
+    ],
+    "emptyWorkspaceMustNotBeCaptureAllowlisted": true,
+    "case1ConversationReceiptsRetainedUntilCleanup": true,
+    "syntheticCorpusSourceCount": 4,
+    "allWorkspacesUnderCandidateRoot": true,
+    "cleanupMustRemoveEmptyWorkspace": true
+  },
+  "mavenPromotion": {
+    "projectDirectory": "/Users/paul/work/tekroo-ai/sma-s1-p2m",
+    "pomPath": "/Users/paul/work/tekroo-ai/sma-s1-p2m/pom.xml",
+    "subprocessWorkingDirectoryMustBeExplicit": true,
+    "parentWorkingDirectoryMayChange": false,
+    "failureEvidence": {
+      "exitStatusRequired": true,
+      "stdoutLengthRequired": true,
+      "stdoutSha256Required": true,
+      "stderrLengthRequired": true,
+      "stderrSha256Required": true,
+      "rawStdoutOrStderrProhibited": true
+    }
+  },
+  "mavenInvocationFence": {
+    "maximumInvocations": 6,
+    "initialCorpusEligiblePromotions": 3,
+    "oversizedContextFixturePromotions": 3,
+    "testSelector": "Wp5eReplayPromotionIntegrationTest",
+    "workingDirectory": "/Users/paul/work/tekroo-ai/sma-s1-p2m",
+    "otherMavenInvocationsAuthorized": 0
+  },
+  "driverSha256": "d97b5812472a3bd674d58ac266d24ac4be783aed65984ca055d69a449ebd92cc",
+  "configurationSha256": "88d9e3988f75e1521200b3afe61ee5440b1e67c5e376330e837343046f13ca3b",
+  "preregistrationSha256": "d7680cc0b7b5ed501201e4b9dcc54b089071267c75ca43e3b9fab13b95b251a8",
+  "acceptanceSha256": "2579d877f36da0e5a90188db8a038fa8c2cf8aada529feb0047d4e13fce5332f",
+  "maximumDressRehearsalAttempts": 1,
+  "operationCount": 34,
+  "measuredCaseExecutions": 0,
+  "measuredRepetitionExecutions": 0,
+  "measuredCredit": 0,
+  "claimOnPass": null,
+  "realModelCallsAllowed": false,
+  "serviceRestartsAllowed": 0,
+  "preconditions": [
+    "all localhost network checks execute at the host boundary",
+    "accepted identity and every bound artifact still match",
+    "Agent Canvas and agent-server each return HTTP 200 health",
+    "no unrelated OpenHands conversation is running, awaiting confirmation, stuck, or deleting",
+    "the preserved Tekroo Trader conversation remains paused",
+    "stub port 19129 and bridge port 8130 are unoccupied",
+    "candidate-9 disposable MongoDB, Qdrant, workspace, and output namespaces are absent",
+    "actor-empty is absent before setup and excluded from the exact actor-alpha/actor-beta capture allowlist",
+    "the SMA and OpenHands product identities still match the accepted execution identity",
+    "the exact Maven project directory and pom.xml match the accepted execution identity"
+  ],
+  "stopConditions": [
+    "any precondition fails",
+    "any harness boundary failure occurs",
+    "cleanup cannot prove all candidate-owned resources absent",
+    "the single attempt is consumed"
+  ],
+  "notAuthorized": [
+    "automatic dress-rehearsal rerun",
+    "measured S2 execution",
+    "real model calls",
+    "service restart",
+    "Maven invocation outside the six bound promotion subprocesses",
+    "production or historical data access",
+    "OPENHANDS_SMA_BOUNDARY_QUALIFIED claim"
+  ]
+}

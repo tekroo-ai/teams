@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_Q1_EXECUTION_AUTHORIZATION",
+  "authorizationId": "SMA-Q1-NATIVE-STEP15-V5-CORRECTIVE-RERUN-1",
+  "recordedOn": "2026-08-13",
+  "timePrecision": "DAY",
+  "status": "AUTHORIZED_NOT_STARTED",
+  "principalInstruction": "Authorized.",
+  "authorizationContext": "Explicit authorization immediately following presentation of the sealed telemetry-only V5 corrective runner and identity.",
+  "frozenManifest": "investigations/sma-q1/preregistration-native-v5.json",
+  "frozenManifestSHA256": "21030ef4a7004217401b0243e5bb7e94be6bc44ecb9869873a72f112fe676422",
+  "executionIdentity": "investigations/sma-q1/step-15-execution-identity-v5-rerun1.json",
+  "executionIdentitySHA256": "2b157d1431b1e7c0b7f4ec45bf8dad2d800c11d6306ff2954f0f62d0e3d1cd74",
+  "harness": "scripts/smaq1_native_step15_v5_rerun1.py",
+  "harnessSHA256": "c84e5557c6ca69362e2d57929a5b2536c381e447776f60a9c08da6160bd44494",
+  "parentHarness": "scripts/smaq1_native_step15_v5.py",
+  "parentHarnessSHA256": "45b9412e879d76d2beef957efdc23d7a9f7585e4e4820774ba5fb387c599872e",
+  "initialAttemptAdjudication": "OUTPUT/phase-3/step-15-execution-adjudication-v5.json",
+  "initialAttemptAdjudicationSHA256": "04a80924184fd7e9a4a139b6280517b97d61d52615b7155deaf8ed926c3a96f4",
+  "authorizedScope": {
+    "fixtureQualification": true,
+    "measuredScenarioCorpus": true,
+    "scenarioCount": 18,
+    "repetitionCount": 96,
+    "telemetryOnlyCorrection": true,
+    "addedRetrievalCalls": 0,
+    "retryWarmupDelayAllowed": false,
+    "disposableNamespacesOnly": true,
+    "productionOrHistoricalDataAllowed": false,
+    "scenarioMutationAllowed": false,
+    "thresholdMutationAllowed": false,
+    "additionalV5RerunAllowed": false
+  },
+  "attempt": {
+    "ordinal": 2,
+    "correctiveRerun": true,
+    "correctiveRerunOrdinal": 1,
+    "consumesFinalV5Attempt": true
+  },
+  "executionAuthorized": true,
+  "executionStarted": false,
+  "scenarioResultClaimAuthorized": false
+}

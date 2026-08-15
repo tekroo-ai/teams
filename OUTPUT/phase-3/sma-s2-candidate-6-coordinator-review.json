@@ -1,0 +1,111 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_CANDIDATE_6_COORDINATOR_REVIEW",
+  "candidate": 6,
+  "status": "PASS_READY_FOR_PRINCIPAL_REVIEW",
+  "recordedOn": "2026-08-14",
+  "recommendation": "GO_FOR_CANDIDATE_6_PRINCIPAL_ACCEPTANCE_FREEZE_ONLY",
+  "candidatePreregistration": {
+    "path": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-6.json",
+    "sha256": "06e7a689d46dfc759d07ca2f1099854c42e0c21e4dc84cd1fde0a0f612ae6cee"
+  },
+  "remediationAuthorization": {
+    "path": "investigations/sma-q1/layered/sma-s2-candidate-6-harness-identity-remediation-authorization.json",
+    "sha256": "2cd33b35b7c3e2f5a97462416f85d7cb77a4362899e4727d5a1c9b754da22a44"
+  },
+  "finalArtifacts": {
+    "driver": {
+      "path": "scripts/sma_s2_measured_driver_candidate_4.py",
+      "sha256": "b58c8621997b86347acb29d13b73c9167113cdfdd79c0041599f46b46b92bb1f"
+    },
+    "configuration": {
+      "path": "investigations/sma-q1/layered/sma-s2-nonsecret-configuration-candidate-6.json",
+      "sha256": "c85b83f6707edb86f2f71fafdb4fd404db03f70d0c16529c413b93bccb8e94c2"
+    },
+    "offlineHarness": {
+      "path": "scripts/sma_s2_measured_driver_offline_harness_candidate_4.py",
+      "sha256": "665d00001478ee147415514c22635412cc287a8eecec2c6e8acb4e2b266d1e1c"
+    },
+    "offlineReceipt": {
+      "path": "OUTPUT/phase-3/sma-s2-candidate-6-offline-harness-identity-qualification-3/offline-harness-identity-qualification-receipt.json",
+      "sha256": "8d43341fd59f447222f629422139e59d2e275ef37e3ae6e0bc9f2856111314e6"
+    }
+  },
+  "observed": [
+    "candidate 5 and every accepted predecessor remain unmodified",
+    "the candidate-6 driver launches the deterministic stub with explicit identity-derived --host and --port arguments",
+    "the stub ready receipt must repeat the exact identity-bound host and numeric port",
+    "the accepted execution identity, live-preflight authorization, live-preflight receipt, and measured authorization must agree on all four runtime endpoint fields",
+    "bridgePort is constrained to numeric port 8130 and the stub port must be a distinct numeric port from 1024 through 65535",
+    "both identity-bound ports must be unoccupied before live preflight and again before measured execution",
+    "the measured fence cannot open without a passing hash-bound live-preflight receipt",
+    "the final offline harness passed 13 of 13 tests under optimized Python",
+    "the final offline harness made no OpenHands, SMA, service, deterministic-stub network, live-preflight, or measured-execution call"
+  ],
+  "computed": {
+    "semanticCaseCount": 20,
+    "plannedRepetitionCount": 103,
+    "predicateCount": 59,
+    "requiredEvidenceCount": 10,
+    "candidate5SemanticMutationControlsRetained": 25,
+    "candidate6OfflineTestCount": 13,
+    "candidate6OfflinePassCount": 13,
+    "candidate6OfflineFailCount": 0,
+    "retainedNonqualifyingReceiptCount": 2,
+    "livePreflightAttempts": 0,
+    "measuredExecutionAttempts": 0
+  },
+  "inferred": [
+    "the static harness-identity defect that made candidate 5 unable to produce an honest prospective endpoint identity is closed in candidate 6",
+    "candidate 6 is ready for a candidate-specific principal acceptance/freeze decision",
+    "acceptance alone must not be construed as authorization for a live preflight or measured execution"
+  ],
+  "negativeControls": [
+    "missing stubHost",
+    "missing stubPort",
+    "missing bridgeHost",
+    "missing bridgePort",
+    "non-loopback or mutated host",
+    "non-numeric, out-of-range, reused, or wrong bridge port",
+    "authorization-to-identity port mismatch",
+    "live-preflight-authorization-to-identity port mismatch",
+    "preflight-receipt-to-identity port mismatch",
+    "missing, mutated, failing, misbound, or unclean live-preflight receipt",
+    "occupied stub port",
+    "occupied bridge port",
+    "stub ready-host or ready-port mismatch",
+    "mutated acceptance or artifact hash",
+    "Python optimization and default-deny bypass"
+  ],
+  "retainedZeroCreditReceipts": [
+    {
+      "path": "OUTPUT/phase-3/sma-s2-candidate-6-offline-harness-identity-qualification/offline-harness-identity-qualification-receipt.json",
+      "sha256": "a2fbabbb7e3c22de08f2a5fa63f711f891c61037a710e87e4a9cdef5b7d7fce2",
+      "reason": "one self-referential source-safety control failed"
+    },
+    {
+      "path": "OUTPUT/phase-3/sma-s2-candidate-6-offline-harness-identity-qualification-2/offline-harness-identity-qualification-receipt.json",
+      "sha256": "ee8b815803a2ba4d0c74e10a4d5571b2201589e75f424eb4c81788bea8e07efe",
+      "reason": "superseded when the authorization-fenced live-preflight runner was added"
+    }
+  ],
+  "semanticChangeAssessment": {
+    "casePredicatesChanged": false,
+    "thresholdsChanged": false,
+    "faultScheduleChanged": false,
+    "claimChanged": false,
+    "productCodeChanged": false,
+    "qualificationHarnessIdentityChanged": true
+  },
+  "notAuthorized": [
+    "candidate-6 acceptance or freeze by the coordinator",
+    "execution-identity creation or acceptance",
+    "live preflight",
+    "measured execution",
+    "OpenHands conversation creation",
+    "SMA or deterministic-stub network invocation",
+    "real model calls",
+    "OPENHANDS_SMA_BOUNDARY_QUALIFIED claim"
+  ],
+  "nextDecision": "PRINCIPAL_ACCEPT_FREEZE_OR_REJECT_CANDIDATE_6"
+}

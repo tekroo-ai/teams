@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S1_PRODUCT_DRIVER_BUILD_RECEIPT",
+  "status": "PASS_ALL_FOURTEEN_HANDLERS_COMPILED",
+  "scope": "PRODUCT_DRIVER_IMPLEMENTATION_NO_MEASURED_S1_PRODUCT_CREDIT",
+  "recordedOn": "2026-08-13",
+  "compiler": "javac 21.0.12",
+  "jarTool": "jar 21.0.12",
+  "source": {
+    "path": "investigations/sma-q1/layered/driver-src/ai/tekroo/sma/openhands/SmaS1QualificationDriver.java",
+    "sha256": "b22f2e658fad9aa38317e8647f070984a03f7a11a2d1ab0a6a4771243d213345"
+  },
+  "serviceArtifact": {
+    "path": "/Users/paul/work/tekroo-ai/sma/target/sma-1.0-SNAPSHOT.jar",
+    "sha256": "ead8c0c5d9e3fd37b61318d2bdb8a97ef5c4c7481c11ed453777492f39f71042"
+  },
+  "compiledArtifact": {
+    "path": "OUTPUT/phase-3/sma-s1-product-driver-candidate-4/sma-s1-product-driver-candidate-4.jar",
+    "sha256": "e5d0cd194d77968dd18bf2aacd9dbbeb7eea68632b58baabc63681d99881e63a"
+  },
+  "implementedHandlerCount": 14,
+  "modelOrOpenHandsProcessUsed": false,
+  "measuredS1Execution": false,
+  "scientificRepetitionsExecuted": 0,
+  "byteReproducibleArchiveClaimed": false
+}

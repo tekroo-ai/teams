@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "1.0.0",
+  "contractIdentity": "tekroo.event-export.contracts/0.1.0",
+  "fixtures": [
+    {"id": "EE-FIX-001", "given": "authorized principal and two persisted events", "when": "initial export opens", "then": ["live boundary opens before backlog", "both exact event byte records are available", "outbox and organizational storage are unchanged"]},
+    {"id": "EE-FIX-002", "given": "duplicate delivery across reconnect", "when": "consumer receives an existing EventID", "then": ["duplicate is permitted", "consumer deduplicates by EventID", "cursor is not used as event identity"]},
+    {"id": "EE-FIX-003", "given": "tampered or principal-mismatched cursor", "when": "export is requested", "then": ["no event bytes are disclosed", "request fails closed"]},
+    {"id": "EE-FIX-004", "given": "expired or history-lost cursor", "when": "export is requested", "then": ["status is RESYNC_REQUIRED", "fresh live boundary precedes bounded backlog", "consumer EventID deduplication remains mandatory"]},
+    {"id": "EE-FIX-005", "given": "unauthenticated, unauthorized, or source-mismatched request", "when": "export is requested", "then": ["no event bytes are disclosed", "failure is explicit"]},
+    {"id": "EE-FIX-006", "given": "limit, wait, or request body exceeds bounds", "when": "adapter validates input", "then": ["request fails before source access", "terminal status is observable"]},
+    {"id": "EE-FIX-007", "given": "persisted event bytes", "when": "record is exported", "then": ["base64 decodes to exact bytes", "SHA-256 matches exact bytes", "length matches exact bytes", "metadata matches decoded DomainEvent"]},
+    {"id": "EE-FIX-008", "given": "request cancellation or deadline", "when": "source is waiting", "then": ["operation terminates within its bound", "no async operation is orphaned", "no state is mutated"]},
+    {"id": "EE-FIX-009", "given": "content-free telemetry", "when": "export succeeds or fails", "then": ["payload and event bytes are absent", "counts, status, duration, digests, and lengths may be present"]},
+    {"id": "EE-FIX-010", "given": "source manifest identity", "when": "response succeeds", "then": ["kernel contract identity is exact", "kernel manifest SHA-256 is exact"]}
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S1_P2M_CLEAN_BUILD_RECEIPT",
+  "status": "PASS",
+  "recordedOn": "2026-08-14",
+  "source": {
+    "repository": "/Users/paul/work/tekroo-ai/sma",
+    "isolatedWorktree": "/Users/paul/work/tekroo-ai/sma-s1-p2m",
+    "commit": "5d58be508c74ae8577d2fd31e3346be23a912ab3",
+    "tree": "7222410443a6041496a5c313b2549f16eb937458",
+    "remoteRef": "refs/heads/codex/sma-p2-m-release-mtls",
+    "remoteCommitObserved": "5d58be508c74ae8577d2fd31e3346be23a912ab3",
+    "worktreeCleanAfterBuild": true
+  },
+  "command": "mvn --log-file /Users/paul/work/tekroo-ai/teams/OUTPUT/phase-3/sma-s1-p2m-clean-build.log clean verify",
+  "exitCode": 0,
+  "tests": 477,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "buildResult": "BUILD_SUCCESS",
+  "toolchain": {
+    "java": "Eclipse Temurin OpenJDK 21.0.12+8 LTS aarch64",
+    "maven": "Apache Maven 3.9.16 commit 2bdd9fddda4b155ebf8000e807eb73fd829a51d5",
+    "os": "macOS 26.5.2 build 25F84 aarch64"
+  },
+  "sha256": {
+    "rootPom": "998b00e30f7c21d72d3fec31da6b0d0db3699947106e968efccb2f1baaef150a",
+    "proxyPom": "52c4691e6941568edae7ce78a5df55bf80e8c496de1d02cadedf6424bda09ced",
+    "dependencyTree": "f603ec323a0d961b19792bc6ee55f51c2a2bb66bfea87e018d63fb565e1adb46",
+    "buildLog": "d209f27f06a7da881675ed28964e504a72ee03f86be3404b5e2379f13e2675a1",
+    "serviceJar": "c0ddb963798d45603c2e2685744892c40d3e841817f9c966ab7fad34f7e48765",
+    "sourcesJar": "d48f9629588cce161b228511fd5307e0dcf839318d9dc5d8f32c450dfc2ac5fb"
+  },
+  "byteReproducibleJarClaimed": false,
+  "modelOrOpenHandsUsed": false,
+  "measuredS1Execution": false
+}

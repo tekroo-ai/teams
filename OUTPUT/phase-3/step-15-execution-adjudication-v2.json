@@ -1,0 +1,92 @@
+{
+  "schemaVersion": "1.0.0",
+  "reportType": "PHASE_3_STEP_15_SMA_Q1_EXECUTION_ADJUDICATION",
+  "recordedOn": "2026-08-13",
+  "status": "INCONCLUSIVE",
+  "decision": "NO_GO",
+  "productionReadinessClaim": false,
+  "acceptedManifestSHA256": "c618371d571d5333aebd2bdc83d2db2559115f5ec3e1903b33e8e0ab157edf5d",
+  "executionSummary": {
+    "scenarioCorpusCount": 18,
+    "repetitionCorpusCount": 96,
+    "scenariosWithExecutedPrompts": 1,
+    "repetitionsWithExecutedPromptsInEachAttempt": 10,
+    "effectiveScenarioResults": [
+      {
+        "id": "SMAQ1N-001-FIRST-PROMPT-EMPTY",
+        "status": "PASS_OBSERVED_IN_BOTH_ATTEMPTS",
+        "effectiveRepetitions": 10
+      }
+    ],
+    "notRunScenarioCount": 17,
+    "notRunRepetitionCount": 86,
+    "stoppedBeforeScenario": "SMAQ1N-002-SAME-PARTITION-RECALL"
+  },
+  "attempts": [
+    {
+      "kind": "INITIAL",
+      "status": "INCONCLUSIVE",
+      "receipt": "OUTPUT/phase-3/sma-q1n-step15-v2/execution-receipt.json",
+      "receiptSHA256": "ae59bac40d650d421c6a56494d6df888b012a892eefd1d202628a1c18d46d767",
+      "journal": "OUTPUT/phase-3/sma-q1n-step15-v2/raw-receipts.jsonl",
+      "journalSHA256": "bf8c4ecdb9c82c37cb5a4bac64748c32cc29c56d7ff6f5f5dc03bb38ded419ae",
+      "harnessSHA256": "fc482e4501b02ddb1baaa2aea461f543db4f886101c0535465dea9a60e43d646",
+      "terminal": "The codename-style promotion helper was given Repository alpha for a frozen adversarial source that does not contain that phrase.",
+      "classification": "HARNESS_FIXTURE_DEFECT"
+    },
+    {
+      "kind": "ONE_PERMITTED_CORRECTIVE_RERUN",
+      "status": "INCONCLUSIVE",
+      "receipt": "OUTPUT/phase-3/sma-q1n-step15-v2-rerun1/execution-receipt.json",
+      "receiptSHA256": "28d25f57631c3c8061ab5f2aca0f4fc442c4aced6362542194b50e0cf3b0760c",
+      "journal": "OUTPUT/phase-3/sma-q1n-step15-v2-rerun1/raw-receipts.jsonl",
+      "journalSHA256": "772cb3d46f74b86110dedc8e2fa07491a03720d6be079aae53deb0b0e43b5226",
+      "harnessSHA256": "491f093caac6018ab712986d068dca3f64d0062e05c93311070087b6b87dfce6",
+      "terminal": "All three eligible promotion subprocesses exited zero, after which the harness seed-vector cardinality assertion failed.",
+      "classification": "UNRESOLVED_SETUP_OR_HARNESS_BOUNDARY"
+    }
+  ],
+  "evidenceClassification": {
+    "observed": [
+      "SMAQ1N-001 completed 10 of 10 repetitions in each retained attempt with no injected memory context.",
+      "The corrective rerun recorded exit code zero for all three eligible corpus promotion subprocesses.",
+      "The corrective rerun then terminated on seed vector cardinality mismatch before any SMAQ1N-002 prompt.",
+      "Both attempts verified removal of every disposable conversation, workspace, MongoDB database, Qdrant collection, launchd job, and bridge listener."
+    ],
+    "computed": [
+      "One of eighteen scenarios has prompt-level evidence; seventeen scenarios and eighty-six repetitions remain NOT_RUN.",
+      "The corrective rerun allowed by the frozen manifest has been consumed."
+    ],
+    "unverified": [
+      "The exact semantic and episodic collection counts at the second terminal boundary were not retained before cleanup.",
+      "The evidence cannot distinguish a wrong 3/3 harness expectation from unexpected SMA vector projection behavior."
+    ],
+    "inferred": [
+      "A new prospective amendment and newly content-addressed runner are required before another measured execution; silently running the same experiment again would violate the frozen rerun policy."
+    ]
+  },
+  "receiptCorrections": [
+    "Both execution receipts report started_scenarios as 2 because the harness counted a setup failure as a started scenario. Raw journals contain only one SCENARIO_TERMINAL and no SMAQ1N-002 repetition; this adjudication uses the journal floor."
+  ],
+  "safety": {
+    "absoluteStopConditionObserved": false,
+    "note": "No safety breach was observed, but absence of a breach in one completed scenario does not qualify the unexecuted corpus."
+  },
+  "cleanup": {
+    "initialAttempt": "PASS",
+    "correctiveRerun": "PASS",
+    "currentBridgeListenerAbsent": true,
+    "smaExecutionWorktreeClean": true
+  },
+  "nextAuthorizationBoundary": {
+    "required": true,
+    "action": "Create and accept a prospective SMA-Q1 native v3 amendment before any further scenario execution.",
+    "minimumChanges": [
+      "Record semantic and episodic counts and per-memory vector identities before asserting fixture readiness or cleaning up.",
+      "Replace the unproven blanket 3/3 assumption with a source-grounded per-memory projection expectation, then freeze it before execution.",
+      "Run fixture-readiness validation before scenario 1 and emit a terminal receipt if any corpus memory cannot be made eligible and retrievable.",
+      "Correct scenario-start accounting so setup failures never imply a scenario prompt ran.",
+      "Retain both v2 attempts as immutable prior evidence and grant no unexecuted v2 scenario credit."
+    ]
+  }
+}

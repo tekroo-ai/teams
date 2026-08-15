@@ -1,0 +1,177 @@
+{
+  "schemaVersion": "1.0.0-draft",
+  "recordType": "SMA_S1_EXECUTION_IDENTITY",
+  "identityId": "SMA-S1-EXECUTION-IDENTITY-CANDIDATE-4",
+  "status": "DRAFT_INCOMPLETE_NOT_ACCEPTED_NOT_AUTHORIZED",
+  "recordedOn": "2026-08-13",
+  "timePrecision": "DAY",
+  "scientificPreregistration": {
+    "path": "investigations/sma-q1/layered/sma-s1-preregistration.json",
+    "sha256": "e663f5b732c22248adc5fab2f536dbf02dd72337f7c8428f225937e72d6a7f8c",
+    "status": "ACCEPTED_FROZEN_NOT_AUTHORIZED",
+    "claimUnderInvestigation": "SMA_SEMANTICS_QUALIFIED"
+  },
+  "identityObservation": {
+    "path": "OUTPUT/phase-3/sma-s1-identity-observation.json",
+    "sha256": "f2621e010086b6ac0ad1e56733a82a12c03901958ee78918d24e85106a88a5ec"
+  },
+  "candidateImplementation": {
+    "repository": "/Users/paul/work/tekroo-ai/sma",
+    "branchAtObservation": "master",
+    "commit": "e89ff9e0bab192689122d5e7b9d36d16cae5d368",
+    "tree": "1ff9816967d1ea6378947c2cfc23a0a92308a770",
+    "worktreeCleanAtObservation": true,
+    "originMaster": "e89ff9e0bab192689122d5e7b9d36d16cae5d368",
+    "aheadOfOriginByCommits": 0,
+    "originContainsCandidate": true,
+    "candidateDelta": "MCP stdio EOF and lifecycle repair only: three files, 159 insertions, 7 deletions.",
+    "selectionStatus": "SELECTED_BY_PRINCIPAL_NOT_IDENTITY_ACCEPTED",
+    "selectionDecision": "The principal authorized the recommended e89ff9e0 candidate and push on 2026-08-13."
+  },
+  "sourceAndDependencies": {
+    "rootPomSHA256": "998b00e30f7c21d72d3fec31da6b0d0db3699947106e968efccb2f1baaef150a",
+    "proxyPomSHA256": "52c4691e6941568edae7ce78a5df55bf80e8c496de1d02cadedf6424bda09ced",
+    "mongodbDriverVersion": "5.3.1",
+    "qdrantClientVersion": "1.17.0",
+    "gsonVersion": "2.11.0",
+    "mcpSdkVersion": "1.0.0",
+    "junitVersion": "5.11.4",
+    "dependencyTree": "OUTPUT/phase-3/sma-s1-dependency-tree.txt",
+    "dependencyTreeSHA256": "f603ec323a0d961b19792bc6ee55f51c2a2bb66bfea87e018d63fb565e1adb46"
+  },
+  "build": {
+    "toolchainCandidate": {
+      "java": "Eclipse Temurin OpenJDK 21.0.12+8 LTS aarch64",
+      "maven": "Apache Maven 3.9.16 commit 2bdd9fddda4b155ebf8000e807eb73fd829a51d5"
+    },
+    "cleanBuildCommand": "mvn --log-file ../teams/OUTPUT/phase-3/sma-s1-clean-build.log clean verify",
+    "buildEnvironment": "macOS 26.5.2 aarch64; Eclipse Temurin 21.0.12+8; Maven 3.9.16",
+    "serviceArtifactSHA256": "ead8c0c5d9e3fd37b61318d2bdb8a97ef5c4c7481c11ed453777492f39f71042",
+    "sourcesArtifactSHA256": "61db400f0bdcf24d21f72ed00e62bd4c6310c8a49ce7aa5f04af0c39b6beb139",
+    "buildReceipt": "OUTPUT/phase-3/sma-s1-clean-build-receipt.json",
+    "buildReceiptSHA256": "f6a1c976ca936bad82ad805059583cbb35ac64e9251ee9a2330bbaca2a9c0af3",
+    "buildResult": "PASS_304_TESTS_ZERO_FAILURES_ERRORS_SKIPS",
+    "byteReproducibleJarClaimed": false
+  },
+  "deterministicFixtures": {
+    "clock": "FIXED_2026-08-13T00:00:00Z_IN_PRODUCT_DRIVER_SOURCE",
+    "eventSource": "DETERMINISTIC_LOOPBACK_HTTP_CONVERSATION_AND_EVENT_FIXTURES_IN_PRODUCT_DRIVER_SOURCE",
+    "embeddingOrCognitionImplementation": "MODEL_FREE_DETERMINISTIC_ORTHOGONAL_BASIS_VECTOR_FIXTURE_IN_PRODUCT_DRIVER_SOURCE",
+    "faultActivator": "DETERMINISTIC_CASE_SPECIFIC_LOOPBACK_OUTAGE_DELAY_REPLAY_AND_INPUT_FIXTURES_IN_PRODUCT_DRIVER_SOURCE",
+    "independentFaultObserver": "IMPLEMENTED_AS_DIRECT_METRICS_PERSISTENCE_AND_RESPONSE_OBSERVATIONS_NOT_INDEPENDENTLY_REVIEWED",
+    "concurrencyScheduler": "FOUR_CALLER_EXECUTOR_WITH_BRIDGE_OWNED_BOUNDED_EXECUTORS_AND_LATCHED_RETRIEVER_FIXTURE",
+    "syntheticCorpusDigest": "6f93a82c0659f37ba45ff7f0e046285c4a13540490adfa912907b99121ca9d49",
+    "productQualificationDriver": {
+      "status": "ALL_FOURTEEN_HANDLERS_IMPLEMENTED_AND_MECHANICALLY_CHECKED_NOT_INDEPENDENTLY_REVIEWED",
+      "launcher": "scripts/sma_s1_product_driver.py",
+      "launcherSHA256": "6ce65e203c2de466d20bb6454e16429447fe50da3eccfb43df584c73fb4b8e50",
+      "source": "investigations/sma-q1/layered/driver-src/ai/tekroo/sma/openhands/SmaS1QualificationDriver.java",
+      "sourceSHA256": "b22f2e658fad9aa38317e8647f070984a03f7a11a2d1ab0a6a4771243d213345",
+      "compiledArtifact": "OUTPUT/phase-3/sma-s1-product-driver-candidate-4/sma-s1-product-driver-candidate-4.jar",
+      "compiledArtifactSHA256": "e5d0cd194d77968dd18bf2aacd9dbbeb7eea68632b58baabc63681d99881e63a",
+      "boundServiceArtifactSHA256": "ead8c0c5d9e3fd37b61318d2bdb8a97ef5c4c7481c11ed453777492f39f71042"
+    },
+    "driverProtocol": "investigations/sma-q1/layered/sma-s1-driver-protocol.json",
+    "driverProtocolSHA256": "24d28b526af7d533c1d551b6cdc3d0c15a16f07615945ea570af9dd401374cad",
+    "selfTestFixtureDriver": "scripts/sma_s1_fixture_driver.py",
+    "selfTestFixtureDriverSHA256": "283a537f6bb8c1e4d59e0c74e16ca97f2c696820ea1793d0f650fd2852579235",
+    "productDriverControlQualification": {
+      "status": "PASS_CONTROLS_ONLY_NO_S1_PRODUCT_CREDIT",
+      "receipt": "OUTPUT/phase-3/sma-s1-product-driver-controls-candidate-3/control-receipt.json",
+      "receiptSHA256": "58399ed351eac3d8fbe444a0eecb74592d787dd27a2ac94e42d5833f637fbacf",
+      "journal": "OUTPUT/phase-3/sma-s1-product-driver-controls-candidate-3/control-journal.jsonl",
+      "journalSHA256": "9ab3e7102b958bd3f4ca9827c566b1012521b01d1c5395af435074672e8c03c4",
+      "qualifiedSequence": [
+        "INVENTORY",
+        "PREPARE",
+        "INVENTORY",
+        "CLEANUP",
+        "CLEANUP",
+        "INVENTORY"
+      ],
+      "executeCaseOperations": 0,
+      "measuredCasesExecuted": 0
+    },
+    "handlerImplementationCheck": {
+      "status": "PASS_MECHANICS_ONLY_NO_S1_PRODUCT_CREDIT",
+      "receipt": "OUTPUT/phase-3/sma-s1-handler-implementation-check-candidate-3/handler-check-receipt.json",
+      "receiptSHA256": "2a65784dd8565f287090aaee58b59790cfb175882515120c109c9c4bdbd2f612",
+      "journal": "OUTPUT/phase-3/sma-s1-handler-implementation-check-candidate-3/handler-check-journal.jsonl",
+      "journalSHA256": "12588e0ef8b1d00da1f5019313a2f2d039f450fd1bf4b914c37595ab0c045b4b",
+      "handlerCount": 14,
+      "scientificRepetitionsExecuted": 0,
+      "observedPredicateFailuresNotAcceptedAsS1Results": 8
+    },
+    "fixtureReceipt": "OUTPUT/phase-3/sma-s1-harness-self-test-v5/self-test-receipt.json"
+  },
+  "harness": {
+    "implementation": "scripts/sma_s1_harness.py",
+    "implementationSHA256": "cbb3d1ac8b053817d84f8eb060af6ce28be7bc67abea77cc5a1b3993f29b0d92",
+    "journalWriter": "CREATE_ONCE_SHARED_LOCK_CANONICAL_JSONL_APPEND_FLUSH_FSYNC",
+    "offlineSelfTestReceipt": "OUTPUT/phase-3/sma-s1-harness-self-test-v5/self-test-receipt.json",
+    "independentReviewer": "UNBOUND",
+    "requiredSelfTests": [
+      "schema and content-address verification",
+      "create-once output-root protection",
+      "concurrent append, flush, fsync, reopen, and journal order",
+      "positive and negative fault controls",
+      "raw persistence before deliberate assertion failure",
+      "timeout, cancellation, and process termination",
+      "synthetic-secret telemetry exclusion and persistence scanning",
+      "cleanup idempotency and inventory",
+      "receipt reconstruction from append-only evidence"
+    ]
+  },
+  "environmentCandidate": {
+    "os": "macOS 26.5.2 aarch64",
+    "locale": "en_US",
+    "encoding": "UTF-8",
+    "mongodb": {
+      "serverVersionObserved": "8.3.4",
+      "driverVersion": "5.3.1",
+      "configurationDigest": "UNBOUND",
+      "replicaSetOrTopology": "UNBOUND"
+    },
+    "qdrant": {
+      "serverVersionObserved": "1.18.2",
+      "serverCommitObserved": "44ad62f8cd69642be5afa6441612525e24a0d063",
+      "clientVersion": "1.17.0",
+      "configurationDigest": "UNBOUND"
+    },
+    "containerRuntime": "NOT_USED_IN_OBSERVED_CANDIDATE; DOCKER_DAEMON_UNAVAILABLE",
+    "resourceLimitsAndPressureBaseline": "UNBOUND",
+    "nonSecretConfigurationDigest": "UNBOUND"
+  },
+  "plannedIsolation": {
+    "qualificationMongoDatabase": "sma_s1_driver_fixture_candidate_3",
+    "qualificationSemanticCollection": "sma_s1_driver_fixture_semantic_candidate_3",
+    "qualificationEpisodicCollection": "sma_s1_driver_fixture_episodic_candidate_3",
+    "measuredMongoDatabase": "sma_s1_measured_20260813_candidate_1",
+    "measuredSemanticCollection": "sma_s1_measured_semantic_20260813_candidate_1",
+    "measuredEpisodicCollection": "sma_s1_measured_episodic_20260813_candidate_1",
+    "actorAlphaPartition": "sma-s1-measured-actor-alpha-candidate-1",
+    "actorBetaPartition": "sma-s1-measured-actor-beta-candidate-1",
+    "namespaceAvailabilityVerified": false,
+    "qualificationNamespacesAbsentAfterControlQualification": true,
+    "measuredNamespacesAbsentBeforeExecutionVerified": false,
+    "productionOrHistoricalDataAllowed": false
+  },
+  "unresolvedBindings": [
+    "independent review of all fourteen EXECUTE_CASE handlers and evidence mappings",
+    "independent harness reviewer",
+    "MongoDB and Qdrant topology and configuration digests",
+    "resource limits and pressure baseline",
+    "non-secret configuration digest",
+    "proof that all proposed measured disposable namespaces are absent immediately before any separately authorized execution"
+  ],
+  "executionFence": {
+    "identityAccepted": false,
+    "offlineHarnessQualified": false,
+    "singleUseExecutionAuthorizationPresent": false,
+    "executionAuthorized": false,
+    "executionAttemptsAuthorized": 0,
+    "executionStarted": false,
+    "casesExecuted": 0,
+    "executionState": "NOT_RUN"
+  }
+}

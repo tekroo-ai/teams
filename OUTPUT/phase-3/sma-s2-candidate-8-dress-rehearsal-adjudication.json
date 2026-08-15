@@ -1,0 +1,89 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_CANDIDATE_8_DRESS_REHEARSAL_ADJUDICATION",
+  "candidate": 8,
+  "status": "INCONCLUSIVE",
+  "recordedAt": "2026-08-14T21:04:44Z",
+  "executionIdentitySha256": "285ef6fefa5fb5b4b71afe1ff368a119c80a5b3b839467d06883a9cb7e31cdcb",
+  "authorizationSha256": "34cf176268f173c1b9640b564873bce583c169554c507aad30906afbe7f775bf",
+  "preflight": {
+    "path": "OUTPUT/phase-3/sma-s2-candidate-8-dress-rehearsal-live-preflight-2.json",
+    "sha256": "532efbe846553973e9d35f399e75d60d3a89e99382c0b10d6e7e525a2cc29a33",
+    "status": "PASS",
+    "executionBoundary": "HOST_LOCAL_UNSANDBOXED"
+  },
+  "dressEvidence": {
+    "receipt": {
+      "path": "OUTPUT/phase-3/sma-s2-candidate-8-dress-rehearsal-attempt-1/dress-rehearsal-receipt.json",
+      "sha256": "f91a7f8c7c02cbb70be302dba78bdc1f8ca6ff2ed6b8ec1cb6df882d08a29cca"
+    },
+    "rawJournal": {
+      "path": "OUTPUT/phase-3/sma-s2-candidate-8-dress-rehearsal-attempt-1/raw-evidence.jsonl",
+      "sha256": "d97410588579c77c6bd43c1dfc09176a1ac4c843199d985315aa5889cb819e0f"
+    },
+    "stubRawJournal": {
+      "path": "OUTPUT/phase-3/sma-s2-candidate-8-dress-rehearsal-attempt-1/stub-raw-evidence.jsonl",
+      "sha256": "e6f7435d12fd8fe86ad0d98962e566d2be4a09a40ab38c42ec484877770b4c30"
+    },
+    "stubTerminalJournal": {
+      "path": "OUTPUT/phase-3/sma-s2-candidate-8-dress-rehearsal-attempt-1/stub-terminal.jsonl",
+      "sha256": "c49590e4f2d3fb7648627563e81340f7158df6641543fccde43cc8262c6a384a"
+    }
+  },
+  "observed": {
+    "plannedOperations": 34,
+    "completedOperations": 10,
+    "case1CompletedRepetitions": 10,
+    "case1PassedRepetitions": 10,
+    "case1AllContextEmpty": true,
+    "case1AllEmptyWorkspaceExcludedFromCapture": true,
+    "case1CaptureAllowlistCardinality": 2,
+    "firstIncompleteCaseId": "SMA-S2-002-SAME-PARTITION-DELIVERY",
+    "firstIncompleteRepetition": 1,
+    "failureClass": "HARNESS",
+    "failureErrorType": "CalledProcessError",
+    "failurePhases": [
+      "BOUND_CORPUS_SEED",
+      "OPERATION:SMA-S2-002-SAME-PARTITION-DELIVERY:1"
+    ],
+    "serviceStartedForCorpusCapture": true,
+    "fourCorpusSourceEventsCreated": true,
+    "serviceStoppedBeforePromotion": true,
+    "corpusPromotionReceiptsRecorded": 0,
+    "driverInvocationWorkingDirectory": "/Users/paul/work/tekroo-ai/teams",
+    "driverInvocationWorkingDirectoryContainsPomXml": false,
+    "boundSmaRepository": "/Users/paul/work/tekroo-ai/sma-s1-p2m",
+    "boundSmaRepositoryContainsPomXml": true,
+    "promotionFunctionInvokesMavenWithoutExplicitWorkingDirectory": true,
+    "supportCommandInheritsProcessWorkingDirectory": true,
+    "mavenStderrRetained": false,
+    "cleanupStatus": "PASS",
+    "postRunCandidateResourcesAbsent": true,
+    "postRunActiveConversationCount": 0,
+    "postRunPreservedTekrooTraderStatus": "paused"
+  },
+  "computed": {
+    "case1PassRate": 1.0,
+    "operationCompletionFraction": 0.29411764705882354,
+    "measuredCaseExecutions": 0,
+    "measuredRepetitionExecutions": 0,
+    "measuredCredit": 0,
+    "automaticReruns": 0,
+    "realModelCalls": 0
+  },
+  "inferred": {
+    "rootCause": "the first Maven corpus-promotion subprocess inherited the Teams working directory instead of the bound SMA Maven project directory",
+    "confidence": "HIGH",
+    "qualification": "the exact Maven stderr was captured by subprocess.run but discarded by the exception path, so the causal conclusion is inferred from the executed code path, working directories, missing Teams pom.xml, present SMA pom.xml, and failure timing rather than directly observed stderr",
+    "candidate8WorkspaceIsolationCorrectionClosedOriginalFailure": true,
+    "candidate8ScientificClaimEstablished": false
+  },
+  "disposition": {
+    "dressRehearsalPass": false,
+    "measuredExecutionMayProceed": false,
+    "qualificationClaim": null,
+    "automaticRerunAllowed": false,
+    "candidate8ArtifactsRemainImmutable": true,
+    "recommendation": "authorize one bounded candidate-9 harness-working-directory remediation with retained Maven stderr and offline mutation controls before any further live attempt"
+  }
+}

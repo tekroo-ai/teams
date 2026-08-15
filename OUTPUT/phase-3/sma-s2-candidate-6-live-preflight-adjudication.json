@@ -1,0 +1,53 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_CANDIDATE_6_LIVE_PREFLIGHT_ADJUDICATION",
+  "candidate": 6,
+  "status": "PASS",
+  "recordedAt": "2026-08-14T17:40:25Z",
+  "recommendation": "GO_FOR_SEPARATE_SINGLE_USE_MEASURED_AUTHORIZATION",
+  "executionIdentity": {
+    "path": "investigations/sma-q1/layered/sma-s2-candidate-6-execution-identity.json",
+    "sha256": "5640c60968261402bc1878204703845581e266cbce1b4cc7e135a3008f05e5a4"
+  },
+  "livePreflightReceipt": {
+    "path": "OUTPUT/phase-3/sma-s2-candidate-6-live-preflight-attempt-1/live-preflight-receipt.json",
+    "sha256": "8d479433e93599209c50b314aef481c75aaf1460e6c2b9db9806f7dcb4de0624",
+    "rawJournalSha256": "3ec3f2777610da1a291d844ffe8421b7b16c617836685daccf482234938bdcce"
+  },
+  "observed": [
+    "the candidate-6 execution identity passed all 14 identity-fence checks",
+    "the single-use live-preflight authorization passed all 14 authorization-fence checks",
+    "the deterministic stub listened on identity-bound port 19126 and reported the same ready endpoint",
+    "one OpenHands conversation produced one deterministic-stub request and one terminal response",
+    "the probe case was SMA-S2-001-FIRST-PROMPT-EMPTY",
+    "the live-preflight receipt status and cleanup status are PASS",
+    "post-cleanup checks found no candidate-6 service, bridge listener, stub listener, MongoDB database, Qdrant collection, or workspace root",
+    "the OpenHands conversation population returned to eight with zero active conversations",
+    "the paused Tekroo Trader conversation retained its status and timestamps"
+  ],
+  "computed": {
+    "livePreflightAttempts": 1,
+    "openhandsConversations": 1,
+    "deterministicStubRawRequests": 1,
+    "deterministicStubTerminalResponses": 1,
+    "cleanupFailures": 0,
+    "serviceRestarts": 0,
+    "measuredCaseExecutions": 0,
+    "measuredRepetitionExecutions": 0,
+    "realModelCalls": 0
+  },
+  "inferred": [
+    "the accepted candidate-6 harness can execute against its prospectively bound endpoints without identity drift",
+    "the live-preflight prerequisite for requesting a measured authorization is satisfied",
+    "the live preflight does not establish the SMA-S2 measured claim"
+  ],
+  "authorityState": {
+    "identityAndPreflightAuthorityConsumed": true,
+    "livePreflightAuthorityConsumed": true,
+    "measuredAuthorizationIssued": false,
+    "measuredExecutionAuthorized": false,
+    "measuredExecutionState": "NOT_RUN",
+    "qualifiedClaimEarned": false
+  },
+  "nextSeparateGate": "PRINCIPAL_DECISION_ON_ONE_SINGLE_USE_20_CASE_103_REPETITION_MEASURED_AUTHORIZATION"
+}

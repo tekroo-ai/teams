@@ -1,0 +1,68 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_CANDIDATE_7_EXECUTION_IDENTITY_PREPARATION_REVIEW",
+  "candidate": 7,
+  "status": "PASS_READY_FOR_PRINCIPAL_IDENTITY_REVIEW",
+  "recordedOn": "2026-08-14",
+  "recommendation": "GO_FOR_EXECUTION_IDENTITY_ACCEPT_FREEZE_ONLY",
+  "executionIdentity": {
+    "path": "investigations/sma-q1/layered/sma-s2-candidate-7-execution-identity.json",
+    "sha256": "40235ba0eda978c497dc17740aab09ebeb8fe3852e961b0f4d522737f3c38f22",
+    "candidate": 7,
+    "principalAcceptancePending": true
+  },
+  "preparationAuthorization": {
+    "path": "investigations/sma-q1/layered/sma-s2-candidate-7-execution-identity-preparation-authorization.json",
+    "sha256": "351957d30e044a59e83bc5743cc8af1bcc7825ccfc4c8f8468b27137f5d3d2a3"
+  },
+  "acceptedCandidate": {
+    "preregistrationSha256": "66530bb10fe7e46f23e8f3f550c83a89203905cc844dba8732d8794dba9575d3",
+    "acceptanceSha256": "c93c8892d58995c86d4ed11cba340192037fc32725db82a2ad66b9e5783b3e0f"
+  },
+  "runtimePorts": {
+    "stubHost": "127.0.0.1",
+    "stubPort": 19127,
+    "bridgeHost": "127.0.0.1",
+    "bridgePort": 8130
+  },
+  "observed": [
+    "the candidate-7 executable identity validator accepted the proposed identity and its runtime endpoint shape",
+    "all 19 path-and-sha references in the identity matched their current bytes",
+    "the SMA source worktree is clean at the bound commit and tree",
+    "the OpenHands source worktree is clean at the bound commit and tree",
+    "the bound SMA JAR, agent-server executable, and Agent Canvas executable hashes match",
+    "the identity binds the candidate-7 disposable namespaces and output roots",
+    "the identity authorizes zero measured attempts, zero measured cases, zero measured repetitions, zero real-model calls, and zero service restarts"
+  ],
+  "computed": {
+    "identityReferenceCount": 19,
+    "identityReferenceMismatchCount": 0,
+    "stubPortNumeric": true,
+    "bridgePortNumeric": true,
+    "loopbackHostsExact": true,
+    "portsDistinct": true,
+    "dressRehearsalOperationLimit": 34,
+    "dressRehearsalMeasuredCredit": 0
+  },
+  "notRun": [
+    "live service health or process audit",
+    "active-conversation audit",
+    "runtime port availability",
+    "candidate-7 namespace absence",
+    "OpenHands conversation creation",
+    "SMA or deterministic-stub invocation",
+    "live dress rehearsal",
+    "measured execution"
+  ],
+  "inferred": [
+    "the proposed identity is internally correspondent and ready for a candidate-specific principal accept/freeze decision",
+    "live suitability is not established and must be checked immediately before a separately authorized dress rehearsal"
+  ],
+  "authority": {
+    "executionIdentityAcceptedByPrincipal": false,
+    "liveDressRehearsalAuthorized": false,
+    "measuredExecutionAuthorized": false,
+    "qualifiedClaimEarned": false
+  },
+  "nextDecision": "PRINCIPAL_ACCEPT_FREEZE_OR_REJECT_CANDIDATE_7_EXECUTION_IDENTITY"
+}

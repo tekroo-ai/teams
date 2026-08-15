@@ -1,0 +1,45 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_EXECUTION_IDENTITY_PREFLIGHT_AUTHORIZATION",
+  "authorizationId": "SMA-S2-CANDIDATE-5-IDENTITY-PREFLIGHT-20260814",
+  "status": "AUTHORIZED_NOT_CONSUMED",
+  "recordedOn": "2026-08-14",
+  "principalStatement": "Authorized. you may proceed.",
+  "acceptedPreregistration": {
+    "path": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-5.json",
+    "sha256": "2afe7930e20a95dd40d7477c4a7d4ee638477d0ea0a339b3742ff2b39446f939"
+  },
+  "acceptance": {
+    "path": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-5-acceptance.json",
+    "sha256": "30d83e68bfdfb391d5afa69c45871cb73aebe482fef4bc58fa87827c9bf8e1f8"
+  },
+  "authorizedActions": [
+    "perform one immediate read-only active-work and service-identity audit",
+    "prove accepted artifact digest correspondence",
+    "prove candidate-5 measured namespace absence",
+    "prepare and seal one candidate-5 execution identity",
+    "perform one bounded live preflight with one preflight-only conversation and one deterministic-stub request",
+    "clean every preflight-only resource",
+    "publish a measured-authorization go or no-go recommendation"
+  ],
+  "limits": {
+    "maximumExecutionIdentityCandidates": 1,
+    "maximumLivePreflightAttempts": 1,
+    "maximumOpenHandsPreflightConversations": 1,
+    "maximumDeterministicStubPreflightRequests": 1,
+    "maximumServiceRestarts": 0,
+    "measuredCaseExecutions": 0,
+    "measuredRepetitionExecutions": 0
+  },
+  "notAuthorized": [
+    "modify accepted candidate 5 or any bound artifact",
+    "run any measured S2 case or repetition",
+    "create an accepted measured MongoDB or Qdrant namespace",
+    "invoke a real model",
+    "restart Agent Canvas, agent-server, SMA, MongoDB, or Qdrant",
+    "issue or consume measured-attempt authorization",
+    "claim OPENHANDS_SMA_BOUNDARY_QUALIFIED"
+  ],
+  "measuredExecutionAuthorized": false,
+  "measuredExecutionState": "NOT_RUN"
+}

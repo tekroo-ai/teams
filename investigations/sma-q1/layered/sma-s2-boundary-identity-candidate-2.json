@@ -1,0 +1,152 @@
+{
+  "schemaVersion": "1.0.0-candidate",
+  "recordType": "SMA_S2_BOUNDARY_IDENTITY_BINDING",
+  "status": "SUCCESSOR_CANDIDATE_NOT_ACCEPTED_NOT_AUTHORIZED",
+  "recordedOn": "2026-08-14",
+  "upstreamS1": {
+    "qualifiedClaim": "SMA_SEMANTICS_QUALIFIED",
+    "acceptedAdjudicationSha256": "0e5ace0acbe6e2441755ae656de36096e38b2364d27fb45ee844f2422abf2f7d",
+    "acceptanceRecord": {
+      "path": "investigations/sma-q1/layered/sma-s1-evidence-v2-scientific-adjudication-acceptance.json",
+      "sha256": "78e766ba6f8fd1fa9958515c9a0bd75174edd8de23bcb0183b66f0ca7340b230"
+    },
+    "executionReceiptSha256": "485152e2fe74b62c426d0c2c35769379f1d05a5da7c94148bdffc5b27fdcadf3",
+    "rawJournalSha256": "334d5e1e1845a7445f623ed88be957c7b433e5e5321c0d086a3c07715f91f5b4",
+    "postCleanupVerificationSha256": "8693073ad3b80034e64c19574dcc8dfe77d058e08c4faa0fbf3346cd96c5f345"
+  },
+  "sma": {
+    "worktree": "/Users/paul/work/tekroo-ai/sma-s1-p2m",
+    "gitCommit": "5d58be508c74ae8577d2fd31e3346be23a912ab3",
+    "gitTree": "7222410443a6041496a5c313b2549f16eb937458",
+    "worktreeStateAtObservation": "CLEAN_DETACHED",
+    "serviceJar": {
+      "path": "/Users/paul/work/tekroo-ai/sma-s1-p2m/target/sma-1.0-SNAPSHOT.jar",
+      "sha256": "c0ddb963798d45603c2e2685744892c40d3e841817f9c966ab7fad34f7e48765"
+    },
+    "sourcesJar": {
+      "path": "/Users/paul/work/tekroo-ai/sma-s1-p2m/target/sma-1.0-SNAPSHOT-sources.jar",
+      "sha256": "d48f9629588cce161b228511fd5307e0dcf839318d9dc5d8f32c450dfc2ac5fb"
+    },
+    "environmentBinding": {
+      "path": "investigations/sma-q1/layered/sma-s1-p2m-environment-binding.json",
+      "sha256": "46af2cba3ea00e0852a0ad034450705b7d3a02098925625d6e61e4709b5380c0"
+    }
+  },
+  "openhands": {
+    "runtimeSource": "/Users/paul/.local/src/openhands-software-agent-sdk-1.40.1-parallel",
+    "version": "1.40.1",
+    "gitBranch": "codex/tekroo-1.40.1-custom",
+    "gitCommit": "a338ba9b6cbb529886b755a335bae3dee0004700",
+    "gitTree": "9e72f1b4ee0b857025d9f170600b9dce539b169a",
+    "worktreeStateAtObservation": "CLEAN",
+    "agentServerExecutable": {
+      "path": "/Users/paul/.cache/uv/archive-v0/vKrvIz9VszwbxPTh/bin/agent-server",
+      "sha256": "9f1a91d9a58d13a27bc0e729eac36553bb9c977797c21f5483de3340cfa682bf"
+    },
+    "pythonExecutable": {
+      "path": "/Users/paul/.cache/uv/archive-v0/vKrvIz9VszwbxPTh/bin/python",
+      "sha256": "4e1dfb03f82c5f7f253bbc3c04a79bb9f09a5cd0528829c32d6984ef309ebb2f"
+    },
+    "runningProcess": {
+      "pidAtObservation": 46569,
+      "startedLocal": "2026-08-14T09:34:20-06:00",
+      "startedAfterBoundHead": true,
+      "healthStatus": 200,
+      "healthBody": "{\"status\":\"ok\"}"
+    },
+    "uvLockSha256": "2522dec69ec862071bfe02271679314c3b330fb69a5dbc37c0c96cfcd3d0a1d2",
+    "pyprojectSha256": "6ddf2465f2b0a7dc927af912709606337c798f56023ce10ca63ad0897572661b",
+    "openApiSnapshot": {
+      "path": "investigations/sma-q1/layered/sma-s2-openhands-openapi-candidate-2.json",
+      "sha256": "b3000ea03830bc375df30772b34f9b30357b10bded62b411b2ed446d83e187bb"
+    },
+    "selectedEventSchemas": {
+      "path": "investigations/sma-q1/layered/sma-s2-openhands-event-schemas-candidate-2.json",
+      "sha256": "49d30377c6f8b69e77e9231c39ff1d327c8a33c5ef859cc9ef8306a0536605b0",
+      "schemas": [
+        "Event",
+        "MessageEvent",
+        "HookExecutionEvent",
+        "ActionEvent",
+        "ObservationEvent",
+        "ConversationErrorEvent",
+        "CondensationSummaryEvent"
+      ],
+      "liveMessageEventSemanticFieldsPresent": [
+        "authorship_origin",
+        "semantic_purpose",
+        "agent_response_finality"
+      ],
+      "liveMessageEventSemanticFieldsMissing": []
+    }
+  },
+  "agentCanvas": {
+    "version": "1.12.0",
+    "executable": {
+      "path": "/opt/homebrew/lib/node_modules/@openhands/agent-canvas/bin/agent-canvas.mjs",
+      "sha256": "133e26fb65434ddac2eee471bfc56cb8144c92452241aacd627a8cbcfde277e6"
+    },
+    "packageJson": {
+      "path": "/opt/homebrew/lib/node_modules/@openhands/agent-canvas/package.json",
+      "sha256": "37f3c8f34d87a782c2db5b213c400ddb73daa9c8f8b2cc023bde5c93240a9c9d"
+    },
+    "runningProcess": {
+      "pidAtObservation": 46541,
+      "launchdRunsAtObservation": 22,
+      "state": "running"
+    },
+    "ingressEndpoint": "http://127.0.0.1:8000",
+    "agentServerEndpoint": "http://127.0.0.1:18000"
+  },
+  "hookAssets": {
+    "configurationSha256": "c689320fbc54149d01d56c35c51cdb1b650ac7a9f0b29f76c18982f05c210a31",
+    "pythonHookSha256": "e50005e82ac6de4aa11efd552cbf1586a764dbf09fc6fd617cc462ba73b0d3d9",
+    "shellBridgeSha256": "950fd31661c94c17cb2c635304cece815c6474ef5bf5cd82ff687311eb687bbd",
+    "nativeProbeSha256": "85b6b7b9c3f95e19face4dcfe000663dc2da4cd80b2ab44537bd79f8135b598d"
+  },
+  "candidateArtifacts": {
+    "deterministicStub": {
+      "path": "scripts/sma_s2_deterministic_model_stub_candidate_2.py",
+      "sha256": "8013ba1dcd5db6192abce075f95dbd255ef8ada8335093cfaf0f5962f884e0f9"
+    },
+    "offlineHarness": {
+      "path": "scripts/sma_s2_offline_harness_candidate_5.py",
+      "sha256": "7236b8b1c1fd52adffea58e1e5e1d0f689211a565964fb370b4fdf7a77c7d534"
+    },
+    "offlineQualificationReceipt": {
+      "path": "OUTPUT/phase-3/sma-s2-successor-candidate-1-offline-harness/offline-harness-receipt.json",
+      "sha256": "e636595264bc7cb87bccb3a7d19372e8e4295bea27dbecee5796e0f64958eda0",
+      "status": "PASS",
+      "scope": "OFFLINE_HARNESS_CONTROLS_ONLY"
+    },
+    "nonSecretConfiguration": {
+      "path": "investigations/sma-q1/layered/sma-s2-nonsecret-configuration-candidate-2.json",
+      "sha256": "09c78fdc1ca95c4277222ac1f106357af9df9fddb4099fcd83222a3df89291d1"
+    }
+  },
+  "restartAndPreservation": {
+    "authorization": "investigations/sma-q1/layered/sma-s2-successor-remediation-authorization.json",
+    "restartCount": 1,
+    "preRestartActiveExecutionCounts": {
+      "running": 0,
+      "waiting_for_confirmation": 0,
+      "stuck": 0,
+      "deleting": 0
+    },
+    "preservedPausedConversation": {
+      "conversationId": "4c2e5f84-ecd3-4971-b375-a0fa9905a058",
+      "title": "Tekroo Trader",
+      "executionStatus": "paused",
+      "createdAt": "2026-08-09T19:52:16.454058Z",
+      "updatedAt": "2026-08-13T17:38:02.080929Z",
+      "identityAndTimestampsUnchangedAfterRestart": true
+    }
+  },
+  "executionFence": {
+    "measuredExecutionAuthorized": false,
+    "measuredAttemptsAuthorized": 0,
+    "immediateIdentityRecheckRequired": true,
+    "liveHealthIsNotFrozenByThisCandidate": true,
+    "successorExecutionIdentityRequired": true
+  }
+}

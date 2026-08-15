@@ -1,0 +1,44 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_Q1_EXECUTION_AUTHORIZATION",
+  "authorizationId": "SMA-Q1-NATIVE-STEP15-V4-CORRECTIVE-RERUN-1",
+  "recordedOn": "2026-08-13",
+  "timePrecision": "DAY",
+  "status": "AUTHORIZED_CORRECTIVE_RERUN_1_NOT_STARTED",
+  "principalInstruction": "Step 15 is authorized.",
+  "derivedAuthority": {
+    "originalAuthorization": "investigations/sma-q1/step-15-execution-authorization-v4.json",
+    "originalAuthorizationSHA256": "673a855ee2fca910f344823256f229a60feac2c785cbbc749fc4f924c8c89957",
+    "frozenRule": "One corrective v4 rerun is permitted only for a newly documented harness defect that could not have altered an SMA outcome; retain and adjudicate every attempt.",
+    "classification": "CONTROLLED_CORPUS_BACKGROUND_REPLAY_ISOLATION_DEFECT"
+  },
+  "frozenManifest": "investigations/sma-q1/preregistration-native-v4.json",
+  "frozenManifestSHA256": "2178116c866e9abed9b5e83edd3c9c221f55f81e6f343a168205209f25834d23",
+  "executionIdentity": "investigations/sma-q1/step-15-execution-identity-v4-rerun1.json",
+  "executionIdentitySHA256": "f7932e2269dd6488b0ce3d633c247a66c06e2028c47ac2998b4f3d8ce0d30693",
+  "harness": "scripts/smaq1_native_step15_v4_rerun1.py",
+  "harnessSHA256": "91e42b9208134a5fb1df91f4b37988a465f34e6efad8c1a5bfb47469fb2721f2",
+  "baseManifest": "investigations/sma-q1/preregistration-native-v2.json",
+  "baseManifestSHA256": "c618371d571d5333aebd2bdc83d2db2559115f5ec3e1903b33e8e0ab157edf5d",
+  "authorizedScope": {
+    "fixtureQualification": true,
+    "measuredScenarioCorpus": true,
+    "scenarioCount": 18,
+    "repetitionCount": 96,
+    "disposableNamespacesOnly": true,
+    "productionOrHistoricalDataAllowed": false,
+    "scenarioMutationAllowed": false,
+    "thresholdMutationAllowed": false,
+    "rerunPolicyMutationAllowed": false
+  },
+  "attempt": {
+    "ordinal": 2,
+    "correctiveRerun": true,
+    "correctiveRerunOrdinal": 1,
+    "priorStartedScenarios": 0,
+    "priorStartedRepetitions": 0
+  },
+  "executionAuthorized": true,
+  "executionStarted": false,
+  "scenarioResultClaimAuthorized": false
+}

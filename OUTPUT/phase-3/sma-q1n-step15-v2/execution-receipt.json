@@ -1,0 +1,67 @@
+{
+  "cleanup": {
+    "conversation_count": 4,
+    "conversations": [
+      {
+        "conversation_id": "f642d476-4bc4-4a46-a6e8-22a22cf8f718",
+        "delete_status": 200,
+        "get_after_delete": 404
+      },
+      {
+        "conversation_id": "b7e5e8cd-e262-4429-b46a-a41808f0b675",
+        "delete_status": 200,
+        "get_after_delete": 404
+      },
+      {
+        "conversation_id": "aacb6b4a-194e-445d-9ff4-fbcb7d731ec6",
+        "delete_status": 200,
+        "get_after_delete": 404
+      },
+      {
+        "conversation_id": "beb9ecc1-eb5a-4818-9c3f-a246b0faccf7",
+        "delete_status": 200,
+        "get_after_delete": 404
+      }
+    ],
+    "episodic_delete_status": 200,
+    "finished_at": "2026-08-13T18:30:30.146132+00:00",
+    "semantic_delete_status": 200,
+    "service": {
+      "already_stopped": true,
+      "listener": null
+    },
+    "started_at": "2026-08-13T18:30:28.722773+00:00",
+    "verified": {
+      "bridge_absent": true,
+      "episodic_absent": true,
+      "mongo_absent": true,
+      "run_root_absent": true,
+      "semantic_absent": true,
+      "service_absent": true
+    }
+  },
+  "completed_scenarios": 1,
+  "decision": "NO_GO",
+  "failure": {
+    "classification": "HARNESS_OR_ENVIRONMENT",
+    "message": "Command '('mvn', '-q', '-Dunit.excludedGroups=', '-Dtest=Wp5eReplayPromotionIntegrationTest', '-Dwp5e.database=sma_q1n_step15_20260813_v2', '-Dwp5e.semanticCollection=sma_sem_q1n_step15_20260813_v2', '-Dwp5e.episodicCollection=sma_epi_q1n_step15_20260813_v2', '-Dwp5e.memoryId=oh_32fb6e8c16d4466d89e85197512929d194ffef97dda64ca479515887af4f162c', '-Dwp5e.code=Repository alpha', '-Dwp5e.checksum=DELETE_CONFIRMED', 'test')' returned non-zero exit status 1.",
+    "message_sha256": "ace5425db2be7237ccfce1723d7cc578cc950ff7e146d698090d58d1b445da9f",
+    "type": "CalledProcessError"
+  },
+  "harness_sha256": "fc482e4501b02ddb1baaa2aea461f543db4f886101c0535465dea9a60e43d646",
+  "manifest_sha256": "c618371d571d5333aebd2bdc83d2db2559115f5ec3e1903b33e8e0ab157edf5d",
+  "raw_journal_sha256": "bf8c4ecdb9c82c37cb5a4bac64748c32cc29c56d7ff6f5f5dc03bb38ded419ae",
+  "receipt_type": "SMA_Q1_NATIVE_STEP15_EXECUTION",
+  "recorded_at": "2026-08-13T18:30:30.147888+00:00",
+  "report_sha256": "b74ef00e38375dedd812c533e9948e06234228cb4c25ce871a2c628f236ac176",
+  "scenario_results": [
+    {
+      "records": 10,
+      "scenario_id": "SMAQ1N-001-FIRST-PROMPT-EMPTY",
+      "status": "PASS"
+    }
+  ],
+  "schema_version": "1.0.0",
+  "started_scenarios": 2,
+  "status": "INCONCLUSIVE"
+}
