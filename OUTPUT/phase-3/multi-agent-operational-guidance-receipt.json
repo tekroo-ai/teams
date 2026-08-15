@@ -1,0 +1,283 @@
+{
+  "receiptType": "TEKROO_TEAMS_MULTI_AGENT_OPERATIONAL_GUIDANCE",
+  "receiptVersion": 1,
+  "status": "PASS_DOCUMENTATION_ONLY",
+  "generatedAt": "2026-08-15T23:12:52Z",
+  "authority": {
+    "scope": "documentation-only operational guidance using accepted contract 0.7.0",
+    "productionAuthority": "NONE",
+    "liveEvidenceRegistrationAuthorized": false,
+    "smaMutationAuthorized": false
+  },
+  "teamsSourceBaseline": {
+    "branch": "main",
+    "commit": "e5642704d98702e4ff0b325b7c32a058757c44d9",
+    "tree": "70375702f06628087375c01d57310309f5b49229",
+    "worktreeWasClean": false,
+    "preExistingDirtyWorkPreserved": true
+  },
+  "contract": {
+    "name": "tekroo.kernel.contracts",
+    "version": "0.7.0",
+    "manifestPath": "CONTRACTS/tekroo.kernel.contracts/0.7.0/manifest.json",
+    "manifestSha256": "e2b9b5224a860a3eaa07451cf48fb5ac16a440b22b8dd592ff1662c1cff67f16",
+    "modifiedByThisTask": false
+  },
+  "architectureNote": {
+    "path": "docs/architecture/088-multi-agent-delegation-and-memory-handoff-guidance.md",
+    "sha256": "469651bcf57683cc7e733803c3ff0292064cd5a0e442de7dcb0e6c624ce3e13a",
+    "byteLength": 28776
+  },
+  "inspectedSources": [
+    {
+      "kind": "EXTERNAL_ARTICLE",
+      "locator": "https://www.anthropic.com/engineering/multi-agent-research-system",
+      "accessedAt": "2026-08-15"
+    },
+    {
+      "kind": "TEAMS_CONTRACT",
+      "locator": "CONTRACTS/tekroo.kernel.contracts/0.7.0/manifest.json"
+    },
+    {
+      "kind": "TEAMS_CONTRACT",
+      "locator": "CONTRACTS/tekroo.kernel.contracts/0.7.0/catalogue/kernel-catalogue.json"
+    },
+    {
+      "kind": "TEAMS_CONTRACT",
+      "locator": "CONTRACTS/tekroo.kernel.contracts/0.7.0/schemas/aggregate-state.schema.json"
+    },
+    {
+      "kind": "TEAMS_CONTRACT",
+      "locator": "CONTRACTS/tekroo.kernel.contracts/0.7.0/schemas/work-profile.schema.json"
+    },
+    {
+      "kind": "TEAMS_CONTRACT",
+      "locator": "CONTRACTS/tekroo.kernel.contracts/0.7.0/schemas/evidence-record.schema.json"
+    },
+    {
+      "kind": "TEAMS_CONTRACT",
+      "locator": "CONTRACTS/tekroo.kernel.contracts/0.7.0/schemas/team-continuity-state.schema.json"
+    },
+    {
+      "kind": "TEAMS_CONTRACT",
+      "locator": "CONTRACTS/tekroo.kernel.contracts/0.7.0/schemas/payloads.schema.json"
+    },
+    {
+      "kind": "TEAMS_ARCHITECTURE",
+      "locator": "docs/architecture/020-model-capability-and-verification-policy.md"
+    },
+    {
+      "kind": "TEAMS_ARCHITECTURE",
+      "locator": "docs/architecture/022-operator-and-host-continuity-control.md"
+    },
+    {
+      "kind": "SMA_DESIGN",
+      "locator": "/Users/paul/work/tekroo-ai/sma/docs/PROGRAMMING_MEMORY_ADAPTER_AND_CONTEXT_PROTOCOL.md"
+    },
+    {
+      "kind": "SMA_DESIGN",
+      "locator": "/Users/paul/work/tekroo-ai/sma/docs/OPENHANDS_SMA_INTEGRATION_PLAN.md"
+    },
+    {
+      "kind": "SMA_STATUS",
+      "locator": "/Users/paul/work/tekroo-ai/sma/TASK_STATUS.md"
+    }
+  ],
+  "existingContractMappings": [
+    {
+      "behavior": "bounded task definition and DAG decomposition",
+      "bindings": [
+        "task.create.title",
+        "task.create.description",
+        "task.create.acceptance_criteria",
+        "task.create.depends_on"
+      ]
+    },
+    {
+      "behavior": "work classification, route, verification, independence, variants, and budgets",
+      "bindings": [
+        "task.bind-work-profile",
+        "work-profile.minimum_decision_route",
+        "work-profile.required_deterministic_gate_ids",
+        "work-profile.required_validation_branches",
+        "work-profile.required_independence_dimensions",
+        "work-profile.implementation_variant_count",
+        "work-profile.valid_candidate_quorum",
+        "work-profile.budgets"
+      ]
+    },
+    {
+      "behavior": "content-addressed delegation and qualified worker selection",
+      "bindings": [
+        "EvidenceRecord.locator",
+        "EvidenceRecord.raw_sha256",
+        "EvidenceRecord.canonical_digest",
+        "task.authorize-qualified-assignment.evidence_ids",
+        "task.authorize-qualified-assignment.selection_policy_digest",
+        "task.authorize-qualified-assignment.selected_execution_id",
+        "task.authorize-qualified-assignment.selected_fencing_epoch"
+      ]
+    },
+    {
+      "behavior": "independent variants and deterministic comparison",
+      "bindings": [
+        "variant-group.open",
+        "variant-group.submit-candidate",
+        "variant-group.record-comparison",
+        "variant-group.select"
+      ]
+    },
+    {
+      "behavior": "artifact-first completion and outcome validation",
+      "bindings": [
+        "task.request-completion.artifact_digests",
+        "task.request-completion.evidence_ids",
+        "completion-review.open.candidate_artifact_digest",
+        "completion-review.open.verification_topology_digest",
+        "completion-review.record-result",
+        "completion-review.finalize"
+      ]
+    },
+    {
+      "behavior": "ownership, compact handoff, replacement, and continuity",
+      "bindings": [
+        "aggregate.ownership",
+        "task.handoff",
+        "aggregate.lifecycle_epoch",
+        "aggregate.scope_revision",
+        "qualified-assignment.selected_execution_id",
+        "qualified-assignment.selected_fencing_epoch",
+        "team-continuity-state.control_state",
+        "team-continuity-state.power_epoch"
+      ]
+    },
+    {
+      "behavior": "bounded escalation and loop prevention",
+      "bindings": [
+        "escalation.open.trigger",
+        "escalation.open.triggering_condition_digest",
+        "escalation.open.evidence_ids",
+        "escalation.open.deadline_at",
+        "escalation.open.resolution_round_limit",
+        "escalation.open.route_limit"
+      ]
+    }
+  ],
+  "smaRelevance": {
+    "stage": "Stage 6 canary and promotion rollout",
+    "existingMechanisms": [
+      "Agent Memory Worktree (AMW)",
+      "Shared Project Working Set (SPWS)",
+      "evidence-episode compilation and atomic promotion proposals",
+      "ordinary raw intake and existing SMA lifecycle",
+      "bounded context assembly with labelled AMW/SPWS deltas",
+      "session delivery manifests and context epochs",
+      "snapshot, delta, tombstone, and condensation re-anchoring",
+      "content-free disclosure and denial receipts"
+    ],
+    "newLifecycleStateRequired": false,
+    "newDatastoreRequired": false,
+    "newEmbeddingSpaceRequired": false,
+    "teamsRemainsOrchestrationAuthority": true,
+    "recommendedHandoffInsertionPoint": {
+      "file": "/Users/paul/work/tekroo-ai/sma/docs/PROGRAMMING_MEMORY_ADAPTER_AND_CONTEXT_PROTOCOL.md",
+      "afterHeading": "### Stage 6 — Canary and promotion rollout",
+      "afterExistingBullet": "migrate historical material only after the live path is trustworthy.",
+      "beforeHeading": "## 23. Acceptance gates"
+    }
+  },
+  "verification": {
+    "status": "PASS",
+    "checks": [
+      {
+        "name": "contract-0.7.0-package-validation",
+        "command": "node runner/validate-package.mjs /tmp/tekroo-0.7.0-multi-agent-guidance-validation.json",
+        "workingDirectory": "CONTRACTS/tekroo.kernel.contracts/0.7.0",
+        "exitStatus": 0,
+        "result": "PASS",
+        "checkCount": 3290,
+        "failedCheckCount": 0,
+        "reportSha256": "0d9e07ceaa0814d8ea82bda404fab00bca852fcd22571ea4af929d5051ce7e7b"
+      },
+      {
+        "name": "receipt-json-parse",
+        "command": "jq empty OUTPUT/phase-3/multi-agent-operational-guidance-receipt.json",
+        "exitStatus": 0,
+        "result": "PASS"
+      },
+      {
+        "name": "pre-stage-documentation-diff-check",
+        "command": "git diff --check -- docs/architecture/088-multi-agent-delegation-and-memory-handoff-guidance.md OUTPUT/phase-3/multi-agent-operational-guidance-receipt.json",
+        "exitStatus": 0,
+        "result": "NON_CREDITABLE_UNTRACKED_FILES_NOT_INCLUDED"
+      },
+      {
+        "name": "initial-staged-documentation-diff-check",
+        "command": "git diff --cached --check",
+        "exitStatus": 2,
+        "result": "FAIL_CORRECTED_BEFORE_COMMIT",
+        "detail": "Three Markdown metadata lines contained trailing two-space hard-break markers; those markers were removed and the staged check was repeated."
+      },
+      {
+        "name": "final-staged-documentation-diff-check",
+        "command": "git diff --cached --check",
+        "exitStatus": 0,
+        "result": "PASS"
+      },
+      {
+        "name": "accepted-contract-worktree-diff",
+        "command": "git diff --exit-code -- CONTRACTS/tekroo.kernel.contracts/0.7.0",
+        "exitStatus": 0,
+        "result": "PASS",
+        "interpretation": "No tracked byte in the accepted 0.7.0 package differs from the source baseline."
+      },
+      {
+        "name": "complete-new-artifact-diff-review",
+        "commands": [
+          "git diff --no-index /dev/null docs/architecture/088-multi-agent-delegation-and-memory-handoff-guidance.md",
+          "git diff --no-index /dev/null OUTPUT/phase-3/multi-agent-operational-guidance-receipt.json"
+        ],
+        "result": "PASS_MANUAL_REVIEW"
+      },
+      {
+        "name": "initial-package-validator-invocation",
+        "command": "node runner/validate-package.mjs",
+        "exitStatus": 1,
+        "result": "NON_CREDITABLE_USAGE_ERROR",
+        "detail": "The validator requires an explicit report path; the corrected invocation above passed."
+      }
+    ],
+    "notRun": [
+      {
+        "check": "Go runtime tests",
+        "reason": "Documentation and receipt only; no Go or runtime file changed."
+      },
+      {
+        "check": "live Teams/SMA/AMW/SPWS/Stage 6 execution",
+        "reason": "Explicitly outside authority and scope."
+      },
+      {
+        "check": "repository-specific Markdown linter",
+        "reason": "No dedicated Markdown validation command was found in the inspected repository scripts."
+      }
+    ]
+  },
+  "exclusions": [
+    "accepted contract modification",
+    "kernel schema or runtime modification",
+    "SMA repository modification",
+    "live service access or mutation",
+    "production deployment",
+    "live EvidenceRecord registration",
+    "model or provider execution",
+    "private model prompt inspection"
+  ],
+  "residualRisks": [
+    "The note maps enforceable binding points but does not prove that every future live adapter applies the policy correctly.",
+    "Live AMW, SPWS, Stage 6 canary, provider-cost, and production-observability behavior was outside this task and remains to be qualified by its own gates.",
+    "The task handoff payload does not directly carry an artifact identity; durable handoff binding therefore depends on EvidenceRecord registration and the successor qualified assignment evidence_ids policy described in the note.",
+    "Anthropic quantitative results are not treated as transferable Teams performance thresholds."
+  ],
+  "evidenceRecordCandidate": null,
+  "evidenceRecordCandidateReason": "No candidate was generated because this task prohibited live registration and no task-scoped deterministic UUIDv7/time authority was supplied; inventing one would weaken identity provenance."
+}
