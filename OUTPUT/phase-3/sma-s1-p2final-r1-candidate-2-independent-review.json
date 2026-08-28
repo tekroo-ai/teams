@@ -1,0 +1,44 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S1_FINAL_P2_R1_CANDIDATE_2_INDEPENDENT_REVIEW",
+  "status": "PASS_READY_FOR_PRINCIPAL_ACCEPT_FREEZE_NOT_AUTHORIZED",
+  "reviewedOn": "2026-08-28",
+  "subject": {
+    "identitySHA256": "2624b25095e99ca20d5d1da936e0276449ac533eca9251ab52828a6dcd972f59",
+    "offlineQualificationSHA256": "cdea4d04eac8c6c9dc4682f441d2bd55405b24c24b72defd9bdbc1a0f0455af9",
+    "environmentBindingSHA256": "de4bc9ade5783cb91d8fcaa5136cbab3e1cbdb58002d44c0d2c4306db2798d68",
+    "scientificPreregistrationSHA256": "e663f5b732c22248adc5fab2f536dbf02dd72337f7c8428f225937e72d6a7f8c",
+    "smaCommit": "fe9903cdf59497aabf12cbe7722e1397a1372068",
+    "smaTree": "fc2ae06c6333e94f6db34d691e50cb8bb1e5aa36",
+    "serviceArtifactSHA256": "1561d18739cc53e744a0014ce562c8a7b2adfc988494a984728d680e887fbb8b",
+    "sourcesArtifactSHA256": "a2a521819ae1fcc3164d235823408b987e1b73471bd2d861ec7fb2df9ff91184"
+  },
+  "verification": {
+    "contentAddresses": "PASS",
+    "finalP2IdentityAndCleanliness": "PASS",
+    "unchangedScientificPlan14Cases71Repetitions": "PASS",
+    "createOnceAndAppendBeforeAssertion": "PASS",
+    "p2DeltaControls": "PASS",
+    "candidate1ZeroCreditNegativeControl": "PASS",
+    "candidate2NamespaceGrammar": "PASS",
+    "handlerAndPredicateEvidence": "PASS",
+    "cleanupInventory": "PASS",
+    "authorityFences": "PASS",
+    "measuredScientificRepetitions": 0
+  },
+  "precisionNotes": [
+    {
+      "classification": "NONBLOCKING_UNVERIFIED_SUPPLEMENTAL_DETAIL",
+      "detail": "The separate post-run Qdrant HTTP 404 is not backed by a distinct retained HTTP receipt. The content-addressed final-inventory journal independently proves both collections absent."
+    },
+    {
+      "classification": "NONBLOCKING_DOCUMENTARY_PRECISION",
+      "detail": "Candidate 2 changes no product or scientific behavior, but its handler script also adds a handlerCheckSHA256 receipt field in addition to correcting disposable identities."
+    }
+  ],
+  "recommendation": {
+    "principalAcceptFreezeCandidate2": true,
+    "authorizeMeasuredExecution": false,
+    "authorizeS2M1E1": false
+  }
+}

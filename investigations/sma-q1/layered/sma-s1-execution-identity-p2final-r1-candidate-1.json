@@ -1,0 +1,104 @@
+{
+  "schemaVersion": "1.0.0-candidate",
+  "recordType": "SMA_S1_EXECUTION_IDENTITY",
+  "identityId": "SMA-S1-EXECUTION-IDENTITY-P2FINAL-R1-CANDIDATE-1",
+  "status": "CANDIDATE_NOT_ACCEPTED_NOT_AUTHORIZING_NOT_STARTED",
+  "recordedOn": "2026-08-28",
+  "scientificPreregistration": {
+    "path": "investigations/sma-q1/layered/sma-s1-preregistration.json",
+    "sha256": "e663f5b732c22248adc5fab2f536dbf02dd72337f7c8428f225937e72d6a7f8c",
+    "status": "ACCEPTED_FROZEN_NOT_AUTHORIZED",
+    "changed": false,
+    "cases": 14,
+    "repetitions": 71
+  },
+  "acceptedLineage": {
+    "priorSmaCommit": "5d58be508c74ae8577d2fd31e3346be23a912ab3",
+    "priorSmaTree": "7222410443a6041496a5c313b2549f16eb937458",
+    "priorScientificAdjudicationSHA256": "0e5ace0acbe6e2441755ae656de36096e38b2364d27fb45ee844f2422abf2f7d",
+    "priorClaim": "SMA_SEMANTICS_QUALIFIED",
+    "priorDisposition": "ACCEPTED_FOR_ORIGINAL_IDENTITY_STALE_FOR_FINAL_P2",
+    "priorMeasuredCreditImported": 0,
+    "priorAuthorizationReusable": false,
+    "reconciliation": {
+      "path": "OUTPUT/phase-3/step-15-post-p2-baseline-reconciliation.json",
+      "sha256": "0f226bae8b55600eb5aec6e20413975a7ce8a545893ba02ffafc70ba9a1a4f1c"
+    }
+  },
+  "boundImplementation": {
+    "smaCommit": "fe9903cdf59497aabf12cbe7722e1397a1372068",
+    "smaTree": "fc2ae06c6333e94f6db34d691e50cb8bb1e5aa36",
+    "isolatedWorktree": "/Users/paul/work/tekroo-ai/sma-step15-s1-p2final",
+    "serviceArtifactPath": "/Users/paul/work/tekroo-ai/sma-step15-s1-p2final/target/sma-1.0-SNAPSHOT.jar",
+    "serviceArtifactSHA256": "1561d18739cc53e744a0014ce562c8a7b2adfc988494a984728d680e887fbb8b",
+    "sourcesArtifactPath": "/Users/paul/work/tekroo-ai/sma-step15-s1-p2final/target/sma-1.0-SNAPSHOT-sources.jar",
+    "sourcesArtifactSHA256": "a2a521819ae1fcc3164d235823408b987e1b73471bd2d861ec7fb2df9ff91184",
+    "sourceBlobs": {
+      "serviceMain": "eb040888e44aeaa9bde33551ec7a538b81b3c9d1",
+      "bridge": "f8543f01d937c2d567ec49d476ebf07f7ba6c531",
+      "retrieval": "5f706a9e45d13b6c2d980035f32ae26138592bff",
+      "replay": "b8bf08e01b189e183f6b1f290c9c934e8d6ea951",
+      "delivery": "da377208bf1b4f41dda39260f59f92f577ba2cf4"
+    },
+    "productDriverSource": "investigations/sma-q1/layered/driver-src-p2m-evidence-v2-candidate-4/ai/tekroo/sma/openhands/SmaS1QualificationDriver.java",
+    "productDriverSourceSHA256": "184fa7bc9bc468b55a9c94d134841161938b9572a7e359265620d84358ed7667",
+    "productDriverSourceChangedFromAcceptedS1": false,
+    "productDriverArtifact": "OUTPUT/phase-3/sma-s1-product-driver-p2final-r1-candidate-1/sma-s1-product-driver-p2final-r1-candidate-1.jar",
+    "productDriverArtifactSHA256": "00ac8098562215b9c021b2512776457d6b123a731c650cc9224d5f8bcff67e8f",
+    "productDriverLauncher": "scripts/sma_s1_product_driver_p2final_r1_candidate_1.py",
+    "productDriverLauncherSHA256": "dff1baaf44322807eae92428677d23fbbc8e93614c3593107a799b7ba4ed99d6",
+    "productDriverBuildReceipt": "OUTPUT/phase-3/sma-s1-product-driver-p2final-r1-candidate-1/build-receipt.json",
+    "productDriverBuildReceiptSHA256": "cceee5a4162bad927ea61103db674c7ded72efb8a718ded0be6a8ddf6ddf3f74",
+    "acceptedBaseHarness": "scripts/sma_s1_harness_evidence_v2_candidate_4.py",
+    "acceptedBaseHarnessSHA256": "14850c72cbcb9b76dac5af208f360b1bcd526b211cb8d38e67a448b0ed92f9c5",
+    "handlerCheck": "scripts/sma_s1_p2final_r1_handler_checks.py",
+    "handlerCheckSHA256": "1706387ec5672528f695f4dcff246ece111310c93acade38c70c1b7c32cc6efb",
+    "p2DeltaControls": "scripts/sma_s1_p2final_r1_delta_controls.py",
+    "p2DeltaControlsSHA256": "1d69c5d7c3e8d2008b34e060b09288f798f9779d8f813e3fd34529dc43545123",
+    "driverProtocol": "investigations/sma-q1/layered/sma-s1-driver-protocol.json",
+    "driverProtocolSHA256": "24d28b526af7d533c1d551b6cdc3d0c15a16f07615945ea570af9dd401374cad",
+    "environmentBinding": "investigations/sma-q1/layered/sma-s1-p2final-r1-environment-binding.json",
+    "environmentBindingSHA256": "35f16d1d942adcc94735f45b038f9f0f0730135420ba0e4d0d3fe8270db840b7"
+  },
+  "p2Evidence": {
+    "runtimeCompositionReceipt": "/Users/paul/work/tekroo-ai/sma-step15-s1-p2final/docs/SMA_S1_P2_AF_RUNTIME_COMPOSITION_RECEIPT.json",
+    "runtimeCompositionReceiptSHA256": "a9a8bf859203b3681a5123f68e172019786e755d04981033f10015aeb94894c0",
+    "p2ClosureDecision": "/Users/paul/work/tekroo-ai/sma-step15-s1-p2final/docs/SMA_S1_P2_AG_CLOSURE_DECISION.json",
+    "p2ClosureDecisionSHA256": "d93afa0cb915b60d6766b5b39b1b30449b9ca93899a4be1e25d45ee92e31da1d"
+  },
+  "selectedConfiguration": {
+    "p2AFEnabled": false,
+    "deletionFenceMode": "PERMIT_ALL_COMPATIBILITY",
+    "defaultEntrypoint": "ai.tekroo.sma.runtime.SmaServiceMain"
+  },
+  "plannedIsolation": {
+    "measuredMongoDatabase": "sma_s1_measured_p2final_r1_candidate_1",
+    "measuredSemanticCollection": "sma_s1_measured_semantic_p2final_r1_candidate_1",
+    "measuredEpisodicCollection": "sma_s1_measured_episodic_p2final_r1_candidate_1",
+    "actorAlphaPartition": "sma-s1-measured-alpha-p2final-r1-candidate-1",
+    "actorBetaPartition": "sma-s1-measured-beta-p2final-r1-candidate-1",
+    "productionOrHistoricalDataAllowed": false
+  },
+  "offlineQualificationPlan": {
+    "baseHarnessMechanics": "RERUN_ACCEPTED_TWELVE_TEST_SELF_TEST",
+    "handlerChecks": "FOURTEEN_HANDLERS_ONE_ZERO_CREDIT_INVOCATION_EACH",
+    "p2DeltaControls": [
+      "P2_AF_DISABLED_DEFAULT_ENTRYPOINT",
+      "PERMIT_ALL_COMPATIBILITY_COMPOSITION",
+      "BRIDGE_PREPARE_AND_DISCLOSURE_RECHECK",
+      "MATERIAL_CONFIGURATION_IDENTITY_FENCE"
+    ],
+    "independentReviewRequiredBeforeAcceptance": true
+  },
+  "executionFence": {
+    "identityAccepted": false,
+    "offlineQualificationAccepted": false,
+    "singleUseExecutionAuthorizationPresent": false,
+    "executionAuthorized": false,
+    "executionAttemptsAuthorized": 0,
+    "executionStarted": false,
+    "casesExecuted": 0,
+    "scientificRepetitionsExecuted": 0,
+    "executionState": "NOT_RUN"
+  }
+}

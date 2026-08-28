@@ -1,0 +1,154 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S1_FINAL_P2_R1_OFFLINE_QUALIFICATION",
+  "status": "PASS_READY_FOR_INDEPENDENT_REVIEW_NOT_ACCEPTED_NOT_AUTHORIZED",
+  "recordedOn": "2026-08-28",
+  "scope": "FINAL_P2_SUCCESSOR_PREPARATION_ZERO_MEASURED_REPETITIONS",
+  "scientificPreregistration": {
+    "path": "investigations/sma-q1/layered/sma-s1-preregistration.json",
+    "sha256": "e663f5b732c22248adc5fab2f536dbf02dd72337f7c8428f225937e72d6a7f8c",
+    "changed": false,
+    "cases": 14,
+    "repetitions": 71
+  },
+  "executionIdentityCandidate": {
+    "path": "investigations/sma-q1/layered/sma-s1-execution-identity-p2final-r1-candidate-2.json",
+    "sha256": "2624b25095e99ca20d5d1da936e0276449ac533eca9251ab52828a6dcd972f59",
+    "status": "CANDIDATE_NOT_ACCEPTED_NOT_AUTHORIZING_NOT_STARTED"
+  },
+  "boundSma": {
+    "commit": "fe9903cdf59497aabf12cbe7722e1397a1372068",
+    "tree": "fc2ae06c6333e94f6db34d691e50cb8bb1e5aa36",
+    "worktree": "/Users/paul/work/tekroo-ai/sma-step15-s1-p2final",
+    "worktreeClean": true,
+    "serviceArtifactSHA256": "1561d18739cc53e744a0014ce562c8a7b2adfc988494a984728d680e887fbb8b",
+    "sourcesArtifactSHA256": "a2a521819ae1fcc3164d235823408b987e1b73471bd2d861ec7fb2df9ff91184",
+    "smaProductSourceChanged": false
+  },
+  "buildQualification": {
+    "receipt": "OUTPUT/phase-3/sma-s1-product-driver-p2final-r1-candidate-1/build-receipt.json",
+    "receiptSHA256": "cceee5a4162bad927ea61103db674c7ded72efb8a718ded0be6a8ddf6ddf3f74",
+    "cleanMavenVerification": {
+      "status": "PASS",
+      "tests": 671,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "driverSourceSHA256": "184fa7bc9bc468b55a9c94d134841161938b9572a7e359265620d84358ed7667",
+    "driverArtifactSHA256": "00ac8098562215b9c021b2512776457d6b123a731c650cc9224d5f8bcff67e8f",
+    "launcherSHA256": "dff1baaf44322807eae92428677d23fbbc8e93614c3593107a799b7ba4ed99d6"
+  },
+  "environmentBinding": {
+    "path": "investigations/sma-q1/layered/sma-s1-p2final-r1-environment-binding-candidate-2.json",
+    "sha256": "de4bc9ade5783cb91d8fcaa5136cbab3e1cbdb58002d44c0d2c4306db2798d68"
+  },
+  "packageValidator": {
+    "path": "scripts/validate_sma_s1_p2final_r1_candidate_2.py",
+    "sha256": "45813fc2810a6099c7315292aeadaf58456e86f5f249c8f88b489e779682ef3b",
+    "status": "PASS",
+    "checkCount": 44,
+    "independentReview": "NOT_RUN"
+  },
+  "baseHarnessQualification": {
+    "harnessSHA256": "14850c72cbcb9b76dac5af208f360b1bcd526b211cb8d38e67a448b0ed92f9c5",
+    "receipt": "OUTPUT/phase-3/sma-s1-p2final-r1-candidate-2-harness-self-test/self-test-receipt.json",
+    "receiptSHA256": "c5c6071b0a5d5d207bf4a664c25a53bfc4f70d45862a0b538ce6189175943251",
+    "journalSHA256": "353948501a2c29d52fba2fc979027800b1ba89d3e373530758f672188595678e",
+    "status": "PASS",
+    "testCount": 12,
+    "measuredCasesExecuted": 0,
+    "mongoOrQdrantMutated": false,
+    "openhandsOrModelUsed": false
+  },
+  "p2DeltaQualification": {
+    "script": "scripts/sma_s1_p2final_r1_delta_controls.py",
+    "scriptSHA256": "1d69c5d7c3e8d2008b34e060b09288f798f9779d8f813e3fd34529dc43545123",
+    "receipt": "OUTPUT/phase-3/sma-s1-p2final-r1-candidate-2-p2-delta-controls/p2-delta-control-receipt.json",
+    "receiptSHA256": "c4e96f1b4895ee6948e72cdd4bf82fe4ff66a2d632fd786a1cfbdb144493b058",
+    "journalSHA256": "044ff54d0b3fd6c6a72b467010c729f8ef16edc06e5fc78c244c5d5ebcd704b3",
+    "status": "PASS",
+    "controlCount": 10,
+    "controlPassCount": 10,
+    "focusedTests": 32,
+    "focusedFailures": 0,
+    "focusedErrors": 0,
+    "focusedSkipped": 0,
+    "measuredExecution": false
+  },
+  "handlerQualification": {
+    "script": "scripts/sma_s1_p2final_r1_handler_checks_candidate_2.py",
+    "scriptSHA256": "6e8134654c0d8abeabf596311abe3e9223a002e7d7b52994ed135b9f22fd57bd",
+    "receipt": "OUTPUT/phase-3/sma-s1-p2final-r1-candidate-2-handler-check/handler-check-receipt.json",
+    "receiptSHA256": "d3da827429005560f6a0d699c4d2bb7a34b111852dbaf09b04544885a792559e",
+    "journalSHA256": "8fbdc6d4f7f6ba155b6313dc12d63b5270bbd2992324d7b41394510a54e7ac0b",
+    "status": "PASS",
+    "handlerCount": 14,
+    "handlerPassCount": 14,
+    "predicateCount": 32,
+    "predicatePassCount": 32,
+    "predicateFailCount": 0,
+    "lifecycleControlCount": 5,
+    "lifecycleControlPassCount": 5,
+    "scientificRepetitionsExecuted": 0
+  },
+  "retainedNegativeControl": {
+    "candidate": 1,
+    "identitySHA256": "683e75496d356b2f5d2310f6ee177f6918f26f82489a0f7a6434efef7be2a1b7",
+    "handlerReceiptSHA256": "74a84e08edddcfe55b937e1c76569c85bd93421919f19ba74d54ee3972b01914",
+    "handlerJournalSHA256": "6ea80e69fa50050f588104e4b6b9b2787ecca3c6c4559715b0d7ebde7cd35ada",
+    "status": "FAIL_ZERO_CREDIT",
+    "rootCause": "DISPOSABLE_NAMESPACE_NAMES_DID_NOT_MATCH_FROZEN_DRIVER_GRAMMAR",
+    "handlersExecuted": 0,
+    "scientificRepetitionsExecuted": 0,
+    "externalMutationObserved": false,
+    "hiddenOrAutomaticRerun": false
+  },
+  "cleanup": {
+    "handlerMongoDatabaseAbsent": true,
+    "handlerSemanticCollectionAbsent": true,
+    "handlerEpisodicCollectionAbsent": true,
+    "qdrantAbsenceHTTPStatus": 404,
+    "cleanupOnePassed": true,
+    "cleanupTwoPassed": true,
+    "finalInventoryPassed": true,
+    "productionOrHistoricalNamespaceUsed": false
+  },
+  "evidenceClassification": {
+    "observed": [
+      "The clean final-P2 Maven verification passed 671 tests with zero failures, errors, or skips.",
+      "The accepted S1 driver source compiled unchanged against the final-P2 shaded service artifact.",
+      "Candidate 2 passed 12 harness mechanics tests, 10 P2-delta controls, all 14 handler checks, all 32 handler predicates, and all 5 lifecycle controls.",
+      "Post-check MongoDB and Qdrant reads found the exact candidate-2 disposable resources absent.",
+      "Candidate 1 stopped before PREPARE or any handler because its namespace names failed the frozen disposable grammar."
+    ],
+    "computed": [
+      "Zero of the 71 scientific repetitions were executed.",
+      "The predecessor failure imported zero measured credit and performed zero external mutation."
+    ],
+    "inferred": [
+      "Candidate 2 is complete enough for an independent package review, but it is not yet acceptable or executable.",
+      "The final-P2 permit-all compatibility path is prospectively consistent with the accepted S1 behavior; only the separately authorized measured run can qualify it scientifically."
+    ]
+  },
+  "review": {
+    "coordinatorValidation": "PASS",
+    "independentReview": "NOT_RUN",
+    "principalAcceptance": "NOT_RUN"
+  },
+  "recommendation": {
+    "disposition": "INDEPENDENT_REVIEW_CANDIDATE_2_PACKAGE",
+    "nextAfterIndependentPass": "PRINCIPAL_ACCEPT_FREEZE_IDENTITY_AND_OFFLINE_QUALIFICATION",
+    "measuredExecutionAuthorizationRequestedByThisRecord": false
+  },
+  "authorityFence": {
+    "identityAccepted": false,
+    "offlineQualificationAccepted": false,
+    "measuredExecutionAuthorized": false,
+    "measuredExecutionAttemptsAuthorized": 0,
+    "executionState": "NOT_RUN",
+    "s2Authorized": false,
+    "m1Authorized": false,
+    "e1Authorized": false
+  }
+}

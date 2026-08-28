@@ -1,0 +1,51 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S1_FINAL_P2_R1_PRODUCT_DRIVER_BUILD_RECEIPT",
+  "status": "PASS",
+  "scope": "PROSPECTIVE_FINAL_P2_BUILD_NO_MEASURED_S1_CREDIT",
+  "recordedOn": "2026-08-28",
+  "compiler": "javac 21.0.12",
+  "jarTool": "jar 21.0.12",
+  "smaBuild": {
+    "worktree": "/Users/paul/work/tekroo-ai/sma-step15-s1-p2final",
+    "commit": "fe9903cdf59497aabf12cbe7722e1397a1372068",
+    "tree": "fc2ae06c6333e94f6db34d691e50cb8bb1e5aa36",
+    "command": "mvn clean verify",
+    "status": "PASS",
+    "tests": 671,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "worktreeCleanAfterBuild": true
+  },
+  "source": {
+    "path": "investigations/sma-q1/layered/driver-src-p2m-evidence-v2-candidate-4/ai/tekroo/sma/openhands/SmaS1QualificationDriver.java",
+    "sha256": "184fa7bc9bc468b55a9c94d134841161938b9572a7e359265620d84358ed7667",
+    "changedFromAcceptedS1": false
+  },
+  "serviceArtifact": {
+    "path": "/Users/paul/work/tekroo-ai/sma-step15-s1-p2final/target/sma-1.0-SNAPSHOT.jar",
+    "sha256": "1561d18739cc53e744a0014ce562c8a7b2adfc988494a984728d680e887fbb8b"
+  },
+  "sourcesArtifact": {
+    "path": "/Users/paul/work/tekroo-ai/sma-step15-s1-p2final/target/sma-1.0-SNAPSHOT-sources.jar",
+    "sha256": "a2a521819ae1fcc3164d235823408b987e1b73471bd2d861ec7fb2df9ff91184"
+  },
+  "compileCommand": "javac -cp /Users/paul/work/tekroo-ai/sma-step15-s1-p2final/target/sma-1.0-SNAPSHOT.jar -d OUTPUT/phase-3/sma-s1-product-driver-p2final-r1-candidate-1/classes investigations/sma-q1/layered/driver-src-p2m-evidence-v2-candidate-4/ai/tekroo/sma/openhands/SmaS1QualificationDriver.java",
+  "archiveCommand": "jar --create --file OUTPUT/phase-3/sma-s1-product-driver-p2final-r1-candidate-1/sma-s1-product-driver-p2final-r1-candidate-1.jar -C OUTPUT/phase-3/sma-s1-product-driver-p2final-r1-candidate-1/classes .",
+  "compiledArtifact": {
+    "path": "OUTPUT/phase-3/sma-s1-product-driver-p2final-r1-candidate-1/sma-s1-product-driver-p2final-r1-candidate-1.jar",
+    "sha256": "00ac8098562215b9c021b2512776457d6b123a731c650cc9224d5f8bcff67e8f"
+  },
+  "launcher": {
+    "path": "scripts/sma_s1_product_driver_p2final_r1_candidate_1.py",
+    "sha256": "dff1baaf44322807eae92428677d23fbbc8e93614c3593107a799b7ba4ed99d6"
+  },
+  "acceptedBaseHarnessSHA256": "14850c72cbcb9b76dac5af208f360b1bcd526b211cb8d38e67a448b0ed92f9c5",
+  "implementedHandlerCount": 14,
+  "smaProductSourceChanged": false,
+  "modelOrOpenHandsProcessUsed": false,
+  "measuredS1Execution": false,
+  "scientificRepetitionsExecuted": 0,
+  "byteReproducibleArchiveClaimed": false
+}

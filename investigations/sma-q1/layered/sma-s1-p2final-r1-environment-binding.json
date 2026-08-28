@@ -1,0 +1,74 @@
+{
+  "schemaVersion": "1.0.0-candidate",
+  "recordType": "SMA_S1_FINAL_P2_R1_ENVIRONMENT_BINDING",
+  "status": "CANDIDATE_NOT_ACCEPTED_NOT_AUTHORIZED",
+  "recordedOn": "2026-08-28",
+  "sourceIdentity": {
+    "smaCommit": "fe9903cdf59497aabf12cbe7722e1397a1372068",
+    "smaTree": "fc2ae06c6333e94f6db34d691e50cb8bb1e5aa36",
+    "isolatedWorktree": "/Users/paul/work/tekroo-ai/sma-step15-s1-p2final",
+    "worktreeMode": "DETACHED_EXACT_COMMIT",
+    "worktreeCleanAfterBuild": true
+  },
+  "host": {
+    "os": "macOS 26.5.2 build 25F84",
+    "architecture": "aarch64",
+    "physicalMemoryBytes": 137438953472,
+    "physicalCpuCount": 18,
+    "logicalCpuCount": 18,
+    "java": "Eclipse Temurin OpenJDK 21.0.12+8 LTS aarch64",
+    "maven": "Apache Maven 3.9.16 commit 2bdd9fddda4b155ebf8000e807eb73fd829a51d5"
+  },
+  "persistence": {
+    "mongodb": {
+      "uri": "mongodb://127.0.0.1:27017",
+      "serverVersion": "8.3.4",
+      "serverGitVersion": "4b03e7daaa316c78b9bf433046dba81637d581c0",
+      "driverVersion": "5.3.1"
+    },
+    "qdrant": {
+      "restEndpoint": "http://127.0.0.1:6333",
+      "grpcHost": "127.0.0.1",
+      "grpcPort": 6334,
+      "serverVersion": "1.18.2",
+      "serverCommit": "44ad62f8cd69642be5afa6441612525e24a0d063",
+      "clientVersion": "1.17.0",
+      "tls": false
+    }
+  },
+  "selectedConfiguration": {
+    "p2AFEnabled": false,
+    "deletionFenceMode": "PERMIT_ALL_COMPATIBILITY",
+    "defaultEntrypoint": "ai.tekroo.sma.runtime.SmaServiceMain",
+    "semanticAcceptanceThreshold": 0.5,
+    "maximumBridgeResults": 3,
+    "maximumBridgeContextCharacters": 4096,
+    "embeddingFixture": "MODEL_FREE_ORTHOGONAL_BASIS_VECTOR_DIMENSION_768",
+    "clock": "FIXED_2026-08-13T00:00:00Z",
+    "modelOrOpenHandsAllowed": false,
+    "productionOrHistoricalDataAllowed": false
+  },
+  "handlerCheckIsolation": {
+    "mongodbDatabase": "sma_s1_handler_p2final_r1_candidate_1",
+    "semanticCollection": "sma_s1_handler_semantic_p2final_r1_candidate_1",
+    "episodicCollection": "sma_s1_handler_episodic_p2final_r1_candidate_1",
+    "actorAlphaPartition": "sma-s1-handler-alpha-p2final-r1-candidate-1",
+    "actorBetaPartition": "sma-s1-handler-beta-p2final-r1-candidate-1",
+    "productionOrHistoricalDataAllowed": false
+  },
+  "plannedMeasuredIsolation": {
+    "mongodbDatabase": "sma_s1_measured_p2final_r1_candidate_1",
+    "semanticCollection": "sma_s1_measured_semantic_p2final_r1_candidate_1",
+    "episodicCollection": "sma_s1_measured_episodic_p2final_r1_candidate_1",
+    "actorAlphaPartition": "sma-s1-measured-alpha-p2final-r1-candidate-1",
+    "actorBetaPartition": "sma-s1-measured-beta-p2final-r1-candidate-1",
+    "productionOrHistoricalDataAllowed": false
+  },
+  "authorityFence": {
+    "measuredExecutionAuthorized": false,
+    "measuredExecutionState": "NOT_RUN",
+    "serviceStartAuthorized": false,
+    "openhandsOrModelAuthorized": false,
+    "productionOrHistoricalAccessAuthorized": false
+  }
+}

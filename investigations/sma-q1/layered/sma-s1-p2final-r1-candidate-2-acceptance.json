@@ -1,0 +1,47 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S1_FINAL_P2_R1_CANDIDATE_ACCEPTANCE",
+  "acceptanceId": "SMA-S1-FINAL-P2-R1-CANDIDATE-2-ACCEPTANCE",
+  "status": "ACCEPTED_FROZEN_MEASURED_EXECUTION_NOT_AUTHORIZED",
+  "recordedOn": "2026-08-28",
+  "timePrecision": "DAY",
+  "principalStatement": "Proceed.",
+  "decisionContext": "ACCEPT/FREEZE SMA-S1 final-P2 R1 candidate 2 identity 2624b25095e99ca20d5d1da936e0276449ac533eca9251ab52828a6dcd972f59 and offline qualification cdea4d04eac8c6c9dc4682f441d2bd55405b24c24b72defd9bdbc1a0f0455af9. This does not authorize measured execution, S2, M1, or E1.",
+  "acceptedArtifacts": {
+    "candidateIdentity": {
+      "path": "investigations/sma-q1/layered/sma-s1-execution-identity-p2final-r1-candidate-2.json",
+      "sha256": "2624b25095e99ca20d5d1da936e0276449ac533eca9251ab52828a6dcd972f59",
+      "acceptedFrozen": true
+    },
+    "offlineQualification": {
+      "path": "OUTPUT/phase-3/sma-s1-p2final-r1-candidate-2-offline-qualification.json",
+      "sha256": "cdea4d04eac8c6c9dc4682f441d2bd55405b24c24b72defd9bdbc1a0f0455af9",
+      "acceptedFrozen": true
+    }
+  },
+  "supportingEvidence": {
+    "independentReview": {
+      "path": "OUTPUT/phase-3/sma-s1-p2final-r1-candidate-2-independent-review.json",
+      "sha256": "1324a5220d74d259992563f9bd9154ecd4c9cba7814e917fa92f188b754c8f94",
+      "status": "PASS_READY_FOR_PRINCIPAL_ACCEPT_FREEZE_NOT_AUTHORIZED"
+    }
+  },
+  "authority": {
+    "measuredExecutionAuthorized": false,
+    "executionAttemptsAuthorized": 0,
+    "executionStarted": false,
+    "measuredCasesExecuted": 0,
+    "livePreflightAuthorized": false,
+    "serviceStartAuthorized": false,
+    "s2Authorized": false,
+    "m1Authorized": false,
+    "e1Authorized": false,
+    "executionState": "NOT_RUN"
+  },
+  "immutability": {
+    "acceptedArtifactsMayBeEditedInPlace": false,
+    "successorIdentityRequiredForAnyChange": true,
+    "newSingleUseAuthorizationRequiredForMeasuredExecution": true
+  },
+  "nextGate": "SEPARATE_PRINCIPAL_DECISION_ON_SINGLE_USE_MEASURED_S1_EXECUTION"
+}
