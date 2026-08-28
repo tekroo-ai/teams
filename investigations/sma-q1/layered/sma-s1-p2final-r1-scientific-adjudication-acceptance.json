@@ -1,0 +1,58 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S1_FINAL_P2_R1_SCIENTIFIC_ADJUDICATION_ACCEPTANCE",
+  "acceptanceId": "SMA-S1-FINAL-P2-R1-SCIENTIFIC-ADJUDICATION-ACCEPTANCE",
+  "status": "ACCEPTED_FROZEN_SMA_SEMANTICS_QUALIFIED_NO_FURTHER_AUTHORITY",
+  "recordedAt": "2026-08-28T16:09:05Z",
+  "principalStatement": "ACCEPT/FREEZE SMA-S1 final-P2 R1 scientific adjudication d4800482ef8204904c182783abb8800770b46d08f572df5f717e5c1a2ed645b5. This records SMA_SEMANTICS_QUALIFIED for sealed identity 2cd705ab40a0aabee0fea5115154920675ebba600a2e2e670a368c51c25b1738 and authorizes no additional execution, S2, M1, E1, OpenHands/model use, or production/historical access.",
+  "acceptedArtifacts": {
+    "scientificAdjudication": {
+      "path": "OUTPUT/phase-3/sma-s1-measured-p2final-r1-sealed-v1-attempt-1/scientific-adjudication.json",
+      "sha256": "d4800482ef8204904c182783abb8800770b46d08f572df5f717e5c1a2ed645b5",
+      "acceptedFrozen": true
+    },
+    "sealedIdentity": {
+      "path": "investigations/sma-q1/layered/sma-s1-execution-identity-p2final-r1-sealed-v1.json",
+      "sha256": "2cd705ab40a0aabee0fea5115154920675ebba600a2e2e670a368c51c25b1738",
+      "acceptedFrozen": true
+    }
+  },
+  "supportingEvidence": {
+    "executionReceiptSHA256": "5379325c60138b129227d7df006b4d104e01638ac37fad9d7db391e4db1b7c55",
+    "rawJournalSHA256": "2b4a0c9971658f28ac5b4d0d97d45f050702c24fed6d102d304c9b6640e6c331",
+    "postCleanupVerificationSHA256": "835c6cbd5fff1f707914d06f797d84c203080d176bcf4142218b5181275467bb",
+    "authorizationConsumptionSHA256": "6ad87a76485665a741cf89401c604cebb86de70fee2b818b708efaabd06d6069",
+    "adjudicationValidatorSHA256": "469d5a0903fe526ee43802cb16b9ae7ae611df1c5138cebc2e3768b0553db684"
+  },
+  "acceptedClaim": {
+    "claim": "SMA_SEMANTICS_QUALIFIED",
+    "scope": "EXACT_BOUND_FINAL_P2_SMA_IMPLEMENTATION_UNDER_FROZEN_S1_DETERMINISTIC_SEMANTIC_QUALIFICATION",
+    "completedRepetitions": 71,
+    "failedRepetitions": 0,
+    "predicateEvaluationsPassed": 160,
+    "predicateEvaluationsFailed": 0
+  },
+  "excludedClaims": [
+    "OpenHands boundary qualification",
+    "model behavior qualification",
+    "integrated runtime qualification",
+    "workflow or process-control authority",
+    "production readiness"
+  ],
+  "authority": {
+    "additionalExecutionAuthorized": false,
+    "additionalAttemptsAuthorized": 0,
+    "correctiveRerunAuthorized": false,
+    "s2Authorized": false,
+    "m1Authorized": false,
+    "e1Authorized": false,
+    "openhandsOrModelAuthorized": false,
+    "productionOrHistoricalAccessAuthorized": false,
+    "consumedAuthorizationReusable": false
+  },
+  "immutability": {
+    "acceptedArtifactsMayBeEditedInPlace": false,
+    "successorIdentityRequiredForAnyChange": true,
+    "separatePrincipalAuthorityRequiredForAnyDownstreamGate": true
+  }
+}

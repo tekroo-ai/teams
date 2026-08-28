@@ -3,7 +3,7 @@
 Date: 2026-08-28
 Measured attempt: **PASS — 71/71**
 Scientific classification: **PASS — FINAL-P2 SMA SEMANTICS QUALIFIED**
-Principal acceptance/freeze: **PENDING**
+Principal acceptance/freeze: **ACCEPTED / FROZEN**
 
 ## Authority and identity
 
@@ -61,7 +61,10 @@ interfaces and persistence adapters.
 This does not qualify OpenHands integration, model behavior, the integrated
 runtime, workflow/process control, or production readiness.
 
-## Next gate
+## Acceptance
 
-The principal may accept/freeze the exact scientific adjudication hash. The
-consumed authorization cannot be reused, regardless of that decision.
+The principal accepted and froze the exact scientific adjudication hash. The
+acceptance record is
+`investigations/sma-q1/layered/sma-s1-p2final-r1-scientific-adjudication-acceptance.json`.
+The consumed authorization cannot be reused, and this acceptance creates no
+downstream authority.
