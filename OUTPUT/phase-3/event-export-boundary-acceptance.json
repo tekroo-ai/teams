@@ -1,0 +1,186 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "EVENT_EXPORT_BOUNDARY_ACCEPTANCE",
+  "recordedOn": "2026-08-28",
+  "verdict": "ACCEPTED",
+  "candidateAcceptance": "ACCEPTED",
+  "reviewScope": "SUPPORTED_READ_ONLY_SOURCE_BOUNDARY_FOR_SMA_TEAMS_V4_LIVE_INTEGRATION",
+  "reviewedRepository": {
+    "path": "/Users/paul/work/tekroo-ai/teams",
+    "branch": "codex/event-export-acceptance",
+    "startingCommit": "ec28b10e1962ae5d6765a27f613ca89d0237a986",
+    "reviewedCommit": "ec28b10e1962ae5d6765a27f613ca89d0237a986",
+    "reviewedTree": "17f1dfeb27f4e8e7253b35fae7bd07d8d17f0bb2",
+    "startingOriginMain": "ec28b10e1962ae5d6765a27f613ca89d0237a986",
+    "isolationReason": "The main checkout contained unrelated untracked roots; review and acceptance artifacts were isolated in a clean worktree."
+  },
+  "contracts": {
+    "eventExport": {
+      "identity": "tekroo.event-export.contracts/0.1.0",
+      "manifestPath": "CONTRACTS/tekroo.event-export.contracts/0.1.0/manifest.json",
+      "manifestSHA256": "4aa87278b6812f967331bef98b2c7e63585b6742b39d0b64c0ff693632aa9731",
+      "inventoriedFiles": 6,
+      "invariants": 12,
+      "fixtures": 10,
+      "schemas": 1
+    },
+    "sourceKernel": {
+      "identity": "tekroo.kernel.contracts/0.7.0",
+      "manifestPath": "CONTRACTS/tekroo.kernel.contracts/0.7.0/manifest.json",
+      "manifestSHA256": "e2b9b5224a860a3eaa07451cf48fb5ac16a440b22b8dd592ff1662c1cff67f16",
+      "modifiedByReview": false
+    }
+  },
+  "historicalImplementationEvidence": {
+    "path": "OUTPUT/phase-3/event-export-boundary-receipt.json",
+    "sha256": "011113ce369eda8001df0b9b1b324a76d5f487f89bc5bd0fa99e07a7eb87d147",
+    "preservedUnchanged": true
+  },
+  "sourceIdentities": {
+    "eventexport/types.go": "147c1bb37ffd73f67a636d715a40413d4cf9048c279731db0388601c436756f1",
+    "eventexport/service.go": "eadc65df1d226f146423f008cd7957ff4d51f75ed9050702f708ef7b54596a7d",
+    "adapters/memory/event_export.go": "cf7dac13a1b698f39073f0e0174394cc84330b33977a9b01ee17bab315cdabfe",
+    "adapters/mongo/event_export.go": "1f903528d64f02e6d512e08e2793cadc74417dd9da21ad0b411f4bb1204caa6d",
+    "adapters/eventexporthttp/handler.go": "3e01fb385483de5e11778f05a3f1fbb2c901b9a19740719e80a0d6983d66d530",
+    "adapters/eventexporthttp/security.go": "ae0226fde21ef4f254f23b2c83c7afd740d6ab1f3f8f4ae715afb46c93959937",
+    "cmd/event-export-server/main.go": "e8ffb0b0fccfa3127b5114c50b29d58c45b4abe20663e65bddc3690f073be1bb",
+    "go.mod": "a1c122c789f0fd3713bda5f4e10920af67d70e097ae27fefb1c0fb878d445b75",
+    "go.sum": "39569c290d929ff622fa806c77d02c20f0b1a38cac5be2ee5f7df10e59d272f7"
+  },
+  "testSourceIdentities": {
+    "eventexport/service_test.go": "93e10b618fdf0be3513f5704ae997eace88d8b52bb49ba0b3dce3ee9f71d5f7f",
+    "adapters/mongo/event_export_integration_test.go": "dd5bfc157a10290f1fc777f1cd628f7db22f978b0361f6de208b232d4eaaf60c",
+    "adapters/eventexporthttp/handler_test.go": "78dbd1af0c1321e58042be8377b35780cd67ee96aa8a40f63a8e3a8f939cbe55",
+    "adapters/eventexporthttp/security_test.go": "434de8e623fa981a2c624ed1fb258c1fe2f9ef6737086ad4df46b0499e36d78f",
+    "cmd/event-export-server/main_test.go": "c182b7f0561be3da3324a3c8931c3f2f62df78eae6364ce4af6f52708fc412a7"
+  },
+  "toolchain": {
+    "go": "go1.26.4 darwin/arm64",
+    "node": "v26.7.0",
+    "mongodb": "8.3.4 arm64",
+    "mongodPath": "/opt/homebrew/bin/mongod"
+  },
+  "verification": [
+    {
+      "command": "node CONTRACTS/tekroo.event-export.contracts/0.1.0/runner/validate-package.mjs",
+      "status": "PASS",
+      "exitCode": 0,
+      "result": {
+        "files": 6,
+        "invariants": 12,
+        "fixtures": 10,
+        "manifestSHA256": "4aa87278b6812f967331bef98b2c7e63585b6742b39d0b64c0ff693632aa9731"
+      }
+    },
+    {
+      "command": "go test ./...",
+      "status": "PASS",
+      "exitCode": 0,
+      "result": {
+        "packagesPassed": 18,
+        "packagesWithoutTests": 21,
+        "topLevelTestsPassed": 194,
+        "testAndSubtestTerminalsPassed": 560,
+        "failed": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "command": "go vet ./...",
+      "status": "PASS",
+      "exitCode": 0,
+      "result": {
+        "diagnostics": 0
+      }
+    },
+    {
+      "command": "go test -race ./eventexport ./adapters/memory ./adapters/eventexporthttp ./adapters/mongo ./cmd/event-export-server",
+      "status": "PASS",
+      "exitCode": 0,
+      "result": {
+        "packagesPassed": 5,
+        "topLevelTestsPassed": 30,
+        "testAndSubtestTerminalsPassed": 35,
+        "failed": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "command": "go test -tags=mongo_integration ./adapters/mongo",
+      "status": "PASS",
+      "exitCode": 0,
+      "result": {
+        "packagesPassed": 1,
+        "packageElapsedSeconds": 22.241,
+        "topLevelTestsPassed": 30,
+        "testAndSubtestTerminalsPassed": 35,
+        "failed": 0,
+        "skipped": 0,
+        "eventExportIntegrationTestsPassed": 4
+      }
+    }
+  ],
+  "countingMethod": {
+    "topLevelTests": "Unique terminal Go test names without a slash in supplemental go test -json output.",
+    "testAndSubtestTerminals": "Unique terminal Go test names including subtests in supplemental go test -json output.",
+    "requiredCommandsRunExactly": true
+  },
+  "acceptedBehavioralBoundary": {
+    "httpMethodAndPath": "POST /v1/event-export",
+    "protocolVersion": "1.0.0",
+    "access": "AUTHENTICATED_AUTHORIZED_READ_ONLY",
+    "recordRepresentation": "EXACT_PERSISTED_DOMAIN_EVENT_BYTES_BASE64_WITH_SHA256_AND_LENGTH",
+    "deduplicationIdentity": "event_id",
+    "delivery": "AT_LEAST_ONCE",
+    "cursor": "OPAQUE_HMAC_SOURCE_PRINCIPAL_TTL_BOUND_OPERATIONAL_STATE",
+    "initialConvergence": "OPEN_LIVE_BEFORE_BOUNDED_BACKLOG",
+    "historyLoss": "RESYNC_REQUIRED",
+    "maximumRecordsPerRequest": 1000,
+    "maximumWaitMillis": 30000,
+    "maximumRequestBodyBytes": 32768,
+    "outboxClaimsOrMutation": false,
+    "persistentExportCheckpoints": false,
+    "connectorCollectionOrIndexCreation": false,
+    "telemetry": "CONTENT_FREE",
+    "organizationalAuthorityGranted": false,
+    "workflowAuthorityGranted": false,
+    "acceptanceAuthorityGranted": false,
+    "continuityControlAuthorityGranted": false,
+    "memoryAuthorityGranted": false
+  },
+  "observedEvidence": {
+    "exactPersistedBytesDigestAndLengthVerified": true,
+    "eventIDExposedAsStableDeduplicationIdentity": true,
+    "cursorTamperSourcePrincipalAndExpiryFailuresClosed": true,
+    "streamEstablishedBeforeBacklog": true,
+    "resumeDidNotOmitNewEvent": true,
+    "historyLossReturnedResyncRequired": true,
+    "rawOutboxBSONUnchanged": true,
+    "exportCheckpointCount": 0,
+    "readOnlyConnectorCollectionInventoryUnchanged": true,
+    "nonLoopbackServerBindingRejected": true,
+    "secretsAbsentFromTelemetryAndStartupOutputBySourceShape": true
+  },
+  "exclusions": {
+    "deploymentStatus": "NOT_RUN",
+    "smaClientQualification": "NOT_RUN",
+    "liveShadowQualification": "NOT_RUN",
+    "step15Execution": "NOT_RUN",
+    "smaQ1Execution": "NOT_RUN",
+    "wp6": "NOT_RUN",
+    "productionOrHistoricalDataAccess": "NOT_RUN"
+  },
+  "residualRisks": [
+    "Delivery is deliberately at-least-once; the SMA client must deduplicate by event_id.",
+    "Cursor expiry, signing-key rotation, or lost MongoDB change-stream history requires explicit RESYNC_REQUIRED handling and bounded replay.",
+    "The runnable composition is loopback-only bearer authentication without TLS and must not be exposed remotely.",
+    "Responses are bounded by 1000 records, persisted MongoDB document limits, and HTTP write timeout; the protocol has no separate aggregate response-byte limit.",
+    "Acceptance does not qualify SMA cursor persistence, deduplication, resynchronization, or cross-repository live behavior."
+  ],
+  "decision": {
+    "candidateAcceptance": "ACCEPTED",
+    "deploymentStatus": "NOT_RUN",
+    "smaClientQualification": "NOT_RUN",
+    "liveShadowQualification": "NOT_RUN"
+  }
+}
