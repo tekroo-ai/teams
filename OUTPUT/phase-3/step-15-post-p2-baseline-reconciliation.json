@@ -1,0 +1,171 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "STEP_15_POST_P2_BASELINE_RECONCILIATION",
+  "recordedOn": "2026-08-28",
+  "status": "ACCEPTED_R1_PREPARATION_OFFLINE_QUALIFICATION_AUTHORIZED",
+  "executionAuthorityCreated": false,
+  "principalAcceptance": {
+    "accepted": true,
+    "statement": "Accepted. You may proceed.",
+    "authorizedScope": "FINAL_P2_S1_SUCCESSOR_PREPARATION_AND_OFFLINE_QUALIFICATION_ONLY",
+    "measuredExecutionAuthorized": false,
+    "laterLayerExecutionAuthorized": false
+  },
+  "canonicalIdentities": {
+    "teams": {
+      "branch": "main",
+      "commit": "a3a918d83089fd18799e4cd243d7f3fa33c128b8",
+      "tree": "715d0e89b5321e42139bd9d5067b51dd9c9fc04b",
+      "originCommit": "a3a918d83089fd18799e4cd243d7f3fa33c128b8"
+    },
+    "smaFinalP2": {
+      "branch": "master",
+      "commit": "fe9903cdf59497aabf12cbe7722e1397a1372068",
+      "tree": "fc2ae06c6333e94f6db34d691e50cb8bb1e5aa36",
+      "originCommit": "fe9903cdf59497aabf12cbe7722e1397a1372068",
+      "workingCheckoutClean": false,
+      "workingCheckoutContentBound": false,
+      "reviewSource": "IMMUTABLE_GIT_OBJECTS_ONLY"
+    }
+  },
+  "step15": {
+    "definition": "FOUR_LAYER_PROGRAMMING_MEMORY_QUALIFICATION",
+    "orderedLayers": [
+      "SMA-S1",
+      "SMA-S2",
+      "SMA-M1-<profile>",
+      "SMA-E1-<runtime-tuple>"
+    ],
+    "currentLayer": "SMA-S1_FINAL_P2_SUCCESSOR_REQUIRED",
+    "closed": false
+  },
+  "acceptedS1": {
+    "statusForBoundIdentity": "ACCEPTED_FROZEN_NOT_REVOKED",
+    "smaCommit": "5d58be508c74ae8577d2fd31e3346be23a912ab3",
+    "smaTree": "7222410443a6041496a5c313b2549f16eb937458",
+    "scientificPreregistrationSHA256": "e663f5b732c22248adc5fab2f536dbf02dd72337f7c8428f225937e72d6a7f8c",
+    "scientificAdjudicationSHA256": "0e5ace0acbe6e2441755ae656de36096e38b2364d27fb45ee844f2422abf2f7d",
+    "claim": "SMA_SEMANTICS_QUALIFIED",
+    "measuredAuthorityReusable": false,
+    "dispositionForFinalP2": "STALE_INAPPLICABLE_IDENTITY_DRIFT",
+    "transferredMeasuredCredit": 0
+  },
+  "finalP2Delta": {
+    "commitsAfterAcceptedS1": 27,
+    "filesChanged": 191,
+    "insertions": 45613,
+    "deletions": 66,
+    "materialS1BoundariesChanged": [
+      {
+        "boundary": "OPENHANDS_BRIDGE",
+        "path": "src/main/java/ai/tekroo/sma/openhands/OpenHandsBridgeServer.java",
+        "baselineBlob": "5b885689f263e09e10b52521b6a8aa0440574cf4",
+        "finalBlob": "f8543f01d937c2d567ec49d476ebf07f7ba6c531"
+      },
+      {
+        "boundary": "SEMANTIC_RETRIEVAL_AND_DISCLOSURE",
+        "path": "src/main/java/ai/tekroo/sma/retrieval/SmaRetrievalService.java",
+        "baselineBlob": "f177edbaf826043fa9aa1b20be5a1cac1b8de4b4",
+        "finalBlob": "5f706a9e45d13b6c2d980035f32ae26138592bff"
+      },
+      {
+        "boundary": "REPLAY",
+        "path": "src/main/java/ai/tekroo/sma/replay/ReplayWorker.java",
+        "baselineBlob": "7ce6021e32abe482ebc87927e2e1d1863e1b373c",
+        "finalBlob": "b8bf08e01b189e183f6b1f290c9c934e8d6ea951"
+      },
+      {
+        "boundary": "DELIVERY",
+        "path": "src/main/java/ai/tekroo/sma/delivery/DeliveryManifestService.java",
+        "baselineBlob": "dcffd032aebf5d7f49eddc4ec649a4c16f79d4c7",
+        "finalBlob": "da377208bf1b4f41dda39260f59f92f577ba2cf4"
+      },
+      {
+        "boundary": "MONGO_COLLECTION_CONFIGURATION",
+        "path": "src/main/java/ai/tekroo/sma/config/CollectionNames.java",
+        "baselineBlob": "790e4d8f656ae3591e0f3e460bbecd3b74654fdb",
+        "finalBlob": "a316132e05f62e823bf761c3c39aff30a5516784"
+      }
+    ],
+    "p2Closure": {
+      "status": "P2_EXERCISE_CLOSED",
+      "p2AE": "RETAINED_ACCEPTED_WORK",
+      "p2AF": "RETAINED_ACCEPTED_DISABLED_BY_DEFAULT_WORK",
+      "p2AG": "CLOSED_NON_REQUIREMENT"
+    }
+  },
+  "decision": {
+    "acceptedS1Revoked": false,
+    "successorS1Required": true,
+    "successorS1Science": {
+      "reuseAcceptedPreregistrationUnchanged": true,
+      "cases": 14,
+      "repetitions": 71,
+      "newMeasuredCreditImported": 0
+    },
+    "selectedP2Configuration": "P2_AF_DISABLED_PERMIT_ALL_COMPATIBILITY_PATH",
+    "futureDeletionRuntimeActivationInvalidatesQualificationIdentity": true,
+    "s2MayProceedBeforeCurrentS1Pass": false,
+    "candidate10DispositionRecommendation": "PRESERVE_HISTORICAL_REPLACE_DO_NOT_CONTINUE",
+    "m1Status": "NOT_RUN",
+    "e1Status": "NOT_RUN"
+  },
+  "candidate10Evidence": {
+    "accepted": false,
+    "manifestStatuses": "H0_WORK_PRODUCT_NOT_ACCEPTED",
+    "publishedFilesObserved": [
+      "OUTPUT/phase-3/sma-s2-candidate-10-h0-attempt-1/dress-evidence.jsonl",
+      "OUTPUT/phase-3/sma-s2-candidate-10-h0-attempt-1/dress-integrated-walk.json",
+      "OUTPUT/phase-3/sma-s2-candidate-10-h0-attempt-1/measured-evidence.jsonl",
+      "OUTPUT/phase-3/sma-s2-candidate-10-h0-attempt-1/measured-integrated-walk.json"
+    ],
+    "h0QualificationReceiptObserved": false,
+    "independentPassObserved": false,
+    "closurePlanClassification": "NOT_READY"
+  },
+  "nextAuthorizedDecisionRecommended": {
+    "scope": "FINAL_P2_S1_SUCCESSOR_PREPARATION_AND_OFFLINE_QUALIFICATION_ONLY",
+    "liveWork": false,
+    "scientificExecution": false,
+    "openhandsProcess": false,
+    "generativeModel": false,
+    "productionOrHistoricalData": false,
+    "smaModification": false
+  },
+  "separateEventExportLineage": {
+    "boundaryAcceptance": "ACCEPTED",
+    "deployment": "NOT_RUN",
+    "smaClientQualification": "NOT_RUN",
+    "liveShadowQualification": "NOT_RUN",
+    "substitutesForStep15": false
+  },
+  "evidenceClassification": {
+    "observed": [
+      "Canonical Teams and SMA remote identities match their local branch heads.",
+      "Final P2 changes retrieval, replay, delivery, bridge, and Mongo configuration files exercised by S1.",
+      "Compatibility constructors retain permit-all behavior and P2-AF is disabled by default.",
+      "Candidate-10 work products are not accepted and no H0 qualification receipt is present."
+    ],
+    "computed": [
+      "Final P2 is 27 commits after the accepted S1 implementation and changes 191 files with 45613 insertions and 66 deletions.",
+      "The unchanged accepted S1 corpus contains 14 cases and 71 repetitions."
+    ],
+    "inferred": [
+      "A no-regression result is plausible on the permit-all compatibility path but requires a new measured S1 qualification.",
+      "Replacing the incomplete pre-P2 S2 harness after current S1 acceptance is the shortest evidence-valid route to Step 15 closure."
+    ]
+  },
+  "notRun": {
+    "step15Execution": true,
+    "smaS1SuccessorBuild": true,
+    "smaS1MeasuredExecution": true,
+    "smaS2LiveWork": true,
+    "smaM1": true,
+    "smaE1": true,
+    "serviceStart": true,
+    "deployment": true,
+    "smaClientQualification": true,
+    "liveShadowQualification": true,
+    "productionOrHistoricalAccess": true
+  }
+}
