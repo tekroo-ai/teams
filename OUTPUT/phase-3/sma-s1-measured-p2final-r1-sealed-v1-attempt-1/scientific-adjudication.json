@@ -1,0 +1,223 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S1_SCIENTIFIC_ADJUDICATION",
+  "status": "PASS",
+  "recordedAt": "2026-08-28T16:02:25Z",
+  "claimUnderInvestigation": "SMA_SEMANTICS_QUALIFIED",
+  "claimAuthorized": true,
+  "productFailureEstablished": false,
+  "classification": "PASS_FROZEN_FINAL_P2_SMA_SEMANTICS_QUALIFIED",
+  "bindings": {
+    "manifestSHA256": "e663f5b732c22248adc5fab2f536dbf02dd72337f7c8428f225937e72d6a7f8c",
+    "identitySHA256": "2cd705ab40a0aabee0fea5115154920675ebba600a2e2e670a368c51c25b1738",
+    "offlineHarnessReceiptSHA256": "0fbc9bf3a671143305173304caf0bf6f0e6b67ecc2ac681f8fe5bd411b73c283",
+    "preflightReceiptSHA256": "0a897a45629e2dea9bf0badaabaf98e6d4fef63e690a2ec250cf40315d02ce6e",
+    "authorizationSHA256": "bbc8b3185e97dbb9b161e1ae8b3666d9dcf7b402c9777d27e9905e68f74054f8",
+    "authorizationConsumptionStartSHA256": "8509b4b0365fe7156274a14720e3b866827e82152c54c9c68870bf8efb855b44",
+    "harnessSHA256": "14850c72cbcb9b76dac5af208f360b1bcd526b211cb8d38e67a448b0ed92f9c5",
+    "driverSHA256": "dff1baaf44322807eae92428677d23fbbc8e93614c3593107a799b7ba4ed99d6",
+    "executionReceiptSHA256": "5379325c60138b129227d7df006b4d104e01638ac37fad9d7db391e4db1b7c55",
+    "journalSHA256": "2b4a0c9971658f28ac5b4d0d97d45f050702c24fed6d102d304c9b6640e6c331",
+    "postCleanupVerificationSHA256": "835c6cbd5fff1f707914d06f797d84c203080d176bcf4142218b5181275467bb"
+  },
+  "observed": {
+    "harnessStatus": "PASS",
+    "completedRepetitions": 71,
+    "failedRepetitions": 0,
+    "harnessFailure": false,
+    "safetyStop": false,
+    "cleanupPassed": true,
+    "journalRecordCount": 169,
+    "caseAssertionPassCount": 71,
+    "caseAssertionFailCount": 0,
+    "caseAssertionInconclusiveCount": 0,
+    "predicateEvaluationCount": 160,
+    "distinctPredicateCount": 32,
+    "predicateEvaluationPassCount": 160,
+    "restartBeforeAssertionPassCount": 9,
+    "restartBeforeAssertionNonPassCount": 0,
+    "parentChildExactProvenanceObservationCount": 5,
+    "minimumEvidenceGapCount": 0,
+    "thresholdAssertionStatus": "PASS",
+    "journalSequenceFirst": 0,
+    "journalSequenceLast": 168,
+    "journalSequenceContiguousAndUnique": true,
+    "postCleanupMongoDatabaseAbsent": true,
+    "postCleanupSemanticCollectionAbsent": true,
+    "postCleanupEpisodicCollectionAbsent": true
+  },
+  "caseResults": [
+    {
+      "caseId": "SMA-S1-001-SAME-PARTITION-SELECTION",
+      "repetitions": 10,
+      "pass": 10,
+      "fail": 0,
+      "inconclusive": 0
+    },
+    {
+      "caseId": "SMA-S1-002-CROSS-PARTITION-ISOLATION",
+      "repetitions": 10,
+      "pass": 10,
+      "fail": 0,
+      "inconclusive": 0
+    },
+    {
+      "caseId": "SMA-S1-003-RAW-INELIGIBLE",
+      "repetitions": 3,
+      "pass": 3,
+      "fail": 0,
+      "inconclusive": 0
+    },
+    {
+      "caseId": "SMA-S1-004-DUPLICATE-CAPTURE",
+      "repetitions": 3,
+      "pass": 3,
+      "fail": 0,
+      "inconclusive": 0
+    },
+    {
+      "caseId": "SMA-S1-005-RETRIEVAL-FAIL-OPEN",
+      "repetitions": 5,
+      "pass": 5,
+      "fail": 0,
+      "inconclusive": 0
+    },
+    {
+      "caseId": "SMA-S1-006-CAPTURE-OUTAGE-RECOVERY",
+      "repetitions": 5,
+      "pass": 5,
+      "fail": 0,
+      "inconclusive": 0
+    },
+    {
+      "caseId": "SMA-S1-007-PARENT-CHILD-PROVENANCE",
+      "repetitions": 5,
+      "pass": 5,
+      "fail": 0,
+      "inconclusive": 0
+    },
+    {
+      "caseId": "SMA-S1-008-RESTART-CONTINUITY",
+      "repetitions": 3,
+      "pass": 3,
+      "fail": 0,
+      "inconclusive": 0
+    },
+    {
+      "caseId": "SMA-S1-009-FOUR-CHANNEL-CONCURRENCY",
+      "repetitions": 5,
+      "pass": 5,
+      "fail": 0,
+      "inconclusive": 0
+    },
+    {
+      "caseId": "SMA-S1-010-FEEDBACK-LOOP-PREVENTION",
+      "repetitions": 3,
+      "pass": 3,
+      "fail": 0,
+      "inconclusive": 0
+    },
+    {
+      "caseId": "SMA-S1-011-SECRET-QUARANTINE",
+      "repetitions": 3,
+      "pass": 3,
+      "fail": 0,
+      "inconclusive": 0
+    },
+    {
+      "caseId": "SMA-S1-012-EMPTY-RESULT",
+      "repetitions": 10,
+      "pass": 10,
+      "fail": 0,
+      "inconclusive": 0
+    },
+    {
+      "caseId": "SMA-S1-013-OVERSIZED-CONTEXT",
+      "repetitions": 3,
+      "pass": 3,
+      "fail": 0,
+      "inconclusive": 0
+    },
+    {
+      "caseId": "SMA-S1-014-CONDENSATION-REANCHOR-STATE",
+      "repetitions": 3,
+      "pass": 3,
+      "fail": 0,
+      "inconclusive": 0
+    }
+  ],
+  "computedThresholdResults": {
+    "samePartitionExpectedRecallAt5": 1.0,
+    "crossPartitionLeakSignalCount": 0,
+    "rawMemoryInjectionSignalCount": 0,
+    "feedbackLoopSignalCount": 0,
+    "secretExposureSignalCount": 0,
+    "irrelevantQueryInjectionRate": 0.0,
+    "boundedCaseTerminationRate": 1.0,
+    "failOpenElapsedNanosecondsSorted": [
+      33430792,
+      34815208,
+      34983833,
+      35043459,
+      38502000
+    ],
+    "failOpenMaximumElapsedMilliseconds": 38.502,
+    "contextServiceWarmHitSamplesNanoseconds": [
+      3313459,
+      3120167,
+      2734958,
+      3006542,
+      3050791,
+      3243083,
+      2498209,
+      3274791,
+      2725542,
+      3042333
+    ],
+    "contextServiceWarmHitNearestRankP95Milliseconds": 3.313459,
+    "contextServiceWarmNoHitSamplesNanoseconds": [
+      2636625,
+      2598542,
+      2628375,
+      3260500,
+      2696042,
+      2948625,
+      3320209,
+      3166042,
+      3214541,
+      3053083
+    ],
+    "contextServiceWarmNoHitNearestRankP95Milliseconds": 3.320209,
+    "warmLatencyThresholdMilliseconds": 200.0,
+    "maximumReturnedMemoryCount": 1,
+    "maximumReturnedContextCharacters": 3183,
+    "midMemoryTruncationCount": 0,
+    "maximumObservedConcurrentRetrieverCalls": 4,
+    "maximumObservedQueuedWork": 4,
+    "maximumCanonicalRequestBytes": 1682,
+    "maximumCanonicalResponseBytes": 2453
+  },
+  "minimumPassEvidenceGaps": [],
+  "adjudication": {
+    "harnessPassAccepted": true,
+    "scientificPassAccepted": true,
+    "scientificFailRejected": true,
+    "reason": "All 71 frozen case repetitions and all 160 predicate evaluations passed; all required warm-latency, provenance, restart, request/response bound, threshold, journal-integrity, and cleanup evidence was retained; every declared quantitative threshold passed.",
+    "qualifiedClaim": "The exact bound final-P2 SMA implementation passed the frozen S1 deterministic semantic qualification through the declared service interfaces and persistence adapters.",
+    "nextAction": "Accept and freeze this final-P2 S1 scientific adjudication, then advance only to the separately authorized downstream gate. Do not reuse this consumed authorization."
+  },
+  "excludedClaims": [
+    "OpenHands boundary qualification",
+    "model behavior qualification",
+    "integrated runtime qualification",
+    "workflow or process-control authority",
+    "production readiness"
+  ],
+  "authority": {
+    "attemptsAuthorized": 1,
+    "attemptsConsumed": 1,
+    "additionalAttemptsAuthorized": 0,
+    "correctiveRerunsAuthorized": 0,
+    "authorizationReusable": false
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S1_EXECUTION_AUTHORIZATION_CONSUMPTION",
+  "status": "CONSUMED_NO_REUSE",
+  "recordedAt": "2026-08-28T16:03:23Z",
+  "authorization": {
+    "path": "investigations/sma-q1/layered/sma-s1-execution-authorization-p2final-r1-sealed-v1-attempt-1.json",
+    "sha256": "bbc8b3185e97dbb9b161e1ae8b3666d9dcf7b402c9777d27e9905e68f74054f8",
+    "authorizationId": "SMA-S1-P2FINAL-R1-SEALED-V1-ATTEMPT-1",
+    "attemptsAllowed": 1,
+    "correctiveRerunsAllowed": 0
+  },
+  "preActionConsumption": {
+    "path": "investigations/sma-q1/layered/sma-s1-execution-authorization-p2final-r1-sealed-v1-attempt-1-consumption-start.json",
+    "sha256": "8509b4b0365fe7156274a14720e3b866827e82152c54c9c68870bf8efb855b44"
+  },
+  "consumption": {
+    "attemptsConsumed": 1,
+    "executionStarted": true,
+    "executionCompleted": true,
+    "reuseProhibited": true,
+    "outputRoot": "OUTPUT/phase-3/sma-s1-measured-p2final-r1-sealed-v1-attempt-1",
+    "executionReceiptSHA256": "5379325c60138b129227d7df006b4d104e01638ac37fad9d7db391e4db1b7c55",
+    "journalSHA256": "2b4a0c9971658f28ac5b4d0d97d45f050702c24fed6d102d304c9b6640e6c331",
+    "postCleanupVerificationSHA256": "835c6cbd5fff1f707914d06f797d84c203080d176bcf4142218b5181275467bb",
+    "scientificAdjudicationSHA256": "d4800482ef8204904c182783abb8800770b46d08f572df5f717e5c1a2ed645b5"
+  },
+  "outcome": {
+    "harnessStatus": "PASS",
+    "scientificGateStatus": "PASS",
+    "scientificClassification": "PASS_FROZEN_FINAL_P2_SMA_SEMANTICS_QUALIFIED",
+    "productFailureEstablished": false,
+    "claimOnPassAuthorized": true,
+    "completedRepetitions": 71,
+    "failedRepetitions": 0,
+    "cleanupPassed": true
+  },
+  "authorityBoundary": {
+    "additionalAttemptAuthorized": false,
+    "correctiveRerunAuthorized": false,
+    "authorizationReusable": false,
+    "s2Authorized": false,
+    "m1Authorized": false,
+    "e1Authorized": false,
+    "newProspectiveBoundaryAndSeparateAuthorityRequired": true
+  }
+}

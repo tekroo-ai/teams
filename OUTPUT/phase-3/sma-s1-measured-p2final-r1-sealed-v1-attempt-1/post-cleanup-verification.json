@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S1_POST_CLEANUP_VERIFICATION",
+  "status": "PASS",
+  "recordedAt": "2026-08-28T16:01:01Z",
+  "executionReceiptSHA256": "5379325c60138b129227d7df006b4d104e01638ac37fad9d7db391e4db1b7c55",
+  "journalSHA256": "2b4a0c9971658f28ac5b4d0d97d45f050702c24fed6d102d304c9b6640e6c331",
+  "mongodb": {
+    "uri": "mongodb://127.0.0.1:27017",
+    "database": "sma_s1_measured_p2final_r1_candidate_2",
+    "listDatabasesResult": [],
+    "databaseAbsent": true
+  },
+  "qdrant": {
+    "restEndpoint": "http://127.0.0.1:6333",
+    "semanticCollection": "sma_s1_measured_semantic_p2final_r1_candidate_2",
+    "semanticCollectionHttpStatus": 404,
+    "semanticCollectionAbsent": true,
+    "episodicCollection": "sma_s1_measured_episodic_p2final_r1_candidate_2",
+    "episodicCollectionHttpStatus": 404,
+    "episodicCollectionAbsent": true
+  },
+  "computed": {
+    "allExactDisposableResourcesAbsent": true,
+    "productionOrHistoricalResourceQueried": false
+  }
+}

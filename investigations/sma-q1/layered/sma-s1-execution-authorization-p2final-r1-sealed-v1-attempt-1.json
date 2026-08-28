@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S1_EXECUTION_AUTHORIZATION",
+  "authorizationId": "SMA-S1-P2FINAL-R1-SEALED-V1-ATTEMPT-1",
+  "recordedAt": "2026-08-28T15:56:54Z",
+  "status": "AUTHORIZED_UNUSED",
+  "principalInstruction": "AUTHORIZE one single-use measured SMA-S1 final-P2 R1 execution against sealed identity 2cd705ab40a0aabee0fea5115154920675ebba600a2e2e670a368c51c25b1738 and post-seal offline receipt 0fbc9bf3a671143305173304caf0bf6f0e6b67ecc2ac681f8fe5bd411b73c283, under preflight receipt 0a897a45629e2dea9bf0badaabaf98e6d4fef63e690a2ec250cf40315d02ce6e. This authorizes exactly one 14-case/71-repetition attempt and does not authorize S2, M1, E1, OpenHands/model use, or production/historical data access.",
+  "executionAuthorized": true,
+  "attemptsAllowed": 1,
+  "correctiveRerunsAllowed": 0,
+  "outputRoot": "OUTPUT/phase-3/sma-s1-measured-p2final-r1-sealed-v1-attempt-1",
+  "preflight": {
+    "path": "OUTPUT/phase-3/sma-s1-p2final-r1-sealed-v1-preflight-receipt.json",
+    "sha256": "0a897a45629e2dea9bf0badaabaf98e6d4fef63e690a2ec250cf40315d02ce6e"
+  },
+  "bindings": {
+    "manifestSHA256": "e663f5b732c22248adc5fab2f536dbf02dd72337f7c8428f225937e72d6a7f8c",
+    "identitySHA256": "2cd705ab40a0aabee0fea5115154920675ebba600a2e2e670a368c51c25b1738",
+    "harnessSHA256": "14850c72cbcb9b76dac5af208f360b1bcd526b211cb8d38e67a448b0ed92f9c5",
+    "driverSHA256": "dff1baaf44322807eae92428677d23fbbc8e93614c3593107a799b7ba4ed99d6",
+    "offlineHarnessReceiptSHA256": "0fbc9bf3a671143305173304caf0bf6f0e6b67ecc2ac681f8fe5bd411b73c283"
+  },
+  "scope": {
+    "measuredCases": 14,
+    "measuredRepetitions": 71,
+    "disposableNamespacesOnly": true,
+    "productionOrHistoricalDataAllowed": false,
+    "modelOrOpenHandsAllowed": false,
+    "s2Authorized": false,
+    "m1Authorized": false,
+    "e1Authorized": false,
+    "safetyStopRequired": true,
+    "cleanupRequired": true
+  },
+  "executionFence": {
+    "executionStarted": false,
+    "attemptsConsumed": 0,
+    "executionState": "NOT_RUN",
+    "reuseProhibited": true
+  }
+}

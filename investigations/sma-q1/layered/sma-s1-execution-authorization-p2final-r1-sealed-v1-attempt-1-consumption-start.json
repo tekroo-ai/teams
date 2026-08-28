@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S1_EXECUTION_AUTHORIZATION_CONSUMPTION_START",
+  "status": "CONSUMED_EXECUTION_STARTING_NO_REUSE",
+  "recordedAt": "2026-08-28T15:57:43Z",
+  "authorization": {
+    "path": "investigations/sma-q1/layered/sma-s1-execution-authorization-p2final-r1-sealed-v1-attempt-1.json",
+    "sha256": "bbc8b3185e97dbb9b161e1ae8b3666d9dcf7b402c9777d27e9905e68f74054f8",
+    "authorizationId": "SMA-S1-P2FINAL-R1-SEALED-V1-ATTEMPT-1",
+    "attemptsAllowed": 1,
+    "correctiveRerunsAllowed": 0
+  },
+  "consumption": {
+    "attemptsConsumed": 1,
+    "executionStarted": true,
+    "executionCompleted": false,
+    "reuseProhibited": true,
+    "outputRoot": "OUTPUT/phase-3/sma-s1-measured-p2final-r1-sealed-v1-attempt-1",
+    "outputRootAbsentBeforeConsumption": true,
+    "measuredDatabaseAbsentBeforeConsumption": true,
+    "measuredSemanticCollectionAbsentBeforeConsumption": true,
+    "measuredEpisodicCollectionAbsentBeforeConsumption": true
+  },
+  "authorityBoundary": {
+    "additionalAttemptAuthorized": false,
+    "correctiveRerunAuthorized": false,
+    "authorizationReusable": false,
+    "s2Authorized": false,
+    "m1Authorized": false,
+    "e1Authorized": false,
+    "openhandsOrModelAuthorized": false,
+    "productionOrHistoricalDataAuthorized": false
+  }
+}
