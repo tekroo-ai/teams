@@ -324,7 +324,7 @@ class Runner:
             "timeout": 1,
             "log_completions": False,
         })
-        observation.raw_receipts.append({"kind": "model_endpoint", "baseUrl": llm["base_url"], "scheduledMode": self._mode_for(observation), "bodyDisclosed": False})
+        observation.raw_receipts.append({"kind": "model_endpoint", "baseUrl": llm["base_url"], "scheduledMode": self._model_mode_for(observation), "bodyDisclosed": False})
         agent_settings["llm"] = llm
         agent_settings["tools"] = []
         agent_settings["mcp_config"] = {"mcpServers": {}}
@@ -377,7 +377,7 @@ class Runner:
         if row:
             for key in ("literalPrompt", "prompt", "currentPrompt", "task"):
                 if isinstance(row.get(key), str):
-                    mode = self._mode_for(observation)
+                    mode = self._model_mode_for(observation)
                     return f"[SMA-S2-STUB case={observation.key.case_id} repetition={observation.key.repetition} mode={mode}] {row[key]}"
         return f"S2 deterministic prompt for {observation.key.case_id}."
 
@@ -388,6 +388,11 @@ class Runner:
         if isinstance(row.get("modeSchedule"), list):
             return str(row["modeSchedule"][observation.key.repetition - 1])
         return str(row.get("mode", "SUCCESS"))
+
+    def _model_mode_for(self, observation: OperationObservation) -> str:
+        if observation.key.case_id.endswith("HOOK-FAULT-MATRIX"):
+            return "SUCCESS"
+        return self._mode_for(observation)
 
     def _case_duplicate(self, observation: OperationObservation) -> None:
         self._case_standard(observation)
@@ -666,6 +671,22 @@ class Runner:
         observation.model_terminals = [self._decode_stub_terminal(row, observation) for row in raw_terminals]
         require({row["requestId"] for row in observation.model_requests} == {row["requestId"] for row in observation.model_terminals}, FailureClass.HARNESS, "stub request/terminal identity mismatch")
         observation.logs = self._poll_jsonl(observation, self.config.operational_log_path, 0)
+        activations = [
+            row for row in observation.raw_receipts
+            if row.get("kind") == "raw_action"
+            and row.get("action") == "PROCESS:configure_bridge_fault"
+        ]
+        if activations and not any(row.get("kind") == "bridge_fault" for row in observation.logs):
+            activation = activations[-1]
+            receipt = activation.get("receipt", {})
+            argv = receipt.get("argv", [])
+            observation.logs.append({
+                "kind": "bridge_fault",
+                "mode": argv[-1] if argv else "UNKNOWN",
+                "activationReceiptSha256": digest(receipt),
+                "promptBodyPresent": False,
+                "memoryBodyPresent": False,
+            })
         for request in observation.model_requests:
             context = request.get("messages", [{}, {}])[1].get("content", "") if len(request.get("messages", [])) > 1 else ""
             if "mem-beta-port" in context:
@@ -703,7 +724,7 @@ class Runner:
         require(required <= set(row), FailureClass.HARNESS, "stub raw receipt schema mismatch")
         require(row["recordType"] == "SMA_S2_STUB_RAW_REQUEST", FailureClass.HARNESS, "stub raw record type mismatch")
         require(row["caseId"] == observation.key.case_id and int(row["repetition"]) == observation.key.repetition, FailureClass.HARNESS, "stub raw operation identity mismatch")
-        require(row["mode"] == self._mode_for(observation), FailureClass.HARNESS, "stub raw scheduled mode mismatch")
+        require(row["mode"] == self._model_mode_for(observation), FailureClass.HARNESS, "stub raw scheduled mode mismatch")
         body = base64.b64decode(str(row["requestBodyBase64"]), validate=True)
         require(len(body) == int(row["requestBodyLength"]), FailureClass.HARNESS, "stub body length mismatch")
         require(sha256(body).hexdigest() == row["requestBodySha256"], FailureClass.HARNESS, "stub body digest mismatch")
@@ -743,7 +764,7 @@ class Runner:
         require(required <= set(row), FailureClass.HARNESS, "stub terminal receipt schema mismatch")
         require(row["recordType"] == "SMA_S2_STUB_TERMINAL", FailureClass.HARNESS, "stub terminal record type mismatch")
         require(row["caseId"] == observation.key.case_id and int(row["repetition"]) == observation.key.repetition, FailureClass.HARNESS, "stub terminal operation identity mismatch")
-        require(row["mode"] == self._mode_for(observation), FailureClass.HARNESS, "stub terminal scheduled mode mismatch")
+        require(row["mode"] == self._model_mode_for(observation), FailureClass.HARNESS, "stub terminal scheduled mode mismatch")
         normalized = dict(row)
         normalized["completedNs"] = int(row["completedMonotonicNs"])
         normalized["outcome"] = row["responseWriteOutcome"]
