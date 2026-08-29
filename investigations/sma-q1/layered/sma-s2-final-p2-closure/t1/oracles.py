@@ -35,8 +35,12 @@ def _request_prompts(observation: OperationObservation) -> list[str]:
 def _request_contexts(observation: OperationObservation) -> list[str]:
     values: list[str] = []
     for row in observation.model_requests:
-        messages = row.get("messages", [])
-        values.append(str(messages[1].get("content", "")) if len(messages) > 1 else "")
+        user_messages = [
+            message for message in row.get("messages", [])
+            if message.get("role") == "user"
+        ]
+        segments = user_messages[-1].get("contentSegments", []) if user_messages else []
+        values.append("".join(str(segment) for segment in segments[1:]))
     return values
 
 
@@ -248,7 +252,12 @@ def _secret_only_allowed(o: OperationObservation, _: ProductTruth) -> tuple[bool
     secret = "sk-test-SMA-S2-NEVER-PERSIST"
     prompt = _prompt(o)
     request = o.model_requests[0] if o.model_requests else {}
-    segment0 = request.get("messages", [{}])[0].get("content") if request else None
+    user_messages = [
+        message for message in request.get("messages", [])
+        if message.get("role") == "user"
+    ]
+    segments = user_messages[-1].get("contentSegments", []) if user_messages else []
+    segment0 = segments[0] if segments else None
     return (secret in str(prompt) and segment0 == prompt and _all_text(o, ("model_terminals",)).count(secret) == 0, "secret only in prompt, segment 0, sealed raw")
 
 

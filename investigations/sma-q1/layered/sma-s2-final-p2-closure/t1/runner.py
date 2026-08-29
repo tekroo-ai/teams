@@ -563,6 +563,7 @@ class Runner:
         observation.timings.extend([
             {"kind": "client_disconnect", "atNs": terminal_at, "durationMs": (terminal_at-cancel_at)/1_000_000, "deadlineMs": 10_000},
         ])
+        self._stabilize_conversation_capture(observation, conversation)
         shutdown_at = self.ports.now_ns()
         self._process(observation, "stop_stub")
         self._process(observation, "stop_bridge")
@@ -575,6 +576,39 @@ class Runner:
         require(not inventory.get("activeRequests"), FailureClass.SAFETY, "owned active work remained after shutdown")
         stopped_at = self.ports.now_ns()
         observation.timings.append({"kind": "owned_shutdown", "atNs": stopped_at, "activatedNs": shutdown_at, "durationMs": (stopped_at-shutdown_at)/1_000_000, "deadlineMs": 15_000, "inventoryDigest": digest(inventory)})
+
+    def _stabilize_conversation_capture(
+            self,
+            observation: OperationObservation,
+            conversation: Mapping[str, Any],
+    ) -> None:
+        request = RawHttpRequest(
+            "GET",
+            f"/api/conversations/{conversation['id']}/events/search?limit=100",
+            {"X-Session-API-Key": self.config.session_header_value},
+            b"",
+            10_000,
+        )
+        receipt = self._http(observation, "OPENHANDS", request)
+        require(receipt.status == 200, FailureClass.ENVIRONMENT, "capture stabilization event search failed")
+        eligible = [
+            event for event in receipt.json_body().get("items", [])
+            if self.truth.eligible(event) and event.get("id")
+        ]
+        require(bool(eligible), FailureClass.SCIENTIFIC, "no eligible event available for capture stabilization")
+        self._process(observation, "reconcile_persisted")
+        for event in eligible:
+            query = RawStoreQuery(
+                "MONGODB",
+                self.config.mongo_database,
+                "memories",
+                {
+                    "origin.openhands_provenance.conversation_id": conversation["id"],
+                    "origin.openhands_provenance.event_id": event["id"],
+                },
+                tuple(self.truth.surface["mongo"]["memoryRequiredProjection"]),
+            )
+            self._poll_store(observation, query, minimum=1)
 
     def _collect_events(self, observation: OperationObservation) -> None:
         observation.raw_events.clear()
@@ -789,7 +823,10 @@ class Runner:
                 return latest
             previous = current
             self.ports.sleep_ms(self.config.poll_interval_ms)
-        raise HarnessFailure(FailureClass.SCIENTIFIC, f"store evidence failed to stabilize for {query.collection}")
+        raise HarnessFailure(
+            FailureClass.SCIENTIFIC,
+            f"store evidence failed to stabilize for {query.collection}: minimum={minimum} observed={len(latest)}",
+        )
 
     def _poll_jsonl(self, observation: OperationObservation, path: str, expected: int, exact: bool = False) -> list[dict[str, Any]]:
         deadline = min(self.ports.now_ns() + observation.descriptor.stabilization_deadline_ms * 1_000_000, self._operation_deadline_ns or 2**63-1)
@@ -812,7 +849,11 @@ class Runner:
                 return rows
             previous = current
             self.ports.sleep_ms(self.config.poll_interval_ms)
-        raise HarnessFailure(FailureClass.SCIENTIFIC, f"file evidence failed to stabilize: {path}")
+        cardinality = "exact" if exact else "minimum"
+        raise HarnessFailure(
+            FailureClass.SCIENTIFIC,
+            f"file evidence failed to stabilize: {path}: {cardinality}={expected} observed={len(rows)}",
+        )
 
     def _expected_model_receipts(self, observation: OperationObservation) -> int:
         if observation.key.case_id.endswith("FOUR-CHANNEL-CONCURRENCY"):
