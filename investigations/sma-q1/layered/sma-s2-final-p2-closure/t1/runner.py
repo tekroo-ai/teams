@@ -396,6 +396,21 @@ class Runner:
             and event.get("source") == "user"
             and self.truth.eligible(event)
         )
+        initial_capture = RawStoreQuery(
+            "MONGODB",
+            self.config.mongo_database,
+            "memories",
+            {
+                "origin.openhands_provenance.conversation_id": observation.conversations[0]["id"],
+                "origin.openhands_provenance.event_id": user["id"],
+            },
+            tuple(self.truth.surface["mongo"]["memoryRequiredProjection"]),
+        )
+        rows = self._poll_store(observation, initial_capture, minimum=1)
+        require(len(rows) == 1, FailureClass.SCIENTIFIC, "initial exact event capture did not stabilize at one memory")
+        self.truth.validate_memory_document(
+            rows[0], observation.conversations[0]["id"], str(user["id"])
+        )
         self._process(observation, "reconcile_exact_event", observation.conversations[0]["id"], user["id"])
         self._process(observation, "stop_sma")
         self._process(observation, "start_sma")
