@@ -180,14 +180,22 @@ def _lineage(o: OperationObservation, _: ProductTruth) -> tuple[bool, str]:
     child = next((c for c in o.conversations if c.get("parent_conversation_id") is not None), None)
     if not parent or not child or child.get("parent_conversation_id") != parent.get("id") or child.get("id") not in parent.get("sub_conversation_ids", []):
         return False, "parent-child linkage mismatch"
+    child_workspace = _conversation_workspace(child)
     memories = [m for m in o.memories if nested_get(m, "origin.openhands_provenance.conversation_id") == child.get("id")]
     sequences = [nested_get(m, "event.sequence_position.$numberInt") for m in memories]
-    return (bool(memories) and all(value is not None for value in sequences) and all(nested_get(m, "origin.openhands_provenance.workspace") == child.get("workspace") and nested_get(m, "origin.openhands_provenance.profile") == child.get("profile") for m in memories), "actual lineage, workspace, profile, and sequence retained")
+    return (bool(memories) and all(value is not None for value in sequences) and all(nested_get(m, "origin.openhands_provenance.workspace") == child_workspace and nested_get(m, "origin.openhands_provenance.profile") == child.get("profile") for m in memories), "actual lineage, workspace, profile, and sequence retained")
 
 
 def _partition_attribution(o: OperationObservation, _: ProductTruth) -> tuple[bool, str]:
-    owned = {c.get("workspace") for c in o.conversations}
+    owned = {_conversation_workspace(c) for c in o.conversations}
     return (bool(o.memories) and all(nested_get(m, "origin.openhands_provenance.workspace") in owned for m in o.memories), "no unrelated partition attribution")
+
+
+def _conversation_workspace(conversation: Mapping[str, Any]) -> Any:
+    workspace = conversation.get("workspace")
+    if isinstance(workspace, Mapping):
+        return workspace.get("working_dir")
+    return workspace
 
 
 def _same_partition_after_restart(o: OperationObservation, _: ProductTruth) -> tuple[bool, str]:
