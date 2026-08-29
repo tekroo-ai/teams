@@ -165,8 +165,11 @@ class Runner:
             observation.failure = FailureClass.HARNESS
             observation.failure_detail = f"unhandled {type(exc).__name__}: {exc}"
         finally:
-            self._cleanup_best_effort(observation)
+            # Cleanup is mandatory even when the operation deadline has fired.
+            # Keeping the scientific deadline active here can strand services
+            # and contaminate every following operation.
             self._operation_deadline_ns = None
+            self._cleanup_best_effort(observation)
         observation.timings.append({"kind": "operation_end", "atNs": self.ports.now_ns(), "durationMs": (self.ports.now_ns() - started) / 1_000_000})
         scientific = scientific_oracles(observation, self.truth)
         evidence = evidence_oracles(observation, self.truth)
@@ -596,11 +599,20 @@ class Runner:
     def _collect(self, observation: OperationObservation) -> None:
         self._collect_events(observation)
         expected_events: list[tuple[str, Mapping[str, Any]]] = []
-        allowlisted = set(observation.descriptor.workspace_roles) != {"empty-uncaptured"}
+        workspace_excluded = set(observation.descriptor.workspace_roles) == {"empty-uncaptured"}
+        capture_intentionally_disabled = observation.key.case_id.endswith(
+            ("RETRIEVAL-OUTAGE", "HOOK-FAULT-MATRIX")
+        )
+        capture_expected = not workspace_excluded and not capture_intentionally_disabled
         for event in observation.raw_events:
-            if self.truth.eligible(event) and allowlisted and event.get("id"):
+            if self.truth.eligible(event) and capture_expected and event.get("id"):
                 expected_events.append((str(event["_receipt_conversation_id"]), event))
-        observation.raw_receipts.append({"kind": "intake_scope", "workspaceExcluded": not allowlisted, "eligibleEventIds": [event["id"] for _, event in expected_events]})
+        observation.raw_receipts.append({
+            "kind": "intake_scope",
+            "workspaceExcluded": workspace_excluded,
+            "captureIntentionallyDisabled": capture_intentionally_disabled,
+            "eligibleEventIds": [event["id"] for _, event in expected_events],
+        })
         memories: list[Mapping[str, Any]] = []
         for conversation_id, event in expected_events:
             query = RawStoreQuery(
