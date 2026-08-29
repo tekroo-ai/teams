@@ -858,8 +858,11 @@ class Runner:
     def _expected_model_receipts(self, observation: OperationObservation) -> int:
         if observation.key.case_id.endswith("FOUR-CHANNEL-CONCURRENCY"):
             return 4
-        if observation.key.case_id.endswith("CONDENSATION-REANCHOR"):
+        if observation.key.case_id.endswith("FEEDBACK-LOOP-PREVENTION"):
             return 2
+        if observation.key.case_id.endswith("CONDENSATION-REANCHOR"):
+            # Two user turns plus the model call made by OpenHands condensation.
+            return 3
         if observation.key.case_id.endswith("MODEL-STUB-FAULT-MATRIX") and self._mode_for(observation) == "TRANSPORT_FAILURE_UNUSED_PORT":
             return 0
         return 1
@@ -886,7 +889,23 @@ class Runner:
             conversation.update(current)
             if stable >= observation.descriptor.stable_reads:
                 ended = self.ports.now_ns()
-                observation.timings.append({"kind": "conversation_terminal", "atNs": ended, "durationMs": (ended-started)/1_000_000, "deadlineMs": observation.descriptor.stabilization_deadline_ms, "status": status})
+                timing = {
+                    "kind": "conversation_terminal",
+                    "conversationId": conversation["id"],
+                    "atNs": ended,
+                    "durationMs": (ended-started)/1_000_000,
+                    "deadlineMs": observation.descriptor.stabilization_deadline_ms,
+                    "status": status,
+                }
+                for index, retained in enumerate(observation.timings):
+                    if (
+                        retained.get("kind") == "conversation_terminal"
+                        and retained.get("conversationId") == conversation["id"]
+                    ):
+                        observation.timings[index] = timing
+                        break
+                else:
+                    observation.timings.append(timing)
                 return
             previous = status
             self.ports.sleep_ms(self.config.poll_interval_ms)

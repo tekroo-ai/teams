@@ -379,6 +379,54 @@ class OfflineWorld:
                 fixture = dict(self.truth.event_by_label("ineligible_condensation_summary"))
                 fixture["id"] = f"summary-{conversation_id}-{len(self.events[conversation_id])}"
                 self.events[conversation_id].append(fixture)
+                prior = self.stub_raw[-1]
+                request_id = f"stub-{self.request_counter + 1:06d}"
+                self.request_counter += 1
+                wire_body = canonical_bytes({
+                    "model": "sma-s2-deterministic-stub-final-p2",
+                    "messages": [{
+                        "role": "user",
+                        "content": [{
+                            "type": "text",
+                            "text": "Summarize the conversation for condensation.",
+                        }],
+                    }],
+                    "stream": False,
+                    "tools": [],
+                })
+                received_ns = self.now_ns()
+                self.stub_raw.append({
+                    "recordType": "SMA_S2_STUB_RAW_REQUEST",
+                    "requestId": request_id,
+                    "caseId": prior["caseId"],
+                    "repetition": prior["repetition"],
+                    "mode": prior["mode"],
+                    "receivedMonotonicNs": received_ns,
+                    "requestBodyLength": len(wire_body),
+                    "requestBodySha256": __import__("hashlib").sha256(wire_body).hexdigest(),
+                    "requestBodyBase64": base64.b64encode(wire_body).decode("ascii"),
+                })
+                response = canonical_bytes({
+                    "id": request_id,
+                    "choices": [{
+                        "message": {
+                            "role": "assistant",
+                            "content": "Deterministic condensation summary.",
+                        },
+                    }],
+                })
+                self.stub_terminal.append({
+                    "recordType": "SMA_S2_STUB_TERMINAL",
+                    "requestId": request_id,
+                    "caseId": prior["caseId"],
+                    "repetition": prior["repetition"],
+                    "mode": prior["mode"],
+                    "completedMonotonicNs": self.now_ns(),
+                    "httpStatus": 200,
+                    "responseBodyLength": len(response),
+                    "responseBodySha256": __import__("hashlib").sha256(response).hexdigest(),
+                    "responseWriteOutcome": "CLIENT_RECEIVED",
+                })
                 return 200, {}, canonical_bytes({"event_id": fixture["id"]}), None
         return 404, {}, canonical_bytes({"error": "unsupported route"}), "HTTP_ERROR"
 
@@ -448,6 +496,45 @@ class OfflineWorld:
         self.events[conversation_id].append(final)
         self._capture(conversation, final)
         if self.faults.model_mode == "INELIGIBLE_TOOL_TRAFFIC":
+            second_request_id = f"stub-{self.request_counter + 1:06d}"
+            self.request_counter += 1
+            second_wire_body = canonical_bytes({
+                "model": "sma-s2-deterministic-stub-final-p2",
+                "messages": [
+                    {"role": "user", "content": [{"type": "text", "text": prompt}]},
+                    {"role": "tool", "content": [{"type": "text", "text": "Tool rejected by fixture policy."}]},
+                ],
+                "stream": False,
+                "tools": [],
+            })
+            second_received_ns = self.now_ns()
+            self.stub_raw.append({
+                "recordType": "SMA_S2_STUB_RAW_REQUEST",
+                "requestId": second_request_id,
+                "caseId": case_id,
+                "repetition": repetition,
+                "mode": mode,
+                "receivedMonotonicNs": second_received_ns,
+                "requestBodyLength": len(second_wire_body),
+                "requestBodySha256": __import__("hashlib").sha256(second_wire_body).hexdigest(),
+                "requestBodyBase64": base64.b64encode(second_wire_body).decode("ascii"),
+            })
+            second_response = canonical_bytes({
+                "id": second_request_id,
+                "choices": [{"message": {"role": "assistant", "content": "Deterministic feedback fixture completed."}}],
+            })
+            self.stub_terminal.append({
+                "recordType": "SMA_S2_STUB_TERMINAL",
+                "requestId": second_request_id,
+                "caseId": case_id,
+                "repetition": repetition,
+                "mode": mode,
+                "completedMonotonicNs": self.now_ns(),
+                "httpStatus": 200,
+                "responseBodyLength": len(second_response),
+                "responseBodySha256": __import__("hashlib").sha256(second_response).hexdigest(),
+                "responseWriteOutcome": "CLIENT_RECEIVED",
+            })
             for fixture in self.truth.event_fixtures:
                 candidate = fixture["event"]
                 if self.truth.eligible(candidate) or candidate.get("kind") == "HookExecutionEvent":

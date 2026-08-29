@@ -82,6 +82,49 @@ class Candidate3Handler(base.DeterministicStubHandler):
         self.state.operational.append({key: value for key, value in raw_record.items()
                                        if key != "requestBodyBase64"})
 
+        try:
+            request_payload = json.loads(body)
+        except json.JSONDecodeError:
+            request_payload = {}
+        messages = request_payload.get("messages", [])
+        tool_result_observed = any(
+            isinstance(message, dict) and message.get("role") == "tool"
+            for message in messages
+        )
+
+        if mode == "INELIGIBLE_TOOL_TRAFFIC" and tool_result_observed:
+            response = base.canonical_json_bytes({
+                "id": f"sma-s2-feedback-terminal-{case_id}-{repetition}",
+                "object": "chat.completion",
+                "created": 0,
+                "model": "sma-s2-deterministic-stub-candidate-3",
+                "choices": [{
+                    "index": 0,
+                    "message": {
+                        "role": "assistant",
+                        "content": "Deterministic feedback fixture completed.",
+                        "reasoning_content": "deterministic fixture reasoning",
+                    },
+                    "finish_reason": "stop",
+                }],
+                "usage": {
+                    "prompt_tokens": 0,
+                    "completion_tokens": 0,
+                    "total_tokens": 0,
+                },
+            })
+            outcome = self._send_bytes(HTTPStatus.OK, response, "application/json")
+            self._record_terminal(
+                request_id=request_id,
+                case_id=case_id,
+                repetition=repetition,
+                mode=mode,
+                http_status=HTTPStatus.OK.value,
+                response_body=response,
+                outcome=outcome,
+            )
+            return
+
         if mode == "DELEGATION_TOOL":
             child_task = (
                 f"[SMA-S2-STUB case={case_id} repetition={repetition} mode=SUCCESS] "

@@ -67,7 +67,7 @@
     {"path": "/Users/paul/work/tekroo-ai/sma-step15-s1-p2final/scripts/wp5e_restart_recovery.py", "sha256": "73857ed0734e0607a8a3a80646589d58c26e0ba338a450ecbee73fef8656677b"},
     {"path": "/Users/paul/work/tekroo-ai/sma-step15-s1-p2final/.openhands/hooks/sma_context_hook.py", "sha256": "e50005e82ac6de4aa11efd552cbf1586a764dbf09fc6fd617cc462ba73b0d3d9"},
     {"path": "/Users/paul/work/tekroo-ai/teams-step15-s1-p2final-r1/scripts/sma_s2_deterministic_model_stub_candidate_2.py", "sha256": "a759254cc871b9896d8bc5d285211e56cf1768e406e72cf99113f14dda71de7f"},
-    {"path": "/Users/paul/work/tekroo-ai/teams-step15-s1-p2final-r1/scripts/sma_s2_deterministic_model_stub_candidate_3.py", "sha256": "93a258bb0efe1ca292009b36c100af07f7591c4fb6b6bb86e765984db5a9eef8"},
+    {"path": "/Users/paul/work/tekroo-ai/teams-step15-s1-p2final-r1/scripts/sma_s2_deterministic_model_stub_candidate_3.py", "sha256": "2e6f653fa48ddc3f773831fae4a74fc81f782185fc22ac44cb10dcde31ca4739"},
     {"path": "/Users/paul/work/tekroo-ai/teams-step15-s1-p2final-r1/scripts/sma_s2_bridge_fault_fixture_v2.py", "sha256": "cb2f6f683ee4f2ff2c22f744d1b02af8a9bc5c6d7b865edb740bda03c4c30ae9"},
     {"path": "/Users/paul/work/tekroo-ai/teams-step15-s1-p2final-r1/scripts/sma_s2_openhands_capture_audit_proxy_v1.py", "sha256": "54d8742ac2e0e46f27f808e0fe7c43f08dc6e7fd87d31bc62aa19bd3e2721cc1"},
     {"path": "/Users/paul/work/tekroo-ai/teams-step15-s1-p2final-r1/scripts/sma_s2_unused_port_guard_v1.py", "sha256": "475d9116048502266764dc60eea92a4113f8b237f79a908d5437e5aa6e09b238"},

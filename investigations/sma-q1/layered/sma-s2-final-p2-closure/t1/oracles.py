@@ -262,7 +262,17 @@ def _secret_only_allowed(o: OperationObservation, _: ProductTruth) -> tuple[bool
 
 
 def _two_request_terminals(o: OperationObservation, _: ProductTruth) -> tuple[bool, str]:
-    return (len(o.model_requests) == 2 and len(o.model_terminals) == 2, "pre/post-condensation requests reach terminals")
+    prompt = _prompt(o)
+    prompt_calls = sum(request.get("prompt") == prompt for request in o.model_requests)
+    request_ids = {request.get("requestId") for request in o.model_requests}
+    terminal_ids = {terminal.get("requestId") for terminal in o.model_terminals}
+    return (
+        len(o.model_requests) == 3
+        and len(o.model_terminals) == 3
+        and prompt_calls == 2
+        and request_ids == terminal_ids,
+        "two user turns and one condensation call reach matching terminals",
+    )
 
 
 def _secret_absent_derived(o: OperationObservation, _: ProductTruth) -> tuple[bool, str]:

@@ -85,7 +85,7 @@ def _case(o: Mapping[str, Any]) -> bool:
         telemetry = _timing(o, "concurrency")
         return len(requests) == len(terminals) == 4 and len(telemetry) == 1 and int(telemetry[0].get("peakInFlight", 0)) >= 2
     if case_id.endswith("FEEDBACK-LOOP-PREVENTION"):
-        return len(o.get("hooks", [])) == 1 and len({row.get("id") for row in events}) == len(events)
+        return len(requests) == len(terminals) == 2 and len(o.get("hooks", [])) == 1 and len({row.get("id") for row in events}) == len(events)
     if case_id.endswith("SECRET-DELIVERY-ABSENCE"):
         return "sk-test-SMA-S2-NEVER-PERSIST" not in json.dumps({"logs": o.get("logs"), "retrievals": o.get("retrievals"), "semantic": o.get("semantic_points"), "episodic": o.get("episodic_points")})
     if case_id.endswith("EMPTY-RESULT"):
@@ -94,7 +94,12 @@ def _case(o: Mapping[str, Any]) -> bool:
         return len(contexts) == 1 and len(contexts[0]) <= 4096 and contexts[0].count("--- MEMORY") == contexts[0].count("--- END MEMORY")
     if case_id.endswith("CONDENSATION-REANCHOR"):
         summaries = [row for row in events if row.get("kind") == "CondensationSummaryEvent"]
-        return len(requests) == len(terminals) == 2 and len(contexts) == 2 and len(summaries) == 1
+        prompt = next(
+            row.get("prompt")
+            for row in requests
+            if str(row.get("prompt", "")).startswith("[SMA-S2-STUB case=")
+        )
+        return len(requests) == len(terminals) == 3 and sum(row.get("prompt") == prompt for row in requests) == 2 and len(contexts) == 2 and len(summaries) == 1
     if case_id.endswith("MODEL-STUB-FAULT-MATRIX"):
         repetition = int(o["key"]["repetition"])
         return len(_timing(o, "fault_activation")) == 1 and (not requests and not terminals if repetition == 4 else len(requests) == len(terminals) == 1)
