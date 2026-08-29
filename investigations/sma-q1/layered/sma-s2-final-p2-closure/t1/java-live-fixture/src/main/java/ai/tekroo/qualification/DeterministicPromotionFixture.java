@@ -5,6 +5,7 @@ import ai.tekroo.sma.domain.Memory;
 import ai.tekroo.sma.domain.MemoryInterpretation;
 import ai.tekroo.sma.domain.MemoryState;
 import ai.tekroo.sma.domain.ReplayOrigin;
+import ai.tekroo.sma.domain.ReplayTrigger;
 import ai.tekroo.sma.mongo.MongoBootstrap;
 import ai.tekroo.sma.mongo.MongoContradictionEdgeRepository;
 import ai.tekroo.sma.mongo.MongoInterpretationLogRepository;
@@ -16,6 +17,7 @@ import ai.tekroo.sma.replay.LifecyclePolicy;
 import ai.tekroo.sma.replay.ReplayCandidate;
 import ai.tekroo.sma.replay.ReplayWorker;
 import ai.tekroo.sma.vector.OllamaEmbeddingService;
+import ai.tekroo.sma.vector.QdrantCollectionInitializer;
 import ai.tekroo.sma.vector.QdrantVectorStore;
 import com.google.gson.JsonObject;
 import io.qdrant.client.QdrantClient;
@@ -50,6 +52,7 @@ public final class DeterministicPromotionFixture {
                              config.vector().qdrantHost(),
                              config.vector().qdrantGrpcPort(), false).build())) {
             mongo.initialize();
+            new QdrantCollectionInitializer(qdrant, config.vector()).initialize();
             MongoMemoryRepository memories = mongo.memoryRepository();
             var actualEmbedding = OllamaEmbeddingService.create(config.vector());
             ReplayWorker worker = new ReplayWorker(
@@ -70,11 +73,20 @@ public final class DeterministicPromotionFixture {
                                         1,
                                         Instant.now(),
                                         "sma-s2-deterministic-cognitive-fixture",
-                                        null, null, null,
+                                        ReplayTrigger.SCHEDULED,
+                                        new MemoryInterpretation.InputContext(
+                                                context.memories().stream().map(Memory::id).toList(),
+                                                locked.relations().belongsToTheme(),
+                                                null),
+                                        new MemoryInterpretation.PriorState(
+                                                locked.canonical().interpretationVersion(),
+                                                locked.convergence().rollingDeltaMean()),
                                         new MemoryInterpretation.Interpretation(
                                                 locked.event().surfaceSummary(), List.of()),
                                         List.of(), List.of(), List.of(), List.of(),
-                                        null, false));
+                                        new MemoryInterpretation.Stability(
+                                                false, false, "deterministic-fixture"),
+                                        false));
                     },
                     ignored -> { },
                     Clock.systemUTC(),
