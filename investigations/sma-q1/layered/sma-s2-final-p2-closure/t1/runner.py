@@ -389,7 +389,13 @@ class Runner:
     def _case_duplicate(self, observation: OperationObservation) -> None:
         self._case_standard(observation)
         self._collect_events(observation)
-        user = next(event for event in observation.raw_events if event.get("source") == "user")
+        user = next(
+            event
+            for event in observation.raw_events
+            if event.get("kind") == "MessageEvent"
+            and event.get("source") == "user"
+            and self.truth.eligible(event)
+        )
         self._process(observation, "reconcile_exact_event", observation.conversations[0]["id"], user["id"])
         self._process(observation, "stop_sma")
         self._process(observation, "start_sma")
