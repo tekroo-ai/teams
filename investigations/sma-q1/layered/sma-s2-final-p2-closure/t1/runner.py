@@ -231,7 +231,13 @@ class Runner:
         self._pre_action(observation, f"PROCESS:{action}", {"argv": list(request.argv), "cwd": request.cwd})
         receipt = self.ports.process(request)
         self._post_action(observation, f"PROCESS:{action}", receipt)
-        require(receipt.exit_code == 0 and receipt.error_kind is None, FailureClass.SAFETY if action.startswith("cleanup") else FailureClass.ENVIRONMENT, f"process action failed: {action}")
+        if receipt.exit_code != 0 or receipt.error_kind is not None:
+            stderr_lines = receipt.stderr.decode("utf-8", errors="replace").splitlines()
+            detail = stderr_lines[-1][-500:] if stderr_lines else receipt.error_kind or "no stderr"
+            raise HarnessFailure(
+                FailureClass.SAFETY if action.startswith("cleanup") else FailureClass.ENVIRONMENT,
+                f"process action failed: {action}: {detail}",
+            )
         if action == "reconcile_exact_event":
             payload = json.loads(receipt.stdout.decode("utf-8"))
             cycle = payload.get("captureCycleReceipt")
@@ -671,18 +677,30 @@ class Runner:
         payload = json.loads(body)
         messages = payload.get("messages")
         require(isinstance(messages, list) and len(messages) >= 1, FailureClass.HARNESS, "stub request messages missing")
-        def text_of(content: Any) -> str:
-            if isinstance(content, str): return content
+        def segments_of(content: Any) -> list[str]:
+            if isinstance(content, str): return [content]
             require(isinstance(content, list), FailureClass.HARNESS, "unsupported model content serializer")
-            return "".join(str(item.get("text", "")) for item in content if isinstance(item, Mapping) and item.get("type") == "text")
+            return [
+                str(item.get("text", ""))
+                for item in content
+                if isinstance(item, Mapping) and item.get("type") == "text"
+            ]
         normalized = dict(row)
-        normalized["messages"] = [{"role": message.get("role"), "content": text_of(message.get("content"))} for message in messages]
+        normalized["messages"] = []
+        for message in messages:
+            segments = segments_of(message.get("content"))
+            normalized["messages"].append({
+                "role": message.get("role"),
+                "content": "".join(segments),
+                "contentSegments": segments,
+            })
         user_messages = [
             message for message in normalized["messages"]
             if message.get("role") == "user"
         ]
         require(bool(user_messages), FailureClass.HARNESS, "stub request has no user message")
-        normalized["prompt"] = user_messages[-1]["content"]
+        require(bool(user_messages[-1]["contentSegments"]), FailureClass.HARNESS, "stub request user content is empty")
+        normalized["prompt"] = user_messages[-1]["contentSegments"][0]
         normalized["receivedNs"] = int(row["receivedMonotonicNs"])
         normalized["retry"] = 0
         return normalized

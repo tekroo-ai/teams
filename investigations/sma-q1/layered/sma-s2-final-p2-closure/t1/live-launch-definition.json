@@ -63,7 +63,7 @@
     {"path": "/Users/paul/work/tekroo-ai/teams-step15-s1-p2final-r1/.qualification/sma-s2-final-p2-live/bin/python3.14", "sha256": "b502cb4c5b46b8d4192ec6bcb600ce8922f1afc396fcf646e8765c6eba74a0bf"},
     {"path": "/Users/paul/work/tekroo-ai/teams-step15-s1-p2final-r1/.qualification/sma-s2-final-p2-live/pyvenv.cfg", "sha256": "2fa547fa3f92cd8e65cdc89c0c2f6fa47461ea061981e15f4d0348a0287d0d82"},
     {"path": "/Users/paul/Library/Java/JavaVirtualMachines/temurin-21.0.12/Contents/Home/bin/java", "sha256": "34b9c157bedcebafc6033b8beaa72c2ff14e2b697e33f45aa959a8373d6581a0"},
-    {"path": "/Users/paul/work/tekroo-ai/sma-step15-s1-p2final/target/sma-1.0-SNAPSHOT.jar", "sha256": "fb02579bc39b3615fe57521475463f9a3799372082265861c1013b283f4802f9"},
+    {"path": "/Users/paul/work/tekroo-ai/sma-step15-s1-p2final/target/sma-1.0-SNAPSHOT.jar", "sha256": "e26270b0bd770bc9b5db83872ebd2533d717138e0c1d01a7cdf27fe4916391b9"},
     {"path": "/Users/paul/work/tekroo-ai/sma-step15-s1-p2final/scripts/wp5e_restart_recovery.py", "sha256": "73857ed0734e0607a8a3a80646589d58c26e0ba338a450ecbee73fef8656677b"},
     {"path": "/Users/paul/work/tekroo-ai/sma-step15-s1-p2final/.openhands/hooks/sma_context_hook.py", "sha256": "e50005e82ac6de4aa11efd552cbf1586a764dbf09fc6fd617cc462ba73b0d3d9"},
     {"path": "/Users/paul/work/tekroo-ai/teams-step15-s1-p2final-r1/scripts/sma_s2_deterministic_model_stub_candidate_2.py", "sha256": "a759254cc871b9896d8bc5d285211e56cf1768e406e72cf99113f14dda71de7f"},
