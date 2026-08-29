@@ -21,6 +21,8 @@ import time
 import uuid
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+ThreadingHTTPServer.allow_reuse_address = True
 from pathlib import Path
 from typing import Any
 

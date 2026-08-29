@@ -12,6 +12,8 @@ import time
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+ThreadingHTTPServer.allow_reuse_address = True
+
 
 class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"

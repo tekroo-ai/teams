@@ -93,7 +93,7 @@ class Handler(BaseHTTPRequestHandler):
 
 
 class Server(ThreadingHTTPServer):
-    allow_reuse_address = False
+    allow_reuse_address = True
 
     def __init__(self, address: tuple[str, int], upstream: str, journal: Path):
         super().__init__(address, Handler)

@@ -338,6 +338,7 @@ class Runner:
         value = receipt.json_body()
         require(value.get("id") and value.get("workspace"), FailureClass.HARNESS, "conversation response missing product identity")
         value["role"] = role
+        value["profile"] = self.config.profile
         observation.conversations.append(value)
         observation.raw_receipts.append({
             "kind": "hook_installation",
@@ -676,7 +677,12 @@ class Runner:
             return "".join(str(item.get("text", "")) for item in content if isinstance(item, Mapping) and item.get("type") == "text")
         normalized = dict(row)
         normalized["messages"] = [{"role": message.get("role"), "content": text_of(message.get("content"))} for message in messages]
-        normalized["prompt"] = normalized["messages"][0]["content"]
+        user_messages = [
+            message for message in normalized["messages"]
+            if message.get("role") == "user"
+        ]
+        require(bool(user_messages), FailureClass.HARNESS, "stub request has no user message")
+        normalized["prompt"] = user_messages[-1]["content"]
         normalized["receivedNs"] = int(row["receivedMonotonicNs"])
         normalized["retry"] = 0
         return normalized
