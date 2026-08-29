@@ -1,0 +1,118 @@
+{
+  "recordType": "SMA_S2_FINAL_P2_FROZEN_LIVE_LAUNCH_DEFINITION",
+  "schemaVersion": "1.0.0-dev",
+  "status": "FROZEN_NONLIVE_REQUIRES_SEPARATE_EXECUTION_IDENTITY_AND_SINGLE_USE_AUTHORITY",
+  "loopback": {
+    "openhands": "http://127.0.0.1:8000",
+    "openhandsCaptureProxy": "http://127.0.0.1:19193",
+    "qdrant": "http://127.0.0.1:6333",
+    "sma": "http://127.0.0.1:8130",
+    "stub": "http://127.0.0.1:19191/v1",
+    "transportFailure": "http://127.0.0.1:19192/v1"
+  },
+  "ports": {
+    "openhands": 8000,
+    "qdrant": 6333,
+    "smaBridge": 8130,
+    "stub": 19191,
+    "transportFailure": 19192,
+    "openhandsCaptureProxy": 19193
+  },
+  "disposable": {
+    "mongoDatabase": "sma_s2_final_p2_closure",
+    "semanticCollection": "sma_s2_final_p2_closure_semantic",
+    "episodicCollection": "sma_s2_final_p2_closure_episodic",
+    "workspaceRoot": "/Users/paul/work/tekroo-ai/sma-step15-s1-p2final/target/sma-s2-final-p2-closure",
+    "launchLabel": "com.tekroo.sma-service-s2-final-p2-closure",
+    "stubLaunchLabel": "com.tekroo.sma-s2-final-p2-stub",
+    "bridgeFaultLaunchLabel": "com.tekroo.sma-s2-final-p2-bridge-fault"
+  },
+  "environment": {
+    "mongoUri": "mongodb://127.0.0.1:27017",
+    "cognitionApi": "OPENAI_COMPATIBLE",
+    "cognitionBaseUrl": "http://127.0.0.1:8800",
+    "cognitionModel": "qwen3.8-27b-q8-no-mtp",
+    "sessionKeyFile": "/Users/paul/.openhands/agent-canvas/api-key.txt",
+    "livePython": "/Users/paul/work/tekroo-ai/teams-step15-s1-p2final-r1/.qualification/sma-s2-final-p2-live/bin/python3.14",
+    "livePythonPrefix": "/Users/paul/work/tekroo-ai/teams-step15-s1-p2final-r1/.qualification/sma-s2-final-p2-live",
+    "profile": "default",
+    "smaRoot": "/Users/paul/work/tekroo-ai/sma-step15-s1-p2final",
+    "teamsRoot": "/Users/paul/work/tekroo-ai/teams-step15-s1-p2final-r1"
+  },
+  "seedTemplate": {
+    "path": "/Users/paul/work/tekroo-ai/teams-step15-s1-p2final-r1/OUTPUT/phase-3/sma-s2-final-p2-closure-product-truth-v5/sma-final-p2-product-truth.json",
+    "sha256": "fb7ecc85881a325bf549dcc04b67035ccaf3cfe40b45bfaa0420c587c884f2e6",
+    "manifestPath": "/Users/paul/work/tekroo-ai/teams-step15-s1-p2final-r1/OUTPUT/phase-3/sma-s2-final-p2-closure-product-truth-v5/product-truth-manifest.json",
+    "manifestSha256": "c2520df45c0ac318fc3d23cef864586b609032179eae6a59c955898758bb476e"
+  },
+  "promotionFixture": {
+    "projectDirectory": "/Users/paul/work/tekroo-ai/teams-step15-s1-p2final-r1/investigations/sma-q1/layered/sma-s2-final-p2-closure/t1/java-live-fixture",
+    "mainClass": "ai.tekroo.qualification.DeterministicPromotionFixture",
+    "javaExecutable": "/Users/paul/Library/Java/JavaVirtualMachines/temurin-21.0.12/Contents/Home/bin/java",
+    "fixtureJar": "/Users/paul/work/tekroo-ai/teams-step15-s1-p2final-r1/investigations/sma-q1/layered/sma-s2-final-p2-closure/t1/java-live-fixture/deterministic-promotion-fixture.jar",
+    "smaJar": "/Users/paul/work/tekroo-ai/sma-step15-s1-p2final/target/sma-1.0-SNAPSHOT.jar",
+    "timeoutSeconds": 900,
+    "runtimeClasspathFullyBound": true,
+    "generativeModelCallsMaximum": 0,
+    "embeddingInvocationsMinimum": 1,
+    "usesProductionReplayWorker": true,
+    "usesProductionMongoRepositories": true,
+    "usesProductionQdrantVectorStore": true
+  },
+  "boundFiles": [
+    {"path": "/Users/paul/work/tekroo-ai/teams-step15-s1-p2final-r1/.qualification/sma-s2-final-p2-live/bin/python3.14", "sha256": "b502cb4c5b46b8d4192ec6bcb600ce8922f1afc396fcf646e8765c6eba74a0bf"},
+    {"path": "/Users/paul/work/tekroo-ai/teams-step15-s1-p2final-r1/.qualification/sma-s2-final-p2-live/pyvenv.cfg", "sha256": "2fa547fa3f92cd8e65cdc89c0c2f6fa47461ea061981e15f4d0348a0287d0d82"},
+    {"path": "/Users/paul/Library/Java/JavaVirtualMachines/temurin-21.0.12/Contents/Home/bin/java", "sha256": "34b9c157bedcebafc6033b8beaa72c2ff14e2b697e33f45aa959a8373d6581a0"},
+    {"path": "/Users/paul/work/tekroo-ai/sma-step15-s1-p2final/target/sma-1.0-SNAPSHOT.jar", "sha256": "fb02579bc39b3615fe57521475463f9a3799372082265861c1013b283f4802f9"},
+    {"path": "/Users/paul/work/tekroo-ai/sma-step15-s1-p2final/scripts/wp5e_restart_recovery.py", "sha256": "73857ed0734e0607a8a3a80646589d58c26e0ba338a450ecbee73fef8656677b"},
+    {"path": "/Users/paul/work/tekroo-ai/sma-step15-s1-p2final/.openhands/hooks/sma_context_hook.py", "sha256": "e50005e82ac6de4aa11efd552cbf1586a764dbf09fc6fd617cc462ba73b0d3d9"},
+    {"path": "/Users/paul/work/tekroo-ai/teams-step15-s1-p2final-r1/scripts/sma_s2_deterministic_model_stub_candidate_2.py", "sha256": "8013ba1dcd5db6192abce075f95dbd255ef8ada8335093cfaf0f5962f884e0f9"},
+    {"path": "/Users/paul/work/tekroo-ai/teams-step15-s1-p2final-r1/scripts/sma_s2_deterministic_model_stub_candidate_3.py", "sha256": "fffbea327321af9f2a6c8deaa6d71088c88db58abda11eae0f4cc082b613831e"},
+    {"path": "/Users/paul/work/tekroo-ai/teams-step15-s1-p2final-r1/scripts/sma_s2_bridge_fault_fixture_v2.py", "sha256": "9356a12b73e199882506eeaab4f840e970b1f389463a5d02e07742d46fb67ba7"},
+    {"path": "/Users/paul/work/tekroo-ai/teams-step15-s1-p2final-r1/scripts/sma_s2_openhands_capture_audit_proxy_v1.py", "sha256": "b36a88ff81d004c521930f6aa43bbf3c096b6c30c04778670ec0c0d007256bed"},
+    {"path": "/Users/paul/work/tekroo-ai/teams-step15-s1-p2final-r1/scripts/sma_s2_unused_port_guard_v1.py", "sha256": "475d9116048502266764dc60eea92a4113f8b237f79a908d5437e5aa6e09b238"},
+    {"path": "/Users/paul/work/tekroo-ai/teams-step15-s1-p2final-r1/investigations/sma-q1/launch-child-conversation-client-tool.json", "sha256": "89575b6d659666f45b51c3d963b421cd174fd23e84b394714b2580b1a74e2c29"},
+    {"path": "/Users/paul/work/tekroo-ai/teams-step15-s1-p2final-r1/OUTPUT/phase-3/sma-s2-final-p2-closure-product-truth-v5/sma-final-p2-product-truth.json", "sha256": "fb7ecc85881a325bf549dcc04b67035ccaf3cfe40b45bfaa0420c587c884f2e6"},
+    {"path": "/Users/paul/work/tekroo-ai/teams-step15-s1-p2final-r1/OUTPUT/phase-3/sma-s2-final-p2-closure-product-truth-v5/product-truth-manifest.json", "sha256": "c2520df45c0ac318fc3d23cef864586b609032179eae6a59c955898758bb476e"},
+    {"path": "/Users/paul/work/tekroo-ai/teams-step15-s1-p2final-r1/investigations/sma-q1/layered/sma-s2-final-p2-closure/t1/java-live-fixture/pom.xml", "sha256": "63b923d8dc85288a556d974240497fbdb9b625bc6cbb6fc13663c2d5c9ef53b6"},
+    {"path": "/Users/paul/work/tekroo-ai/teams-step15-s1-p2final-r1/investigations/sma-q1/layered/sma-s2-final-p2-closure/t1/java-live-fixture/deterministic-promotion-fixture.jar", "sha256": "4d38689fca582de135f8d65c39f14632c9dc9cf3ecbf96a8a4e7a19cce254897"},
+    {"path": "/Users/paul/work/tekroo-ai/teams-step15-s1-p2final-r1/investigations/sma-q1/layered/sma-s2-final-p2-closure/t1/live-python-requirements.lock", "sha256": "7c337e158932b90a5b4bb31af7381a1e90c85ba43ca3546c33c5c6ed486e9ad4"},
+    {"path": "/Users/paul/work/tekroo-ai/teams-step15-s1-p2final-r1/investigations/sma-q1/layered/sma-s2-final-p2-closure/t1/java-live-fixture/src/main/java/ai/tekroo/qualification/DeterministicPromotionFixture.java", "sha256": "db669b15525df1f6968c1763a1275d9fcca540f2377f8e10844fa3c8a00fe4d2"},
+    {"path": "/Users/paul/work/tekroo-ai/teams-step15-s1-p2final-r1/investigations/sma-q1/layered/sma-s2-final-p2-closure/t1/java-live-fixture/target/classes/ai/tekroo/qualification/DeterministicPromotionFixture.class", "sha256": "e55fbda2b8fd78e45439604b72779d350379f91a4c877910760414dae303b802"}
+  ],
+  "boundTrees": [
+    {"path": "/Users/paul/Library/Java/JavaVirtualMachines/temurin-21.0.12/Contents/Home", "sha256": "fbd55ec0ec65cccc10fd02f5aa5c8b72dae6c99384dbd81ae936ab3b08076e92"},
+    {"path": "/Users/paul/work/tekroo-ai/teams-step15-s1-p2final-r1/.qualification/sma-s2-final-p2-live/lib/python3.14/site-packages/pymongo", "sha256": "bcc440595539b339d31bdfeb6d1edc187cb3f67002740cc206531aa3197f3105"},
+    {"path": "/Users/paul/work/tekroo-ai/teams-step15-s1-p2final-r1/.qualification/sma-s2-final-p2-live/lib/python3.14/site-packages/bson", "sha256": "4170076f6d5841b7f02dcd948483175034be09bdad80b82d96adc5bf88e27990"},
+    {"path": "/Users/paul/work/tekroo-ai/teams-step15-s1-p2final-r1/.qualification/sma-s2-final-p2-live/lib/python3.14/site-packages/dns", "sha256": "e85ddc641163e44312cdb3d7607d7bfe6e5b5ca445bf1086bfe9dea527efe633"},
+    {"path": "/Users/paul/work/tekroo-ai/teams-step15-s1-p2final-r1/.qualification/sma-s2-final-p2-live/lib/python3.14/site-packages/pymongo-4.15.3.dist-info", "sha256": "8bc73322fe4b816f6ba333ee52a39317dbc59f408cda9fbd0756a497c86d2b4c"},
+    {"path": "/Users/paul/work/tekroo-ai/teams-step15-s1-p2final-r1/.qualification/sma-s2-final-p2-live/lib/python3.14/site-packages/dnspython-2.8.0.dist-info", "sha256": "d342186f588c0ebc26a78cfbbac6518baec7298c46c2436ab188bf6a313d932e"}
+  ],
+  "evidenceFiles": {
+    "stubRaw": "/Users/paul/work/tekroo-ai/sma-step15-s1-p2final/target/sma-s2-final-p2-closure/runtime/stub-raw.jsonl",
+    "stubTerminal": "/Users/paul/work/tekroo-ai/sma-step15-s1-p2final/target/sma-s2-final-p2-closure/runtime/stub-terminal.jsonl",
+    "operationalLog": "/Users/paul/work/tekroo-ai/sma-step15-s1-p2final/target/sma-s2-final-p2-closure/runtime/operational-log.jsonl",
+    "captureAudit": "/Users/paul/work/tekroo-ai/sma-step15-s1-p2final/target/sma-s2-final-p2-closure/runtime/capture-audit.jsonl"
+  },
+  "actions": [
+    "cleanup_owned", "configure_bridge_fault", "configure_capture_allowlist",
+    "configure_model_fault", "configure_service_mode", "inventory_owned",
+    "prepare_workspaces", "promote_memories", "reconcile_exact_event",
+    "reconcile_persisted", "seed_partition", "start_bridge",
+    "set_startup_configuration",
+    "start_intake_proxy", "start_sma", "start_stub", "start_transport_guard",
+    "stop_bridge", "stop_intake_proxy", "stop_sma", "stop_stub",
+    "stop_transport_guard"
+  ],
+  "authority": {
+    "defaultDeny": true,
+    "acceptedPackageRequired": true,
+    "singleUseRequired": true,
+    "modeExact": true,
+    "consumeBeforeFirstRawCall": true
+  },
+  "prohibitedWithoutLaterAuthority": [
+    "serviceStart", "OpenHandsConversation", "modelCall", "dressRehearsal",
+    "measuredExecution"
+  ]
+}

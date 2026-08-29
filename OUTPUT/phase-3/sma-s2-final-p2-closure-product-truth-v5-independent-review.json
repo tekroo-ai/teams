@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_T0_PRODUCT_TRUTH_INDEPENDENT_REVIEW",
+  "reviewedPack": "OUTPUT/phase-3/sma-s2-final-p2-closure-product-truth-v5",
+  "reviewedQualificationReceiptSha256": "fc28087c5ab54930c45b2665bac19be1cdaac229bf746bde9a5c88d577f45af9",
+  "reviewedManifestSha256": "c2520df45c0ac318fc3d23cef864586b609032179eae6a59c955898758bb476e",
+  "reviewedPlanSha256": "68d44b1cdef272b46b9e984a2598d2e6bbce2e7758c6f844d5697c70d51964ae",
+  "verdict": "PASS_T0_PRODUCT_TRUTH",
+  "disposition": "ACCEPT_FREEZE_T0_V5",
+  "independentIdentityRecomputations": 217,
+  "identityMismatches": 0,
+  "verifiedProductTruth": {
+    "openhandsCommit": "a338ba9b6cbb529886b755a335bae3dee0004700",
+    "openhandsTree": "9e72f1b4ee0b857025d9f170600b9dce539b169a",
+    "smaCommit": "fe9903cdf59497aabf12cbe7722e1397a1372068",
+    "smaTree": "fc2ae06c6333e94f6db34d691e50cb8bb1e5aa36",
+    "eventOrder": "event.sequence_position",
+    "optionalUpstreamSequence": "origin.openhands_provenance.sequence",
+    "openhandsApiAuthentication": "X-Session-API-Key",
+    "mongoProjectionReference": "embeddings.semantic_ref",
+    "episodicPointIdentity": "UUID.nameUUIDFromBytes(memory_id UTF-8)",
+    "bridgeTraceJoin": "HookExecutionEvent.stdout.smaTraceId == retrieval_events.task_ref",
+    "hookPath": "HookManager -> HookExecutor -> HookEventProcessor -> HookExecutionEvent",
+    "scienceCardinality": {
+      "cases": 20,
+      "repetitions": 103,
+      "predicates": 59,
+      "evidenceClasses": 10
+    }
+  },
+  "prohibitedActivity": {
+    "serviceStart": "NOT_RUN",
+    "openhandsConversation": "NOT_RUN",
+    "modelCall": "NOT_RUN",
+    "livePreflight": "NOT_RUN",
+    "liveDress": "NOT_RUN",
+    "measuredExecution": "NOT_RUN",
+    "productionOrHistoricalDataAccess": "NOT_RUN"
+  },
+  "nextGate": "T1_SINGLE_RUNNER_SHARED_TYPED_RAW_RECEIPTS",
+  "t1StatusAtReview": "NOT_REVIEWED"
+}
