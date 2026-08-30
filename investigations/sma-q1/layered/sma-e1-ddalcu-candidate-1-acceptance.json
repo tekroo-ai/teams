@@ -1,0 +1,69 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_E1_DDALCU_CANDIDATE_1_ACCEPTANCE",
+  "status": "ACCEPTED_FROZEN",
+  "recordedAt": "2026-08-30T14:00:59Z",
+  "principalStatement": "Accepted. Please proceed.",
+  "packageIdentity": "7c87e8d1348e92fc7ead0a590e8549e3403daf8be77db262115a04cc80e30f1b",
+  "acceptedArtifacts": {
+    "packageIdentityRecord": {
+      "path": "investigations/sma-q1/layered/sma-e1-ddalcu-candidate-1-package-identity.json",
+      "sha256": "8756b30a06803e56dd77ce4bc114b22bd4f521bdc2360264e856f82718fa6389"
+    },
+    "corpus": {
+      "path": "investigations/sma-q1/layered/sma-e1-ddalcu-corpus-candidate-1.json",
+      "sha256": "69ad47c6b73f3d3d5b326e3c1817f22f1d5aa6e6ebe91970a448ec21dd6778c2"
+    },
+    "preregistration": {
+      "path": "investigations/sma-q1/layered/sma-e1-ddalcu-preregistration-candidate-1.json",
+      "sha256": "de9f90bdbbf5a422c2d77dc1e958ac27a09c6a6e2977a198d2cc6ca07c5fd045"
+    },
+    "liveLaunchDefinition": {
+      "path": "investigations/sma-q1/layered/sma-e1-ddalcu-candidate-1/e1/live-launch-definition.json",
+      "sha256": "4cf88b032b19a5e9ab7e9e5429badb01fa0975d05506d6464954d83ff3cda514"
+    },
+    "offlineQualification": {
+      "path": "OUTPUT/phase-3/sma-e1-ddalcu-candidate-1-offline-qualification/offline-qualification.json",
+      "sha256": "2e765e621ee9d96b8acc34ecbdb02c1a4a910d2aa4c822e534d212896296a193",
+      "embeddedReceiptSha256": "d65d75d086193c78882483f536d71e0b269b5d3d57566c13be931424bc6b702e"
+    },
+    "offlineWalk": {
+      "path": "OUTPUT/phase-3/sma-e1-ddalcu-candidate-1-offline-qualification/offline-walk.jsonl",
+      "sha256": "038921ce129f06144fd9948eec79f059724363e30d1dade37002420a08d11ad4",
+      "records": 96
+    }
+  },
+  "acceptedScope": {
+    "upstreamClaims": [
+      "SMA_SEMANTICS_QUALIFIED",
+      "OPENHANDS_SMA_BOUNDARY_QUALIFIED",
+      "MODEL_PROFILE_MEMORY_USE_QUALIFIED"
+    ],
+    "model": "ddalcu--Qwen3.8-27B-MLX-Serve-8bit",
+    "apiRoot": "http://127.0.0.1:8802/v1",
+    "thinking": false,
+    "tools": [],
+    "temperature": 0,
+    "maximumOutputTokens": 128,
+    "scenarios": 18,
+    "repetitions": 96,
+    "offlineOperationsPassed": 96
+  },
+  "authority": {
+    "executionIdentityAccepted": false,
+    "liveStatePreflight": false,
+    "serviceStartOrRestart": false,
+    "openhandsConversation": false,
+    "modelCall": false,
+    "liveDressRehearsal": false,
+    "measuredExecution": false,
+    "productionOrHistoricalDataAccess": false,
+    "commit": false,
+    "push": false
+  },
+  "immutability": {
+    "acceptedArtifactsMayBeEditedInPlace": false,
+    "successorIdentityRequiredForAnyChange": true
+  },
+  "nextStep": "PREPARE_SEPARATE_EXACT_EXECUTION_IDENTITY"
+}

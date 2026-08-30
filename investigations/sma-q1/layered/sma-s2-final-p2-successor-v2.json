@@ -1,0 +1,92 @@
+{
+  "schemaVersion": "2.0.0",
+  "recordType": "SMA_S2_FINAL_P2_SUCCESSOR_PACKAGE",
+  "lineageId": "SMA-S2-FINAL-P2-SUCCESSOR-V2",
+  "status": "OFFLINE_QUALIFIED_PENDING_INDEPENDENT_REVIEW_NOT_ACCEPTED_NOT_FROZEN",
+  "authority": {
+    "preparationAndOfflineQualificationAuthorized": true,
+    "livePreflightAuthorized": false,
+    "serviceStartAuthorized": false,
+    "dressRehearsalAuthorized": false,
+    "measuredExecutionAuthorized": false,
+    "modelCallsAuthorized": false,
+    "m1Authorized": false,
+    "e1Authorized": false,
+    "productionOrHistoricalAccessAuthorized": false
+  },
+  "upstream": {
+    "acceptedClaim": "SMA_SEMANTICS_QUALIFIED",
+    "acceptancePath": "investigations/sma-q1/layered/sma-s1-p2final-r1-scientific-adjudication-acceptance.json",
+    "acceptanceSha256": "3315838d0c5047189494cece49b953481431321d16e238efa338712be076bee4",
+    "smaCommit": "fe9903cdf59497aabf12cbe7722e1397a1372068",
+    "smaTree": "fc2ae06c6333e94f6db34d691e50cb8bb1e5aa36"
+  },
+  "preservedScience": {
+    "preregistrationSha256": "b7315835b6291d44d3d8cb918dbec1f16c1e64f2106fd70212c6a8f7ec678188",
+    "corpusSha256": "c273c148a7b289f6650a26a82c38bda9680904701120e083543e9b7954b9a960",
+    "oracleMatrixSha256": "806e12a59dd8dcbc8f248d0a8d486c1afb856fc310e1952f7855e9fdf955d4f4",
+    "caseCount": 20,
+    "dressOperations": 34,
+    "measuredRepetitions": 103,
+    "scientificPredicates": 59,
+    "requiredEvidenceClasses": 10
+  },
+  "package": {
+    "configuration": {
+      "path": "investigations/sma-q1/layered/sma-s2-final-p2-successor-v2-config.json",
+      "sha256": "ced7b980793d82df52a2d5cda8067147b4e56e99a91fae62c0d76608298e266b"
+    },
+    "runner": {
+      "path": "scripts/sma_s2_final_p2_successor_v2.py",
+      "sha256": "092b19a683c1c9f6bb5571fc79dea9234de5a48c780c2a875a84cc1b4b47013e"
+    },
+    "qualifier": {
+      "path": "scripts/qualify_sma_s2_final_p2_successor_v2.py",
+      "sha256": "68e1ddf73dc359daf7565a08202093535cc03ca3e55ad89130a7c480b0748ec1"
+    },
+    "bridgeFaultFixture": {
+      "path": "scripts/sma_s2_bridge_fault_fixture_v2.py",
+      "sha256": "9356a12b73e199882506eeaab4f840e970b1f389463a5d02e07742d46fb67ba7"
+    }
+  },
+  "offlineQualification": {
+    "status": "PASS",
+    "receiptPath": "OUTPUT/phase-3/sma-s2-final-p2-successor-v2-offline-qualification/offline-qualification-receipt.json",
+    "receiptSha256": "94eb67565ff7ce8085b6ec506496709cc4d9e0b8c5e5312c6f87574831f495d3",
+    "dressWalkSha256": "387ff240f6d9fe66bd6c59494f72c89bcc506cb4a36553440180d719ad6401b7",
+    "dressLedgerSha256": "8e3d26e49fbc91c4f2b5cf08a3eb7452f61ef02d80fbee72b4c0ee7ea28c4fc6",
+    "dressObservationsSha256": "bb34a9752c419adeb1b9ee7e8761231344af13f82f03bc4ae746379e1cb3102a",
+    "measuredPlanWalkSha256": "243db7d9cb2b612e0564f16da43a3911565dc2b66fa2c80970aa037477eef03f",
+    "measuredPlanLedgerSha256": "c6a009a471ba645171f735f3b6925ada1c27e1c630fa925864eb4c56bd5473a3",
+    "measuredPlanObservationsSha256": "5413df08b0dc82356f7e20be00f3a64510d9095473855107b06580a31f19cc09",
+    "testsPassed": 14,
+    "testsFailed": 0,
+    "scienceMutationsRejected": 59,
+    "evidenceMutationsRejected": 10,
+    "optimizedRuntimeEquivalent": true
+  },
+  "architecture": {
+    "oneSharedRunner": true,
+    "liveAdapterPackagedDefaultDeny": true,
+    "offlineFakesBelowRawPorts": true,
+    "supportedOpenHandsApiShapes": true,
+    "supportedSmaContextAndStoreSurfaces": true,
+    "retainedStubAndFaultReceipts": true,
+    "activeInterruptUsedForCancellation": true,
+    "postFreezeHelperAllowed": false
+  },
+  "historicalEvidence": {
+    "candidate10": "PRESERVED_UNMODIFIED_NOT_CONTINUED",
+    "successorV1": "INDEPENDENT_REVIEW_NO_GO_PRESERVED_UNMODIFIED_NOT_ACCEPTED"
+  },
+  "notRun": [
+    "LIVE_PREFLIGHT",
+    "SERVICE_START",
+    "LIVE_DRESS_REHEARSAL",
+    "MEASURED_EXECUTION",
+    "MODEL_CALLS",
+    "M1",
+    "E1",
+    "PRODUCTION_OR_HISTORICAL_ACCESS"
+  ]
+}

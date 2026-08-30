@@ -1,0 +1,9 @@
+{
+  "recordType": "SMA_S2_FINAL_P2_MEASURED_EXECUTION",
+  "packageIdentity": "270594670d9edcb4ac71a6a6f6ec92ac0b09fecd454807e37ecdd175f20b64c2",
+  "executionIdentity": "85245a0351982ff0a3ab524e11b0e6826ff6b7d23ce42309e539ab651fdbd0e2",
+  "mode": "MEASURED",
+  "cases": 20,
+  "operations": 103,
+  "planSha256": "4c0ffad0996747cfa7002694461048e7b7ea3aae2d3731757efdb7b150024fa6"
+}

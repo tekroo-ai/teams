@@ -1,0 +1,33 @@
+{
+  "recordType": "SMA_S2_FINAL_P2_MEASURED_EXECUTION_PREPARATION_RECEIPT",
+  "status": "PASS_PREPARED_NOT_AUTHORIZED",
+  "executionIdentity": "85245a0351982ff0a3ab524e11b0e6826ff6b7d23ce42309e539ab651fdbd0e2",
+  "identityPath": "/Users/paul/work/tekroo-ai/teams-step15-s1-p2final-r1/OUTPUT/phase-3/sma-s2-final-p2-measured-execution-preparation/measured-execution-identity.json",
+  "identityFileSha256": "4f960aa9e29103b6533cf35ccb14ea9df15a5c77a92a63b38a6afe371827fbd3",
+  "packageIdentity": "270594670d9edcb4ac71a6a6f6ec92ac0b09fecd454807e37ecdd175f20b64c2",
+  "sealIdentity": "6c2f76bf6c45f45a4428f003de932ee9334751b4ec425a72f711866df011ed1f",
+  "rehearsalAcceptanceIdentity": "c8c487d5c10226ebb76850635d7a0506009feed2bfc9739e0ef7f66f220aaca3",
+  "verification": {
+    "identityDigestRecomputed": true,
+    "manifestDigestMatched": true,
+    "packageSealDigestMatched": true,
+    "caseCount": 20,
+    "operationCount": 103,
+    "measuredPlanCanonicalSha256": "4c0ffad0996747cfa7002694461048e7b7ea3aae2d3731757efdb7b150024fa6",
+    "perCaseRepetitionCountsMatched": true,
+    "manifestAuthorityAllFalse": true,
+    "identityAuthorityAllFalse": true
+  },
+  "activity": {
+    "authorizationFile": "NOT_CREATED",
+    "consumptionMarker": "NOT_CREATED",
+    "services": "NOT_STARTED",
+    "openhandsConversations": "NOT_RUN",
+    "modelCalls": "NOT_RUN",
+    "measuredExecution": "NOT_RUN",
+    "m1": "NOT_RUN",
+    "e1": "NOT_RUN",
+    "productionOrHistoricalData": "NOT_ACCESSED"
+  },
+  "nextAction": "PRINCIPAL_MAY_SEPARATELY_AUTHORIZE_EXACTLY_ONE_MEASURED_20_CASE_103_OPERATION_EXECUTION"
+}

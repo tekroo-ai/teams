@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "2.0.0",
+  "recordType": "SMA_S2_FINAL_P2_SUCCESSOR_V2_OFFLINE_READINESS",
+  "status": "PASS_PENDING_INDEPENDENT_REVIEW_NOT_ACCEPTED_NOT_FROZEN",
+  "packagePath": "investigations/sma-q1/layered/sma-s2-final-p2-successor-v2.json",
+  "offlineQualificationReceipt": {
+    "path": "OUTPUT/phase-3/sma-s2-final-p2-successor-v2-offline-qualification/offline-qualification-receipt.json",
+    "sha256": "94eb67565ff7ce8085b6ec506496709cc4d9e0b8c5e5312c6f87574831f495d3",
+    "status": "PASS",
+    "tests": "14/14",
+    "dressOperations": "34/34",
+    "measuredPlanRepetitions": "103/103",
+    "scientificMutations": "59/59_REJECTED",
+    "evidenceMutations": "10/10_REJECTED"
+  },
+  "observed": {
+    "sharedRawRunner": true,
+    "packagedDefaultDenyLivePorts": true,
+    "packagedSmaStubAndFaultLifecycle": true,
+    "boundedPolling": true,
+    "activeCancellation": true,
+    "completeCleanup": true,
+    "normalOptimizedEquivalence": true,
+    "liveActivity": false
+  },
+  "recommendation": "SUBMIT_EXACT_PACKAGE_FOR_ONE_INDEPENDENT_ACCEPTANCE_REVIEW",
+  "notAuthorized": [
+    "LIVE_PREFLIGHT",
+    "SERVICE_START",
+    "LIVE_DRESS_REHEARSAL",
+    "MEASURED_EXECUTION",
+    "MODEL_CALLS",
+    "M1",
+    "E1",
+    "PRODUCTION_OR_HISTORICAL_ACCESS"
+  ]
+}

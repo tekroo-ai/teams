@@ -1,0 +1,61 @@
+{
+  "recordType": "SMA_S2_FINAL_P2_MEASURED_EXECUTION_IDENTITY",
+  "status": "PREPARED_NOT_AUTHORIZED_NOT_CONSUMABLE",
+  "mode": "MEASURED",
+  "packageIdentity": "270594670d9edcb4ac71a6a6f6ec92ac0b09fecd454807e37ecdd175f20b64c2",
+  "sealIdentity": "6c2f76bf6c45f45a4428f003de932ee9334751b4ec425a72f711866df011ed1f",
+  "rehearsalAcceptanceIdentity": "c8c487d5c10226ebb76850635d7a0506009feed2bfc9739e0ef7f66f220aaca3",
+  "manifest": {
+    "path": "/Users/paul/work/tekroo-ai/teams-step15-s1-p2final-r1/OUTPUT/phase-3/sma-s2-final-p2-final-package-seal/mutable-package-manifest.json",
+    "sha256": "270594670d9edcb4ac71a6a6f6ec92ac0b09fecd454807e37ecdd175f20b64c2"
+  },
+  "packageSeal": {
+    "path": "/Users/paul/work/tekroo-ai/teams-step15-s1-p2final-r1/OUTPUT/phase-3/sma-s2-final-p2-final-package-seal/package-seal.json",
+    "fileSha256": "c6a6d33a3f51e0136b4a20b0fec8ee1ada5398dc5365067a4bc7cd65166eeb9c"
+  },
+  "plan": {
+    "caseCount": 20,
+    "operationCount": 103,
+    "canonicalSha256": "4c0ffad0996747cfa7002694461048e7b7ea3aae2d3731757efdb7b150024fa6",
+    "firstOperation": "SMA-S2-001-FIRST-PROMPT-EMPTY#001",
+    "lastOperation": "SMA-S2-020-ACTIVE-CANCELLATION-AND-SHUTDOWN#003",
+    "repetitionsByCase": {
+      "SMA-S2-001-FIRST-PROMPT-EMPTY": 10,
+      "SMA-S2-002-SAME-PARTITION-DELIVERY": 10,
+      "SMA-S2-003-CROSS-PARTITION-DELIVERY-DENIAL": 10,
+      "SMA-S2-004-UNTRUSTED-CONTEXT-PLACEMENT": 5,
+      "SMA-S2-005-RAW-INELIGIBLE-ABSENCE": 3,
+      "SMA-S2-006-DUPLICATE-PERSISTED-EVENT": 3,
+      "SMA-S2-007-RETRIEVAL-OUTAGE": 5,
+      "SMA-S2-008-CAPTURE-OUTAGE": 5,
+      "SMA-S2-009-ADDITIONAL-CONTEXT-INTEGRITY": 5,
+      "SMA-S2-010-HOOK-FAULT-MATRIX": 5,
+      "SMA-S2-011-PARENT-CHILD-PROVENANCE": 5,
+      "SMA-S2-012-RESTART-CONTINUITY": 3,
+      "SMA-S2-013-FOUR-CHANNEL-CONCURRENCY": 5,
+      "SMA-S2-014-FEEDBACK-LOOP-PREVENTION": 3,
+      "SMA-S2-015-SECRET-DELIVERY-ABSENCE": 3,
+      "SMA-S2-016-EMPTY-RESULT": 10,
+      "SMA-S2-017-OVERSIZED-CONTEXT": 3,
+      "SMA-S2-018-CONDENSATION-REANCHOR": 3,
+      "SMA-S2-019-MODEL-STUB-FAULT-MATRIX": 4,
+      "SMA-S2-020-ACTIVE-CANCELLATION-AND-SHUTDOWN": 3
+    }
+  },
+  "singleUse": true,
+  "authority": {
+    "authorizationFileCreated": false,
+    "consumptionMarkerCreated": false,
+    "liveExecution": false,
+    "measuredExecution": false,
+    "modelCalls": false,
+    "serviceStart": false
+  },
+  "scope": {
+    "m1": false,
+    "e1": false,
+    "productionData": false,
+    "historicalData": false
+  },
+  "identityBasisSha256": "85245a0351982ff0a3ab524e11b0e6826ff6b7d23ce42309e539ab651fdbd0e2"
+}

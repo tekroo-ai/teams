@@ -1,0 +1,8 @@
+{
+  "recordType": "SMA_S2_FINAL_P2_ZERO_CREDIT_AUTHORIZATION",
+  "executionIdentity": "839804ca2f2053d184fd917914c6c51a5901202c02ee2c1947696d4e125f6fa4",
+  "mode": "ZERO_CREDIT_DRESS",
+  "singleUse": true,
+  "maximumOperations": 34,
+  "measuredCredit": false
+}

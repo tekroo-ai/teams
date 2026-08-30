@@ -1,0 +1,12 @@
+{
+  "recordType": "SMA_S2_FINAL_P2_MEASURED_AUTHORIZATION",
+  "executionIdentity": "85245a0351982ff0a3ab524e11b0e6826ff6b7d23ce42309e539ab651fdbd0e2",
+  "mode": "MEASURED",
+  "singleUse": true,
+  "maximumCases": 20,
+  "maximumOperations": 103,
+  "measuredCredit": true,
+  "m1": false,
+  "e1": false,
+  "productionOrHistoricalData": false
+}

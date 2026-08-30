@@ -1,0 +1,11 @@
+{
+  "recordType": "SMA_S2_FINAL_P2_RUN_PACKAGE",
+  "status": "ACCEPTED_FROZEN",
+  "packageIdentity": "8afa56879720ba99bcc425da397097b492c9544db6960e7f6da3b2973178815a",
+  "teamsCommit": "70852d670591a7f311be58805968e13434e6441c",
+  "teamsTree": "d7e4adb51f6ab46b558520f0e6dd20b383eb911b",
+  "smaCommit": "c6e1958019a9c5564a5cc9c40793d97bf6078ce2",
+  "smaTree": "cfaabbc86c372d37a973b0b8e4289101be7b803e",
+  "mutablePackageManifestSha256": "8afa56879720ba99bcc425da397097b492c9544db6960e7f6da3b2973178815a",
+  "liveLaunchDefinitionSha256": "7b60a1ff70f3978a5a2d40396319eb28f92e1c120eca68c4760d709aa76f0cde"
+}

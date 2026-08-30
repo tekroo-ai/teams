@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_E1_DDALCU_CANDIDATE_1_EXECUTION_IDENTITY_ACCEPTANCE",
+  "status": "ACCEPTED_FROZEN_EXECUTION_IDENTITY",
+  "recordedAt": "2026-08-30T14:05:55Z",
+  "principalDecision": "ACCEPT/FREEZE E1 execution identity b8a0fcd0ea9ff067bfcbb57b8d257bfe2977ce71a47e0831bd8fd94deed70198 only. After that, proceed with the pre-flight as recommended.",
+  "executionIdentity": "b8a0fcd0ea9ff067bfcbb57b8d257bfe2977ce71a47e0831bd8fd94deed70198",
+  "executionIdentityRecord": {
+    "path": "investigations/sma-q1/layered/sma-e1-ddalcu-candidate-1-execution-identity.json",
+    "sha256": "07f13fe89fef3013bef1e829a8e9db2e433cd49b9acba4ff735db5d7eb414e10"
+  },
+  "preparationReceipt": {
+    "path": "OUTPUT/phase-3/sma-e1-ddalcu-candidate-1-execution-identity-preparation/execution-identity-preparation-receipt.json",
+    "sha256": "d0a61b3a2c7ef83b457a3d01062f3698303ca0700ee610f71a8cba740291e7ef",
+    "embeddedReceiptSha256": "16c0057e462398e8eb41c1ae020a7aad6015ada60045f4815286b41d8b2a53bf"
+  },
+  "acceptedPackageIdentity": "7c87e8d1348e92fc7ead0a590e8549e3403daf8be77db262115a04cc80e30f1b",
+  "acceptedScope": "EXECUTION_IDENTITY_ONLY",
+  "authority": {
+    "liveStatePreflight": true,
+    "preflightAttemptsAuthorized": 1,
+    "readOnlyChecksOnly": true,
+    "serviceStartOrRestart": false,
+    "openhandsConversation": false,
+    "modelCall": false,
+    "liveDressRehearsal": false,
+    "measuredExecution": false,
+    "productionOrHistoricalDataAccess": false,
+    "commit": false,
+    "push": false
+  },
+  "preflightStopRule": "STOP_ON_ANY_FAILED_PRECONDITION",
+  "nextStep": "RUN_ONE_READ_ONLY_LIVE_STATE_PREFLIGHT"
+}

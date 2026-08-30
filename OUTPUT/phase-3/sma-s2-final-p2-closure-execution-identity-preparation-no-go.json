@@ -1,0 +1,57 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_FINAL_P2_EXECUTION_IDENTITY_PREPARATION_NO_GO",
+  "status": "NO_GO_PRE_EXECUTION_STATIC_LINKAGE_DEFECT",
+  "packageIdentity": "0dbe7053cbb24938fb6c24b5e6a918d9008c65466ee00c01e481759198631fe0",
+  "packageAcceptance": {
+    "path": "investigations/sma-q1/layered/sma-s2-final-p2-closure-package-acceptance.json",
+    "sha256": "cabc1d46bebf939063ff10e566ddc428830b867ccb2883998d625857a15ea481"
+  },
+  "observedDefect": {
+    "caller": "investigations/sma-q1/layered/sma-s2-final-p2-closure/t1/live_actions.py",
+    "callerLines": [234, 240],
+    "calledAttribute": "replay_promotion",
+    "boundSupport": "/Users/paul/work/tekroo-ai/sma-step15-s1-p2final/scripts/wp5e_restart_recovery.py",
+    "boundSupportSha256": "73857ed0734e0607a8a3a80646589d58c26e0ba338a450ecbee73fef8656677b",
+    "calledAttributeExists": false,
+    "actualCompatibleAttribute": "promote_memory",
+    "actualCompatibleAttributeExists": true,
+    "affectedLiveCases": [2, 4, 9, 12, 13, 17, 18]
+  },
+  "relatedWorkingDirectoryDefect": {
+    "actualCompatibleAttribute": "promote_memory",
+    "mavenInvocationSetsExplicitCwd": false,
+    "frozenLiveActionProcessCwd": "/Users/paul/work/tekroo-ai/teams-step15-s1-p2final-r1",
+    "requiredMavenProjectCwd": "/Users/paul/work/tekroo-ai/sma-step15-s1-p2final",
+    "liveOutcomeWithoutRepair": "MAVEN_PROJECT_RESOLUTION_FAILURE"
+  },
+  "qualificationEscape": {
+    "cause": "T2 searched for the replay_promotion token but never imported the exact bound helper, checked its callable/signature, or exercised the live wrapper with an injected command boundary that retained the effective Maven working directory.",
+    "h0UsedOfflineEmulatorInsteadOfBoundHelperForPromotion": true
+  },
+  "additionalEnvironmentObservation": {
+    "openhandsCommitMatchesT0": true,
+    "openhandsTreeMatchesT0": true,
+    "openhandsTrackedWorktreeClean": false,
+    "modifiedRuntimeFiles": [
+      "openhands-sdk/openhands/sdk/conversation/title_utils.py",
+      "openhands-tools/openhands/tools/terminal/definition.py",
+      "openhands-tools/openhands/tools/terminal/descriptions.py"
+    ],
+    "modifiedTestFiles": [
+      "tests/sdk/conversation/test_generate_title.py",
+      "tests/tools/terminal/test_schema.py"
+    ],
+    "executionIdentityDisposition": "UNRESOLVED_NOT_SEALED"
+  },
+  "authorityAndActivity": {
+    "executionIdentityCreated": false,
+    "serviceStart": "NOT_RUN",
+    "livePreflight": "NOT_RUN",
+    "openhandsConversation": "NOT_RUN",
+    "modelCall": "NOT_RUN",
+    "liveDress": "NOT_RUN",
+    "measuredExecution": "NOT_RUN"
+  },
+  "recommendedDisposition": "PRINCIPAL_AUTHORIZE_CONTROLLED_PACKAGE_SUPERSESSION_AND_REQUALIFICATION"
+}

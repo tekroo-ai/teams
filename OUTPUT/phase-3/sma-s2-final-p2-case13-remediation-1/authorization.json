@@ -1,0 +1,18 @@
+{
+  "automaticReruns": 0,
+  "caseId": "SMA-S2-013-FOUR-CHANNEL-CONCURRENCY",
+  "executionIdentity": "9632ffaf0eefad987e8eab81297ac1705b720265c3cd89513c88cbee9c77560c",
+  "measuredCredit": true,
+  "mode": "MEASURED",
+  "operations": 5,
+  "principalDecision": "Approved. Please proceed.",
+  "prohibitions": {
+    "full103OperationRerun": true,
+    "productionOrHistoricalData": true,
+    "realModelCalls": true
+  },
+  "recordType": "SMA_S2_FINAL_P2_CASE13_REMEDIATION_AUTHORIZATION",
+  "recordedAt": "2026-08-30T12:33:05Z",
+  "repetitions": [1, 2, 3, 4, 5],
+  "singleUse": true
+}

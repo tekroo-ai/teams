@@ -304,11 +304,16 @@ def _reanchored(o: OperationObservation, _: ProductTruth) -> tuple[bool, str]:
 
 
 def _summary_not_delivery(o: OperationObservation, _: ProductTruth) -> tuple[bool, str]:
-    summaries = [event for event in o.raw_events if event.get("kind") == "CondensationSummaryEvent"]
+    condensations = [
+        event for event in o.raw_events
+        if event.get("kind") == "Condensation"
+        and event.get("id")
+        and event.get("summary")
+    ]
     selected = {row.get("memory_id") for retrieval in o.retrievals for row in retrieval.get("results", [])}
-    summary_ids = {event.get("id") for event in summaries}
+    summary_ids = {f"{event['id']}-summary" for event in condensations}
     memory_by_event = {nested_get(m, "origin.openhands_provenance.event_id"): m.get("_id") for m in o.memories}
-    return (len(summaries) == 1 and not {memory_by_event.get(event_id) for event_id in summary_ids} & selected, "exact summary event absent from delivery provenance")
+    return (len(condensations) == 1 and not {memory_by_event.get(event_id) for event_id in summary_ids} & selected, "derived condensation summary identity absent from delivery provenance")
 
 
 def _scheduled_fault_once(o: OperationObservation, _: ProductTruth) -> tuple[bool, str]:

@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_M1_SINGLE_USE_EXECUTION_AUTHORIZATION",
+  "status": "AUTHORIZED_SINGLE_USE_UNCONSUMED",
+  "recordedAt": "2026-08-30T13:30:09Z",
+  "principalStatement": "Accepted and authorized. Please proceed.",
+  "acceptedPackageIdentity": "a1bea34d3c0b5e10bd1c6a889647e588ae8fb11e452009b8d5b646d9f4e54c12",
+  "acceptanceSha256": "355802d70cd4622002a20def8271ae981329e369b861674dd0f7653af8d5e1a1",
+  "preregistrationSha256": "4b52c135ea472e920faa7c1c9811ea683139e30b5dee2be44d95a4cd454737e0",
+  "profileIdentitySha256": "c905951756c94cf0006b857bf13d74909db3cbb725ad703b175c07ffc1e7889e",
+  "fixtureSourceSha256": "99fd8ae52a861ae281b24c122c1c181e33f20fefb55fb9d8171f7ab2990f736e",
+  "harnessSha256": "8f4d0290aaf389b41a4f7568b1aedcf44041d72fd0ede677ea3fc1428a0d2af8",
+  "offlineQualificationSha256": "68eb80de2d27ba5ddee1bc58ed6813617f37ffec13514d805ac2cd74495a2038",
+  "executionAuthorized": true,
+  "attemptsAuthorized": 1,
+  "plannedOperations": 72,
+  "executionScope": {
+    "endpoint": "http://127.0.0.1:8802/v1/chat/completions",
+    "model": "ddalcu--Qwen3.8-27B-MLX-Serve-8bit",
+    "thinking": false,
+    "concurrency": 1,
+    "servicesMayBeStartedOrRestarted": false,
+    "smaMayBeCalled": false,
+    "openHandsMayBeCalled": false,
+    "mongoOrQdrantMayBeAccessed": false,
+    "productionOrHistoricalDataMayBeAccessed": false
+  },
+  "excludedAuthority": [
+    "automatic rerun",
+    "corrective rerun",
+    "E1 execution",
+    "service start or restart",
+    "SMA or OpenHands execution",
+    "production or historical data access"
+  ]
+}

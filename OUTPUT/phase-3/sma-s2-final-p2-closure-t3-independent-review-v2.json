@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_FINAL_P2_CLOSURE_T3_INDEPENDENT_REVIEW",
+  "status": "PASS_READY_TO_PUBLISH",
+  "reviewer": "/root/s2_final_p2_independent_review",
+  "reviewDate": "2026-08-28",
+  "reviewed": {
+    "mutableManifestSha256": "2a056fe7480a4c2287bf85195471122565135d5dff9cb4c457cf0b1e975ddc25",
+    "traceabilitySha256": "ce87f34b1f32f9dfa0cafb5460961b42ad70e90a99660fe2799bbd6ff1a9a0a0",
+    "t2QualificationSha256": "b328c3827fc164ceda92976a1c1cd6c23cf94ae09304f2eb61499b2e200aaccf",
+    "nonPublishedH0Sha256": "75b5103602b6bdddc2d0d466a8437b06a77a28142ab632c3d493d7d9ea9189b2",
+    "dressWalkSha256": "99fd3298b85e86a10efbc1384975e700ce0a4d541be19bef2aff1b9be3900061",
+    "measuredWalkSha256": "959a4a927762af910b7c481f2e34358c4c0fdac6e4f1bf274f8398558dfc2f17",
+    "runnerSha256": "2c979ce96334ace9237bc647cf41157d67166f5277cb0abf071ad4fdb5956f2d"
+  },
+  "verified": {
+    "allReviewedHashesRecomputed": true,
+    "boundPythonTreesMatch": true,
+    "boundTemurinTreeMatches": true,
+    "directJavaClasspathFullyBound": true,
+    "mavenAbsentFromLivePath": true,
+    "fixtureUsesProductReplayMongoQdrantAndEmbedding": true,
+    "backgroundGenerativeReplayDisabled": true,
+    "t2ByteReproducible": true,
+    "h0AndWalksByteReproducible": true
+  },
+  "activity": {
+    "live": "NOT_RUN",
+    "services": "NOT_STARTED",
+    "openhandsConversations": 0,
+    "modelCalls": 0,
+    "productionOrHistoricalAccess": 0
+  },
+  "authority": "READY_TO_PUBLISH_H0_ONLY"
+}

@@ -1,0 +1,73 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_M1_DDALCU_CANDIDATE_1_SCIENTIFIC_ADJUDICATION",
+  "status": "PASS_RECOMMENDED_FOR_ACCEPTANCE",
+  "recordedAt": "2026-08-30T13:31:30Z",
+  "acceptedCandidatePackageIdentity": "a1bea34d3c0b5e10bd1c6a889647e588ae8fb11e452009b8d5b646d9f4e54c12",
+  "bindings": {
+    "candidateAcceptanceSha256": "355802d70cd4622002a20def8271ae981329e369b861674dd0f7653af8d5e1a1",
+    "singleUseAuthorizationSha256": "92b339c0b850537550795813020c045943debe6c1ac46a3d8aeb50eb345dd6ac",
+    "authorizationConsumptionSha256": "ae96de4aeb4046f24662aa5aacc09f6bff611052d43a9b436064697e1ac444e8",
+    "profileIdentitySha256": "c905951756c94cf0006b857bf13d74909db3cbb725ad703b175c07ffc1e7889e",
+    "fixtureSourceSha256": "99fd8ae52a861ae281b24c122c1c181e33f20fefb55fb9d8171f7ab2990f736e",
+    "preregistrationSha256": "4b52c135ea472e920faa7c1c9811ea683139e30b5dee2be44d95a4cd454737e0",
+    "harnessSha256": "8f4d0290aaf389b41a4f7568b1aedcf44041d72fd0ede677ea3fc1428a0d2af8",
+    "measuredResultSha256": "be1a52f20bc554f657a79ad8841f28d6c3002be0ca44d5b35b91a3551b8ef709",
+    "evidenceLedgerSha256": "b1ab667ecd0fbf716de843803ac40df8b37fc5b160d018f60b0be5c68bc4d6f8"
+  },
+  "profile": {
+    "provider": "LOCAL_MLX_SERVE",
+    "endpoint": "http://127.0.0.1:8802/v1/chat/completions",
+    "model": "ddalcu--Qwen3.8-27B-MLX-Serve-8bit",
+    "thinking": false,
+    "tools": [],
+    "temperature": 0,
+    "maximumOutputTokens": 128,
+    "concurrency": 1
+  },
+  "observedResult": {
+    "operationsExpected": 72,
+    "operationsPassed": 72,
+    "operationsFailed": 0,
+    "predicateFailures": 0,
+    "thinkingViolations": 0,
+    "formatNonconformances": 0,
+    "maximumElapsedMilliseconds": 8499.211125,
+    "maximumCompletionTokens": 7,
+    "totalPromptTokens": 4929,
+    "totalCompletionTokens": 231,
+    "providerCost": "NOT_REPORTED"
+  },
+  "independentRecomputation": {
+    "status": "PASS",
+    "resultsChecked": 72,
+    "rawResponsesChecked": 72,
+    "rawResponseDigestFailures": 0,
+    "semanticFailures": 0
+  },
+  "claimOnAcceptance": {
+    "claim": "MODEL_PROFILE_MEMORY_USE_QUALIFIED",
+    "scope": "EXACT_DDALCU_QWEN38_27B_MLX_SERVE_8BIT_PROFILE_UNDER_FROZEN_M1_FIXTURES_AND_PARAMETERS"
+  },
+  "excludedClaims": [
+    "another model profile's qualification",
+    "model routing qualification",
+    "integrated E1 runtime qualification",
+    "production readiness"
+  ],
+  "activity": {
+    "modelRequests": 72,
+    "automaticReruns": 0,
+    "smaCalls": 0,
+    "openHandsCalls": 0,
+    "mongoOrQdrantAccess": 0,
+    "serviceStartsOrRestarts": 0,
+    "productionOrHistoricalDataAccess": 0
+  },
+  "authority": {
+    "consumedExecutionAuthorizationReusable": false,
+    "additionalM1ExecutionAuthorized": false,
+    "e1Authorized": false
+  },
+  "nextGateAfterPrincipalAcceptance": "E1_PREPARATION"
+}

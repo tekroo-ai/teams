@@ -1,0 +1,90 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_FINAL_P2_SUCCESSOR_PACKAGE",
+  "lineageId": "SMA-S2-FINAL-P2-SUCCESSOR-V1",
+  "status": "PREPARED_OFFLINE_QUALIFICATION_PENDING",
+  "authority": {
+    "preparationAndOfflineQualificationAuthorized": true,
+    "livePreflightAuthorized": false,
+    "serviceStartAuthorized": false,
+    "dressRehearsalAuthorized": false,
+    "measuredExecutionAuthorized": false,
+    "modelCallsAuthorized": false,
+    "m1Authorized": false,
+    "e1Authorized": false,
+    "productionOrHistoricalAccessAuthorized": false
+  },
+  "upstream": {
+    "acceptedClaim": "SMA_SEMANTICS_QUALIFIED",
+    "acceptancePath": "investigations/sma-q1/layered/sma-s1-p2final-r1-scientific-adjudication-acceptance.json",
+    "acceptanceSha256": "3315838d0c5047189494cece49b953481431321d16e238efa338712be076bee4",
+    "smaCommit": "fe9903cdf59497aabf12cbe7722e1397a1372068",
+    "smaTree": "fc2ae06c6333e94f6db34d691e50cb8bb1e5aa36"
+  },
+  "preservedScience": {
+    "preregistrationPath": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-2.json",
+    "preregistrationSha256": "b7315835b6291d44d3d8cb918dbec1f16c1e64f2106fd70212c6a8f7ec678188",
+    "corpusPath": "investigations/sma-q1/layered/sma-s2-measured-corpus-candidate-1.json",
+    "corpusSha256": "c273c148a7b289f6650a26a82c38bda9680904701120e083543e9b7954b9a960",
+    "oracleMatrixPath": "investigations/sma-q1/layered/sma-s2-predicate-oracle-matrix-candidate-4.json",
+    "oracleMatrixSha256": "806e12a59dd8dcbc8f248d0a8d486c1afb856fc310e1952f7855e9fdf955d4f4",
+    "caseCount": 20,
+    "measuredRepetitions": 103,
+    "scientificPredicateCount": 59,
+    "requiredEvidenceOracleCount": 10
+  },
+  "historicalEvidence": {
+    "candidate10Disposition": "PRESERVED_UNMODIFIED_NOT_CONTINUED_NO_CREDIT_IMPORTED",
+    "candidate10ClosurePlanPath": "docs/architecture/087-sma-s2-closure-plan.md",
+    "candidate10FilesMayBeModified": false
+  },
+  "supportedSurfaces": {
+    "openhands": {
+      "commit": "a338ba9b6cbb529886b755a335bae3dee0004700",
+      "tree": "9e72f1b4ee0b857025d9f170600b9dce539b169a",
+      "authenticationHeader": "X-Session-API-Key",
+      "settings": "/api/settings",
+      "hooks": "/api/hooks",
+      "conversations": "/api/conversations",
+      "eventSearchTemplate": "/api/conversations/{conversation_id}/events/search?limit=100",
+      "eventSubmitTemplate": "/api/conversations/{conversation_id}/events",
+      "conversationDeleteTemplate": "/api/conversations/{conversation_id}"
+    },
+    "sma": {
+      "health": "/healthz",
+      "context": "/v1/openhands/context",
+      "contextRequestFields": ["session_id", "working_dir", "prompt"],
+      "maximumResults": 3,
+      "maximumContextCharacters": 4096,
+      "serviceBudgetMilliseconds": 500
+    },
+    "stubEvidence": {
+      "transport": "CONTENT_ADDRESSED_JSONL_FILES",
+      "rawRequestJournal": "stub-raw-evidence.jsonl",
+      "terminalJournal": "stub-terminal.jsonl",
+      "operationalJournal": "stub-operational.jsonl"
+    }
+  },
+  "architecture": {
+    "orchestration": "ONE_SHARED_RUNNER_FOR_OFFLINE_DRESS_OFFLINE_MEASURED_AND_FUTURE_LIVE",
+    "rawPorts": ["HTTP", "FILESYSTEM", "PROCESS", "MONGODB", "QDRANT", "MONOTONIC_CLOCK"],
+    "offlineAdapterLevel": "BELOW_RAW_PORTS",
+    "liveAdapterIncludedDefault": "DENY",
+    "semanticStoreCommandsAllowed": false,
+    "fakeOnlyHttpRoutesAllowed": false,
+    "predecessorDriverImportsAllowed": false,
+    "monkeypatchingAllowed": false
+  },
+  "offlineQualification": {
+    "networkAllowed": false,
+    "serviceStartsAllowed": false,
+    "mavenAllowed": false,
+    "openhandsConversationsAllowed": false,
+    "dressOperations": 34,
+    "measuredRepetitions": 103,
+    "rawPredicateMutations": 59,
+    "rawEvidenceMutations": 10,
+    "optimizedRuntimeEquivalenceRequired": true,
+    "noLiveActivityReceiptRequired": true
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "schemaVersion": "1.0.0-candidate",
+  "recordType": "SMA_M1_DDALCU_CANDIDATE_1_PACKAGE_IDENTITY",
+  "status": "READY_FOR_ACCEPTANCE_NOT_EXECUTION_AUTHORITY",
+  "recordedAt": "2026-08-30T13:15:05Z",
+  "packageIdentity": "a1bea34d3c0b5e10bd1c6a889647e588ae8fb11e452009b8d5b646d9f4e54c12",
+  "identitySubject": {
+    "acceptedS2": "cac6cd68ff7b60fdd36a593779221ce90b6553a570b71f6fb90b6f593184e0c3",
+    "profile": "c905951756c94cf0006b857bf13d74909db3cbb725ad703b175c07ffc1e7889e",
+    "fixtures": "99fd8ae52a861ae281b24c122c1c181e33f20fefb55fb9d8171f7ab2990f736e",
+    "preregistration": "4b52c135ea472e920faa7c1c9811ea683139e30b5dee2be44d95a4cd454737e0",
+    "harness": "8f4d0290aaf389b41a4f7568b1aedcf44041d72fd0ede677ea3fc1428a0d2af8",
+    "offlineQualification": "68eb80de2d27ba5ddee1bc58ed6813617f37ffec13514d805ac2cd74495a2038"
+  },
+  "workload": {
+    "cases": 8,
+    "fixtures": 12,
+    "plannedOperations": 72,
+    "concurrency": 1
+  },
+  "profile": {
+    "endpoint": "http://127.0.0.1:8802/v1/chat/completions",
+    "model": "ddalcu--Qwen3.8-27B-MLX-Serve-8bit",
+    "thinking": false,
+    "tools": [],
+    "temperature": 0,
+    "maximumOutputTokens": 128,
+    "requestTimeoutMilliseconds": 120000,
+    "retries": 0
+  },
+  "offlineQualification": {
+    "status": "PASS",
+    "normalRuntimeReceiptSha256": "68eb80de2d27ba5ddee1bc58ed6813617f37ffec13514d805ac2cd74495a2038",
+    "optimizedRuntimeReceiptSha256": "68eb80de2d27ba5ddee1bc58ed6813617f37ffec13514d805ac2cd74495a2038",
+    "semanticMutationsRejected": 43,
+    "formatNonconformanceControls": 7,
+    "modelCalls": 0,
+    "networkActivity": "NONE"
+  },
+  "authority": {
+    "acceptanceRecorded": false,
+    "modelExecutionAuthorized": false,
+    "executionAttemptsAuthorized": 0,
+    "e1Authorized": false
+  }
+}

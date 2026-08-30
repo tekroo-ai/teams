@@ -1,0 +1,61 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_FINAL_P2_SUCCESSOR_V2_INDEPENDENT_REVIEW",
+  "reviewMode": "READ_ONLY_SINGLE_FINAL_REVIEW",
+  "verdict": "NO_GO",
+  "recommendation": "DO_NOT_ACCEPT_OR_FREEZE",
+  "reviewedIdentity": {
+    "packageSha256": "b57d766204081335de09364a51533d947ddd10297d29814ef8fab4982e8cb49f",
+    "configurationSha256": "ced7b980793d82df52a2d5cda8067147b4e56e99a91fae62c0d76608298e266b",
+    "runnerSha256": "092b19a683c1c9f6bb5571fc79dea9234de5a48c780c2a875a84cc1b4b47013e",
+    "qualifierSha256": "68e1ddf73dc359daf7565a08202093535cc03ca3e55ad89130a7c480b0748ec1",
+    "bridgeFaultFixtureSha256": "9356a12b73e199882506eeaab4f840e970b1f389463a5d02e07742d46fb67ba7",
+    "offlineQualificationReceiptSha256": "94eb67565ff7ce8085b6ec506496709cc4d9e0b8c5e5312c6f87574831f495d3"
+  },
+  "verifiedPasses": {
+    "publishedHashesMatch": true,
+    "dressObservationCount": 34,
+    "measuredPlanObservationCount": 103,
+    "caseCount": 20,
+    "scientificPredicateCount": 59,
+    "evidenceClassCount": 10
+  },
+  "blockingFindings": [
+    {
+      "id": "V2-BLOCK-001",
+      "classification": "OBSERVED",
+      "finding": "The runner queries memory provenance as top-level conversation_id, event_id, memory_id, trace_id, and source fields. The bound final-P2 MemoryDocumentMapper persists identity as _id and OpenHands provenance beneath origin.openhands_provenance.",
+      "sourcePath": "/Users/paul/work/tekroo-ai/sma-step15-s1-p2final/src/main/java/ai/tekroo/sma/mongo/MemoryDocumentMapper.java",
+      "sourceSha256": "a575fba58bce608c82c0b67c96c3980f2cb8ea483083fc3e83132ac47f53f435"
+    },
+    {
+      "id": "V2-BLOCK-002",
+      "classification": "OBSERVED",
+      "finding": "The runner filters Qdrant by conversation_id and requires trace_id provenance. The bound final-P2 QdrantVectorStore writes only memory_id and optional agent_id payloads.",
+      "sourcePath": "/Users/paul/work/tekroo-ai/sma-step15-s1-p2final/src/main/java/ai/tekroo/sma/vector/QdrantVectorStore.java",
+      "sourceSha256": "ebde338949a6267809f35712ed7fd10267d6f95aae0fb1232a079c7134e32e93"
+    },
+    {
+      "id": "V2-BLOCK-003",
+      "classification": "OBSERVED",
+      "finding": "The offline intake accepts human/task_content user events and excludes final agent responses. The bound final-P2 intake accepts conversation_input or delegated_agent with task_input, and agent_model with agent_response/final.",
+      "sourcePath": "/Users/paul/work/tekroo-ai/sma-step15-s1-p2final/src/main/java/ai/tekroo/sma/openhands/OpenHandsEventIntakeService.java",
+      "sourceSha256": "74283c37a9967cc571910c3c99dc4361859c470d75cf2ec7f2d516f5e7ffccf9"
+    },
+    {
+      "id": "V2-BLOCK-004",
+      "classification": "OBSERVED",
+      "finding": "The qualifier does not bind or test MemoryDocumentMapper, QdrantVectorStore, or OpenHandsEventIntakeService, so the offline PASS does not establish live schema reachability."
+    }
+  ],
+  "disposition": {
+    "successorV2": "PRESERVE_AS_REJECTED_HISTORICAL_EVIDENCE_NOT_ACCEPTED_NOT_FROZEN",
+    "additionalIterationAuthorized": false,
+    "livePreflight": "NOT_RUN",
+    "serviceStart": "NOT_RUN",
+    "liveDressRehearsal": "NOT_RUN",
+    "measuredExecution": "NOT_RUN",
+    "modelCalls": "NOT_RUN",
+    "productionHistoricalAccess": "NOT_RUN"
+  }
+}

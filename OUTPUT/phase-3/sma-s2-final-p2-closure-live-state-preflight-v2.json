@@ -1,0 +1,97 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_FINAL_P2_CLOSURE_LIVE_STATE_PREFLIGHT",
+  "recordedAt": "2026-08-29T01:57:46Z",
+  "status": "NO_GO_UNSAFE_INITIAL_CAPTURE_SCOPE",
+  "authorization": {
+    "executionIdentity": "bef7f4b85a50405e9489d31bac6293fdab49c3ac564e3b6d1b57fdbc21689666",
+    "scope": "ONE_READ_ONLY_LIVE_STATE_PREFLIGHT",
+    "serviceStart": false,
+    "serviceRestart": false,
+    "openhandsConversation": false,
+    "modelCall": false,
+    "liveDress": false,
+    "measuredExecution": false
+  },
+  "frozenIdentity": {
+    "executionIdentityRecomputed": true,
+    "executionIdentityRecordSha256": "3a271af242093f9df094f347f851a08dd7a0b23607784f8c5415cda4fdd61cab",
+    "acceptanceRecordSha256": "9b76e46f79810d0919c5aa72ce5579978617c8f17dd61f7422f262b390f03491",
+    "smaCommit": "fe9903cdf59497aabf12cbe7722e1397a1372068",
+    "smaTree": "fc2ae06c6333e94f6db34d691e50cb8bb1e5aa36",
+    "smaTrackedWorktreeClean": true,
+    "openhandsCommit": "a338ba9b6cbb529886b755a335bae3dee0004700",
+    "openhandsTree": "9e72f1b4ee0b857025d9f170600b9dce539b169a",
+    "openhandsExactBoundOverlayPaths": 5,
+    "unexpectedOpenhandsTrackedPaths": 0
+  },
+  "runtimeValidation": {
+    "frozenLiveComposition": "PASS_DEFAULT_DENY_LIVE_COMPOSITION",
+    "frozenActions": 21,
+    "liveExecutionPerformed": false,
+    "launchBoundFilesAndTrees": "PASS",
+    "openhandsVenvTreeSha256": "f40cba34f96f12117894376012d11f35dee9485d2f38552754602888d296c2d9",
+    "agentCanvasTreeSha256": "004c57d41fed43e0809df00ed90bcb67397f1d48a1ed4b610bdf09e15909f4ce",
+    "sessionKeyFileMode": "0600",
+    "sessionKeyValueRetained": false
+  },
+  "hostState": {
+    "requiredReachablePorts": {
+      "mongodb": 27017,
+      "qdrant": 6333,
+      "openhands": 8000
+    },
+    "requiredFreePorts": {
+      "smaBridge": 8130,
+      "stub": 19191,
+      "transportFailure": 19192,
+      "openhandsCaptureProxy": 19193
+    },
+    "openhandsHealth": "PASS",
+    "openhandsAuthenticatedSettings": "PASS_HTTP_200",
+    "qualificationOwnedLaunchLabelsLoaded": 0,
+    "qualificationOwnedProcessMatches": 0,
+    "workspaceRootAbsent": true,
+    "nonOwnedSmaProxyPreserved": {
+      "pidAtObservation": 1470,
+      "port": 8123,
+      "conflictsWithFrozenPorts": false
+    }
+  },
+  "disposableState": {
+    "mongoDatabase": "sma_s2_final_p2_closure",
+    "mongoDatabaseAbsent": true,
+    "qdrantSemanticCollection": "sma_s2_final_p2_closure_semantic",
+    "qdrantSemanticCollectionAbsent": true,
+    "qdrantEpisodicCollection": "sma_s2_final_p2_closure_episodic",
+    "qdrantEpisodicCollectionAbsent": true
+  },
+  "activeWork": {
+    "openhandsConversationsInspected": 36,
+    "runningWaitingOrDeleting": 0,
+    "tekrooTrader": {
+      "conversationId": "4c2e5f84-ecd3-4971-b375-a0fa9905a058",
+      "executionStatus": "paused",
+      "preserved": true
+    }
+  },
+  "failedPrecondition": {
+    "classification": "SAFETY",
+    "observedCondition": "The frozen runner starts SMA before it prepares qualification workspaces or installs the operation-specific capture allowlist.",
+    "runnerEvidence": "investigations/sma-q1/layered/sma-s2-final-p2-closure/t1/runner.py:_enter",
+    "productEvidence": "src/main/java/ai/tekroo/sma/openhands/OpenHandsEventIntakeService.java:isWorkspaceAllowed",
+    "mechanism": "The initial live state defaults capture to enabled and the allowlist to empty. Product code interprets an empty allowlist as allow every workspace. The first start can therefore scan existing OpenHands conversations, including the paused Tekroo Trader conversation, before the qualification allowlist is installed.",
+    "liveImpactObserved": false,
+    "reasonNoImpactOccurred": "Preflight authority prohibited service start, and no qualification-owned service was started."
+  },
+  "prohibitedActivity": {
+    "serviceStartOrRestart": "NOT_RUN",
+    "conversationMutation": "NOT_RUN",
+    "modelCall": "NOT_RUN",
+    "liveDress": "NOT_RUN",
+    "measuredExecution": "NOT_RUN",
+    "productionOrHistoricalDataMutation": "NOT_RUN"
+  },
+  "verdict": "NO_GO_STOPPED_BEFORE_SERVICE_START",
+  "nextDecision": "REMEDIATE_FAIL_CLOSED_STARTUP_ORDER_BEFORE_ANY_LIVE_SERVICE_AUTHORITY"
+}

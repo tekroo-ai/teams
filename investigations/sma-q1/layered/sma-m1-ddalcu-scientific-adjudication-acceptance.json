@@ -1,0 +1,67 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_M1_DDALCU_SCIENTIFIC_ADJUDICATION_ACCEPTANCE",
+  "acceptanceId": "SMA-M1-DDALCU-SCIENTIFIC-ADJUDICATION-ACCEPTANCE",
+  "status": "ACCEPTED_FROZEN_MODEL_PROFILE_MEMORY_USE_QUALIFIED_NO_FURTHER_AUTHORITY",
+  "recordedAt": "2026-08-30T13:34:17Z",
+  "principalStatement": "ACCEPT/FREEZE M1 as MODEL_PROFILE_MEMORY_USE_QUALIFIED.",
+  "acceptedArtifacts": {
+    "candidateAcceptance": {
+      "path": "investigations/sma-q1/layered/sma-m1-ddalcu-candidate-1-acceptance.json",
+      "sha256": "355802d70cd4622002a20def8271ae981329e369b861674dd0f7653af8d5e1a1"
+    },
+    "scientificAdjudication": {
+      "path": "OUTPUT/phase-3/sma-m1-ddalcu-candidate-1-measured-attempt-1/scientific-adjudication.json",
+      "sha256": "1bce015ad888f0d1018ca9d727ee53301e2b7d0f611913a38a0e4c6799f614f4"
+    },
+    "measuredResult": {
+      "path": "OUTPUT/phase-3/sma-m1-ddalcu-candidate-1-measured-attempt-1/measured-result.json",
+      "sha256": "be1a52f20bc554f657a79ad8841f28d6c3002be0ca44d5b35b91a3551b8ef709"
+    },
+    "evidenceLedger": {
+      "path": "OUTPUT/phase-3/sma-m1-ddalcu-candidate-1-measured-attempt-1/evidence-ledger.jsonl",
+      "sha256": "b1ab667ecd0fbf716de843803ac40df8b37fc5b160d018f60b0be5c68bc4d6f8"
+    },
+    "authorizationConsumption": {
+      "path": "OUTPUT/phase-3/sma-m1-ddalcu-candidate-1-measured-attempt-1/authorization-consumption.json",
+      "sha256": "ae96de4aeb4046f24662aa5aacc09f6bff611052d43a9b436064697e1ac444e8"
+    }
+  },
+  "acceptedClaim": {
+    "claim": "MODEL_PROFILE_MEMORY_USE_QUALIFIED",
+    "scope": "EXACT_DDALCU_QWEN38_27B_MLX_SERVE_8BIT_PROFILE_UNDER_FROZEN_M1_FIXTURES_AND_PARAMETERS",
+    "operationsPassed": 72,
+    "operationsExpected": 72,
+    "predicateFailures": 0,
+    "thinkingViolations": 0,
+    "protectedMarkerExposures": 0
+  },
+  "exactProfile": {
+    "provider": "LOCAL_MLX_SERVE",
+    "endpoint": "http://127.0.0.1:8802/v1/chat/completions",
+    "model": "ddalcu--Qwen3.8-27B-MLX-Serve-8bit",
+    "thinking": false,
+    "tools": [],
+    "temperature": 0,
+    "maximumOutputTokens": 128,
+    "concurrency": 1
+  },
+  "excludedClaims": [
+    "another model profile's qualification",
+    "model routing qualification",
+    "integrated E1 runtime qualification",
+    "production readiness"
+  ],
+  "authority": {
+    "additionalM1ExecutionAuthorized": false,
+    "consumedAuthorizationReusable": false,
+    "e1PreparationAuthorized": false,
+    "e1ExecutionAuthorized": false,
+    "productionOrHistoricalAccessAuthorized": false
+  },
+  "nextGate": "E1",
+  "immutability": {
+    "acceptedArtifactsMayBeEditedInPlace": false,
+    "successorIdentityRequiredForAnyChange": true
+  }
+}

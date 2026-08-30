@@ -1,0 +1,74 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_FINAL_P2_SUCCESSOR_V1_OFFLINE_READINESS",
+  "status": "PASS_READY_FOR_INDEPENDENT_REVIEW_NOT_ACCEPTED_NOT_FROZEN",
+  "claim": "OFFLINE_HARNESS_QUALIFIED_ONLY",
+  "upstream": {
+    "acceptedS1ReceiptSha256": "3315838d0c5047189494cece49b953481431321d16e238efa338712be076bee4",
+    "acceptedClaim": "SMA_SEMANTICS_QUALIFIED"
+  },
+  "package": {
+    "manifest": {
+      "path": "investigations/sma-q1/layered/sma-s2-final-p2-successor-v1.json",
+      "sha256": "04af8e49bbc613f29d0cdffa2ee69dc34fdc43277e02cb49ea9546bdcc1fcaed"
+    },
+    "sourceBindings": {
+      "path": "investigations/sma-q1/layered/sma-s2-final-p2-supported-source-bindings-v1.json",
+      "sha256": "24c1813e5843f78b6c2ef5a45f55421038faf467763313be1537beecefdc4301"
+    },
+    "runner": {
+      "path": "scripts/sma_s2_final_p2_successor_v1.py",
+      "sha256": "423f7292243d614d6ead26efae6463c6d78ed1f96f236755bdad961a7067c094"
+    },
+    "offlineQualifier": {
+      "path": "scripts/qualify_sma_s2_final_p2_successor_v1.py",
+      "sha256": "29d0454235305102a64ce357686c5c7110f8aad19aebdd74595577fb1247a6ff"
+    }
+  },
+  "qualification": {
+    "receipt": {
+      "path": "OUTPUT/phase-3/sma-s2-final-p2-successor-v1-offline-qualification/offline-qualification-receipt.json",
+      "sha256": "1994b5977c9b71e2dc6d08dce2fad47584031033a3ab45fdc4fa5181815ba345"
+    },
+    "testsPassed": 13,
+    "testsTotal": 13,
+    "dressOperationsPassed": 34,
+    "dressOperationsTotal": 34,
+    "measuredPlanRepetitionsPassed": 103,
+    "measuredPlanRepetitionsTotal": 103,
+    "scientificMutationControlsPassed": 59,
+    "scientificMutationControlsTotal": 59,
+    "requiredEvidenceMutationControlsPassed": 10,
+    "requiredEvidenceMutationControlsTotal": 10,
+    "optimizedRuntimeEquivalent": true,
+    "liveActivity": false,
+    "cleanupInventoryAbsent": true,
+    "retainedArtifacts": {
+      "dressWalkReceiptSha256": "20a8e4d1082a4498824c04a63a62eee12db5caafcec844d5af5cbb8821734d5d",
+      "dressWalkLedgerSha256": "d9ae18376121c8b103ae7175e822a0cfc782412d962a4d3d03685e63152541cf",
+      "measuredPlanWalkReceiptSha256": "e8803f3f26cf6952b47ad7d4f5d28040d4f107e0e20847d9701b3bf7e5d41f97",
+      "measuredPlanWalkLedgerSha256": "5232df453c9543703d60582f3d54e53ad9d4c83ff8a27412e90be84fc69af4f2"
+    }
+  },
+  "science": {
+    "preservedCaseCount": 20,
+    "preservedRepetitionCount": 103,
+    "preservedPredicateCount": 59,
+    "preservedEvidenceClassCount": 10,
+    "candidate10CreditImported": 0,
+    "candidate10Modified": false
+  },
+  "authority": {
+    "independentReviewAuthorized": false,
+    "principalAcceptanceRecorded": false,
+    "livePreflightAuthorized": false,
+    "serviceStartAuthorized": false,
+    "dressRehearsalAuthorized": false,
+    "measuredExecutionAuthorized": false,
+    "modelCallsAuthorized": false,
+    "m1Authorized": false,
+    "e1Authorized": false,
+    "productionOrHistoricalAccessAuthorized": false
+  },
+  "nextGate": "INDEPENDENT_READ_ONLY_PACKAGE_REVIEW_THEN_PRINCIPAL_ACCEPT_FREEZE_DECISION"
+}

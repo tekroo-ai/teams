@@ -1,0 +1,88 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_FINAL_P2_COMPOSITE_SCIENTIFIC_ADJUDICATION_ACCEPTANCE",
+  "acceptanceId": "SMA-S2-FINAL-P2-COMPOSITE-SCIENTIFIC-ADJUDICATION-ACCEPTANCE",
+  "status": "ACCEPTED_FROZEN_OPENHANDS_SMA_BOUNDARY_QUALIFIED_NO_FURTHER_EXECUTION_AUTHORITY",
+  "recordedAt": "2026-08-30T13:15:05Z",
+  "principalStatement": "ACCEPT/FREEZE and advance.",
+  "acceptedScience": {
+    "acceptedS1Receipt": {
+      "path": "investigations/sma-q1/layered/sma-s1-p2final-r1-scientific-adjudication-acceptance.json",
+      "sha256": "3315838d0c5047189494cece49b953481431321d16e238efa338712be076bee4"
+    },
+    "s2Preregistration": {
+      "path": "investigations/sma-q1/layered/sma-s2-preregistration-candidate-2.json",
+      "sha256": "b7315835b6291d44d3d8cb918dbec1f16c1e64f2106fd70212c6a8f7ec678188"
+    },
+    "s2Corpus": {
+      "path": "investigations/sma-q1/layered/sma-s2-measured-corpus-candidate-1.json",
+      "sha256": "c273c148a7b289f6650a26a82c38bda9680904701120e083543e9b7954b9a960"
+    },
+    "s2OracleMatrix": {
+      "path": "investigations/sma-q1/layered/sma-s2-predicate-oracle-matrix-candidate-4.json",
+      "sha256": "806e12a59dd8dcbc8f248d0a8d486c1afb856fc310e1952f7855e9fdf955d4f4"
+    }
+  },
+  "acceptedEvidence": {
+    "predecessorMeasuredResult": {
+      "path": "OUTPUT/phase-3/sma-s2-final-p2-repaired-measured-1/measured-result.json",
+      "sha256": "f095151fe5ad0a20ee8748d04977377c4f53ff1bb6f565f82aa559c755204aba",
+      "unaffectedOperationsAccepted": 98,
+      "supersededCase13Operations": 5
+    },
+    "case13RemediationPackageIdentity": "540388a53d243397aa3562a07952100334c20b3d05818aafe144f9c848f653d9",
+    "case13RemediationExecutionIdentity": "9632ffaf0eefad987e8eab81297ac1705b720265c3cd89513c88cbee9c77560c",
+    "focusedResult": {
+      "path": "OUTPUT/phase-3/sma-s2-final-p2-case13-remediation-1/focused-result.json",
+      "sha256": "f6a02c0a5412447b8c7ffa6c095789afb116d59f2b6b66c0ee2e11284d8fcd59",
+      "operationsPassed": 5,
+      "operationsExpected": 5
+    },
+    "focusedOperationEvidence": {
+      "path": "OUTPUT/phase-3/sma-s2-final-p2-case13-remediation-1/focused-operation-evidence.jsonl",
+      "sha256": "f14077cf779021b712dedf360a8cce8dc6dd18711a1a8eeb4062b94f29e618bf"
+    },
+    "focusedEvidenceLedger": {
+      "path": "OUTPUT/phase-3/sma-s2-final-p2-case13-remediation-1/focused-evidence-ledger.json",
+      "sha256": "846e4e51fc13e11dc0a52cffa2b27756cf88513e9e81807a68cb3be5ca1b903a"
+    },
+    "compositeResult": {
+      "path": "OUTPUT/phase-3/sma-s2-final-p2-case13-remediation-1/composite-result.json",
+      "sha256": "06614c7fe76acc89a80e3cc8d5e9c2adaa9ab3fc321f222c7ae6ed76748ec497",
+      "status": "PASS",
+      "operationsPassed": 103,
+      "operationsExpected": 103
+    }
+  },
+  "acceptedClaim": {
+    "claim": "OPENHANDS_SMA_BOUNDARY_QUALIFIED",
+    "scope": "EXACT_BOUND_FINAL_P2_SMA_AND_OPENHANDS_IMPLEMENTATIONS_UNDER_ACCEPTED_S1_AND_S2 QUALIFICATION",
+    "completedRepetitions": 103,
+    "failedRepetitions": 0,
+    "finalDisposableInventoryAbsent": true,
+    "realModelCalls": false,
+    "productionOrHistoricalDataAccessed": false
+  },
+  "excludedClaims": [
+    "model behavior qualification",
+    "integrated runtime qualification",
+    "production readiness"
+  ],
+  "nextGate": {
+    "gate": "M1",
+    "preparationAuthorizedByAdvance": true,
+    "modelExecutionAuthorized": false,
+    "e1Authorized": false
+  },
+  "authority": {
+    "additionalS2ExecutionAuthorized": false,
+    "m1PreparationAuthorized": true,
+    "m1ModelCallsAuthorized": false,
+    "e1Authorized": false,
+    "productionOrHistoricalAccessAuthorized": false
+  },
+  "immutability": {
+    "acceptedArtifactsMayBeEditedInPlace": false,
+    "successorIdentityRequiredForAnyChange": true
+  }
+}

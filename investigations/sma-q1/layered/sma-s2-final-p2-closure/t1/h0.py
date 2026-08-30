@@ -14,7 +14,14 @@ from .independent_reconstruct import reconstruct as independent_reconstruct
 from .model import OperationKey, RunMode, canonical_bytes, digest, file_sha256
 from .ports import OfflineFaults, OfflineWorld
 from .qualify_t2 import run_suite
-from .runner import Runner, RunnerConfiguration, dress_plan, measured_plan
+from .runner import (
+    DEFAULT_PROCESS_ACTION_TIMEOUT_MS,
+    LIFECYCLE_PROCESS_ACTION_TIMEOUT_MS,
+    Runner,
+    RunnerConfiguration,
+    dress_plan,
+    measured_plan,
+)
 from .truth import ProductTruth
 
 
@@ -93,6 +100,33 @@ def _controls(truth: ProductTruth) -> dict[str, Any]:
     )
     if startup_configuration["receipt"].get("argv", [])[-1].endswith("empty-uncaptured"):
         raise AssertionError("case 1 capture configuration included the uncaptured workspace")
+    process_timeouts = {
+        row["receipt"]["action"]: row["receipt"]["timeoutMs"]
+        for row in startup_calls
+        if row.get("kind") == "raw_action"
+        and row.get("action", "").startswith("PROCESS:")
+    }
+    for action in ("start_sma", "start_bridge", "cleanup_owned"):
+        if process_timeouts.get(action) != LIFECYCLE_PROCESS_ACTION_TIMEOUT_MS:
+            raise AssertionError(f"lifecycle action retained an undersized timeout: {action}")
+    if process_timeouts.get("start_stub") != DEFAULT_PROCESS_ACTION_TIMEOUT_MS:
+        raise AssertionError("non-lifecycle process timeout changed unexpectedly")
+    concurrency, _ = _run_walk(
+        truth,
+        [OperationKey("SMA-S2-013-FOUR-CHANNEL-CONCURRENCY", 1)],
+        RunMode.OFFLINE_DRESS,
+    )
+    concurrency_observation = concurrency[0].observation
+    if not concurrency[0].passed:
+        raise AssertionError("four-channel concurrency control failed")
+    if {row.get("mode") for row in concurrency_observation.model_requests} != {"CONCURRENT_SUCCESS"}:
+        raise AssertionError("four-channel requests did not use the concurrency rendezvous mode")
+    concurrency_telemetry = [
+        row for row in concurrency_observation.timings
+        if row.get("kind") == "concurrency"
+    ]
+    if len(concurrency_telemetry) != 1 or concurrency_telemetry[0].get("peakInFlight", 0) < 2:
+        raise AssertionError("four-channel overlap telemetry was not exercised")
     return {
         "delayedVisibilityAndBacklog": delayed,
         "journalFailures": journal,
@@ -100,10 +134,18 @@ def _controls(truth: ProductTruth) -> dict[str, Any]:
         "recoveryFailureImmediateStop": True,
         "candidate8WorkspaceIsolation": True,
         "failClosedStartupOrder": True,
+        "lifecycleTimeoutBudget": {
+            "lifecycleMs": LIFECYCLE_PROCESS_ACTION_TIMEOUT_MS,
+            "defaultMs": DEFAULT_PROCESS_ACTION_TIMEOUT_MS,
+        },
         "delayedJsonlEvidence": True,
         "delayedConversationTerminal": True,
         "lateNegativeStoreAppearanceRejected": True,
         "wholeOperationDeadlineEnforced": True,
+        "fourChannelRendezvous": {
+            "modelMode": "CONCURRENT_SUCCESS",
+            "minimumPeakInFlight": 2,
+        },
         "faultCasesCovered": {"hook": 5, "model": 4, "cancellation": 3},
     }
 

@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_FINAL_P2_CLOSURE_PACKAGE_SUPERSESSION",
+  "status": "SUPERSEDED_PRE_EXECUTION",
+  "decisionDate": "2026-08-28",
+  "principalDirective": "Fix this and complete the step as required.",
+  "supersededPackageIdentity": "0dbe7053cbb24938fb6c24b5e6a918d9008c65466ee00c01e481759198631fe0",
+  "supersededAcceptance": {
+    "path": "investigations/sma-q1/layered/sma-s2-final-p2-closure-package-acceptance.json",
+    "sha256": "cabc1d46bebf939063ff10e566ddc428830b867ccb2883998d625857a15ea481"
+  },
+  "preExecutionNoGo": {
+    "path": "OUTPUT/phase-3/sma-s2-final-p2-closure-execution-identity-preparation-no-go.json",
+    "sha256": "8a763a03dee98edd13eb470f74c975dda5fd15d4b11b5d112101e9f3df8186f5",
+    "observedBlockingCondition": "The frozen live action called replay_promotion on the bound SMA support module, but that module exports no replay_promotion callable."
+  },
+  "preservation": {
+    "acceptedPackageRecordPreserved": true,
+    "h0Attempt1Preserved": true,
+    "preExecutionNoGoPreserved": true,
+    "historicalReceiptsModified": false
+  },
+  "authority": {
+    "successorPreparation": true,
+    "livePreflight": false,
+    "serviceStart": false,
+    "openhandsConversation": false,
+    "generativeModelCall": false,
+    "liveDress": false,
+    "measuredExecution": false,
+    "productionOrHistoricalAccess": false
+  }
+}

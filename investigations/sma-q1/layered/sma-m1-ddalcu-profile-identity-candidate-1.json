@@ -1,0 +1,101 @@
+{
+  "schemaVersion": "1.0.0-candidate",
+  "recordType": "SMA_M1_MODEL_PROFILE_IDENTITY",
+  "candidate": 1,
+  "status": "PREPARED_NOT_ACCEPTED_NOT_EXECUTION_AUTHORITY",
+  "recordedAt": "2026-08-30T13:15:05Z",
+  "provider": "LOCAL_MLX_SERVE",
+  "api": {
+    "protocol": "OPENAI_COMPATIBLE",
+    "baseUrl": "http://127.0.0.1:8802/v1",
+    "chatCompletionsPath": "/chat/completions",
+    "modelsPath": "/models",
+    "bindAddress": "127.0.0.1",
+    "port": 8802,
+    "authentication": "NONE_LOOPBACK_ONLY",
+    "modelsResponseCanonicalSha256": "42fb5118ee53f1f316dc9b4a12c176fe71b04c8dee822eca6995b2d4ae12e9bc",
+    "modelsResponseCanonicalBytes": 693,
+    "observedModelState": "ready",
+    "observedContextLength": 262144,
+    "observedQuantization": "8-bit"
+  },
+  "runtime": {
+    "executable": "/opt/homebrew/bin/mlx-serve",
+    "executableSha256": "aabe7c5ff71daeac11b7a0855588581c95071087a5075001cc501d8ca2943912",
+    "version": "26.8.10",
+    "mlxVersion": "0.32.0",
+    "mlxCRevision": "fba4470b8907",
+    "nax": "ON_M5_NEURAL_ACCELERATORS",
+    "launchDefinition": "/Users/paul/Library/LaunchAgents/com.tekroo.mlx-serve-ddalcu-batch.plist",
+    "launchDefinitionSha256": "d70e6743b4e4e824034f2b20d7c97845f95ae20487a7f560ee7b2ca830ac4e7d",
+    "launchArguments": [
+      "/opt/homebrew/bin/mlx-serve",
+      "--model",
+      "/Users/paul/.local/share/tekroo-vllm-mlx/models/ddalcu--Qwen3.8-27B-MLX-Serve-8bit",
+      "--serve",
+      "--host",
+      "127.0.0.1",
+      "--port",
+      "8802",
+      "--no-vision",
+      "--no-pld",
+      "--no-mtp",
+      "--metrics",
+      "--timeout",
+      "1200"
+    ],
+    "mtpEnabled": false,
+    "pldEnabled": false,
+    "visionEnabled": false
+  },
+  "model": {
+    "apiModelId": "ddalcu--Qwen3.8-27B-MLX-Serve-8bit",
+    "artifactPath": "/Users/paul/.local/share/tekroo-vllm-mlx/models/ddalcu--Qwen3.8-27B-MLX-Serve-8bit",
+    "diskKiB": 30485108,
+    "architecture": "Qwen3_5ForConditionalGeneration",
+    "modelType": "qwen3_5",
+    "quantization": {
+      "bits": 8,
+      "groupSize": 64,
+      "mode": "affine"
+    },
+    "maximumContextTokens": 262144,
+    "artifacts": [
+      {"path": "model-00001.safetensors", "bytes": 6699043279, "sha256": "0db4119aaf3269f01e629fe67738632f0a44dc5433f84d5677ca2745e6afd65d"},
+      {"path": "model-00002.safetensors", "bytes": 5382572517, "sha256": "f8a67e1febc7e793e55ac28825fbe34aa671a53211212eb53e59fa57add55f10"},
+      {"path": "model-00003.safetensors", "bytes": 5448802532, "sha256": "98e5719bc628c9dd5311987120a92d3e9f2cda5604ed071d3a61a5ccb970a6d2"},
+      {"path": "model-00004.safetensors", "bytes": 5398689427, "sha256": "364692d97424074dd7c9679fe2a78fab1a2ac3cab4fd1d84c2e26a4e93fe7b38"},
+      {"path": "model-00005.safetensors", "bytes": 5420960896, "sha256": "cd1e82cf3a9137e97ba12b3148c6f95dfca6cc194e81d4a981bee1fe2910c24c"},
+      {"path": "model-00006.safetensors", "bytes": 2843508924, "sha256": "620dc8ebf9b5e2033abfbad38e65d11b22181e1e870404407be659aef6fd0435"},
+      {"path": "model.safetensors.index.json", "bytes": 192192, "sha256": "6e881f186eed7449477622a4cce4e94979b5d87827a9ad773feb2eb199bc0f98"},
+      {"path": "config.json", "bytes": 3809, "sha256": "b49a20cb4489c3290339c03256e75974c65bbd4d34bd2dbec5c293eb6f4e0b62"},
+      {"path": "generation_config.json", "bytes": 202, "sha256": "e70c136c1b78ddc1fb0905bac8e733a4dc448d4f852a5dd75143fffc70be550e"},
+      {"path": "tokenizer.json", "bytes": 12809320, "sha256": "0997f410c57a1f4e53b09e4be8f4a172d90edd9564368fb0847030937229b9f3"},
+      {"path": "tokenizer_config.json", "bytes": 17928, "sha256": "b11349aafa7cdc6a320767cf7ceb29ed82f7eda5d65e8e0819e76f0ce947bf27"},
+      {"path": "chat_template.jinja", "bytes": 8952, "sha256": "c3cf9e34abf4f9e36c2d72165aa9c132d3e2a725b6c2586aaa3a8af9d7a81041"},
+      {"path": "vocab.json", "bytes": 6722759, "sha256": "ce99b4cb2983d118806ce0a8b777a35b093e2000a503ebde25853284c9dfa003"},
+      {"path": "merges.txt", "bytes": 3353259, "sha256": "a9d356d7bdf1ef4949e3e748e95b8e10ad9d4e2e838eddc38a0a7b6b94d1db8d"}
+    ]
+  },
+  "profile": {
+    "thinking": false,
+    "thinkingControl": {"chat_template_kwargs": {"enable_thinking": false}},
+    "temperature": 0,
+    "topP": 1,
+    "maximumOutputTokens": 128,
+    "stream": false,
+    "tools": [],
+    "toolChoice": "NONE",
+    "seed": "UNSUPPORTED_OR_NOT_REPORTED",
+    "requestTimeoutMilliseconds": 120000,
+    "harnessRetries": 0,
+    "productRetries": 0,
+    "concurrency": 1,
+    "providerCostReporting": "NOT_REPORTED"
+  },
+  "authority": {
+    "modelCallsAuthorized": false,
+    "executionAttemptsAuthorized": 0,
+    "serviceStartOrRestartAuthorized": false
+  }
+}

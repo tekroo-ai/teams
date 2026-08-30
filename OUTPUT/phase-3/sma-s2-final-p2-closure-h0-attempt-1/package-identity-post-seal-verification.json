@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_FINAL_P2_PACKAGE_IDENTITY_POST_SEAL_VERIFICATION",
+  "status": "PASS_MECHANICAL_POST_SEAL_NOT_EXECUTION_AUTHORITY",
+  "packageIdentityPath": "investigations/sma-q1/layered/sma-s2-final-p2-closure-package-identity.json",
+  "packageIdentityFileSha256": "3fc853e3245762605dfabeed07d942f951db91dc1e6a722be62e81115132e9b5",
+  "packageIdentity": "0dbe7053cbb24938fb6c24b5e6a918d9008c65466ee00c01e481759198631fe0",
+  "verifiedBindings": 16,
+  "bindingMismatches": 0,
+  "identityRecomputed": true,
+  "dressWalkRecords": 34,
+  "measuredWalkRecords": 103,
+  "recordCountsMatch": true,
+  "t3ReviewedMutableTreeIdentity": "7dd43921357a3ad81d190ddd75228cfd6cfd2099439448c6c35a8f87c1e92adb",
+  "h0QualificationStatus": "PASS_H0_NONLIVE_NOT_EXECUTION_AUTHORITY",
+  "authority": {
+    "livePreflight": false,
+    "serviceStart": false,
+    "openhandsConversation": false,
+    "modelCall": false,
+    "liveDress": false,
+    "measuredExecution": false
+  },
+  "nextDecision": "PRINCIPAL_ACCEPT_FREEZE_PACKAGE_ONLY"
+}

@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_E1_DDALCU_CANDIDATE_2_ACCEPTANCE",
+  "status": "ACCEPTED_FROZEN",
+  "recordedAt": "2026-08-30T14:36:29Z",
+  "principalStatement": "Approved. Please proceed.",
+  "packageIdentity": "addf15192595f39f07594305f7eaa31bfb03fa771c601b6047de111d0292fd16",
+  "packageIdentityRecordSha256": "4bd4337638aa763788ab43ced60332805400100fdf4ecfc15836a51151ea6215",
+  "offlineQualificationSha256": "22713e65646f489196c1577488881bc74f0ed832337406b9ee945ff3ae178a04",
+  "executionIdentity": "8aec5b1b6923264cb552edf7d9b666bc2dc304891a3b2e73dbafcbdad40a521d",
+  "acceptedScope": "LIVE_ACTION_SUBPROCESS_DEPENDENCY_BOOTSTRAP_ONLY",
+  "scienceChanged": false,
+  "authority": {
+    "liveStatePreflight": true,
+    "serviceStartOrRestart": false,
+    "openhandsConversation": false,
+    "modelCall": false,
+    "measuredExecution": false,
+    "productionOrHistoricalDataAccess": false,
+    "commit": false,
+    "push": false
+  }
+}

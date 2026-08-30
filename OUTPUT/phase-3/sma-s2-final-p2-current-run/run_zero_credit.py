@@ -1,0 +1,102 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+
+
+RUN_DIR = Path(__file__).resolve().parent
+REPO = RUN_DIR.parents[2]
+PACKAGE = REPO / "investigations/sma-q1/layered/sma-s2-final-p2-closure"
+sys.path.insert(0, str(PACKAGE))
+
+from t1.live_entrypoint import compose  # noqa: E402
+from t1.model import LiveAuthority, RunMode, canonical_bytes, file_sha256  # noqa: E402
+
+
+def main() -> int:
+    package = RUN_DIR / "package.json"
+    authorization = RUN_DIR / "authorization.json"
+    execution = RUN_DIR / "execution.json"
+    marker = RUN_DIR / "consumed.json"
+    receipt_path = RUN_DIR / "zero-credit-result.json"
+    authority = LiveAuthority(
+        package_manifest_path=str(package),
+        package_manifest_sha256=file_sha256(package),
+        authorization_path=str(authorization),
+        authorization_sha256=file_sha256(authorization),
+        execution_identity_path=str(execution),
+        execution_identity_sha256=file_sha256(execution),
+        mode=RunMode.ZERO_CREDIT_DRESS,
+        consumed_marker_path=str(marker),
+    )
+
+    runner, plan = compose(REPO, RunMode.ZERO_CREDIT_DRESS, authority)
+    results = runner.run(plan)
+    rows = []
+    for result in results:
+        rows.append({
+            "caseId": result.observation.key.case_id,
+            "repetition": result.observation.key.repetition,
+            "passed": result.passed,
+            "failure": (
+                result.observation.failure.value
+                if result.observation.failure is not None
+                else None
+            ),
+            "failureDetail": result.observation.failure_detail,
+            "failedScientificOracles": [
+                item.oracle_id for item in result.scientific if not item.passed
+            ],
+            "failedEvidenceOracles": [
+                item.oracle_id for item in result.evidence if not item.passed
+            ],
+        })
+
+    definition = PACKAGE / "t1/live-launch-definition.json"
+    action_script = PACKAGE / "t1/live_actions.py"
+    live_python = json.loads(definition.read_text())["environment"]["livePython"]
+    inventory_process = subprocess.run(
+        [live_python, str(action_script), "--definition", str(definition), "inventory_owned"],
+        cwd=REPO,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=30,
+    )
+    inventory = (
+        json.loads(inventory_process.stdout)
+        if inventory_process.returncode == 0
+        else {"inventoryError": inventory_process.stderr[-1000:]}
+    )
+    passed = len(rows) == 34 and all(row["passed"] for row in rows)
+    receipt = {
+        "recordType": "SMA_S2_FINAL_P2_ZERO_CREDIT_RESULT",
+        "executionIdentity": "6681af348c21a90c6be7b85d62cf7214840763e46eadadc002fa6193b7658550",
+        "status": "PASS" if passed else "FAIL",
+        "operationsExpected": 34,
+        "operationsCompleted": len(rows),
+        "operationsPassed": sum(1 for row in rows if row["passed"]),
+        "results": rows,
+        "finalInventory": inventory,
+        "measuredCredit": False,
+    }
+    descriptor = os.open(receipt_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(descriptor, "wb") as stream:
+        stream.write(canonical_bytes(receipt) + b"\n")
+        stream.flush()
+        os.fsync(stream.fileno())
+    print(json.dumps({
+        "status": receipt["status"],
+        "operationsCompleted": len(rows),
+        "operationsPassed": receipt["operationsPassed"],
+        "finalInventory": inventory,
+    }, sort_keys=True))
+    return 0 if passed else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

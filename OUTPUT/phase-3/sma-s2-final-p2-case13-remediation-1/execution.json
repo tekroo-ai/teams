@@ -1,0 +1,19 @@
+{
+  "executionIdentity": "9632ffaf0eefad987e8eab81297ac1705b720265c3cd89513c88cbee9c77560c",
+  "identitySubject": {
+    "h0Sha256": "40f65b878ad53f06ef584445669b7e5b4ee3719787e67a8c6cae16ee5eb126a1",
+    "jarSha256": "89e8893badccb94a0f7b2ac361394659b066e61b542a847740d51336c04c4d44",
+    "launchSha256": "6db9f664abcbb608d090f51d3d4304ced7259cadb590e9ad03e744cdd9f11462",
+    "mode": "MEASURED",
+    "operations": 5,
+    "packageIdentity": "540388a53d243397aa3562a07952100334c20b3d05818aafe144f9c848f653d9",
+    "planSha256": "8702e1c73818967121930e9bbabce73a67982e7505333a497b5e541a6aacddaa",
+    "predecessorMeasuredResultSha256": "f095151fe5ad0a20ee8748d04977377c4f53ff1bb6f565f82aa559c755204aba",
+    "runnerSha256": "3aa7a23f83c76ad4bc465866e1b982ff38e1cb6dafb979594917702824419e6c",
+    "stubSha256": "f86fdcbe18c35757272b5c2fe0c060d7b836b8d405de0cd6b35d046eb81f4ff3"
+  },
+  "packageIdentity": "540388a53d243397aa3562a07952100334c20b3d05818aafe144f9c848f653d9",
+  "recordType": "SMA_S2_FINAL_P2_CASE13_REMEDIATION_EXECUTION_IDENTITY",
+  "recordedAt": "2026-08-30T12:33:05Z",
+  "status": "SEALED_SINGLE_USE"
+}

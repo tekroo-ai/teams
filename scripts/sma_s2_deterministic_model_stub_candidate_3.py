@@ -26,7 +26,12 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 BASE_PATH = ROOT / "scripts/sma_s2_deterministic_model_stub_candidate_2.py"
-SPECIAL_MODES = frozenset({"DELEGATION_TOOL", "INELIGIBLE_TOOL_TRAFFIC"})
+SPECIAL_MODES = frozenset({
+    "CONCURRENT_SUCCESS",
+    "DELEGATION_TOOL",
+    "INELIGIBLE_TOOL_TRAFFIC",
+})
+CONCURRENT_PARTNER_DEADLINE_SECONDS = 5.0
 
 
 def load_base():
@@ -43,6 +48,22 @@ base = load_base()
 
 class Candidate3Handler(base.DeterministicStubHandler):
     server_version = "SMA-S2-Deterministic-Stub-Candidate-3"
+    _concurrency_condition = threading.Condition()
+    _concurrency_arrivals: dict[tuple[str, int], int] = {}
+
+    @classmethod
+    def _await_concurrent_partner(cls, case_id: str, repetition: int) -> bool:
+        key = (case_id, repetition)
+        deadline = time.monotonic() + CONCURRENT_PARTNER_DEADLINE_SECONDS
+        with cls._concurrency_condition:
+            cls._concurrency_arrivals[key] = cls._concurrency_arrivals.get(key, 0) + 1
+            cls._concurrency_condition.notify_all()
+            while cls._concurrency_arrivals[key] < 2:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    return False
+                cls._concurrency_condition.wait(timeout=remaining)
+            return True
 
     def do_POST(self) -> None:
         if self.path != "/v1/chat/completions":
@@ -81,6 +102,44 @@ class Candidate3Handler(base.DeterministicStubHandler):
         self.state.raw.append(raw_record)
         self.state.operational.append({key: value for key, value in raw_record.items()
                                        if key != "requestBodyBase64"})
+
+        if mode == "CONCURRENT_SUCCESS":
+            partner_observed = self._await_concurrent_partner(case_id, repetition)
+            self.state.operational.append({
+                "recordType": "SMA_S2_STUB_CONCURRENCY_RENDEZVOUS",
+                "caseId": case_id,
+                "repetition": repetition,
+                "requestId": request_id,
+                "partnerObserved": partner_observed,
+            })
+            terminal = f"STUB_OK:{case_id}:{repetition}"
+            response = base.canonical_json_bytes({
+                "id": f"sma-s2-concurrent-{case_id}-{repetition}-{request_id}",
+                "object": "chat.completion",
+                "created": 0,
+                "model": "sma-s2-deterministic-stub-candidate-3",
+                "choices": [{
+                    "index": 0,
+                    "message": {"role": "assistant", "content": terminal},
+                    "finish_reason": "stop",
+                }],
+                "usage": {
+                    "prompt_tokens": 0,
+                    "completion_tokens": 0,
+                    "total_tokens": 0,
+                },
+            })
+            outcome = self._send_bytes(HTTPStatus.OK, response, "application/json")
+            self._record_terminal(
+                request_id=request_id,
+                case_id=case_id,
+                repetition=repetition,
+                mode=mode,
+                http_status=HTTPStatus.OK.value,
+                response_body=response,
+                outcome=outcome,
+            )
+            return
 
         try:
             request_payload = json.loads(body)

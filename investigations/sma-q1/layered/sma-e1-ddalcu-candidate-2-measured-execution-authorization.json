@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_E1_DDALCU_CANDIDATE_2_MEASURED_EXECUTION_AUTHORIZATION",
+  "status": "AUTHORIZED_SINGLE_USE_NOT_YET_CONSUMED",
+  "recordedAt": "2026-08-30T14:39:41Z",
+  "principalStatement": "kAuthorized. Please proceed.",
+  "packageIdentity": "addf15192595f39f07594305f7eaa31bfb03fa771c601b6047de111d0292fd16",
+  "packageIdentityRecordSha256": "4bd4337638aa763788ab43ced60332805400100fdf4ecfc15836a51151ea6215",
+  "packageAcceptanceSha256": "83cf5968f367ad85b6c66ae6ce5710e1b0e5420ac0180edcf4ec6e7f80485dc6",
+  "offlineQualificationSha256": "22713e65646f489196c1577488881bc74f0ed832337406b9ee945ff3ae178a04",
+  "executionIdentity": "8aec5b1b6923264cb552edf7d9b666bc2dc304891a3b2e73dbafcbdad40a521d",
+  "executionIdentityRecordSha256": "f1b216b6d360c34ab6e862ae970520abf9b47d37f08f0959a009d6b184f6cbb3",
+  "executionIdentityAcceptanceSha256": "59e6ff757d0e3fcd82ee547a7911053e15fe4d1501d341e694f87760f6cd4f6c",
+  "preflightReceiptSha256": "cf28d49894e3cc619797da8d480c00b66825e951bae3982e4a56dec161233486",
+  "executionDriverSha256": "9f9612476e315167a8271bf9d1f3595d2ef7fa7b9c447373c12108d4e7e331df",
+  "mode": "MEASURED",
+  "singleUse": true,
+  "maximumAttempts": 1,
+  "automaticReruns": 0,
+  "maximumScenarios": 18,
+  "maximumRepetitions": 96,
+  "authorizedActivity": {
+    "qualificationOwnedServiceStartAndStop": true,
+    "qualificationOwnedOpenHandsConversations": true,
+    "exactBoundModelCalls": true,
+    "disposableNamespaceUseAndCleanup": true,
+    "measuredE1Execution": true
+  },
+  "notAuthorized": {
+    "secondAttempt": true,
+    "automaticRerun": true,
+    "differentModelOrProfile": true,
+    "productionOrHistoricalDataAccess": true,
+    "commit": true,
+    "push": true
+  },
+  "stopRule": "STOP_ON_HARNESS_ENVIRONMENT_OR_SAFETY_FAILURE_AND_RETAIN_EVIDENCE"
+}

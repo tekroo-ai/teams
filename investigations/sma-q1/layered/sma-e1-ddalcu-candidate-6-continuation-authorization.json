@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_E1_DDALCU_CANDIDATE_6_CONTINUATION_PRINCIPAL_AUTHORIZATION",
+  "status": "AUTHORIZED_BY_PRINCIPAL",
+  "readinessIdentity": "f84ad94c5f239af38799e307f1868762a85361b40c3498c6ac8a07b13ae5bed7",
+  "readinessRecordSha256": "7c0734f196fa9ebec45cd435cba7875836a320b6620734ab97dbb09d7c57c486",
+  "packageIdentity": "1717983362120d429412a5f63c9e89174b5b31220a9753b5f34df04e4e4fa4e5",
+  "sourceCanaryReceiptSha256": "ebf1032def32047a9a63800b45abf2a138377a84ed67663e2398c1dc05e4c065",
+  "offlineAdjudicationReceiptSha256": "33815ceef2dba287e8ea6635f8d834c5c9c021c5dfd43a98c22782d05f4b7e31",
+  "scope": "SCENARIOS_14_THROUGH_18_ZERO_CREDIT_CONTINUATION",
+  "mode": "ZERO_CREDIT_DRESS",
+  "singleUse": true,
+  "maximumScenarios": 5,
+  "maximumRepetitions": 5,
+  "automaticReruns": 0,
+  "preserveRecordedScenarios": {
+    "first": 1,
+    "last": 13,
+    "repeat": false
+  },
+  "measuredExecution": false,
+  "principalStatement": "AUTHORIZE one single-use zero-credit candidate-6 continuation for scenarios 14–18 against readiness identity f84ad94c5f239af38799e307f1868762a85361b40c3498c6ac8a07b13ae5bed7. Preserve scenarios 1–13 from the recorded checkpoint, prohibit automatic reruns, and stop on any failed condition. This does not authorize measured execution."
+}

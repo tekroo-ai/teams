@@ -1,0 +1,45 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_FINAL_P2_CLOSURE_EXECUTION_IDENTITY_PREPARATION_RECEIPT",
+  "recordedAt": "2026-08-29T00:44:52Z",
+  "status": "PASS_PREPARED_PENDING_PRINCIPAL_ACCEPT_FREEZE",
+  "executionIdentityRecord": {
+    "path": "investigations/sma-q1/layered/sma-s2-final-p2-closure-execution-identity-v2.json",
+    "sha256": "3a271af242093f9df094f347f851a08dd7a0b23607784f8c5415cda4fdd61cab"
+  },
+  "executionIdentity": {
+    "declared": "bef7f4b85a50405e9489d31bac6293fdab49c3ac564e3b6d1b57fdbc21689666",
+    "recomputed": "bef7f4b85a50405e9489d31bac6293fdab49c3ac564e3b6d1b57fdbc21689666",
+    "match": true
+  },
+  "acceptedPackageIdentity": "5f1a91eef803deb8777e07085aa16574b1144a1500657a8444c62a411ca6b5e0",
+  "verifiedProductState": {
+    "smaCommit": "fe9903cdf59497aabf12cbe7722e1397a1372068",
+    "smaTree": "fc2ae06c6333e94f6db34d691e50cb8bb1e5aa36",
+    "smaTrackedWorktreeClean": true,
+    "openhandsCommit": "a338ba9b6cbb529886b755a335bae3dee0004700",
+    "openhandsTree": "9e72f1b4ee0b857025d9f170600b9dce539b169a",
+    "openhandsExactBoundOverlayPaths": 5,
+    "unexpectedOpenhandsTrackedPaths": 0
+  },
+  "verifiedRuntime": {
+    "dependencyTreesBound": true,
+    "agentCanvasLaunchChainBound": true,
+    "sessionKeyValueReadOrRetained": false,
+    "sessionKeyFileMode": "0600",
+    "disposableNamespacesBound": true,
+    "loopbackPortsBound": true
+  },
+  "notRun": [
+    "live-state preflight",
+    "service start or restart",
+    "OpenHands conversation",
+    "model call",
+    "live dress rehearsal",
+    "measured execution",
+    "M1",
+    "E1",
+    "production or historical data access"
+  ],
+  "nextDecision": "PRINCIPAL_ACCEPT_FREEZE_EXECUTION_IDENTITY_ONLY"
+}

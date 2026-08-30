@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_FINAL_P2_CLOSURE_PACKAGE_ACCEPTANCE",
+  "status": "ACCEPTED_FROZEN",
+  "principalDecision": "Accept and proceed with the next step.",
+  "decisionDate": "2026-08-28",
+  "packageIdentity": "0dbe7053cbb24938fb6c24b5e6a918d9008c65466ee00c01e481759198631fe0",
+  "packageIdentityRecord": {
+    "path": "investigations/sma-q1/layered/sma-s2-final-p2-closure-package-identity.json",
+    "sha256": "3fc853e3245762605dfabeed07d942f951db91dc1e6a722be62e81115132e9b5"
+  },
+  "postSealVerification": {
+    "path": "OUTPUT/phase-3/sma-s2-final-p2-closure-h0-attempt-1/package-identity-post-seal-verification.json",
+    "sha256": "b013dcfffd7eed3f56e83fd9a9f4d4e68ffdb0fb39e24bbf0445eb9de57b913c"
+  },
+  "acceptedScope": "PACKAGE_ONLY",
+  "authority": {
+    "executionIdentityAccepted": false,
+    "livePreflight": false,
+    "serviceStart": false,
+    "openhandsConversation": false,
+    "modelCall": false,
+    "liveDress": false,
+    "measuredExecution": false,
+    "m1": false,
+    "e1": false,
+    "productionOrHistoricalAccess": false,
+    "commit": false,
+    "push": false
+  },
+  "nextStep": "PREPARE_SEPARATE_EXECUTION_IDENTITY"
+}

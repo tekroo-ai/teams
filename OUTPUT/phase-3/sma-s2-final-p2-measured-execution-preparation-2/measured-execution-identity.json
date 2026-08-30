@@ -1,0 +1,36 @@
+{
+  "recordType": "SMA_S2_FINAL_P2_MEASURED_EXECUTION_IDENTITY_SUCCESSOR",
+  "status": "PREPARED_NOT_AUTHORIZED_NOT_CONSUMABLE",
+  "attempt": 2,
+  "mode": "MEASURED",
+  "packageIdentity": "270594670d9edcb4ac71a6a6f6ec92ac0b09fecd454807e37ecdd175f20b64c2",
+  "sealIdentity": "6c2f76bf6c45f45a4428f003de932ee9334751b4ec425a72f711866df011ed1f",
+  "rehearsalAcceptanceIdentity": "c8c487d5c10226ebb76850635d7a0506009feed2bfc9739e0ef7f66f220aaca3",
+  "plan": {
+    "caseCount": 20,
+    "operationCount": 103,
+    "canonicalSha256": "4c0ffad0996747cfa7002694461048e7b7ea3aae2d3731757efdb7b150024fa6"
+  },
+  "supersedes": {
+    "executionIdentity": "85245a0351982ff0a3ab524e11b0e6826ff6b7d23ce42309e539ab651fdbd0e2",
+    "resultSha256": "cec6f1d6cede9dcb561f2d148a7148f14edc9353ea8e5a1cda6c2df14f148b23",
+    "classification": "ENVIRONMENTAL_AGENT_CANVAS_RESTART",
+    "resumeCredit": false
+  },
+  "singleUse": true,
+  "authority": {
+    "authorizationFileCreated": false,
+    "consumptionMarkerCreated": false,
+    "liveExecution": false,
+    "measuredExecution": false,
+    "modelCalls": false,
+    "serviceStart": false
+  },
+  "scope": {
+    "m1": false,
+    "e1": false,
+    "productionData": false,
+    "historicalData": false
+  },
+  "identityBasisSha256": "23262b987196522ad7c420546c982e95901f0e9f65c5ae914606563ec3bfd069"
+}

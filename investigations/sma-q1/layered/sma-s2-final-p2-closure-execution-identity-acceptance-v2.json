@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_FINAL_P2_CLOSURE_EXECUTION_IDENTITY_ACCEPTANCE",
+  "status": "ACCEPTED_FROZEN_EXECUTION_IDENTITY",
+  "recordedAt": "2026-08-29T01:52:12Z",
+  "principalDecision": "ACCEPT/FREEZE the execution identity bef7f4b85a50405e9489d31bac6293fdab49c3ac564e3b6d1b57fdbc21689666.",
+  "executionIdentity": "bef7f4b85a50405e9489d31bac6293fdab49c3ac564e3b6d1b57fdbc21689666",
+  "executionIdentityRecord": {
+    "path": "investigations/sma-q1/layered/sma-s2-final-p2-closure-execution-identity-v2.json",
+    "sha256": "3a271af242093f9df094f347f851a08dd7a0b23607784f8c5415cda4fdd61cab"
+  },
+  "preparationReceipt": {
+    "path": "OUTPUT/phase-3/sma-s2-final-p2-closure-successor-h0/execution-identity-preparation-receipt-v2.json",
+    "sha256": "e1cd4b406818ae66b76f6ad5764d161ee0596cfff13c2778d7ca6ad25cfdc269"
+  },
+  "acceptedPackageIdentity": "5f1a91eef803deb8777e07085aa16574b1144a1500657a8444c62a411ca6b5e0",
+  "acceptedScope": "EXECUTION_IDENTITY_ONLY",
+  "authority": {
+    "liveStatePreflight": false,
+    "serviceStart": false,
+    "serviceRestart": false,
+    "openhandsConversation": false,
+    "modelCall": false,
+    "liveDress": false,
+    "measuredExecution": false,
+    "m1": false,
+    "e1": false,
+    "productionOrHistoricalAccess": false,
+    "commit": false,
+    "push": false
+  },
+  "nextStep": "AUTHORIZE_ONE_READ_ONLY_LIVE_STATE_PREFLIGHT"
+}

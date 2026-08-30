@@ -1,0 +1,9 @@
+{
+  "recordType": "SMA_S2_FINAL_P2_RUN_PACKAGE",
+  "status": "SEALED",
+  "packageIdentity": "270594670d9edcb4ac71a6a6f6ec92ac0b09fecd454807e37ecdd175f20b64c2",
+  "sealIdentity": "6c2f76bf6c45f45a4428f003de932ee9334751b4ec425a72f711866df011ed1f",
+  "rehearsalAcceptanceIdentity": "c8c487d5c10226ebb76850635d7a0506009feed2bfc9739e0ef7f66f220aaca3",
+  "mutablePackageManifestSha256": "270594670d9edcb4ac71a6a6f6ec92ac0b09fecd454807e37ecdd175f20b64c2",
+  "liveLaunchDefinitionSha256": "dfb2a71695bdb9ae6f14da47dff0861afe35df9a87e66b0da5b17e120c696a81"
+}

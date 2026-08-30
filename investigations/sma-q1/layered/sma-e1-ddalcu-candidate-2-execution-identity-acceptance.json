@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_E1_DDALCU_CANDIDATE_2_EXECUTION_IDENTITY_ACCEPTANCE",
+  "status": "ACCEPTED_FROZEN_EXECUTION_IDENTITY",
+  "recordedAt": "2026-08-30T14:36:29Z",
+  "principalStatement": "Approved. Please proceed.",
+  "packageIdentity": "addf15192595f39f07594305f7eaa31bfb03fa771c601b6047de111d0292fd16",
+  "executionIdentity": "8aec5b1b6923264cb552edf7d9b666bc2dc304891a3b2e73dbafcbdad40a521d",
+  "executionIdentityRecordSha256": "f1b216b6d360c34ab6e862ae970520abf9b47d37f08f0959a009d6b184f6cbb3",
+  "preparationReceiptSha256": "399f5973d124ad3ea23dd31db03a9484db540342823eeaab48e92aae67300529",
+  "authority": {
+    "liveStatePreflight": true,
+    "serviceStartOrRestart": false,
+    "openhandsConversation": false,
+    "modelCall": false,
+    "measuredExecution": false,
+    "productionOrHistoricalDataAccess": false,
+    "commit": false,
+    "push": false
+  },
+  "stopRule": "STOP_ON_ANY_FAILED_PREFLIGHT_PRECONDITION"
+}

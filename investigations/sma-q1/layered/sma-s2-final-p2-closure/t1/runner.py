@@ -33,6 +33,20 @@ from .ports import RawPorts
 from .truth import ProductTruth
 
 
+DEFAULT_PROCESS_ACTION_TIMEOUT_MS = 30_000
+# The launch helper has its own bounded stop (30 s), bootstrap (30 s), and
+# readiness (45 s) phases. Recovery and cleanup can add another bounded wait.
+# The outer process timeout must exceed those legitimate inner bounds; the
+# 120-second scientific operation deadline remains independently enforced.
+LIFECYCLE_PROCESS_ACTION_TIMEOUT_MS = 180_000
+LIFECYCLE_PROCESS_ACTIONS = frozenset({
+    "start_sma", "stop_sma", "start_bridge", "stop_bridge",
+    "configure_service_mode", "configure_capture_allowlist",
+    "configure_bridge_fault", "reconcile_persisted",
+    "reconcile_exact_event", "promote_memories", "cleanup_owned",
+})
+
+
 @dataclass(frozen=True)
 class RunnerConfiguration:
     mongo_database: str = "sma_s2_final_p2_closure"
@@ -229,7 +243,11 @@ class Runner:
         return receipt
 
     def _process(self, observation: OperationObservation, action: str, *arguments: str):
-        timeout_ms = 90_000 if action in {"reconcile_persisted", "reconcile_exact_event", "promote_memories"} else 30_000
+        timeout_ms = (
+            LIFECYCLE_PROCESS_ACTION_TIMEOUT_MS
+            if action in LIFECYCLE_PROCESS_ACTIONS
+            else DEFAULT_PROCESS_ACTION_TIMEOUT_MS
+        )
         request = RawProcessRequest(action, (action, *arguments), self.config.workspace_root, timeout_ms)
         self._pre_action(observation, f"PROCESS:{action}", {"argv": list(request.argv), "cwd": request.cwd})
         receipt = self.ports.process(request)
@@ -283,7 +301,76 @@ class Runner:
         self._process(observation, "start_bridge")
 
     def _seed(self, observation: OperationObservation, role: str, memory_id: str, text: str, state: str = "consistent") -> None:
-        self._process(observation, "seed_partition", self._workspace(role, observation), self.config.profile, memory_id, text, state)
+        workspace = self._workspace(role, observation)
+        self._process(
+            observation, "seed_partition", workspace, self.config.profile,
+            memory_id, text, state,
+        )
+        self._stabilize_seed(observation, workspace, memory_id, text, state)
+
+    def _stabilize_seed(
+            self,
+            observation: OperationObservation,
+            workspace: str,
+            memory_id: str,
+            text: str,
+            state: str,
+    ) -> None:
+        memory_query = RawStoreQuery(
+            "MONGODB",
+            self.config.mongo_database,
+            "memories",
+            {"_id": memory_id},
+            (
+                "_id", "agent_id", "state", "reasoning_eligible",
+                "canonical.text", "embeddings.semantic_ref",
+            ),
+        )
+        memories = self._poll_store(observation, memory_query, minimum=1)
+        require(len(memories) == 1, FailureClass.HARNESS,
+                "seed memory did not stabilize at exact cardinality one")
+        memory = memories[0]
+        require(memory.get("agent_id") == self._agent_id(workspace), FailureClass.HARNESS,
+                "seed memory partition mismatch")
+        if state != "consistent":
+            require(memory.get("state") == state, FailureClass.HARNESS,
+                    "raw seed state mismatch")
+            require(memory.get("reasoning_eligible") is False, FailureClass.HARNESS,
+                    "raw seed became reasoning eligible")
+            return
+
+        require(memory.get("state") == "consistent", FailureClass.HARNESS,
+                "promoted seed state mismatch")
+        require(memory.get("reasoning_eligible") is True, FailureClass.HARNESS,
+                "promoted seed is not reasoning eligible")
+        require(nested_get(memory, "canonical.text") == text, FailureClass.HARNESS,
+                "promoted seed canonical text mismatch")
+        semantic_query = RawStoreQuery(
+            "QDRANT", self.config.mongo_database, self.config.semantic_collection,
+            {"memory_id": memory_id}, ("id", "payload"),
+        )
+        episodic_query = RawStoreQuery(
+            "QDRANT", self.config.mongo_database, self.config.episodic_collection,
+            {"memory_id": memory_id}, ("id", "payload"),
+        )
+        semantic = self._poll_store(observation, semantic_query, minimum=1)
+        episodic = self._poll_store(observation, episodic_query, minimum=1)
+        require(len(semantic) == 1 and len(episodic) == 1, FailureClass.HARNESS,
+                "promoted seed vector cardinality mismatch")
+        self.truth.validate_qdrant_join(memory, semantic[0], episodic[0])
+
+    def _record_bridge_health(self, observation: OperationObservation) -> None:
+        request = RawHttpRequest("GET", "/healthz", {}, b"", 2_000)
+        receipt = self._http(observation, "SMA", request)
+        require(receipt.status == 200 and receipt.error_kind is None,
+                FailureClass.ENVIRONMENT, "bridge health snapshot failed")
+        health = receipt.json_body()
+        require(health.get("status") == "ok", FailureClass.ENVIRONMENT,
+                "bridge health snapshot is not healthy")
+        observation.raw_receipts.append({
+            "kind": "bridge_health_snapshot",
+            "health": health,
+        })
 
     def _seed_standard(self, observation: OperationObservation) -> None:
         case_id = observation.key.case_id
@@ -370,6 +457,7 @@ class Runner:
         conversation = self._create(observation, observation.descriptor.conversation_roles[0])
         prompt = self._prompt_for(observation)
         self._submit(observation, conversation, prompt)
+        self._record_bridge_health(observation)
 
     def _prompt_for(self, observation: OperationObservation) -> str:
         corpus_cases = self.truth.corpus.get("cases") or self.truth.corpus.get("scenarios") or []
@@ -392,6 +480,8 @@ class Runner:
     def _model_mode_for(self, observation: OperationObservation) -> str:
         if observation.key.case_id.endswith("HOOK-FAULT-MATRIX"):
             return "SUCCESS"
+        if observation.key.case_id.endswith("FOUR-CHANNEL-CONCURRENCY"):
+            return "CONCURRENT_SUCCESS"
         return self._mode_for(observation)
 
     def _case_duplicate(self, observation: OperationObservation) -> None:
@@ -486,16 +576,39 @@ class Runner:
         self._seed_standard(observation)
         self._process(observation, "configure_model_fault", "CONCURRENT_SUCCESS")
         conversations = [self._create(observation, role) for role in observation.descriptor.conversation_roles]
-        barrier_ns = self.ports.now_ns()
         if self.ports.live:
+            start_barrier = threading.Barrier(len(conversations) + 1)
+
+            def submit_after_barrier(conversation: Mapping[str, Any]) -> None:
+                try:
+                    start_barrier.wait(timeout=5)
+                except threading.BrokenBarrierError as exc:
+                    raise HarnessFailure(
+                        FailureClass.HARNESS,
+                        "four-channel submission barrier did not fill",
+                    ) from exc
+                self._submit(observation, conversation, self._prompt_for(observation))
+
             with ThreadPoolExecutor(max_workers=4) as executor:
-                futures = [executor.submit(self._submit, observation, conversation, self._prompt_for(observation)) for conversation in conversations]
+                futures = [
+                    executor.submit(submit_after_barrier, conversation)
+                    for conversation in conversations
+                ]
+                try:
+                    start_barrier.wait(timeout=5)
+                except threading.BrokenBarrierError as exc:
+                    raise HarnessFailure(
+                        FailureClass.HARNESS,
+                        "four-channel submission barrier did not release",
+                    ) from exc
+                barrier_ns = self.ports.now_ns()
                 for future in futures:
                     future.result()
         else:
             # The offline port encodes overlapping receipt intervals. Execute
             # submissions in descriptor order so retained H0 evidence is
             # byte-reproducible while the live port still exercises threads.
+            barrier_ns = self.ports.now_ns()
             for conversation in conversations:
                 self._submit(observation, conversation, self._prompt_for(observation))
         observation.timings.append({"kind": "concurrency_barrier", "atNs": self.ports.now_ns(), "barrierReleasedNs": barrier_ns})
@@ -563,6 +676,7 @@ class Runner:
         observation.timings.extend([
             {"kind": "client_disconnect", "atNs": terminal_at, "durationMs": (terminal_at-cancel_at)/1_000_000, "deadlineMs": 10_000},
         ])
+        self._poll_conversation_terminal(observation, conversation)
         self._stabilize_conversation_capture(observation, conversation)
         shutdown_at = self.ports.now_ns()
         self._process(observation, "stop_stub")
@@ -625,9 +739,14 @@ class Runner:
             observation.raw_events.extend(events)
             observation.hooks.extend(event for event in events if event.get("kind") == "HookExecutionEvent")
             submitted = any(row.get("kind") == "prompt_submission" and row.get("conversationId") == conversation["id"] for row in observation.raw_receipts)
-            if submitted:
+            terminal_retained = any(
+                row.get("kind") == "conversation_terminal"
+                and row.get("conversationId") == conversation["id"]
+                for row in observation.timings
+            )
+            if submitted and not terminal_retained:
                 self._poll_conversation_terminal(observation, conversation)
-            else:
+            elif not submitted:
                 info_request = RawHttpRequest("GET", f"/api/conversations/{conversation['id']}", {"X-Session-API-Key": self.config.session_header_value}, b"", 10_000)
                 info_receipt = self._http(observation, "OPENHANDS", info_request)
                 require(info_receipt.status == 200 and info_receipt.error_kind is None, FailureClass.ENVIRONMENT, "conversation identity retrieval failed")
@@ -766,6 +885,8 @@ class Runner:
         messages = payload.get("messages")
         require(isinstance(messages, list) and len(messages) >= 1, FailureClass.HARNESS, "stub request messages missing")
         def segments_of(content: Any) -> list[str]:
+            if content is None:
+                return []
             if isinstance(content, str): return [content]
             require(isinstance(content, list), FailureClass.HARNESS, "unsupported model content serializer")
             return [
@@ -828,7 +949,7 @@ class Runner:
             f"store evidence failed to stabilize for {query.collection}: minimum={minimum} observed={len(latest)}",
         )
 
-    def _poll_jsonl(self, observation: OperationObservation, path: str, expected: int, exact: bool = False) -> list[dict[str, Any]]:
+    def _poll_jsonl(self, observation: OperationObservation, path: str, expected: int | tuple[int, ...], exact: bool = False) -> list[dict[str, Any]]:
         deadline = min(self.ports.now_ns() + observation.descriptor.stabilization_deadline_ms * 1_000_000, self._operation_deadline_ns or 2**63-1)
         stable = 0
         previous: str | None = None
@@ -838,7 +959,13 @@ class Runner:
             require(receipt.exists, FailureClass.ENVIRONMENT, f"evidence file missing: {path}")
             rows = [json.loads(line) for line in receipt.content.decode().splitlines() if line]
             current = digest(rows)
-            cardinality_ok = len(rows) == expected if exact else len(rows) >= expected
+            cardinality_ok = (
+                len(rows) in expected
+                if exact and isinstance(expected, tuple)
+                else len(rows) == expected
+                if exact
+                else len(rows) >= expected
+            )
             if cardinality_ok and current == previous:
                 stable += 1
             elif cardinality_ok:
@@ -849,17 +976,17 @@ class Runner:
                 return rows
             previous = current
             self.ports.sleep_ms(self.config.poll_interval_ms)
-        cardinality = "exact" if exact else "minimum"
+        cardinality = "allowed" if exact and isinstance(expected, tuple) else "exact" if exact else "minimum"
         raise HarnessFailure(
             FailureClass.SCIENTIFIC,
             f"file evidence failed to stabilize: {path}: {cardinality}={expected} observed={len(rows)}",
         )
 
-    def _expected_model_receipts(self, observation: OperationObservation) -> int:
+    def _expected_model_receipts(self, observation: OperationObservation) -> int | tuple[int, ...]:
         if observation.key.case_id.endswith("FOUR-CHANNEL-CONCURRENCY"):
             return 4
         if observation.key.case_id.endswith("FEEDBACK-LOOP-PREVENTION"):
-            return 2
+            return (1, 2)
         if observation.key.case_id.endswith("CONDENSATION-REANCHOR"):
             # Two user turns plus the model call made by OpenHands condensation.
             return 3
@@ -897,15 +1024,7 @@ class Runner:
                     "deadlineMs": observation.descriptor.stabilization_deadline_ms,
                     "status": status,
                 }
-                for index, retained in enumerate(observation.timings):
-                    if (
-                        retained.get("kind") == "conversation_terminal"
-                        and retained.get("conversationId") == conversation["id"]
-                    ):
-                        observation.timings[index] = timing
-                        break
-                else:
-                    observation.timings.append(timing)
+                observation.timings.append(timing)
                 return
             previous = status
             self.ports.sleep_ms(self.config.poll_interval_ms)

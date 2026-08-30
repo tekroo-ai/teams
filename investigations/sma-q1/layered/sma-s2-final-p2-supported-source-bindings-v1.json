@@ -1,0 +1,51 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_FINAL_P2_SUPPORTED_SOURCE_BINDINGS",
+  "status": "BOUND_FOR_OFFLINE_QUALIFICATION",
+  "openhands": {
+    "repositoryRoot": "/Users/paul/.local/src/openhands-software-agent-sdk-1.40.1-parallel",
+    "commit": "a338ba9b6cbb529886b755a335bae3dee0004700",
+    "tree": "9e72f1b4ee0b857025d9f170600b9dce539b169a",
+    "sources": [
+      {
+        "path": "openhands-agent-server/openhands/agent_server/conversation_router.py",
+        "gitBlob": "4cd65aab76368f0a0d9afff26bac61125fe79453",
+        "supports": ["POST /api/conversations", "GET /api/conversations/{id}", "DELETE /api/conversations/{id}", "POST /api/conversations/{id}/pause", "POST /api/conversations/{id}/condense"]
+      },
+      {
+        "path": "openhands-agent-server/openhands/agent_server/event_router.py",
+        "gitBlob": "7358cdadf923d1cf5c88031ce90efaac67a8d703",
+        "supports": ["POST /api/conversations/{id}/events", "GET /api/conversations/{id}/events/search"]
+      },
+      {
+        "path": "openhands-sdk/openhands/sdk/conversation/request.py",
+        "gitBlob": "e538db4f99ef9fc294cfd24b846e22944b4dbb52",
+        "supports": ["StartConversationRequest", "SendMessageRequest"]
+      }
+    ]
+  },
+  "sma": {
+    "immutableWorktreeRoot": "/Users/paul/work/tekroo-ai/sma-step15-s1-p2final",
+    "commit": "fe9903cdf59497aabf12cbe7722e1397a1372068",
+    "tree": "fc2ae06c6333e94f6db34d691e50cb8bb1e5aa36",
+    "sources": [
+      {
+        "path": "src/main/java/ai/tekroo/sma/openhands/OpenHandsBridgeServer.java",
+        "sha256": "68a609cd25eb0a2ee8e2d7ee22daa106d597825403a2b0106bdbe80c583e3fc7",
+        "supports": ["GET /healthz", "POST /v1/openhands/context", "500ms service budget", "3-result bound", "4096-character bound"]
+      },
+      {
+        "path": ".openhands/hooks/sma_context_hook.py",
+        "sha256": "e50005e82ac6de4aa11efd552cbf1586a764dbf09fc6fd617cc462ba73b0d3d9",
+        "supports": ["UserPromptSubmit", "additionalContext", "smaTraceId", "fail-open"]
+      }
+    ]
+  },
+  "unsupportedAndForbidden": [
+    "/candidate-10/raw-source",
+    "/candidate-10/direct-context",
+    "semantic store command adapters",
+    "candidate-10 driver imports",
+    "post-freeze live helper implementation"
+  ]
+}

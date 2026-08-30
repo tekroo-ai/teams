@@ -376,8 +376,16 @@ class OfflineWorld:
                     })
                 return 200, {}, canonical_bytes({"status": "stopped"}), None
             if len(parts) == 4 and parts[3] == "condense" and request.method == "POST":
-                fixture = dict(self.truth.event_by_label("ineligible_condensation_summary"))
-                fixture["id"] = f"summary-{conversation_id}-{len(self.events[conversation_id])}"
+                summary_fixture = self.truth.event_by_label("ineligible_condensation_summary")
+                fixture = {
+                    "id": f"condensation-{conversation_id}-{len(self.events[conversation_id])}",
+                    "kind": "Condensation",
+                    "source": "environment",
+                    "forgotten_event_ids": [],
+                    "summary": summary_fixture["summary"],
+                    "summary_offset": 0,
+                    "llm_response_id": f"condensation-response-{conversation_id}",
+                }
                 self.events[conversation_id].append(fixture)
                 prior = self.stub_raw[-1]
                 request_id = f"stub-{self.request_counter + 1:06d}"
@@ -496,45 +504,6 @@ class OfflineWorld:
         self.events[conversation_id].append(final)
         self._capture(conversation, final)
         if self.faults.model_mode == "INELIGIBLE_TOOL_TRAFFIC":
-            second_request_id = f"stub-{self.request_counter + 1:06d}"
-            self.request_counter += 1
-            second_wire_body = canonical_bytes({
-                "model": "sma-s2-deterministic-stub-final-p2",
-                "messages": [
-                    {"role": "user", "content": [{"type": "text", "text": prompt}]},
-                    {"role": "tool", "content": [{"type": "text", "text": "Tool rejected by fixture policy."}]},
-                ],
-                "stream": False,
-                "tools": [],
-            })
-            second_received_ns = self.now_ns()
-            self.stub_raw.append({
-                "recordType": "SMA_S2_STUB_RAW_REQUEST",
-                "requestId": second_request_id,
-                "caseId": case_id,
-                "repetition": repetition,
-                "mode": mode,
-                "receivedMonotonicNs": second_received_ns,
-                "requestBodyLength": len(second_wire_body),
-                "requestBodySha256": __import__("hashlib").sha256(second_wire_body).hexdigest(),
-                "requestBodyBase64": base64.b64encode(second_wire_body).decode("ascii"),
-            })
-            second_response = canonical_bytes({
-                "id": second_request_id,
-                "choices": [{"message": {"role": "assistant", "content": "Deterministic feedback fixture completed."}}],
-            })
-            self.stub_terminal.append({
-                "recordType": "SMA_S2_STUB_TERMINAL",
-                "requestId": second_request_id,
-                "caseId": case_id,
-                "repetition": repetition,
-                "mode": mode,
-                "completedMonotonicNs": self.now_ns(),
-                "httpStatus": 200,
-                "responseBodyLength": len(second_response),
-                "responseBodySha256": __import__("hashlib").sha256(second_response).hexdigest(),
-                "responseWriteOutcome": "CLIENT_RECEIVED",
-            })
             for fixture in self.truth.event_fixtures:
                 candidate = fixture["event"]
                 if self.truth.eligible(candidate) or candidate.get("kind") == "HookExecutionEvent":

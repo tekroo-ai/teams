@@ -1,0 +1,143 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_FINAL_P2_CLOSURE_EXECUTION_IDENTITY",
+  "status": "PREPARED_SEALED_PENDING_PRINCIPAL_ACCEPT_FREEZE",
+  "recordedAt": "2026-08-29T00:44:52Z",
+  "identityAlgorithm": "SHA256_CANONICAL_JSON_OF_IDENTITY_SUBJECT",
+  "identitySubject": {
+    "acceptedPackageIdentity": "5f1a91eef803deb8777e07085aa16574b1144a1500657a8444c62a411ca6b5e0",
+    "packageAcceptanceSha256": "3485695086a92d69e443d40409d67375fb429d702fb89fc6a26fa69433b550e3",
+    "liveLaunchDefinitionSha256": "7f5839b8c8d51bbcd43ca06add99334da2da7d00ccc5001d5baf9eae495822aa",
+    "runnerSha256": "2c979ce96334ace9237bc647cf41157d67166f5277cb0abf071ad4fdb5956f2d",
+    "liveEntrypointSha256": "9f628368ae7d91641a81ad54e4db4816e53f7c99766492ff0483d06ad4aec73e",
+    "liveActionsSha256": "dbe0ae9f12a9805fb92298f06d3df793ab1afa5f5c77d747476443eaae873203",
+    "smaCommit": "fe9903cdf59497aabf12cbe7722e1397a1372068",
+    "smaTree": "fc2ae06c6333e94f6db34d691e50cb8bb1e5aa36",
+    "smaJarSha256": "1561d18739cc53e744a0014ce562c8a7b2adfc988494a984728d680e887fbb8b",
+    "openhandsCommit": "a338ba9b6cbb529886b755a335bae3dee0004700",
+    "openhandsTree": "9e72f1b4ee0b857025d9f170600b9dce539b169a",
+    "openhandsRuntimeOverlay": {
+      "openhands-sdk/openhands/sdk/conversation/title_utils.py": "686cec8a88319b3d40ff50fa2615cfd2ddb6c35a8bab430050500fcb3e3b8dcb",
+      "openhands-tools/openhands/tools/terminal/definition.py": "b6a4db206ff3d0045a5837197fa12e1f9f9d2da4ad970372e498966dc5d8ae3e",
+      "openhands-tools/openhands/tools/terminal/descriptions.py": "03e6c7d3317fa0053294f00256ed35c21f2fc0d3b6ac58fd4997ea5ed26d8ae4"
+    },
+    "openhandsTestOverlay": {
+      "tests/sdk/conversation/test_generate_title.py": "1a4914325d710e25086ca05503b3b8e16065212e394dfc94a0ca47903a9e2d83",
+      "tests/tools/terminal/test_schema.py": "6a5e2b9cee4ab011d2a9d9d014a74aabc6c591b6f0ff9617bfabcf26ef38a405"
+    },
+    "openhandsVenvTreeSha256": "f40cba34f96f12117894376012d11f35dee9485d2f38552754602888d296c2d9",
+    "agentCanvasTreeSha256": "004c57d41fed43e0809df00ed90bcb67397f1d48a1ed4b610bdf09e15909f4ce",
+    "agentCanvasPlistSha256": "3824865a057d39d83d792cde1ad088ed2650bdbaa775b486ad34fb3b1d6875ca",
+    "agentCanvasWrapperSha256": "40b401d67ff9cb12449326d4f235aa4953077ce1158d5bcf5b8b28261cb687e4",
+    "agentCanvasLoopbackPreloadSha256": "be10eb4a18670fccfeb97c92ceb59751d21b0f5777dd4210f2cd0df97be5336e",
+    "agentServerExecutableSha256": "5ac0288c9457349d683376fcdb6668d8cad70957d518efc428e2fdb8ed91e495",
+    "sessionKeyFileSha256": "81e0c7fa2e30b88cab093c9ecd9bb607bdd8c9e9f1562dbca7c6bfa776080629",
+    "sessionKeyFileMode": "0600",
+    "javaRuntimeTreeSha256": "fbd55ec0ec65cccc10fd02f5aa5c8b72dae6c99384dbd81ae936ab3b08076e92",
+    "livePythonPymongoTreeSha256": "bcc440595539b339d31bdfeb6d1edc187cb3f67002740cc206531aa3197f3105",
+    "livePythonBsonTreeSha256": "4170076f6d5841b7f02dcd948483175034be09bdad80b82d96adc5bf88e27990",
+    "livePythonDnsTreeSha256": "e85ddc641163e44312cdb3d7607d7bfe6e5b5ca445bf1086bfe9dea527efe633",
+    "ports": {
+      "openhands": 8000,
+      "qdrant": 6333,
+      "smaBridge": 8130,
+      "stub": 19191,
+      "transportFailure": 19192,
+      "openhandsCaptureProxy": 19193
+    },
+    "disposableNamespaces": {
+      "mongoDatabase": "sma_s2_final_p2_closure",
+      "semanticCollection": "sma_s2_final_p2_closure_semantic",
+      "episodicCollection": "sma_s2_final_p2_closure_episodic",
+      "workspaceRoot": "/Users/paul/work/tekroo-ai/sma-step15-s1-p2final/target/sma-s2-final-p2-closure"
+    }
+  },
+  "executionIdentity": "bef7f4b85a50405e9489d31bac6293fdab49c3ac564e3b6d1b57fdbc21689666",
+  "package": {
+    "identity": "5f1a91eef803deb8777e07085aa16574b1144a1500657a8444c62a411ca6b5e0",
+    "acceptancePath": "investigations/sma-q1/layered/sma-s2-final-p2-closure-package-acceptance-v2.json",
+    "acceptanceSha256": "3485695086a92d69e443d40409d67375fb429d702fb89fc6a26fa69433b550e3",
+    "h0": "PASS_H0_NONLIVE_NOT_EXECUTION_AUTHORITY",
+    "independentReview": "PASS_READY_TO_PUBLISH"
+  },
+  "boundProductIdentity": {
+    "smaWorktree": "/Users/paul/work/tekroo-ai/sma-step15-s1-p2final",
+    "smaCommit": "fe9903cdf59497aabf12cbe7722e1397a1372068",
+    "smaTree": "fc2ae06c6333e94f6db34d691e50cb8bb1e5aa36",
+    "smaTrackedWorktreeClean": true,
+    "smaJarPath": "/Users/paul/work/tekroo-ai/sma-step15-s1-p2final/target/sma-1.0-SNAPSHOT.jar",
+    "smaJarSha256": "1561d18739cc53e744a0014ce562c8a7b2adfc988494a984728d680e887fbb8b",
+    "openhandsWorktree": "/Users/paul/.local/src/openhands-software-agent-sdk-1.40.1-parallel",
+    "openhandsCommit": "a338ba9b6cbb529886b755a335bae3dee0004700",
+    "openhandsTree": "9e72f1b4ee0b857025d9f170600b9dce539b169a",
+    "openhandsExactTrackedStatus": [
+      " M openhands-sdk/openhands/sdk/conversation/title_utils.py",
+      " M openhands-tools/openhands/tools/terminal/definition.py",
+      " M openhands-tools/openhands/tools/terminal/descriptions.py",
+      " M tests/sdk/conversation/test_generate_title.py",
+      " M tests/tools/terminal/test_schema.py"
+    ],
+    "openhandsOverlayDisposition": {
+      "titleGenerationDisabledByFrozenRequest": true,
+      "terminalToolsDisabledByFrozenRequest": true,
+      "testFilesAreNonRuntime": true,
+      "anyAdditionalOrChangedPathFailsClosed": true
+    }
+  },
+  "boundRuntime": {
+    "launchDefinitionPath": "investigations/sma-q1/layered/sma-s2-final-p2-closure/t1/live-launch-definition.json",
+    "launchDefinitionSha256": "7f5839b8c8d51bbcd43ca06add99334da2da7d00ccc5001d5baf9eae495822aa",
+    "agentCanvasPlistPath": "/Users/paul/Library/LaunchAgents/com.tekroo.openhands-agent-canvas.plist",
+    "agentCanvasPlistSha256": "3824865a057d39d83d792cde1ad088ed2650bdbaa775b486ad34fb3b1d6875ca",
+    "agentCanvasWrapperPath": "/Users/paul/.local/bin/agent-canvas",
+    "agentCanvasWrapperSha256": "40b401d67ff9cb12449326d4f235aa4953077ce1158d5bcf5b8b28261cb687e4",
+    "agentCanvasLoopbackPreloadPath": "/Users/paul/.local/bin/agent-canvas-loopback.mjs",
+    "agentCanvasLoopbackPreloadSha256": "be10eb4a18670fccfeb97c92ceb59751d21b0f5777dd4210f2cd0df97be5336e",
+    "agentCanvasPackageRoot": "/opt/homebrew/lib/node_modules/@openhands/agent-canvas",
+    "agentCanvasPackageTreeSha256": "004c57d41fed43e0809df00ed90bcb67397f1d48a1ed4b610bdf09e15909f4ce",
+    "agentServerExecutablePath": "/Users/paul/.local/src/openhands-software-agent-sdk-1.40.1-parallel/.venv/bin/agent-server",
+    "agentServerExecutableSha256": "5ac0288c9457349d683376fcdb6668d8cad70957d518efc428e2fdb8ed91e495",
+    "openhandsVenvRoot": "/Users/paul/.local/src/openhands-software-agent-sdk-1.40.1-parallel/.venv",
+    "openhandsVenvTreeSha256": "f40cba34f96f12117894376012d11f35dee9485d2f38552754602888d296c2d9",
+    "sessionKeyFilePath": "/Users/paul/.openhands/agent-canvas/api-key.txt",
+    "sessionKeyFileSha256": "81e0c7fa2e30b88cab093c9ecd9bb607bdd8c9e9f1562dbca7c6bfa776080629",
+    "sessionKeyFileMode": "0600",
+    "secretValueRetained": false
+  },
+  "offlinePreparationAudit": {
+    "packageSeal": "PASS",
+    "packageIdentityRecomputation": "PASS",
+    "productCommitAndTreeIdentity": "PASS",
+    "smaTrackedWorktree": "PASS_CLEAN",
+    "openhandsTrackedOverlay": "PASS_EXACTLY_BOUND",
+    "runtimeDependencyClosure": "PASS_BOUND",
+    "sessionKeyPermission": "PASS_0600",
+    "liveServiceState": "NOT_RUN_NOT_AUTHORIZED",
+    "runtimePortAvailability": "NOT_RUN_REQUIRES_LIVE_PREFLIGHT_AUTHORITY",
+    "namespaceAbsence": "NOT_RUN_REQUIRES_LIVE_PREFLIGHT_AUTHORITY",
+    "activeConversationAudit": "NOT_RUN_REQUIRES_LIVE_PREFLIGHT_AUTHORITY"
+  },
+  "limits": {
+    "dressRehearsalAttemptsAuthorized": 0,
+    "dressRehearsalOperationsAuthorized": 0,
+    "measuredAttemptsAuthorized": 0,
+    "measuredRepetitionsAuthorized": 0,
+    "realModelCallsAuthorized": 0,
+    "serviceStartsAuthorized": 0
+  },
+  "authority": {
+    "executionIdentityAccepted": false,
+    "liveStatePreflight": false,
+    "serviceStart": false,
+    "openhandsConversation": false,
+    "modelCall": false,
+    "liveDress": false,
+    "measuredExecution": false,
+    "m1": false,
+    "e1": false,
+    "productionOrHistoricalAccess": false,
+    "commit": false,
+    "push": false
+  },
+  "nextDecision": "PRINCIPAL_ACCEPT_FREEZE_EXECUTION_IDENTITY_ONLY"
+}

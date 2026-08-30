@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "SMA_S2_FINAL_P2_CLOSURE_PACKAGE_POST_SEAL_VERIFICATION",
+  "recordedAt": "2026-08-29T00:44:52Z",
+  "status": "PASS",
+  "packageIdentityRecord": {
+    "path": "investigations/sma-q1/layered/sma-s2-final-p2-closure-package-identity-v2.json",
+    "sha256": "5de99f9b51d9fc8893bcfae8ba8a9f3fd873f74f35a513e69258caee0c7ae6a2"
+  },
+  "packageIdentity": {
+    "declared": "5f1a91eef803deb8777e07085aa16574b1144a1500657a8444c62a411ca6b5e0",
+    "recomputed": "5f1a91eef803deb8777e07085aa16574b1144a1500657a8444c62a411ca6b5e0",
+    "match": true
+  },
+  "verifiedArtifacts": {
+    "mutableManifestSha256": "2a056fe7480a4c2287bf85195471122565135d5dff9cb4c457cf0b1e975ddc25",
+    "traceabilitySha256": "ce87f34b1f32f9dfa0cafb5460961b42ad70e90a99660fe2799bbd6ff1a9a0a0",
+    "t2QualificationSha256": "b328c3827fc164ceda92976a1c1cd6c23cf94ae09304f2eb61499b2e200aaccf",
+    "t3IndependentReviewSha256": "0101f7ab0add820a6bc4ded6f50a2146c92f5a45dd8186e7e4fad6eac997d310",
+    "h0QualificationSha256": "75b5103602b6bdddc2d0d466a8437b06a77a28142ab632c3d493d7d9ea9189b2",
+    "dressWalkSha256": "99fd3298b85e86a10efbc1384975e700ce0a4d541be19bef2aff1b9be3900061",
+    "dressWalkRecords": 34,
+    "measuredWalkSha256": "959a4a927762af910b7c481f2e34358c4c0fdac6e4f1bf274f8398558dfc2f17",
+    "measuredWalkRecords": 103
+  },
+  "verification": {
+    "jsonParsed": true,
+    "allHashesMatched": true,
+    "recordCardinalitiesMatched": true,
+    "independentVerdict": "PASS_READY_TO_PUBLISH"
+  },
+  "authority": {
+    "livePreflight": false,
+    "serviceStart": false,
+    "openhandsConversation": false,
+    "modelCall": false,
+    "liveDress": false,
+    "measuredExecution": false
+  }
+}
