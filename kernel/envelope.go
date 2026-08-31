@@ -22,25 +22,25 @@ type AggregatePrecondition struct {
 }
 
 type KernelCommand struct {
-	ContractManifest          string
-	CommandID                 UUIDv7
-	CommandType               string
-	CommandVersion            string
-	Target                    AggregateRef
-	Authority                 PrincipalRef
-	ActorFQN                  *ActorFQN
-	Execution                 *ExecutionTuple
-	ExpectedRevision          ExpectedRevision
-	Preconditions             []AggregatePrecondition
-	ExpectedLifecycleEpoch    *uint64
-	ExpectedPolicyRevision    uint64
-	ExpectedCatalogueRevision uint64
-	IdempotencyKey            string
-	CorrelationID             UUIDv7
-	Causation                 []DagParent
-	IssuedAt                  *time.Time
-	Payload                   json.RawMessage
-	EvidenceRefs              []EvidenceRef
+	ContractManifest          string                  `json:"contract_manifest"`
+	CommandID                 UUIDv7                  `json:"command_id"`
+	CommandType               string                  `json:"command_type"`
+	CommandVersion            string                  `json:"command_version"`
+	Target                    AggregateRef            `json:"target"`
+	Authority                 PrincipalRef            `json:"authority"`
+	ActorFQN                  *ActorFQN               `json:"actor_fqn"`
+	Execution                 *ExecutionTuple         `json:"execution"`
+	ExpectedRevision          ExpectedRevision        `json:"expected_revision"`
+	Preconditions             []AggregatePrecondition `json:"preconditions"`
+	ExpectedLifecycleEpoch    *uint64                 `json:"expected_lifecycle_epoch"`
+	ExpectedPolicyRevision    uint64                  `json:"expected_policy_revision"`
+	ExpectedCatalogueRevision uint64                  `json:"expected_catalogue_revision"`
+	IdempotencyKey            string                  `json:"idempotency_key"`
+	CorrelationID             UUIDv7                  `json:"correlation_id"`
+	Causation                 []DagParent             `json:"causation"`
+	IssuedAt                  *time.Time              `json:"issued_at"`
+	Payload                   json.RawMessage         `json:"payload"`
+	EvidenceRefs              []EvidenceRef           `json:"evidence_refs"`
 }
 
 type OutcomeCode string

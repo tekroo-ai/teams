@@ -112,8 +112,8 @@ func TestLoadCancellationRequiresExactInvocationCommand(t *testing.T) {
 func TestLoadCommandRejectsUnknownAndTrailingJSON(t *testing.T) {
 	t.Parallel()
 	for _, input := range []string{
-		`{"CommandType":"tekroo.command.story.create","unknown":true}`,
-		`{"CommandType":"tekroo.command.story.create"}{}`,
+		`{"command_type":"tekroo.command.story.create","unknown":true}`,
+		`{"command_type":"tekroo.command.story.create"}{}`,
 	} {
 		if _, _, err := loadCommand([]string{"-"}, strings.NewReader(input), 4096); err == nil {
 			t.Fatalf("accepted invalid command %q", input)
