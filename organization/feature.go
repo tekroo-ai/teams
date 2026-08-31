@@ -201,19 +201,20 @@ func (story PlannedStory) Valid() bool {
 }
 
 type PlannedTask struct {
-	ID                 kernel.UUIDv7   `json:"id"`
-	StoryID            kernel.UUIDv7   `json:"story_id"`
-	Title              string          `json:"title"`
-	Description        string          `json:"description"`
-	AcceptanceCriteria []string        `json:"acceptance_criteria"`
-	DependsOn          []kernel.UUIDv7 `json:"depends_on"`
-	Owner              kernel.ActorFQN `json:"owner"`
-	ModelProfile       kernel.Digest   `json:"model_profile_digest"`
-	Complexity         uint8           `json:"complexity"`
-	Risk               RiskLevel       `json:"risk"`
-	CriticalPath       bool            `json:"critical_path"`
-	AttemptLimit       uint32          `json:"attempt_limit"`
-	ReviewRoundLimit   uint32          `json:"review_round_limit"`
+	ID                 kernel.UUIDv7        `json:"id"`
+	StoryID            kernel.UUIDv7        `json:"story_id"`
+	Title              string               `json:"title"`
+	Description        string               `json:"description"`
+	AcceptanceCriteria []string             `json:"acceptance_criteria"`
+	DependsOn          []kernel.UUIDv7      `json:"depends_on"`
+	Owner              kernel.ActorFQN      `json:"owner"`
+	ModelProfile       kernel.Digest        `json:"model_profile_digest"`
+	DecisionRoute      kernel.DecisionRoute `json:"decision_route"`
+	Complexity         uint8                `json:"complexity"`
+	Risk               RiskLevel            `json:"risk"`
+	CriticalPath       bool                 `json:"critical_path"`
+	AttemptLimit       uint32               `json:"attempt_limit"`
+	ReviewRoundLimit   uint32               `json:"review_round_limit"`
 }
 
 type FeaturePlan struct {
@@ -244,7 +245,7 @@ func (plan FeaturePlan) Validate(feature FeatureRequest) error {
 	}
 	tasks := make(map[kernel.UUIDv7]PlannedTask, len(plan.Tasks))
 	for _, task := range plan.Tasks {
-		if !task.ID.Valid() || task.Title == "" || task.Description == "" || len(task.AcceptanceCriteria) == 0 || !task.Owner.Valid() || !task.ModelProfile.Valid() || task.Complexity == 0 || task.Complexity > 10 || !task.Risk.Valid() || task.AttemptLimit == 0 || task.ReviewRoundLimit == 0 {
+		if !task.ID.Valid() || task.Title == "" || task.Description == "" || len(task.AcceptanceCriteria) == 0 || !task.Owner.Valid() || !task.ModelProfile.Valid() || !task.DecisionRoute.ModelExecutable() || task.Complexity == 0 || task.Complexity > 10 || !task.Risk.Valid() || task.AttemptLimit == 0 || task.ReviewRoundLimit == 0 {
 			return ErrInvalidFeature
 		}
 		if _, found := stories[task.StoryID]; !found {

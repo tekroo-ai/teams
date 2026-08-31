@@ -1,0 +1,302 @@
+package operationalruntime
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"time"
+
+	"github.com/tekroo-ai/teams/kernel"
+	"github.com/tekroo-ai/teams/organization"
+)
+
+type trackedTask struct {
+	plan     organization.PlannedTask
+	revision uint64
+	last     kernel.UUIDv7
+	profile  kernel.WorkRiskProfile
+	owner    organization.RoleInstanceState
+}
+
+func (service *ProductionService) preparePlannedTasks(ctx context.Context, feature organization.FeatureRequest, plan organization.FeaturePlan, storyEvents map[kernel.UUIDv7]kernel.UUIDv7, taskEvents map[kernel.UUIDv7]kernel.UUIDv7) error {
+	planBytes, err := json.Marshal(plan)
+	if err != nil {
+		return err
+	}
+	planDigest := digestBytes(planBytes)
+	evidenceID := deterministicOperationalUUID("feature-plan-evidence", string(feature.ID), fmt.Sprint(plan.Version), string(planDigest))
+	evidencePayload, err := json.Marshal(map[string]any{
+		"access_partition": feature.Input.WorkspaceID, "availability": "AVAILABLE", "byte_length": len(planBytes), "canonical_digest": planDigest,
+		"computation": nil, "deletion_tombstone": nil, "evidence_kind": "DECISION_RECORD", "integrity_state": "DIGEST_VERIFIED",
+		"locator": fmt.Sprintf("teams://feature/%s/plan/%d", feature.ID, plan.Version), "locator_immutable": true, "media_type": "application/json",
+		"producing_component": "tekrood-feature-planning", "producing_version": FeaturePlanningVersion, "redacts": nil,
+		"retention_policy": "feature-lifecycle", "sensitivity": "INTERNAL", "sha256": planDigest, "source_evidence_ids": []kernel.UUIDv7{},
+		"source_timestamp": plan.CreatedAt, "transport_provenance": "teams-organizational-feature-plan",
+	})
+	if err != nil {
+		return err
+	}
+	if _, err := service.submitDeterministicCommand(ctx, feature, "tekroo.command.evidence.register", kernel.SchemaVersion, kernel.AggregateEvidence, evidenceID, service.serviceAuthority, 0, evidencePayload, nil, nil, "plan-evidence"); err != nil {
+		return err
+	}
+	evidenceRefs := []kernel.EvidenceRef{{EvidenceID: evidenceID, SHA256: planDigest}}
+
+	if len(plan.Stories) == 0 {
+		return organization.ErrInvalidFeature
+	}
+	limits := make(kernel.PurposeCounters, len(kernel.AllWorkPurposes))
+	for _, purpose := range kernel.AllWorkPurposes {
+		limits[purpose] = 0
+	}
+	var modelLimit uint64
+	for _, task := range plan.Tasks {
+		modelLimit += uint64(task.AttemptLimit + task.ReviewRoundLimit + 2)
+	}
+	if modelLimit == 0 || modelLimit > 1000 {
+		return organization.ErrInvalidFeature
+	}
+	limits[kernel.PurposeImplementation] = modelLimit
+	limits[kernel.PurposeValidation] = modelLimit
+	limits[kernel.PurposeReview] = modelLimit
+	limits[kernel.PurposeRepair] = modelLimit
+	limits[kernel.PurposeEscalation] = uint64(len(plan.Tasks))
+	deadline := plan.CreatedAt.Add(service.planningDeadline)
+	budgetPayload, err := json.Marshal(map[string]any{
+		"budget_account_id": feature.BudgetAccountID, "root_work": kernel.AggregateRef{Kind: kernel.AggregateStory, ID: plan.Stories[0].ID},
+		"lifecycle_epoch": feature.LifecycleEpoch, "policy_revision": service.planning.PolicyRevision, "policy_digest": service.planning.BudgetPolicyDigest,
+		"model_invocation_limit": modelLimit, "purpose_limits": limits, "deadline_at": deadline, "evidence_ids": []kernel.UUIDv7{evidenceID}, "authority": service.policyAuthority,
+	})
+	if err != nil {
+		return err
+	}
+	budgetPreconditions := []kernel.AggregatePrecondition{{Aggregate: kernel.AggregateRef{Kind: kernel.AggregateStory, ID: plan.Stories[0].ID}, Expected: kernel.NewExpectedRevision(1)}}
+	budgetReceipt, err := service.submitDeterministicCommand(ctx, feature, "tekroo.command.work-budget.create", kernel.OperationalSchemaVersion, kernel.AggregateWorkBudget, feature.BudgetAccountID, service.policyAuthority, 0, budgetPayload, []kernel.DagParent{{ParentEventID: storyEvents[plan.Stories[0].ID], EdgeKind: kernel.EdgeDerivation}}, evidenceRefs, "budget", budgetPreconditions...)
+	if err != nil {
+		return err
+	}
+	budgetRevision := revisionOrOne(budgetReceipt)
+
+	tasks := make(map[kernel.UUIDv7]*trackedTask, len(plan.Tasks))
+	for _, item := range plan.Tasks {
+		profileConfig, found := service.profilesByModel[item.ModelProfile]
+		if !found || profileConfig.Qualification.DecisionRoute != item.DecisionRoute {
+			return organization.ErrInvalidFeature
+		}
+		owner, active, err := service.RoleHost.Status(ctx, item.Owner)
+		if err != nil {
+			return err
+		}
+		if !active || owner.Status != organization.RoleIdle {
+			owner, err = service.RoleHost.EnsureStarted(ctx, item.Owner)
+		}
+		if err != nil || owner.ModelProfile != item.ModelProfile {
+			return errors.Join(organization.ErrRoleNotRunning, err)
+		}
+		workspace, found := service.workspacesByID[owner.WorkspaceID]
+		if !found {
+			return organization.ErrInvalidFeature
+		}
+		if err := service.registerExecution(ctx, feature, owner, profileConfig); err != nil {
+			return err
+		}
+		profile := service.workProfile(feature, item, evidenceID, deadline)
+		tracked := &trackedTask{plan: item, revision: 1, last: taskEvents[item.ID], profile: profile, owner: owner}
+		if err := service.applyTaskCommand(ctx, feature, tracked, "tekroo.command.task.bind-work-profile", kernel.SchemaVersion, service.policyAuthority, profile, evidenceRefs, nil, "profile"); err != nil {
+			return err
+		}
+		if len(item.DependsOn) == 0 {
+			if err := service.activateRootTask(ctx, feature, tracked, profileConfig, workspace, budgetRevision, evidenceRefs, evidenceID); err != nil {
+				return err
+			}
+		}
+		tasks[item.ID] = tracked
+	}
+	_ = tasks
+	return nil
+}
+
+func (service *ProductionService) workProfile(feature organization.FeatureRequest, task organization.PlannedTask, evidenceID kernel.UUIDv7, deadline time.Time) kernel.WorkRiskProfile {
+	ambiguity, novelty, blast, security := kernel.AmbiguityLow, kernel.NoveltyRoutine, kernel.BlastLocal, kernel.SecurityOrdinary
+	if task.Complexity >= 7 {
+		ambiguity, novelty, blast = kernel.AmbiguityHigh, kernel.NoveltyUnfamiliar, kernel.BlastMultiComponent
+	} else if task.Complexity >= 4 {
+		ambiguity = kernel.AmbiguityMedium
+	}
+	if task.Risk == organization.RiskHigh {
+		security = kernel.SecuritySensitive
+	}
+	if task.Risk == organization.RiskCritical {
+		security, blast = kernel.SecurityCritical, kernel.BlastArchitectural
+	}
+	criteria, _ := json.Marshal(task.AcceptanceCriteria)
+	profileID := deterministicOperationalUUID("work-profile", string(feature.ID), string(task.ID))
+	profileDigest := digestBytes([]byte(string(feature.ID) + "\x00" + string(task.ID) + "\x00" + string(digestBytes(criteria)) + "\x00" + string(task.DecisionRoute)))
+	return kernel.WorkRiskProfile{
+		TaskID: task.ID, ProfileID: profileID, ProfileRevision: 1, ProfileDigest: profileDigest, LifecycleEpoch: feature.LifecycleEpoch, ScopeRevision: feature.ScopeRevision,
+		WorkKind: kernel.WorkImplementation, Ambiguity: ambiguity, Novelty: novelty, BlastRadius: blast, SecuritySensitivity: security,
+		MinimumDecisionRoute: task.DecisionRoute, AcceptanceCriteriaDigest: digestBytes(criteria), RequiredDeterministicGateIDs: append([]string(nil), service.planning.RequiredGateIDs...),
+		RequiredValidationBranches: 1, RequiredIndependenceDimensions: []kernel.IndependenceDimension{kernel.IndependencePrincipal, kernel.IndependenceActor, kernel.IndependenceExecution, kernel.IndependenceContext, kernel.IndependenceWorkspace, kernel.IndependenceMethod},
+		ImplementationVariantCount: 1, ValidCandidateQuorum: 1, VerificationTopologyDigest: service.planning.VerificationTopologyDigest,
+		ClassificationPolicyRevision: service.planning.PolicyRevision, ClassificationPolicyDigest: service.planning.ClassificationPolicyDigest,
+		PromotionPolicyRevision: service.planning.PolicyRevision, PromotionPolicyDigest: service.planning.PromotionPolicyDigest,
+		Budgets:                 kernel.FiniteWorkBudgets{AttemptLimit: uint64(task.AttemptLimit), ReviewRoundLimit: uint64(task.ReviewRoundLimit), PromotionLimit: 1, EscalationLimit: 1, DeadlineAt: deadline},
+		ClassificationAuthority: feature.SubmittedBy, ClassificationEvidenceIDs: []kernel.UUIDv7{evidenceID},
+	}
+}
+
+func (service *ProductionService) registerExecution(ctx context.Context, feature organization.FeatureRequest, owner organization.RoleInstanceState, profile ProductionProfile) error {
+	payload, err := json.Marshal(map[string]any{"actor_fqn": owner.ActorFQN, "execution_id": owner.Execution.ExecutionID, "fencing_epoch": owner.Execution.FencingEpoch, "runtime_identity": profile.RuntimeIdentityDigest})
+	if err != nil {
+		return err
+	}
+	_, err = service.submitDeterministicCommand(ctx, feature, "tekroo.command.execution.register", kernel.SchemaVersion, kernel.AggregateExecution, owner.Execution.ExecutionID, service.serviceAuthority, 0, payload, nil, nil, "execution-"+string(owner.Execution.ExecutionID))
+	return err
+}
+
+func (service *ProductionService) activateRootTask(ctx context.Context, feature organization.FeatureRequest, task *trackedTask, profileConfig ProductionProfile, workspace ProductionWorkspace, budgetRevision uint64, evidence []kernel.EvidenceRef, evidenceID kernel.UUIDv7) error {
+	if err := service.applyTaskCommand(ctx, feature, task, "tekroo.command.task.mark-ready", kernel.SchemaVersion, service.policyAuthority, map[string]any{"dependency_event_ids": []kernel.UUIDv7{}, "readiness_policy_revision": service.planning.PolicyRevision}, nil, nil, "ready"); err != nil {
+		return err
+	}
+	assignmentID := deterministicOperationalUUID("assignment", string(feature.ID), string(task.plan.ID))
+	qualification := profileConfig.Qualification
+	assignment := map[string]any{
+		"assignment_id": assignmentID, "task_id": task.plan.ID, "expected_task_revision": task.revision, "work_profile": task.profile.Binding(),
+		"required_decision_route": task.plan.DecisionRoute, "selected_decision_route": qualification.DecisionRoute, "selected_actor_fqn": task.owner.ActorFQN,
+		"selected_execution_id": task.owner.Execution.ExecutionID, "selected_fencing_epoch": task.owner.Execution.FencingEpoch,
+		"model_profile_digest": profileConfig.ModelProfileDigest, "runtime_identity_digest": profileConfig.RuntimeIdentityDigest, "qualification": qualification,
+		"selection_policy_revision": service.planning.PolicyRevision, "selection_policy_digest": service.planning.SelectionPolicyDigest,
+		"hard_constraint_results": []map[string]any{{"constraint_id": "exact-role-model-workspace", "outcome": "PASS", "evidence_ids": []kernel.UUIDv7{evidenceID}}},
+		"selection_reasons":       []string{"exact configured role, qualified model profile, and workspace binding"}, "evidence_ids": []kernel.UUIDv7{evidenceID},
+	}
+	if err := service.applyTaskCommand(ctx, feature, task, "tekroo.command.task.authorize-qualified-assignment", kernel.SchemaVersion, service.policyAuthority, assignment, evidence, nil, "assignment"); err != nil {
+		return err
+	}
+	actorAuthority := kernel.PrincipalRef{Kind: kernel.PrincipalActor, ID: string(task.owner.ActorFQN)}
+	if err := service.applyActorTaskCommand(ctx, feature, task, "tekroo.command.task.acquire-ownership", actorAuthority, map[string]any{"owner_fqn": task.owner.ActorFQN, "expected_ownership_version": 0}, "ownership"); err != nil {
+		return err
+	}
+	if err := service.applyActorTaskCommand(ctx, feature, task, "tekroo.command.task.activate", actorAuthority, map[string]any{"owner_fqn": task.owner.ActorFQN, "ownership_version": 1}, "activate"); err != nil {
+		return err
+	}
+	taskModelLimit := uint64(task.plan.AttemptLimit + task.plan.ReviewRoundLimit + 2)
+	taskLimits := make(kernel.PurposeCounters, len(kernel.AllWorkPurposes))
+	for _, purpose := range kernel.AllWorkPurposes {
+		taskLimits[purpose] = 0
+	}
+	taskLimits[kernel.PurposeImplementation] = uint64(task.plan.AttemptLimit)
+	taskLimits[kernel.PurposeValidation] = uint64(task.plan.ReviewRoundLimit)
+	taskLimits[kernel.PurposeReview] = uint64(task.plan.ReviewRoundLimit)
+	taskLimits[kernel.PurposeRepair] = uint64(task.plan.AttemptLimit)
+	taskLimits[kernel.PurposeEscalation] = 1
+	budgetPayload := map[string]any{"task_id": task.plan.ID, "budget_account_id": feature.BudgetAccountID, "expected_task_revision": task.revision, "lifecycle_epoch": feature.LifecycleEpoch, "scope_revision": feature.ScopeRevision, "task_model_invocation_limit": taskModelLimit, "purpose_limits": taskLimits, "evidence_ids": []kernel.UUIDv7{evidenceID}}
+	preconditions := []kernel.AggregatePrecondition{{Aggregate: kernel.AggregateRef{Kind: kernel.AggregateWorkBudget, ID: feature.BudgetAccountID}, Expected: kernel.NewExpectedRevision(budgetRevision)}}
+	if err := service.applyTaskCommand(ctx, feature, task, "tekroo.command.task.bind-work-budget", kernel.OperationalSchemaVersion, service.policyAuthority, budgetPayload, evidence, preconditions, "task-budget"); err != nil {
+		return err
+	}
+	scopePayload := map[string]any{"task_id": task.plan.ID, "expected_task_revision": task.revision, "lifecycle_epoch": feature.LifecycleEpoch, "scope_revision": feature.ScopeRevision, "owner_fqn": task.owner.ActorFQN, "execution_id": task.owner.Execution.ExecutionID, "fencing_epoch": task.owner.Execution.FencingEpoch, "workspace_id": workspace.WorkspaceID, "worktree_id": workspace.WorktreeID, "branch": workspace.Branch, "baseline_sha": workspace.BaselineSHA, "writable_paths": workspace.WritablePaths, "interface_constraint_evidence_ids": []kernel.UUIDv7{evidenceID}}
+	return service.applyTaskCommand(ctx, feature, task, "tekroo.command.task.bind-operational-scope", kernel.OperationalSchemaVersion, service.policyAuthority, scopePayload, evidence, nil, "scope")
+}
+
+func (service *ProductionService) applyTaskCommand(ctx context.Context, feature organization.FeatureRequest, task *trackedTask, commandType, version string, authority kernel.PrincipalRef, payload any, evidence []kernel.EvidenceRef, preconditions []kernel.AggregatePrecondition, key string) error {
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	receipt, err := service.submitDeterministicCommand(ctx, feature, commandType, version, kernel.AggregateTask, task.plan.ID, authority, task.revision, encoded, []kernel.DagParent{{ParentEventID: task.last, EdgeKind: kernel.EdgeCausal}}, evidence, key+"-"+string(task.plan.ID), preconditions...)
+	if err != nil {
+		return err
+	}
+	if len(receipt.EventIDs) != 1 {
+		return errors.New("task transition did not return one event")
+	}
+	task.revision = revisionAfter(receipt, task.revision)
+	task.last = receipt.EventIDs[0]
+	return nil
+}
+
+func (service *ProductionService) applyActorTaskCommand(ctx context.Context, feature organization.FeatureRequest, task *trackedTask, commandType string, authority kernel.PrincipalRef, payload any, key string) error {
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	receipt, err := service.submitDeterministicActorCommand(ctx, feature, commandType, task.plan.ID, authority, task.owner.ActorFQN, task.owner.Execution, task.revision, encoded, []kernel.DagParent{{ParentEventID: task.last, EdgeKind: kernel.EdgeCausal}}, key+"-"+string(task.plan.ID))
+	if err != nil {
+		return err
+	}
+	if len(receipt.EventIDs) != 1 {
+		return errors.New("actor task transition did not return one event")
+	}
+	task.revision = revisionAfter(receipt, task.revision)
+	task.last = receipt.EventIDs[0]
+	return nil
+}
+
+func (service *ProductionService) submitDeterministicCommand(ctx context.Context, feature organization.FeatureRequest, commandType, version string, kind kernel.AggregateKind, id kernel.UUIDv7, authority kernel.PrincipalRef, revision uint64, payload []byte, parents []kernel.DagParent, evidence []kernel.EvidenceRef, key string, preconditions ...kernel.AggregatePrecondition) (kernel.CommandReceipt, error) {
+	command := kernel.KernelCommand{ContractManifest: kernel.ContractIdentity, CommandID: deterministicOperationalUUID("command", string(feature.ID), commandType, string(id), key), CommandType: commandType, CommandVersion: version, Target: kernel.AggregateRef{Kind: kind, ID: id}, Authority: authority, ExpectedRevision: expectedRevision(revision), ExpectedLifecycleEpoch: expectedLifecycleEpoch(kind, revision, feature.LifecycleEpoch), Preconditions: append([]kernel.AggregatePrecondition(nil), preconditions...), ExpectedPolicyRevision: service.provenance.PolicyRevision, ExpectedCatalogueRevision: kernel.CatalogueRevision, IdempotencyKey: "feature:" + string(feature.ID) + ":" + key, CorrelationID: feature.ID, Causation: append([]kernel.DagParent(nil), parents...), Payload: append([]byte(nil), payload...), EvidenceRefs: append([]kernel.EvidenceRef(nil), evidence...)}
+	receipt, err := service.Submit(ctx, command)
+	if err != nil {
+		return receipt, err
+	}
+	if receipt.OutcomeCode != kernel.OutcomeApplied && receipt.OutcomeCode != kernel.OutcomeNoChange {
+		return receipt, fmt.Errorf("%s rejected: %s", commandType, receipt.ReasonCode)
+	}
+	return receipt, nil
+}
+
+func (service *ProductionService) submitDeterministicActorCommand(ctx context.Context, feature organization.FeatureRequest, commandType string, id kernel.UUIDv7, authority kernel.PrincipalRef, actor kernel.ActorFQN, execution kernel.ExecutionTuple, revision uint64, payload []byte, parents []kernel.DagParent, key string) (kernel.CommandReceipt, error) {
+	command := kernel.KernelCommand{ContractManifest: kernel.ContractIdentity, CommandID: deterministicOperationalUUID("command", string(feature.ID), commandType, string(id), key), CommandType: commandType, CommandVersion: kernel.SchemaVersion, Target: kernel.AggregateRef{Kind: kernel.AggregateTask, ID: id}, Authority: authority, ActorFQN: &actor, Execution: &execution, ExpectedRevision: kernel.NewExpectedRevision(revision), ExpectedLifecycleEpoch: expectedLifecycleEpoch(kernel.AggregateTask, revision, feature.LifecycleEpoch), Preconditions: []kernel.AggregatePrecondition{}, ExpectedPolicyRevision: service.provenance.PolicyRevision, ExpectedCatalogueRevision: kernel.CatalogueRevision, IdempotencyKey: "feature:" + string(feature.ID) + ":" + key, CorrelationID: feature.ID, Causation: append([]kernel.DagParent(nil), parents...), Payload: append([]byte(nil), payload...), EvidenceRefs: []kernel.EvidenceRef{}}
+	receipt, err := service.Submit(ctx, command)
+	if err != nil {
+		return receipt, err
+	}
+	if receipt.OutcomeCode != kernel.OutcomeApplied && receipt.OutcomeCode != kernel.OutcomeNoChange {
+		return receipt, fmt.Errorf("%s rejected: %s", commandType, receipt.ReasonCode)
+	}
+	return receipt, nil
+}
+
+func deterministicOperationalUUID(parts ...string) kernel.UUIDv7 {
+	hash := sha256.New()
+	for _, part := range parts {
+		_, _ = hash.Write([]byte{0})
+		_, _ = hash.Write([]byte(part))
+	}
+	value := hex.EncodeToString(hash.Sum(nil)[:16])
+	value = value[:12] + "7" + value[13:16] + "8" + value[17:]
+	return kernel.UUIDv7(value[:8] + "-" + value[8:12] + "-" + value[12:16] + "-" + value[16:20] + "-" + value[20:32])
+}
+
+func digestBytes(value []byte) kernel.Digest {
+	digest := sha256.Sum256(value)
+	return kernel.Digest(hex.EncodeToString(digest[:]))
+}
+func expectedRevision(revision uint64) kernel.ExpectedRevision {
+	if revision == 0 {
+		return kernel.MustNotExist()
+	}
+	return kernel.NewExpectedRevision(revision)
+}
+func expectedLifecycleEpoch(kind kernel.AggregateKind, revision, epoch uint64) *uint64 {
+	if revision == 0 || kind != kernel.AggregateTask && kind != kernel.AggregateStory {
+		return nil
+	}
+	value := epoch
+	return &value
+}
+func revisionOrOne(receipt kernel.CommandReceipt) uint64 {
+	if receipt.ResultingRevision != nil {
+		return *receipt.ResultingRevision
+	}
+	return 1
+}
+func revisionAfter(receipt kernel.CommandReceipt, prior uint64) uint64 {
+	if receipt.ResultingRevision != nil {
+		return *receipt.ResultingRevision
+	}
+	return prior + 1
+}
+
+const FeaturePlanningVersion = "phase6"

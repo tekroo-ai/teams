@@ -156,13 +156,14 @@ func writeProductionFixture(t *testing.T) (string, ProductionConfig) {
 		Operator:              ProductionOperatorConfig{Address: "127.0.0.1:8787", BearerTokenFile: "operator-token", Principal: kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "operator"}, OperationTimeout: "10s", MaximumBodyBytes: 1 << 20},
 		TeamsDatabaseIdentity: "tekroo_v4", SMADatabaseIdentity: "sma_v4", DeploymentIdentity: repeatedDigest('1'), AuthorizationPolicyFile: "authorization.json", ProvenanceFile: "provenance.json", EvidenceRoot: "evidence",
 		ServiceAuthority: kernel.PrincipalRef{Kind: kernel.PrincipalService, ID: "teams-operational-runtime"}, ExpiryAuthority: kernel.PrincipalRef{Kind: kernel.PrincipalPolicy, ID: "teams-admission-policy"},
-		Workspaces:   []ProductionWorkspace{{WorkspaceID: "workspace-1", WorktreeID: "worktree-1", WorkingDirectory: "workspace"}},
-		Profiles:     []ProductionProfile{{ModelProfileDigest: repeatedDigest('2'), RuntimeIdentityDigest: repeatedDigest('3'), ToolPolicyDigest: repeatedDigest('4'), EffectPolicyDigest: repeatedDigest('5'), MaximumIterations: 24}},
+		Workspaces:   []ProductionWorkspace{{WorkspaceID: "workspace-1", WorktreeID: "worktree-1", WorkingDirectory: "workspace", Branch: "task/workspace-1", BaselineSHA: strings.Repeat("1", 40), WritablePaths: []string{"."}}},
+		Profiles:     []ProductionProfile{{ModelProfileDigest: repeatedDigest('2'), RuntimeIdentityDigest: repeatedDigest('3'), ToolPolicyDigest: repeatedDigest('4'), EffectPolicyDigest: repeatedDigest('5'), MaximumIterations: 24, Qualification: kernel.AssignmentQualificationReceipt{QualificationID: "00000000-0000-7000-8000-000000000099", QualificationDigest: repeatedDigest('6'), QualificationCorpusDigest: repeatedDigest('7'), ModelProfileDigest: repeatedDigest('2'), DecisionRoute: kernel.RouteBoundedExecution, QualifiedRole: "programmer", Status: kernel.QualificationPass, ObservedAt: time.Date(2026, 8, 30, 0, 0, 0, 0, time.UTC)}}},
 		Execution:    ProductionExecution{ConsumerID: "tekrood", OperationTimeout: "130s", MaximumBriefBytes: 1 << 20, PolicyRevision: 1},
 		Evidence:     ProductionEvidence{PolicyRevision: 1, ProducingVersion: "phase5", RetentionPolicy: "local-operational"},
 		Worker:       ProductionWorker{LeaseDuration: "150s", ReconciliationInterval: "1s", MaximumReconciliations: 600, MaximumConcurrentInvocations: 4, LeaseOperationTimeout: "5s"},
 		Projection:   ProductionProjection{Interval: "100ms", OperationTimeout: "5s"},
 		Organization: organizationConfig,
+		Planning:     ProductionPlanning{PolicyRevision: 1, ClassificationPolicyDigest: repeatedDigest('8'), PromotionPolicyDigest: repeatedDigest('9'), VerificationTopologyDigest: repeatedDigest('a'), SelectionPolicyDigest: repeatedDigest('b'), BudgetPolicyDigest: repeatedDigest('c'), RequiredGateIDs: []string{"go-test"}, Deadline: "2h"},
 	}
 	path := filepath.Join(directory, "tekrood.json")
 	writeJSON(t, path, config, 0o600)

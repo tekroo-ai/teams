@@ -39,7 +39,10 @@
     {
       "workspace_id": "replace-with-workspace-id",
       "worktree_id": "replace-with-worktree-id",
-      "working_directory": "/absolute/path/to/worktree"
+      "working_directory": "/absolute/path/to/worktree",
+      "branch": "task/replace-with-task-id",
+      "baseline_sha": "1111111111111111111111111111111111111111",
+      "writable_paths": ["."]
     }
   ],
   "profiles": [
@@ -48,7 +51,17 @@
       "runtime_identity_digest": "3333333333333333333333333333333333333333333333333333333333333333",
       "tool_policy_digest": "4444444444444444444444444444444444444444444444444444444444444444",
       "effect_policy_digest": "5555555555555555555555555555555555555555555555555555555555555555",
-      "maximum_iterations": 24
+      "maximum_iterations": 24,
+      "qualification": {
+        "qualification_id": "00000000-0000-7000-8000-000000000001",
+        "qualification_digest": "6666666666666666666666666666666666666666666666666666666666666666",
+        "qualification_corpus_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+        "model_profile_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+        "decision_route": "BOUNDED_EXECUTION",
+        "qualified_role": "programmer",
+        "status": "PASS",
+        "observed_at": "2026-08-30T00:00:00Z"
+      }
     }
   ],
   "execution": {
@@ -85,5 +98,15 @@
         "public_key_file": "/Users/you/work/tekroo-ai/teams/config/starter-team/publisher.pub"
       }
     ]
+  },
+  "planning": {
+    "policy_revision": 1,
+    "classification_policy_digest": "8888888888888888888888888888888888888888888888888888888888888888",
+    "promotion_policy_digest": "9999999999999999999999999999999999999999999999999999999999999999",
+    "verification_topology_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "selection_policy_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "budget_policy_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "required_gate_ids": ["go-test"],
+    "deadline": "2h"
   }
 }

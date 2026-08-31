@@ -46,9 +46,10 @@ func (service *ProductionService) SpecifyFeature(ctx context.Context, id kernel.
 	return service.Features.Specify(ctx, id, expectedRevision, specification)
 }
 
-// MaterializeFeaturePlan creates only canonical story/task aggregates. It is
-// idempotent: stable per-feature idempotency keys recover prior receipts after
-// an interrupted materialization.
+// MaterializeFeaturePlan creates canonical story/task aggregates and binds the
+// executable work profile, assignment, budget, and operational scope for each
+// task. It is idempotent: stable per-feature idempotency keys recover prior
+// receipts after an interrupted materialization.
 func (service *ProductionService) MaterializeFeaturePlan(ctx context.Context, feature organization.FeatureRequest, plan organization.FeaturePlan) error {
 	if service == nil || service.Runtime == nil || service.ids == nil || service.clock == nil || plan.Validate(feature) != nil {
 		return organization.ErrInvalidFeature
@@ -92,7 +93,8 @@ func (service *ProductionService) MaterializeFeaturePlan(ctx context.Context, fe
 			if !ready {
 				continue
 			}
-			payload, err := json.Marshal(map[string]any{"story_id": task.StoryID, "title": task.Title, "description": task.Description, "acceptance_criteria": task.AcceptanceCriteria, "depends_on": task.DependsOn})
+			dependencies := append([]kernel.UUIDv7{}, task.DependsOn...)
+			payload, err := json.Marshal(map[string]any{"story_id": task.StoryID, "title": task.Title, "description": task.Description, "acceptance_criteria": task.AcceptanceCriteria, "depends_on": dependencies})
 			if err != nil {
 				return err
 			}
@@ -111,7 +113,7 @@ func (service *ProductionService) MaterializeFeaturePlan(ctx context.Context, fe
 			return organization.ErrInvalidFeature
 		}
 	}
-	return nil
+	return service.preparePlannedTasks(ctx, feature, plan, storyEvents, taskEvents)
 }
 
 func (service *ProductionService) submitPlannedCommand(ctx context.Context, feature organization.FeatureRequest, commandType string, kind kernel.AggregateKind, id kernel.UUIDv7, label string, payload []byte, parents []kernel.DagParent) (kernel.CommandReceipt, error) {
@@ -138,7 +140,14 @@ func (service *ProductionService) submitPlannedCommand(ctx context.Context, feat
 		Payload:                   payload,
 		EvidenceRefs:              []kernel.EvidenceRef{},
 	}
-	return service.Submit(ctx, command)
+	receipt, err := service.Submit(ctx, command)
+	if err != nil {
+		return receipt, err
+	}
+	if receipt.OutcomeCode != kernel.OutcomeApplied && receipt.OutcomeCode != kernel.OutcomeNoChange {
+		return receipt, fmt.Errorf("%s rejected: %s", commandType, receipt.ReasonCode)
+	}
+	return receipt, nil
 }
 
 func timePointer(value time.Time) *time.Time { return &value }

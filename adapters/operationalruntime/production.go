@@ -59,6 +59,7 @@ type ProductionConfig struct {
 	Worker                  ProductionWorker          `json:"worker"`
 	Projection              ProductionProjection      `json:"projection"`
 	Organization            ProductionOrganization    `json:"organization"`
+	Planning                ProductionPlanning        `json:"planning"`
 }
 
 type ProductionMongoConfig struct {
@@ -86,17 +87,32 @@ type ProductionOperatorConfig struct {
 }
 
 type ProductionWorkspace struct {
-	WorkspaceID      string `json:"workspace_id"`
-	WorktreeID       string `json:"worktree_id"`
-	WorkingDirectory string `json:"working_directory"`
+	WorkspaceID      string   `json:"workspace_id"`
+	WorktreeID       string   `json:"worktree_id"`
+	WorkingDirectory string   `json:"working_directory"`
+	Branch           string   `json:"branch"`
+	BaselineSHA      string   `json:"baseline_sha"`
+	WritablePaths    []string `json:"writable_paths"`
 }
 
 type ProductionProfile struct {
-	ModelProfileDigest    kernel.Digest `json:"model_profile_digest"`
-	RuntimeIdentityDigest kernel.Digest `json:"runtime_identity_digest"`
-	ToolPolicyDigest      kernel.Digest `json:"tool_policy_digest"`
-	EffectPolicyDigest    kernel.Digest `json:"effect_policy_digest"`
-	MaximumIterations     uint32        `json:"maximum_iterations"`
+	ModelProfileDigest    kernel.Digest                         `json:"model_profile_digest"`
+	RuntimeIdentityDigest kernel.Digest                         `json:"runtime_identity_digest"`
+	ToolPolicyDigest      kernel.Digest                         `json:"tool_policy_digest"`
+	EffectPolicyDigest    kernel.Digest                         `json:"effect_policy_digest"`
+	MaximumIterations     uint32                                `json:"maximum_iterations"`
+	Qualification         kernel.AssignmentQualificationReceipt `json:"qualification"`
+}
+
+type ProductionPlanning struct {
+	PolicyRevision             uint64        `json:"policy_revision"`
+	ClassificationPolicyDigest kernel.Digest `json:"classification_policy_digest"`
+	PromotionPolicyDigest      kernel.Digest `json:"promotion_policy_digest"`
+	VerificationTopologyDigest kernel.Digest `json:"verification_topology_digest"`
+	SelectionPolicyDigest      kernel.Digest `json:"selection_policy_digest"`
+	BudgetPolicyDigest         kernel.Digest `json:"budget_policy_digest"`
+	RequiredGateIDs            []string      `json:"required_gate_ids"`
+	Deadline                   string        `json:"deadline"`
 }
 
 type ProductionExecution struct {
@@ -157,6 +173,12 @@ type resolvedProductionConfig struct {
 	operatorTimeout       time.Duration
 	team                  organization.LoadedTeam
 	roleReconciliation    time.Duration
+	planningDeadline      time.Duration
+	planning              ProductionPlanning
+	profilesByModel       map[kernel.Digest]ProductionProfile
+	workspacesByID        map[string]ProductionWorkspace
+	serviceAuthority      kernel.PrincipalRef
+	policyAuthority       kernel.PrincipalRef
 }
 
 // LoadProductionConfig strictly decodes and validates a tekrood configuration.
@@ -262,6 +284,10 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 	if err != nil || config.Organization.MaximumRestarts == 0 || config.Organization.MaximumDeliveryAttempts == 0 {
 		return resolvedProductionConfig{}, invalidConfig("organization recovery policy is invalid")
 	}
+	planningDeadline, err := positiveDuration("planning.deadline", config.Planning.Deadline)
+	if err != nil || config.Planning.PolicyRevision == 0 || !config.Planning.ClassificationPolicyDigest.Valid() || !config.Planning.PromotionPolicyDigest.Valid() || !config.Planning.VerificationTopologyDigest.Valid() || !config.Planning.SelectionPolicyDigest.Valid() || !config.Planning.BudgetPolicyDigest.Valid() || len(config.Planning.RequiredGateIDs) == 0 || len(config.Planning.RequiredGateIDs) > 32 {
+		return resolvedProductionConfig{}, invalidConfig("planning policy is invalid")
+	}
 	if config.OpenHands.MaximumPages == 0 || config.OpenHands.MaximumPages > 1000 || config.OpenHands.MaximumEvidenceBytes <= 0 || config.OpenHands.MaximumEvidenceBytes > 16<<20 || config.Execution.ConsumerID == "" || len(config.Execution.ConsumerID) > 256 || config.Execution.MaximumBriefBytes <= 0 || config.Execution.MaximumBriefBytes > 1<<20 || config.Execution.PolicyRevision == 0 || config.Evidence.PolicyRevision == 0 || config.Evidence.ProducingVersion == "" || config.Evidence.RetentionPolicy == "" || config.Worker.MaximumReconciliations == 0 || config.Worker.MaximumConcurrentInvocations == 0 || config.Worker.MaximumConcurrentInvocations > 64 || reconciliation >= leaseDuration {
 		return resolvedProductionConfig{}, invalidConfig("execution, evidence, OpenHands, or worker limits are invalid")
 	}
@@ -271,7 +297,7 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 	workspaceBindings := make([]openhands.WorkspaceBinding, 0, len(config.Workspaces))
 	for _, workspace := range config.Workspaces {
 		info, statErr := os.Stat(workspace.WorkingDirectory)
-		if workspace.WorkspaceID == "" || workspace.WorktreeID == "" || !filepath.IsAbs(workspace.WorkingDirectory) || statErr != nil || !info.IsDir() {
+		if workspace.WorkspaceID == "" || workspace.WorktreeID == "" || !filepath.IsAbs(workspace.WorkingDirectory) || workspace.Branch == "" || len(workspace.BaselineSHA) != 40 || len(workspace.WritablePaths) == 0 || statErr != nil || !info.IsDir() {
 			return resolvedProductionConfig{}, invalidConfig("workspace binding is invalid or missing")
 		}
 		workspaceBindings = append(workspaceBindings, openhands.WorkspaceBinding{WorkspaceID: workspace.WorkspaceID, WorktreeID: workspace.WorktreeID, WorkingDirectory: workspace.WorkingDirectory})
@@ -282,7 +308,7 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 	profiles := make([]openhands.ExecutionProfile, 0, len(config.Profiles))
 	for _, profile := range config.Profiles {
 		resolved, profileErr := openhands.NewAcceptedExecutionProfile(profile.ModelProfileDigest, profile.RuntimeIdentityDigest, profile.ToolPolicyDigest, profile.EffectPolicyDigest, profile.MaximumIterations, config.TeamsDatabaseIdentity, config.SMADatabaseIdentity)
-		if profileErr != nil {
+		if profileErr != nil || !profile.Qualification.Valid() || profile.Qualification.ModelProfileDigest != profile.ModelProfileDigest {
 			return resolvedProductionConfig{}, invalidConfig("execution profile is invalid")
 		}
 		profiles = append(profiles, resolved)
@@ -317,7 +343,7 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 	if err := readStrictJSONFile(config.ProvenanceFile, &provenance); err != nil || !provenance.Valid() || provenance.PolicyDigest != policy.PolicyDigest || provenance.PolicyRevision != policy.Revision {
 		return resolvedProductionConfig{}, invalidConfig("provenance file is invalid or does not bind the authorization policy")
 	}
-	return resolvedProductionConfig{ProductionConfig: config, mongoURI: mongoURI, sessionAPIKey: sessionKey, operatorBearerToken: operatorToken, authorizationPolicy: policy, provenance: provenance, requestTimeout: requestTimeout, pollInterval: pollInterval, operationTimeout: operationTimeout, leaseDuration: leaseDuration, reconciliation: reconciliation, leaseOperationTimeout: leaseOperationTimeout, projectionInterval: projectionInterval, projectionTimeout: projectionTimeout, operatorTimeout: operatorTimeout, team: team, roleReconciliation: roleReconciliation}, nil
+	return resolvedProductionConfig{ProductionConfig: config, mongoURI: mongoURI, sessionAPIKey: sessionKey, operatorBearerToken: operatorToken, authorizationPolicy: policy, provenance: provenance, requestTimeout: requestTimeout, pollInterval: pollInterval, operationTimeout: operationTimeout, leaseDuration: leaseDuration, reconciliation: reconciliation, leaseOperationTimeout: leaseOperationTimeout, projectionInterval: projectionInterval, projectionTimeout: projectionTimeout, operatorTimeout: operatorTimeout, team: team, roleReconciliation: roleReconciliation, planningDeadline: planningDeadline}, nil
 }
 
 // ProductionService owns the Mongo store, assembled runtime, and lifecycle
@@ -351,6 +377,12 @@ type ProductionService struct {
 	roleReconciliation     time.Duration
 	roleMaximumRestarts    uint32
 	messageMaximumAttempts uint32
+	planningDeadline       time.Duration
+	planning               ProductionPlanning
+	profilesByModel        map[kernel.Digest]ProductionProfile
+	workspacesByID         map[string]ProductionWorkspace
+	serviceAuthority       kernel.PrincipalRef
+	policyAuthority        kernel.PrincipalRef
 	clock                  kernel.Clock
 	ids                    kernel.IDSource
 }
@@ -388,12 +420,14 @@ func NewProductionService(ctx context.Context, config ProductionConfig) (*Produc
 		workspaces = append(workspaces, openhands.WorkspaceBinding{WorkspaceID: item.WorkspaceID, WorktreeID: item.WorktreeID, WorkingDirectory: item.WorkingDirectory})
 	}
 	profiles := make([]openhands.ExecutionProfile, 0, len(config.Profiles))
+	profilesByModel := make(map[kernel.Digest]ProductionProfile, len(config.Profiles))
 	for _, item := range config.Profiles {
 		profile, profileErr := openhands.NewAcceptedExecutionProfile(item.ModelProfileDigest, item.RuntimeIdentityDigest, item.ToolPolicyDigest, item.EffectPolicyDigest, item.MaximumIterations, config.TeamsDatabaseIdentity, config.SMADatabaseIdentity)
 		if profileErr != nil {
 			return fail(profileErr)
 		}
 		profiles = append(profiles, profile)
+		profilesByModel[item.ModelProfileDigest] = item
 	}
 	runtime, err := New(ctx, Config{
 		Store: store, Catalogue: catalogue, Clock: clock, IDs: ids,
@@ -429,7 +463,11 @@ func NewProductionService(ctx context.Context, config ProductionConfig) (*Produc
 		_ = runtime.Close(context.WithoutCancel(ctx))
 		return fail(err)
 	}
-	service := &ProductionService{Store: store, Runtime: runtime, Controller: controller, RoleHost: roleHost, RoleRuntime: roleRuntime, MessageBus: messageBus, RoleInbox: roleInbox, projectionInterval: resolved.projectionInterval, projectionTimeout: resolved.projectionTimeout, recoveryInterval: resolved.reconciliation, recoveryTimeout: resolved.leaseOperationTimeout, recoveryAttempts: config.Worker.MaximumReconciliations, failures: make(chan error, 4), provenance: resolved.provenance, operatorToken: resolved.operatorBearerToken, operatorIdentity: protocol.AuthenticatedContext{Principal: config.Operator.Principal}, operatorTimeout: resolved.operatorTimeout, operatorMaxBody: config.Operator.MaximumBodyBytes, roleReconciliation: resolved.roleReconciliation, roleMaximumRestarts: config.Organization.MaximumRestarts, messageMaximumAttempts: config.Organization.MaximumDeliveryAttempts, clock: clock, ids: ids}
+	workspacesByID := make(map[string]ProductionWorkspace, len(config.Workspaces))
+	for _, workspace := range config.Workspaces {
+		workspacesByID[workspace.WorkspaceID] = workspace
+	}
+	service := &ProductionService{Store: store, Runtime: runtime, Controller: controller, RoleHost: roleHost, RoleRuntime: roleRuntime, MessageBus: messageBus, RoleInbox: roleInbox, projectionInterval: resolved.projectionInterval, projectionTimeout: resolved.projectionTimeout, recoveryInterval: resolved.reconciliation, recoveryTimeout: resolved.leaseOperationTimeout, recoveryAttempts: config.Worker.MaximumReconciliations, failures: make(chan error, 4), provenance: resolved.provenance, operatorToken: resolved.operatorBearerToken, operatorIdentity: protocol.AuthenticatedContext{Principal: config.Operator.Principal}, operatorTimeout: resolved.operatorTimeout, operatorMaxBody: config.Operator.MaximumBodyBytes, roleReconciliation: resolved.roleReconciliation, roleMaximumRestarts: config.Organization.MaximumRestarts, messageMaximumAttempts: config.Organization.MaximumDeliveryAttempts, clock: clock, ids: ids, planningDeadline: resolved.planningDeadline, planning: config.Planning, profilesByModel: profilesByModel, workspacesByID: workspacesByID, serviceAuthority: config.ServiceAuthority, policyAuthority: config.ExpiryAuthority}
 	features, err := organization.NewFeatureCoordinator(store, roleHost, service, clock, ids)
 	if err != nil {
 		return fail(err)
