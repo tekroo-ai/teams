@@ -21,7 +21,7 @@ import (
 	"github.com/tekroo-ai/teams/kernel"
 )
 
-func TestTeamsdAndTeamsctlExecuteNormalTaskThroughSupportedSurface(t *testing.T) {
+func TestTekroodAndTekrooExecuteNormalTaskThroughSupportedSurface(t *testing.T) {
 	process, uri := startRuntimeMongod(t)
 	defer stopRuntimeMongod(process)
 
@@ -36,9 +36,9 @@ func TestTeamsdAndTeamsctlExecuteNormalTaskThroughSupportedSurface(t *testing.T)
 	defer openHands.Close()
 
 	configPath := writeProductSurfaceConfiguration(t, uri, openHands.URL, workspace, fixture)
-	teamsd, teamsctl := buildProductSurfaceBinaries(t)
+	tekrood, tekroo := buildProductSurfaceBinaries(t)
 	var stdout, stderr bytes.Buffer
-	service := exec.Command(teamsd, "-config", configPath)
+	service := exec.Command(tekrood, "-config", configPath)
 	service.Stdout = &stdout
 	service.Stderr = &stderr
 	if err := service.Start(); err != nil {
@@ -53,10 +53,10 @@ func TestTeamsdAndTeamsctlExecuteNormalTaskThroughSupportedSurface(t *testing.T)
 		_ = service.Wait()
 	}()
 
-	waitForProductHealth(t, teamsctl, configPath, &stderr)
-	productCLI(t, teamsctl, configPath, "pause")
-	productCLI(t, teamsctl, configPath, "status")
-	productCLI(t, teamsctl, configPath, "resume")
+	waitForProductHealth(t, tekroo, configPath, &stderr)
+	productCLI(t, tekroo, configPath, "pause")
+	productCLI(t, tekroo, configPath, "status")
+	productCLI(t, tekroo, configPath, "resume")
 	// A persistent service must remain healthy while idle across multiple
 	// bounded change-stream polls before the first operator command arrives.
 	time.Sleep(1500 * time.Millisecond)
@@ -69,7 +69,7 @@ func TestTeamsdAndTeamsctlExecuteNormalTaskThroughSupportedSurface(t *testing.T)
 		t.Helper()
 		path := filepath.Join(commandDirectory, string(command.CommandID)+".json")
 		writeJSON(t, path, command, 0o600)
-		raw := productCLI(t, teamsctl, configPath, "submit", path)
+		raw := productCLI(t, tekroo, configPath, "submit", path)
 		var receipt kernel.CommandReceipt
 		if err := json.Unmarshal(raw, &receipt); err != nil {
 			t.Fatalf("decode %s receipt: %v\n%s", command.CommandType, err, raw)
@@ -80,29 +80,29 @@ func TestTeamsdAndTeamsctlExecuteNormalTaskThroughSupportedSurface(t *testing.T)
 		return receipt
 	}
 	fixture.createAuthoritativeTaskWith(t, submit)
-	storyAtCreation := waitForProductStory(t, teamsctl, configPath, fixture.storyID, func(view mongo.StoryProjection) bool {
+	storyAtCreation := waitForProductStory(t, tekroo, configPath, fixture.storyID, func(view mongo.StoryProjection) bool {
 		return view.AggregateRevision == 1 && len(view.TaskIDs) == 1
 	})
 	activateProductStory(t, fixture, storyAtCreation, submit)
 	fixture.authorizeInvocationWith(t, submit)
 
-	task := waitForProductTask(t, teamsctl, configPath, fixture.taskID, func(view mongo.TaskProjection) bool {
+	task := waitForProductTask(t, tekroo, configPath, fixture.taskID, func(view mongo.TaskProjection) bool {
 		return view.LatestInvocation != nil && view.LatestInvocation.State == kernel.InvocationSucceeded
 	})
 	if task.OwnerFQN == nil || *task.OwnerFQN != fixture.actor || task.Budget.ModelInvocationsUsed != 1 || task.LatestInvocation.InvocationID != fixture.invocationID {
 		t.Fatalf("terminal task projection = %#v", task)
 	}
-	storyRaw := productCLI(t, teamsctl, configPath, "story", string(fixture.storyID))
+	storyRaw := productCLI(t, tekroo, configPath, "story", string(fixture.storyID))
 	var story mongo.StoryProjection
 	if err := json.Unmarshal(storyRaw, &story); err != nil || len(story.TaskIDs) != 1 || story.TaskIDs[0] != fixture.taskID {
 		t.Fatalf("story projection = %#v err=%v raw=%s", story, err, storyRaw)
 	}
 	serverState.assertAuthorizedPrompts(t, fixture)
 	completeAndAcceptProductStory(t, fixture, task, story, submit)
-	waitForProductTask(t, teamsctl, configPath, fixture.taskID, func(view mongo.TaskProjection) bool {
+	waitForProductTask(t, tekroo, configPath, fixture.taskID, func(view mongo.TaskProjection) bool {
 		return view.Phase == string(kernel.PhaseCompleted) && view.Validation.State == "PASS" && view.Completion.State == "COMPLETED"
 	})
-	waitForProductStory(t, teamsctl, configPath, fixture.storyID, func(view mongo.StoryProjection) bool {
+	waitForProductStory(t, tekroo, configPath, fixture.storyID, func(view mongo.StoryProjection) bool {
 		return view.Phase == string(kernel.PhaseAccepted) && view.Completion.State == "COMPLETED" && view.Acceptance.State == "ACCEPTED" && view.Release.State == string(kernel.ReleaseNotRequired)
 	})
 
@@ -112,7 +112,7 @@ func TestTeamsdAndTeamsctlExecuteNormalTaskThroughSupportedSurface(t *testing.T)
 	serverState.mu.Unlock()
 	cancelFixture.createAuthoritativeTaskWith(t, submit)
 	cancelFixture.authorizeInvocationWith(t, submit)
-	active := waitForProductInvocation(t, teamsctl, configPath, cancelFixture.invocationID, func(status InvocationStatus) bool {
+	active := waitForProductInvocation(t, tekroo, configPath, cancelFixture.invocationID, func(status InvocationStatus) bool {
 		return status.State == kernel.InvocationStarted
 	})
 	cancelPayload := map[string]any{
@@ -125,18 +125,18 @@ func TestTeamsdAndTeamsctlExecuteNormalTaskThroughSupportedSurface(t *testing.T)
 	cancelCommand.ExpectedLifecycleEpoch = nil
 	cancelPath := filepath.Join(commandDirectory, string(cancelCommand.CommandID)+".json")
 	writeJSON(t, cancelPath, cancelCommand, 0o600)
-	cancelRaw := productCLI(t, teamsctl, configPath, "cancel", string(cancelFixture.invocationID), cancelPath)
+	cancelRaw := productCLI(t, tekroo, configPath, "cancel", string(cancelFixture.invocationID), cancelPath)
 	var cancelReceipt kernel.CommandReceipt
 	if err := json.Unmarshal(cancelRaw, &cancelReceipt); err != nil || cancelReceipt.OutcomeCode != kernel.OutcomeApplied {
 		t.Fatalf("cancellation receipt = %#v err=%v raw=%s", cancelReceipt, err, cancelRaw)
 	}
-	cancelled := waitForProductInvocation(t, teamsctl, configPath, cancelFixture.invocationID, func(status InvocationStatus) bool {
+	cancelled := waitForProductInvocation(t, tekroo, configPath, cancelFixture.invocationID, func(status InvocationStatus) bool {
 		return status.State == kernel.InvocationCancelled
 	})
 	if cancelled.TerminalOutcome == nil || *cancelled.TerminalOutcome != kernel.InvocationCancelled || cancelled.CancellationRequestedAt == nil {
 		t.Fatalf("cancelled invocation = %#v", cancelled)
 	}
-	waitForProductTask(t, teamsctl, configPath, cancelFixture.taskID, func(view mongo.TaskProjection) bool {
+	waitForProductTask(t, tekroo, configPath, cancelFixture.taskID, func(view mongo.TaskProjection) bool {
 		return view.LatestInvocation != nil && view.LatestInvocation.State == kernel.InvocationCancelled
 	})
 	serverState.mu.Lock()
@@ -146,17 +146,17 @@ func TestTeamsdAndTeamsctlExecuteNormalTaskThroughSupportedSurface(t *testing.T)
 		t.Fatal("OpenHands cancellation was not observed")
 	}
 
-	productCLI(t, teamsctl, configPath, "stop")
+	productCLI(t, tekroo, configPath, "stop")
 	waitResult := make(chan error, 1)
 	go func() { waitResult <- service.Wait() }()
 	select {
 	case err := <-waitResult:
 		if err != nil {
-			t.Fatalf("teamsd stop: %v\nstdout=%s\nstderr=%s", err, stdout.String(), stderr.String())
+			t.Fatalf("tekrood stop: %v\nstdout=%s\nstderr=%s", err, stdout.String(), stderr.String())
 		}
 		serviceStopped = true
 	case <-time.After(20 * time.Second):
-		t.Fatalf("teamsd did not stop\nstdout=%s\nstderr=%s", stdout.String(), stderr.String())
+		t.Fatalf("tekrood did not stop\nstdout=%s\nstderr=%s", stdout.String(), stderr.String())
 	}
 }
 
@@ -167,16 +167,16 @@ func buildProductSurfaceBinaries(t *testing.T) (string, string) {
 		t.Fatal(err)
 	}
 	directory := t.TempDir()
-	teamsd := filepath.Join(directory, "teamsd")
-	teamsctl := filepath.Join(directory, "teamsctl")
-	for output, source := range map[string]string{teamsd: "./cmd/teamsd", teamsctl: "./cmd/teamsctl"} {
+	tekrood := filepath.Join(directory, "tekrood")
+	tekroo := filepath.Join(directory, "tekroo")
+	for output, source := range map[string]string{tekrood: "./cmd/tekrood", tekroo: "./cmd/tekroo"} {
 		command := exec.Command("go", "build", "-trimpath", "-o", output, source)
 		command.Dir = root
 		if raw, err := command.CombinedOutput(); err != nil {
 			t.Fatalf("build %s: %v\n%s", source, err, raw)
 		}
 	}
-	return teamsd, teamsctl
+	return tekrood, tekroo
 }
 
 func writeProductSurfaceConfiguration(t *testing.T, mongoURI, openHandsURL, workspace string, fixture *integratedFixture) string {
@@ -232,30 +232,30 @@ func productCLI(t *testing.T, binary, config string, arguments ...string) []byte
 	command := exec.Command(binary, commandArguments...)
 	raw, err := command.CombinedOutput()
 	if err != nil {
-		t.Fatalf("teamsctl %s: %v\n%s", strings.Join(arguments, " "), err, raw)
+		t.Fatalf("tekroo %s: %v\n%s", strings.Join(arguments, " "), err, raw)
 	}
 	return raw
 }
 
-func waitForProductHealth(t *testing.T, teamsctl, config string, serviceStderr *bytes.Buffer) {
+func waitForProductHealth(t *testing.T, tekroo, config string, serviceStderr *bytes.Buffer) {
 	t.Helper()
 	deadline := time.Now().Add(20 * time.Second)
 	for {
-		command := exec.Command(teamsctl, "-config", config, "health")
+		command := exec.Command(tekroo, "-config", config, "health")
 		if raw, err := command.CombinedOutput(); err == nil {
 			return
 		} else if time.Now().After(deadline) {
-			t.Fatalf("teamsd health timeout: %v\n%s\nservice stderr=%s", err, raw, serviceStderr.String())
+			t.Fatalf("tekrood health timeout: %v\n%s\nservice stderr=%s", err, raw, serviceStderr.String())
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
 }
 
-func waitForProductTask(t *testing.T, teamsctl, config string, id kernel.UUIDv7, predicate func(mongo.TaskProjection) bool) mongo.TaskProjection {
+func waitForProductTask(t *testing.T, tekroo, config string, id kernel.UUIDv7, predicate func(mongo.TaskProjection) bool) mongo.TaskProjection {
 	t.Helper()
 	deadline := time.Now().Add(20 * time.Second)
 	for {
-		raw := productCLI(t, teamsctl, config, "task", string(id))
+		raw := productCLI(t, tekroo, config, "task", string(id))
 		var view mongo.TaskProjection
 		if err := json.Unmarshal(raw, &view); err != nil {
 			t.Fatalf("decode task projection: %v\n%s", err, raw)
@@ -270,11 +270,11 @@ func waitForProductTask(t *testing.T, teamsctl, config string, id kernel.UUIDv7,
 	}
 }
 
-func waitForProductInvocation(t *testing.T, teamsctl, config string, id kernel.UUIDv7, predicate func(InvocationStatus) bool) InvocationStatus {
+func waitForProductInvocation(t *testing.T, tekroo, config string, id kernel.UUIDv7, predicate func(InvocationStatus) bool) InvocationStatus {
 	t.Helper()
 	deadline := time.Now().Add(20 * time.Second)
 	for {
-		raw := productCLI(t, teamsctl, config, "invocation", string(id))
+		raw := productCLI(t, tekroo, config, "invocation", string(id))
 		var status InvocationStatus
 		if err := json.Unmarshal(raw, &status); err != nil {
 			t.Fatalf("decode invocation status: %v\n%s", err, raw)
@@ -289,11 +289,11 @@ func waitForProductInvocation(t *testing.T, teamsctl, config string, id kernel.U
 	}
 }
 
-func waitForProductStory(t *testing.T, teamsctl, config string, id kernel.UUIDv7, predicate func(mongo.StoryProjection) bool) mongo.StoryProjection {
+func waitForProductStory(t *testing.T, tekroo, config string, id kernel.UUIDv7, predicate func(mongo.StoryProjection) bool) mongo.StoryProjection {
 	t.Helper()
 	deadline := time.Now().Add(20 * time.Second)
 	for {
-		raw := productCLI(t, teamsctl, config, "story", string(id))
+		raw := productCLI(t, tekroo, config, "story", string(id))
 		var view mongo.StoryProjection
 		if err := json.Unmarshal(raw, &view); err != nil {
 			t.Fatalf("decode story projection: %v\n%s", err, raw)

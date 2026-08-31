@@ -3,12 +3,12 @@
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.tekroo.teamsd</string>
+  <string>com.tekroo.tekrood</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/ABSOLUTE/INSTALL/ROOT/bin/teamsd</string>
+    <string>/ABSOLUTE/INSTALL/ROOT/bin/tekrood</string>
     <string>-config</string>
-    <string>/ABSOLUTE/PATH/teamsd.json</string>
+    <string>/ABSOLUTE/PATH/tekrood.json</string>
   </array>
   <key>RunAtLoad</key>
   <false/>
@@ -17,8 +17,8 @@
   <key>ProcessType</key>
   <string>Background</string>
   <key>StandardOutPath</key>
-  <string>/ABSOLUTE/STATE/DIRECTORY/teamsd.log</string>
+  <string>/ABSOLUTE/STATE/DIRECTORY/tekrood.log</string>
   <key>StandardErrorPath</key>
-  <string>/ABSOLUTE/STATE/DIRECTORY/teamsd.log</string>
+  <string>/ABSOLUTE/STATE/DIRECTORY/tekrood.log</string>
 </dict>
 </plist>

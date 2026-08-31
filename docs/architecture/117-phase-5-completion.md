@@ -3,7 +3,7 @@
 ## Outcome
 
 Phase 5 is complete for ordinary local use. The supported path is the actual
-`teamsd` service and `teamsctl` client assembled from the accepted Phase 4
+`tekrood` service and `tekroo` client assembled from the accepted Phase 4
 runtime. It is not a parallel test-only workflow.
 
 Teams v4 starts with a new, explicitly bound MongoDB database. No Tekroo v3
@@ -21,12 +21,12 @@ The supported product surface was used to:
 - repair two isolated disposable Go repositories and independently pass each
   repository's tests;
 - retain terminal output digests and evidence identities;
-- preserve task projections and one-use model budgets across a `teamsd`
+- preserve task projections and one-use model budgets across a `tekrood`
   restart;
 - observe an unavailable OpenHands boundary, recover without a second
   authorization, and avoid a duplicate invocation;
-- suspend and resume the active `teamsd` process with `SIGSTOP`/`SIGCONT`;
-- cancel the recovered live OpenHands conversation through `teamsctl`; and
+- suspend and resume the active daemon process with `SIGSTOP`/`SIGCONT`;
+- cancel the recovered live OpenHands conversation through the operator CLI; and
 - preserve the cancelled projection and budget across restart.
 
 The three live conversations had exact disposable workspace bindings and no
@@ -87,3 +87,12 @@ Process suspension exercises the Teams-controlled pause in execution time, but
 it is not represented as a physical host-sleep observation. Ordinary local
 operation is ready; remote hosting, multi-user exposure, and data migration
 remain outside Phase 5.
+
+## Post-completion command names
+
+The supported daemon and operator CLI names are `tekrood` and `tekroo`.
+Configuration examples, the LaunchAgent example, lifecycle scripts, tests, and
+operator documentation use those names. The earlier live receipts remain
+unchanged because they record the command names that existed when those runs
+were performed. The rename acceptance is recorded in
+`OUTPUT/phase-5/phase-5-command-rename-acceptance.json`.

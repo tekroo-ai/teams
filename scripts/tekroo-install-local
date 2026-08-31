@@ -3,7 +3,7 @@
 set -eu
 
 if [ "$#" -ne 1 ]; then
-  echo "usage: teams-install-local ABSOLUTE_INSTALL_ROOT" >&2
+  echo "usage: tekroo-install-local ABSOLUTE_INSTALL_ROOT" >&2
   exit 2
 fi
 
@@ -18,22 +18,22 @@ SCRIPT_TARGET=$INSTALL_ROOT/scripts
 /bin/mkdir -p "$BIN_DIR" "$SCRIPT_TARGET"
 /bin/chmod 700 "$INSTALL_ROOT" "$BIN_DIR" "$SCRIPT_TARGET"
 
-TEAMSD_TEMP=$BIN_DIR/teamsd.new.$$
-TEAMSCTL_TEMP=$BIN_DIR/teamsctl.new.$$
+TEKROOD_TEMP=$BIN_DIR/tekrood.new.$$
+TEKROO_TEMP=$BIN_DIR/tekroo.new.$$
 
 cleanup() {
-  /bin/rm -f "$TEAMSD_TEMP" "$TEAMSCTL_TEMP"
+  /bin/rm -f "$TEKROOD_TEMP" "$TEKROO_TEMP"
 }
 trap cleanup EXIT HUP INT TERM
 
 cd -- "$REPOSITORY_ROOT"
-/usr/bin/env go build -trimpath -o "$TEAMSD_TEMP" ./cmd/teamsd
-/usr/bin/env go build -trimpath -o "$TEAMSCTL_TEMP" ./cmd/teamsctl
-/bin/chmod 700 "$TEAMSD_TEMP" "$TEAMSCTL_TEMP"
-/bin/mv "$TEAMSD_TEMP" "$BIN_DIR/teamsd"
-/bin/mv "$TEAMSCTL_TEMP" "$BIN_DIR/teamsctl"
+/usr/bin/env go build -trimpath -o "$TEKROOD_TEMP" ./cmd/tekrood
+/usr/bin/env go build -trimpath -o "$TEKROO_TEMP" ./cmd/tekroo
+/bin/chmod 700 "$TEKROOD_TEMP" "$TEKROO_TEMP"
+/bin/mv "$TEKROOD_TEMP" "$BIN_DIR/tekrood"
+/bin/mv "$TEKROO_TEMP" "$BIN_DIR/tekroo"
 
-for NAME in teams-service teams-start teams-stop teams-restart teams-status; do
+for NAME in tekroo-service tekroo-start tekroo-stop tekroo-restart tekroo-status; do
   /usr/bin/install -m 700 "$SCRIPT_DIR/$NAME" "$SCRIPT_TARGET/$NAME"
 done
 

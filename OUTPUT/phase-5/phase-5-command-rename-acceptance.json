@@ -1,0 +1,56 @@
+{
+  "recordType": "PHASE_5_COMMAND_RENAME_ACCEPTANCE",
+  "status": "PASS",
+  "recordedAt": "2026-08-31T19:38:43Z",
+  "sourcePhase5Commit": "c5dca2eb010fc2c7f4b1d36817e4ebe8f188845b",
+  "sourcePhase5Tree": "c42bf222d8c1a6cc62d3e5d362619511474a23f0",
+  "names": {
+    "daemon": {
+      "former": "teamsd",
+      "supported": "tekrood"
+    },
+    "cli": {
+      "former": "teamsctl",
+      "supported": "tekroo"
+    }
+  },
+  "scope": [
+    "Go command directories and binaries",
+    "public help and error text",
+    "example configuration and LaunchAgent",
+    "local installer and lifecycle scripts",
+    "product-surface tests",
+    "operator and architecture documentation"
+  ],
+  "verification": {
+    "goTestAll": "PASS",
+    "goVetAll": "PASS",
+    "raceTests": "PASS",
+    "mongoAndOperationalIntegrationTests": "PASS",
+    "shellSyntax": "PASS",
+    "configurationJSON": "PASS",
+    "launchAgentPlist": "PASS",
+    "localInstall": "PASS",
+    "installedBinaries": [
+      "bin/tekrood",
+      "bin/tekroo"
+    ],
+    "contractStructure": {
+      "result": "PASS 3604",
+      "sha256": "fe88ec20d984ee2a547bb010847abd09d7aaea82dd0939921e39e97e2336b958"
+    },
+    "contractReference": {
+      "result": "PASS 297",
+      "sha256": "0327158c444d5159d8d797378cafa61b5508f6bed68fbd104c52eb6f1aaa3f7a"
+    }
+  },
+  "preservedHistoricalEvidence": {
+    "OUTPUT/phase-5/step-6-live-soak-receipt.json": "9fb97ea9b2c4d4ee9efba33101de759fcaa037ebb2c5ab56590886acd42fb0a2",
+    "OUTPUT/phase-5/step-6-live-recovery-cancellation-receipt.json": "955ea59116e03bac8d239ca46f7357f65890bb9b92a51665dbadf1f49148f349"
+  },
+  "notRun": [
+    "live model work",
+    "production or historical data access",
+    "data migration"
+  ]
+}

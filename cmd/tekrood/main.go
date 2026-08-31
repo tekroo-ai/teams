@@ -26,20 +26,20 @@ const (
 
 func main() {
 	if err := run(os.Args[1:], os.Stdout, os.Stderr); err != nil {
-		fmt.Fprintln(os.Stderr, "teamsd:", err)
+		fmt.Fprintln(os.Stderr, "tekrood:", err)
 		os.Exit(1)
 	}
 }
 
 func run(arguments []string, stdout, stderr io.Writer) error {
-	flags := flag.NewFlagSet("teamsd", flag.ContinueOnError)
+	flags := flag.NewFlagSet("tekrood", flag.ContinueOnError)
 	flags.SetOutput(stderr)
-	configPath := flags.String("config", "", "absolute path to teamsd JSON configuration")
+	configPath := flags.String("config", "", "absolute path to tekrood JSON configuration")
 	if err := flags.Parse(arguments); err != nil {
 		return err
 	}
 	if flags.NArg() != 0 || *configPath == "" {
-		return errors.New("usage: teamsd -config /absolute/path/teamsd.json")
+		return errors.New("usage: tekrood -config /absolute/path/tekrood.json")
 	}
 	config, err := operationalruntime.LoadProductionConfig(*configPath)
 	if err != nil {
@@ -86,18 +86,18 @@ func run(arguments []string, stdout, stderr io.Writer) error {
 	server := &http.Server{Addr: config.Operator.Address, Handler: handler, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 15 * time.Second, IdleTimeout: time.Minute}
 	serverResult := make(chan error, 1)
 	go func() { serverResult <- server.Serve(listener) }()
-	writeLog(stdout, serviceLog{Event: "teamsd_started", At: time.Now().UTC(), Contract: kernel.ContractIdentity, Database: config.Mongo.Database, OpenHands: config.OpenHands.BaseURL, Operator: config.Operator.Address, Workspaces: len(config.Workspaces), Profiles: len(config.Profiles)})
+	writeLog(stdout, serviceLog{Event: "tekrood_started", At: time.Now().UTC(), Contract: kernel.ContractIdentity, Database: config.Mongo.Database, OpenHands: config.OpenHands.BaseURL, Operator: config.Operator.Address, Workspaces: len(config.Workspaces), Profiles: len(config.Profiles)})
 
 	shutdownSignal, stopSignals := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stopSignals()
 	var runtimeErr error
 	select {
 	case runtimeErr = <-service.Failures():
-		writeLog(stderr, serviceLog{Event: "teamsd_failed", At: time.Now().UTC(), Error: runtimeErr.Error()})
+		writeLog(stderr, serviceLog{Event: "tekrood_failed", At: time.Now().UTC(), Error: runtimeErr.Error()})
 	case serveErr := <-serverResult:
 		if !errors.Is(serveErr, http.ErrServerClosed) {
 			runtimeErr = serveErr
-			writeLog(stderr, serviceLog{Event: "teamsd_failed", At: time.Now().UTC(), Error: serveErr.Error()})
+			writeLog(stderr, serviceLog{Event: "tekrood_failed", At: time.Now().UTC(), Error: serveErr.Error()})
 		}
 	case <-stopRequested:
 	case <-shutdownSignal.Done():
@@ -119,7 +119,7 @@ func run(arguments []string, stdout, stderr io.Writer) error {
 		return err
 	}
 	closed = true
-	writeLog(stdout, serviceLog{Event: "teamsd_stopped", At: time.Now().UTC(), Contract: kernel.ContractIdentity, Database: config.Mongo.Database})
+	writeLog(stdout, serviceLog{Event: "tekrood_stopped", At: time.Now().UTC(), Contract: kernel.ContractIdentity, Database: config.Mongo.Database})
 	return runtimeErr
 }
 

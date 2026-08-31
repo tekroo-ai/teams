@@ -25,8 +25,8 @@ semantics.
 
 At phase completion, the local machine can run:
 
-- one persistent `teamsd` service containing the accepted Phase 4 runtime;
-- one `teamsctl` command-line client for operator work and lifecycle control;
+- one persistent `tekrood` service containing the accepted Phase 4 runtime;
+- one `tekroo` command-line client for operator work and lifecycle control;
 - authenticated localhost-only HTTP endpoints for health, status, pause,
   resume, command submission, and task/story reads;
 - durable recovery after service restart and host sleep/resume;
@@ -55,11 +55,11 @@ the accepted runtime. Configuration must support:
   unsafe non-loopback endpoint, or inconsistent runtime identity; and
 - human-readable validation errors without logging credentials.
 
-Add `cmd/teamsd` with foreground operation, signal-aware graceful shutdown, and
+Add `cmd/tekrood` with foreground operation, signal-aware graceful shutdown, and
 structured startup/shutdown reporting. It must assemble the same production
 runtime used by the accepted pilot rather than a parallel test-only path.
 
-**Exit:** `teamsd` starts the accepted runtime from a validated local config and
+**Exit:** `tekrood` starts the accepted runtime from a validated local config and
 stops cleanly without leaking workers, feeds, files, or secrets.
 
 ### Step 2 — localhost operator control API
@@ -83,7 +83,7 @@ raw semantic-memory internals.
 **Exit:** the operator can control and inspect the service without a Go test or
 direct MongoDB access.
 
-### Step 3 — `teamsctl` operator client
+### Step 3 — `tekroo` operator client
 
 Add a small client that reads the same secret file and supports:
 
@@ -121,7 +121,7 @@ would violate that boundary.
 
 ### Step 5 — normal operator workflow
 
-Use `teamsctl` and `teamsd`, not test fixtures, to run the normal workflow:
+Use `tekroo` and `tekrood`, not test fixtures, to run the normal workflow:
 
 1. create a story and task;
 2. classify and scope the task;
@@ -155,6 +155,6 @@ data migration are outside this phase.
 
 ## Completion rule
 
-Phase 5 is complete only when the supported `teamsd` + `teamsctl` path—not a
+Phase 5 is complete only when the supported `tekrood` + `tekroo` path—not a
 test-only assembly—can execute, inspect, control, recover, and finish real local
 work through the accepted Teams/OpenHands/SMA boundaries.

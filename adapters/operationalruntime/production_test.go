@@ -151,12 +151,12 @@ func writeProductionFixture(t *testing.T) (string, ProductionConfig) {
 		ServiceAuthority: kernel.PrincipalRef{Kind: kernel.PrincipalService, ID: "teams-operational-runtime"}, ExpiryAuthority: kernel.PrincipalRef{Kind: kernel.PrincipalPolicy, ID: "teams-admission-policy"},
 		Workspaces: []ProductionWorkspace{{WorkspaceID: "workspace-1", WorktreeID: "worktree-1", WorkingDirectory: "workspace"}},
 		Profiles:   []ProductionProfile{{ModelProfileDigest: repeatedDigest('2'), RuntimeIdentityDigest: repeatedDigest('3'), ToolPolicyDigest: repeatedDigest('4'), EffectPolicyDigest: repeatedDigest('5'), MaximumIterations: 24}},
-		Execution:  ProductionExecution{ConsumerID: "teamsd", OperationTimeout: "130s", MaximumBriefBytes: 1 << 20, PolicyRevision: 1},
+		Execution:  ProductionExecution{ConsumerID: "tekrood", OperationTimeout: "130s", MaximumBriefBytes: 1 << 20, PolicyRevision: 1},
 		Evidence:   ProductionEvidence{PolicyRevision: 1, ProducingVersion: "phase5", RetentionPolicy: "local-operational"},
 		Worker:     ProductionWorker{LeaseDuration: "150s", ReconciliationInterval: "1s", MaximumReconciliations: 600, MaximumConcurrentInvocations: 4, LeaseOperationTimeout: "5s"},
 		Projection: ProductionProjection{Interval: "100ms", OperationTimeout: "5s"},
 	}
-	path := filepath.Join(directory, "teamsd.json")
+	path := filepath.Join(directory, "tekrood.json")
 	writeJSON(t, path, config, 0o600)
 	return path, config
 }

@@ -63,8 +63,8 @@ func TestPhase5LiveSoakRunsConcurrentLocalWorkAndRestartsCleanly(t *testing.T) {
 		{WorkspaceID: first.workspaceID, WorktreeID: first.worktreeID, WorkingDirectory: firstWorkspace},
 		{WorkspaceID: second.workspaceID, WorktreeID: second.worktreeID, WorkingDirectory: secondWorkspace},
 	}, first)
-	teamsd, teamsctl := buildProductSurfaceBinaries(t)
-	service, stdout, stderr := startPhase5Teamsd(t, teamsd, configPath)
+	tekrood, tekroo := buildProductSurfaceBinaries(t)
+	service, stdout, stderr := startPhase5Tekrood(t, tekrood, configPath)
 	serviceStopped := false
 	defer func() {
 		if serviceStopped {
@@ -73,25 +73,25 @@ func TestPhase5LiveSoakRunsConcurrentLocalWorkAndRestartsCleanly(t *testing.T) {
 		_ = service.Process.Kill()
 		_ = service.Wait()
 	}()
-	waitForProductHealth(t, teamsctl, configPath, stderr)
+	waitForProductHealth(t, tekroo, configPath, stderr)
 
 	commandDirectory := filepath.Join(t.TempDir(), "commands")
 	if err := os.Mkdir(commandDirectory, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	submit := phase5ProductSubmitter(t, teamsctl, configPath, commandDirectory)
+	submit := phase5ProductSubmitter(t, tekroo, configPath, commandDirectory)
 	for _, fixture := range []*integratedFixture{first, second} {
 		fixture.createAuthoritativeTaskWith(t, submit)
-		story := waitForProductStory(t, teamsctl, configPath, fixture.storyID, func(view mongo.StoryProjection) bool {
+		story := waitForProductStory(t, tekroo, configPath, fixture.storyID, func(view mongo.StoryProjection) bool {
 			return view.AggregateRevision == 1 && len(view.TaskIDs) == 1
 		})
 		activateProductStory(t, fixture, story, submit)
 	}
-	productCLI(t, teamsctl, configPath, "pause")
+	productCLI(t, tekroo, configPath, "pause")
 	first.authorizeInvocationWith(t, submit)
 	second.authorizeInvocationWith(t, submit)
 	for _, fixture := range []*integratedFixture{first, second} {
-		status := waitForLiveInvocation(t, teamsctl, configPath, fixture.invocationID, func(value InvocationStatus) bool {
+		status := waitForLiveInvocation(t, tekroo, configPath, fixture.invocationID, func(value InvocationStatus) bool {
 			return value.State == kernel.InvocationAuthorized
 		})
 		if status.ConversationID != nil {
@@ -100,9 +100,9 @@ func TestPhase5LiveSoakRunsConcurrentLocalWorkAndRestartsCleanly(t *testing.T) {
 	}
 
 	startedAt := time.Now().UTC()
-	productCLI(t, teamsctl, configPath, "resume")
-	firstTerminal := waitForLiveInvocation(t, teamsctl, configPath, first.invocationID, terminalInvocation)
-	secondTerminal := waitForLiveInvocation(t, teamsctl, configPath, second.invocationID, terminalInvocation)
+	productCLI(t, tekroo, configPath, "resume")
+	firstTerminal := waitForLiveInvocation(t, tekroo, configPath, first.invocationID, terminalInvocation)
+	secondTerminal := waitForLiveInvocation(t, tekroo, configPath, second.invocationID, terminalInvocation)
 	for _, status := range []InvocationStatus{firstTerminal, secondTerminal} {
 		if status.State != kernel.InvocationSucceeded || status.TerminalOutcome == nil || *status.TerminalOutcome != kernel.InvocationSucceeded || len(status.TerminalEvidenceIDs) == 0 || status.OutputDigest == nil || status.FinishedAt == nil {
 			t.Fatalf("live terminal invocation = %#v", status)
@@ -117,29 +117,29 @@ func TestPhase5LiveSoakRunsConcurrentLocalWorkAndRestartsCleanly(t *testing.T) {
 			t.Fatalf("workspace verification %s: %v\n%s", workspace, err, raw)
 		}
 	}
-	statusRaw := productCLI(t, teamsctl, configPath, "status")
+	statusRaw := productCLI(t, tekroo, configPath, "status")
 	var control ControlStatus
 	if err := json.Unmarshal(statusRaw, &control); err != nil || control.State != ControlRunning || control.Worker.Completed < 2 || control.Worker.Active != 0 {
 		t.Fatalf("live control status = %#v err=%v raw=%s", control, err, statusRaw)
 	}
 
-	productCLI(t, teamsctl, configPath, "stop")
-	waitPhase5Teamsd(t, service, stdout, stderr)
+	productCLI(t, tekroo, configPath, "stop")
+	waitPhase5Tekrood(t, service, stdout, stderr)
 	serviceStopped = true
 
-	restarted, restartStdout, restartStderr := startPhase5Teamsd(t, teamsd, configPath)
+	restarted, restartStdout, restartStderr := startPhase5Tekrood(t, tekrood, configPath)
 	service, stdout, stderr, serviceStopped = restarted, restartStdout, restartStderr, false
-	waitForProductHealth(t, teamsctl, configPath, stderr)
+	waitForProductHealth(t, tekroo, configPath, stderr)
 	for _, fixture := range []*integratedFixture{first, second} {
-		view := waitForProductTask(t, teamsctl, configPath, fixture.taskID, func(value mongo.TaskProjection) bool {
+		view := waitForProductTask(t, tekroo, configPath, fixture.taskID, func(value mongo.TaskProjection) bool {
 			return value.LatestInvocation != nil && value.LatestInvocation.State == kernel.InvocationSucceeded
 		})
 		if view.Budget.ModelInvocationsUsed != 1 || view.LatestInvocation.InvocationID != fixture.invocationID {
 			t.Fatalf("post-restart task projection = %#v", view)
 		}
 	}
-	productCLI(t, teamsctl, configPath, "stop")
-	waitPhase5Teamsd(t, service, stdout, stderr)
+	productCLI(t, tekroo, configPath, "stop")
+	waitPhase5Tekrood(t, service, stdout, stderr)
 	serviceStopped = true
 
 	receipt := map[string]any{
@@ -148,7 +148,7 @@ func TestPhase5LiveSoakRunsConcurrentLocalWorkAndRestartsCleanly(t *testing.T) {
 		"teams_database": "disposable_replica_set", "sma_database_access_by_teams": false,
 		"task_count": 2, "maximum_concurrency": 2, "elapsed_ms": time.Since(startedAt).Milliseconds(),
 		"invocations": []InvocationStatus{firstTerminal, secondTerminal},
-		"checks":      []string{"pause prevented admission", "both isolated repositories repaired", "go test passed in both repositories", "budget usage remained one invocation per task", "projections survived teamsd restart", "service stopped cleanly"},
+		"checks":      []string{"pause prevented admission", "both isolated repositories repaired", "go test passed in both repositories", "budget usage remained one invocation per task", "projections survived tekrood restart", "service stopped cleanly"},
 		"not_run":     []string{"v3 data migration", "production or historical database access", "physical host sleep", "model-server shutdown"},
 	}
 	writePhase5SoakReceipt(t, receipt)
@@ -177,8 +177,8 @@ func TestPhase5LiveSoakRecoversFromDependencyOutageAndCancelsAfterSuspend(t *tes
 	requirePhase5ConversationAbsent(t, fixture.invocationID)
 
 	configPath := writePhase5LiveSoakConfig(t, mongoURI, gate.URL(), []ProductionWorkspace{{WorkspaceID: fixture.workspaceID, WorktreeID: fixture.worktreeID, WorkingDirectory: workspace}}, fixture)
-	teamsd, teamsctl := buildProductSurfaceBinaries(t)
-	service, stdout, stderr := startPhase5Teamsd(t, teamsd, configPath)
+	tekrood, tekroo := buildProductSurfaceBinaries(t)
+	service, stdout, stderr := startPhase5Tekrood(t, tekrood, configPath)
 	serviceStopped := false
 	defer func() {
 		if serviceStopped {
@@ -187,40 +187,40 @@ func TestPhase5LiveSoakRecoversFromDependencyOutageAndCancelsAfterSuspend(t *tes
 		_ = service.Process.Kill()
 		_ = service.Wait()
 	}()
-	waitForProductHealth(t, teamsctl, configPath, stderr)
+	waitForProductHealth(t, tekroo, configPath, stderr)
 
 	commandDirectory := filepath.Join(t.TempDir(), "commands")
 	if err := os.Mkdir(commandDirectory, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	submit := phase5ProductSubmitter(t, teamsctl, configPath, commandDirectory)
+	submit := phase5ProductSubmitter(t, tekroo, configPath, commandDirectory)
 	fixture.createAuthoritativeTaskWith(t, submit)
-	story := waitForProductStory(t, teamsctl, configPath, fixture.storyID, func(view mongo.StoryProjection) bool {
+	story := waitForProductStory(t, tekroo, configPath, fixture.storyID, func(view mongo.StoryProjection) bool {
 		return view.AggregateRevision == 1 && len(view.TaskIDs) == 1
 	})
 	activateProductStory(t, fixture, story, submit)
-	productCLI(t, teamsctl, configPath, "pause")
+	productCLI(t, tekroo, configPath, "pause")
 	fixture.authorizeInvocationWith(t, submit)
-	waitForLiveInvocation(t, teamsctl, configPath, fixture.invocationID, func(value InvocationStatus) bool { return value.State == kernel.InvocationAuthorized })
+	waitForLiveInvocation(t, tekroo, configPath, fixture.invocationID, func(value InvocationStatus) bool { return value.State == kernel.InvocationAuthorized })
 
 	gate.SetAvailable(false)
-	productCLI(t, teamsctl, configPath, "resume")
-	waitForLiveInvocation(t, teamsctl, configPath, fixture.invocationID, func(value InvocationStatus) bool { return value.State == kernel.InvocationClaimed })
+	productCLI(t, tekroo, configPath, "resume")
+	waitForLiveInvocation(t, tekroo, configPath, fixture.invocationID, func(value InvocationStatus) bool { return value.State == kernel.InvocationClaimed })
 	waitForPhase5GateRejection(t, gate)
 	gate.SetAvailable(true)
 	waitForPhase5Conversation(t, fixture.invocationID)
-	active := waitForLiveInvocation(t, teamsctl, configPath, fixture.invocationID, func(value InvocationStatus) bool {
+	active := waitForLiveInvocation(t, tekroo, configPath, fixture.invocationID, func(value InvocationStatus) bool {
 		return value.State == kernel.InvocationStarted && value.ConversationID != nil
 	})
 
 	if err := service.Process.Signal(syscall.SIGSTOP); err != nil {
-		t.Fatalf("suspend teamsd: %v", err)
+		t.Fatalf("suspend tekrood: %v", err)
 	}
 	time.Sleep(2 * time.Second)
 	if err := service.Process.Signal(syscall.SIGCONT); err != nil {
-		t.Fatalf("resume teamsd: %v", err)
+		t.Fatalf("resume tekrood: %v", err)
 	}
-	waitForProductHealth(t, teamsctl, configPath, stderr)
+	waitForProductHealth(t, tekroo, configPath, stderr)
 
 	cancelPayload := map[string]any{
 		"invocation_id": fixture.invocationID, "expected_invocation_revision": active.Revision,
@@ -232,31 +232,31 @@ func TestPhase5LiveSoakRecoversFromDependencyOutageAndCancelsAfterSuspend(t *tes
 	cancelCommand.ExpectedLifecycleEpoch = nil
 	cancelPath := filepath.Join(commandDirectory, string(cancelCommand.CommandID)+".json")
 	writeJSON(t, cancelPath, cancelCommand, 0o600)
-	raw := productCLI(t, teamsctl, configPath, "cancel", string(fixture.invocationID), cancelPath)
+	raw := productCLI(t, tekroo, configPath, "cancel", string(fixture.invocationID), cancelPath)
 	var cancelReceipt kernel.CommandReceipt
 	if json.Unmarshal(raw, &cancelReceipt) != nil || cancelReceipt.OutcomeCode != kernel.OutcomeApplied {
 		t.Fatalf("cancellation receipt = %#v raw=%s", cancelReceipt, raw)
 	}
-	cancelled := waitForLiveInvocation(t, teamsctl, configPath, fixture.invocationID, func(value InvocationStatus) bool { return value.State == kernel.InvocationCancelled })
+	cancelled := waitForLiveInvocation(t, tekroo, configPath, fixture.invocationID, func(value InvocationStatus) bool { return value.State == kernel.InvocationCancelled })
 	if cancelled.TerminalOutcome == nil || *cancelled.TerminalOutcome != kernel.InvocationCancelled || cancelled.CancellationRequestedAt == nil || len(cancelled.TerminalEvidenceIDs) == 0 {
 		t.Fatalf("cancelled invocation = %#v", cancelled)
 	}
 	requirePhase5ConversationWorkspace(t, fixture.invocationID, workspace)
 
-	productCLI(t, teamsctl, configPath, "stop")
-	waitPhase5Teamsd(t, service, stdout, stderr)
+	productCLI(t, tekroo, configPath, "stop")
+	waitPhase5Tekrood(t, service, stdout, stderr)
 	serviceStopped = true
-	restarted, restartStdout, restartStderr := startPhase5Teamsd(t, teamsd, configPath)
+	restarted, restartStdout, restartStderr := startPhase5Tekrood(t, tekrood, configPath)
 	service, stdout, stderr, serviceStopped = restarted, restartStdout, restartStderr, false
-	waitForProductHealth(t, teamsctl, configPath, stderr)
-	view := waitForProductTask(t, teamsctl, configPath, fixture.taskID, func(value mongo.TaskProjection) bool {
+	waitForProductHealth(t, tekroo, configPath, stderr)
+	view := waitForProductTask(t, tekroo, configPath, fixture.taskID, func(value mongo.TaskProjection) bool {
 		return value.LatestInvocation != nil && value.LatestInvocation.State == kernel.InvocationCancelled
 	})
 	if view.Budget.ModelInvocationsUsed != 1 || view.LatestInvocation.InvocationID != fixture.invocationID {
 		t.Fatalf("post-restart cancellation projection = %#v", view)
 	}
-	productCLI(t, teamsctl, configPath, "stop")
-	waitPhase5Teamsd(t, service, stdout, stderr)
+	productCLI(t, tekroo, configPath, "stop")
+	waitPhase5Tekrood(t, service, stdout, stderr)
 	serviceStopped = true
 
 	receipt := map[string]any{
@@ -264,7 +264,7 @@ func TestPhase5LiveSoakRecoversFromDependencyOutageAndCancelsAfterSuspend(t *tes
 		"openhands_endpoint": phase5OpenHandsURL, "model_endpoint": "http://127.0.0.1:8802/v1", "model_id": phase5ExpectedModelID,
 		"teams_database": "disposable_replica_set", "sma_database_access_by_teams": false,
 		"outage_responses_observed": gate.Rejected(), "invocation": cancelled,
-		"checks":  []string{"OpenHands proxy outage observed", "invocation recovered without reauthorization", "teamsd SIGSTOP/SIGCONT during active execution", "teamsctl cancellation interrupted OpenHands", "budget remained one invocation", "cancelled projection survived teamsd restart", "conversation had no parent agent"},
+		"checks":  []string{"OpenHands proxy outage observed", "invocation recovered without reauthorization", "tekrood SIGSTOP/SIGCONT during active execution", "tekroo cancellation interrupted OpenHands", "budget remained one invocation", "cancelled projection survived tekrood restart", "conversation had no parent agent"},
 		"not_run": []string{"v3 data migration", "production or historical database access", "physical host sleep", "model-server shutdown"},
 	}
 	writePhase5Receipt(t, "step-6-live-recovery-cancellation-receipt.json", receipt)
@@ -498,7 +498,7 @@ func writePhase5LiveSoakConfig(t *testing.T, mongoURI, openHandsURL string, work
 	return path
 }
 
-func startPhase5Teamsd(t *testing.T, binary, configPath string) (*exec.Cmd, *bytes.Buffer, *bytes.Buffer) {
+func startPhase5Tekrood(t *testing.T, binary, configPath string) (*exec.Cmd, *bytes.Buffer, *bytes.Buffer) {
 	t.Helper()
 	stdout, stderr := &bytes.Buffer{}, &bytes.Buffer{}
 	service := exec.Command(binary, "-config", configPath)
@@ -509,27 +509,27 @@ func startPhase5Teamsd(t *testing.T, binary, configPath string) (*exec.Cmd, *byt
 	return service, stdout, stderr
 }
 
-func waitPhase5Teamsd(t *testing.T, service *exec.Cmd, stdout, stderr *bytes.Buffer) {
+func waitPhase5Tekrood(t *testing.T, service *exec.Cmd, stdout, stderr *bytes.Buffer) {
 	t.Helper()
 	done := make(chan error, 1)
 	go func() { done <- service.Wait() }()
 	select {
 	case err := <-done:
 		if err != nil {
-			t.Fatalf("teamsd stop: %v\nstdout=%s\nstderr=%s", err, stdout.String(), stderr.String())
+			t.Fatalf("tekrood stop: %v\nstdout=%s\nstderr=%s", err, stdout.String(), stderr.String())
 		}
 	case <-time.After(30 * time.Second):
-		t.Fatalf("teamsd stop timeout\nstdout=%s\nstderr=%s", stdout.String(), stderr.String())
+		t.Fatalf("tekrood stop timeout\nstdout=%s\nstderr=%s", stdout.String(), stderr.String())
 	}
 }
 
-func phase5ProductSubmitter(t *testing.T, teamsctl, configPath, commandDirectory string) integratedCommandSubmitter {
+func phase5ProductSubmitter(t *testing.T, tekroo, configPath, commandDirectory string) integratedCommandSubmitter {
 	t.Helper()
 	return func(t *testing.T, command kernel.KernelCommand) kernel.CommandReceipt {
 		t.Helper()
 		path := filepath.Join(commandDirectory, string(command.CommandID)+".json")
 		writeJSON(t, path, command, 0o600)
-		raw := productCLI(t, teamsctl, configPath, "submit", path)
+		raw := productCLI(t, tekroo, configPath, "submit", path)
 		var receipt kernel.CommandReceipt
 		if err := json.Unmarshal(raw, &receipt); err != nil || receipt.OutcomeCode != kernel.OutcomeApplied || len(receipt.EventIDs) != 1 {
 			t.Fatalf("%s receipt=%#v err=%v raw=%s", command.CommandType, receipt, err, raw)
@@ -538,11 +538,11 @@ func phase5ProductSubmitter(t *testing.T, teamsctl, configPath, commandDirectory
 	}
 }
 
-func waitForLiveInvocation(t *testing.T, teamsctl, config string, id kernel.UUIDv7, predicate func(InvocationStatus) bool) InvocationStatus {
+func waitForLiveInvocation(t *testing.T, tekroo, config string, id kernel.UUIDv7, predicate func(InvocationStatus) bool) InvocationStatus {
 	t.Helper()
 	deadline := time.Now().Add(25 * time.Minute)
 	for {
-		raw := productCLI(t, teamsctl, config, "invocation", string(id))
+		raw := productCLI(t, tekroo, config, "invocation", string(id))
 		var status InvocationStatus
 		if err := json.Unmarshal(raw, &status); err != nil {
 			t.Fatalf("decode invocation status: %v\n%s", err, raw)

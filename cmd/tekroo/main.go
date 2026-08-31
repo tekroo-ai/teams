@@ -21,15 +21,15 @@ import (
 
 func main() {
 	if err := run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr); err != nil {
-		fmt.Fprintln(os.Stderr, "teamsctl:", err)
+		fmt.Fprintln(os.Stderr, "tekroo:", err)
 		os.Exit(1)
 	}
 }
 
 func run(arguments []string, stdin io.Reader, stdout, stderr io.Writer) error {
-	flags := flag.NewFlagSet("teamsctl", flag.ContinueOnError)
+	flags := flag.NewFlagSet("tekroo", flag.ContinueOnError)
 	flags.SetOutput(stderr)
-	configPath := flags.String("config", "", "absolute path to teamsd JSON configuration")
+	configPath := flags.String("config", "", "absolute path to tekrood JSON configuration")
 	if err := flags.Parse(arguments); err != nil {
 		return err
 	}
@@ -218,5 +218,5 @@ func loadCommand(operands []string, stdin io.Reader, maximum int64) ([]byte, ker
 }
 
 func usageError() error {
-	return errors.New("usage: teamsctl -config /absolute/path/teamsd.json health|status|pause|resume|stop|task ID|story ID|invocation ID|submit FILE|-|cancel INVOCATION_ID FILE|-")
+	return errors.New("usage: tekroo -config /absolute/path/tekrood.json health|status|pause|resume|stop|task ID|story ID|invocation ID|submit FILE|-|cancel INVOCATION_ID FILE|-")
 }

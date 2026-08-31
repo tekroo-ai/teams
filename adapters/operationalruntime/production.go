@@ -30,9 +30,9 @@ const (
 	maximumConfigBytes  = 1 << 20
 )
 
-var ErrInvalidProductionConfiguration = errors.New("invalid teamsd configuration")
+var ErrInvalidProductionConfiguration = errors.New("invalid tekrood configuration")
 
-// ProductionConfig is the non-secret, file-backed configuration for teamsd.
+// ProductionConfig is the non-secret, file-backed configuration for tekrood.
 // Credentials and policy/provenance documents are referenced by path so they
 // never need to be embedded in the service configuration or process listing.
 type ProductionConfig struct {
@@ -137,7 +137,7 @@ type resolvedProductionConfig struct {
 	operatorTimeout       time.Duration
 }
 
-// LoadProductionConfig strictly decodes and validates a teamsd configuration.
+// LoadProductionConfig strictly decodes and validates a tekrood configuration.
 // Relative file paths are resolved against the configuration file directory.
 func LoadProductionConfig(path string) (ProductionConfig, error) {
 	if !filepath.IsAbs(path) {

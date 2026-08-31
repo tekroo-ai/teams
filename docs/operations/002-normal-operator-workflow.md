@@ -1,25 +1,25 @@
 # Normal local operator workflow
 
-This is the supported Phase 5 path. Run `teamsd` as the persistent service and
-submit every organizational change with `teamsctl`. Do not write Teams MongoDB
+This is the supported Phase 5 path. Run `tekrood` as the persistent service and
+submit every organizational change with `tekroo`. Do not write Teams MongoDB
 documents directly.
 
 ## Product surface
 
 ```text
-teamsctl health
-teamsctl status
-teamsctl pause
-teamsctl resume
-teamsctl submit COMMAND.json
-teamsctl task TASK_ID
-teamsctl story STORY_ID
-teamsctl invocation INVOCATION_ID
-teamsctl cancel INVOCATION_ID COMMAND.json
-teamsctl stop
+tekroo health
+tekroo status
+tekroo pause
+tekroo resume
+tekroo submit COMMAND.json
+tekroo task TASK_ID
+tekroo story STORY_ID
+tekroo invocation INVOCATION_ID
+tekroo cancel INVOCATION_ID COMMAND.json
+tekroo stop
 ```
 
-Every invocation of `teamsctl` also requires `-config /absolute/path/to/teamsd.json`.
+Every invocation of `tekroo` also requires `-config /absolute/path/to/tekrood.json`.
 The client reads the operator bearer token from the file named by that config.
 
 ## Command envelope
@@ -52,10 +52,10 @@ command's causal parent and revision fence.
 3. Register the exact execution identity and all referenced evidence with
    `execution.register` and `evidence.register`.
 4. Authorize work with `work-invocation.authorize`. Inspect it with
-   `teamsctl invocation`; inspect its task with `teamsctl task`.
+   `tekroo invocation`; inspect its task with `tekroo task`.
 5. To cancel active work, read the invocation's current revision and last event,
    place those exact values in a
-   `work-invocation.request-cancellation` command, then use `teamsctl cancel`.
+   `work-invocation.request-cancellation` command, then use `tekroo cancel`.
 6. For successful work, open one `completion-review` for the task, record each
    required branch result, and finalize the all-pass join. Submit
    `task.request-completion` using the exact finalized-review identity.
@@ -66,10 +66,9 @@ command's causal parent and revision fence.
    `release_mode: NO_RELEASE_REQUIRED` and a nonempty reason. For code release,
    use the separately qualified `CODE` release workflow.
 10. Submit `story.request-acceptance` with the exact finalized release-plan
-    identity. Confirm `phase: ACCEPTED` using `teamsctl story`.
+    identity. Confirm `phase: ACCEPTED` using `tekroo story`.
 
 The black-box regression
-`TestTeamsdAndTeamsctlExecuteNormalTaskThroughSupportedSurface` executes this
-sequence against built `teamsd` and `teamsctl` binaries, including a second
+`TestTekroodAndTekrooExecuteNormalTaskThroughSupportedSurface` executes this
+sequence against built `tekrood` and `tekroo` binaries, including a second
 invocation that is cancelled through the operator surface.
-
