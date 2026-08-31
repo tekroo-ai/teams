@@ -1,0 +1,53 @@
+{
+  "checks": [
+    "OpenHands proxy outage observed",
+    "invocation recovered without reauthorization",
+    "teamsd SIGSTOP/SIGCONT during active execution",
+    "teamsctl cancellation interrupted OpenHands",
+    "budget remained one invocation",
+    "cancelled projection survived teamsd restart",
+    "conversation had no parent agent"
+  ],
+  "invocation": {
+    "invocation_id": "00000000-0000-7000-8000-eb7f25657008",
+    "revision": 5,
+    "state": "CANCELLED",
+    "task_id": "00000000-0000-7000-8000-eb7f25657002",
+    "budget_account_id": "00000000-0000-7000-8000-eb7f25657007",
+    "lifecycle_epoch": 1,
+    "scope_revision": 1,
+    "actor_fqn": "teams::coder-1",
+    "execution": {
+      "execution_id": "00000000-0000-7000-8000-eb7f25657004",
+      "fencing_epoch": 1
+    },
+    "purpose": "IMPLEMENTATION",
+    "attempt_ordinal": 1,
+    "conversation_id": "00000000-0000-7000-8000-eb7f25657008",
+    "terminal_outcome": "CANCELLED",
+    "retryable": false,
+    "terminal_evidence_ids": [
+      "4bf423e7-59f9-76c5-840c-203ba4eee4e5",
+      "81287448-c6b8-7bb9-8f3c-e8d4e88890ad"
+    ],
+    "output_digest": "fbbd3726f2c4c52f943183849bc40281a8a565ea386291a5b171718058532542",
+    "finished_at": "2026-08-31T19:24:06.377471Z",
+    "cancellation_requested_at": "2026-08-31T19:24:05.306208Z",
+    "last_event_id": "01a05947-656c-7bc2-8788-f9b76f798b80"
+  },
+  "model_endpoint": "http://127.0.0.1:8802/v1",
+  "model_id": "ddalcu--Qwen3.8-27B-MLX-Serve-8bit",
+  "not_run": [
+    "v3 data migration",
+    "production or historical database access",
+    "physical host sleep",
+    "model-server shutdown"
+  ],
+  "openhands_endpoint": "http://127.0.0.1:8000",
+  "outage_responses_observed": 2,
+  "record_type": "PHASE_5_LIVE_RECOVERY_AND_CANCELLATION",
+  "recorded_at": "2026-08-31T19:24:06.951535Z",
+  "sma_database_access_by_teams": false,
+  "status": "PASS",
+  "teams_database": "disposable_replica_set"
+}

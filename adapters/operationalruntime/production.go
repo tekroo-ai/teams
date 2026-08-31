@@ -411,6 +411,10 @@ type InvocationStatus struct {
 	AttemptOrdinal          uint64                      `json:"attempt_ordinal"`
 	ConversationID          *string                     `json:"conversation_id"`
 	TerminalOutcome         *kernel.WorkInvocationState `json:"terminal_outcome"`
+	Retryable               *bool                       `json:"retryable"`
+	TerminalEvidenceIDs     []kernel.UUIDv7             `json:"terminal_evidence_ids"`
+	OutputDigest            *kernel.Digest              `json:"output_digest"`
+	FinishedAt              *time.Time                  `json:"finished_at"`
 	CancellationRequestedAt *time.Time                  `json:"cancellation_requested_at"`
 	LastEventID             kernel.UUIDv7               `json:"last_event_id"`
 }
@@ -433,7 +437,9 @@ func (service *ProductionService) ReadInvocation(ctx context.Context, id kernel.
 		LifecycleEpoch: invocation.LifecycleEpoch, ScopeRevision: invocation.ScopeRevision,
 		ActorFQN: invocation.ActorFQN, Execution: invocation.Execution, Purpose: invocation.Purpose,
 		AttemptOrdinal: invocation.AttemptOrdinal, ConversationID: invocation.ConversationID,
-		TerminalOutcome: invocation.TerminalOutcome, CancellationRequestedAt: invocation.CancellationRequestedAt,
+		TerminalOutcome: invocation.TerminalOutcome, Retryable: invocation.Retryable,
+		TerminalEvidenceIDs: append([]kernel.UUIDv7(nil), invocation.TerminalEvidenceIDs...), OutputDigest: invocation.OutputDigest,
+		FinishedAt: invocation.FinishedAt, CancellationRequestedAt: invocation.CancellationRequestedAt,
 		LastEventID: invocation.LastEventID,
 	}, true, nil
 }

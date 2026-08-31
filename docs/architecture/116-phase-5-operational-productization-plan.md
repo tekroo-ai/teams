@@ -2,7 +2,9 @@
 
 ## Status and scope
 
-**Status:** authorized
+**Status:** complete
+
+**Completion record:** `OUTPUT/phase-5/phase-5-completion.json`
 
 **Starting commit:** `44baba12ecda6321c79b65ea179eb22c385b26c9`
 

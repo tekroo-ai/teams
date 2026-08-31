@@ -1,0 +1,85 @@
+{
+  "checks": [
+    "pause prevented admission",
+    "both isolated repositories repaired",
+    "go test passed in both repositories",
+    "budget usage remained one invocation per task",
+    "projections survived teamsd restart",
+    "service stopped cleanly"
+  ],
+  "elapsed_ms": 124330,
+  "invocations": [
+    {
+      "invocation_id": "00000000-0000-7000-8000-e2ceef49f008",
+      "revision": 4,
+      "state": "SUCCEEDED",
+      "task_id": "00000000-0000-7000-8000-e2ceef49f002",
+      "budget_account_id": "00000000-0000-7000-8000-e2ceef49f007",
+      "lifecycle_epoch": 1,
+      "scope_revision": 1,
+      "actor_fqn": "teams::coder-1",
+      "execution": {
+        "execution_id": "00000000-0000-7000-8000-e2ceef49f004",
+        "fencing_epoch": 1
+      },
+      "purpose": "IMPLEMENTATION",
+      "attempt_ordinal": 1,
+      "conversation_id": "00000000-0000-7000-8000-e2ceef49f008",
+      "terminal_outcome": "SUCCEEDED",
+      "retryable": false,
+      "terminal_evidence_ids": [
+        "2cb8d3c0-dd88-7b37-819f-c6bae683fa77",
+        "4002715a-2b34-7b88-85f1-cee84df44636",
+        "5210d4c8-6ec8-76b2-8620-8a3180c530ed"
+      ],
+      "output_digest": "dc34d83b50a422eb8212389858bdd3c559ed9f26f6dfd357174d6805e478dcd5",
+      "finished_at": "2026-08-31T19:19:04.1376Z",
+      "cancellation_requested_at": null,
+      "last_event_id": "01a05942-c8cc-7fd6-ae79-e5237ae3235a"
+    },
+    {
+      "invocation_id": "00000000-0000-7000-8000-e2ceef49f108",
+      "revision": 4,
+      "state": "SUCCEEDED",
+      "task_id": "00000000-0000-7000-8000-e2ceef49f102",
+      "budget_account_id": "00000000-0000-7000-8000-e2ceef49f107",
+      "lifecycle_epoch": 1,
+      "scope_revision": 1,
+      "actor_fqn": "teams::coder-2",
+      "execution": {
+        "execution_id": "00000000-0000-7000-8000-e2ceef49f104",
+        "fencing_epoch": 1
+      },
+      "purpose": "IMPLEMENTATION",
+      "attempt_ordinal": 1,
+      "conversation_id": "00000000-0000-7000-8000-e2ceef49f108",
+      "terminal_outcome": "SUCCEEDED",
+      "retryable": false,
+      "terminal_evidence_ids": [
+        "0c2ae107-3adf-742d-8866-aab7f0dba788",
+        "4d8d1146-2289-7b7b-8ac8-013903d86ead",
+        "9adfd2b6-ad2d-7118-8778-60781f384db6"
+      ],
+      "output_digest": "a6ba9710b337bdcb9c814960ce98f8efa09b04f0c66eb66e898970c8db05f6ea",
+      "finished_at": "2026-08-31T19:19:03.694149Z",
+      "cancellation_requested_at": null,
+      "last_event_id": "01a05942-c710-7f22-bffb-91879b241287"
+    }
+  ],
+  "maximum_concurrency": 2,
+  "model_endpoint": "http://127.0.0.1:8802/v1",
+  "model_id": "ddalcu--Qwen3.8-27B-MLX-Serve-8bit",
+  "not_run": [
+    "v3 data migration",
+    "production or historical database access",
+    "physical host sleep",
+    "model-server shutdown"
+  ],
+  "openhands_endpoint": "http://127.0.0.1:8000",
+  "record_type": "PHASE_5_LIVE_MULTI_TASK_SOAK",
+  "recorded_at": "2026-08-31T19:19:04.95Z",
+  "sma_database_access_by_teams": false,
+  "status": "PASS",
+  "task_count": 2,
+  "teams_database": "disposable_replica_set"
+}
