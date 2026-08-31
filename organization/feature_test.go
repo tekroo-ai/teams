@@ -46,7 +46,7 @@ func TestFeaturePlanRejectsCyclesAndMaterializesFiniteDAG(t *testing.T) {
 	productOwner := activeRole("teams::product-owner-1", "product-owner", featureUUID(92), featureDigest('4'))
 	planner := activeRole("teams::architect-1", "architect", featureUUID(93), featureDigest('1'))
 	owner := activeRole("teams::coder-1", "coder", featureUUID(94), featureDigest('2'))
-	feature := organization.FeatureRequest{SchemaVersion: organization.FeatureSchemaVersion, ID: featureUUID(1), Revision: 1, SubmittedBy: kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "paul"}, Input: featureInput(), Status: organization.FeatureSubmitted, OperatorActor: operator.ActorFQN, ProductOwnerActor: productOwner.ActorFQN, InitialMessageID: featureUUID(2), BudgetAccountID: featureUUID(4), LifecycleEpoch: 1, ScopeRevision: 1, CreatedAt: now, UpdatedAt: now}
+	feature := organization.FeatureRequest{SchemaVersion: organization.FeatureSchemaVersion, ID: featureUUID(1), Revision: 1, SubmittedBy: kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "paul"}, Input: featureInput(), Status: organization.FeatureSubmitted, OperatorActor: operator.ActorFQN, ProductOwnerActor: productOwner.ActorFQN, InitialMessageID: featureUUID(2), LastMessageID: featureUUID(2), LastStepID: featureUUID(3), LastHop: 1, BudgetAccountID: featureUUID(4), LifecycleEpoch: 1, ScopeRevision: 1, CreatedAt: now, UpdatedAt: now}
 	store := &featureStoreFake{feature: feature}
 	host := &featureHostFake{roles: map[kernel.ActorFQN]organization.RoleInstanceState{operator.ActorFQN: operator, productOwner.ActorFQN: productOwner, planner.ActorFQN: planner, owner.ActorFQN: owner}}
 	materializer := &recordingMaterializer{}
@@ -59,6 +59,9 @@ func TestFeaturePlanRejectsCyclesAndMaterializesFiniteDAG(t *testing.T) {
 		{ID: firstTask, StoryID: storyID, Title: "First", Description: "Implement.", AcceptanceCriteria: []string{"passes"}, Owner: owner.ActorFQN, ModelProfile: owner.ModelProfile, Complexity: 3, Risk: organization.RiskLow, CriticalPath: true, AttemptLimit: 2, ReviewRoundLimit: 1},
 		{ID: secondTask, StoryID: storyID, Title: "Second", Description: "Verify.", AcceptanceCriteria: []string{"verified"}, DependsOn: []kernel.UUIDv7{firstTask}, Owner: owner.ActorFQN, ModelProfile: owner.ModelProfile, Complexity: 2, Risk: organization.RiskModerate, CriticalPath: true, AttemptLimit: 2, ReviewRoundLimit: 1},
 	}, CreatedAt: now.Add(time.Minute)}
+	feature.Status = organization.FeatureSpecified
+	feature.Specification = &organization.FeatureSpecification{PreparedBy: "teams::project-manager-1", PreparedExecution: kernel.ExecutionTuple{ExecutionID: featureUUID(95), FencingEpoch: 1}, Stories: plan.Stories, PreparedAt: now.Add(time.Minute)}
+	store.feature = feature
 	planned, err := coordinator.ApplyPlan(context.Background(), feature.ID, 1, plan)
 	if err != nil || materializer.calls != 1 || planned.Status != organization.FeaturePlanned || len(planned.Plan.Tasks) != 2 {
 		t.Fatalf("apply calls=%d feature=%#v err=%v", materializer.calls, planned, err)
@@ -68,6 +71,32 @@ func TestFeaturePlanRejectsCyclesAndMaterializesFiniteDAG(t *testing.T) {
 	cycle.Tasks[0].DependsOn = []kernel.UUIDv7{secondTask}
 	if cycle.Validate(feature) == nil {
 		t.Fatal("cyclic task plan was accepted")
+	}
+}
+
+func TestFeatureRoleHandoffsFormFiniteProductOwnerProjectManagerArchitectDAG(t *testing.T) {
+	now := time.Date(2026, 8, 31, 12, 0, 0, 0, time.UTC)
+	operator := activeRole("teams::operator-1", "operator", featureUUID(71), featureDigest('3'))
+	productOwner := activeRole("teams::product-owner-1", "product-owner", featureUUID(72), featureDigest('4'))
+	projectManager := activeRole("teams::project-manager-1", "project-manager", featureUUID(73), featureDigest('5'))
+	architect := activeRole("teams::architect-1", "architect", featureUUID(74), featureDigest('1'))
+	feature := organization.FeatureRequest{SchemaVersion: organization.FeatureSchemaVersion, ID: featureUUID(1), Revision: 1, SubmittedBy: kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "paul"}, Input: featureInput(), Status: organization.FeatureSubmitted, OperatorActor: operator.ActorFQN, ProductOwnerActor: productOwner.ActorFQN, InitialMessageID: featureUUID(2), LastMessageID: featureUUID(2), LastStepID: featureUUID(3), LastHop: 1, BudgetAccountID: featureUUID(4), LifecycleEpoch: 1, ScopeRevision: 1, CreatedAt: now, UpdatedAt: now}
+	store := &featureStoreFake{feature: feature}
+	host := &featureHostFake{roles: map[kernel.ActorFQN]organization.RoleInstanceState{operator.ActorFQN: operator, productOwner.ActorFQN: productOwner, projectManager.ActorFQN: projectManager, architect.ActorFQN: architect}}
+	coordinator, err := organization.NewFeatureCoordinator(store, host, materializerFake{}, fixedClock(now.Add(time.Minute)), &idQueue{ids: []kernel.UUIDv7{featureUUID(20), featureUUID(21), featureUUID(22), featureUUID(23)}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	refinement := organization.FeatureRefinement{PreparedBy: productOwner.ActorFQN, PreparedExecution: productOwner.Execution, AcceptanceCriteria: []string{"finite DAG"}, Priority: organization.PriorityHigh, PreparedAt: now.Add(time.Minute)}
+	refined, err := coordinator.Refine(context.Background(), feature.ID, 1, refinement)
+	if err != nil || refined.Status != organization.FeatureReadyForPlanning || store.message.Recipient != projectManager.ActorFQN || store.message.Flow.Hop != 2 {
+		t.Fatalf("refine feature=%#v message=%#v err=%v", refined, store.message, err)
+	}
+	story := organization.PlannedStory{ID: featureUUID(30), Title: "Restore runtime", Description: "Implement the bounded team path.", AcceptanceCriteria: []string{"works"}, Priority: organization.PriorityHigh}
+	specification := organization.FeatureSpecification{PreparedBy: projectManager.ActorFQN, PreparedExecution: projectManager.Execution, Stories: []organization.PlannedStory{story}, PreparedAt: now.Add(2 * time.Minute)}
+	specified, err := coordinator.Specify(context.Background(), feature.ID, 2, specification)
+	if err != nil || specified.Status != organization.FeatureSpecified || store.message.Recipient != architect.ActorFQN || store.message.Type != "tekroo.message.story.design-requested" || store.message.Flow.Hop != 3 {
+		t.Fatalf("specify feature=%#v message=%#v err=%v", specified, store.message, err)
 	}
 }
 
@@ -100,6 +129,16 @@ func (store *featureStoreFake) ApplyFeaturePlan(_ context.Context, id kernel.UUI
 	store.feature.UpdatedAt = now
 	return store.feature, nil
 }
+func (store *featureStoreFake) AdvanceFeature(_ context.Context, next organization.FeatureRequest, revision uint64, message *organization.OrganizationalMessage) (organization.FeatureRequest, error) {
+	if store.feature.ID != next.ID || store.feature.Revision != revision {
+		return organization.FeatureRequest{}, organization.ErrFeatureRevisionConflict
+	}
+	store.feature = next
+	if message != nil {
+		store.message = *message
+	}
+	return next, nil
+}
 
 type featureHostFake struct {
 	roles map[kernel.ActorFQN]organization.RoleInstanceState
@@ -119,8 +158,13 @@ func (host *featureHostFake) EnsureStarted(_ context.Context, actor kernel.Actor
 	return state, nil
 }
 func (host *featureHostFake) ResolveRoleRecipients(_ context.Context, role string) ([]kernel.ActorFQN, error) {
-	if role == "product-owner" {
+	switch role {
+	case "product-owner":
 		return []kernel.ActorFQN{"teams::product-owner-1"}, nil
+	case "project-manager":
+		return []kernel.ActorFQN{"teams::project-manager-1"}, nil
+	case "architect":
+		return []kernel.ActorFQN{"teams::architect-1"}, nil
 	}
 	return nil, organization.ErrRoleNotRunning
 }

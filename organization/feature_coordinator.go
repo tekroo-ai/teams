@@ -59,9 +59,9 @@ func (coordinator *FeatureCoordinator) Submit(ctx context.Context, principal ker
 	if err != nil || operator.Status != RoleIdle || !operator.Execution.Valid() {
 		return FeatureRequest{}, false, errors.Join(ErrRoleNotRunning, err)
 	}
-	productOwners, err := coordinator.host.ResolveRoleRecipients(ctx, "product-owner")
-	if err != nil || len(productOwners) != 1 {
-		return FeatureRequest{}, false, errors.Join(ErrRoleNotRunning, err)
+	productOwner, err := coordinator.ensureSingleRole(ctx, "product-owner")
+	if err != nil {
+		return FeatureRequest{}, false, err
 	}
 	now := coordinator.clock.Now().UTC()
 	featureID, err := coordinator.ids.Next()
@@ -82,9 +82,9 @@ func (coordinator *FeatureCoordinator) Submit(ctx context.Context, principal ker
 	}
 	feature := FeatureRequest{
 		SchemaVersion: FeatureSchemaVersion, ID: featureID, Revision: 1, SubmittedBy: principal,
-		Input: input, Status: FeatureSubmitted, OperatorActor: operator.ActorFQN, ProductOwnerActor: productOwners[0],
+		Input: input, Status: FeatureSubmitted, OperatorActor: operator.ActorFQN, ProductOwnerActor: productOwner.ActorFQN,
 		InitialMessageID: messageID, BudgetAccountID: budgetID, LifecycleEpoch: 1, ScopeRevision: 1,
-		CreatedAt: now, UpdatedAt: now,
+		CreatedAt: now, UpdatedAt: now, LastMessageID: messageID, LastStepID: stepID, LastHop: 1,
 	}
 	body, err := json.Marshal(map[string]any{"feature_id": featureID, "request": input, "submitted_by": principal})
 	if err != nil {
@@ -92,8 +92,8 @@ func (coordinator *FeatureCoordinator) Submit(ctx context.Context, principal ker
 	}
 	digest := sha256.Sum256(body)
 	message := OrganizationalMessage{
-		SchemaVersion: OrganizationalMessageSchemaVersion, ID: messageID, Type: "tekroo.message.feature.requested", Purpose: PurposeRequest,
-		Sender: operator.ActorFQN, SenderExecution: operator.Execution, Recipient: productOwners[0], CorrelationID: featureID,
+		SchemaVersion: OrganizationalMessageSchemaVersion, ID: messageID, Type: "tekroo.message.feature.submitted", Purpose: PurposeRequest,
+		Sender: operator.ActorFQN, SenderExecution: operator.Execution, Recipient: productOwner.ActorFQN, CorrelationID: featureID,
 		Work: MessageWorkLink{FeatureID: &featureID, DAGNodeID: stepID},
 		Flow: MessageFlow{ThreadID: featureID, StepID: stepID, Hop: 1, MaximumHops: input.MaximumHops, BudgetAccountID: budgetID, LifecycleEpoch: 1, ScopeRevision: 1, ProgressDigest: kernel.Digest(hex.EncodeToString(digest[:]))},
 		Body: body, CreatedAt: now, ExpiresAt: now.Add(7 * 24 * time.Hour),
@@ -115,10 +115,10 @@ func (coordinator *FeatureCoordinator) ApplyPlan(ctx context.Context, featureID 
 	if !found {
 		return FeatureRequest{}, ErrFeatureNotFound
 	}
-	if feature.Revision != expectedRevision || feature.Status == FeatureCancelled {
+	if feature.Revision != expectedRevision || feature.Status != FeatureSpecified || feature.Specification == nil {
 		return FeatureRequest{}, ErrFeatureRevisionConflict
 	}
-	if plan.Validate(feature) != nil || !planningRole(plan.PreparedBy) {
+	if plan.Validate(feature) != nil || !strings.Contains(string(plan.PreparedBy), "::architect-") || !reflect.DeepEqual(plan.Stories, feature.Specification.Stories) {
 		return FeatureRequest{}, ErrInvalidFeature
 	}
 	planner, found, err := coordinator.host.Status(ctx, plan.PreparedBy)
@@ -127,7 +127,13 @@ func (coordinator *FeatureCoordinator) ApplyPlan(ctx context.Context, featureID 
 	}
 	for _, task := range plan.Tasks {
 		owner, active, ownerErr := coordinator.host.Status(ctx, task.Owner)
-		if ownerErr != nil || !active || owner.Status != RoleIdle || owner.ModelProfile != task.ModelProfile {
+		if ownerErr != nil {
+			return FeatureRequest{}, ownerErr
+		}
+		if !active || owner.Status != RoleIdle {
+			owner, ownerErr = coordinator.host.EnsureStarted(ctx, task.Owner)
+		}
+		if ownerErr != nil || owner.Status != RoleIdle || owner.ModelProfile != task.ModelProfile {
 			return FeatureRequest{}, errors.Join(ErrRoleNotRunning, ownerErr)
 		}
 	}
@@ -135,6 +141,133 @@ func (coordinator *FeatureCoordinator) ApplyPlan(ctx context.Context, featureID 
 		return FeatureRequest{}, err
 	}
 	return coordinator.store.ApplyFeaturePlan(ctx, feature.ID, expectedRevision, plan, coordinator.clock.Now().UTC())
+}
+
+func (coordinator *FeatureCoordinator) Refine(ctx context.Context, featureID kernel.UUIDv7, expectedRevision uint64, refinement FeatureRefinement) (FeatureRequest, error) {
+	feature, err := coordinator.currentFeature(ctx, featureID, expectedRevision, FeatureSubmitted)
+	if err != nil {
+		return FeatureRequest{}, err
+	}
+	if refinement.Validate(feature) != nil {
+		return FeatureRequest{}, ErrInvalidFeature
+	}
+	actor, found, err := coordinator.host.Status(ctx, refinement.PreparedBy)
+	if err != nil || !found || actor.Status != RoleIdle || actor.Execution != refinement.PreparedExecution {
+		return FeatureRequest{}, errors.Join(ErrStaleOrganizationalClaim, err)
+	}
+	next := feature
+	next.Revision++
+	next.UpdatedAt = coordinator.clock.Now().UTC()
+	next.Refinement = &refinement
+	if len(refinement.ClarificationQuestions) > 0 {
+		next.Status = FeatureClarificationRequired
+		return coordinator.store.AdvanceFeature(ctx, next, expectedRevision, nil)
+	}
+	recipient, err := coordinator.ensureSingleRole(ctx, "project-manager")
+	if err != nil {
+		return FeatureRequest{}, err
+	}
+	next.Status = FeatureReadyForPlanning
+	message, err := coordinator.handoffMessage(feature, refinement.PreparedBy, refinement.PreparedExecution, recipient.ActorFQN, "tekroo.message.feature.refined", PurposeHandoff, map[string]any{"feature_id": feature.ID, "refinement": refinement})
+	if err != nil {
+		return FeatureRequest{}, err
+	}
+	next.LastMessageID, next.LastStepID, next.LastHop = message.ID, message.Flow.StepID, message.Flow.Hop
+	return coordinator.store.AdvanceFeature(ctx, next, expectedRevision, &message)
+}
+
+func (coordinator *FeatureCoordinator) Specify(ctx context.Context, featureID kernel.UUIDv7, expectedRevision uint64, specification FeatureSpecification) (FeatureRequest, error) {
+	feature, err := coordinator.currentFeature(ctx, featureID, expectedRevision, FeatureReadyForPlanning)
+	if err != nil {
+		return FeatureRequest{}, err
+	}
+	if specification.Validate(feature) != nil || !strings.Contains(string(specification.PreparedBy), "::project-manager-") {
+		return FeatureRequest{}, ErrInvalidFeature
+	}
+	actor, found, err := coordinator.host.Status(ctx, specification.PreparedBy)
+	if err != nil || !found || actor.Status != RoleIdle || actor.Execution != specification.PreparedExecution {
+		return FeatureRequest{}, errors.Join(ErrStaleOrganizationalClaim, err)
+	}
+	recipient, err := coordinator.ensureSingleRole(ctx, "architect")
+	if err != nil {
+		return FeatureRequest{}, err
+	}
+	message, err := coordinator.handoffMessage(feature, specification.PreparedBy, specification.PreparedExecution, recipient.ActorFQN, "tekroo.message.story.design-requested", PurposeHandoff, map[string]any{"feature_id": feature.ID, "specification": specification})
+	if err != nil {
+		return FeatureRequest{}, err
+	}
+	next := feature
+	next.Revision++
+	next.Status = FeatureSpecified
+	next.Specification = &specification
+	next.UpdatedAt = coordinator.clock.Now().UTC()
+	next.LastMessageID, next.LastStepID, next.LastHop = message.ID, message.Flow.StepID, message.Flow.Hop
+	return coordinator.store.AdvanceFeature(ctx, next, expectedRevision, &message)
+}
+
+func (coordinator *FeatureCoordinator) currentFeature(ctx context.Context, id kernel.UUIDv7, revision uint64, status FeatureStatus) (FeatureRequest, error) {
+	if coordinator == nil || !id.Valid() || revision == 0 {
+		return FeatureRequest{}, ErrInvalidFeature
+	}
+	feature, found, err := coordinator.store.LoadFeature(ctx, id)
+	if err != nil {
+		return FeatureRequest{}, err
+	}
+	if !found {
+		return FeatureRequest{}, ErrFeatureNotFound
+	}
+	if feature.Revision != revision || feature.Status != status {
+		return FeatureRequest{}, ErrFeatureRevisionConflict
+	}
+	return feature, nil
+}
+
+func (coordinator *FeatureCoordinator) handoffMessage(feature FeatureRequest, sender kernel.ActorFQN, execution kernel.ExecutionTuple, recipient kernel.ActorFQN, messageType string, purpose MessagePurpose, value any) (OrganizationalMessage, error) {
+	messageID, err := coordinator.ids.Next()
+	if err != nil {
+		return OrganizationalMessage{}, err
+	}
+	stepID, err := coordinator.ids.Next()
+	if err != nil {
+		return OrganizationalMessage{}, err
+	}
+	body, err := json.Marshal(value)
+	if err != nil {
+		return OrganizationalMessage{}, err
+	}
+	digest := sha256.Sum256(body)
+	parentStep, cause := feature.LastStepID, feature.LastMessageID
+	now := coordinator.clock.Now().UTC()
+	message := OrganizationalMessage{
+		SchemaVersion: OrganizationalMessageSchemaVersion, ID: messageID, Type: messageType, Purpose: purpose,
+		Sender: sender, SenderExecution: execution, Recipient: recipient, CausationID: &cause, CorrelationID: feature.ID,
+		Work: MessageWorkLink{FeatureID: &feature.ID, DAGNodeID: stepID},
+		Flow: MessageFlow{ThreadID: feature.ID, StepID: stepID, ParentStepID: &parentStep, Hop: feature.LastHop + 1, MaximumHops: feature.Input.MaximumHops, BudgetAccountID: feature.BudgetAccountID, LifecycleEpoch: feature.LifecycleEpoch, ScopeRevision: feature.ScopeRevision, ProgressDigest: kernel.Digest(hex.EncodeToString(digest[:]))},
+		Body: body, CreatedAt: now, ExpiresAt: now.Add(7 * 24 * time.Hour),
+	}
+	if message.Validate() != nil {
+		return OrganizationalMessage{}, ErrInvalidFeature
+	}
+	return message, nil
+}
+
+func (coordinator *FeatureCoordinator) ensureSingleRole(ctx context.Context, role string) (RoleInstanceState, error) {
+	recipients, resolveErr := coordinator.host.ResolveRoleRecipients(ctx, role)
+	if resolveErr == nil && len(recipients) == 1 {
+		state, found, err := coordinator.host.Status(ctx, recipients[0])
+		if err == nil && found && state.Status == RoleIdle {
+			return state, nil
+		}
+	}
+	configured, err := coordinator.host.ConfiguredRoleActors(role)
+	if err != nil || len(configured) != 1 {
+		return RoleInstanceState{}, errors.Join(ErrRoleNotRunning, resolveErr, err)
+	}
+	state, err := coordinator.host.EnsureStarted(ctx, configured[0])
+	if err != nil || state.Status != RoleIdle {
+		return RoleInstanceState{}, errors.Join(ErrRoleNotRunning, err)
+	}
+	return state, nil
 }
 
 func planningRole(actor kernel.ActorFQN) bool {

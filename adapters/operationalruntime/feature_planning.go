@@ -32,6 +32,20 @@ func (service *ProductionService) ApplyFeaturePlan(ctx context.Context, id kerne
 	return service.Features.ApplyPlan(ctx, id, expectedRevision, plan)
 }
 
+func (service *ProductionService) RefineFeature(ctx context.Context, id kernel.UUIDv7, expectedRevision uint64, refinement organization.FeatureRefinement) (organization.FeatureRequest, error) {
+	if service == nil || service.Features == nil {
+		return organization.FeatureRequest{}, organization.ErrInvalidFeature
+	}
+	return service.Features.Refine(ctx, id, expectedRevision, refinement)
+}
+
+func (service *ProductionService) SpecifyFeature(ctx context.Context, id kernel.UUIDv7, expectedRevision uint64, specification organization.FeatureSpecification) (organization.FeatureRequest, error) {
+	if service == nil || service.Features == nil {
+		return organization.FeatureRequest{}, organization.ErrInvalidFeature
+	}
+	return service.Features.Specify(ctx, id, expectedRevision, specification)
+}
+
 // MaterializeFeaturePlan creates only canonical story/task aggregates. It is
 // idempotent: stable per-feature idempotency keys recover prior receipts after
 // an interrupted materialization.

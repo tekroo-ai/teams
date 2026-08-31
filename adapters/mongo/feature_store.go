@@ -126,7 +126,7 @@ func (s *Store) ApplyFeaturePlan(ctx context.Context, id kernel.UUIDv7, expected
 	if !found {
 		return organization.FeatureRequest{}, organization.ErrFeatureNotFound
 	}
-	if feature.Revision != expectedRevision || feature.Status == organization.FeatureCancelled || plan.Validate(feature) != nil || now.Before(feature.UpdatedAt) {
+	if feature.Revision != expectedRevision || feature.Status != organization.FeatureSpecified || plan.Validate(feature) != nil || now.Before(feature.UpdatedAt) {
 		return organization.FeatureRequest{}, organization.ErrFeatureRevisionConflict
 	}
 	feature.Revision++
@@ -145,6 +145,59 @@ func (s *Store) ApplyFeaturePlan(ctx context.Context, id kernel.UUIDv7, expected
 		return organization.FeatureRequest{}, organization.ErrFeatureRevisionConflict
 	}
 	return feature, nil
+}
+
+func (s *Store) AdvanceFeature(ctx context.Context, next organization.FeatureRequest, expectedRevision uint64, message *organization.OrganizationalMessage) (organization.FeatureRequest, error) {
+	if err := requireDeadline(ctx); err != nil {
+		return organization.FeatureRequest{}, err
+	}
+	if s == nil || s.client == nil || expectedRevision == 0 || next.Revision != expectedRevision+1 || next.Validate() != nil {
+		return organization.FeatureRequest{}, organization.ErrInvalidFeature
+	}
+	if message != nil && (message.Validate() != nil || message.Work.FeatureID == nil || *message.Work.FeatureID != next.ID || next.LastMessageID != message.ID || next.LastStepID != message.Flow.StepID || next.LastHop != message.Flow.Hop) {
+		return organization.FeatureRequest{}, organization.ErrInvalidFeature
+	}
+	raw, err := json.Marshal(next)
+	if err != nil {
+		return organization.FeatureRequest{}, err
+	}
+	var messageRaw []byte
+	if message != nil {
+		messageRaw, err = json.Marshal(*message)
+		if err != nil {
+			return organization.FeatureRequest{}, err
+		}
+	}
+	session, err := s.client.StartSession()
+	if err != nil {
+		return organization.FeatureRequest{}, err
+	}
+	defer session.EndSession(ctx)
+	_, err = session.WithTransaction(ctx, func(transactionContext context.Context) (any, error) {
+		result, updateErr := s.db.Collection("feature_requests").UpdateOne(transactionContext, bson.D{{Key: "_id", Value: string(next.ID)}, {Key: "revision", Value: expectedRevision}}, bson.D{{Key: "$set", Value: bson.D{{Key: "revision", Value: next.Revision}, {Key: "status", Value: next.Status}, {Key: "updated_at", Value: next.UpdatedAt}, {Key: "data", Value: raw}}}})
+		if updateErr != nil {
+			return nil, updateErr
+		}
+		if result.ModifiedCount != 1 {
+			return nil, organization.ErrFeatureRevisionConflict
+		}
+		if message == nil {
+			return nil, nil
+		}
+		if advanceErr := s.advanceMessageThread(transactionContext, *message); advanceErr != nil {
+			return nil, advanceErr
+		}
+		document := organizationalMessageDocument{ID: string(message.ID), Recipient: string(message.Recipient), ThreadID: string(message.Flow.ThreadID), StepID: string(message.Flow.StepID), Hop: message.Flow.Hop, CreatedAt: message.CreatedAt, ExpiresAt: message.ExpiresAt, State: organization.MessagePending, Data: messageRaw}
+		_, insertErr := s.db.Collection("organizational_messages").InsertOne(transactionContext, document)
+		return nil, insertErr
+	}, options.Transaction().SetReadConcern(readconcern.Snapshot()).SetWriteConcern(writeconcern.Majority()).SetReadPreference(readpref.Primary()))
+	if driver.IsDuplicateKeyError(err) {
+		return organization.FeatureRequest{}, organization.ErrFeatureConflict
+	}
+	if err != nil {
+		return organization.FeatureRequest{}, err
+	}
+	return next, nil
 }
 
 func decodeFeature(document featureDocument) (organization.FeatureRequest, error) {

@@ -47,6 +47,7 @@ const (
 	FeatureSubmitted             FeatureStatus = "SUBMITTED"
 	FeatureClarificationRequired FeatureStatus = "CLARIFICATION_REQUIRED"
 	FeatureReadyForPlanning      FeatureStatus = "READY_FOR_PLANNING"
+	FeatureSpecified             FeatureStatus = "SPECIFIED"
 	FeaturePlanned               FeatureStatus = "PLANNED"
 	FeatureApproved              FeatureStatus = "APPROVED"
 	FeatureCancelled             FeatureStatus = "CANCELLED"
@@ -54,7 +55,7 @@ const (
 
 func (status FeatureStatus) Valid() bool {
 	switch status {
-	case FeatureSubmitted, FeatureClarificationRequired, FeatureReadyForPlanning, FeaturePlanned, FeatureApproved, FeatureCancelled:
+	case FeatureSubmitted, FeatureClarificationRequired, FeatureReadyForPlanning, FeatureSpecified, FeaturePlanned, FeatureApproved, FeatureCancelled:
 		return true
 	default:
 		return false
@@ -89,31 +90,83 @@ func (input FeatureRequestInput) Validate() error {
 }
 
 type FeatureRequest struct {
-	SchemaVersion     string              `json:"schema_version"`
-	ID                kernel.UUIDv7       `json:"id"`
-	Revision          uint64              `json:"revision"`
-	SubmittedBy       kernel.PrincipalRef `json:"submitted_by"`
-	Input             FeatureRequestInput `json:"input"`
-	Status            FeatureStatus       `json:"status"`
-	OperatorActor     kernel.ActorFQN     `json:"operator_actor"`
-	ProductOwnerActor kernel.ActorFQN     `json:"product_owner_actor"`
-	InitialMessageID  kernel.UUIDv7       `json:"initial_message_id"`
-	BudgetAccountID   kernel.UUIDv7       `json:"budget_account_id"`
-	LifecycleEpoch    uint64              `json:"lifecycle_epoch"`
-	ScopeRevision     uint64              `json:"scope_revision"`
-	CreatedAt         time.Time           `json:"created_at"`
-	UpdatedAt         time.Time           `json:"updated_at"`
-	Plan              *FeaturePlan        `json:"plan,omitempty"`
+	SchemaVersion     string                `json:"schema_version"`
+	ID                kernel.UUIDv7         `json:"id"`
+	Revision          uint64                `json:"revision"`
+	SubmittedBy       kernel.PrincipalRef   `json:"submitted_by"`
+	Input             FeatureRequestInput   `json:"input"`
+	Status            FeatureStatus         `json:"status"`
+	OperatorActor     kernel.ActorFQN       `json:"operator_actor"`
+	ProductOwnerActor kernel.ActorFQN       `json:"product_owner_actor"`
+	InitialMessageID  kernel.UUIDv7         `json:"initial_message_id"`
+	BudgetAccountID   kernel.UUIDv7         `json:"budget_account_id"`
+	LifecycleEpoch    uint64                `json:"lifecycle_epoch"`
+	ScopeRevision     uint64                `json:"scope_revision"`
+	CreatedAt         time.Time             `json:"created_at"`
+	UpdatedAt         time.Time             `json:"updated_at"`
+	LastMessageID     kernel.UUIDv7         `json:"last_message_id"`
+	LastStepID        kernel.UUIDv7         `json:"last_step_id"`
+	LastHop           uint32                `json:"last_hop"`
+	Refinement        *FeatureRefinement    `json:"refinement,omitempty"`
+	Specification     *FeatureSpecification `json:"specification,omitempty"`
+	Plan              *FeaturePlan          `json:"plan,omitempty"`
 }
 
 func (feature FeatureRequest) Validate() error {
-	if feature.SchemaVersion != FeatureSchemaVersion || !feature.ID.Valid() || feature.Revision == 0 || !feature.SubmittedBy.Valid() || feature.SubmittedBy.Kind != kernel.PrincipalHuman || feature.Input.Validate() != nil || !feature.Status.Valid() || !feature.OperatorActor.Valid() || !feature.ProductOwnerActor.Valid() || feature.OperatorActor == feature.ProductOwnerActor || !feature.InitialMessageID.Valid() || !feature.BudgetAccountID.Valid() || feature.LifecycleEpoch == 0 || feature.ScopeRevision == 0 || feature.CreatedAt.IsZero() || feature.UpdatedAt.Before(feature.CreatedAt) {
+	if feature.SchemaVersion != FeatureSchemaVersion || !feature.ID.Valid() || feature.Revision == 0 || !feature.SubmittedBy.Valid() || feature.SubmittedBy.Kind != kernel.PrincipalHuman || feature.Input.Validate() != nil || !feature.Status.Valid() || !feature.OperatorActor.Valid() || !feature.ProductOwnerActor.Valid() || feature.OperatorActor == feature.ProductOwnerActor || !feature.InitialMessageID.Valid() || !feature.LastMessageID.Valid() || !feature.LastStepID.Valid() || feature.LastHop == 0 || feature.LastHop > feature.Input.MaximumHops || !feature.BudgetAccountID.Valid() || feature.LifecycleEpoch == 0 || feature.ScopeRevision == 0 || feature.CreatedAt.IsZero() || feature.UpdatedAt.Before(feature.CreatedAt) {
 		return ErrInvalidFeature
 	}
 	if feature.Plan != nil && feature.Plan.Validate(feature) != nil {
 		return ErrInvalidFeature
 	}
+	if feature.Refinement != nil && feature.Refinement.Validate(feature) != nil {
+		return ErrInvalidFeature
+	}
+	if feature.Specification != nil && feature.Specification.Validate(feature) != nil {
+		return ErrInvalidFeature
+	}
 	return nil
+}
+
+type FeatureRefinement struct {
+	PreparedBy             kernel.ActorFQN       `json:"prepared_by"`
+	PreparedExecution      kernel.ExecutionTuple `json:"prepared_execution"`
+	AcceptanceCriteria     []string              `json:"acceptance_criteria"`
+	ClarificationQuestions []string              `json:"clarification_questions"`
+	Priority               FeaturePriority       `json:"priority"`
+	PreparedAt             time.Time             `json:"prepared_at"`
+}
+
+func (refinement FeatureRefinement) Validate(feature FeatureRequest) error {
+	if refinement.PreparedBy != feature.ProductOwnerActor || !refinement.PreparedExecution.Valid() || len(refinement.AcceptanceCriteria) == 0 || len(refinement.AcceptanceCriteria) > 32 || len(refinement.ClarificationQuestions) > 16 || !refinement.Priority.Valid() || refinement.PreparedAt.Before(feature.CreatedAt) {
+		return ErrInvalidFeature
+	}
+	return validBoundedStrings(append(append([]string(nil), refinement.AcceptanceCriteria...), refinement.ClarificationQuestions...), 4096)
+}
+
+type FeatureSpecification struct {
+	PreparedBy        kernel.ActorFQN       `json:"prepared_by"`
+	PreparedExecution kernel.ExecutionTuple `json:"prepared_execution"`
+	Stories           []PlannedStory        `json:"stories"`
+	DesignConstraints []string              `json:"design_constraints"`
+	PreparedAt        time.Time             `json:"prepared_at"`
+}
+
+func (specification FeatureSpecification) Validate(feature FeatureRequest) error {
+	if !specification.PreparedBy.Valid() || !specification.PreparedExecution.Valid() || len(specification.Stories) == 0 || len(specification.Stories) > int(feature.Input.MaximumStories) || len(specification.DesignConstraints) > 64 || specification.PreparedAt.Before(feature.CreatedAt) {
+		return ErrInvalidFeature
+	}
+	seen := make(map[kernel.UUIDv7]struct{}, len(specification.Stories))
+	for _, story := range specification.Stories {
+		if !story.Valid() {
+			return ErrInvalidFeature
+		}
+		if _, duplicate := seen[story.ID]; duplicate {
+			return ErrInvalidFeature
+		}
+		seen[story.ID] = struct{}{}
+	}
+	return validBoundedStrings(specification.DesignConstraints, 4096)
 }
 
 type RiskLevel string
@@ -141,6 +194,10 @@ type PlannedStory struct {
 	AcceptanceCriteria []string        `json:"acceptance_criteria"`
 	Priority           FeaturePriority `json:"priority"`
 	SupersedesStoryID  *kernel.UUIDv7  `json:"supersedes_story_id,omitempty"`
+}
+
+func (story PlannedStory) Valid() bool {
+	return story.ID.Valid() && story.Title != "" && len(story.Title) <= 256 && story.Description != "" && len(story.Description) <= 64<<10 && len(story.AcceptanceCriteria) > 0 && len(story.AcceptanceCriteria) <= 32 && story.Priority.Valid() && (story.SupersedesStoryID == nil || story.SupersedesStoryID.Valid()) && validBoundedStrings(story.AcceptanceCriteria, 4096) == nil
 }
 
 type PlannedTask struct {
@@ -177,7 +234,7 @@ func (plan FeaturePlan) Validate(feature FeatureRequest) error {
 	}
 	stories := make(map[kernel.UUIDv7]struct{}, len(plan.Stories))
 	for _, story := range plan.Stories {
-		if !story.ID.Valid() || story.Title == "" || story.Description == "" || len(story.AcceptanceCriteria) == 0 || !story.Priority.Valid() {
+		if !story.Valid() {
 			return ErrInvalidFeature
 		}
 		if _, exists := stories[story.ID]; exists {
@@ -234,4 +291,14 @@ type FeatureStore interface {
 	LoadFeature(context.Context, kernel.UUIDv7) (FeatureRequest, bool, error)
 	LoadFeatureByIdempotencyKey(context.Context, kernel.PrincipalRef, string) (FeatureRequest, bool, error)
 	ApplyFeaturePlan(context.Context, kernel.UUIDv7, uint64, FeaturePlan, time.Time) (FeatureRequest, error)
+	AdvanceFeature(context.Context, FeatureRequest, uint64, *OrganizationalMessage) (FeatureRequest, error)
+}
+
+func validBoundedStrings(values []string, maximum int) error {
+	for _, value := range values {
+		if value == "" || len(value) > maximum {
+			return ErrInvalidFeature
+		}
+	}
+	return nil
 }
