@@ -197,7 +197,61 @@ func (service *ProductionService) activateRootTask(ctx context.Context, feature 
 		return err
 	}
 	scopePayload := map[string]any{"task_id": task.plan.ID, "expected_task_revision": task.revision, "lifecycle_epoch": feature.LifecycleEpoch, "scope_revision": feature.ScopeRevision, "owner_fqn": task.owner.ActorFQN, "execution_id": task.owner.Execution.ExecutionID, "fencing_epoch": task.owner.Execution.FencingEpoch, "workspace_id": workspace.WorkspaceID, "worktree_id": workspace.WorktreeID, "branch": workspace.Branch, "baseline_sha": workspace.BaselineSHA, "writable_paths": workspace.WritablePaths, "interface_constraint_evidence_ids": []kernel.UUIDv7{evidenceID}}
-	return service.applyTaskCommand(ctx, feature, task, "tekroo.command.task.bind-operational-scope", kernel.OperationalSchemaVersion, service.policyAuthority, scopePayload, evidence, nil, "scope")
+	if err := service.applyTaskCommand(ctx, feature, task, "tekroo.command.task.bind-operational-scope", kernel.OperationalSchemaVersion, service.policyAuthority, scopePayload, evidence, nil, "scope"); err != nil {
+		return err
+	}
+	return service.authorizeImplementationInvocation(ctx, feature, task, profileConfig, workspace, budgetRevision)
+}
+
+func (service *ProductionService) authorizeImplementationInvocation(ctx context.Context, feature organization.FeatureRequest, task *trackedTask, profile ProductionProfile, workspace ProductionWorkspace, budgetRevision uint64) error {
+	invocationID := deterministicOperationalUUID("work-invocation", string(feature.ID), string(task.plan.ID), "implementation", "1")
+	idempotencyKey := "feature:" + string(feature.ID) + ":invocation-" + string(task.plan.ID)
+	criteria, err := json.Marshal(task.plan.AcceptanceCriteria)
+	if err != nil {
+		return err
+	}
+	criteriaDigest := digestBytes(criteria)
+	conditionDigest := digestBytes([]byte(string(task.profile.ProfileDigest) + "\x00" + string(criteriaDigest)))
+	outputPredicateDigest := digestBytes([]byte("accepted-task-output\x00" + string(task.plan.ID) + "\x00" + string(criteriaDigest)))
+	payload, err := json.Marshal(map[string]any{
+		"invocation_id": invocationID, "task_id": task.plan.ID, "budget_account_id": feature.BudgetAccountID,
+		"expected_budget_revision": budgetRevision, "expected_task_revision": task.revision,
+		"lifecycle_epoch": feature.LifecycleEpoch, "scope_revision": feature.ScopeRevision, "parent_event_id": task.last,
+		"work_profile": task.profile.Binding(), "qualified_assignment_id": deterministicOperationalUUID("assignment", string(feature.ID), string(task.plan.ID)),
+		"purpose": kernel.PurposeImplementation, "attempt_family": "implementation", "attempt_ordinal": 1,
+		"condition_digest": conditionDigest, "retry_of_invocation_id": nil, "retry_ordinal": 0,
+		"output_predicate_digest": outputPredicateDigest, "allowed_terminal_outcomes": []kernel.WorkInvocationState{kernel.InvocationSucceeded, kernel.InvocationFailed, kernel.InvocationTimedOut, kernel.InvocationCancelled, kernel.InvocationStartFailed},
+		"tool_policy_digest": profile.ToolPolicyDigest, "effect_policy_digest": profile.EffectPolicyDigest,
+		"actor_fqn": task.owner.ActorFQN, "execution_id": task.owner.Execution.ExecutionID, "fencing_epoch": task.owner.Execution.FencingEpoch,
+		"model_profile_digest": profile.ModelProfileDigest, "runtime_identity_digest": profile.RuntimeIdentityDigest,
+		"workspace_id": workspace.WorkspaceID, "deadline_at": task.profile.Budgets.DeadlineAt,
+		"idempotency_key": idempotencyKey, "admission_policy_revision": service.planning.PolicyRevision, "admission_policy_digest": service.planning.BudgetPolicyDigest,
+	})
+	if err != nil {
+		return err
+	}
+	command := kernel.KernelCommand{
+		ContractManifest: kernel.ContractIdentity,
+		CommandID:        deterministicOperationalUUID("command", string(feature.ID), "tekroo.command.work-invocation.authorize", string(invocationID)),
+		CommandType:      "tekroo.command.work-invocation.authorize", CommandVersion: kernel.OperationalSchemaVersion,
+		Target: kernel.AggregateRef{Kind: kernel.AggregateWorkInvocation, ID: invocationID}, Authority: service.policyAuthority,
+		ExpectedRevision: kernel.MustNotExist(),
+		Preconditions: []kernel.AggregatePrecondition{
+			{Aggregate: kernel.AggregateRef{Kind: kernel.AggregateTask, ID: task.plan.ID}, Expected: kernel.NewExpectedRevision(task.revision)},
+			{Aggregate: kernel.AggregateRef{Kind: kernel.AggregateWorkBudget, ID: feature.BudgetAccountID}, Expected: kernel.NewExpectedRevision(budgetRevision)},
+		},
+		ExpectedPolicyRevision: service.provenance.PolicyRevision, ExpectedCatalogueRevision: kernel.CatalogueRevision,
+		IdempotencyKey: idempotencyKey, CorrelationID: feature.ID,
+		Causation: []kernel.DagParent{{ParentEventID: task.last, EdgeKind: kernel.EdgeCausal}}, Payload: payload, EvidenceRefs: []kernel.EvidenceRef{},
+	}
+	receipt, err := service.Submit(ctx, command)
+	if err != nil {
+		return err
+	}
+	if receipt.OutcomeCode != kernel.OutcomeApplied && receipt.OutcomeCode != kernel.OutcomeNoChange {
+		return fmt.Errorf("%s rejected: %s", command.CommandType, receipt.ReasonCode)
+	}
+	return nil
 }
 
 func (service *ProductionService) applyTaskCommand(ctx context.Context, feature organization.FeatureRequest, task *trackedTask, commandType, version string, authority kernel.PrincipalRef, payload any, evidence []kernel.EvidenceRef, preconditions []kernel.AggregatePrecondition, key string) error {

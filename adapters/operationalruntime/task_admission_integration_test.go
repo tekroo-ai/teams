@@ -127,7 +127,7 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 		t.Fatal(err)
 	}
 	projection, found, err := store.ReadTaskProjection(contextWithTimeout(t), plan.Tasks[0].ID)
-	if err != nil || !found || !projection.Valid() || projection.Phase != string(kernel.PhaseActive) || projection.OwnerFQN == nil || *projection.OwnerFQN != plan.Tasks[0].Owner || !projection.WorkProfileID.Valid() || projection.QualifiedAssignment == nil || projection.Budget.AccountID != feature.BudgetAccountID || projection.OperationalScope == nil || projection.OperationalScope.WorkspaceID != "coder-1" {
+	if err != nil || !found || !projection.Valid() || projection.Phase != string(kernel.PhaseActive) || projection.OwnerFQN == nil || *projection.OwnerFQN != plan.Tasks[0].Owner || !projection.WorkProfileID.Valid() || projection.QualifiedAssignment == nil || projection.Budget.AccountID != feature.BudgetAccountID || projection.OperationalScope == nil || projection.OperationalScope.WorkspaceID != "coder-1" || projection.LatestInvocation == nil || projection.LatestInvocation.State != kernel.InvocationAuthorized {
 		t.Fatalf("projection=%+v found=%t err=%v", projection, found, err)
 	}
 }
