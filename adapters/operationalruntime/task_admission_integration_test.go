@@ -6,7 +6,9 @@ import (
 	"context"
 	"crypto/ed25519"
 	"encoding/base64"
+	"errors"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -49,6 +51,9 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 		t.Fatal(err)
 	}
 	workspace := t.TempDir()
+	serverState := &integratedOpenHands{t: t, conversations: make(map[string]*integratedConversation)}
+	server := httptest.NewServer(http.HandlerFunc(serverState.serveHTTP))
+	defer server.Close()
 	modelDigest := digestByte('2')
 	runtimeDigest := digestByte('3')
 	toolDigest := digestByte('4')
@@ -64,7 +69,7 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 	}
 	runtime, err := New(contextWithTimeout(t), Config{
 		Store: store, Catalogue: catalogue, Clock: clock, IDs: ids,
-		OpenHandsBaseURL: "http://127.0.0.1:1", OpenHandsSessionAPIKey: "not-used",
+		OpenHandsBaseURL: server.URL, OpenHandsSessionAPIKey: "step7-session-key",
 		HTTPClient:        &http.Client{Timeout: time.Second},
 		WorkspaceBindings: []openhands.WorkspaceBinding{{WorkspaceID: "coder-1", WorktreeID: "worktree-coder-1", WorkingDirectory: workspace}},
 		ExecutionProfiles: []openhands.ExecutionProfile{profile}, OpenHandsPollInterval: time.Millisecond,
@@ -97,7 +102,7 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 		QualifiedRole: "programmer", Status: kernel.QualificationPass, ObservedAt: now.Add(-time.Minute),
 	}
 	service := &ProductionService{
-		Runtime: runtime, RoleHost: roleHost, provenance: provenance, clock: clock, ids: ids,
+		Store: store, Runtime: runtime, RoleHost: roleHost, provenance: provenance, clock: clock, ids: ids,
 		planningDeadline: 2 * time.Hour,
 		planning:         ProductionPlanning{PolicyRevision: 1, ClassificationPolicyDigest: digestByte('8'), PromotionPolicyDigest: digestByte('6'), VerificationTopologyDigest: digestByte('d'), SelectionPolicyDigest: digestByte('9'), BudgetPolicyDigest: digestByte('b'), RequiredGateIDs: []string{"go-test"}, Deadline: "2h"},
 		profilesByModel:  map[kernel.Digest]ProductionProfile{modelDigest: {ModelProfileDigest: modelDigest, RuntimeIdentityDigest: runtimeDigest, ToolPolicyDigest: toolDigest, EffectPolicyDigest: effectDigest, MaximumIterations: 24, Qualification: qualification}},
@@ -115,20 +120,56 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 	plan := organization.FeaturePlan{
 		Version: 1, CreatedAt: now, PreparedBy: "example::architect-1", PreparedExecution: kernel.ExecutionTuple{ExecutionID: kernel.UUIDv7("00000000-0000-7000-8000-000000006017"), FencingEpoch: 1}, Architecture: "One bounded implementation task.",
 		Stories: []organization.PlannedStory{{ID: kernel.UUIDv7("00000000-0000-7000-8000-000000006012"), Title: "Executable story", Description: "Materialize an admitted task.", AcceptanceCriteria: []string{"root task is active"}, Priority: organization.PriorityHigh}},
-		Tasks:   []organization.PlannedTask{{ID: kernel.UUIDv7("00000000-0000-7000-8000-000000006013"), StoryID: kernel.UUIDv7("00000000-0000-7000-8000-000000006012"), Title: "Implement", Description: "Implement the accepted change.", AcceptanceCriteria: []string{"go test passes"}, Owner: "example::coder-1", ModelProfile: modelDigest, DecisionRoute: kernel.RouteBoundedExecution, Purpose: kernel.PurposeImplementation, Complexity: 3, Risk: organization.RiskLow, CriticalPath: true, AttemptLimit: 2, ReviewRoundLimit: 1}},
+		Tasks: []organization.PlannedTask{
+			{ID: kernel.UUIDv7("00000000-0000-7000-8000-000000006013"), StoryID: kernel.UUIDv7("00000000-0000-7000-8000-000000006012"), Title: "Implement", Description: "Implement the accepted change.", AcceptanceCriteria: []string{"go test passes"}, Owner: "example::coder-1", ModelProfile: modelDigest, DecisionRoute: kernel.RouteBoundedExecution, Purpose: kernel.PurposeImplementation, Complexity: 3, Risk: organization.RiskLow, CriticalPath: true, AttemptLimit: 2, ReviewRoundLimit: 1},
+			{ID: kernel.UUIDv7("00000000-0000-7000-8000-000000006018"), StoryID: kernel.UUIDv7("00000000-0000-7000-8000-000000006012"), Title: "Validate", Description: "Independently validate the accepted change.", AcceptanceCriteria: []string{"validation passes"}, DependsOn: []kernel.UUIDv7{kernel.UUIDv7("00000000-0000-7000-8000-000000006013")}, Owner: "example::coder-1", ModelProfile: modelDigest, DecisionRoute: kernel.RouteBoundedExecution, Purpose: kernel.PurposeValidation, Complexity: 2, Risk: organization.RiskLow, CriticalPath: true, AttemptLimit: 1, ReviewRoundLimit: 1},
+		},
 	}
+	runContext, cancelRun := context.WithCancel(context.Background())
+	runResult := make(chan error, 1)
+	go func() { runResult <- runtime.Run(runContext) }()
 	if err := service.MaterializeFeaturePlan(contextWithTimeout(t), feature, plan); err != nil {
 		t.Fatal(err)
 	}
 	if err := service.MaterializeFeaturePlan(contextWithTimeout(t), feature, plan); err != nil {
 		t.Fatalf("idempotent materialization: %v", err)
 	}
+	firstInvocationID := deterministicOperationalUUID("work-invocation", string(feature.ID), string(plan.Tasks[0].ID), string(plan.Tasks[0].Purpose), "1")
+	waitForInvocationState(t, store, firstInvocationID, kernel.InvocationSucceeded)
+	if err := service.reconcileFeaturePlan(contextWithTimeout(t), feature, plan); err != nil {
+		t.Fatal(err)
+	}
+	secondInvocationID := deterministicOperationalUUID("work-invocation", string(feature.ID), string(plan.Tasks[1].ID), string(plan.Tasks[1].Purpose), "1")
+	waitForInvocationState(t, store, secondInvocationID, kernel.InvocationSucceeded)
+	cancelRun()
+	if err := <-runResult; !errors.Is(err, context.Canceled) {
+		t.Fatalf("runtime stop = %v", err)
+	}
 	if _, err := store.ProjectPendingOperationalEvents(contextWithTimeout(t), now.Add(time.Minute)); err != nil {
 		t.Fatal(err)
 	}
 	projection, found, err := store.ReadTaskProjection(contextWithTimeout(t), plan.Tasks[0].ID)
-	if err != nil || !found || !projection.Valid() || projection.Phase != string(kernel.PhaseActive) || projection.OwnerFQN == nil || *projection.OwnerFQN != plan.Tasks[0].Owner || !projection.WorkProfileID.Valid() || projection.QualifiedAssignment == nil || projection.Budget.AccountID != feature.BudgetAccountID || projection.OperationalScope == nil || projection.OperationalScope.WorkspaceID != "coder-1" || projection.LatestInvocation == nil || projection.LatestInvocation.State != kernel.InvocationAuthorized {
+	if err != nil || !found || !projection.Valid() || projection.Phase != string(kernel.PhaseActive) || projection.OwnerFQN == nil || *projection.OwnerFQN != plan.Tasks[0].Owner || !projection.WorkProfileID.Valid() || projection.QualifiedAssignment == nil || projection.Budget.AccountID != feature.BudgetAccountID || projection.OperationalScope == nil || projection.OperationalScope.WorkspaceID != "coder-1" || projection.LatestInvocation == nil || projection.LatestInvocation.State != kernel.InvocationSucceeded {
 		t.Fatalf("projection=%+v found=%t err=%v", projection, found, err)
+	}
+	dependent, found, err := store.ReadTaskProjection(contextWithTimeout(t), plan.Tasks[1].ID)
+	if err != nil || !found || !dependent.Valid() || dependent.LatestInvocation == nil || dependent.LatestInvocation.State != kernel.InvocationSucceeded {
+		t.Fatalf("dependent projection=%+v found=%t err=%v", dependent, found, err)
+	}
+}
+
+func waitForInvocationState(t *testing.T, store *mongo.Store, invocationID kernel.UUIDv7, expected kernel.WorkInvocationState) {
+	t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		current, err := store.LoadOperationalExecution(contextWithTimeout(t), invocationID)
+		if err == nil && current.Invocation.State == expected {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("invocation %s state=%s err=%v", invocationID, current.Invocation.State, err)
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
 }
 

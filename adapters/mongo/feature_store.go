@@ -115,6 +115,43 @@ func (s *Store) LoadFeatureByIdempotencyKey(ctx context.Context, principal kerne
 	return feature, err == nil, err
 }
 
+func (s *Store) ListFeatures(ctx context.Context, statuses []organization.FeatureStatus, limit int64) ([]organization.FeatureRequest, error) {
+	if err := requireDeadline(ctx); err != nil {
+		return nil, err
+	}
+	if s == nil || len(statuses) == 0 || len(statuses) > 16 || limit <= 0 || limit > 1000 {
+		return nil, organization.ErrInvalidFeature
+	}
+	values := make(bson.A, len(statuses))
+	for index, status := range statuses {
+		if !status.Valid() {
+			return nil, organization.ErrInvalidFeature
+		}
+		values[index] = status
+	}
+	cursor, err := s.db.Collection("feature_requests").Find(ctx, bson.D{{Key: "status", Value: bson.D{{Key: "$in", Value: values}}}}, options.Find().SetSort(bson.D{{Key: "updated_at", Value: 1}, {Key: "_id", Value: 1}}).SetLimit(limit))
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+	result := make([]organization.FeatureRequest, 0)
+	for cursor.Next(ctx) {
+		var document featureDocument
+		if err := cursor.Decode(&document); err != nil {
+			return nil, err
+		}
+		feature, err := decodeFeature(document)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, feature)
+	}
+	if err := cursor.Err(); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
 func (s *Store) ApplyFeaturePlan(ctx context.Context, id kernel.UUIDv7, expectedRevision uint64, plan organization.FeaturePlan, now time.Time) (organization.FeatureRequest, error) {
 	if err := requireDeadline(ctx); err != nil {
 		return organization.FeatureRequest{}, err

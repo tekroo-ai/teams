@@ -109,7 +109,7 @@ func (service *ProductionService) preparePlannedTasks(ctx context.Context, featu
 			return err
 		}
 		if len(item.DependsOn) == 0 {
-			if err := service.activateRootTask(ctx, feature, tracked, profileConfig, workspace, budgetRevision, evidenceRefs, evidenceID); err != nil {
+			if err := service.activateTask(ctx, feature, tracked, profileConfig, workspace, budgetRevision, nil, evidenceRefs, evidenceID); err != nil {
 				return err
 			}
 		}
@@ -157,8 +157,8 @@ func (service *ProductionService) registerExecution(ctx context.Context, feature
 	return err
 }
 
-func (service *ProductionService) activateRootTask(ctx context.Context, feature organization.FeatureRequest, task *trackedTask, profileConfig ProductionProfile, workspace ProductionWorkspace, budgetRevision uint64, evidence []kernel.EvidenceRef, evidenceID kernel.UUIDv7) error {
-	if err := service.applyTaskCommand(ctx, feature, task, "tekroo.command.task.mark-ready", kernel.SchemaVersion, service.policyAuthority, map[string]any{"dependency_event_ids": []kernel.UUIDv7{}, "readiness_policy_revision": service.planning.PolicyRevision}, nil, nil, "ready"); err != nil {
+func (service *ProductionService) activateTask(ctx context.Context, feature organization.FeatureRequest, task *trackedTask, profileConfig ProductionProfile, workspace ProductionWorkspace, budgetRevision uint64, dependencyEvents []kernel.UUIDv7, evidence []kernel.EvidenceRef, evidenceID kernel.UUIDv7) error {
+	if err := service.applyTaskCommand(ctx, feature, task, "tekroo.command.task.mark-ready", kernel.SchemaVersion, service.policyAuthority, map[string]any{"dependency_event_ids": append([]kernel.UUIDv7{}, dependencyEvents...), "readiness_policy_revision": service.planning.PolicyRevision}, nil, nil, "ready"); err != nil {
 		return err
 	}
 	assignmentID := deterministicOperationalUUID("assignment", string(feature.ID), string(task.plan.ID))
@@ -245,7 +245,7 @@ func (service *ProductionService) authorizeImplementationInvocation(ctx context.
 	}
 	receipt, err := service.Submit(ctx, command)
 	if err != nil {
-		return err
+		return fmt.Errorf("%s: %w", command.CommandType, err)
 	}
 	if receipt.OutcomeCode != kernel.OutcomeApplied && receipt.OutcomeCode != kernel.OutcomeNoChange {
 		return fmt.Errorf("%s rejected: %s", command.CommandType, receipt.ReasonCode)
@@ -311,7 +311,7 @@ func (service *ProductionService) submitDeterministicCommand(ctx context.Context
 	command := kernel.KernelCommand{ContractManifest: kernel.ContractIdentity, CommandID: deterministicOperationalUUID("command", string(feature.ID), commandType, string(id), key), CommandType: commandType, CommandVersion: version, Target: kernel.AggregateRef{Kind: kind, ID: id}, Authority: authority, ExpectedRevision: expectedRevision(revision), ExpectedLifecycleEpoch: expectedLifecycleEpoch(kind, revision, feature.LifecycleEpoch), Preconditions: append([]kernel.AggregatePrecondition(nil), preconditions...), ExpectedPolicyRevision: service.provenance.PolicyRevision, ExpectedCatalogueRevision: kernel.CatalogueRevision, IdempotencyKey: "feature:" + string(feature.ID) + ":" + key, CorrelationID: feature.ID, Causation: append([]kernel.DagParent(nil), parents...), Payload: append([]byte(nil), payload...), EvidenceRefs: append([]kernel.EvidenceRef(nil), evidence...)}
 	receipt, err := service.Submit(ctx, command)
 	if err != nil {
-		return receipt, err
+		return receipt, fmt.Errorf("%s: %w", commandType, err)
 	}
 	if receipt.OutcomeCode != kernel.OutcomeApplied && receipt.OutcomeCode != kernel.OutcomeNoChange {
 		return receipt, fmt.Errorf("%s rejected: %s", commandType, receipt.ReasonCode)
@@ -323,7 +323,7 @@ func (service *ProductionService) submitDeterministicActorCommand(ctx context.Co
 	command := kernel.KernelCommand{ContractManifest: kernel.ContractIdentity, CommandID: deterministicOperationalUUID("command", string(feature.ID), commandType, string(id), key), CommandType: commandType, CommandVersion: kernel.SchemaVersion, Target: kernel.AggregateRef{Kind: kernel.AggregateTask, ID: id}, Authority: authority, ActorFQN: &actor, Execution: &execution, ExpectedRevision: kernel.NewExpectedRevision(revision), ExpectedLifecycleEpoch: expectedLifecycleEpoch(kernel.AggregateTask, revision, feature.LifecycleEpoch), Preconditions: []kernel.AggregatePrecondition{}, ExpectedPolicyRevision: service.provenance.PolicyRevision, ExpectedCatalogueRevision: kernel.CatalogueRevision, IdempotencyKey: "feature:" + string(feature.ID) + ":" + key, CorrelationID: feature.ID, Causation: append([]kernel.DagParent(nil), parents...), Payload: append([]byte(nil), payload...), EvidenceRefs: []kernel.EvidenceRef{}}
 	receipt, err := service.Submit(ctx, command)
 	if err != nil {
-		return receipt, err
+		return receipt, fmt.Errorf("%s: %w", commandType, err)
 	}
 	if receipt.OutcomeCode != kernel.OutcomeApplied && receipt.OutcomeCode != kernel.OutcomeNoChange {
 		return receipt, fmt.Errorf("%s rejected: %s", commandType, receipt.ReasonCode)

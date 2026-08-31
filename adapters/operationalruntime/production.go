@@ -843,6 +843,9 @@ func (service *ProductionService) runRoleRecovery(ctx context.Context) error {
 				}
 			}
 		}
+		if err == nil {
+			err = service.reconcilePlannedFeatureWork(operationContext)
+		}
 		cancel()
 		if err != nil {
 			if ctx.Err() != nil {
