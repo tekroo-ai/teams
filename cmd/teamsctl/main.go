@@ -74,6 +74,8 @@ func run(arguments []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		method, path, err = identityRead("/v1/tasks/", operands)
 	case "story":
 		method, path, err = identityRead("/v1/stories/", operands)
+	case "invocation":
+		method, path, err = identityRead("/v1/invocations/", operands)
 	case "submit":
 		method, path = http.MethodPost, "/v1/commands"
 		body, _, err = loadCommand(operands, stdin, config.Operator.MaximumBodyBytes)
@@ -216,5 +218,5 @@ func loadCommand(operands []string, stdin io.Reader, maximum int64) ([]byte, ker
 }
 
 func usageError() error {
-	return errors.New("usage: teamsctl -config /absolute/path/teamsd.json health|status|pause|resume|stop|task ID|story ID|submit FILE|-|cancel INVOCATION_ID FILE|-")
+	return errors.New("usage: teamsctl -config /absolute/path/teamsd.json health|status|pause|resume|stop|task ID|story ID|invocation ID|submit FILE|-|cancel INVOCATION_ID FILE|-")
 }

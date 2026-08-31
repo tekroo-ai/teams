@@ -206,7 +206,7 @@ func (worker *Worker) Run(ctx context.Context) error {
 		intent, err := worker.source.Next(sourceCtx)
 		sourceCancel()
 		if err != nil {
-			if errors.Is(err, context.DeadlineExceeded) && runCtx.Err() == nil {
+			if (errors.Is(err, context.DeadlineExceeded) || errors.Is(err, mongo.ErrIntentNotFound)) && runCtx.Err() == nil {
 				continue
 			}
 			cancelRun()
@@ -313,7 +313,7 @@ func (source MongoIntentSource) Next(ctx context.Context) (kernel.OutboxIntent, 
 	if source.Feed == nil || source.Feed.Kind() != "WORK_INVOCATION_AUTHORIZED" {
 		return kernel.OutboxIntent{}, ErrInvalidConfiguration
 	}
-	claimed, err := source.Feed.Next(ctx)
+	claimed, err := source.Feed.Poll(ctx)
 	return claimed.Intent, err
 }
 

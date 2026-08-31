@@ -1,0 +1,30 @@
+{
+  "contract_manifest": "tekroo.kernel.contracts/0.8.0",
+  "command_id": "REPLACE_WITH_UUIDV7",
+  "command_type": "REPLACE_WITH_EXACT_CATALOGUE_COMMAND_TYPE",
+  "command_version": "1.6.0",
+  "target": {
+    "kind": "REPLACE_WITH_TARGET_KIND",
+    "id": "REPLACE_WITH_UUIDV7"
+  },
+  "authority": {
+    "kind": "REPLACE_WITH_HUMAN_ACTOR_SERVICE_OR_POLICY",
+    "id": "REPLACE_WITH_AUTHORIZED_PRINCIPAL_ID"
+  },
+  "actor_fqn": null,
+  "execution": null,
+  "expected_revision": {
+    "must_not_exist": true,
+    "revision": 0
+  },
+  "expected_lifecycle_epoch": 1,
+  "expected_policy_revision": 1,
+  "expected_catalogue_revision": 8,
+  "idempotency_key": "REPLACE_WITH_STABLE_OPERATION_KEY",
+  "correlation_id": "REPLACE_WITH_UUIDV7",
+  "causation": [],
+  "issued_at": null,
+  "preconditions": [],
+  "payload": {},
+  "evidence_refs": []
+}

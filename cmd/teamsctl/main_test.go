@@ -131,3 +131,11 @@ func TestIdentityReadRequiresUUIDv7(t *testing.T) {
 		t.Fatal("invalid identity accepted")
 	}
 }
+
+func TestInvocationReadUsesExactPath(t *testing.T) {
+	t.Parallel()
+	method, path, err := identityRead("/v1/invocations/", []string{string(testInvocationID)})
+	if err != nil || method != http.MethodGet || path != "/v1/invocations/"+string(testInvocationID) {
+		t.Fatalf("unexpected result: %q %q %v", method, path, err)
+	}
+}

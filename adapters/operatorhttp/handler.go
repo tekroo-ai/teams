@@ -34,6 +34,7 @@ type Service interface {
 	Submit(context.Context, kernel.KernelCommand) (kernel.CommandReceipt, error)
 	ReadTask(context.Context, kernel.UUIDv7) (mongo.TaskProjection, bool, error)
 	ReadStory(context.Context, kernel.UUIDv7) (mongo.StoryProjection, bool, error)
+	ReadInvocation(context.Context, kernel.UUIDv7) (operationalruntime.InvocationStatus, bool, error)
 }
 
 type Handler struct {
@@ -89,9 +90,29 @@ func (handler *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Requ
 		handler.task(writer, request, strings.TrimPrefix(request.URL.Path, "/v1/tasks/"))
 	case request.Method == http.MethodGet && strings.HasPrefix(request.URL.Path, "/v1/stories/"):
 		handler.story(writer, request, strings.TrimPrefix(request.URL.Path, "/v1/stories/"))
+	case request.Method == http.MethodGet && strings.HasPrefix(request.URL.Path, "/v1/invocations/"):
+		handler.invocation(writer, request, strings.TrimPrefix(request.URL.Path, "/v1/invocations/"))
 	default:
 		writeError(writer, http.StatusNotFound, "NOT_FOUND")
 	}
+}
+
+func (handler *Handler) invocation(writer http.ResponseWriter, request *http.Request, value string) {
+	id := kernel.UUIDv7(value)
+	if !id.Valid() || strings.Contains(value, "/") {
+		writeError(writer, http.StatusBadRequest, "INVALID_INVOCATION_ID")
+		return
+	}
+	status, found, err := handler.service.ReadInvocation(request.Context(), id)
+	if err != nil {
+		writeError(writer, http.StatusInternalServerError, "READ_FAILED")
+		return
+	}
+	if !found {
+		writeError(writer, http.StatusNotFound, "INVOCATION_NOT_FOUND")
+		return
+	}
+	writeJSON(writer, http.StatusOK, status)
 }
 
 func (handler *Handler) authorized(request *http.Request) bool {

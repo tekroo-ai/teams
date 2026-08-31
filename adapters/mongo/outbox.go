@@ -12,6 +12,8 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
+const intentFeedMaxAwait = 100 * time.Millisecond
+
 var (
 	ErrIntentNotFound = errors.New("outbox intent not found")
 	ErrStaleClaim     = errors.New("outbox claim holder or epoch is stale")
@@ -248,7 +250,7 @@ func (s *Store) openIntentFeed(ctx context.Context, consumerID, kind string) (*I
 	if consumerID == "" {
 		return nil, ErrInvalidClaim
 	}
-	streamOptions := options.ChangeStream().SetFullDocument(options.UpdateLookup)
+	streamOptions := options.ChangeStream().SetFullDocument(options.UpdateLookup).SetMaxAwaitTime(intentFeedMaxAwait)
 	var checkpoint valueDocument
 	err := s.db.Collection("consumer_checkpoints").FindOne(ctx, bson.D{{Key: "_id", Value: consumerID}}).Decode(&checkpoint)
 	usedCheckpoint := false
@@ -265,7 +267,7 @@ func (s *Store) openIntentFeed(ctx context.Context, consumerID, kind string) (*I
 		if _, deleteErr := s.db.Collection("consumer_checkpoints").DeleteOne(ctx, bson.D{{Key: "_id", Value: consumerID}}); deleteErr != nil {
 			return nil, deleteErr
 		}
-		stream, err = s.db.Collection("outbox").Watch(ctx, pipeline, options.ChangeStream().SetFullDocument(options.UpdateLookup))
+		stream, err = s.db.Collection("outbox").Watch(ctx, pipeline, options.ChangeStream().SetFullDocument(options.UpdateLookup).SetMaxAwaitTime(intentFeedMaxAwait))
 		resynchronized = true
 	}
 	if err != nil {
@@ -348,9 +350,65 @@ func (feed *IntentFeed) Next(ctx context.Context) (ClaimedIntent, error) {
 	return ClaimedIntent{}, ctx.Err()
 }
 
+// Poll returns one available intent without cancelling an otherwise healthy
+// change stream merely because the service is idle. Mongo change-stream Next
+// treats context expiry as a stream error; TryNext plus a server-side bounded
+// await gives persistent workers a clean no-work result instead.
+func (feed *IntentFeed) Poll(ctx context.Context) (ClaimedIntent, error) {
+	if err := requireDeadline(ctx); err != nil {
+		return ClaimedIntent{}, err
+	}
+	for feed.backlog.Next(ctx) {
+		feed.backlogSeen++
+		if feed.backlogSeen > feed.backlogLimit {
+			return ClaimedIntent{}, ErrBacklogLimit
+		}
+		var document outboxDocument
+		if err := feed.backlog.Decode(&document); err != nil {
+			return ClaimedIntent{}, err
+		}
+		key := intentDeliveryKey(document)
+		if _, duplicate := feed.seen[key]; duplicate {
+			continue
+		}
+		feed.seen[key] = struct{}{}
+		return document.claimedIntent()
+	}
+	if err := feed.backlog.Err(); err != nil {
+		return ClaimedIntent{}, err
+	}
+	for feed.stream.TryNext(ctx) {
+		var change struct {
+			FullDocument outboxDocument `bson:"fullDocument"`
+		}
+		if err := feed.stream.Decode(&change); err != nil {
+			return ClaimedIntent{}, err
+		}
+		if err := feed.saveCheckpoint(ctx); err != nil {
+			return ClaimedIntent{}, err
+		}
+		key := intentDeliveryKey(change.FullDocument)
+		if _, duplicate := feed.seen[key]; duplicate {
+			continue
+		}
+		feed.seen[key] = struct{}{}
+		return change.FullDocument.claimedIntent()
+	}
+	if err := feed.stream.Err(); err != nil {
+		if !feed.resynchronized && isResumeFailure(err) {
+			if resyncErr := feed.resynchronize(ctx); resyncErr != nil {
+				return ClaimedIntent{}, resyncErr
+			}
+			return feed.Poll(ctx)
+		}
+		return ClaimedIntent{}, err
+	}
+	return ClaimedIntent{}, ErrIntentNotFound
+}
+
 func (feed *IntentFeed) resynchronize(ctx context.Context) error {
 	pipeline := intentFeedPipeline(feed.kind)
-	stream, err := feed.store.db.Collection("outbox").Watch(ctx, pipeline, options.ChangeStream().SetFullDocument(options.UpdateLookup))
+	stream, err := feed.store.db.Collection("outbox").Watch(ctx, pipeline, options.ChangeStream().SetFullDocument(options.UpdateLookup).SetMaxAwaitTime(intentFeedMaxAwait))
 	if err != nil {
 		return err
 	}

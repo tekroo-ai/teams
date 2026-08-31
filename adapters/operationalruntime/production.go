@@ -397,6 +397,47 @@ func (service *ProductionService) ReadStory(ctx context.Context, id kernel.UUIDv
 	return service.Store.ReadStoryProjection(ctx, id)
 }
 
+type InvocationStatus struct {
+	InvocationID            kernel.UUIDv7               `json:"invocation_id"`
+	Revision                uint64                      `json:"revision"`
+	State                   kernel.WorkInvocationState  `json:"state"`
+	TaskID                  kernel.UUIDv7               `json:"task_id"`
+	BudgetAccountID         kernel.UUIDv7               `json:"budget_account_id"`
+	LifecycleEpoch          uint64                      `json:"lifecycle_epoch"`
+	ScopeRevision           uint64                      `json:"scope_revision"`
+	ActorFQN                kernel.ActorFQN             `json:"actor_fqn"`
+	Execution               kernel.ExecutionTuple       `json:"execution"`
+	Purpose                 kernel.WorkPurpose          `json:"purpose"`
+	AttemptOrdinal          uint64                      `json:"attempt_ordinal"`
+	ConversationID          *string                     `json:"conversation_id"`
+	TerminalOutcome         *kernel.WorkInvocationState `json:"terminal_outcome"`
+	CancellationRequestedAt *time.Time                  `json:"cancellation_requested_at"`
+	LastEventID             kernel.UUIDv7               `json:"last_event_id"`
+}
+
+func (service *ProductionService) ReadInvocation(ctx context.Context, id kernel.UUIDv7) (InvocationStatus, bool, error) {
+	if service == nil || service.Store == nil || !id.Valid() {
+		return InvocationStatus{}, false, application.ErrInvalidConfiguration
+	}
+	current, err := service.Store.LoadOperationalExecution(ctx, id)
+	if errors.Is(err, application.ErrInvalidOperationalExecution) {
+		return InvocationStatus{}, false, nil
+	}
+	if err != nil {
+		return InvocationStatus{}, false, err
+	}
+	invocation := current.Invocation
+	return InvocationStatus{
+		InvocationID: invocation.ID, Revision: invocation.Revision, State: invocation.State,
+		TaskID: invocation.TaskID, BudgetAccountID: invocation.BudgetAccountID,
+		LifecycleEpoch: invocation.LifecycleEpoch, ScopeRevision: invocation.ScopeRevision,
+		ActorFQN: invocation.ActorFQN, Execution: invocation.Execution, Purpose: invocation.Purpose,
+		AttemptOrdinal: invocation.AttemptOrdinal, ConversationID: invocation.ConversationID,
+		TerminalOutcome: invocation.TerminalOutcome, CancellationRequestedAt: invocation.CancellationRequestedAt,
+		LastEventID: invocation.LastEventID,
+	}, true, nil
+}
+
 func (service *ProductionService) OperatorCredentials() (string, time.Duration, int64) {
 	if service == nil {
 		return "", 0, 0

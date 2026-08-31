@@ -65,7 +65,7 @@ func TestHandlerSubmitsStrictCommandAndReadsProjections(t *testing.T) {
 	if response.Code != http.StatusOK || service.submissions != 1 {
 		t.Fatalf("command status=%d submissions=%d", response.Code, service.submissions)
 	}
-	for _, path := range []string{"/v1/tasks/00000000-0000-7000-8000-000000000001", "/v1/stories/00000000-0000-7000-8000-000000000002"} {
+	for _, path := range []string{"/v1/tasks/00000000-0000-7000-8000-000000000001", "/v1/stories/00000000-0000-7000-8000-000000000002", "/v1/invocations/00000000-0000-7000-8000-000000000003"} {
 		response = httptest.NewRecorder()
 		handler.ServeHTTP(response, authorizedRequest(http.MethodGet, path, nil))
 		if response.Code != http.StatusOK {
@@ -143,6 +143,10 @@ func (service *operatorService) ReadTask(context.Context, kernel.UUIDv7) (mongo.
 
 func (service *operatorService) ReadStory(context.Context, kernel.UUIDv7) (mongo.StoryProjection, bool, error) {
 	return mongo.StoryProjection{Kind: "story_projection", ID: "00000000-0000-7000-8000-000000000002"}, true, nil
+}
+
+func (service *operatorService) ReadInvocation(context.Context, kernel.UUIDv7) (operationalruntime.InvocationStatus, bool, error) {
+	return operationalruntime.InvocationStatus{InvocationID: "00000000-0000-7000-8000-000000000003", Revision: 2, State: kernel.InvocationStarted, LastEventID: "00000000-0000-7000-8000-000000000004"}, true, nil
 }
 
 var _ Service = (*operatorService)(nil)

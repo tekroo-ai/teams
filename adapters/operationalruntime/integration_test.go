@@ -205,24 +205,36 @@ func newIntegratedFixture(t *testing.T, now time.Time, base int, actor kernel.Ac
 	}
 }
 
+type integratedCommandSubmitter func(*testing.T, kernel.KernelCommand) kernel.CommandReceipt
+
+func runtimeCommandSubmitter(runtime *Runtime, provenance kernel.ProvenanceBasis) integratedCommandSubmitter {
+	return func(t *testing.T, command kernel.KernelCommand) kernel.CommandReceipt {
+		return applied(t, runtime, command, provenance)
+	}
+}
+
 func (f *integratedFixture) createAuthoritativeTask(t *testing.T, runtime *Runtime, provenance kernel.ProvenanceBasis) {
+	f.createAuthoritativeTaskWith(t, runtimeCommandSubmitter(runtime, provenance))
+}
+
+func (f *integratedFixture) createAuthoritativeTaskWith(t *testing.T, submit integratedCommandSubmitter) {
 	t.Helper()
 	story := f.command(t, "tekroo.command.story.create", kernel.SchemaVersion, kernel.AggregateStory, f.storyID, f.human, 0,
 		map[string]any{"title": "Integrated runtime", "description": "Execute one authorized task.", "acceptance_criteria": []string{"authorized work completes"}}, nil, nil, nil)
-	storyReceipt := applied(t, runtime, story, provenance)
+	storyReceipt := submit(t, story)
 
 	evidence := f.command(t, "tekroo.command.evidence.register", kernel.SchemaVersion, kernel.AggregateEvidence, f.evidenceID, f.human, 0,
 		map[string]any{"access_partition": "engineering", "availability": "AVAILABLE", "byte_length": 2, "canonical_digest": nil, "computation": nil, "deletion_tombstone": nil, "evidence_kind": "TEST_RESULT", "integrity_state": "DIGEST_VERIFIED", "locator": "artifact://phase4/step7/precondition", "locator_immutable": true, "media_type": "application/json", "producing_component": "phase4-step7", "producing_version": "1", "redacts": nil, "retention_policy": "phase4-step7", "sensitivity": "INTERNAL", "sha256": digestByte('e'), "source_evidence_ids": []kernel.UUIDv7{}, "source_timestamp": nil, "transport_provenance": "teams://phase4-step7"}, nil, nil, nil)
-	applied(t, runtime, evidence, provenance)
+	submit(t, evidence)
 	evidenceRefs := []kernel.EvidenceRef{{EvidenceID: f.evidenceID, SHA256: digestByte('e')}}
 
 	execution := f.command(t, "tekroo.command.execution.register", kernel.SchemaVersion, kernel.AggregateExecution, f.executionID, f.service, 0,
 		map[string]any{"actor_fqn": f.actor, "execution_id": f.executionID, "fencing_epoch": 1, "runtime_identity": f.runtimeDigest}, nil, nil, nil)
-	applied(t, runtime, execution, provenance)
+	submit(t, execution)
 
 	task := f.command(t, "tekroo.command.task.create", kernel.SchemaVersion, kernel.AggregateTask, f.taskID, f.human, 0,
 		map[string]any{"story_id": f.storyID, "title": f.title, "description": f.description, "acceptance_criteria": f.acceptanceCriteria, "depends_on": []kernel.UUIDv7{}}, []kernel.DagParent{{ParentEventID: storyReceipt.EventIDs[0], EdgeKind: kernel.EdgeCausal}}, nil, nil)
-	taskReceipt := applied(t, runtime, task, provenance)
+	taskReceipt := submit(t, task)
 	f.taskRevision, f.lastTaskEvent = 1, taskReceipt.EventIDs[0]
 
 	profile := map[string]any{
@@ -234,8 +246,8 @@ func (f *integratedFixture) createAuthoritativeTask(t *testing.T, runtime *Runti
 		"budgets":                  map[string]any{"attempt_limit": 2, "review_round_limit": 2, "promotion_limit": 1, "escalation_limit": 1, "deadline_at": f.now.Add(2 * time.Hour)},
 		"classification_authority": f.human, "classification_evidence_ids": []kernel.UUIDv7{f.evidenceID}, "supersedes_profile_id": nil,
 	}
-	f.applyTask(t, runtime, provenance, "tekroo.command.task.bind-work-profile", kernel.SchemaVersion, f.policy, profile, evidenceRefs, nil)
-	f.applyTask(t, runtime, provenance, "tekroo.command.task.mark-ready", kernel.SchemaVersion, f.policy, map[string]any{"dependency_event_ids": []kernel.UUIDv7{}, "readiness_policy_revision": 1}, nil, nil)
+	f.applyTask(t, submit, "tekroo.command.task.bind-work-profile", kernel.SchemaVersion, f.policy, profile, evidenceRefs, nil)
+	f.applyTask(t, submit, "tekroo.command.task.mark-ready", kernel.SchemaVersion, f.policy, map[string]any{"dependency_event_ids": []kernel.UUIDv7{}, "readiness_policy_revision": 1}, nil, nil)
 
 	assignment := map[string]any{
 		"assignment_id": f.assignmentID, "task_id": f.taskID, "expected_task_revision": f.taskRevision,
@@ -247,9 +259,9 @@ func (f *integratedFixture) createAuthoritativeTask(t *testing.T, runtime *Runti
 		"hard_constraint_results": []map[string]any{{"constraint_id": "local-qualified-runtime", "outcome": "PASS", "evidence_ids": []kernel.UUIDv7{f.evidenceID}}},
 		"selection_reasons":       []string{"exact accepted local runtime"}, "evidence_ids": []kernel.UUIDv7{f.evidenceID},
 	}
-	f.applyTask(t, runtime, provenance, "tekroo.command.task.authorize-qualified-assignment", kernel.SchemaVersion, f.policy, assignment, evidenceRefs, nil)
-	f.applyActorTask(t, runtime, provenance, "tekroo.command.task.acquire-ownership", map[string]any{"owner_fqn": f.actor, "expected_ownership_version": 0})
-	f.applyActorTask(t, runtime, provenance, "tekroo.command.task.activate", map[string]any{"owner_fqn": f.actor, "ownership_version": 1})
+	f.applyTask(t, submit, "tekroo.command.task.authorize-qualified-assignment", kernel.SchemaVersion, f.policy, assignment, evidenceRefs, nil)
+	f.applyActorTask(t, submit, "tekroo.command.task.acquire-ownership", map[string]any{"owner_fqn": f.actor, "expected_ownership_version": 0})
+	f.applyActorTask(t, submit, "tekroo.command.task.activate", map[string]any{"owner_fqn": f.actor, "ownership_version": 1})
 
 	limits := make(kernel.PurposeCounters)
 	for _, purpose := range kernel.AllWorkPurposes {
@@ -260,17 +272,21 @@ func (f *integratedFixture) createAuthoritativeTask(t *testing.T, runtime *Runti
 		map[string]any{"budget_account_id": f.budgetID, "root_work": map[string]any{"kind": "story", "id": f.storyID}, "lifecycle_epoch": 1, "policy_revision": 1, "policy_digest": f.budgetPolicyDigest, "model_invocation_limit": 2, "purpose_limits": limits, "deadline_at": f.now.Add(2 * time.Hour), "evidence_ids": []kernel.UUIDv7{f.evidenceID}, "authority": f.policy},
 		[]kernel.DagParent{{ParentEventID: storyReceipt.EventIDs[0], EdgeKind: kernel.EdgeDerivation}}, evidenceRefs,
 		[]kernel.AggregatePrecondition{{Aggregate: kernel.AggregateRef{Kind: kernel.AggregateStory, ID: f.storyID}, Expected: kernel.NewExpectedRevision(1)}})
-	budgetReceipt := applied(t, runtime, budget, provenance)
+	budgetReceipt := submit(t, budget)
 	f.budgetRevision, f.lastBudgetEvent = 1, budgetReceipt.EventIDs[0]
 
-	f.applyTask(t, runtime, provenance, "tekroo.command.task.bind-work-budget", kernel.OperationalSchemaVersion, f.policy,
+	f.applyTask(t, submit, "tekroo.command.task.bind-work-budget", kernel.OperationalSchemaVersion, f.policy,
 		map[string]any{"task_id": f.taskID, "budget_account_id": f.budgetID, "expected_task_revision": f.taskRevision, "lifecycle_epoch": 1, "scope_revision": 1, "task_model_invocation_limit": 2, "purpose_limits": limits, "evidence_ids": []kernel.UUIDv7{f.evidenceID}}, evidenceRefs,
 		[]kernel.AggregatePrecondition{{Aggregate: kernel.AggregateRef{Kind: kernel.AggregateWorkBudget, ID: f.budgetID}, Expected: kernel.NewExpectedRevision(f.budgetRevision)}})
-	f.applyTask(t, runtime, provenance, "tekroo.command.task.bind-operational-scope", kernel.OperationalSchemaVersion, f.policy,
+	f.applyTask(t, submit, "tekroo.command.task.bind-operational-scope", kernel.OperationalSchemaVersion, f.policy,
 		map[string]any{"task_id": f.taskID, "expected_task_revision": f.taskRevision, "lifecycle_epoch": 1, "scope_revision": 1, "owner_fqn": f.actor, "execution_id": f.executionID, "fencing_epoch": 1, "workspace_id": f.workspaceID, "worktree_id": f.worktreeID, "branch": "phase4/step7", "baseline_sha": f.baselineSHA, "writable_paths": f.writablePaths, "interface_constraint_evidence_ids": []kernel.UUIDv7{f.evidenceID}}, evidenceRefs, nil)
 }
 
 func (f *integratedFixture) authorizeInvocation(t *testing.T, runtime *Runtime, provenance kernel.ProvenanceBasis) {
+	f.authorizeInvocationWith(t, runtimeCommandSubmitter(runtime, provenance))
+}
+
+func (f *integratedFixture) authorizeInvocationWith(t *testing.T, submit integratedCommandSubmitter) {
 	t.Helper()
 	payload := map[string]any{
 		"invocation_id": f.invocationID, "task_id": f.taskID, "budget_account_id": f.budgetID,
@@ -293,7 +309,7 @@ func (f *integratedFixture) authorizeInvocation(t *testing.T, runtime *Runtime, 
 			{Aggregate: kernel.AggregateRef{Kind: kernel.AggregateWorkBudget, ID: f.budgetID}, Expected: kernel.NewExpectedRevision(f.budgetRevision)},
 		})
 	command.IdempotencyKey = "phase4-step7-invocation"
-	applied(t, runtime, command, provenance)
+	submit(t, command)
 }
 
 func (f *integratedFixture) requestCancellation(t *testing.T, runtime *Runtime, store *mongo.Store, provenance kernel.ProvenanceBasis, reason string) {
@@ -314,23 +330,23 @@ func (f *integratedFixture) requestCancellation(t *testing.T, runtime *Runtime, 
 	applied(t, runtime, command, provenance)
 }
 
-func (f *integratedFixture) applyTask(t *testing.T, runtime *Runtime, provenance kernel.ProvenanceBasis, commandType, version string, authority kernel.PrincipalRef, payload any, evidence []kernel.EvidenceRef, preconditions []kernel.AggregatePrecondition) {
+func (f *integratedFixture) applyTask(t *testing.T, submit integratedCommandSubmitter, commandType, version string, authority kernel.PrincipalRef, payload any, evidence []kernel.EvidenceRef, preconditions []kernel.AggregatePrecondition) {
 	t.Helper()
 	command := f.command(t, commandType, version, kernel.AggregateTask, f.taskID, authority, f.taskRevision, payload,
 		[]kernel.DagParent{{ParentEventID: f.lastTaskEvent, EdgeKind: kernel.EdgeCausal}}, evidence, preconditions)
-	receipt := applied(t, runtime, command, provenance)
+	receipt := submit(t, command)
 	f.taskRevision++
 	f.lastTaskEvent = receipt.EventIDs[0]
 }
 
-func (f *integratedFixture) applyActorTask(t *testing.T, runtime *Runtime, provenance kernel.ProvenanceBasis, commandType string, payload any) {
+func (f *integratedFixture) applyActorTask(t *testing.T, submit integratedCommandSubmitter, commandType string, payload any) {
 	t.Helper()
 	command := f.command(t, commandType, kernel.SchemaVersion, kernel.AggregateTask, f.taskID, kernel.PrincipalRef{Kind: kernel.PrincipalActor, ID: string(f.actor)}, f.taskRevision, payload,
 		[]kernel.DagParent{{ParentEventID: f.lastTaskEvent, EdgeKind: kernel.EdgeCausal}}, nil, nil)
 	execution := kernel.ExecutionTuple{ExecutionID: f.executionID, FencingEpoch: 1}
 	command.ActorFQN = &f.actor
 	command.Execution = &execution
-	receipt := applied(t, runtime, command, provenance)
+	receipt := submit(t, command)
 	f.taskRevision++
 	f.lastTaskEvent = receipt.EventIDs[0]
 }
@@ -389,11 +405,12 @@ func integratedPolicy() kernel.AuthorizationPolicy {
 	return kernel.AuthorizationPolicy{
 		PolicyDigest: digestByte('9'), Revision: 1,
 		Grants: []kernel.AuthorityGrant{
-			{GrantDigest: digestByte('a'), Grantee: kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "principal"}, Scope: kernel.AuthorityScope{CommandTypes: []string{"tekroo.command.story.create", "tekroo.command.task.create", "tekroo.command.evidence.register", "tekroo.command.work-invocation.request-cancellation"}, TargetKinds: []kernel.AggregateKind{kernel.AggregateStory, kernel.AggregateTask, kernel.AggregateEvidence, kernel.AggregateWorkInvocation}, CanReadTarget: true}},
-			{GrantDigest: digestByte('b'), Grantee: kernel.PrincipalRef{Kind: kernel.PrincipalPolicy, ID: "teams-admission-policy"}, Scope: kernel.AuthorityScope{CommandTypes: []string{"tekroo.command.task.bind-work-profile", "tekroo.command.task.mark-ready", "tekroo.command.task.authorize-qualified-assignment", "tekroo.command.work-budget.create", "tekroo.command.task.bind-work-budget", "tekroo.command.task.bind-operational-scope", "tekroo.command.work-invocation.authorize", "tekroo.command.work-invocation.expire"}, TargetKinds: []kernel.AggregateKind{kernel.AggregateTask, kernel.AggregateWorkBudget, kernel.AggregateWorkInvocation}, CanReadTarget: true}},
+			{GrantDigest: digestByte('a'), Grantee: kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "principal"}, Scope: kernel.AuthorityScope{CommandTypes: []string{"tekroo.command.story.create", "tekroo.command.story.begin-planning", "tekroo.command.story.authorize", "tekroo.command.story.activate", "tekroo.command.task.create", "tekroo.command.evidence.register", "tekroo.command.work-invocation.request-cancellation", "tekroo.command.story.request-completion", "tekroo.command.story.approve-release", "tekroo.command.story.request-acceptance"}, TargetKinds: []kernel.AggregateKind{kernel.AggregateStory, kernel.AggregateTask, kernel.AggregateEvidence, kernel.AggregateWorkInvocation}, CanReadTarget: true}},
+			{GrantDigest: digestByte('b'), Grantee: kernel.PrincipalRef{Kind: kernel.PrincipalPolicy, ID: "teams-admission-policy"}, Scope: kernel.AuthorityScope{CommandTypes: []string{"tekroo.command.task.bind-work-profile", "tekroo.command.task.mark-ready", "tekroo.command.task.authorize-qualified-assignment", "tekroo.command.work-budget.create", "tekroo.command.task.bind-work-budget", "tekroo.command.task.bind-operational-scope", "tekroo.command.work-invocation.authorize", "tekroo.command.work-invocation.expire", "tekroo.command.completion-review.open", "tekroo.command.completion-review.finalize", "tekroo.command.release-plan.create", "tekroo.command.release-plan.finalize"}, TargetKinds: []kernel.AggregateKind{kernel.AggregateTask, kernel.AggregateStory, kernel.AggregateCompletionReview, kernel.AggregateReleasePlan, kernel.AggregateWorkBudget, kernel.AggregateWorkInvocation}, CanReadTarget: true}},
 			{GrantDigest: digestByte('c'), Grantee: kernel.PrincipalRef{Kind: kernel.PrincipalService, ID: "teams-operational-runtime"}, Scope: kernel.AuthorityScope{CommandTypes: []string{"tekroo.command.execution.register", "tekroo.command.evidence.register", "tekroo.command.work-invocation.claim", "tekroo.command.work-invocation.record-started", "tekroo.command.work-invocation.record-terminal"}, TargetKinds: []kernel.AggregateKind{kernel.AggregateExecution, kernel.AggregateEvidence, kernel.AggregateWorkInvocation}, CanReadTarget: true}},
-			{GrantDigest: digestByte('d'), Grantee: kernel.PrincipalRef{Kind: kernel.PrincipalActor, ID: "teams::coder-1"}, Scope: kernel.AuthorityScope{CommandTypes: []string{"tekroo.command.task.acquire-ownership", "tekroo.command.task.activate"}, TargetKinds: []kernel.AggregateKind{kernel.AggregateTask}, CanReadTarget: true}},
+			{GrantDigest: digestByte('d'), Grantee: kernel.PrincipalRef{Kind: kernel.PrincipalActor, ID: "teams::coder-1"}, Scope: kernel.AuthorityScope{CommandTypes: []string{"tekroo.command.task.acquire-ownership", "tekroo.command.task.activate", "tekroo.command.task.request-completion"}, TargetKinds: []kernel.AggregateKind{kernel.AggregateTask}, CanReadTarget: true}},
 			{GrantDigest: digestByte('e'), Grantee: kernel.PrincipalRef{Kind: kernel.PrincipalActor, ID: "teams::coder-2"}, Scope: kernel.AuthorityScope{CommandTypes: []string{"tekroo.command.task.acquire-ownership", "tekroo.command.task.activate"}, TargetKinds: []kernel.AggregateKind{kernel.AggregateTask}, CanReadTarget: true}},
+			{GrantDigest: digestByte('1'), Grantee: kernel.PrincipalRef{Kind: kernel.PrincipalService, ID: "validation-service"}, Scope: kernel.AuthorityScope{CommandTypes: []string{"tekroo.command.completion-review.record-result"}, TargetKinds: []kernel.AggregateKind{kernel.AggregateCompletionReview}, CanReadTarget: true}},
 		},
 	}
 }
@@ -401,6 +418,7 @@ func integratedPolicy() kernel.AuthorizationPolicy {
 type integratedConversation struct {
 	workspace, requestDigest, prompt string
 	created, submitted, finished     bool
+	interrupted                      bool
 	readyAt                          time.Time
 }
 
@@ -408,6 +426,7 @@ type integratedOpenHands struct {
 	t             *testing.T
 	mu            sync.Mutex
 	conversations map[string]*integratedConversation
+	delays        map[string]time.Duration
 	active        int
 	peakActive    int
 }
@@ -454,6 +473,9 @@ func (server *integratedOpenHands) serveHTTP(writer http.ResponseWriter, request
 		if conversation.finished {
 			status = "finished"
 		}
+		if conversation.interrupted {
+			status = "paused"
+		}
 		writeIntegratedJSON(writer, map[string]any{"id": conversationID, "execution_status": status, "created_at": time.Now().UTC(), "updated_at": time.Now().UTC(), "workspace": map[string]any{"kind": "LocalWorkspace", "working_dir": conversation.workspace}, "tags": map[string]string{"tekrooinvocation": conversationID, "tekroorequest": conversation.requestDigest}})
 		return
 	}
@@ -474,13 +496,25 @@ func (server *integratedOpenHands) serveHTTP(writer http.ResponseWriter, request
 		conversation.prompt = payload.Content[0].Text
 		if !conversation.submitted {
 			conversation.submitted = true
-			conversation.readyAt = time.Now().Add(50 * time.Millisecond)
+			delay := 50 * time.Millisecond
+			if configured := server.delays[conversationID]; configured > 0 {
+				delay = configured
+			}
+			conversation.readyAt = time.Now().Add(delay)
 			server.active++
 			if server.active > server.peakActive {
 				server.peakActive = server.active
 			}
 		}
 		writeIntegratedJSON(writer, map[string]any{"accepted": true})
+		return
+	}
+	if request.Method == http.MethodPost && len(parts) == 4 && parts[3] == "interrupt" {
+		if conversation.submitted && !conversation.finished {
+			conversation.interrupted = true
+			server.active--
+		}
+		writer.WriteHeader(http.StatusNoContent)
 		return
 	}
 	if request.Method == http.MethodGet && len(parts) == 5 && parts[3] == "events" && parts[4] == "search" {
@@ -501,7 +535,7 @@ func (server *integratedOpenHands) serveHTTP(writer http.ResponseWriter, request
 }
 
 func (server *integratedOpenHands) refresh(conversation *integratedConversation) {
-	if conversation.submitted && !conversation.finished && !time.Now().Before(conversation.readyAt) {
+	if conversation.submitted && !conversation.finished && !conversation.interrupted && !time.Now().Before(conversation.readyAt) {
 		conversation.finished = true
 		server.active--
 	}

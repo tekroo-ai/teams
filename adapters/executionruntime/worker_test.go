@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/tekroo-ai/teams/adapters/mongo"
 	"github.com/tekroo-ai/teams/application"
 	"github.com/tekroo-ai/teams/kernel"
 )
@@ -81,6 +82,14 @@ func TestControlPausesAdmissionWithoutCancellingAndResumes(t *testing.T) {
 	}
 }
 
+func TestWorkerTreatsAnIdlePollAsHealthy(t *testing.T) {
+	runtime := &workerRuntime{nextErrors: []error{mongo.ErrIntentNotFound, context.Canceled}}
+	worker := newTestWorker(t, runtime, 1)
+	if err := worker.Run(context.Background()); !errors.Is(err, context.Canceled) {
+		t.Fatalf("run error = %v", err)
+	}
+}
+
 type workerRuntime struct {
 	intent       kernel.OutboxIntent
 	results      []application.OperationalExecutionResult
@@ -91,9 +100,15 @@ type workerRuntime struct {
 	resolveCalls int
 	yieldCalls   int
 	resolution   string
+	nextErrors   []error
 }
 
 func (runtime *workerRuntime) Next(context.Context) (kernel.OutboxIntent, error) {
+	if len(runtime.nextErrors) > 0 {
+		err := runtime.nextErrors[0]
+		runtime.nextErrors = runtime.nextErrors[1:]
+		return kernel.OutboxIntent{}, err
+	}
 	return runtime.intent, nil
 }
 
