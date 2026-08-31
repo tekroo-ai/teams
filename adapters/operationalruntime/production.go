@@ -124,11 +124,12 @@ type ProductionProjection struct {
 }
 
 type ProductionOrganization struct {
-	ManifestFile           string                `json:"manifest_file"`
-	ManifestDigest         kernel.Digest         `json:"manifest_digest"`
-	Publishers             []ProductionPublisher `json:"trusted_publishers"`
-	ReconciliationInterval string                `json:"reconciliation_interval"`
-	MaximumRestarts        uint32                `json:"maximum_restarts"`
+	ManifestFile            string                `json:"manifest_file"`
+	ManifestDigest          kernel.Digest         `json:"manifest_digest"`
+	Publishers              []ProductionPublisher `json:"trusted_publishers"`
+	ReconciliationInterval  string                `json:"reconciliation_interval"`
+	MaximumRestarts         uint32                `json:"maximum_restarts"`
+	MaximumDeliveryAttempts uint32                `json:"maximum_delivery_attempts"`
 }
 
 type ProductionPublisher struct {
@@ -256,7 +257,7 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 		return resolvedProductionConfig{}, err
 	}
 	roleReconciliation, err := positiveDuration("organization.reconciliation_interval", config.Organization.ReconciliationInterval)
-	if err != nil || config.Organization.MaximumRestarts == 0 {
+	if err != nil || config.Organization.MaximumRestarts == 0 || config.Organization.MaximumDeliveryAttempts == 0 {
 		return resolvedProductionConfig{}, invalidConfig("organization recovery policy is invalid")
 	}
 	if config.OpenHands.MaximumPages == 0 || config.OpenHands.MaximumPages > 1000 || config.OpenHands.MaximumEvidenceBytes <= 0 || config.OpenHands.MaximumEvidenceBytes > 16<<20 || config.Execution.ConsumerID == "" || len(config.Execution.ConsumerID) > 256 || config.Execution.MaximumBriefBytes <= 0 || config.Execution.MaximumBriefBytes > 1<<20 || config.Execution.PolicyRevision == 0 || config.Evidence.PolicyRevision == 0 || config.Evidence.ProducingVersion == "" || config.Evidence.RetentionPolicy == "" || config.Worker.MaximumReconciliations == 0 || config.Worker.MaximumConcurrentInvocations == 0 || config.Worker.MaximumConcurrentInvocations > 64 || reconciliation >= leaseDuration {
@@ -325,24 +326,27 @@ type ProductionService struct {
 	Controller  *Controller
 	RoleHost    *organization.Host
 	RoleRuntime *organization.InProcessRuntime
+	MessageBus  *organization.MessageBus
+	RoleInbox   *organization.RoleInbox
 
-	projectionInterval  time.Duration
-	projectionTimeout   time.Duration
-	recoveryInterval    time.Duration
-	recoveryTimeout     time.Duration
-	recoveryAttempts    uint32
-	mu                  sync.Mutex
-	projectionCancel    context.CancelFunc
-	projectionDone      chan error
-	recoveryDone        chan error
-	roleRecoveryDone    chan error
-	failures            chan error
-	provenance          kernel.ProvenanceBasis
-	operatorToken       string
-	operatorTimeout     time.Duration
-	operatorMaxBody     int64
-	roleReconciliation  time.Duration
-	roleMaximumRestarts uint32
+	projectionInterval     time.Duration
+	projectionTimeout      time.Duration
+	recoveryInterval       time.Duration
+	recoveryTimeout        time.Duration
+	recoveryAttempts       uint32
+	mu                     sync.Mutex
+	projectionCancel       context.CancelFunc
+	projectionDone         chan error
+	recoveryDone           chan error
+	roleRecoveryDone       chan error
+	failures               chan error
+	provenance             kernel.ProvenanceBasis
+	operatorToken          string
+	operatorTimeout        time.Duration
+	operatorMaxBody        int64
+	roleReconciliation     time.Duration
+	roleMaximumRestarts    uint32
+	messageMaximumAttempts uint32
 }
 
 func NewProductionService(ctx context.Context, config ProductionConfig) (*ProductionService, error) {
@@ -403,10 +407,13 @@ func NewProductionService(ctx context.Context, config ProductionConfig) (*Produc
 		_ = runtime.Close(context.WithoutCancel(ctx))
 		return fail(err)
 	}
-	roleRuntime, err := organization.NewInProcessRuntime(organization.RoleWorkerFunc(func(ctx context.Context, _ organization.StartRoleRequest) error {
-		<-ctx.Done()
-		return ctx.Err()
-	}))
+	roleInbox := organization.NewRoleInbox()
+	messageBus, err := organization.NewMessageBus(store, store)
+	if err != nil {
+		_ = runtime.Close(context.WithoutCancel(ctx))
+		return fail(err)
+	}
+	roleRuntime, err := organization.NewInProcessRuntime(&organizationalRoleWorker{store: store, inbox: roleInbox, pollInterval: resolved.pollInterval, openTimeout: resolved.leaseOperationTimeout})
 	if err != nil {
 		_ = runtime.Close(context.WithoutCancel(ctx))
 		return fail(err)
@@ -416,7 +423,7 @@ func NewProductionService(ctx context.Context, config ProductionConfig) (*Produc
 		_ = runtime.Close(context.WithoutCancel(ctx))
 		return fail(err)
 	}
-	return &ProductionService{Store: store, Runtime: runtime, Controller: controller, RoleHost: roleHost, RoleRuntime: roleRuntime, projectionInterval: resolved.projectionInterval, projectionTimeout: resolved.projectionTimeout, recoveryInterval: resolved.reconciliation, recoveryTimeout: resolved.leaseOperationTimeout, recoveryAttempts: config.Worker.MaximumReconciliations, failures: make(chan error, 4), provenance: resolved.provenance, operatorToken: resolved.operatorBearerToken, operatorTimeout: resolved.operatorTimeout, operatorMaxBody: config.Operator.MaximumBodyBytes, roleReconciliation: resolved.roleReconciliation, roleMaximumRestarts: config.Organization.MaximumRestarts}, nil
+	return &ProductionService{Store: store, Runtime: runtime, Controller: controller, RoleHost: roleHost, RoleRuntime: roleRuntime, MessageBus: messageBus, RoleInbox: roleInbox, projectionInterval: resolved.projectionInterval, projectionTimeout: resolved.projectionTimeout, recoveryInterval: resolved.reconciliation, recoveryTimeout: resolved.leaseOperationTimeout, recoveryAttempts: config.Worker.MaximumReconciliations, failures: make(chan error, 4), provenance: resolved.provenance, operatorToken: resolved.operatorBearerToken, operatorTimeout: resolved.operatorTimeout, operatorMaxBody: config.Operator.MaximumBodyBytes, roleReconciliation: resolved.roleReconciliation, roleMaximumRestarts: config.Organization.MaximumRestarts, messageMaximumAttempts: config.Organization.MaximumDeliveryAttempts}, nil
 }
 
 func (service *ProductionService) Submit(ctx context.Context, command kernel.KernelCommand) (kernel.CommandReceipt, error) {
@@ -555,6 +562,27 @@ func (service *ProductionService) ResumeRole(ctx context.Context, actor kernel.A
 		return organization.RoleInstanceState{}, application.ErrInvalidConfiguration
 	}
 	return service.RoleHost.Resume(ctx, actor)
+}
+
+func (service *ProductionService) SendMessage(ctx context.Context, message organization.OrganizationalMessage) error {
+	if service == nil || service.MessageBus == nil {
+		return application.ErrInvalidConfiguration
+	}
+	return service.MessageBus.Send(ctx, message)
+}
+
+func (service *ProductionService) SendMessageFanout(ctx context.Context, messages []organization.OrganizationalMessage) error {
+	if service == nil || service.MessageBus == nil {
+		return application.ErrInvalidConfiguration
+	}
+	return service.MessageBus.SendFanout(ctx, messages)
+}
+
+func (service *ProductionService) RoleInboxSnapshot(actor kernel.ActorFQN) []organization.OrganizationalMessage {
+	if service == nil || service.RoleInbox == nil {
+		return nil
+	}
+	return service.RoleInbox.Snapshot(actor)
 }
 
 func (service *ProductionService) Start(ctx context.Context) error {
@@ -710,7 +738,11 @@ func (service *ProductionService) runRoleRecovery(ctx context.Context) error {
 	attempts := make(map[kernel.ActorFQN]uint32)
 	for {
 		operationContext, cancel := context.WithTimeout(ctx, service.recoveryTimeout)
-		roster, err := service.RoleHost.Roster(operationContext)
+		_, _, err := service.MessageBus.Sweep(operationContext, time.Now().UTC(), service.messageMaximumAttempts)
+		var roster []organization.RoleInstanceState
+		if err == nil {
+			roster, err = service.RoleHost.Roster(operationContext)
+		}
 		if err == nil {
 			for _, role := range roster {
 				if role.Status == organization.RoleStopped {

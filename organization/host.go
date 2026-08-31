@@ -355,6 +355,39 @@ func (host *Host) Roster(ctx context.Context) ([]RoleInstanceState, error) {
 	return states, nil
 }
 
+// ResolveRoleRecipients converts a role-wide address into currently active,
+// exact actor identities. It never starts a role; launch remains an explicit
+// lifecycle operation.
+func (host *Host) ResolveRoleRecipients(ctx context.Context, role string) ([]kernel.ActorFQN, error) {
+	if !namePattern.MatchString(role) {
+		return nil, ErrRoleNotConfigured
+	}
+	configured := false
+	for _, candidate := range host.team.Manifest.Roles {
+		if candidate.Role == role {
+			configured = true
+			break
+		}
+	}
+	if !configured {
+		return nil, ErrRoleNotConfigured
+	}
+	roster, err := host.Roster(ctx)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]kernel.ActorFQN, 0)
+	for _, state := range roster {
+		if state.Role == role && state.Status == RoleIdle {
+			result = append(result, state.ActorFQN)
+		}
+	}
+	if len(result) == 0 {
+		return nil, ErrRoleNotRunning
+	}
+	return result, nil
+}
+
 func (host *Host) StartEager(ctx context.Context) ([]RoleInstanceState, error) {
 	result := make([]RoleInstanceState, 0)
 	for _, role := range host.team.Roles {

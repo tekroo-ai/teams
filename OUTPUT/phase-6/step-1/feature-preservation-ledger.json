@@ -87,6 +87,25 @@
         "V4:adapters/mongo/role_store_test.go",
         "V4:adapters/operationalruntime/production_test.go"
       ]
+    },
+    "step3": {
+      "status": "COMPLETE",
+      "featureIds": ["F016", "F017", "F018", "F019", "F020", "F021", "F022", "F023", "F049", "F050"],
+      "productionEvidence": [
+        "V4:organization/message.go",
+        "V4:organization/message_memory_store.go",
+        "V4:organization/inbox.go",
+        "V4:adapters/mongo/message_store.go",
+        "V4:adapters/mongo/message_feed.go",
+        "V4:adapters/operationalruntime/role_worker.go",
+        "V4:adapters/operationalruntime/production.go"
+      ],
+      "testEvidence": [
+        "V4:organization/message_test.go",
+        "V4:adapters/mongo/message_store_integration_test.go",
+        "V4:organization/host_test.go"
+      ],
+      "contractBinding": "Included in the single consolidated 0.9.0 successor package before Phase 6 completion"
     }
   },
   "features": [

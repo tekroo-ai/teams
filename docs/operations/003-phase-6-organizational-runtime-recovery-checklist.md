@@ -90,10 +90,10 @@ No row may be removed. Add rows when source inspection discovers more.
 | Stable FQN and process replacement | [x] | [x] | [x] | [x] | [x] | [x] |
 | Agent lifecycle and instance ceilings | [x] | [x] | [x] | [x] | [x] | [x] |
 | Worktree and local continuity | [x] | [x] | [x] | [x] | [x] | [x] |
-| Directed message catalogue | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| MongoDB change-stream wakeup | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| Claims, leases, redelivery, dead letters | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| Exact multi-recipient fanout | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| Directed message catalogue | [x] | [x] | [x] | [x] | [x] | [x] |
+| MongoDB change-stream wakeup | [x] | [x] | [x] | [x] | [x] | [x] |
+| Claims, leases, redelivery, dead letters | [x] | [x] | [x] | [x] | [x] | [x] |
+| Exact multi-recipient fanout | [x] | [x] | [x] | [x] | [x] | [x] |
 | Feature intake | [x] | [x] | [x] | [x] | [ ] | [ ] |
 | Stories and specifications | [x] | [x] | [x] | [x] | [ ] | [ ] |
 | Planning and task decomposition | [x] | [x] | [x] | [x] | [ ] | [ ] |
@@ -133,22 +133,22 @@ No row may be removed. Add rows when source inspection discovers more.
 
 ## Step 3 — directed messaging and MongoDB wakeup
 
-- [ ] Implement versioned exact-FQN message envelopes.
-- [ ] Bind story/task/DAG, causation, correlation, and message-purpose identity.
-- [ ] Implement durable inbox, claims, leases, renewal, redelivery, and dead
+- [x] Implement versioned exact-FQN message envelopes.
+- [x] Bind story/task/DAG, causation, correlation, and message-purpose identity.
+- [x] Implement durable inbox, claims, leases, renewal, redelivery, and dead
       letters.
-- [ ] Open the change stream before backlog reconciliation.
-- [ ] Implement exact per-recipient fanout; do not use one-winner broadcast.
-- [ ] Resolve role-wide routing to exact actors before delivery.
-- [ ] Prohibit ordinary message delivery from launching a new agent.
-- [ ] Prohibit message receipt from directly invoking a model.
-- [ ] Preserve budget across role, message-type, handoff, restart, and child-task
+- [x] Open the change stream before backlog reconciliation.
+- [x] Implement exact per-recipient fanout; do not use one-winner broadcast.
+- [x] Resolve role-wide routing to exact actors before delivery.
+- [x] Prohibit ordinary message delivery from launching a new agent.
+- [x] Prohibit message receipt from directly invoking a model.
+- [x] Preserve budget across role, message-type, handoff, restart, and child-task
       changes.
-- [ ] Test crash recovery and duplicate delivery.
-- [ ] Test renamed-message and role-cycle loop attacks.
-- [ ] Test legitimate directed handoff and changed-evidence continuation.
-- [ ] Production-wire messaging and wakeup into `tekrood`.
-- [ ] Obtain Step 3 acceptance.
+- [x] Test crash recovery and duplicate delivery.
+- [x] Test renamed-message and role-cycle loop attacks.
+- [x] Test legitimate directed handoff and changed-evidence continuation.
+- [x] Production-wire messaging and wakeup into `tekrood`.
+- [x] Complete Step 3 under the principal's continuous-execution authority.
 
 ## Step 4 — operator MCP and CLI
 

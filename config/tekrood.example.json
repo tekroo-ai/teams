@@ -77,6 +77,7 @@
     "manifest_digest": "0000000000000000000000000000000000000000000000000000000000000000",
     "reconciliation_interval": "5s",
     "maximum_restarts": 3,
+    "maximum_delivery_attempts": 3,
     "trusted_publishers": [
       {
         "key_id": "tekroo-phase6-bootstrap",

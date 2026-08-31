@@ -116,6 +116,28 @@ func TestEnsureStartedReplacesStaleProcessWithoutChangingActorOrWorkspace(t *tes
 	}
 }
 
+func TestRoleWideResolutionNeverLaunchesAndReturnsOnlyExactActiveActors(t *testing.T) {
+	runtime := newFakeRoleRuntime()
+	host, err := NewHost(testLoadedTeam(), NewMemoryRoleStore(), runtime, fake.NewClock(time.Date(2026, 8, 31, 10, 0, 0, 0, time.UTC)), fake.NewIDSource(kernel.UUIDv7("00000000-0000-7000-8000-000000001007")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := host.ResolveRoleRecipients(context.Background(), "coder"); !errors.Is(err, ErrRoleNotRunning) {
+		t.Fatalf("inactive role resolution error=%v", err)
+	}
+	if len(runtime.observations) != 0 {
+		t.Fatalf("resolution launched a role: %+v", runtime.observations)
+	}
+	actor := kernel.ActorFQN("teams::coder-1")
+	if _, err := host.Start(context.Background(), actor); err != nil {
+		t.Fatal(err)
+	}
+	resolved, err := host.ResolveRoleRecipients(context.Background(), "coder")
+	if err != nil || len(resolved) != 1 || resolved[0] != actor {
+		t.Fatalf("resolved=%v err=%v", resolved, err)
+	}
+}
+
 func testLoadedTeam() LoadedTeam {
 	bundle := testBundle()
 	bundle.Signature = "signed-for-host-test"

@@ -213,7 +213,7 @@ func writeOrganizationFixture(t *testing.T, directory string) ProductionOrganiza
 	return ProductionOrganization{
 		ManifestFile: "team.json", ManifestDigest: kernel.Digest(hex.EncodeToString(manifestHash[:])),
 		Publishers:             []ProductionPublisher{{KeyID: "fixture-publisher", PublicKeyFile: "role-publisher.pub"}},
-		ReconciliationInterval: "100ms", MaximumRestarts: 3,
+		ReconciliationInterval: "100ms", MaximumRestarts: 3, MaximumDeliveryAttempts: 3,
 	}
 }
 
