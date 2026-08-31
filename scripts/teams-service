@@ -1,0 +1,194 @@
+#!/bin/sh
+
+set -eu
+
+usage() {
+  echo "usage: teams-service start|stop|restart|status --config ABSOLUTE_PATH --state-dir ABSOLUTE_PATH [--teamsd ABSOLUTE_PATH] [--teamsctl ABSOLUTE_PATH]" >&2
+  exit 2
+}
+
+[ "$#" -ge 1 ] || usage
+ACTION=$1
+shift
+
+CONFIG_PATH=
+STATE_DIR=
+TEAMSD_PATH=
+TEAMSCTL_PATH=
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --config)
+      [ "$#" -ge 2 ] || usage
+      CONFIG_PATH=$2
+      shift 2
+      ;;
+    --state-dir)
+      [ "$#" -ge 2 ] || usage
+      STATE_DIR=$2
+      shift 2
+      ;;
+    --teamsd)
+      [ "$#" -ge 2 ] || usage
+      TEAMSD_PATH=$2
+      shift 2
+      ;;
+    --teamsctl)
+      [ "$#" -ge 2 ] || usage
+      TEAMSCTL_PATH=$2
+      shift 2
+      ;;
+    *) usage ;;
+  esac
+done
+
+case "$ACTION" in
+  start|stop|restart|status) ;;
+  *) usage ;;
+esac
+
+case "$CONFIG_PATH" in /*) ;; *) usage ;; esac
+case "$STATE_DIR" in /*) ;; *) usage ;; esac
+
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+INSTALL_ROOT=$(dirname -- "$SCRIPT_DIR")
+[ -n "$TEAMSD_PATH" ] || TEAMSD_PATH=$INSTALL_ROOT/bin/teamsd
+[ -n "$TEAMSCTL_PATH" ] || TEAMSCTL_PATH=$INSTALL_ROOT/bin/teamsctl
+case "$TEAMSD_PATH" in /*) ;; *) usage ;; esac
+case "$TEAMSCTL_PATH" in /*) ;; *) usage ;; esac
+
+PID_FILE=$STATE_DIR/teamsd.pid
+LOG_FILE=$STATE_DIR/teamsd.log
+
+ensure_state_dir() {
+  /bin/mkdir -p "$STATE_DIR"
+  /bin/chmod 700 "$STATE_DIR"
+}
+
+read_pid() {
+  [ -f "$PID_FILE" ] || return 1
+  IFS= read -r SERVICE_PID < "$PID_FILE"
+  case "$SERVICE_PID" in
+    ''|*[!0-9]*) return 1 ;;
+  esac
+  [ "$SERVICE_PID" -gt 1 ] || return 1
+}
+
+process_is_ours() {
+  read_pid || return 1
+  /bin/kill -0 "$SERVICE_PID" 2>/dev/null || return 1
+  ACTUAL_COMMAND=$(/bin/ps -p "$SERVICE_PID" -o command=)
+  [ "$ACTUAL_COMMAND" = "$TEAMSD_PATH -config $CONFIG_PATH" ]
+}
+
+healthy() {
+  "$TEAMSCTL_PATH" -config "$CONFIG_PATH" health >/dev/null 2>&1
+}
+
+validate_inputs() {
+  [ -x "$TEAMSD_PATH" ] || { echo "teamsd is not executable: $TEAMSD_PATH" >&2; return 1; }
+  [ -x "$TEAMSCTL_PATH" ] || { echo "teamsctl is not executable: $TEAMSCTL_PATH" >&2; return 1; }
+  [ -f "$CONFIG_PATH" ] || { echo "configuration is missing: $CONFIG_PATH" >&2; return 1; }
+}
+
+wait_healthy() {
+  ATTEMPT=0
+  while [ "$ATTEMPT" -lt 120 ]; do
+    healthy && return 0
+    process_is_ours || return 1
+    /bin/sleep 0.25
+    ATTEMPT=$((ATTEMPT + 1))
+  done
+  return 1
+}
+
+wait_stopped() {
+  ATTEMPT=0
+  while [ "$ATTEMPT" -lt 120 ]; do
+    process_is_ours || return 0
+    /bin/sleep 0.25
+    ATTEMPT=$((ATTEMPT + 1))
+  done
+  return 1
+}
+
+start_service() {
+  ensure_state_dir
+  if healthy; then
+    echo "teamsd is already healthy"
+    return 0
+  fi
+  if process_is_ours; then
+    echo "teamsd process exists but is unhealthy; inspect $LOG_FILE" >&2
+    return 1
+  fi
+  if [ -f "$PID_FILE" ]; then
+    echo "refusing to overwrite stale or foreign pid file: $PID_FILE" >&2
+    return 1
+  fi
+  /usr/bin/nohup "$TEAMSD_PATH" -config "$CONFIG_PATH" >> "$LOG_FILE" 2>&1 </dev/null &
+  SERVICE_PID=$!
+  PID_TEMP=$PID_FILE.tmp.$SERVICE_PID
+  /usr/bin/printf '%s\n' "$SERVICE_PID" > "$PID_TEMP"
+  /bin/chmod 600 "$PID_TEMP"
+  /bin/mv "$PID_TEMP" "$PID_FILE"
+  if ! wait_healthy; then
+    if process_is_ours; then
+      /bin/kill -TERM "$SERVICE_PID"
+      wait_stopped || true
+    fi
+    /bin/rm -f "$PID_FILE"
+    echo "teamsd did not become healthy; inspect $LOG_FILE" >&2
+    return 1
+  fi
+  echo "teamsd is healthy (pid $SERVICE_PID)"
+}
+
+stop_service() {
+  ensure_state_dir
+  if healthy; then
+    "$TEAMSCTL_PATH" -config "$CONFIG_PATH" stop >/dev/null
+  elif process_is_ours; then
+    /bin/kill -TERM "$SERVICE_PID"
+  elif [ -f "$PID_FILE" ]; then
+    echo "refusing to signal the stale or foreign pid in $PID_FILE" >&2
+    return 1
+  else
+    echo "teamsd is already stopped"
+    return 0
+  fi
+  if ! wait_stopped; then
+    echo "teamsd did not stop within 30 seconds" >&2
+    return 1
+  fi
+  /bin/rm -f "$PID_FILE"
+  echo "teamsd is stopped"
+}
+
+status_service() {
+  if healthy; then
+    "$TEAMSCTL_PATH" -config "$CONFIG_PATH" status
+    return 0
+  fi
+  if process_is_ours; then
+    echo "teamsd process exists but its health endpoint is unavailable" >&2
+    return 1
+  fi
+  if [ -f "$PID_FILE" ]; then
+    echo "teamsd is stopped; stale or foreign pid file exists at $PID_FILE" >&2
+    return 1
+  fi
+  echo "teamsd is stopped"
+}
+
+validate_inputs
+
+case "$ACTION" in
+  start) start_service ;;
+  stop) stop_service ;;
+  restart)
+    stop_service
+    start_service
+    ;;
+  status) status_service ;;
+esac

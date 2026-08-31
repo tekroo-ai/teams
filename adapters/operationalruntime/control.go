@@ -43,13 +43,14 @@ type Controller struct {
 	lastError string
 	cancel    context.CancelFunc
 	done      chan error
+	failures  chan error
 }
 
 func NewController(runtime *Runtime, clock interface{ Now() time.Time }) (*Controller, error) {
 	if runtime == nil || runtime.worker == nil || clock == nil {
 		return nil, application.ErrInvalidConfiguration
 	}
-	return &Controller{runtime: runtime, clock: clock, state: ControlStopped}, nil
+	return &Controller{runtime: runtime, clock: clock, state: ControlStopped, failures: make(chan error, 1)}, nil
 }
 
 func (controller *Controller) Start(ctx context.Context) error {
@@ -76,9 +77,24 @@ func (controller *Controller) Start(ctx context.Context) error {
 			}
 		}
 		controller.mu.Unlock()
+		if !errors.Is(err, context.Canceled) {
+			if err == nil {
+				err = errors.New("operational runtime stopped unexpectedly")
+			}
+			controller.failures <- err
+		}
 		controller.done <- err
 	}()
 	return nil
+}
+
+// Failures reports an unexpected worker termination without consuming the
+// lifecycle completion used by Stop. No value is emitted for an operator stop.
+func (controller *Controller) Failures() <-chan error {
+	if controller == nil {
+		return nil
+	}
+	return controller.failures
 }
 
 func (controller *Controller) Pause(ctx context.Context) error {

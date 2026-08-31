@@ -1,0 +1,74 @@
+{
+  "contract_root": "/Users/you/work/tekroo-ai/teams",
+  "mongo": {
+    "uri_file": "/Users/you/.config/tekroo/teams/mongo-uri",
+    "database": "tekroo_teams_v4",
+    "backlog_limit": 10000,
+    "delivery_policy_revision": 1
+  },
+  "openhands": {
+    "base_url": "http://127.0.0.1:8000",
+    "session_api_key_file": "/Users/you/.openhands/agent-canvas/api-key.txt",
+    "request_timeout": "130s",
+    "poll_interval": "250ms",
+    "maximum_pages": 64,
+    "maximum_evidence_bytes": 16777216
+  },
+  "operator": {
+    "address": "127.0.0.1:8787",
+    "bearer_token_file": "/Users/you/.config/tekroo/teams/operator-token",
+    "operation_timeout": "10s",
+    "maximum_body_bytes": 1048576
+  },
+  "teams_database_identity": "tekroo_teams_v4",
+  "sma_database_identity": "sma_v4",
+  "authorization_policy_file": "/Users/you/.config/tekroo/teams/authorization-policy.json",
+  "provenance_file": "/Users/you/.config/tekroo/teams/provenance.json",
+  "evidence_root": "/Users/you/.local/share/tekroo/teams/evidence",
+  "service_authority": {
+    "kind": "SERVICE",
+    "id": "teams-operational-runtime"
+  },
+  "expiry_authority": {
+    "kind": "POLICY",
+    "id": "teams-admission-policy"
+  },
+  "workspaces": [
+    {
+      "workspace_id": "replace-with-workspace-id",
+      "worktree_id": "replace-with-worktree-id",
+      "working_directory": "/absolute/path/to/worktree"
+    }
+  ],
+  "profiles": [
+    {
+      "model_profile_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+      "runtime_identity_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+      "tool_policy_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+      "effect_policy_digest": "5555555555555555555555555555555555555555555555555555555555555555",
+      "maximum_iterations": 24
+    }
+  ],
+  "execution": {
+    "consumer_id": "teamsd-local",
+    "operation_timeout": "130s",
+    "maximum_brief_bytes": 1048576,
+    "policy_revision": 1
+  },
+  "evidence": {
+    "policy_revision": 1,
+    "producing_version": "teams-v4-local",
+    "retention_policy": "local-operational"
+  },
+  "worker": {
+    "lease_duration": "150s",
+    "reconciliation_interval": "1s",
+    "maximum_reconciliations": 600,
+    "maximum_concurrent_invocations": 4,
+    "lease_operation_timeout": "5s"
+  },
+  "projection": {
+    "interval": "250ms",
+    "operation_timeout": "5s"
+  }
+}

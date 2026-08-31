@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.tekroo.teamsd</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/ABSOLUTE/INSTALL/ROOT/bin/teamsd</string>
+    <string>-config</string>
+    <string>/ABSOLUTE/PATH/teamsd.json</string>
+  </array>
+  <key>RunAtLoad</key>
+  <false/>
+  <key>KeepAlive</key>
+  <false/>
+  <key>ProcessType</key>
+  <string>Background</string>
+  <key>StandardOutPath</key>
+  <string>/ABSOLUTE/STATE/DIRECTORY/teamsd.log</string>
+  <key>StandardErrorPath</key>
+  <string>/ABSOLUTE/STATE/DIRECTORY/teamsd.log</string>
+</dict>
+</plist>
