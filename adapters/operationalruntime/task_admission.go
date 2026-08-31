@@ -133,13 +133,17 @@ func (service *ProductionService) workProfile(feature organization.FeatureReques
 		security, blast = kernel.SecurityCritical, kernel.BlastArchitectural
 	}
 	criteria, _ := json.Marshal(task.AcceptanceCriteria)
+	independence := []kernel.IndependenceDimension{kernel.IndependencePrincipal, kernel.IndependenceActor, kernel.IndependenceExecution, kernel.IndependenceContext, kernel.IndependenceWorkspace, kernel.IndependenceMethod}
+	if task.Purpose == kernel.PurposeValidation || task.Purpose == kernel.PurposeReview {
+		independence = []kernel.IndependenceDimension{kernel.IndependencePrincipal, kernel.IndependenceMethod}
+	}
 	profileID := deterministicOperationalUUID("work-profile", string(feature.ID), string(task.ID))
 	profileDigest := digestBytes([]byte(string(feature.ID) + "\x00" + string(task.ID) + "\x00" + string(digestBytes(criteria)) + "\x00" + string(task.DecisionRoute)))
 	return kernel.WorkRiskProfile{
 		TaskID: task.ID, ProfileID: profileID, ProfileRevision: 1, ProfileDigest: profileDigest, LifecycleEpoch: feature.LifecycleEpoch, ScopeRevision: feature.ScopeRevision,
 		WorkKind: workKindForPurpose(task.Purpose, task.Risk), Ambiguity: ambiguity, Novelty: novelty, BlastRadius: blast, SecuritySensitivity: security,
 		MinimumDecisionRoute: task.DecisionRoute, AcceptanceCriteriaDigest: digestBytes(criteria), RequiredDeterministicGateIDs: append([]string(nil), service.planning.RequiredGateIDs...),
-		RequiredValidationBranches: 1, RequiredIndependenceDimensions: []kernel.IndependenceDimension{kernel.IndependencePrincipal, kernel.IndependenceActor, kernel.IndependenceExecution, kernel.IndependenceContext, kernel.IndependenceWorkspace, kernel.IndependenceMethod},
+		RequiredValidationBranches: 1, RequiredIndependenceDimensions: independence,
 		ImplementationVariantCount: 1, ValidCandidateQuorum: 1, VerificationTopologyDigest: service.planning.VerificationTopologyDigest,
 		ClassificationPolicyRevision: service.planning.PolicyRevision, ClassificationPolicyDigest: service.planning.ClassificationPolicyDigest,
 		PromotionPolicyRevision: service.planning.PolicyRevision, PromotionPolicyDigest: service.planning.PromotionPolicyDigest,

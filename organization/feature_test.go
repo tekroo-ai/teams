@@ -46,9 +46,10 @@ func TestFeaturePlanRejectsCyclesAndMaterializesFiniteDAG(t *testing.T) {
 	productOwner := activeRole("teams::product-owner-1", "product-owner", featureUUID(92), featureDigest('4'))
 	planner := activeRole("teams::architect-1", "architect", featureUUID(93), featureDigest('1'))
 	owner := activeRole("teams::coder-1", "coder", featureUUID(94), featureDigest('2'))
+	validator := activeRole("teams::tester-1", "tester", featureUUID(96), featureDigest('8'))
 	feature := organization.FeatureRequest{SchemaVersion: organization.FeatureSchemaVersion, ID: featureUUID(1), Revision: 1, SubmittedBy: kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "paul"}, Input: featureInput(), Status: organization.FeatureSubmitted, OperatorActor: operator.ActorFQN, ProductOwnerActor: productOwner.ActorFQN, InitialMessageID: featureUUID(2), LastMessageID: featureUUID(2), LastStepID: featureUUID(3), LastHop: 1, BudgetAccountID: featureUUID(4), LifecycleEpoch: 1, ScopeRevision: 1, CreatedAt: now, UpdatedAt: now}
 	store := &featureStoreFake{feature: feature}
-	host := &featureHostFake{roles: map[kernel.ActorFQN]organization.RoleInstanceState{operator.ActorFQN: operator, productOwner.ActorFQN: productOwner, planner.ActorFQN: planner, owner.ActorFQN: owner}}
+	host := &featureHostFake{roles: map[kernel.ActorFQN]organization.RoleInstanceState{operator.ActorFQN: operator, productOwner.ActorFQN: productOwner, planner.ActorFQN: planner, owner.ActorFQN: owner, validator.ActorFQN: validator}}
 	materializer := &recordingMaterializer{}
 	coordinator, err := organization.NewFeatureCoordinator(store, host, materializer, fixedClock(now.Add(time.Minute)), &idQueue{})
 	if err != nil {
@@ -57,7 +58,7 @@ func TestFeaturePlanRejectsCyclesAndMaterializesFiniteDAG(t *testing.T) {
 	storyID, firstTask, secondTask := featureUUID(10), featureUUID(11), featureUUID(12)
 	plan := organization.FeaturePlan{Version: 1, PreparedBy: planner.ActorFQN, PreparedExecution: planner.Execution, Architecture: "One bounded implementation pipeline.", Stories: []organization.PlannedStory{{ID: storyID, Title: "Story", Description: "Deliver the feature.", AcceptanceCriteria: []string{"accepted"}, Priority: organization.PriorityHigh}}, Tasks: []organization.PlannedTask{
 		{ID: firstTask, StoryID: storyID, Title: "First", Description: "Implement.", AcceptanceCriteria: []string{"passes"}, Owner: owner.ActorFQN, ModelProfile: owner.ModelProfile, DecisionRoute: kernel.RouteBoundedExecution, Purpose: kernel.PurposeImplementation, Complexity: 3, Risk: organization.RiskLow, CriticalPath: true, AttemptLimit: 2, ReviewRoundLimit: 1},
-		{ID: secondTask, StoryID: storyID, Title: "Second", Description: "Verify.", AcceptanceCriteria: []string{"verified"}, DependsOn: []kernel.UUIDv7{firstTask}, Owner: owner.ActorFQN, ModelProfile: owner.ModelProfile, DecisionRoute: kernel.RouteBoundedExecution, Purpose: kernel.PurposeValidation, Complexity: 2, Risk: organization.RiskModerate, CriticalPath: true, AttemptLimit: 2, ReviewRoundLimit: 1},
+		{ID: secondTask, StoryID: storyID, Title: "Second", Description: "Verify.", AcceptanceCriteria: []string{"verified"}, DependsOn: []kernel.UUIDv7{firstTask}, Validates: []kernel.UUIDv7{firstTask}, Owner: validator.ActorFQN, ModelProfile: validator.ModelProfile, DecisionRoute: kernel.RouteBoundedExecution, Purpose: kernel.PurposeValidation, Complexity: 2, Risk: organization.RiskModerate, CriticalPath: true, AttemptLimit: 2, ReviewRoundLimit: 1},
 	}, CreatedAt: now.Add(time.Minute)}
 	feature.Status = organization.FeatureSpecified
 	feature.Specification = &organization.FeatureSpecification{PreparedBy: "teams::project-manager-1", PreparedExecution: kernel.ExecutionTuple{ExecutionID: featureUUID(95), FencingEpoch: 1}, Stories: plan.Stories, PreparedAt: now.Add(time.Minute)}

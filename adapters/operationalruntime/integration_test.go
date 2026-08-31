@@ -525,7 +525,12 @@ func (server *integratedOpenHands) serveHTTP(writer http.ResponseWriter, request
 				map[string]any{"id": "user-" + conversationID, "kind": "MessageEvent", "source": "user", "timestamp": time.Now().UTC(), "llm_message": map[string]any{"content": []map[string]any{{"type": "text", "text": conversation.prompt}}}},
 			}
 			if conversation.finished {
-				items = append(items, map[string]any{"id": "agent-" + conversationID, "kind": "MessageEvent", "source": "agent", "timestamp": time.Now().UTC(), "llm_message": map[string]any{"content": []map[string]any{{"type": "text", "text": "completed authorized task"}}}})
+				agentText := "completed authorized task"
+				var brief application.ExecutionBrief
+				if json.Unmarshal([]byte(conversation.prompt), &brief) == nil && brief.ResultProtocol != nil {
+					agentText = "completed independent validation\n" + application.ValidationResultMarker + "\n{\"schema_version\":\"1.0.0\",\"outcome\":\"PASS\",\"reasons\":[\"repository checks passed\"]}"
+				}
+				items = append(items, map[string]any{"id": "agent-" + conversationID, "kind": "MessageEvent", "source": "agent", "timestamp": time.Now().UTC(), "llm_message": map[string]any{"content": []map[string]any{{"type": "text", "text": agentText}}}})
 			}
 		}
 		writeIntegratedJSON(writer, map[string]any{"items": items, "next_page_id": nil})

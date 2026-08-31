@@ -32,6 +32,11 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Millisecond)
 	policy := integratedPolicy()
 	policy.Grants[3].Grantee.ID = "example::coder-1"
+	policy.Grants[4].Grantee.ID = "example::coder-2"
+	policy.Grants[4].Scope.CommandTypes = append(policy.Grants[4].Scope.CommandTypes, "tekroo.command.task.request-completion", "tekroo.command.completion-review.record-result")
+	policy.Grants[4].Scope.TargetKinds = append(policy.Grants[4].Scope.TargetKinds, kernel.AggregateCompletionReview)
+	policy.Grants[2].Scope.CommandTypes = append(policy.Grants[2].Scope.CommandTypes, "tekroo.command.completion-review.record-result")
+	policy.Grants[2].Scope.TargetKinds = append(policy.Grants[2].Scope.TargetKinds, kernel.AggregateCompletionReview)
 	store, err := mongo.Open(contextWithTimeout(t), mongo.Config{
 		URI: uri, Database: "tekroo_phase6_task_admission", ContractIdentity: kernel.ContractIdentity,
 		ManifestSHA256: phase4ManifestSHA, MigrationLevel: 1, Policy: policy,
@@ -71,7 +76,7 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 		Store: store, Catalogue: catalogue, Clock: clock, IDs: ids,
 		OpenHandsBaseURL: server.URL, OpenHandsSessionAPIKey: "step7-session-key",
 		HTTPClient:        &http.Client{Timeout: time.Second},
-		WorkspaceBindings: []openhands.WorkspaceBinding{{WorkspaceID: "coder-1", WorktreeID: "worktree-coder-1", WorkingDirectory: workspace}},
+		WorkspaceBindings: []openhands.WorkspaceBinding{{WorkspaceID: "coder-1", WorktreeID: "worktree-coder-1", WorkingDirectory: workspace}, {WorkspaceID: "coder-2", WorktreeID: "worktree-coder-2", WorkingDirectory: workspace}},
 		ExecutionProfiles: []openhands.ExecutionProfile{profile}, OpenHandsPollInterval: time.Millisecond,
 		OpenHandsMaximumPages: 8, OpenHandsMaximumEvidence: 1 << 20, EvidenceRoot: t.TempDir(),
 		ExecutionPolicy: application.OperationalExecutionPolicy{OperationTimeout: time.Second, MaximumBriefBytes: 1 << 20, ConsumerID: "phase6-admission", PolicyRevision: 1, ServiceAuthority: kernel.PrincipalRef{Kind: kernel.PrincipalService, ID: "teams-operational-runtime"}, ExpiryAuthority: kernel.PrincipalRef{Kind: kernel.PrincipalPolicy, ID: "teams-admission-policy"}, Provenance: provenance},
@@ -106,7 +111,10 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 		planningDeadline: 2 * time.Hour,
 		planning:         ProductionPlanning{PolicyRevision: 1, ClassificationPolicyDigest: digestByte('8'), PromotionPolicyDigest: digestByte('6'), VerificationTopologyDigest: digestByte('d'), SelectionPolicyDigest: digestByte('9'), BudgetPolicyDigest: digestByte('b'), RequiredGateIDs: []string{"go-test"}, Deadline: "2h"},
 		profilesByModel:  map[kernel.Digest]ProductionProfile{modelDigest: {ModelProfileDigest: modelDigest, RuntimeIdentityDigest: runtimeDigest, ToolPolicyDigest: toolDigest, EffectPolicyDigest: effectDigest, MaximumIterations: 24, Qualification: qualification}},
-		workspacesByID:   map[string]ProductionWorkspace{"coder-1": {WorkspaceID: "coder-1", WorktreeID: "worktree-coder-1", WorkingDirectory: workspace, Branch: "task/phase6", BaselineSHA: strings.Repeat("1", 40), WritablePaths: []string{"src/"}}},
+		workspacesByID: map[string]ProductionWorkspace{
+			"coder-1": {WorkspaceID: "coder-1", WorktreeID: "worktree-coder-1", WorkingDirectory: workspace, Branch: "task/phase6", BaselineSHA: strings.Repeat("1", 40), WritablePaths: []string{"src/"}},
+			"coder-2": {WorkspaceID: "coder-2", WorktreeID: "worktree-coder-2", WorkingDirectory: workspace, Branch: "task/phase6-review", BaselineSHA: strings.Repeat("1", 40), WritablePaths: []string{"src/"}},
+		},
 		serviceAuthority: kernel.PrincipalRef{Kind: kernel.PrincipalService, ID: "teams-operational-runtime"},
 		policyAuthority:  kernel.PrincipalRef{Kind: kernel.PrincipalPolicy, ID: "teams-admission-policy"},
 	}
@@ -122,10 +130,11 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 		Stories: []organization.PlannedStory{{ID: kernel.UUIDv7("00000000-0000-7000-8000-000000006012"), Title: "Executable story", Description: "Materialize an admitted task.", AcceptanceCriteria: []string{"root task is active"}, Priority: organization.PriorityHigh}},
 		Tasks: []organization.PlannedTask{
 			{ID: kernel.UUIDv7("00000000-0000-7000-8000-000000006013"), StoryID: kernel.UUIDv7("00000000-0000-7000-8000-000000006012"), Title: "Implement", Description: "Implement the accepted change.", AcceptanceCriteria: []string{"go test passes"}, Owner: "example::coder-1", ModelProfile: modelDigest, DecisionRoute: kernel.RouteBoundedExecution, Purpose: kernel.PurposeImplementation, Complexity: 3, Risk: organization.RiskLow, CriticalPath: true, AttemptLimit: 2, ReviewRoundLimit: 1},
-			{ID: kernel.UUIDv7("00000000-0000-7000-8000-000000006018"), StoryID: kernel.UUIDv7("00000000-0000-7000-8000-000000006012"), Title: "Validate", Description: "Independently validate the accepted change.", AcceptanceCriteria: []string{"validation passes"}, DependsOn: []kernel.UUIDv7{kernel.UUIDv7("00000000-0000-7000-8000-000000006013")}, Owner: "example::coder-1", ModelProfile: modelDigest, DecisionRoute: kernel.RouteBoundedExecution, Purpose: kernel.PurposeValidation, Complexity: 2, Risk: organization.RiskLow, CriticalPath: true, AttemptLimit: 1, ReviewRoundLimit: 1},
+			{ID: kernel.UUIDv7("00000000-0000-7000-8000-000000006018"), StoryID: kernel.UUIDv7("00000000-0000-7000-8000-000000006012"), Title: "Validate", Description: "Independently validate the accepted change.", AcceptanceCriteria: []string{"validation passes"}, DependsOn: []kernel.UUIDv7{kernel.UUIDv7("00000000-0000-7000-8000-000000006013")}, Validates: []kernel.UUIDv7{kernel.UUIDv7("00000000-0000-7000-8000-000000006013")}, Owner: "example::coder-2", ModelProfile: modelDigest, DecisionRoute: kernel.RouteBoundedExecution, Purpose: kernel.PurposeValidation, Complexity: 2, Risk: organization.RiskLow, CriticalPath: true, AttemptLimit: 1, ReviewRoundLimit: 1},
 		},
 	}
 	runContext, cancelRun := context.WithCancel(context.Background())
+	defer cancelRun()
 	runResult := make(chan error, 1)
 	go func() { runResult <- runtime.Run(runContext) }()
 	if err := service.MaterializeFeaturePlan(contextWithTimeout(t), feature, plan); err != nil {
@@ -141,6 +150,9 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 	}
 	secondInvocationID := deterministicOperationalUUID("work-invocation", string(feature.ID), string(plan.Tasks[1].ID), string(plan.Tasks[1].Purpose), "1")
 	waitForInvocationState(t, store, secondInvocationID, kernel.InvocationSucceeded)
+	if err := service.reconcileFeaturePlan(contextWithTimeout(t), feature, plan); err != nil {
+		t.Fatal(err)
+	}
 	cancelRun()
 	if err := <-runResult; !errors.Is(err, context.Canceled) {
 		t.Fatalf("runtime stop = %v", err)
@@ -149,11 +161,11 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 		t.Fatal(err)
 	}
 	projection, found, err := store.ReadTaskProjection(contextWithTimeout(t), plan.Tasks[0].ID)
-	if err != nil || !found || !projection.Valid() || projection.Phase != string(kernel.PhaseActive) || projection.OwnerFQN == nil || *projection.OwnerFQN != plan.Tasks[0].Owner || !projection.WorkProfileID.Valid() || projection.QualifiedAssignment == nil || projection.Budget.AccountID != feature.BudgetAccountID || projection.OperationalScope == nil || projection.OperationalScope.WorkspaceID != "coder-1" || projection.LatestInvocation == nil || projection.LatestInvocation.State != kernel.InvocationSucceeded {
+	if err != nil || !found || !projection.Valid() || projection.Phase != string(kernel.PhaseCompleted) || projection.OwnerFQN == nil || *projection.OwnerFQN != plan.Tasks[0].Owner || !projection.WorkProfileID.Valid() || projection.QualifiedAssignment == nil || projection.Budget.AccountID != feature.BudgetAccountID || projection.OperationalScope == nil || projection.OperationalScope.WorkspaceID != "coder-1" || projection.LatestInvocation == nil || projection.LatestInvocation.State != kernel.InvocationSucceeded {
 		t.Fatalf("projection=%+v found=%t err=%v", projection, found, err)
 	}
 	dependent, found, err := store.ReadTaskProjection(contextWithTimeout(t), plan.Tasks[1].ID)
-	if err != nil || !found || !dependent.Valid() || dependent.LatestInvocation == nil || dependent.LatestInvocation.State != kernel.InvocationSucceeded {
+	if err != nil || !found || !dependent.Valid() || dependent.Phase != string(kernel.PhaseCompleted) || dependent.LatestInvocation == nil || dependent.LatestInvocation.State != kernel.InvocationSucceeded {
 		t.Fatalf("dependent projection=%+v found=%t err=%v", dependent, found, err)
 	}
 }

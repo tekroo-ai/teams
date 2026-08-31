@@ -84,6 +84,25 @@ func (store *ExecutionEvidenceStore) Put(ctx context.Context, evidenceID kernel.
 	return blobReceipt(path, digest, len(content)), nil
 }
 
+func (store *ExecutionEvidenceStore) Read(ctx context.Context, digest kernel.Digest) ([]byte, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if !digest.Valid() {
+		return nil, application.ErrInvalidOperationalExecution
+	}
+	path := filepath.Join(store.root, string(digest[:2]), string(digest))
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	observed := sha256.Sum256(content)
+	if hex.EncodeToString(observed[:]) != string(digest) {
+		return nil, ErrEvidenceBlobConflict
+	}
+	return content, nil
+}
+
 func blobReceipt(path, digest string, length int) application.ExecutionEvidenceBlobReceipt {
 	return application.ExecutionEvidenceBlobReceipt{Locator: path, SHA256: kernel.Digest(digest), ByteLength: uint64(length)}
 }

@@ -182,8 +182,18 @@ type ExecutionBrief struct {
 	RemainingPurposeBudget uint64                      `json:"remaining_purpose_budget"`
 	DeadlineAt             time.Time                   `json:"deadline_at"`
 	CoordinationRule       string                      `json:"coordination_rule"`
+	ResultProtocol         *ExecutionResultProtocol    `json:"result_protocol,omitempty"`
 	SemanticContext        SemanticContextRequest      `json:"semantic_context"`
 }
+
+type ExecutionResultProtocol struct {
+	SchemaVersion string   `json:"schema_version"`
+	Marker        string   `json:"marker"`
+	Outcomes      []string `json:"outcomes"`
+	Instruction   string   `json:"instruction"`
+}
+
+const ValidationResultMarker = "TEKROO_VALIDATION_RESULT:"
 
 const evidenceOnlyCoordinationRule = "RETURN_EVIDENCE_AND_PROPOSALS_TO_TEAMS_ONLY;DO_NOT_ADDRESS_OR_INVOKE_ANOTHER_AGENT"
 
@@ -323,6 +333,13 @@ func BuildExecutionBrief(current OperationalExecutionContext, maximumBytes int) 
 		Evidence: evidence, RemainingGlobalBudget: invocation.RemainingGlobalBudget,
 		RemainingPurposeBudget: invocation.RemainingPurposeBudget, DeadlineAt: invocation.DeadlineAt,
 		CoordinationRule: evidenceOnlyCoordinationRule,
+	}
+	if invocation.Purpose == kernel.PurposeValidation || invocation.Purpose == kernel.PurposeReview {
+		brief.ResultProtocol = &ExecutionResultProtocol{
+			SchemaVersion: "1.0.0", Marker: ValidationResultMarker,
+			Outcomes:    []string{"PASS", "FAIL", "BLOCKED", "INCONCLUSIVE"},
+			Instruction: "End the final response with the marker on its own line followed by exactly one JSON object containing schema_version, outcome, and non-empty reasons. Teams will reject missing or malformed results.",
+		}
 	}
 	brief.SemanticContext = buildSemanticContextRequest(current, evidence)
 	if !brief.SemanticContextValid() {

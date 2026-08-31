@@ -780,25 +780,25 @@ func (s *Store) checkGuards(ctx context.Context, expected kernel.Snapshot, decis
 		return err
 	}
 	if expected.Exists != exists || (exists && aggregate.Revision != expected.Revision) {
-		return ErrConflict
+		return fmt.Errorf("%w: target %s expected exists=%t revision=%d observed exists=%t revision=%d", ErrConflict, aggregateKey(decision.Receipt.Target), expected.Exists, expected.Revision, exists, aggregate.Revision)
 	}
 	for actor, tuple := range decision.Guards.Executions {
 		var document executionDocument
 		err := s.db.Collection("executions").FindOne(ctx, bson.D{{Key: "_id", Value: string(actor)}}).Decode(&document)
 		if err != nil {
 			if errors.Is(err, driver.ErrNoDocuments) {
-				return ErrConflict
+				return fmt.Errorf("%w: execution %s is missing", ErrConflict, actor)
 			}
 			return err
 		}
 		if document.ExecutionID != string(tuple.ExecutionID) || document.FencingEpoch != tuple.FencingEpoch {
-			return ErrConflict
+			return fmt.Errorf("%w: execution %s expected %s/%d observed %s/%d", ErrConflict, actor, tuple.ExecutionID, tuple.FencingEpoch, document.ExecutionID, document.FencingEpoch)
 		}
 	}
 	for _, actor := range decision.Guards.AbsentExecutions {
 		err := s.db.Collection("executions").FindOne(ctx, bson.D{{Key: "_id", Value: string(actor)}}).Err()
 		if err == nil {
-			return ErrConflict
+			return fmt.Errorf("%w: execution %s was expected to be absent", ErrConflict, actor)
 		}
 		if !errors.Is(err, driver.ErrNoDocuments) {
 			return err
@@ -808,7 +808,7 @@ func (s *Store) checkGuards(ctx context.Context, expected kernel.Snapshot, decis
 		err := s.db.Collection("events").FindOne(ctx, bson.D{{Key: "_id", Value: string(parent)}}).Err()
 		if err != nil {
 			if errors.Is(err, driver.ErrNoDocuments) {
-				return ErrConflict
+				return fmt.Errorf("%w: parent event %s is missing", ErrConflict, parent)
 			}
 			return err
 		}
@@ -818,12 +818,12 @@ func (s *Store) checkGuards(ctx context.Context, expected kernel.Snapshot, decis
 		err := s.db.Collection("evidence").FindOne(ctx, bson.D{{Key: "_id", Value: string(reference.EvidenceID)}}).Decode(&document)
 		if err != nil {
 			if errors.Is(err, driver.ErrNoDocuments) {
-				return ErrConflict
+				return fmt.Errorf("%w: evidence %s is missing", ErrConflict, reference.EvidenceID)
 			}
 			return err
 		}
 		if !document.Available || document.SHA256 != string(reference.SHA256) {
-			return ErrConflict
+			return fmt.Errorf("%w: evidence %s availability or digest changed", ErrConflict, reference.EvidenceID)
 		}
 	}
 	for _, precondition := range decision.Guards.Preconditions {
@@ -831,16 +831,16 @@ func (s *Store) checkGuards(ctx context.Context, expected kernel.Snapshot, decis
 		err := s.db.Collection("aggregates").FindOne(ctx, bson.D{{Key: "_id", Value: aggregateKey(precondition.Aggregate)}}).Decode(&document)
 		if precondition.Expected.MustNotExist {
 			if err == nil || !errors.Is(err, driver.ErrNoDocuments) {
-				return ErrConflict
+				return fmt.Errorf("%w: precondition %s expected absent", ErrConflict, aggregateKey(precondition.Aggregate))
 			}
 		} else if err != nil || document.Revision != precondition.Expected.Revision {
-			return ErrConflict
+			return fmt.Errorf("%w: precondition %s expected revision %d", ErrConflict, aggregateKey(precondition.Aggregate), precondition.Expected.Revision)
 		}
 	}
 	if decision.Guards.PolicyDigest.Valid() {
 		policy, err := s.loadPolicy(ctx)
 		if err != nil || policy.PolicyDigest != decision.Guards.PolicyDigest || policy.Revision != decision.Guards.PolicyRevision {
-			return ErrConflict
+			return fmt.Errorf("%w: authorization policy changed", ErrConflict)
 		}
 	}
 	for _, key := range decision.Guards.AbsentReviewKeys {
@@ -1044,6 +1044,14 @@ func (s *Store) applyRegistryAndReview(ctx context.Context, event kernel.DomainE
 		result.Authority = event.Authority
 		result.EventID = event.EventID
 		result.DecidedAt = event.CommittedAt
+		if event.ActorFQN != nil {
+			actor := *event.ActorFQN
+			result.ActorFQN = &actor
+		}
+		if event.Execution != nil {
+			execution := *event.Execution
+			result.Execution = &execution
+		}
 		next, valid := kernel.ApplyReviewBranchResult(value.Progress, result)
 		if !valid {
 			return "", ErrConflict

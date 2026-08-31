@@ -63,6 +63,13 @@ func (service *ProductionService) reconcileFeaturePlan(ctx context.Context, feat
 	if !found || !budget.Valid() {
 		return errors.New("feature work budget is missing")
 	}
+	completed, err := service.reconcileTaskCompletions(ctx, feature, plan, states, heads, invocations, snapshot)
+	if err != nil {
+		return err
+	}
+	if completed {
+		return nil
+	}
 
 	for _, item := range plan.Tasks {
 		state := states[item.ID]
@@ -89,13 +96,26 @@ func (service *ProductionService) reconcileFeaturePlan(ctx context.Context, feat
 		}
 		dependencyEvents := make([]kernel.UUIDv7, 0, len(item.DependsOn))
 		ready := len(item.DependsOn) > 0
+		validationTargets := make(map[kernel.UUIDv7]struct{}, len(item.Validates))
+		for _, targetID := range item.Validates {
+			validationTargets[targetID] = struct{}{}
+		}
 		for _, dependencyID := range item.DependsOn {
-			invocation, succeeded := invocations[dependencyID]
-			if !succeeded || invocation.State != kernel.InvocationSucceeded {
+			if _, validationTarget := validationTargets[dependencyID]; validationTarget {
+				invocation, succeeded := invocations[dependencyID]
+				if !succeeded || invocation.State != kernel.InvocationSucceeded {
+					ready = false
+					break
+				}
+				dependencyEvents = append(dependencyEvents, invocation.LastEventID)
+				continue
+			}
+			dependency := states[dependencyID]
+			if dependency.Phase != kernel.PhaseCompleted {
 				ready = false
 				break
 			}
-			dependencyEvents = append(dependencyEvents, invocation.LastEventID)
+			dependencyEvents = append(dependencyEvents, heads[dependencyID])
 		}
 		if !ready {
 			continue

@@ -46,6 +46,7 @@ type Runtime struct {
 	coordinator *application.OperationalExecutionCoordinator
 	worker      *executionruntime.Worker
 	feed        *mongo.IntentFeed
+	evidence    *filesystem.ExecutionEvidenceStore
 	closeOnce   sync.Once
 	closeErr    error
 }
@@ -99,7 +100,14 @@ func New(ctx context.Context, config Config) (*Runtime, error) {
 		_ = feed.Close(context.WithoutCancel(ctx))
 		return nil, err
 	}
-	return &Runtime{handler: handler, coordinator: coordinator, worker: worker, feed: feed}, nil
+	return &Runtime{handler: handler, coordinator: coordinator, worker: worker, feed: feed, evidence: blobs}, nil
+}
+
+func (runtime *Runtime) ReadExecutionOutput(ctx context.Context, digest kernel.Digest) ([]byte, error) {
+	if runtime == nil || runtime.evidence == nil {
+		return nil, application.ErrInvalidConfiguration
+	}
+	return runtime.evidence.Read(ctx, digest)
 }
 
 func (runtime *Runtime) Run(ctx context.Context) error {

@@ -207,6 +207,7 @@ type PlannedTask struct {
 	Description        string               `json:"description"`
 	AcceptanceCriteria []string             `json:"acceptance_criteria"`
 	DependsOn          []kernel.UUIDv7      `json:"depends_on"`
+	Validates          []kernel.UUIDv7      `json:"validates,omitempty"`
 	Owner              kernel.ActorFQN      `json:"owner"`
 	ModelProfile       kernel.Digest        `json:"model_profile_digest"`
 	DecisionRoute      kernel.DecisionRoute `json:"decision_route"`
@@ -256,6 +257,40 @@ func (plan FeaturePlan) Validate(feature FeatureRequest) error {
 			return ErrInvalidFeature
 		}
 		tasks[task.ID] = task
+	}
+	validationCoverage := make(map[kernel.UUIDv7]uint32, len(tasks))
+	for _, task := range plan.Tasks {
+		dependencies := make(map[kernel.UUIDv7]struct{}, len(task.DependsOn))
+		for _, dependency := range task.DependsOn {
+			if _, duplicate := dependencies[dependency]; duplicate {
+				return ErrInvalidFeature
+			}
+			dependencies[dependency] = struct{}{}
+		}
+		validated := make(map[kernel.UUIDv7]struct{}, len(task.Validates))
+		for _, targetID := range task.Validates {
+			target, found := tasks[targetID]
+			_, dependency := dependencies[targetID]
+			if !found || !dependency || targetID == task.ID || target.Owner == task.Owner {
+				return ErrInvalidFeature
+			}
+			if _, duplicate := validated[targetID]; duplicate {
+				return ErrInvalidFeature
+			}
+			validated[targetID] = struct{}{}
+			validationCoverage[targetID]++
+		}
+		validationPurpose := task.Purpose == kernel.PurposeValidation || task.Purpose == kernel.PurposeReview
+		if validationPurpose != (len(task.Validates) > 0) {
+			return ErrInvalidFeature
+		}
+	}
+	for _, task := range plan.Tasks {
+		if task.Purpose == kernel.PurposeImplementation || task.Purpose == kernel.PurposeRepair {
+			if validationCoverage[task.ID] == 0 {
+				return ErrInvalidFeature
+			}
+		}
 	}
 	visiting := make(map[kernel.UUIDv7]bool, len(tasks))
 	visited := make(map[kernel.UUIDv7]bool, len(tasks))
