@@ -42,6 +42,7 @@ type ProductionConfig struct {
 	Operator                ProductionOperatorConfig  `json:"operator"`
 	TeamsDatabaseIdentity   string                    `json:"teams_database_identity"`
 	SMADatabaseIdentity     string                    `json:"sma_database_identity"`
+	DeploymentIdentity      kernel.Digest             `json:"deployment_identity_digest"`
 	AuthorizationPolicyFile string                    `json:"authorization_policy_file"`
 	ProvenanceFile          string                    `json:"provenance_file"`
 	EvidenceRoot            string                    `json:"evidence_root"`
@@ -171,7 +172,7 @@ func LoadProductionConfig(path string) (ProductionConfig, error) {
 }
 
 func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig, error) {
-	if config.ContractRoot == "" || config.Mongo.Database == "" || config.Mongo.Database != config.TeamsDatabaseIdentity || config.SMADatabaseIdentity == "" || config.SMADatabaseIdentity == config.TeamsDatabaseIdentity || config.Mongo.BacklogLimit <= 0 || config.Mongo.DeliveryPolicyRevision == 0 || config.EvidenceRoot == "" || !filepath.IsAbs(config.EvidenceRoot) || len(config.Workspaces) == 0 || len(config.Profiles) == 0 {
+	if config.ContractRoot == "" || config.Mongo.Database == "" || config.Mongo.Database != config.TeamsDatabaseIdentity || config.SMADatabaseIdentity == "" || config.SMADatabaseIdentity == config.TeamsDatabaseIdentity || !config.DeploymentIdentity.Valid() || config.Mongo.BacklogLimit <= 0 || config.Mongo.DeliveryPolicyRevision == 0 || config.EvidenceRoot == "" || !filepath.IsAbs(config.EvidenceRoot) || len(config.Workspaces) == 0 || len(config.Profiles) == 0 {
 		return resolvedProductionConfig{}, invalidConfig("required identity, storage, workspace, or profile binding is missing")
 	}
 	if info, err := os.Stat(filepath.Join(config.ContractRoot, ContractPackagePath, "manifest.json")); err != nil || !info.Mode().IsRegular() {
@@ -304,7 +305,7 @@ func NewProductionService(ctx context.Context, config ProductionConfig) (*Produc
 	if info, err := os.Stat(config.EvidenceRoot); err != nil || !info.IsDir() {
 		return nil, invalidConfig("evidence root is not a directory")
 	}
-	store, err := mongo.Open(ctx, mongo.Config{URI: resolved.mongoURI, Database: config.Mongo.Database, ContractIdentity: kernel.ContractIdentity, ManifestSHA256: ManifestSHA256, MigrationLevel: 1, Policy: resolved.authorizationPolicy, BacklogLimit: config.Mongo.BacklogLimit, DeliveryPolicyRevision: config.Mongo.DeliveryPolicyRevision})
+	store, err := mongo.Open(ctx, mongo.Config{URI: resolved.mongoURI, Database: config.Mongo.Database, ContractIdentity: kernel.ContractIdentity, ManifestSHA256: ManifestSHA256, MigrationLevel: 1, Policy: resolved.authorizationPolicy, BacklogLimit: config.Mongo.BacklogLimit, DeliveryPolicyRevision: config.Mongo.DeliveryPolicyRevision, DeploymentIdentity: config.DeploymentIdentity})
 	if err != nil {
 		return nil, err
 	}

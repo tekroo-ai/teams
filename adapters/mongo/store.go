@@ -39,6 +39,7 @@ type Config struct {
 	Policy                 kernel.AuthorizationPolicy
 	BacklogLimit           int64
 	DeliveryPolicyRevision uint64
+	DeploymentIdentity     kernel.Digest
 }
 
 type Store struct {
@@ -105,7 +106,7 @@ func Open(ctx context.Context, config Config) (*Store, error) {
 	if err := requireDeadline(ctx); err != nil {
 		return nil, err
 	}
-	if config.URI == "" || config.Database == "" || config.ContractIdentity != kernel.ContractIdentity || !config.ManifestSHA256.Valid() || config.MigrationLevel == 0 || config.DeliveryPolicyRevision == 0 {
+	if config.URI == "" || config.Database == "" || config.ContractIdentity != kernel.ContractIdentity || !config.ManifestSHA256.Valid() || config.MigrationLevel == 0 || config.DeliveryPolicyRevision == 0 || config.DeploymentIdentity != "" && !config.DeploymentIdentity.Valid() {
 		return nil, ErrMetadataMismatch
 	}
 	if config.BacklogLimit <= 0 {
@@ -119,9 +120,21 @@ func Open(ctx context.Context, config Config) (*Store, error) {
 		return nil, err
 	}
 	store := &Store{client: client, db: client.Database(config.Database), owns: true, backlogLimit: config.BacklogLimit}
+	if config.DeploymentIdentity != "" {
+		if err := store.validateDeploymentBeforeInitialization(ctx, config.DeploymentIdentity); err != nil {
+			_ = client.Disconnect(context.Background())
+			return nil, err
+		}
+	}
 	if err := store.initialize(ctx, config); err != nil {
 		_ = client.Disconnect(context.Background())
 		return nil, err
+	}
+	if config.DeploymentIdentity != "" {
+		if err := store.BindDeploymentIdentity(ctx, config.DeploymentIdentity); err != nil {
+			_ = client.Disconnect(context.Background())
+			return nil, err
+		}
 	}
 	return store, nil
 }

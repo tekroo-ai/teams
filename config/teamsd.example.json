@@ -22,6 +22,7 @@
   },
   "teams_database_identity": "tekroo_teams_v4",
   "sma_database_identity": "sma_v4",
+  "deployment_identity_digest": "1111111111111111111111111111111111111111111111111111111111111111",
   "authorization_policy_file": "/Users/you/.config/tekroo/teams/authorization-policy.json",
   "provenance_file": "/Users/you/.config/tekroo/teams/provenance.json",
   "evidence_root": "/Users/you/.local/share/tekroo/teams/evidence",

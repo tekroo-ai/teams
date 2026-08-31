@@ -24,7 +24,11 @@ token must contain at least 32 characters. Do not put credentials in the JSON
 configuration or a command line.
 
 The configured Teams database must be new and distinct from both Tekroo v3 and
-the configured SMA database identity. No migration step exists.
+the configured SMA database identity. Give the deployment a stable, randomly
+generated SHA-256 identity in `deployment_identity_digest`. First start binds
+that identity only if the database has no organizational data; every restart
+must present the same identity. Pointing v4 at a populated unbound database or
+changing the identity fails startup. No migration step exists.
 
 ## Install without starting
 
@@ -98,4 +102,3 @@ without credentials.
 and `KeepAlive` values are both false. Copying it does nothing by itself. Replace
 the three absolute placeholders and validate it with `plutil` before loading it.
 Enabling it or changing it to automatic startup is a separate operator action.
-

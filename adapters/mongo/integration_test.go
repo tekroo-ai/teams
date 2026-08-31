@@ -882,6 +882,71 @@ func TestClaimLifecycleIsOneWinnerAndEpochFenced(t *testing.T) {
 	}
 }
 
+func TestDeploymentIdentityBindsFreshDatabaseAndRejectsReplacement(t *testing.T) {
+	store := openTestStore(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	identity := kernel.Digest(strings.Repeat("1", 64))
+	if err := store.BindDeploymentIdentity(ctx, identity); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.BindDeploymentIdentity(ctx, identity); err != nil {
+		t.Fatalf("repeat binding = %v", err)
+	}
+	if err := store.BindDeploymentIdentity(ctx, kernel.Digest(strings.Repeat("2", 64))); !errors.Is(err, ErrDeploymentIdentityMismatch) {
+		t.Fatalf("replacement binding = %v", err)
+	}
+}
+
+func TestOpenBindsFreshDeploymentAndAllowsExactRestart(t *testing.T) {
+	database := nextDatabase(t)
+	identity := kernel.Digest(strings.Repeat("4", 64))
+	config := testConfig(testMongoURI, database)
+	config.DeploymentIdentity = identity
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	first, err := Open(ctx, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := first.Close(ctx); err != nil {
+		t.Fatal(err)
+	}
+	second, err := Open(ctx, config)
+	if err != nil {
+		t.Fatalf("exact restart = %v", err)
+	}
+	defer func() {
+		_ = second.db.Drop(ctx)
+		_ = second.Close(ctx)
+	}()
+	config.DeploymentIdentity = kernel.Digest(strings.Repeat("5", 64))
+	if replacement, err := Open(ctx, config); !errors.Is(err, ErrDeploymentIdentityMismatch) {
+		if replacement != nil {
+			_ = replacement.Close(ctx)
+		}
+		t.Fatalf("replacement deployment open = %v", err)
+	}
+}
+
+func TestDeploymentIdentityRejectsPopulatedUnboundDatabase(t *testing.T) {
+	store := openTestStore(t)
+	commitDecision(t, store, completeDecision(t, 1))
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	config := testConfig(testMongoURI, store.db.Name())
+	config.DeploymentIdentity = kernel.Digest(strings.Repeat("3", 64))
+	if reopened, err := Open(ctx, config); !errors.Is(err, ErrDeploymentIdentityMismatch) {
+		if reopened != nil {
+			_ = reopened.Close(ctx)
+		}
+		t.Fatalf("populated database open = %v", err)
+	}
+	if err := store.db.Collection("metadata").FindOne(ctx, bson.D{{Key: "_id", Value: deploymentMetadataID}}).Err(); !errors.Is(err, driver.ErrNoDocuments) {
+		t.Fatalf("failed open wrote deployment marker: %v", err)
+	}
+}
+
 func TestIntentFeedRedeliversYieldedIntentInSameSession(t *testing.T) {
 	store := openTestStore(t)
 	decision := completeDecision(t, 1)
