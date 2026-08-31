@@ -210,6 +210,7 @@ type PlannedTask struct {
 	Owner              kernel.ActorFQN      `json:"owner"`
 	ModelProfile       kernel.Digest        `json:"model_profile_digest"`
 	DecisionRoute      kernel.DecisionRoute `json:"decision_route"`
+	Purpose            kernel.WorkPurpose   `json:"purpose"`
 	Complexity         uint8                `json:"complexity"`
 	Risk               RiskLevel            `json:"risk"`
 	CriticalPath       bool                 `json:"critical_path"`
@@ -245,7 +246,7 @@ func (plan FeaturePlan) Validate(feature FeatureRequest) error {
 	}
 	tasks := make(map[kernel.UUIDv7]PlannedTask, len(plan.Tasks))
 	for _, task := range plan.Tasks {
-		if !task.ID.Valid() || task.Title == "" || task.Description == "" || len(task.AcceptanceCriteria) == 0 || !task.Owner.Valid() || !task.ModelProfile.Valid() || !task.DecisionRoute.ModelExecutable() || task.Complexity == 0 || task.Complexity > 10 || !task.Risk.Valid() || task.AttemptLimit == 0 || task.ReviewRoundLimit == 0 {
+		if !task.ID.Valid() || task.Title == "" || task.Description == "" || len(task.AcceptanceCriteria) == 0 || !task.Owner.Valid() || !task.ModelProfile.Valid() || !task.DecisionRoute.ModelExecutable() || !task.Purpose.Valid() || task.Complexity == 0 || task.Complexity > 10 || !task.Risk.Valid() || task.AttemptLimit == 0 || task.ReviewRoundLimit == 0 {
 			return ErrInvalidFeature
 		}
 		if _, found := stories[task.StoryID]; !found {

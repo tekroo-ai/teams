@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/tekroo-ai/teams/kernel"
@@ -136,7 +137,7 @@ func (service *ProductionService) workProfile(feature organization.FeatureReques
 	profileDigest := digestBytes([]byte(string(feature.ID) + "\x00" + string(task.ID) + "\x00" + string(digestBytes(criteria)) + "\x00" + string(task.DecisionRoute)))
 	return kernel.WorkRiskProfile{
 		TaskID: task.ID, ProfileID: profileID, ProfileRevision: 1, ProfileDigest: profileDigest, LifecycleEpoch: feature.LifecycleEpoch, ScopeRevision: feature.ScopeRevision,
-		WorkKind: kernel.WorkImplementation, Ambiguity: ambiguity, Novelty: novelty, BlastRadius: blast, SecuritySensitivity: security,
+		WorkKind: workKindForPurpose(task.Purpose, task.Risk), Ambiguity: ambiguity, Novelty: novelty, BlastRadius: blast, SecuritySensitivity: security,
 		MinimumDecisionRoute: task.DecisionRoute, AcceptanceCriteriaDigest: digestBytes(criteria), RequiredDeterministicGateIDs: append([]string(nil), service.planning.RequiredGateIDs...),
 		RequiredValidationBranches: 1, RequiredIndependenceDimensions: []kernel.IndependenceDimension{kernel.IndependencePrincipal, kernel.IndependenceActor, kernel.IndependenceExecution, kernel.IndependenceContext, kernel.IndependenceWorkspace, kernel.IndependenceMethod},
 		ImplementationVariantCount: 1, ValidCandidateQuorum: 1, VerificationTopologyDigest: service.planning.VerificationTopologyDigest,
@@ -186,9 +187,7 @@ func (service *ProductionService) activateRootTask(ctx context.Context, feature 
 	for _, purpose := range kernel.AllWorkPurposes {
 		taskLimits[purpose] = 0
 	}
-	taskLimits[kernel.PurposeImplementation] = uint64(task.plan.AttemptLimit)
-	taskLimits[kernel.PurposeValidation] = uint64(task.plan.ReviewRoundLimit)
-	taskLimits[kernel.PurposeReview] = uint64(task.plan.ReviewRoundLimit)
+	taskLimits[task.plan.Purpose] = uint64(task.plan.AttemptLimit)
 	taskLimits[kernel.PurposeRepair] = uint64(task.plan.AttemptLimit)
 	taskLimits[kernel.PurposeEscalation] = 1
 	budgetPayload := map[string]any{"task_id": task.plan.ID, "budget_account_id": feature.BudgetAccountID, "expected_task_revision": task.revision, "lifecycle_epoch": feature.LifecycleEpoch, "scope_revision": feature.ScopeRevision, "task_model_invocation_limit": taskModelLimit, "purpose_limits": taskLimits, "evidence_ids": []kernel.UUIDv7{evidenceID}}
@@ -204,7 +203,7 @@ func (service *ProductionService) activateRootTask(ctx context.Context, feature 
 }
 
 func (service *ProductionService) authorizeImplementationInvocation(ctx context.Context, feature organization.FeatureRequest, task *trackedTask, profile ProductionProfile, workspace ProductionWorkspace, budgetRevision uint64) error {
-	invocationID := deterministicOperationalUUID("work-invocation", string(feature.ID), string(task.plan.ID), "implementation", "1")
+	invocationID := deterministicOperationalUUID("work-invocation", string(feature.ID), string(task.plan.ID), string(task.plan.Purpose), "1")
 	idempotencyKey := "feature:" + string(feature.ID) + ":invocation-" + string(task.plan.ID)
 	criteria, err := json.Marshal(task.plan.AcceptanceCriteria)
 	if err != nil {
@@ -218,7 +217,7 @@ func (service *ProductionService) authorizeImplementationInvocation(ctx context.
 		"expected_budget_revision": budgetRevision, "expected_task_revision": task.revision,
 		"lifecycle_epoch": feature.LifecycleEpoch, "scope_revision": feature.ScopeRevision, "parent_event_id": task.last,
 		"work_profile": task.profile.Binding(), "qualified_assignment_id": deterministicOperationalUUID("assignment", string(feature.ID), string(task.plan.ID)),
-		"purpose": kernel.PurposeImplementation, "attempt_family": "implementation", "attempt_ordinal": 1,
+		"purpose": task.plan.Purpose, "attempt_family": strings.ToLower(string(task.plan.Purpose)), "attempt_ordinal": 1,
 		"condition_digest": conditionDigest, "retry_of_invocation_id": nil, "retry_ordinal": 0,
 		"output_predicate_digest": outputPredicateDigest, "allowed_terminal_outcomes": []kernel.WorkInvocationState{kernel.InvocationSucceeded, kernel.InvocationFailed, kernel.InvocationTimedOut, kernel.InvocationCancelled, kernel.InvocationStartFailed},
 		"tool_policy_digest": profile.ToolPolicyDigest, "effect_policy_digest": profile.EffectPolicyDigest,
@@ -252,6 +251,26 @@ func (service *ProductionService) authorizeImplementationInvocation(ctx context.
 		return fmt.Errorf("%s rejected: %s", command.CommandType, receipt.ReasonCode)
 	}
 	return nil
+}
+
+func workKindForPurpose(purpose kernel.WorkPurpose, risk organization.RiskLevel) kernel.WorkKind {
+	switch purpose {
+	case kernel.PurposeInvestigation:
+		return kernel.WorkInvestigation
+	case kernel.PurposeValidation, kernel.PurposeReview:
+		if risk == organization.RiskHigh || risk == organization.RiskCritical {
+			return kernel.WorkSecurityReview
+		}
+		return kernel.WorkValidation
+	case kernel.PurposeRepair:
+		return kernel.WorkDebugging
+	case kernel.PurposePromotion:
+		return kernel.WorkRelease
+	case kernel.PurposeHandoff, kernel.PurposeReplan, kernel.PurposeEscalation:
+		return kernel.WorkDesign
+	default:
+		return kernel.WorkImplementation
+	}
 }
 
 func (service *ProductionService) applyTaskCommand(ctx context.Context, feature organization.FeatureRequest, task *trackedTask, commandType, version string, authority kernel.PrincipalRef, payload any, evidence []kernel.EvidenceRef, preconditions []kernel.AggregatePrecondition, key string) error {
