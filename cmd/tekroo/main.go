@@ -79,6 +79,13 @@ func run(arguments []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		method, path, err = identityRead("/v1/invocations/", operands)
 	case "roles":
 		method, path, err = noOperand(http.MethodGet, "/v1/roles", operands)
+	case "feature":
+		method, path = http.MethodPost, "/v1/features"
+		body, err = loadFeature(operands, stdin, config.Operator.MaximumBodyBytes)
+	case "feature-status":
+		method, path, err = identityRead("/v1/features/", operands)
+	case "feature-plan":
+		method, path, body, err = loadFeaturePlan(operands, stdin, config.Operator.MaximumBodyBytes)
 	case "role":
 		method, path, err = roleOperation(operands)
 	case "inbox":
@@ -161,6 +168,48 @@ func loadMessage(operands []string, stdin io.Reader, maximum int64) ([]byte, err
 		return nil, errors.New("message document contains trailing JSON content")
 	}
 	return raw, nil
+}
+
+func loadFeature(operands []string, stdin io.Reader, maximum int64) ([]byte, error) {
+	raw, err := loadDocument(operands, stdin, maximum)
+	if err != nil {
+		return nil, err
+	}
+	var input organization.FeatureRequestInput
+	if err := strictDocument(raw, &input); err != nil || input.Validate() != nil {
+		return nil, errors.New("feature request document is invalid")
+	}
+	return raw, nil
+}
+
+func loadFeaturePlan(operands []string, stdin io.Reader, maximum int64) (string, string, []byte, error) {
+	if len(operands) != 2 || !kernel.UUIDv7(operands[0]).Valid() {
+		return "", "", nil, usageError()
+	}
+	raw, err := loadDocument(operands[1:], stdin, maximum)
+	if err != nil {
+		return "", "", nil, err
+	}
+	var input struct {
+		ExpectedRevision uint64                   `json:"expected_revision"`
+		Plan             organization.FeaturePlan `json:"plan"`
+	}
+	if err := strictDocument(raw, &input); err != nil || input.ExpectedRevision == 0 {
+		return "", "", nil, errors.New("feature plan document is invalid")
+	}
+	return http.MethodPost, "/v1/features/" + operands[0] + "/plan", raw, nil
+}
+
+func strictDocument(raw []byte, target any) error {
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(target); err != nil {
+		return err
+	}
+	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		return errors.New("document contains trailing JSON content")
+	}
+	return nil
 }
 
 func loadDocument(operands []string, stdin io.Reader, maximum int64) ([]byte, error) {
@@ -288,5 +337,5 @@ func loadCommand(operands []string, stdin io.Reader, maximum int64) ([]byte, ker
 }
 
 func usageError() error {
-	return errors.New("usage: tekroo -config CONFIG health|status|pause|resume|stop|roles|role ACTOR start|stop|restart|pause|resume|inbox ACTOR|message FILE|-|message-status ID|message-trace THREAD_ID|deadletters [ACTOR]|task ID|story ID|invocation ID|submit FILE|-|cancel INVOCATION_ID FILE|-")
+	return errors.New("usage: tekroo -config CONFIG health|status|pause|resume|stop|feature FILE|-|feature-status ID|feature-plan ID FILE|-|roles|role ACTOR start|stop|restart|pause|resume|inbox ACTOR|message FILE|-|message-status ID|message-trace THREAD_ID|deadletters [ACTOR]|task ID|story ID|invocation ID|submit FILE|-|cancel INVOCATION_ID FILE|-")
 }

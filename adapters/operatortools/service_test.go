@@ -8,6 +8,7 @@ import (
 
 	"github.com/tekroo-ai/teams/adapters/mcp"
 	"github.com/tekroo-ai/teams/adapters/operatortools"
+	"github.com/tekroo-ai/teams/adapters/protocol"
 	"github.com/tekroo-ai/teams/kernel"
 	"github.com/tekroo-ai/teams/organization"
 )
@@ -18,15 +19,16 @@ func TestRoleControlUsesExactActorAndRejectsUnknownOperation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = service.CallTool(context.Background(), mcp.RoleControlToolName, json.RawMessage(`{"actor_fqn":"teams::coder-1","operation":"restart"}`))
+	identity := protocol.AuthenticatedContext{Principal: kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "operator"}}
+	_, err = service.CallTool(context.Background(), identity, mcp.RoleControlToolName, json.RawMessage(`{"actor_fqn":"teams::coder-1","operation":"restart"}`))
 	if err != nil || backend.restarted != "teams::coder-1" {
 		t.Fatalf("restart err=%v actor=%q", err, backend.restarted)
 	}
-	_, err = service.CallTool(context.Background(), mcp.RoleControlToolName, json.RawMessage(`{"actor_fqn":"teams::coder-1","operation":"launch-unbounded"}`))
+	_, err = service.CallTool(context.Background(), identity, mcp.RoleControlToolName, json.RawMessage(`{"actor_fqn":"teams::coder-1","operation":"launch-unbounded"}`))
 	if !errors.Is(err, operatortools.ErrInvalidArguments) {
 		t.Fatalf("unknown operation err=%v", err)
 	}
-	_, err = service.CallTool(context.Background(), mcp.RoleControlToolName, json.RawMessage(`{"actor_fqn":"teams::coder-1","operation":"restart","extra":true}`))
+	_, err = service.CallTool(context.Background(), identity, mcp.RoleControlToolName, json.RawMessage(`{"actor_fqn":"teams::coder-1","operation":"restart","extra":true}`))
 	if !errors.Is(err, operatortools.ErrInvalidArguments) {
 		t.Fatalf("unknown field err=%v", err)
 	}
@@ -66,4 +68,13 @@ func (*fakeOrganization) TraceMessages(context.Context, kernel.UUIDv7) ([]organi
 }
 func (*fakeOrganization) DeadLetters(context.Context, kernel.ActorFQN, int64) ([]organization.MessageClaim, error) {
 	return nil, nil
+}
+func (*fakeOrganization) SubmitFeature(context.Context, kernel.PrincipalRef, organization.FeatureRequestInput) (organization.FeatureRequest, bool, error) {
+	return organization.FeatureRequest{}, true, nil
+}
+func (*fakeOrganization) ReadFeature(context.Context, kernel.UUIDv7) (organization.FeatureRequest, bool, error) {
+	return organization.FeatureRequest{}, false, nil
+}
+func (*fakeOrganization) ApplyFeaturePlan(context.Context, kernel.UUIDv7, uint64, organization.FeaturePlan) (organization.FeatureRequest, error) {
+	return organization.FeatureRequest{}, nil
 }

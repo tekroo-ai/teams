@@ -270,7 +270,7 @@ type focusedToolsFake struct {
 	arguments json.RawMessage
 }
 
-func (fake *focusedToolsFake) CallTool(_ context.Context, name string, arguments json.RawMessage) (any, error) {
+func (fake *focusedToolsFake) CallTool(_ context.Context, _ protocol.AuthenticatedContext, name string, arguments json.RawMessage) (any, error) {
 	fake.name = name
 	fake.arguments = append([]byte(nil), arguments...)
 	return map[string]any{"accepted": true}, nil

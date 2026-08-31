@@ -17,6 +17,7 @@
   "operator": {
     "address": "127.0.0.1:8787",
     "bearer_token_file": "/Users/you/.config/tekroo/teams/operator-token",
+    "principal": {"kind": "HUMAN", "id": "operator"},
     "operation_timeout": "10s",
     "maximum_body_bytes": 1048576
   },

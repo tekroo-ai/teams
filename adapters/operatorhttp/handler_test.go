@@ -86,9 +86,20 @@ func TestHandlerDecodesCanonicalContractCommandShape(t *testing.T) {
 	}
 }
 
+func TestHandlerSubmitsFeatureWithBoundHumanIdentity(t *testing.T) {
+	service := &operatorService{state: operationalruntime.ControlRunning}
+	handler := newTestHandler(t, service, func() {})
+	body := `{"idempotency_key":"feature-1","team":"teams","title":"Restore workflow","description":"Recover the working team path.","acceptance_criteria":["finite DAG"],"priority":"HIGH","constraints":["no loops"],"repository":"/work/teams","workspace_id":"operator-1","maximum_stories":4,"maximum_tasks":16,"maximum_hops":16}`
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, authorizedRequest(http.MethodPost, "/v1/features", strings.NewReader(body)))
+	if response.Code != http.StatusCreated || service.featurePrincipal != (kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "operator"}) {
+		t.Fatalf("feature status=%d principal=%#v body=%s", response.Code, service.featurePrincipal, response.Body.String())
+	}
+}
+
 func newTestHandler(t *testing.T, service Service, stop func()) *Handler {
 	t.Helper()
-	handler, err := NewHandler(Config{Service: service, BearerToken: testToken, OperationTimeout: time.Second, MaximumBodyBytes: 4096, RequestStop: stop})
+	handler, err := NewHandler(Config{Service: service, BearerToken: testToken, OperatorPrincipal: kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "operator"}, OperationTimeout: time.Second, MaximumBodyBytes: 4096, RequestStop: stop})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,9 +118,10 @@ func authorizedRequest(method, target string, body *strings.Reader) *http.Reques
 }
 
 type operatorService struct {
-	state       operationalruntime.ControlState
-	submissions int
-	lastCommand kernel.KernelCommand
+	state            operationalruntime.ControlState
+	submissions      int
+	lastCommand      kernel.KernelCommand
+	featurePrincipal kernel.PrincipalRef
 }
 
 func (service *operatorService) Status() operationalruntime.ControlStatus {
@@ -148,6 +160,19 @@ func (service *operatorService) ReadStory(context.Context, kernel.UUIDv7) (mongo
 
 func (service *operatorService) ReadInvocation(context.Context, kernel.UUIDv7) (operationalruntime.InvocationStatus, bool, error) {
 	return operationalruntime.InvocationStatus{InvocationID: "00000000-0000-7000-8000-000000000003", Revision: 2, State: kernel.InvocationStarted, LastEventID: "00000000-0000-7000-8000-000000000004"}, true, nil
+}
+
+func (service *operatorService) SubmitFeature(_ context.Context, principal kernel.PrincipalRef, input organization.FeatureRequestInput) (organization.FeatureRequest, bool, error) {
+	service.featurePrincipal = principal
+	return organization.FeatureRequest{ID: "00000000-0000-7000-8000-000000000005", Input: input}, true, nil
+}
+
+func (service *operatorService) ReadFeature(context.Context, kernel.UUIDv7) (organization.FeatureRequest, bool, error) {
+	return organization.FeatureRequest{ID: "00000000-0000-7000-8000-000000000005"}, true, nil
+}
+
+func (service *operatorService) ApplyFeaturePlan(context.Context, kernel.UUIDv7, uint64, organization.FeaturePlan) (organization.FeatureRequest, error) {
+	return organization.FeatureRequest{ID: "00000000-0000-7000-8000-000000000005"}, nil
 }
 
 func (service *operatorService) RoleRoster(context.Context) ([]organization.RoleInstanceState, error) {

@@ -78,10 +78,11 @@ type ProductionOpenHandsConfig struct {
 }
 
 type ProductionOperatorConfig struct {
-	Address          string `json:"address"`
-	BearerTokenFile  string `json:"bearer_token_file"`
-	OperationTimeout string `json:"operation_timeout"`
-	MaximumBodyBytes int64  `json:"maximum_body_bytes"`
+	Address          string              `json:"address"`
+	BearerTokenFile  string              `json:"bearer_token_file"`
+	Principal        kernel.PrincipalRef `json:"principal"`
+	OperationTimeout string              `json:"operation_timeout"`
+	MaximumBodyBytes int64               `json:"maximum_body_bytes"`
 }
 
 type ProductionWorkspace struct {
@@ -206,7 +207,7 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 	if !loopbackHTTPURL(config.OpenHands.BaseURL) {
 		return resolvedProductionConfig{}, invalidConfig("OpenHands base URL must be an explicit loopback HTTP endpoint with no path")
 	}
-	if !loopbackAddress(config.Operator.Address) || config.Operator.MaximumBodyBytes <= 0 || config.Operator.MaximumBodyBytes > 1<<20 {
+	if !loopbackAddress(config.Operator.Address) || !config.Operator.Principal.Valid() || config.Operator.Principal.Kind != kernel.PrincipalHuman || config.Operator.MaximumBodyBytes <= 0 || config.Operator.MaximumBodyBytes > 1<<20 {
 		return resolvedProductionConfig{}, invalidConfig("operator address or body limit is invalid")
 	}
 	mongoURI, err := readSecret(config.Mongo.URIFile)
@@ -329,6 +330,7 @@ type ProductionService struct {
 	RoleRuntime *organization.InProcessRuntime
 	MessageBus  *organization.MessageBus
 	RoleInbox   *organization.RoleInbox
+	Features    *organization.FeatureCoordinator
 
 	projectionInterval     time.Duration
 	projectionTimeout      time.Duration
@@ -349,6 +351,8 @@ type ProductionService struct {
 	roleReconciliation     time.Duration
 	roleMaximumRestarts    uint32
 	messageMaximumAttempts uint32
+	clock                  kernel.Clock
+	ids                    kernel.IDSource
 }
 
 func NewProductionService(ctx context.Context, config ProductionConfig) (*ProductionService, error) {
@@ -425,7 +429,13 @@ func NewProductionService(ctx context.Context, config ProductionConfig) (*Produc
 		_ = runtime.Close(context.WithoutCancel(ctx))
 		return fail(err)
 	}
-	return &ProductionService{Store: store, Runtime: runtime, Controller: controller, RoleHost: roleHost, RoleRuntime: roleRuntime, MessageBus: messageBus, RoleInbox: roleInbox, projectionInterval: resolved.projectionInterval, projectionTimeout: resolved.projectionTimeout, recoveryInterval: resolved.reconciliation, recoveryTimeout: resolved.leaseOperationTimeout, recoveryAttempts: config.Worker.MaximumReconciliations, failures: make(chan error, 4), provenance: resolved.provenance, operatorToken: resolved.operatorBearerToken, operatorIdentity: protocol.AuthenticatedContext{Principal: config.ServiceAuthority}, operatorTimeout: resolved.operatorTimeout, operatorMaxBody: config.Operator.MaximumBodyBytes, roleReconciliation: resolved.roleReconciliation, roleMaximumRestarts: config.Organization.MaximumRestarts, messageMaximumAttempts: config.Organization.MaximumDeliveryAttempts}, nil
+	service := &ProductionService{Store: store, Runtime: runtime, Controller: controller, RoleHost: roleHost, RoleRuntime: roleRuntime, MessageBus: messageBus, RoleInbox: roleInbox, projectionInterval: resolved.projectionInterval, projectionTimeout: resolved.projectionTimeout, recoveryInterval: resolved.reconciliation, recoveryTimeout: resolved.leaseOperationTimeout, recoveryAttempts: config.Worker.MaximumReconciliations, failures: make(chan error, 4), provenance: resolved.provenance, operatorToken: resolved.operatorBearerToken, operatorIdentity: protocol.AuthenticatedContext{Principal: config.Operator.Principal}, operatorTimeout: resolved.operatorTimeout, operatorMaxBody: config.Operator.MaximumBodyBytes, roleReconciliation: resolved.roleReconciliation, roleMaximumRestarts: config.Organization.MaximumRestarts, messageMaximumAttempts: config.Organization.MaximumDeliveryAttempts, clock: clock, ids: ids}
+	features, err := organization.NewFeatureCoordinator(store, roleHost, service, clock, ids)
+	if err != nil {
+		return fail(err)
+	}
+	service.Features = features
+	return service, nil
 }
 
 func (service *ProductionService) Submit(ctx context.Context, command kernel.KernelCommand) (kernel.CommandReceipt, error) {

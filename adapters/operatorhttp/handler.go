@@ -21,11 +21,12 @@ import (
 var ErrInvalidConfiguration = errors.New("invalid operator HTTP configuration")
 
 type Config struct {
-	Service          Service
-	BearerToken      string
-	OperationTimeout time.Duration
-	MaximumBodyBytes int64
-	RequestStop      func()
+	Service           Service
+	BearerToken       string
+	OperatorPrincipal kernel.PrincipalRef
+	OperationTimeout  time.Duration
+	MaximumBodyBytes  int64
+	RequestStop       func()
 }
 
 type Service interface {
@@ -36,6 +37,9 @@ type Service interface {
 	ReadTask(context.Context, kernel.UUIDv7) (mongo.TaskProjection, bool, error)
 	ReadStory(context.Context, kernel.UUIDv7) (mongo.StoryProjection, bool, error)
 	ReadInvocation(context.Context, kernel.UUIDv7) (operationalruntime.InvocationStatus, bool, error)
+	SubmitFeature(context.Context, kernel.PrincipalRef, organization.FeatureRequestInput) (organization.FeatureRequest, bool, error)
+	ReadFeature(context.Context, kernel.UUIDv7) (organization.FeatureRequest, bool, error)
+	ApplyFeaturePlan(context.Context, kernel.UUIDv7, uint64, organization.FeaturePlan) (organization.FeatureRequest, error)
 }
 
 type OrganizationalService interface {
@@ -59,14 +63,15 @@ type Handler struct {
 	timeout      time.Duration
 	maxBody      int64
 	requestStop  func()
+	principal    kernel.PrincipalRef
 }
 
 func NewHandler(config Config) (*Handler, error) {
 	organizationService, ok := config.Service.(OrganizationalService)
-	if config.Service == nil || !ok || len(config.BearerToken) < 32 || config.OperationTimeout <= 0 || config.MaximumBodyBytes <= 0 || config.MaximumBodyBytes > 1<<20 || config.RequestStop == nil {
+	if config.Service == nil || !ok || len(config.BearerToken) < 32 || !config.OperatorPrincipal.Valid() || config.OperatorPrincipal.Kind != kernel.PrincipalHuman || config.OperationTimeout <= 0 || config.MaximumBodyBytes <= 0 || config.MaximumBodyBytes > 1<<20 || config.RequestStop == nil {
 		return nil, ErrInvalidConfiguration
 	}
-	return &Handler{service: config.Service, organization: organizationService, tokenDigest: sha256.Sum256([]byte(config.BearerToken)), timeout: config.OperationTimeout, maxBody: config.MaximumBodyBytes, requestStop: config.RequestStop}, nil
+	return &Handler{service: config.Service, organization: organizationService, tokenDigest: sha256.Sum256([]byte(config.BearerToken)), timeout: config.OperationTimeout, maxBody: config.MaximumBodyBytes, requestStop: config.RequestStop, principal: config.OperatorPrincipal}, nil
 }
 
 func (handler *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
@@ -111,6 +116,12 @@ func (handler *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Requ
 		handler.invocation(writer, request, strings.TrimPrefix(request.URL.Path, "/v1/invocations/"))
 	case request.Method == http.MethodGet && request.URL.Path == "/v1/roles":
 		handler.roles(writer, request)
+	case request.Method == http.MethodPost && request.URL.Path == "/v1/features":
+		handler.submitFeature(writer, request)
+	case request.Method == http.MethodPost && strings.HasPrefix(request.URL.Path, "/v1/features/") && strings.HasSuffix(request.URL.Path, "/plan"):
+		handler.applyFeaturePlan(writer, request, strings.TrimSuffix(strings.TrimPrefix(request.URL.Path, "/v1/features/"), "/plan"))
+	case request.Method == http.MethodGet && strings.HasPrefix(request.URL.Path, "/v1/features/"):
+		handler.readFeature(writer, request, strings.TrimPrefix(request.URL.Path, "/v1/features/"))
 	case request.Method == http.MethodGet && strings.HasPrefix(request.URL.Path, "/v1/roles/") && strings.HasSuffix(request.URL.Path, "/inbox"):
 		handler.roleInbox(writer, strings.TrimSuffix(strings.TrimPrefix(request.URL.Path, "/v1/roles/"), "/inbox"))
 	case request.Method == http.MethodPost && strings.HasPrefix(request.URL.Path, "/v1/roles/"):
@@ -126,6 +137,64 @@ func (handler *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Requ
 	default:
 		writeError(writer, http.StatusNotFound, "NOT_FOUND")
 	}
+}
+
+func (handler *Handler) submitFeature(writer http.ResponseWriter, request *http.Request) {
+	var input organization.FeatureRequestInput
+	if err := decodeBody(writer, request, handler.maxBody, &input); err != nil || input.Validate() != nil {
+		writeError(writer, http.StatusBadRequest, "INVALID_FEATURE_REQUEST")
+		return
+	}
+	feature, created, err := handler.service.SubmitFeature(request.Context(), handler.principal, input)
+	if err != nil {
+		writeError(writer, http.StatusConflict, "FEATURE_SUBMISSION_FAILED")
+		return
+	}
+	status := http.StatusOK
+	if created {
+		status = http.StatusCreated
+	}
+	writeJSON(writer, status, feature)
+}
+
+func (handler *Handler) readFeature(writer http.ResponseWriter, request *http.Request, value string) {
+	id := kernel.UUIDv7(value)
+	if !id.Valid() || strings.Contains(value, "/") {
+		writeError(writer, http.StatusBadRequest, "INVALID_FEATURE_ID")
+		return
+	}
+	feature, found, err := handler.service.ReadFeature(request.Context(), id)
+	if err != nil {
+		writeError(writer, http.StatusInternalServerError, "FEATURE_READ_FAILED")
+		return
+	}
+	if !found {
+		writeError(writer, http.StatusNotFound, "FEATURE_NOT_FOUND")
+		return
+	}
+	writeJSON(writer, http.StatusOK, feature)
+}
+
+func (handler *Handler) applyFeaturePlan(writer http.ResponseWriter, request *http.Request, value string) {
+	id := kernel.UUIDv7(value)
+	if !id.Valid() || strings.Contains(value, "/") {
+		writeError(writer, http.StatusBadRequest, "INVALID_FEATURE_ID")
+		return
+	}
+	var input struct {
+		ExpectedRevision uint64                   `json:"expected_revision"`
+		Plan             organization.FeaturePlan `json:"plan"`
+	}
+	if err := decodeBody(writer, request, handler.maxBody, &input); err != nil || input.ExpectedRevision == 0 {
+		writeError(writer, http.StatusBadRequest, "INVALID_FEATURE_PLAN")
+		return
+	}
+	feature, err := handler.service.ApplyFeaturePlan(request.Context(), id, input.ExpectedRevision, input.Plan)
+	if err != nil {
+		writeError(writer, http.StatusConflict, "FEATURE_PLAN_REJECTED")
+		return
+	}
+	writeJSON(writer, http.StatusOK, feature)
 }
 
 func (handler *Handler) roles(writer http.ResponseWriter, request *http.Request) {

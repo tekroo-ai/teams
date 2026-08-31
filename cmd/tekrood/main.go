@@ -78,7 +78,7 @@ func run(arguments []string, stdout, stderr io.Writer) error {
 	}
 	stopRequested := make(chan struct{}, 1)
 	token, operationTimeout, maximumBodyBytes := service.OperatorCredentials()
-	operatorHandler, err := operatorhttp.NewHandler(operatorhttp.Config{Service: service, BearerToken: token, OperationTimeout: operationTimeout, MaximumBodyBytes: maximumBodyBytes, RequestStop: func() {
+	operatorHandler, err := operatorhttp.NewHandler(operatorhttp.Config{Service: service, BearerToken: token, OperatorPrincipal: service.OperatorIdentity().Principal, OperationTimeout: operationTimeout, MaximumBodyBytes: maximumBodyBytes, RequestStop: func() {
 		select {
 		case stopRequested <- struct{}{}:
 		default:

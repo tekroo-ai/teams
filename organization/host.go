@@ -355,6 +355,25 @@ func (host *Host) Roster(ctx context.Context) ([]RoleInstanceState, error) {
 	return states, nil
 }
 
+// ConfiguredRoleActors resolves manifest role identity without starting a
+// process. The returned FQNs are stable configuration identities.
+func (host *Host) ConfiguredRoleActors(role string) ([]kernel.ActorFQN, error) {
+	if host == nil || !namePattern.MatchString(role) {
+		return nil, ErrInvalidTeamManifest
+	}
+	for _, binding := range host.team.Manifest.Roles {
+		if binding.Role != role {
+			continue
+		}
+		actors := make([]kernel.ActorFQN, 0, binding.MaximumInstances)
+		for instance := uint32(1); instance <= binding.MaximumInstances; instance++ {
+			actors = append(actors, kernel.ActorFQN(fmt.Sprintf("%s::%s-%d", host.team.Manifest.Team, role, instance)))
+		}
+		return actors, nil
+	}
+	return nil, ErrRoleNotConfigured
+}
+
 // ResolveRoleRecipients converts a role-wide address into currently active,
 // exact actor identities. It never starts a role; launch remains an explicit
 // lifecycle operation.

@@ -26,6 +26,9 @@ const (
 	MessageGetToolName     = "tekroo.message.get"
 	MessageTraceToolName   = "tekroo.message.trace"
 	DeadLettersToolName    = "tekroo.deadletters.list"
+	FeatureSubmitToolName  = "tekroo.feature.submit"
+	FeatureGetToolName     = "tekroo.feature.get"
+	FeaturePlanToolName    = "tekroo.feature.plan.apply"
 	DefaultMaxBodyBytes    = int64(1 << 20)
 	codeHeaderMismatch     = -32020
 	codeUnsupportedVersion = -32022
@@ -43,7 +46,7 @@ type Handler struct {
 }
 
 type FocusedTools interface {
-	CallTool(context.Context, string, json.RawMessage) (any, error)
+	CallTool(context.Context, protocol.AuthenticatedContext, string, json.RawMessage) (any, error)
 }
 
 func NewHandler(endpoint protocol.Endpoint, authenticator httpapi.Authenticator, origins httpapi.OriginPolicy, limiter httpapi.RateLimiter, maxBodyBytes int64) (*Handler, error) {
@@ -234,7 +237,7 @@ func (handler *Handler) callTool(writer http.ResponseWriter, request *http.Reque
 		return
 	}
 	if params.Name != CommandToolName {
-		handler.callFocusedTool(writer, request, message, params.Name, params.Arguments)
+		handler.callFocusedTool(writer, request, message, identity, params.Name, params.Arguments)
 		return
 	}
 	invocation, err := protocol.DecodeInvocation(bytes.NewReader(params.Arguments))
@@ -256,12 +259,12 @@ func (handler *Handler) callTool(writer http.ResponseWriter, request *http.Reque
 	handler.writeResult(writer, message.ID, result)
 }
 
-func (handler *Handler) callFocusedTool(writer http.ResponseWriter, request *http.Request, message message, name string, arguments json.RawMessage) {
+func (handler *Handler) callFocusedTool(writer http.ResponseWriter, request *http.Request, message message, identity protocol.AuthenticatedContext, name string, arguments json.RawMessage) {
 	if handler.focused == nil {
 		handler.writeError(writer, http.StatusOK, message.ID, codeInvalidParams, "unknown tool", map[string]any{"name": name})
 		return
 	}
-	result, err := handler.focused.CallTool(request.Context(), name, arguments)
+	result, err := handler.focused.CallTool(request.Context(), identity, name, arguments)
 	if err != nil {
 		handler.writeError(writer, http.StatusOK, message.ID, codeInvalidParams, err.Error(), nil)
 		return
@@ -362,6 +365,9 @@ func organizationalTools() []any {
 	actor := map[string]any{"type": "string", "description": "Exact team::role-instance FQN."}
 	uuid := map[string]any{"type": "string", "format": "uuid"}
 	return []any{
+		map[string]any{"name": FeatureSubmitToolName, "title": "Submit feature request", "description": "Submit one bounded feature request to the configured product owner.", "inputSchema": map[string]any{"$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object"}},
+		map[string]any{"name": FeatureGetToolName, "title": "Inspect feature request", "description": "Read the canonical feature workflow and finite plan.", "inputSchema": object([]string{"feature_id"}, map[string]any{"feature_id": uuid})},
+		map[string]any{"name": FeaturePlanToolName, "title": "Apply reviewed feature plan", "description": "Materialize a finite reviewed story/task DAG.", "inputSchema": map[string]any{"$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object"}},
 		map[string]any{"name": RolesListToolName, "title": "List configured team roles", "description": "Inspect exact role identities and lifecycle state.", "inputSchema": object(nil, map[string]any{})},
 		map[string]any{
 			"name": RoleControlToolName, "title": "Control one role",

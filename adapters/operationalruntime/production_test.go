@@ -153,7 +153,7 @@ func writeProductionFixture(t *testing.T) (string, ProductionConfig) {
 		ContractRoot:          root,
 		Mongo:                 ProductionMongoConfig{URIFile: "mongo-uri", Database: "tekroo_v4", BacklogLimit: 1024, DeliveryPolicyRevision: 1},
 		OpenHands:             ProductionOpenHandsConfig{BaseURL: "http://127.0.0.1:8000", SessionAPIKeyFile: "openhands-key", RequestTimeout: "130s", PollInterval: "250ms", MaximumPages: 64, MaximumEvidenceBytes: 16 << 20},
-		Operator:              ProductionOperatorConfig{Address: "127.0.0.1:8787", BearerTokenFile: "operator-token", OperationTimeout: "10s", MaximumBodyBytes: 1 << 20},
+		Operator:              ProductionOperatorConfig{Address: "127.0.0.1:8787", BearerTokenFile: "operator-token", Principal: kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "operator"}, OperationTimeout: "10s", MaximumBodyBytes: 1 << 20},
 		TeamsDatabaseIdentity: "tekroo_v4", SMADatabaseIdentity: "sma_v4", DeploymentIdentity: repeatedDigest('1'), AuthorizationPolicyFile: "authorization.json", ProvenanceFile: "provenance.json", EvidenceRoot: "evidence",
 		ServiceAuthority: kernel.PrincipalRef{Kind: kernel.PrincipalService, ID: "teams-operational-runtime"}, ExpiryAuthority: kernel.PrincipalRef{Kind: kernel.PrincipalPolicy, ID: "teams-admission-policy"},
 		Workspaces:   []ProductionWorkspace{{WorkspaceID: "workspace-1", WorktreeID: "worktree-1", WorkingDirectory: "workspace"}},

@@ -47,6 +47,7 @@ func (purpose MessagePurpose) Valid() bool {
 }
 
 type MessageWorkLink struct {
+	FeatureID *kernel.UUIDv7 `json:"feature_id,omitempty"`
 	StoryID   *kernel.UUIDv7 `json:"story_id,omitempty"`
 	TaskID    *kernel.UUIDv7 `json:"task_id,omitempty"`
 	DAGNodeID kernel.UUIDv7  `json:"dag_node_id"`
@@ -56,7 +57,7 @@ func (link MessageWorkLink) Valid() bool {
 	if !link.DAGNodeID.Valid() {
 		return false
 	}
-	return (link.StoryID == nil || link.StoryID.Valid()) && (link.TaskID == nil || link.TaskID.Valid())
+	return (link.FeatureID == nil || link.FeatureID.Valid()) && (link.StoryID == nil || link.StoryID.Valid()) && (link.TaskID == nil || link.TaskID.Valid())
 }
 
 type MessageFlow struct {

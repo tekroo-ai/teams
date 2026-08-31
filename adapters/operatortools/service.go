@@ -8,6 +8,7 @@ import (
 	"io"
 
 	"github.com/tekroo-ai/teams/adapters/mcp"
+	"github.com/tekroo-ai/teams/adapters/protocol"
 	"github.com/tekroo-ai/teams/kernel"
 	"github.com/tekroo-ai/teams/organization"
 )
@@ -30,6 +31,9 @@ type Organization interface {
 	ReadMessage(context.Context, kernel.UUIDv7) (organization.MessageClaim, bool, error)
 	TraceMessages(context.Context, kernel.UUIDv7) ([]organization.MessageClaim, error)
 	DeadLetters(context.Context, kernel.ActorFQN, int64) ([]organization.MessageClaim, error)
+	SubmitFeature(context.Context, kernel.PrincipalRef, organization.FeatureRequestInput) (organization.FeatureRequest, bool, error)
+	ReadFeature(context.Context, kernel.UUIDv7) (organization.FeatureRequest, bool, error)
+	ApplyFeaturePlan(context.Context, kernel.UUIDv7, uint64, organization.FeaturePlan) (organization.FeatureRequest, error)
 }
 
 // Service translates focused operator operations into domain calls while the
@@ -45,11 +49,49 @@ func New(organization Organization) (*Service, error) {
 	return &Service{organization: organization}, nil
 }
 
-func (service *Service) CallTool(ctx context.Context, name string, arguments json.RawMessage) (any, error) {
+func (service *Service) CallTool(ctx context.Context, identity protocol.AuthenticatedContext, name string, arguments json.RawMessage) (any, error) {
 	if service == nil || service.organization == nil {
 		return nil, ErrInvalidConfiguration
 	}
+	if !identity.Valid() || identity.Principal.Kind != kernel.PrincipalHuman || identity.ActorFQN != nil || identity.Execution != nil {
+		return nil, ErrInvalidArguments
+	}
 	switch name {
+	case mcp.FeatureSubmitToolName:
+		var input organization.FeatureRequestInput
+		if err := decodeStrict(arguments, &input); err != nil || input.Validate() != nil {
+			return nil, ErrInvalidArguments
+		}
+		feature, created, err := service.organization.SubmitFeature(ctx, identity.Principal, input)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{"created": created, "feature": feature}, nil
+	case mcp.FeatureGetToolName:
+		var input struct {
+			ID kernel.UUIDv7 `json:"feature_id"`
+		}
+		if err := decodeStrict(arguments, &input); err != nil || !input.ID.Valid() {
+			return nil, ErrInvalidArguments
+		}
+		feature, found, err := service.organization.ReadFeature(ctx, input.ID)
+		if err != nil {
+			return nil, err
+		}
+		if !found {
+			return nil, ErrNotFound
+		}
+		return feature, nil
+	case mcp.FeaturePlanToolName:
+		var input struct {
+			ID               kernel.UUIDv7            `json:"feature_id"`
+			ExpectedRevision uint64                   `json:"expected_revision"`
+			Plan             organization.FeaturePlan `json:"plan"`
+		}
+		if err := decodeStrict(arguments, &input); err != nil || !input.ID.Valid() || input.ExpectedRevision == 0 {
+			return nil, ErrInvalidArguments
+		}
+		return service.organization.ApplyFeaturePlan(ctx, input.ID, input.ExpectedRevision, input.Plan)
 	case mcp.RolesListToolName:
 		var input struct{}
 		if err := decodeStrict(arguments, &input); err != nil {
