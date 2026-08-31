@@ -199,12 +199,16 @@ func (service *ProductionService) activateTask(ctx context.Context, feature orga
 	if err := service.applyTaskCommand(ctx, feature, task, "tekroo.command.task.bind-operational-scope", kernel.OperationalSchemaVersion, service.policyAuthority, scopePayload, evidence, nil, "scope"); err != nil {
 		return err
 	}
-	return service.authorizeImplementationInvocation(ctx, feature, task, profileConfig, workspace, budgetRevision)
+	return service.authorizeTaskInvocation(ctx, feature, task, profileConfig, workspace, budgetRevision, 1, nil)
 }
 
-func (service *ProductionService) authorizeImplementationInvocation(ctx context.Context, feature organization.FeatureRequest, task *trackedTask, profile ProductionProfile, workspace ProductionWorkspace, budgetRevision uint64) error {
-	invocationID := deterministicOperationalUUID("work-invocation", string(feature.ID), string(task.plan.ID), string(task.plan.Purpose), "1")
-	idempotencyKey := "feature:" + string(feature.ID) + ":invocation-" + string(task.plan.ID)
+func (service *ProductionService) authorizeTaskInvocation(ctx context.Context, feature organization.FeatureRequest, task *trackedTask, profile ProductionProfile, workspace ProductionWorkspace, budgetRevision, attempt uint64, retry *kernel.WorkInvocation) error {
+	if attempt == 0 || attempt > uint64(task.plan.AttemptLimit) || retry == nil && attempt != 1 || retry != nil && (attempt != retry.AttemptOrdinal+1 || retry.State != kernel.InvocationFailed && retry.State != kernel.InvocationTimedOut && retry.State != kernel.InvocationStartFailed || retry.Retryable == nil || !*retry.Retryable) {
+		return organization.ErrInvalidFeature
+	}
+	attemptLabel := fmt.Sprint(attempt)
+	invocationID := deterministicOperationalUUID("work-invocation", string(feature.ID), string(task.plan.ID), string(task.plan.Purpose), attemptLabel)
+	idempotencyKey := "feature:" + string(feature.ID) + ":invocation-" + string(task.plan.ID) + "-" + attemptLabel
 	criteria, err := json.Marshal(task.plan.AcceptanceCriteria)
 	if err != nil {
 		return err
@@ -212,13 +216,20 @@ func (service *ProductionService) authorizeImplementationInvocation(ctx context.
 	criteriaDigest := digestBytes(criteria)
 	conditionDigest := digestBytes([]byte(string(task.profile.ProfileDigest) + "\x00" + string(criteriaDigest)))
 	outputPredicateDigest := digestBytes([]byte("accepted-task-output\x00" + string(task.plan.ID) + "\x00" + string(criteriaDigest)))
+	var retryID *kernel.UUIDv7
+	retryOrdinal := uint64(0)
+	if retry != nil {
+		value := retry.ID
+		retryID = &value
+		retryOrdinal = retry.RetryOrdinal + 1
+	}
 	payload, err := json.Marshal(map[string]any{
 		"invocation_id": invocationID, "task_id": task.plan.ID, "budget_account_id": feature.BudgetAccountID,
 		"expected_budget_revision": budgetRevision, "expected_task_revision": task.revision,
 		"lifecycle_epoch": feature.LifecycleEpoch, "scope_revision": feature.ScopeRevision, "parent_event_id": task.last,
 		"work_profile": task.profile.Binding(), "qualified_assignment_id": deterministicOperationalUUID("assignment", string(feature.ID), string(task.plan.ID)),
-		"purpose": task.plan.Purpose, "attempt_family": strings.ToLower(string(task.plan.Purpose)), "attempt_ordinal": 1,
-		"condition_digest": conditionDigest, "retry_of_invocation_id": nil, "retry_ordinal": 0,
+		"purpose": task.plan.Purpose, "attempt_family": strings.ToLower(string(task.plan.Purpose)), "attempt_ordinal": attempt,
+		"condition_digest": conditionDigest, "retry_of_invocation_id": retryID, "retry_ordinal": retryOrdinal,
 		"output_predicate_digest": outputPredicateDigest, "allowed_terminal_outcomes": []kernel.WorkInvocationState{kernel.InvocationSucceeded, kernel.InvocationFailed, kernel.InvocationTimedOut, kernel.InvocationCancelled, kernel.InvocationStartFailed},
 		"tool_policy_digest": profile.ToolPolicyDigest, "effect_policy_digest": profile.EffectPolicyDigest,
 		"actor_fqn": task.owner.ActorFQN, "execution_id": task.owner.Execution.ExecutionID, "fencing_epoch": task.owner.Execution.FencingEpoch,

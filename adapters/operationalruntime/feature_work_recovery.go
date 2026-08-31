@@ -66,6 +66,24 @@ func (service *ProductionService) reconcileFeaturePlan(ctx context.Context, feat
 
 	for _, item := range plan.Tasks {
 		state := states[item.ID]
+		if state.Phase == kernel.PhaseActive {
+			latest, found := invocations[item.ID]
+			if found && (latest.State == kernel.InvocationFailed || latest.State == kernel.InvocationTimedOut || latest.State == kernel.InvocationStartFailed) && latest.Retryable != nil && *latest.Retryable && latest.AttemptOrdinal < uint64(item.AttemptLimit) {
+				profileConfig, configured := service.profilesByModel[item.ModelProfile]
+				owner, active, ownerErr := service.RoleHost.Status(ctx, item.Owner)
+				workspace, workspaceFound := service.workspacesByID[owner.WorkspaceID]
+				profileSnapshot, profileFound := snapshot.WorkProfiles[kernel.AggregateRef{Kind: kernel.AggregateTask, ID: item.ID}]
+				if !configured || ownerErr != nil || !active || owner.Status != organization.RoleIdle || owner.Execution != latest.Execution || !workspaceFound || !profileFound || !profileSnapshot.Valid() {
+					return errors.Join(organization.ErrRoleNotRunning, ownerErr)
+				}
+				tracked := &trackedTask{plan: item, revision: state.Revision, last: heads[item.ID], profile: profileSnapshot.Profile, owner: owner}
+				if err := service.authorizeTaskInvocation(ctx, feature, tracked, profileConfig, workspace, budget.Revision, latest.AttemptOrdinal+1, &latest); err != nil {
+					return err
+				}
+				budget.Revision++
+			}
+			continue
+		}
 		if state.Phase != kernel.PhasePlanned {
 			continue
 		}
