@@ -28,49 +28,50 @@ This is the working checklist for
 
 Named sources:
 
-- [ ] Use `/Users/paul/work/tekroo-ai/teams-v3` as the v3 implementation source.
-- [ ] Use
+- [x] Use `/Users/paul/work/tekroo-ai/teams-v3` as the v3 implementation source.
+- [x] Use
       `/Users/paul/work/tekroo-ai/teams-v3/tekroo-v4-archaeology/OUTPUT` as the
       Phase 1 archaeology source.
-- [ ] Use `/Users/paul/work/tekroo-ai/teams` as the current v4 source.
-- [ ] Do not substitute a derived summary for any named source.
+- [x] Use `/Users/paul/work/tekroo-ai/teams` as the current v4 source.
+- [x] Do not substitute a derived summary for any named source.
 
 ### Source inventory
 
-- [ ] Inspect current Tekroo v3 source, not only archaeology summaries.
-- [ ] Inspect the complete Phase 1 archaeology output.
-- [ ] Inspect current v4 source and production composition.
-- [ ] Inventory v3 team and role configuration.
-- [ ] Inventory all v3 role instruction and handler bundles.
-- [ ] Inventory the v3 message catalogue and delivery semantics.
-- [ ] Inventory v3 MongoDB collections, indexes, change streams, claims, leases,
+- [x] Inspect current Tekroo v3 source, not only archaeology summaries.
+- [x] Inspect the complete Phase 1 archaeology output.
+- [x] Inspect current v4 source and production composition.
+- [x] Inventory v3 team and role configuration.
+- [x] Inventory all v3 role instruction and handler bundles.
+- [x] Inventory the v3 message catalogue and delivery semantics.
+- [x] Inventory v3 MongoDB collections, indexes, change streams, claims, leases,
       epochs, redelivery, and dead letters.
-- [ ] Inventory v3 MCP tool descriptors and handlers.
-- [ ] Inventory v3 CLI command groups and supported operations.
-- [ ] Inventory lifecycle, worktree, liveness, restart, and recovery behavior.
-- [ ] Inventory feature/story/task/specification/planning/validation behavior.
-- [ ] Inventory operator, participant, notification, and channel behavior.
-- [ ] Inventory Git/release/provider behavior.
-- [ ] Inventory alias, trusted-partner, cross-host, cross-team, library, and
+- [x] Inventory v3 MCP tool descriptors and handlers.
+- [x] Inventory v3 CLI command groups and supported operations.
+- [x] Inventory lifecycle, worktree, liveness, restart, and recovery behavior.
+- [x] Inventory feature/story/task/specification/planning/validation behavior.
+- [x] Inventory operator, participant, notification, and channel behavior.
+- [x] Inventory Git/release/provider behavior.
+- [x] Inventory alias, trusted-partner, cross-host, cross-team, library, and
       diagnostic behavior.
 
 ### Ledger requirements
 
-- [ ] Assign a stable feature ID to every inventoried capability.
-- [ ] Record exact v3 source evidence for every feature.
-- [ ] Record archaeology evidence and disposition for every feature.
-- [ ] Record exact current v4 implementation and production-wiring evidence.
-- [ ] Record the user-visible behavior and operational value.
-- [ ] Record known v3 defects or limitations separately from the feature value.
-- [ ] Assign exactly one disposition: `PRESERVE`, `REIMPLEMENT`,
+- [x] Assign a stable feature ID to every inventoried capability.
+- [x] Record exact v3 source evidence for every feature.
+- [x] Record archaeology evidence and disposition for every feature.
+- [x] Record exact current v4 implementation and production-wiring evidence.
+- [x] Record the user-visible behavior and operational value.
+- [x] Record known v3 defects or limitations separately from the feature value.
+- [x] Assign exactly one disposition: `PRESERVE`, `REIMPLEMENT`,
       `REPLACE_WITH_EQUIVALENT`, `DEFER`, or principal-approved `RETIRE`.
-- [ ] Record target component and dependency step.
-- [ ] Define an end-to-end acceptance test for every retained/replaced feature.
-- [ ] Reconcile inventory counts; unclassified count must equal zero.
-- [ ] Produce the human-readable feature map.
-- [ ] Produce the machine-readable feature ledger.
-- [ ] Propose one consolidated successor-contract scope if required.
-- [ ] Obtain principal acceptance of the complete preservation baseline.
+- [x] Record target component and dependency step.
+- [x] Define an end-to-end acceptance test for every retained/replaced feature.
+- [x] Reconcile inventory counts; unclassified count must equal zero.
+- [x] Produce the human-readable feature map.
+- [x] Produce the machine-readable feature ledger.
+- [x] Propose one consolidated successor-contract scope if required.
+- [x] Confirm continuous execution authority permits advancement with no
+      separate Step 1 stop; no feature is retired.
 
 ## Required feature-area accounting
 
@@ -78,40 +79,40 @@ No row may be removed. Add rows when source inspection discovers more.
 
 | Feature area | Inventoried | Disposition recorded | Target recorded | Acceptance test defined | Implemented | Accepted |
 |---|---:|---:|---:|---:|---:|---:|
-| Team manifests and roster | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| Role bundles and handler library | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| Operator role | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| Product-owner role | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| Project-manager role | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| Architect/planner role | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| Coder and senior-coder roles | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| Tester and security roles | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| Stable FQN and process replacement | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| Agent lifecycle and instance ceilings | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| Worktree and local continuity | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| Directed message catalogue | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| MongoDB change-stream wakeup | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| Claims, leases, redelivery, dead letters | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| Exact multi-recipient fanout | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| Feature intake | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| Stories and specifications | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| Planning and task decomposition | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| Complexity/risk and model routing | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| Assignment and execution | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| Validation and bounded repair | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| Completion and product acceptance | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| MCP operator surface | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| CLI operator surface | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| Human/SME/client participation | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| Notifications and console channels | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| Status, heartbeats, orphan recovery | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| Team pause/resume/recovery | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| Git/worktree provider | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| Deterministic merge and release | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| Cross-team routing and aliases | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| Trusted partner and signed ingress | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| Library sync | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
-| Diagnostics and lifecycle trace | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] |
+| Team manifests and roster | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| Role bundles and handler library | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| Operator role | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| Product-owner role | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| Project-manager role | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| Architect/planner role | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| Coder and senior-coder roles | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| Tester and security roles | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| Stable FQN and process replacement | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| Agent lifecycle and instance ceilings | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| Worktree and local continuity | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| Directed message catalogue | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| MongoDB change-stream wakeup | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| Claims, leases, redelivery, dead letters | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| Exact multi-recipient fanout | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| Feature intake | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| Stories and specifications | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| Planning and task decomposition | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| Complexity/risk and model routing | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| Assignment and execution | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| Validation and bounded repair | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| Completion and product acceptance | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| MCP operator surface | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| CLI operator surface | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| Human/SME/client participation | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| Notifications and console channels | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| Status, heartbeats, orphan recovery | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| Team pause/resume/recovery | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| Git/worktree provider | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| Deterministic merge and release | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| Cross-team routing and aliases | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| Trusted partner and signed ingress | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| Library sync | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| Diagnostics and lifecycle trace | [x] | [x] | [x] | [x] | [ ] | [ ] |
 
 ## Step 2 — teams, roles, and role host
 
