@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/tekroo-ai/teams/adapters/mcp"
+	"github.com/tekroo-ai/teams/adapters/mongo"
+	"github.com/tekroo-ai/teams/adapters/operationalruntime"
 	"github.com/tekroo-ai/teams/adapters/operatortools"
 	"github.com/tekroo-ai/teams/adapters/protocol"
 	"github.com/tekroo-ai/teams/kernel"
@@ -36,6 +38,19 @@ func TestRoleControlUsesExactActorAndRejectsUnknownOperation(t *testing.T) {
 
 type fakeOrganization struct {
 	restarted kernel.ActorFQN
+}
+
+func (*fakeOrganization) Status() operationalruntime.ControlStatus {
+	return operationalruntime.ControlStatus{State: operationalruntime.ControlRunning}
+}
+func (*fakeOrganization) ReadTask(context.Context, kernel.UUIDv7) (mongo.TaskProjection, bool, error) {
+	return mongo.TaskProjection{}, false, nil
+}
+func (*fakeOrganization) ReadStory(context.Context, kernel.UUIDv7) (mongo.StoryProjection, bool, error) {
+	return mongo.StoryProjection{}, false, nil
+}
+func (*fakeOrganization) ReadInvocation(context.Context, kernel.UUIDv7) (operationalruntime.InvocationStatus, bool, error) {
+	return operationalruntime.InvocationStatus{}, false, nil
 }
 
 func (*fakeOrganization) RoleRoster(context.Context) ([]organization.RoleInstanceState, error) {

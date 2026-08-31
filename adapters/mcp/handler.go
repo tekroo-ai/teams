@@ -29,6 +29,10 @@ const (
 	FeatureSubmitToolName  = "tekroo.feature.submit"
 	FeatureGetToolName     = "tekroo.feature.get"
 	FeaturePlanToolName    = "tekroo.feature.plan.apply"
+	StatusToolName         = "tekroo.status.get"
+	TaskGetToolName        = "tekroo.task.get"
+	StoryGetToolName       = "tekroo.story.get"
+	InvocationGetToolName  = "tekroo.invocation.get"
 	DefaultMaxBodyBytes    = int64(1 << 20)
 	codeHeaderMismatch     = -32020
 	codeUnsupportedVersion = -32022
@@ -368,6 +372,10 @@ func organizationalTools() []any {
 		map[string]any{"name": FeatureSubmitToolName, "title": "Submit feature request", "description": "Submit one bounded feature request to the configured product owner.", "inputSchema": map[string]any{"$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object"}},
 		map[string]any{"name": FeatureGetToolName, "title": "Inspect feature request", "description": "Read the canonical feature workflow and finite plan.", "inputSchema": object([]string{"feature_id"}, map[string]any{"feature_id": uuid})},
 		map[string]any{"name": FeaturePlanToolName, "title": "Apply reviewed feature plan", "description": "Materialize a finite reviewed story/task DAG.", "inputSchema": map[string]any{"$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object"}},
+		map[string]any{"name": StatusToolName, "title": "Inspect team runtime", "description": "Read current tekrood control and liveness state.", "inputSchema": object(nil, map[string]any{})},
+		map[string]any{"name": TaskGetToolName, "title": "Inspect task", "description": "Read one canonical task projection, assignment, scope, budget, and latest invocation.", "inputSchema": object([]string{"task_id"}, map[string]any{"task_id": uuid})},
+		map[string]any{"name": StoryGetToolName, "title": "Inspect story", "description": "Read one canonical story projection and its task DAG.", "inputSchema": object([]string{"story_id"}, map[string]any{"story_id": uuid})},
+		map[string]any{"name": InvocationGetToolName, "title": "Inspect invocation", "description": "Read one single-use work invocation and terminal evidence state.", "inputSchema": object([]string{"invocation_id"}, map[string]any{"invocation_id": uuid})},
 		map[string]any{"name": RolesListToolName, "title": "List configured team roles", "description": "Inspect exact role identities and lifecycle state.", "inputSchema": object(nil, map[string]any{})},
 		map[string]any{
 			"name": RoleControlToolName, "title": "Control one role",

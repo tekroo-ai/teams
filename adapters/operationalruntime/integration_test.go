@@ -527,8 +527,17 @@ func (server *integratedOpenHands) serveHTTP(writer http.ResponseWriter, request
 			if conversation.finished {
 				agentText := "completed authorized task"
 				var brief application.ExecutionBrief
-				if json.Unmarshal([]byte(conversation.prompt), &brief) == nil && brief.ResultProtocol != nil {
+				if json.Unmarshal([]byte(conversation.prompt), &brief) == nil && brief.ResultProtocol != nil && brief.ResultProtocol.Marker == application.ValidationResultMarker {
 					agentText = "completed independent validation\n" + application.ValidationResultMarker + "\n{\"schema_version\":\"1.0.0\",\"outcome\":\"PASS\",\"reasons\":[\"repository checks passed\"]}"
+				} else if brief.ResultProtocol != nil && brief.ResultProtocol.Marker == application.OrganizationalResultMarker {
+					switch brief.Task.Title {
+					case "Refine feature request":
+						agentText = application.OrganizationalResultMarker + "\n{\"schema_version\":\"1.0.0\",\"result_type\":\"FEATURE_REFINEMENT\",\"acceptance_criteria\":[\"the requested behavior works\"],\"clarification_questions\":[],\"priority\":\"HIGH\"}"
+					case "Specify feature stories":
+						agentText = application.OrganizationalResultMarker + "\n{\"schema_version\":\"1.0.0\",\"result_type\":\"FEATURE_SPECIFICATION\",\"stories\":[{\"title\":\"Deliver behavior\",\"description\":\"Implement and verify the requested behavior.\",\"acceptance_criteria\":[\"the requested behavior works\"],\"priority\":\"HIGH\"}],\"design_constraints\":[\"preserve current interfaces\"]}"
+					case "Design executable feature DAG":
+						agentText = application.OrganizationalResultMarker + "\n{\"schema_version\":\"1.0.0\",\"result_type\":\"FEATURE_PLAN\",\"architecture\":\"One implementation followed by independent validation.\",\"design_decisions\":[\"use the existing interface\"],\"assumptions\":[],\"tasks\":[{\"story_index\":0,\"title\":\"Implement behavior\",\"description\":\"Implement the accepted behavior.\",\"acceptance_criteria\":[\"the requested behavior works\"],\"depends_on\":[],\"validates\":[],\"role\":\"coder\",\"purpose\":\"IMPLEMENTATION\",\"complexity\":3,\"risk\":\"LOW\",\"critical_path\":true,\"attempt_limit\":2,\"review_round_limit\":2}]}"
+					}
 				}
 				items = append(items, map[string]any{"id": "agent-" + conversationID, "kind": "MessageEvent", "source": "agent", "timestamp": time.Now().UTC(), "llm_message": map[string]any{"content": []map[string]any{{"type": "text", "text": agentText}}}})
 			}

@@ -22,6 +22,46 @@ type trackedTask struct {
 	owner    organization.RoleInstanceState
 }
 
+func (service *ProductionService) ensureFeatureWorkBudget(ctx context.Context, feature organization.FeatureRequest, evidenceID kernel.UUIDv7, evidence []kernel.EvidenceRef, deadline time.Time) (uint64, error) {
+	budgetRef := kernel.AggregateRef{Kind: kernel.AggregateWorkBudget, ID: feature.BudgetAccountID}
+	snapshot, err := service.Store.LoadDecision(ctx, kernel.KernelCommand{Target: budgetRef})
+	if err != nil {
+		return 0, err
+	}
+	if account, found := snapshot.WorkBudgetAccounts[budgetRef]; found {
+		if !account.Valid() || account.LifecycleEpoch != feature.LifecycleEpoch || account.PolicyRevision != service.planning.PolicyRevision || account.PolicyDigest != service.planning.BudgetPolicyDigest {
+			return 0, organization.ErrInvalidFeature
+		}
+		return account.Revision, nil
+	}
+	planningStoryID := deterministicOperationalUUID("feature-planning-story", string(feature.ID))
+	storyState, storyEvent, found, err := service.Store.ReadAggregateHead(ctx, kernel.AggregateRef{Kind: kernel.AggregateStory, ID: planningStoryID})
+	if err != nil || !found || storyState.Revision == 0 {
+		return 0, errors.Join(organization.ErrInvalidFeature, err)
+	}
+	modelLimit := uint64(feature.Input.MaximumTasks)*4 + uint64(feature.Input.MaximumHops) + 16
+	if modelLimit == 0 || modelLimit > 1000 {
+		return 0, organization.ErrInvalidFeature
+	}
+	limits := make(kernel.PurposeCounters, len(kernel.AllWorkPurposes))
+	for _, purpose := range kernel.AllWorkPurposes {
+		limits[purpose] = modelLimit
+	}
+	payload, err := json.Marshal(map[string]any{
+		"budget_account_id": feature.BudgetAccountID, "root_work": kernel.AggregateRef{Kind: kernel.AggregateStory, ID: planningStoryID},
+		"lifecycle_epoch": feature.LifecycleEpoch, "policy_revision": service.planning.PolicyRevision, "policy_digest": service.planning.BudgetPolicyDigest,
+		"model_invocation_limit": modelLimit, "purpose_limits": limits, "deadline_at": deadline, "evidence_ids": []kernel.UUIDv7{evidenceID}, "authority": service.policyAuthority,
+	})
+	if err != nil {
+		return 0, err
+	}
+	receipt, err := service.submitDeterministicCommand(ctx, feature, "tekroo.command.work-budget.create", kernel.OperationalSchemaVersion, kernel.AggregateWorkBudget, feature.BudgetAccountID, service.policyAuthority, 0, payload, []kernel.DagParent{{ParentEventID: storyEvent, EdgeKind: kernel.EdgeDerivation}}, evidence, "budget", kernel.AggregatePrecondition{Aggregate: kernel.AggregateRef{Kind: kernel.AggregateStory, ID: planningStoryID}, Expected: kernel.NewExpectedRevision(storyState.Revision)})
+	if err != nil {
+		return 0, err
+	}
+	return revisionOrOne(receipt), nil
+}
+
 func (service *ProductionService) preparePlannedTasks(ctx context.Context, feature organization.FeatureRequest, plan organization.FeaturePlan, storyEvents map[kernel.UUIDv7]kernel.UUIDv7, taskEvents map[kernel.UUIDv7]kernel.UUIDv7) error {
 	planBytes, err := json.Marshal(plan)
 	if err != nil {
@@ -48,37 +88,11 @@ func (service *ProductionService) preparePlannedTasks(ctx context.Context, featu
 	if len(plan.Stories) == 0 {
 		return organization.ErrInvalidFeature
 	}
-	limits := make(kernel.PurposeCounters, len(kernel.AllWorkPurposes))
-	for _, purpose := range kernel.AllWorkPurposes {
-		limits[purpose] = 0
-	}
-	var modelLimit uint64
-	for _, task := range plan.Tasks {
-		modelLimit += uint64(task.AttemptLimit + task.ReviewRoundLimit + 2)
-	}
-	if modelLimit == 0 || modelLimit > 1000 {
-		return organization.ErrInvalidFeature
-	}
-	limits[kernel.PurposeImplementation] = modelLimit
-	limits[kernel.PurposeValidation] = modelLimit
-	limits[kernel.PurposeReview] = modelLimit
-	limits[kernel.PurposeRepair] = modelLimit
-	limits[kernel.PurposeEscalation] = uint64(len(plan.Tasks))
 	deadline := plan.CreatedAt.Add(service.planningDeadline)
-	budgetPayload, err := json.Marshal(map[string]any{
-		"budget_account_id": feature.BudgetAccountID, "root_work": kernel.AggregateRef{Kind: kernel.AggregateStory, ID: plan.Stories[0].ID},
-		"lifecycle_epoch": feature.LifecycleEpoch, "policy_revision": service.planning.PolicyRevision, "policy_digest": service.planning.BudgetPolicyDigest,
-		"model_invocation_limit": modelLimit, "purpose_limits": limits, "deadline_at": deadline, "evidence_ids": []kernel.UUIDv7{evidenceID}, "authority": service.policyAuthority,
-	})
+	budgetRevision, err := service.ensureFeatureWorkBudget(ctx, feature, evidenceID, evidenceRefs, deadline)
 	if err != nil {
 		return err
 	}
-	budgetPreconditions := []kernel.AggregatePrecondition{{Aggregate: kernel.AggregateRef{Kind: kernel.AggregateStory, ID: plan.Stories[0].ID}, Expected: kernel.NewExpectedRevision(1)}}
-	budgetReceipt, err := service.submitDeterministicCommand(ctx, feature, "tekroo.command.work-budget.create", kernel.OperationalSchemaVersion, kernel.AggregateWorkBudget, feature.BudgetAccountID, service.policyAuthority, 0, budgetPayload, []kernel.DagParent{{ParentEventID: storyEvents[plan.Stories[0].ID], EdgeKind: kernel.EdgeDerivation}}, evidenceRefs, "budget", budgetPreconditions...)
-	if err != nil {
-		return err
-	}
-	budgetRevision := revisionOrOne(budgetReceipt)
 
 	tasks := make(map[kernel.UUIDv7]*trackedTask, len(plan.Tasks))
 	for _, item := range plan.Tasks {
@@ -134,7 +148,7 @@ func (service *ProductionService) workProfile(feature organization.FeatureReques
 	}
 	criteria, _ := json.Marshal(task.AcceptanceCriteria)
 	independence := []kernel.IndependenceDimension{kernel.IndependencePrincipal, kernel.IndependenceActor, kernel.IndependenceExecution, kernel.IndependenceContext, kernel.IndependenceWorkspace, kernel.IndependenceMethod}
-	if task.Purpose == kernel.PurposeValidation || task.Purpose == kernel.PurposeReview {
+	if task.Purpose != kernel.PurposeImplementation && task.Purpose != kernel.PurposeRepair && task.Purpose != kernel.PurposePromotion {
 		independence = []kernel.IndependenceDimension{kernel.IndependencePrincipal, kernel.IndependenceMethod}
 	}
 	profileID := deterministicOperationalUUID("work-profile", string(feature.ID), string(task.ID))

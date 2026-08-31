@@ -15,7 +15,16 @@ func (service *ProductionService) SubmitFeature(ctx context.Context, principal k
 	if service == nil || service.Features == nil {
 		return organization.FeatureRequest{}, false, organization.ErrInvalidFeature
 	}
-	return service.Features.Submit(ctx, principal, input)
+	feature, created, err := service.Features.Submit(ctx, principal, input)
+	if err != nil {
+		return feature, created, err
+	}
+	if feature.Status == organization.FeatureSubmitted {
+		if err := service.materializeFeatureIntake(ctx, feature); err != nil {
+			return feature, created, err
+		}
+	}
+	return feature, created, nil
 }
 
 func (service *ProductionService) ReadFeature(ctx context.Context, id kernel.UUIDv7) (organization.FeatureRequest, bool, error) {
@@ -53,6 +62,9 @@ func (service *ProductionService) SpecifyFeature(ctx context.Context, id kernel.
 func (service *ProductionService) MaterializeFeaturePlan(ctx context.Context, feature organization.FeatureRequest, plan organization.FeaturePlan) error {
 	if service == nil || service.Runtime == nil || service.ids == nil || service.clock == nil || plan.Validate(feature) != nil {
 		return organization.ErrInvalidFeature
+	}
+	if _, err := service.ensureFeaturePlanningStory(ctx, feature); err != nil {
+		return err
 	}
 	storyEvents := make(map[kernel.UUIDv7]kernel.UUIDv7, len(plan.Stories))
 	for _, story := range plan.Stories {
@@ -114,6 +126,19 @@ func (service *ProductionService) MaterializeFeaturePlan(ctx context.Context, fe
 		}
 	}
 	return service.preparePlannedTasks(ctx, feature, plan, storyEvents, taskEvents)
+}
+
+func (service *ProductionService) ensureFeaturePlanningStory(ctx context.Context, feature organization.FeatureRequest) (kernel.CommandReceipt, error) {
+	id := deterministicOperationalUUID("feature-planning-story", string(feature.ID))
+	payload, err := json.Marshal(map[string]any{
+		"title":               "Plan feature: " + feature.Input.Title,
+		"description":         feature.Input.Description,
+		"acceptance_criteria": feature.Input.AcceptanceCriteria,
+	})
+	if err != nil {
+		return kernel.CommandReceipt{}, err
+	}
+	return service.submitPlannedCommand(ctx, feature, "tekroo.command.story.create", kernel.AggregateStory, id, "planning-story", payload, nil)
 }
 
 func (service *ProductionService) submitPlannedCommand(ctx context.Context, feature organization.FeatureRequest, commandType string, kind kernel.AggregateKind, id kernel.UUIDv7, label string, payload []byte, parents []kernel.DagParent) (kernel.CommandReceipt, error) {

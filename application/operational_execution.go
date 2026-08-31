@@ -194,6 +194,7 @@ type ExecutionResultProtocol struct {
 }
 
 const ValidationResultMarker = "TEKROO_VALIDATION_RESULT:"
+const OrganizationalResultMarker = "TEKROO_ORGANIZATIONAL_RESULT:"
 
 const evidenceOnlyCoordinationRule = "RETURN_EVIDENCE_AND_PROPOSALS_TO_TEAMS_ONLY;DO_NOT_ADDRESS_OR_INVOKE_ANOTHER_AGENT"
 
@@ -339,6 +340,12 @@ func BuildExecutionBrief(current OperationalExecutionContext, maximumBytes int) 
 			SchemaVersion: "1.0.0", Marker: ValidationResultMarker,
 			Outcomes:    []string{"PASS", "FAIL", "BLOCKED", "INCONCLUSIVE"},
 			Instruction: "End the final response with the marker on its own line followed by exactly one JSON object containing schema_version, outcome, and non-empty reasons. Teams will reject missing or malformed results.",
+		}
+	} else if invocation.Purpose == kernel.PurposeHandoff || invocation.Purpose == kernel.PurposeReplan {
+		brief.ResultProtocol = &ExecutionResultProtocol{
+			SchemaVersion: "1.0.0", Marker: OrganizationalResultMarker,
+			Outcomes:    []string{"STRUCTURED_HANDOFF"},
+			Instruction: "End the final response with the marker on its own line followed by exactly one JSON object conforming to the result schema in the task description. Teams will reject missing, malformed, or extra fields.",
 		}
 	}
 	brief.SemanticContext = buildSemanticContextRequest(current, evidence)

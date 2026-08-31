@@ -8,6 +8,8 @@ import (
 	"io"
 
 	"github.com/tekroo-ai/teams/adapters/mcp"
+	"github.com/tekroo-ai/teams/adapters/mongo"
+	"github.com/tekroo-ai/teams/adapters/operationalruntime"
 	"github.com/tekroo-ai/teams/adapters/protocol"
 	"github.com/tekroo-ai/teams/kernel"
 	"github.com/tekroo-ai/teams/organization"
@@ -21,6 +23,10 @@ var (
 )
 
 type Organization interface {
+	Status() operationalruntime.ControlStatus
+	ReadTask(context.Context, kernel.UUIDv7) (mongo.TaskProjection, bool, error)
+	ReadStory(context.Context, kernel.UUIDv7) (mongo.StoryProjection, bool, error)
+	ReadInvocation(context.Context, kernel.UUIDv7) (operationalruntime.InvocationStatus, bool, error)
 	RoleRoster(context.Context) ([]organization.RoleInstanceState, error)
 	StartRole(context.Context, kernel.ActorFQN) (organization.RoleInstanceState, error)
 	StopRole(context.Context, kernel.ActorFQN) (organization.RoleInstanceState, error)
@@ -57,6 +63,57 @@ func (service *Service) CallTool(ctx context.Context, identity protocol.Authenti
 		return nil, ErrInvalidArguments
 	}
 	switch name {
+	case mcp.StatusToolName:
+		var input struct{}
+		if err := decodeStrict(arguments, &input); err != nil {
+			return nil, ErrInvalidArguments
+		}
+		return service.organization.Status(), nil
+	case mcp.TaskGetToolName:
+		var input struct {
+			ID kernel.UUIDv7 `json:"task_id"`
+		}
+		if err := decodeStrict(arguments, &input); err != nil || !input.ID.Valid() {
+			return nil, ErrInvalidArguments
+		}
+		value, found, err := service.organization.ReadTask(ctx, input.ID)
+		if err != nil {
+			return nil, err
+		}
+		if !found {
+			return nil, ErrNotFound
+		}
+		return value, nil
+	case mcp.StoryGetToolName:
+		var input struct {
+			ID kernel.UUIDv7 `json:"story_id"`
+		}
+		if err := decodeStrict(arguments, &input); err != nil || !input.ID.Valid() {
+			return nil, ErrInvalidArguments
+		}
+		value, found, err := service.organization.ReadStory(ctx, input.ID)
+		if err != nil {
+			return nil, err
+		}
+		if !found {
+			return nil, ErrNotFound
+		}
+		return value, nil
+	case mcp.InvocationGetToolName:
+		var input struct {
+			ID kernel.UUIDv7 `json:"invocation_id"`
+		}
+		if err := decodeStrict(arguments, &input); err != nil || !input.ID.Valid() {
+			return nil, ErrInvalidArguments
+		}
+		value, found, err := service.organization.ReadInvocation(ctx, input.ID)
+		if err != nil {
+			return nil, err
+		}
+		if !found {
+			return nil, ErrNotFound
+		}
+		return value, nil
 	case mcp.FeatureSubmitToolName:
 		var input organization.FeatureRequestInput
 		if err := decodeStrict(arguments, &input); err != nil || input.Validate() != nil {
