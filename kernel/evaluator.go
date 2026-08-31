@@ -146,6 +146,10 @@ func (e Evaluator) Evaluate(command KernelCommand, snapshot Snapshot, context De
 	if !validEvidenceRefs(command, snapshot) {
 		return rejectedAuthorizedDecision(command, context, fingerprint, OutcomeRejectedInvalid, reasonInvalidEvidence, authorityDecision), nil
 	}
+	phase4, outcome, reason, phase4Handled := evaluatePhase4Command(command, snapshot, context)
+	if phase4Handled && outcome != OutcomeApplied {
+		return rejectedAuthorizedDecision(command, context, fingerprint, outcome, reason, authorityDecision), nil
+	}
 	if outcome, reason := validateCommandPolicy(command, snapshot, context); outcome != OutcomeApplied {
 		return rejectedAuthorizedDecision(command, context, fingerprint, outcome, reason, authorityDecision), nil
 	}
@@ -164,13 +168,18 @@ func (e Evaluator) Evaluate(command KernelCommand, snapshot Snapshot, context De
 	lifecycleEpoch := uint64(1)
 	if nextState != nil {
 		lifecycleEpoch = nextState.LifecycleEpoch
+	} else if phase4Handled {
+		lifecycleEpoch = phase4.LifecycleEpoch
 	}
 	payload := append(json.RawMessage(nil), command.Payload...)
+	if phase4Handled {
+		payload = append(json.RawMessage(nil), phase4.EventPayload...)
+	}
 	event := DomainEvent{
 		ContractManifest:  ContractIdentity,
 		EventID:           context.EventID,
 		EventType:         definition.EventTypes[0],
-		EventVersion:      SchemaVersion,
+		EventVersion:      definition.Version,
 		Aggregate:         command.Target,
 		AggregateRevision: nextRevision,
 		LifecycleEpoch:    lifecycleEpoch,
@@ -185,6 +194,7 @@ func (e Evaluator) Evaluate(command KernelCommand, snapshot Snapshot, context De
 	}
 	revision := nextRevision
 	receipt := receiptFor(command, context, OutcomeApplied, reasonApplied, true, &revision, []UUIDv7{context.EventID})
+	outboxKind := outboxKindForCommand(command.CommandType)
 	return Decision{
 		CommandFingerprint: fingerprint,
 		IdempotencyScope:   idempotencyScope,
@@ -192,11 +202,19 @@ func (e Evaluator) Evaluate(command KernelCommand, snapshot Snapshot, context De
 		Events:             []DomainEvent{event},
 		Receipt:            receipt,
 		Authority:          authorityDecision,
-		Outbox:             []OutboxIntent{{IntentID: context.IntentID, EventID: context.EventID, Kind: "DOMAIN_EVENT"}},
+		Outbox:             []OutboxIntent{{IntentID: context.IntentID, EventID: context.EventID, Kind: outboxKind}},
 		Guards:             decisionGuards(command, authorityDecision),
 		Provenance:         provenance,
 		AttemptBudget:      attemptBudget,
+		WorkBudget:         phase4.WorkBudget,
 	}, nil
+}
+
+func outboxKindForCommand(commandType string) string {
+	if commandType == "tekroo.command.work-invocation.authorize" {
+		return "WORK_INVOCATION_AUTHORIZED"
+	}
+	return "DOMAIN_EVENT"
 }
 
 func decisionGuards(command KernelCommand, authority AuthorityDecision) DecisionGuards {
@@ -661,6 +679,8 @@ func commandCreatesAggregate(command KernelCommand) bool {
 	switch command.CommandType {
 	case "tekroo.command.story.create",
 		"tekroo.command.task.create",
+		"tekroo.command.work-budget.create",
+		"tekroo.command.work-invocation.authorize",
 		"tekroo.command.evidence.register",
 		"tekroo.command.execution.register",
 		"tekroo.command.completion-review.open",

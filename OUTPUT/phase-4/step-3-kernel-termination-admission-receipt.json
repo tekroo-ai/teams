@@ -1,0 +1,112 @@
+{
+  "schemaVersion": "1.0.0",
+  "phase": 4,
+  "step": 3,
+  "title": "Kernel termination and invocation admission",
+  "status": "PASS",
+  "startingCommit": "6a4a262461e967498e876090079c05a0cbb8ce1d",
+  "branch": "codex/phase4-step1-design-closure",
+  "contract": {
+    "identity": "tekroo.kernel.contracts/0.8.0",
+    "manifestSHA256": "c7eb4baae3a8312e44f9946fabde5a9cddb1937c7a41eb02d9b014ef21027ad1",
+    "structureReport": {
+      "path": "OUTPUT/phase-4/contract-0.8.0-structure-report.json",
+      "sha256": "4c77c26c1e5db663419c85b509315e6262be060584373310ae20da08449cfe4e",
+      "result": "PASS",
+      "checks": 3604
+    },
+    "referenceReport": {
+      "path": "OUTPUT/phase-4/contract-0.8.0-reference-report.json",
+      "sha256": "bc02542ed52dfa0dbfb09c5e3d82016d690d32569b0fef2fdb51a6647a7f55ec",
+      "result": "PASS",
+      "fixtures": 297
+    }
+  },
+  "implementationFiles": [
+    {
+      "path": "kernel/work_invocation.go",
+      "sha256": "955cbab6b5f1751a85479723837bc1ea6e1fd9bbfc96853f4efc4d9013adc1e7"
+    },
+    {
+      "path": "kernel/phase4_policy.go",
+      "sha256": "824b8d2ab3222a6dfcdae7c48232312539a4dbfc8f45f2850ed1900ea2e148e5"
+    },
+    {
+      "path": "kernel/evaluator.go",
+      "sha256": "6fe377ceab350a437a5fc23b3ce559b74b5386d0a2b9ef8d3094ae6a1f9c1b0c"
+    },
+    {
+      "path": "kernel/types.go",
+      "sha256": "07fa3e4df797712e8f96fcc191ef801f984aeb5b35f6406cd53a79793c2bdcf6"
+    },
+    {
+      "path": "kernel/envelope.go",
+      "sha256": "e0ea995a8e8c08d6d353bfd1b4cfca5c4c0e85bcee2912bfa8983e93b0ee3241"
+    },
+    {
+      "path": "adapters/memory/store.go",
+      "sha256": "171f22414534a14a0cca9ff77c7cce2384c1f972bd7584d063b844ce99040a48"
+    },
+    {
+      "path": "adapters/memory/phase4.go",
+      "sha256": "37514f1df515d92cc05ed880d2df5f727a056bb157029d6e4fa87686bcecb6a0"
+    },
+    {
+      "path": "adapters/mongo/store.go",
+      "sha256": "3945b61e0b5342cb1b9e53b689fd5f38d604fd4f4cd3bf5d48d5999d751aaea6"
+    },
+    {
+      "path": "adapters/mongo/phase4.go",
+      "sha256": "d0ad43b602a523f1cd928fa0e4d662a3bdc6eee6e2bec6a3b7da7f11c34ee500"
+    }
+  ],
+  "verificationFiles": [
+    {
+      "path": "kernel/work_invocation_test.go",
+      "sha256": "8da005c8123a891f646b800c1f9cb1cb5e3117e3f969adc2da3038abdc82bde2"
+    },
+    {
+      "path": "adapters/memory/store_test.go",
+      "sha256": "886809807439ac49a89965083cc37bf7c5d62d760605183da7bdf56f664f49cf"
+    },
+    {
+      "path": "internal/conformance/conformance_test.go",
+      "sha256": "016f37a76255c8eb642e1db0faa2d69c7f282ecc1cf73d09275bfe1ce8b4c233"
+    }
+  ],
+  "architectureRecord": {
+    "path": "docs/architecture/110-phase-4-step-3-kernel-termination-admission.md",
+    "sha256": "53a3b491b9f544e118b45dd5c2789b83f2f5fda10648dee82407ca471842f739"
+  },
+  "tests": [
+    {
+      "command": "go test -count=1 ./...",
+      "result": "PASS"
+    },
+    {
+      "command": "go test -race -count=1 ./kernel ./adapters/memory ./application",
+      "result": "PASS"
+    },
+    {
+      "command": "go vet ./...",
+      "result": "PASS"
+    }
+  ],
+  "provedProperties": [
+    "finite root budget bounds all accepted changed-condition invocations",
+    "task rebinding cannot reset the budget account or erase consumed capacity",
+    "only work-invocation authorization emits executable work",
+    "invocation permit is single use",
+    "budget debit and invocation creation commit atomically",
+    "stale competing debit fails closed",
+    "unchanged condition requires the exact retryable terminal predecessor",
+    "handoff, replan, review, repair, promotion, actor replacement, model replacement, restart, and child-task creation cannot mint root capacity"
+  ],
+  "notRun": [
+    "Phase 4 Step 4 task/story projections",
+    "Phase 4 Step 5 OpenHands execution coordination",
+    "service start or deployment",
+    "production or historical data access"
+  ],
+  "recommendation": "ACCEPT_PHASE_4_STEP_3_AND_AUTHORIZE_STEP_4"
+}

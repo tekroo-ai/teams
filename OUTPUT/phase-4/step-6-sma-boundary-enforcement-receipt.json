@@ -1,0 +1,82 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "PHASE_4_STEP_6_SMA_BOUNDARY_ENFORCEMENT_RECEIPT",
+  "status": "PASS",
+  "date": "2026-08-31",
+  "startingIdentity": {
+    "commit": "6a4a262461e967498e876090079c05a0cbb8ce1d",
+    "tree": "86061116c9eb58e5c55d231d73d121fb174be34f"
+  },
+  "contract": {
+    "identity": "tekroo.kernel.contracts/0.8.0",
+    "manifestSHA256": "c7eb4baae3a8312e44f9946fabde5a9cddb1937c7a41eb02d9b014ef21027ad1",
+    "structure": {
+      "status": "PASS",
+      "cases": 3604,
+      "reportSHA256": "fe88ec20d984ee2a547bb010847abd09d7aaea82dd0939921e39e97e2336b958"
+    },
+    "reference": {
+      "status": "PASS",
+      "cases": 297,
+      "reportSHA256": "0327158c444d5159d8d797378cafa61b5508f6bed68fbd104c52eb6f1aaa3f7a"
+    }
+  },
+  "acceptedStep15Binding": {
+    "status": "PASS_ACCEPTED",
+    "claim": "INTEGRATED_RUNTIME_TUPLE_QUALIFIED",
+    "step15Status": "COMPLETE_ACCEPTED",
+    "packageIdentity": "fd04a04c453b00d89196471c506d947e093dce3315441b7c810c065055888e23",
+    "executionIdentity": "c54f7e8cb2d76f07a76acaf9a397fcb02017d73e5445eca6cd78ada3a745b858",
+    "scientificReceiptSHA256": "5f103e5ed9f6f335834ba5fd786e9a08341d8cb783eb7a5061d13c4309dc61e6",
+    "adjudicationRecordSHA256": "bb351a8e87dd41d2ade1b40f74fd091fc940ebb451e32f54416675cc02f3a62a",
+    "launchDefinitionSHA256": "e37a3ba454d757fb73312c21d0db0901fc9cae3e8ffd639c92b25228fc2c156f",
+    "s1AcceptanceSHA256": "3315838d0c5047189494cece49b953481431321d16e238efa338712be076bee4",
+    "s2AcceptanceSHA256": "cac6cd68ff7b60fdd36a593779221ce90b6553a570b71f6fb90b6f593184e0c3",
+    "m1AcceptanceSHA256": "e97a6fb8ba1dab2837f96d2253a73d142e11a055c9fbf94b67ec6fb4498b8f3e",
+    "scenarios": 18,
+    "repetitions": 96
+  },
+  "implementationFiles": {
+    "application/operational_execution.go": "c5a2cd38b457f8f163d44d808d1a5c2ec7361ea4998228701a0773fade47136a",
+    "adapters/openhands/client.go": "cd5a586bffa52f99651a9a5ac7b49d1ea356352393956828a4592b4536438a1b",
+    "adapters/openhands/bindings.go": "05302a880299934c19fcb0f94389e687a3e6de32f0a97492cc1c684d0a3a782e",
+    "docs/architecture/113-phase-4-step-6-sma-boundary-enforcement.md": "d0f49392b755adf1b66b1184c84495df06dbea9117eef74b8e9c38d5a1abc636"
+  },
+  "testFiles": {
+    "application/operational_execution_coordinator_test.go": "6c107b3e3747e83e42aa0d23daa47ddaeb95cdbe06c93db612d8ca73d6ccb1c0",
+    "adapters/openhands/client_test.go": "c081daca1741fc6a8231b4b340928ff43b6d312e37afe7c7135bf792f92a9a36",
+    "adapters/openhands/bindings_test.go": "c435d28c260e829c778b341bebd79acb62147e20b23d1b1d2926902d31264e1a"
+  },
+  "verification": {
+    "fullGoSuite": "PASS",
+    "focusedRaceSuite": "PASS",
+    "retainedStep15IdentityAndSourceBinding": "PASS",
+    "goVet": "PASS",
+    "gitDiffCheck": "PASS"
+  },
+  "demonstratedProperties": [
+    "TEAMS_SUPPLIES_EXACT_READ_ONLY_TASK_AND_PROVENANCE_METADATA",
+    "OPENHANDS_USER_PROMPT_HOOK_IS_THE_ONLY_SMA_RETRIEVAL_PATH",
+    "RECALLED_CONTEXT_IS_LABELLED_BOUNDED_AND_NON_AUTHORITATIVE",
+    "MISSING_TEAMS_AUTHORITY_NEVER_FALLS_BACK_TO_SMA",
+    "SEMANTIC_CONTEXT_METADATA_MUST_MATCH_THE_ENCLOSING_EXECUTION_BRIEF",
+    "STALE_CONTRADICTORY_OR_MALICIOUS_RECALL_CANNOT_ISSUE_TEAMS_COMMANDS",
+    "AGENT_OUTPUT_REMAINS_EVIDENCE_AND_CANNOT_DIRECTLY_CHAIN_EXECUTION",
+    "TEAMS_AND_SMA_DATABASE_IDENTITIES_ARE_DISTINCT",
+    "DIRECT_CROSS_DATABASE_CAPABILITIES_ARE_REJECTED",
+    "EXACT_ACCEPTED_MODEL_RUNTIME_HOOK_AND_STEP15_IDENTITIES_ARE_REQUIRED"
+  ],
+  "notRun": [
+    "LIVE_OPENHANDS_CONVERSATION",
+    "LIVE_SMA_REQUEST",
+    "MODEL_CALL",
+    "SMA_SOURCE_OR_CONFIGURATION_CHANGE",
+    "SERVICE_START_OR_RESTART",
+    "DEPLOYMENT",
+    "PRODUCTION_DATABASE_ACCESS",
+    "HISTORICAL_DATA_ACCESS",
+    "MIGRATION",
+    "PHASE_4_STEP_7",
+    "PHASE_4_STEP_8"
+  ]
+}

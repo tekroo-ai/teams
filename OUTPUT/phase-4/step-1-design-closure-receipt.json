@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "1.0.0",
+  "phase": "4",
+  "step": "1",
+  "verdict": "READY_FOR_PRINCIPAL_REVIEW",
+  "baseline": {
+    "teamsCommit": "6a4a262461e967498e876090079c05a0cbb8ce1d",
+    "teamsContract": "0.7.0"
+  },
+  "artifacts": [
+    {
+      "path": "docs/architecture/107-phase-4-operational-teams-runtime-plan.md",
+      "sha256": "e39593ae76b83d01d9fb01271875310d43f6f5293812a3eccd71e638aae0dabc"
+    },
+    {
+      "path": "docs/architecture/108-phase-4-step-1-design-closure.md",
+      "sha256": "2c1d0ea47aad889da3d8c6c3325cbf29503439563feac8ff0994c20a38339688"
+    },
+    {
+      "path": "OUTPUT/phase-4/step-1-state-ownership-matrix.json",
+      "sha256": "d93c0de4139c91546238b84d4bd2d826adf7e963e0d7b8290609d6a50e82e337"
+    }
+  ],
+  "checks": {
+    "unresolvedDesignOwnershipDecisions": 0,
+    "computableInvocationBound": true,
+    "acceptedContractModified": false,
+    "teamsProductCodeModified": false,
+    "smaModified": false,
+    "servicesTouched": false,
+    "databasesTouched": false
+  },
+  "recommendedDecision": "ACCEPT_PHASE_4_STEP_1_AND_AUTHORIZE_STEP_2_CONTRACT_0_8_0",
+  "step2Authorized": false
+}

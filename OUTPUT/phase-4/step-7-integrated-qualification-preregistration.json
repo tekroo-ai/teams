@@ -1,0 +1,104 @@
+{
+  "schemaVersion": "1.0.0",
+  "qualification": "PHASE_4_STEP_7_INTEGRATED_QUALIFICATION",
+  "contractIdentity": "tekroo.kernel.contracts/0.8.0",
+  "contractManifestSHA256": "c7eb4baae3a8312e44f9946fabde5a9cddb1937c7a41eb02d9b014ef21027ad1",
+  "statusBeforeExecution": "NOT_RUN",
+  "runtimeSubject": {
+    "assembly": "adapters/operationalruntime.Runtime",
+    "workerConcurrencyLimit": 2,
+    "openHandsBoundary": "adapters/openhands.Client",
+    "semanticMemoryBinding": "PHASE_3_STEP_15_ACCEPTED_TUPLE",
+    "teamsAuthorityDatabase": "disposable MongoDB replica set",
+    "smaMemoryDatabase": "separate identity; no direct Teams access"
+  },
+  "boundFiles": {
+    "adapters/operationalruntime/runtime.go": "10215e5beb6ad41ed503b06ec331010608a7958d8c1d7300e0b3480ac26ec318",
+    "adapters/operationalruntime/system.go": "536b7df07e80ea6a72f63f5b4649f7cbbbc2e43ff8417cbf83b3964cf90efe46",
+    "adapters/operationalruntime/integration_test.go": "04fcd8e5e980f72d31b366998cd811b4317592544650601852d54df9631cd3aa",
+    "adapters/executionruntime/worker.go": "99c7c569bcde263750517d95519ba6709c7eec546ef74a13014c22bc6997d41b",
+    "adapters/openhands/client.go": "14d15a31d3f5b9788f5d19fc5cc1cea931eb27bd80ebcb2b90dda1bb937761cf",
+    "application/operational_execution.go": "c5a2cd38b457f8f163d44d808d1a5c2ec7361ea4998228701a0773fade47136a",
+    "application/operational_execution_coordinator.go": "7f50f45b5341be31d1f36a68046a171468032ccf4341e1ae4863e4b468a26d54",
+    "kernel/work_invocation.go": "503530fa06b4e025cc3f76177e84b75185549ffbd32c53e1158370cb495a2188",
+    "adapters/mongo/operational_projection.go": "13e8d7b22600decb4185ac4dded8279b713ffd359bc68efa0fc343652549f856"
+  },
+  "scenarios": [
+    {
+      "id": 1,
+      "name": "normal single-owner completion",
+      "evidence": ["assembled-runtime"]
+    },
+    {
+      "id": 2,
+      "name": "explicit DAG decomposition and deterministic join",
+      "evidence": ["kernel-termination", "contract-reference"]
+    },
+    {
+      "id": 3,
+      "name": "ordinary and co-opted A/B wakeup loop rejection",
+      "evidence": ["contract-reference", "kernel-termination"]
+    },
+    {
+      "id": 4,
+      "name": "changed-evidence review and repair",
+      "evidence": ["contract-reference", "kernel-termination", "application-recovery"]
+    },
+    {
+      "id": 5,
+      "name": "handoff promotion and replanning preserve finite inherited budget",
+      "evidence": ["contract-reference", "kernel-termination"]
+    },
+    {
+      "id": 6,
+      "name": "budget exhaustion rejects execution and bounded escalation is terminal",
+      "evidence": ["contract-reference", "kernel-termination"]
+    },
+    {
+      "id": 7,
+      "name": "restart stale result duplicate delivery timeout and cancellation",
+      "evidence": ["application-recovery", "worker-recovery", "mongo-projections"]
+    },
+    {
+      "id": 8,
+      "name": "task/story incremental projection and exact rebuild",
+      "evidence": ["assembled-runtime", "mongo-projections"]
+    },
+    {
+      "id": 9,
+      "name": "absent stale contradictory and cross-partition SMA context is non-authoritative",
+      "evidence": ["sma-boundary", "application-recovery"]
+    },
+    {
+      "id": 10,
+      "name": "concurrent independent tasks do not leak task state or budget",
+      "evidence": ["assembled-runtime"]
+    }
+  ],
+  "executions": {
+    "contract-validation": "node CONTRACTS/tekroo.kernel.contracts/0.8.0/runner/validate-package.mjs OUTPUT/phase-4/step-7-raw/contract-validation.json",
+    "contract-reference": "node CONTRACTS/tekroo.kernel.contracts/0.8.0/runner/reference-runner.mjs OUTPUT/phase-4/step-7-raw/contract-reference.json",
+    "assembled-runtime": "go test -json -tags mongo_integration ./adapters/operationalruntime -run ^TestAssembledRuntimeExecutesIndependentAuthorizedTasksConcurrentlyAndBuildsOperationalViews$ -count=1",
+    "kernel-termination": "go test -json ./kernel -run ^(TestGeneratedDAGsAcceptOnlyAcyclicExistingNodes|TestValidationJoinProjectionIsCanonicalAndOrderIndependent|TestWorkInvocationAdmissionFailsClosedAcrossEveryIdentityAndBudgetBoundary|TestUnchangedConditionRequiresExactRetryableTerminal|TestEveryNamedResetMechanismRetainsTheRootBound|TestFiniteRootBudgetBoundsAllAcceptedChangedConditionInvocations|TestOnlyInvocationAuthorizationCreatesExecutableWork|TestEscalationIsExactBoundedAndTerminal|TestTerminalEscalationCannotBeReopened|TestBoundedValidationEnforcesExactAuthorityDeadlineRoundAndSupersession|TestReopeningPlanIsExplicitCanonicalAndTerminalOnly)$ -count=1",
+    "application-recovery": "go test -json ./application -run ^(TestOperationalCoordinatorExecutesOneInvocationAndNeverChainsAgentProse|TestOperationalCoordinatorReconcilesAmbiguousStartWithoutDuplicateSubmission|TestOperationalCoordinatorRestartFromClaimedReconcilesBeforeStart|TestOperationalCoordinatorFailsClosedBeforeProviderOnStaleFence|TestOperationalCoordinatorExpiresUnclaimedInvocationWithoutProviderCall|TestOperationalCoordinatorHonorsDurableCancellationAndRecordsTerminalEvidence|TestOperationalCoordinatorRecordsProviderTimeoutAsTerminalEvidence|TestOperationalCoordinatorLeavesUnknownStartClaimedForLaterReconciliation|TestOperationalCoordinatorRecoversTerminalEvidenceWriteAfterStartedCheckpoint|TestCompletionCoordinatorEmitsExplicitReopeningWithoutActorImpersonation)$ -count=1",
+    "worker-recovery": "go test -json ./adapters/executionruntime -run ^(TestWorkerHoldsLeaseUntilTerminalAndResolvesOnce|TestWorkerYieldsUnknownOutcomeAfterBoundedReconciliation|TestWorkerResolvesStaleAuthorityWithoutCallingAgain)$ -count=1",
+    "mongo-projections": "go test -json -tags mongo_integration ./adapters/mongo -run ^(TestCommittedStateSurvivesApplicationRestart|TestOperationalProjectionsApplyIdempotentlyAndRebuildExactly|TestOperationalProjectionGapFailsClosedAndRetainsFault|TestChangeStreamOpensBeforeBacklogWithoutGap|TestClaimLifecycleIsOneWinnerAndEpochFenced|TestOperationalExecutionReaderReconstructsAuthoritativeMongoContext)$ -count=1",
+    "sma-boundary": "go test -json ./adapters/openhands -run ^(TestBoundResolversRequireExactImmutableIdentityTuple|TestSemanticMemoryBindingRejectsTupleHookAndAuthorityDrift|TestAcceptedSemanticMemoryBindingRequiresQualifiedHookAndSeparateStores|TestAcceptedSemanticMemoryBindingMatchesRetainedStep15Evidence|TestClientRejectsWorkspaceOrProfileDriftBeforeHTTP|TestClientRejectsAuthoritativeOrIncompleteSemanticContextBeforeHTTP)$ -count=1"
+  },
+  "passCriteria": [
+    "Every bound file hash remains exact.",
+    "The contract validator and reference runner both return PASS.",
+    "Every selected Go test emits pass and every package exits successfully.",
+    "The assembled runtime reaches two terminal SUCCEEDED invocations with peak concurrency at least two.",
+    "Each assembled task projection records exactly one consumed invocation from its own budget.",
+    "No direct agent wakeup, budget reset, stale authority, or authoritative SMA context reaches OpenHands.",
+    "No production or historical namespace is read or modified."
+  ],
+  "prohibited": [
+    "production deployment",
+    "historical data access",
+    "v3 mutation",
+    "SMA lifecycle changes",
+    "unqualified model substitution"
+  ]
+}

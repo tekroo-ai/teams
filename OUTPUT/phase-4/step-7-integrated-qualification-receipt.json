@@ -1,0 +1,158 @@
+{
+  "schemaVersion": "1.0.0",
+  "qualification": "PHASE_4_STEP_7_INTEGRATED_QUALIFICATION",
+  "contractIdentity": "tekroo.kernel.contracts/0.8.0",
+  "contractManifestSha256": "c7eb4baae3a8312e44f9946fabde5a9cddb1937c7a41eb02d9b014ef21027ad1",
+  "preregistrationSha256": "1ff70cb47ed3457e1b97cb66512f9d6e7d03ba4417d8b38264cc96762b74108e",
+  "status": "PASS",
+  "assembledRuntimeIdentity": "32beef3756531111fa3d4fa8fcc986fe2b6423fc3430ce5d4f49e9a133156018",
+  "computedInvocationCeiling": 6,
+  "loopTerminalReason": "BUDGET_EXHAUSTED",
+  "concurrentInvocationFloor": 2,
+  "commands": [
+    {
+      "name": "contract-validation",
+      "status": "PASS",
+      "exitCode": 0,
+      "passedTests": 0,
+      "failedTests": 0,
+      "rawReceiptPath": "OUTPUT/phase-4/step-7-raw/contract-validation.stdout.txt",
+      "rawSha256": "7e13ae8c8dd4d8ecdab46add640e9bcc8a2d1aa449569d1adba4ca93a06784e0"
+    },
+    {
+      "name": "contract-reference",
+      "status": "PASS",
+      "exitCode": 0,
+      "passedTests": 0,
+      "failedTests": 0,
+      "rawReceiptPath": "OUTPUT/phase-4/step-7-raw/contract-reference.stdout.txt",
+      "rawSha256": "159e0a8776a036d8c498b3adb566405e0fe6be351eccea92883105215869edf4"
+    },
+    {
+      "name": "assembled-runtime",
+      "status": "PASS",
+      "exitCode": 0,
+      "passedTests": 1,
+      "failedTests": 0,
+      "rawReceiptPath": "OUTPUT/phase-4/step-7-raw/assembled-runtime.jsonl",
+      "rawSha256": "97fe3217760915fec4e8d39f6f14d8298bcaf0d85bdc50214a20bc84426cb05d"
+    },
+    {
+      "name": "kernel-termination",
+      "status": "PASS",
+      "exitCode": 0,
+      "passedTests": 38,
+      "failedTests": 0,
+      "rawReceiptPath": "OUTPUT/phase-4/step-7-raw/kernel-termination.jsonl",
+      "rawSha256": "2b2b10c2dc4436b66ba7322eb346c5093604e357993014924c6af360093a289c"
+    },
+    {
+      "name": "application-recovery",
+      "status": "PASS",
+      "exitCode": 0,
+      "passedTests": 10,
+      "failedTests": 0,
+      "rawReceiptPath": "OUTPUT/phase-4/step-7-raw/application-recovery.jsonl",
+      "rawSha256": "0ac6b0bead4345fc69dc4f536e618022720126993863b73befc46655519f3847"
+    },
+    {
+      "name": "worker-recovery",
+      "status": "PASS",
+      "exitCode": 0,
+      "passedTests": 3,
+      "failedTests": 0,
+      "rawReceiptPath": "OUTPUT/phase-4/step-7-raw/worker-recovery.jsonl",
+      "rawSha256": "a5141c10c2e33afaef8a830644ee50808c651cdc9b0a6f3f71c4a025316ea41c"
+    },
+    {
+      "name": "mongo-projections",
+      "status": "PASS",
+      "exitCode": 0,
+      "passedTests": 6,
+      "failedTests": 0,
+      "rawReceiptPath": "OUTPUT/phase-4/step-7-raw/mongo-projections.jsonl",
+      "rawSha256": "d404395c36ff42c700bcdee203886d6dccb7edaebdcf7ccf1108ce44afc26974"
+    },
+    {
+      "name": "sma-boundary",
+      "status": "PASS",
+      "exitCode": 0,
+      "passedTests": 25,
+      "failedTests": 0,
+      "rawReceiptPath": "OUTPUT/phase-4/step-7-raw/sma-boundary.jsonl",
+      "rawSha256": "7e57984c90be9c6a4592390980810da2aa8b873420da01efd1fde10d29091d36"
+    }
+  ],
+  "scenarios": [
+    {
+      "id": 1,
+      "name": "normal single-owner completion",
+      "status": "PASS"
+    },
+    {
+      "id": 2,
+      "name": "explicit DAG decomposition and deterministic join",
+      "status": "PASS"
+    },
+    {
+      "id": 3,
+      "name": "ordinary and co-opted A/B wakeup loop rejection",
+      "status": "PASS"
+    },
+    {
+      "id": 4,
+      "name": "changed-evidence review and repair",
+      "status": "PASS"
+    },
+    {
+      "id": 5,
+      "name": "handoff promotion and replanning preserve finite inherited budget",
+      "status": "PASS"
+    },
+    {
+      "id": 6,
+      "name": "budget exhaustion rejects execution and bounded escalation is terminal",
+      "status": "PASS"
+    },
+    {
+      "id": 7,
+      "name": "restart stale result duplicate delivery timeout and cancellation",
+      "status": "PASS"
+    },
+    {
+      "id": 8,
+      "name": "task/story incremental projection and exact rebuild",
+      "status": "PASS"
+    },
+    {
+      "id": 9,
+      "name": "absent stale contradictory and cross-partition SMA context is non-authoritative",
+      "status": "PASS"
+    },
+    {
+      "id": 10,
+      "name": "concurrent independent tasks do not leak task state or budget",
+      "status": "PASS"
+    }
+  ],
+  "boundFiles": {
+    "adapters/executionruntime/worker.go": "99c7c569bcde263750517d95519ba6709c7eec546ef74a13014c22bc6997d41b",
+    "adapters/mongo/operational_projection.go": "13e8d7b22600decb4185ac4dded8279b713ffd359bc68efa0fc343652549f856",
+    "adapters/openhands/client.go": "14d15a31d3f5b9788f5d19fc5cc1cea931eb27bd80ebcb2b90dda1bb937761cf",
+    "adapters/operationalruntime/integration_test.go": "04fcd8e5e980f72d31b366998cd811b4317592544650601852d54df9631cd3aa",
+    "adapters/operationalruntime/runtime.go": "10215e5beb6ad41ed503b06ec331010608a7958d8c1d7300e0b3480ac26ec318",
+    "adapters/operationalruntime/system.go": "536b7df07e80ea6a72f63f5b4649f7cbbbc2e43ff8417cbf83b3964cf90efe46",
+    "application/operational_execution.go": "c5a2cd38b457f8f163d44d808d1a5c2ec7361ea4998228701a0773fade47136a",
+    "application/operational_execution_coordinator.go": "7f50f45b5341be31d1f36a68046a171468032ccf4341e1ae4863e4b468a26d54",
+    "kernel/work_invocation.go": "503530fa06b4e025cc3f76177e84b75185549ffbd32c53e1158370cb495a2188"
+  },
+  "prohibitedActivity": {
+    "deployment": "NOT_RUN",
+    "historicalDataAccess": "NOT_RUN",
+    "liveModelCall": "NOT_RUN",
+    "productionDataAccess": "NOT_RUN",
+    "smaLifecycleChange": "NOT_RUN",
+    "v3Mutation": "NOT_RUN"
+  },
+  "receiptSha256": "0b16c702e54a93d9f8e67be0e976bea522c9810cb64c5bac81d53e1605cf4fe4"
+}

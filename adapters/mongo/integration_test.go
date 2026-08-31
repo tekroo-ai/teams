@@ -28,7 +28,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
-const testManifestSHA = kernel.Digest("e2b9b5224a860a3eaa07451cf48fb5ac16a440b22b8dd592ff1662c1cff67f16")
+const testManifestSHA = kernel.Digest("c7eb4baae3a8312e44f9946fabde5a9cddb1937c7a41eb02d9b014ef21027ad1")
 
 var (
 	testMongoURI string
@@ -62,7 +62,7 @@ func TestStartupRejectsUnsupportedTopology(t *testing.T) {
 }
 
 func TestStartupPinsMetadataAndRequiredIndexes(t *testing.T) {
-	manifest, err := os.ReadFile("../../CONTRACTS/tekroo.kernel.contracts/0.7.0/manifest.json")
+	manifest, err := os.ReadFile("../../CONTRACTS/tekroo.kernel.contracts/0.8.0/manifest.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -605,6 +605,153 @@ func TestModelCapabilityProjectionsRoundTrip(t *testing.T) {
 	}
 }
 
+func TestOperationalProjectionsApplyIdempotentlyAndRebuildExactly(t *testing.T) {
+	store := openTestStore(t)
+	story := kernel.AggregateRef{Kind: kernel.AggregateStory, ID: testUUID(8701)}
+	task := kernel.AggregateRef{Kind: kernel.AggregateTask, ID: testUUID(8702)}
+	budget := kernel.AggregateRef{Kind: kernel.AggregateWorkBudget, ID: testUUID(8703)}
+	storyState := kernel.AggregateState{Kind: kernel.AggregateStory, ID: story.ID, Revision: 1, LifecycleEpoch: 1, ScopeRevision: 1, Phase: kernel.PhaseDraft, Condition: kernel.ConditionRunnable}
+	taskState := kernel.AggregateState{Kind: kernel.AggregateTask, ID: task.ID, Revision: 3, LifecycleEpoch: 1, ScopeRevision: 1, Phase: kernel.PhasePlanned, Condition: kernel.ConditionRunnable}
+	insertProjectionAggregate(t, store, storyState)
+	insertProjectionAggregate(t, store, taskState)
+
+	storyCreated := projectionMongoEvent(story, 1, testUUID(8711), "tekroo.event.story.created", json.RawMessage(`{"acceptance_criteria":["all projections agree"],"description":"Operational read model.","title":"Projection story"}`))
+	taskCreated := projectionMongoEvent(task, 1, testUUID(8712), "tekroo.event.task.created", json.RawMessage(fmt.Sprintf(`{"acceptance_criteria":["view is rebuildable"],"depends_on":[],"description":"Project one task.","story_id":"%s","title":"Projection task"}`, story.ID)))
+	profile := mongoTestWorkProfile(task.ID)
+	profilePayload, err := json.Marshal(profile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	profileBound := projectionMongoEvent(task, 2, testUUID(8713), "tekroo.event.task.work-profile-bound", profilePayload)
+	purposeLimits := make(kernel.PurposeCounters, len(kernel.AllWorkPurposes))
+	purposeUsed := make(kernel.PurposeCounters, len(kernel.AllWorkPurposes))
+	for _, purpose := range kernel.AllWorkPurposes {
+		purposeLimits[purpose] = 1
+		purposeUsed[purpose] = 0
+	}
+	budgetBoundPayload, err := json.Marshal(map[string]any{"budget_account_id": budget.ID, "expected_task_revision": 2, "lifecycle_epoch": 1, "purpose_limits": purposeLimits, "scope_revision": 1, "task_id": task.ID, "task_model_invocation_limit": 3})
+	if err != nil {
+		t.Fatal(err)
+	}
+	budgetBound := projectionMongoEvent(task, 3, testUUID(8714), "tekroo.event.task.work-budget-bound", budgetBoundPayload)
+	for _, event := range []kernel.DomainEvent{storyCreated, taskCreated, profileBound, budgetBound} {
+		insertProjectionEvent(t, store, event)
+	}
+	profileSnapshot := kernel.WorkProfileSnapshot{Profile: profile, TaskRevision: 2, BoundEventID: profileBound.EventID}
+	insertProjectionValue(t, store, "work_profiles", aggregateKey(task), struct {
+		Task    kernel.AggregateRef        `json:"task"`
+		Profile kernel.WorkProfileSnapshot `json:"profile"`
+	}{task, profileSnapshot})
+	account := kernel.WorkBudgetAccount{ID: budget.ID, Revision: 1, RootWork: story, LifecycleEpoch: 1, PolicyRevision: 1, PolicyDigest: kernel.Digest("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), ModelInvocationLimit: 3, PurposeLimits: purposeLimits, PurposeUsed: purposeUsed, DeadlineAt: time.Date(2026, 9, 30, 0, 0, 0, 0, time.UTC), LastEventID: testUUID(8715)}
+	insertProjectionValue(t, store, "work_budget_accounts", aggregateKey(budget), workBudgetValue{Reference: budget, Account: account})
+	binding := kernel.TaskWorkBudgetBinding{TaskID: task.ID, BudgetAccountID: budget.ID, TaskRevision: 3, LifecycleEpoch: 1, ScopeRevision: 1, ModelInvocationLimit: 3, PurposeLimits: purposeLimits, PurposeUsed: purposeUsed, BoundEventID: budgetBound.EventID}
+	insertProjectionValue(t, store, "task_work_budgets", aggregateKey(task), taskBudgetValue{Task: task, Binding: binding})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	applied, err := store.ProjectPendingOperationalEvents(ctx, time.Date(2026, 8, 31, 12, 0, 0, 0, time.UTC))
+	if err != nil || applied != 4 {
+		t.Fatalf("project pending = %d, %v", applied, err)
+	}
+	taskProjection, found, err := store.ReadTaskProjection(ctx, task.ID)
+	if err != nil || !found || taskProjection.StoryID != story.ID || taskProjection.Budget.AccountID != budget.ID || taskProjection.ProjectionRevision != 3 {
+		t.Fatalf("task projection = %#v, found=%t, err=%v", taskProjection, found, err)
+	}
+	storyProjection, found, err := store.ReadStoryProjection(ctx, story.ID)
+	if err != nil || !found || len(storyProjection.TaskIDs) != 1 || storyProjection.TaskIDs[0] != task.ID || storyProjection.ProjectionRevision != 4 {
+		t.Fatalf("story projection = %#v, found=%t, err=%v", storyProjection, found, err)
+	}
+	duplicate, err := store.ApplyOperationalProjectionEvent(ctx, budgetBound.EventID, time.Date(2026, 8, 31, 12, 1, 0, 0, time.UTC))
+	if err != nil || !duplicate.Duplicate || duplicate.Applied {
+		t.Fatalf("duplicate application = %#v, %v", duplicate, err)
+	}
+	olderDuplicate, err := store.ApplyOperationalProjectionEvent(ctx, taskCreated.EventID, time.Date(2026, 8, 31, 12, 1, 30, 0, time.UTC))
+	if err != nil || !olderDuplicate.Duplicate || olderDuplicate.Applied {
+		t.Fatalf("older duplicate application = %#v, %v", olderDuplicate, err)
+	}
+	rebuild, err := store.RebuildOperationalProjections(ctx, time.Date(2026, 8, 31, 12, 2, 0, 0, time.UTC))
+	if err != nil || !rebuild.ExactMatch || !rebuild.ReplacementApplied || rebuild.StoryCount != 1 || rebuild.TaskCount != 1 {
+		t.Fatalf("rebuild = %#v, %v", rebuild, err)
+	}
+	database := store.db.Name()
+	restartCtx, restartCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	if err := store.Close(restartCtx); err != nil {
+		restartCancel()
+		t.Fatal(err)
+	}
+	restartCancel()
+	restartCtx, restartCancel = context.WithTimeout(context.Background(), 15*time.Second)
+	reopened, err := Open(restartCtx, testConfig(testMongoURI, database))
+	restartCancel()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cleanupCancel()
+		_ = reopened.db.Drop(cleanupCtx)
+		_ = reopened.Close(cleanupCtx)
+	})
+	store = reopened
+	postRestart, err := store.ProjectPendingOperationalEvents(ctx, time.Date(2026, 8, 31, 12, 2, 30, 0, time.UTC))
+	if err != nil || postRestart != 0 {
+		t.Fatalf("post-restart projection count = %d, %v", postRestart, err)
+	}
+	taskProjection, found, err = store.ReadTaskProjection(ctx, task.ID)
+	if err != nil || !found || taskProjection.ProjectionRevision != 3 {
+		t.Fatalf("projection after restart = %#v, found=%t, err=%v", taskProjection, found, err)
+	}
+
+	taskProjection.Phase = "CORRUPTED"
+	corrupt, err := projectionDocument(taskProjection)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.db.Collection("task_projections").ReplaceOne(ctx, bson.D{{Key: "_id", Value: corrupt.ID}}, corrupt); err != nil {
+		t.Fatal(err)
+	}
+	authoritative, err := store.loadSnapshot(ctx, task, nil)
+	if err != nil || authoritative.State == nil || authoritative.State.Phase != kernel.PhasePlanned {
+		t.Fatalf("corrupt read projection affected authority = %#v, %v", authoritative.State, err)
+	}
+	mismatch, err := store.RebuildOperationalProjections(ctx, time.Date(2026, 8, 31, 12, 3, 0, 0, time.UTC))
+	if !errors.Is(err, ErrProjectionRebuildMismatch) || mismatch.ExactMatch || mismatch.ReplacementApplied {
+		t.Fatalf("mismatch rebuild = %#v, %v", mismatch, err)
+	}
+	retained, found, err := store.ReadTaskProjection(ctx, task.ID)
+	if err != nil || !found || retained.Phase != "CORRUPTED" {
+		t.Fatalf("mismatch replaced live projection = %#v, found=%t, err=%v", retained, found, err)
+	}
+}
+
+func TestOperationalProjectionGapFailsClosedAndRetainsFault(t *testing.T) {
+	store := openTestStore(t)
+	task := kernel.AggregateRef{Kind: kernel.AggregateTask, ID: testUUID(8751)}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if _, err := store.db.Collection("aggregates").InsertOne(ctx, aggregateDocument{ID: aggregateKey(task), Revision: 2}); err != nil {
+		t.Fatal(err)
+	}
+	event := projectionMongoEvent(task, 2, testUUID(8752), "tekroo.event.task.work-budget-bound", json.RawMessage(`{}`))
+	insertProjectionEvent(t, store, event)
+	result, err := store.ApplyOperationalProjectionEvent(ctx, event.EventID, time.Date(2026, 8, 31, 13, 0, 0, 0, time.UTC))
+	if !errors.Is(err, ErrProjectionGap) || result.Fault == nil || result.Fault.FaultKind != "REVISION_GAP" || result.Applied {
+		t.Fatalf("gap result = %#v, %v", result, err)
+	}
+	faults, err := store.db.Collection("projection_faults").CountDocuments(ctx, bson.D{})
+	if err != nil || faults != 1 {
+		t.Fatalf("fault count = %d, %v", faults, err)
+	}
+	faultRecords, err := store.ReadProjectionFaults(ctx)
+	if err != nil || len(faultRecords) != 1 || faultRecords[0].Aggregate != task || faultRecords[0].FaultKind != "REVISION_GAP" {
+		t.Fatalf("fault records = %#v, %v", faultRecords, err)
+	}
+	checkpoints, err := store.db.Collection("projection_checkpoints").CountDocuments(ctx, bson.D{})
+	if err != nil || checkpoints != 0 {
+		t.Fatalf("checkpoint count after gap = %d, %v", checkpoints, err)
+	}
+}
+
 func TestChangeStreamOpensBeforeBacklogWithoutGap(t *testing.T) {
 	store := openTestStore(t)
 	first := completeDecision(t, 1)
@@ -634,6 +781,41 @@ func TestChangeStreamOpensBeforeBacklogWithoutGap(t *testing.T) {
 	}
 	if !seen[first.Outbox[0].IntentID] || !seen[second.Outbox[0].IntentID] {
 		t.Fatalf("boundary intents = %#v", seen)
+	}
+}
+
+func TestKindFilteredIntentFeedExcludesUnrelatedBacklog(t *testing.T) {
+	store := openTestStore(t)
+	invocationIntent := kernel.OutboxIntent{IntentID: testUUID(8891), EventID: testUUID(8892), Kind: "WORK_INVOCATION_AUTHORIZED"}
+	unrelatedIntent := kernel.OutboxIntent{IntentID: testUUID(8893), EventID: testUUID(8894), Kind: "TASK_UPDATED"}
+	for _, intent := range []kernel.OutboxIntent{unrelatedIntent, invocationIntent} {
+		data, err := encode(intent)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		_, err = store.db.Collection("outbox").InsertOne(ctx, outboxDocument{ID: string(intent.IntentID), EventID: string(intent.EventID), Kind: intent.Kind, State: DeliveryPending, Data: data})
+		cancel()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	feed, err := store.OpenIntentFeedForKind(ctx, "operational-execution-test", "WORK_INVOCATION_AUTHORIZED")
+	cancel()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		closeCtx, closeCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer closeCancel()
+		_ = feed.Close(closeCtx)
+	}()
+	readCtx, readCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	observed, err := feed.Next(readCtx)
+	readCancel()
+	if err != nil || observed.Intent != invocationIntent || feed.Kind() != invocationIntent.Kind {
+		t.Fatalf("observed=%#v kind=%q err=%v", observed, feed.Kind(), err)
 	}
 }
 
@@ -697,6 +879,52 @@ func TestClaimLifecycleIsOneWinnerAndEpochFenced(t *testing.T) {
 	}
 	if err := store.ResolveIntent(ctx, second.Intent.IntentID, second.Holder, second.ClaimEpoch, now.Add(4*time.Second), "DELIVERED"); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestIntentFeedRedeliversYieldedIntentInSameSession(t *testing.T) {
+	store := openTestStore(t)
+	decision := completeDecision(t, 1)
+	commitDecision(t, store, decision)
+	intent := decision.Outbox[0]
+
+	openCtx, openCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	feed, err := store.OpenIntentFeedForKind(openCtx, "yield-redelivery-test", intent.Kind)
+	openCancel()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		closeCtx, closeCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer closeCancel()
+		_ = feed.Close(closeCtx)
+	}()
+
+	readCtx, readCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	first, err := feed.Next(readCtx)
+	readCancel()
+	if err != nil || first.Intent != intent {
+		t.Fatalf("first delivery = %#v, err=%v", first, err)
+	}
+	now := testNow()
+	claimCtx, claimCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	claim, err := store.AcquireIntent(claimCtx, intent.IntentID, "yielding-worker", now, time.Minute)
+	claimCancel()
+	if err != nil {
+		t.Fatal(err)
+	}
+	yieldCtx, yieldCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	err = store.YieldIntent(yieldCtx, intent.IntentID, claim.Holder, claim.ClaimEpoch, now.Add(time.Second))
+	yieldCancel()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	retryCtx, retryCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	retry, err := feed.Next(retryCtx)
+	retryCancel()
+	if err != nil || retry.Intent != intent {
+		t.Fatalf("retry delivery = %#v, err=%v", retry, err)
 	}
 }
 
@@ -987,6 +1215,54 @@ func completeDecision(t *testing.T, ordinal int) kernel.Decision {
 		t.Fatal(err)
 	}
 	return attachProvenance(t, decision)
+}
+
+func projectionMongoEvent(aggregate kernel.AggregateRef, revision uint64, eventID kernel.UUIDv7, eventType string, payload json.RawMessage) kernel.DomainEvent {
+	return kernel.DomainEvent{
+		ContractManifest: kernel.ContractIdentity, EventID: eventID, EventType: eventType,
+		EventVersion: kernel.OperationalSchemaVersion, Aggregate: aggregate, AggregateRevision: revision,
+		LifecycleEpoch: 1, CommittedAt: time.Date(2026, time.August, 31, 12, 0, int(revision), 0, time.UTC), Payload: payload,
+	}
+}
+
+func insertProjectionAggregate(t *testing.T, store *Store, state kernel.AggregateState) {
+	t.Helper()
+	data, err := encode(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if _, err := store.db.Collection("aggregates").InsertOne(ctx, aggregateDocument{ID: aggregateKey(kernel.AggregateRef{Kind: state.Kind, ID: state.ID}), Revision: state.Revision, State: data}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func insertProjectionEvent(t *testing.T, store *Store, event kernel.DomainEvent) {
+	t.Helper()
+	data, err := encode(event)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	document := eventDocument{ID: string(event.EventID), AggregateKey: aggregateKey(event.Aggregate), Revision: event.AggregateRevision, EventType: event.EventType, Data: data}
+	if _, err := store.db.Collection("events").InsertOne(ctx, document); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func insertProjectionValue(t *testing.T, store *Store, collection, id string, value any) {
+	t.Helper()
+	data, err := encode(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if _, err := store.db.Collection(collection).InsertOne(ctx, valueDocument{ID: id, Data: data}); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func mongoEscalationOpeningDecision(t *testing.T, ordinal int, escalationID kernel.UUIDv7) kernel.Decision {

@@ -3,6 +3,7 @@ package mongo
 import (
 	"context"
 	"errors"
+	"strconv"
 	"time"
 
 	"github.com/tekroo-ai/teams/kernel"
@@ -221,11 +222,26 @@ type IntentFeed struct {
 	backlogSeen    int64
 	backlogLimit   int64
 	resynchronized bool
+	kind           string
 }
 
 // OpenIntentFeed deliberately opens the change stream before it queries the
 // backlog. Both observation paths converge on immutable intent IDs.
 func (s *Store) OpenIntentFeed(ctx context.Context, consumerID string) (*IntentFeed, error) {
+	return s.openIntentFeed(ctx, consumerID, "")
+}
+
+// OpenIntentFeedForKind observes only one exact outbox kind in both the
+// initial backlog and the change stream. This prevents a specialized consumer
+// from treating unrelated organizational events as executable work.
+func (s *Store) OpenIntentFeedForKind(ctx context.Context, consumerID, kind string) (*IntentFeed, error) {
+	if kind == "" {
+		return nil, ErrInvalidClaim
+	}
+	return s.openIntentFeed(ctx, consumerID, kind)
+}
+
+func (s *Store) openIntentFeed(ctx context.Context, consumerID, kind string) (*IntentFeed, error) {
 	if err := requireDeadline(ctx); err != nil {
 		return nil, err
 	}
@@ -242,7 +258,7 @@ func (s *Store) OpenIntentFeed(ctx context.Context, consumerID string) (*IntentF
 	} else if err != nil && !errors.Is(err, driver.ErrNoDocuments) {
 		return nil, err
 	}
-	pipeline := driver.Pipeline{bson.D{{Key: "$match", Value: bson.D{{Key: "operationType", Value: "insert"}}}}}
+	pipeline := intentFeedPipeline(kind)
 	stream, err := s.db.Collection("outbox").Watch(ctx, pipeline, streamOptions)
 	resynchronized := false
 	if err != nil && usedCheckpoint && isResumeFailure(err) {
@@ -255,20 +271,25 @@ func (s *Store) OpenIntentFeed(ctx context.Context, consumerID string) (*IntentF
 	if err != nil {
 		return nil, err
 	}
-	backlog, err := s.openBoundedBacklog(ctx)
+	backlog, err := s.openBoundedBacklog(ctx, kind)
 	if err != nil {
 		_ = stream.Close(ctx)
 		return nil, err
 	}
-	return &IntentFeed{store: s, consumerID: consumerID, stream: stream, backlog: backlog, seen: make(map[string]struct{}), backlogLimit: s.backlogLimit, resynchronized: resynchronized}, nil
+	return &IntentFeed{store: s, consumerID: consumerID, stream: stream, backlog: backlog, seen: make(map[string]struct{}), backlogLimit: s.backlogLimit, resynchronized: resynchronized, kind: kind}, nil
 }
 
-func (s *Store) openBoundedBacklog(ctx context.Context) (*driver.Cursor, error) {
+func (s *Store) openBoundedBacklog(ctx context.Context, kind string) (*driver.Cursor, error) {
 	filter := bson.D{{Key: "state", Value: bson.D{{Key: "$in", Value: bson.A{DeliveryPending, DeliveryClaimed}}}}}
+	if kind != "" {
+		filter = append(filter, bson.E{Key: "kind", Value: kind})
+	}
 	return s.db.Collection("outbox").Find(ctx, filter, options.Find().SetLimit(s.backlogLimit+1))
 }
 
 func (feed *IntentFeed) Resynchronized() bool { return feed.resynchronized }
+
+func (feed *IntentFeed) Kind() string { return feed.kind }
 
 func (feed *IntentFeed) Close(ctx context.Context) error {
 	_ = feed.backlog.Close(ctx)
@@ -288,10 +309,11 @@ func (feed *IntentFeed) Next(ctx context.Context) (ClaimedIntent, error) {
 		if err := feed.backlog.Decode(&document); err != nil {
 			return ClaimedIntent{}, err
 		}
-		if _, duplicate := feed.seen[document.ID]; duplicate {
+		key := intentDeliveryKey(document)
+		if _, duplicate := feed.seen[key]; duplicate {
 			continue
 		}
-		feed.seen[document.ID] = struct{}{}
+		feed.seen[key] = struct{}{}
 		return document.claimedIntent()
 	}
 	if err := feed.backlog.Err(); err != nil {
@@ -307,10 +329,11 @@ func (feed *IntentFeed) Next(ctx context.Context) (ClaimedIntent, error) {
 		if err := feed.saveCheckpoint(ctx); err != nil {
 			return ClaimedIntent{}, err
 		}
-		if _, duplicate := feed.seen[change.FullDocument.ID]; duplicate {
+		key := intentDeliveryKey(change.FullDocument)
+		if _, duplicate := feed.seen[key]; duplicate {
 			continue
 		}
-		feed.seen[change.FullDocument.ID] = struct{}{}
+		feed.seen[key] = struct{}{}
 		return change.FullDocument.claimedIntent()
 	}
 	if err := feed.stream.Err(); err != nil {
@@ -326,12 +349,12 @@ func (feed *IntentFeed) Next(ctx context.Context) (ClaimedIntent, error) {
 }
 
 func (feed *IntentFeed) resynchronize(ctx context.Context) error {
-	pipeline := driver.Pipeline{bson.D{{Key: "$match", Value: bson.D{{Key: "operationType", Value: "insert"}}}}}
+	pipeline := intentFeedPipeline(feed.kind)
 	stream, err := feed.store.db.Collection("outbox").Watch(ctx, pipeline, options.ChangeStream().SetFullDocument(options.UpdateLookup))
 	if err != nil {
 		return err
 	}
-	backlog, err := feed.store.openBoundedBacklog(ctx)
+	backlog, err := feed.store.openBoundedBacklog(ctx, feed.kind)
 	if err != nil {
 		_ = stream.Close(ctx)
 		return err
@@ -348,6 +371,27 @@ func (feed *IntentFeed) resynchronize(ctx context.Context) error {
 	feed.backlogSeen = 0
 	feed.resynchronized = true
 	return nil
+}
+
+func intentFeedPipeline(kind string) driver.Pipeline {
+	// Inserts expose newly committed intents. Updates that return an intent to
+	// PENDING expose retries yielded by a consumer. Claim/lease extensions and
+	// terminal resolutions are deliberately excluded.
+	match := bson.D{
+		{Key: "operationType", Value: bson.D{{Key: "$in", Value: bson.A{"insert", "update", "replace"}}}},
+		{Key: "fullDocument.state", Value: DeliveryPending},
+	}
+	if kind != "" {
+		match = append(match, bson.E{Key: "fullDocument.kind", Value: kind})
+	}
+	return driver.Pipeline{bson.D{{Key: "$match", Value: match}}}
+}
+
+func intentDeliveryKey(document outboxDocument) string {
+	// The claim epoch changes on every acquisition. Using it in the feed key
+	// suppresses the backlog/change-stream overlap for one delivery while still
+	// allowing the same immutable intent to be delivered after YieldIntent.
+	return document.ID + ":" + strconv.FormatUint(document.ClaimEpoch, 10)
 }
 
 func (feed *IntentFeed) saveCheckpoint(ctx context.Context) error {

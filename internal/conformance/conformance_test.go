@@ -14,7 +14,7 @@ import (
 	"github.com/tekroo-ai/teams/kernel"
 )
 
-const contractRoot = "CONTRACTS/tekroo.kernel.contracts/0.7.0"
+const contractRoot = "CONTRACTS/tekroo.kernel.contracts/0.8.0"
 
 type fixtureDocument struct {
 	Fixtures []fixture `json:"fixtures"`
@@ -43,8 +43,8 @@ func TestFrozenContractCorpus(t *testing.T) {
 		loadFixtures(t, filepath.Join(repositoryRoot, contractRoot, "fixtures/catalogue-coverage.json")),
 		loadFixtures(t, filepath.Join(repositoryRoot, contractRoot, "fixtures/model-and-invariant-scenarios.json"))...,
 	)
-	if len(fixtures) != 235 {
-		t.Fatalf("fixture count = %d, want 235", len(fixtures))
+	if len(fixtures) != 297 {
+		t.Fatalf("fixture count = %d, want 297", len(fixtures))
 	}
 
 	for _, item := range fixtures {
@@ -485,6 +485,82 @@ func runFixture(t *testing.T, catalogue *contract.Catalogue, item fixture) any {
 			KnownInFlightIDs:       when.KnownInFlightExecutionIDs, ServicesHealthy: when.ServicesHealthy,
 			OutboxReconciled: when.OutboxReconciled, ChangeStreamReconciled: when.ChangeStreamReconciled,
 		})
+	case "INVOCATION_ADMISSION_MODEL":
+		var given kernel.InvocationAdmissionScenarioGiven
+		var when kernel.InvocationAdmissionScenarioAction
+		decode(t, item.Given, &given)
+		decode(t, item.When, &when)
+		return kernel.EvaluateInvocationAdmissionScenario(given, when)
+	case "WORK_BUDGET_MODEL":
+		var given kernel.WorkBudgetScenarioGiven
+		var when kernel.WorkBudgetScenarioAction
+		decode(t, item.Given, &given)
+		decode(t, item.When, &when)
+		return kernel.EvaluateWorkBudgetScenario(given, when)
+	case "PROJECTION_MODEL":
+		var given struct {
+			Revision    uint64 `json:"revision"`
+			LastEventID string `json:"lastEventId"`
+			LastDigest  string `json:"lastDigest"`
+			Incremental any    `json:"incremental"`
+		}
+		var when struct {
+			Action string `json:"action"`
+			Event  struct {
+				Revision uint64 `json:"revision"`
+				EventID  string `json:"eventId"`
+				Digest   string `json:"digest"`
+			} `json:"event"`
+			Rebuilt any `json:"rebuilt"`
+		}
+		decode(t, item.Given, &given)
+		decode(t, item.When, &when)
+		if when.Action == "COMPARE_REBUILD" {
+			if reflect.DeepEqual(given.Incremental, when.Rebuilt) {
+				return struct {
+					Accepted bool   `json:"accepted"`
+					Reason   string `json:"reason"`
+				}{true, "EXACT_REBUILD_MATCH"}
+			}
+			return struct {
+				Accepted bool   `json:"accepted"`
+				Reason   string `json:"reason"`
+			}{false, "REBUILD_MISMATCH"}
+		}
+		result := struct {
+			Accepted bool   `json:"accepted"`
+			Reason   string `json:"reason"`
+			Revision uint64 `json:"revision"`
+		}{Revision: given.Revision}
+		switch {
+		case when.Event.Revision == given.Revision && when.Event.EventID == given.LastEventID && when.Event.Digest == given.LastDigest:
+			result.Accepted, result.Reason = true, "DUPLICATE"
+		case when.Event.Revision > given.Revision+1:
+			result.Reason = "REVISION_GAP"
+		case when.Event.Revision <= given.Revision:
+			result.Reason = "REVISION_CONFLICT"
+		default:
+			result.Accepted, result.Reason, result.Revision = true, "APPLIED", when.Event.Revision
+		}
+		return result
+	case "AUTHORITY_BOUNDARY_MODEL":
+		var when struct {
+			Source string `json:"source"`
+			Effect string `json:"effect"`
+		}
+		decode(t, item.When, &when)
+		result := struct {
+			Accepted bool   `json:"accepted"`
+			Reason   string `json:"reason"`
+		}{}
+		if when.Source == "SMA" && when.Effect == "SEMANTIC_MEMORY" {
+			result.Accepted, result.Reason = true, "SMA_MEMORY_DOMAIN"
+		} else if when.Source == "TEAMS_KERNEL" {
+			result.Accepted, result.Reason = true, "ACCEPTED"
+		} else {
+			result.Reason = "TEAMS_AUTHORITY_REQUIRED"
+		}
+		return result
 	default:
 		t.Fatalf("unsupported fixture kind %q", item.Kind)
 		return nil

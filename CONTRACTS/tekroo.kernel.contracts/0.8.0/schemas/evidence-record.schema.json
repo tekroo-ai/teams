@@ -1,0 +1,201 @@
+{
+  "$id": "https://contracts.tekroo.ai/tekroo.kernel.contracts/0.8.0/schemas/evidence-record.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "access_partition": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "availability": {
+      "enum": [
+        "AVAILABLE",
+        "UNAVAILABLE",
+        "DELETED_WITH_TOMBSTONE"
+      ]
+    },
+    "byte_length": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "canonical_digest": {
+      "anyOf": [
+        {
+          "$ref": "./core.schema.json#/$defs/Sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "computation": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "build_digest": {
+              "$ref": "./core.schema.json#/$defs/Sha256"
+            },
+            "configuration_digest": {
+              "$ref": "./core.schema.json#/$defs/Sha256"
+            },
+            "deterministic": {
+              "type": "boolean"
+            },
+            "method": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "method",
+            "build_digest",
+            "configuration_digest",
+            "deterministic"
+          ],
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "deletion_tombstone": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "authority": {
+              "$ref": "./core.schema.json#/$defs/PrincipalRef"
+            },
+            "basis": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "deleted_at": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          "required": [
+            "basis",
+            "authority",
+            "deleted_at"
+          ],
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "evidence_id": {
+      "$ref": "./core.schema.json#/$defs/UUIDv7"
+    },
+    "evidence_kind": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "ingested_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "integrity_state": {
+      "enum": [
+        "UNVERIFIED",
+        "DIGEST_VERIFIED",
+        "MISSING",
+        "MISMATCH"
+      ]
+    },
+    "locator": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "locator_immutable": {
+      "const": true
+    },
+    "media_type": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "producing_component": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "producing_version": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "raw_sha256": {
+      "$ref": "./core.schema.json#/$defs/Sha256"
+    },
+    "redacts": {
+      "anyOf": [
+        {
+          "$ref": "./core.schema.json#/$defs/UUIDv7"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "registered_by": {
+      "$ref": "./core.schema.json#/$defs/PrincipalRef"
+    },
+    "retention_policy": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "sensitivity": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "source_evidence_ids": {
+      "items": {
+        "$ref": "./core.schema.json#/$defs/UUIDv7"
+      },
+      "maxItems": 64,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "source_timestamp": {
+      "format": "date-time",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "transport_provenance": {
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "evidence_id",
+    "evidence_kind",
+    "raw_sha256",
+    "byte_length",
+    "media_type",
+    "canonical_digest",
+    "locator",
+    "locator_immutable",
+    "availability",
+    "registered_by",
+    "producing_component",
+    "producing_version",
+    "source_timestamp",
+    "ingested_at",
+    "transport_provenance",
+    "source_evidence_ids",
+    "sensitivity",
+    "access_partition",
+    "retention_policy",
+    "integrity_state",
+    "computation",
+    "redacts",
+    "deletion_tombstone"
+  ],
+  "title": "EvidenceRecord",
+  "type": "object"
+}

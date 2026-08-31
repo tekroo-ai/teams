@@ -1,0 +1,128 @@
+{
+  "record_type": "TEKROO_TEAMS_PHASE4_STEP8_CONTROLLED_LOCAL_OPERATING_PILOT_RECEIPT",
+  "recorded_at": "2026-08-31T17:10:12Z",
+  "status": "PASS",
+  "qualification": "TEAMS_V4_LOCAL_OPERATIONAL_RUNTIME_QUALIFIED",
+  "source": {
+    "branch": "codex/phase4-step1-design-closure",
+    "head": "6a4a262461e967498e876090079c05a0cbb8ce1d",
+    "head_tree": "86061116c9eb58e5c55d231d73d121fb174be34f",
+    "accepted_step_7_receipt_sha256": "f7e1e24475b389412943353c0f625e592a3f92496b73bf4130866cd53f010041",
+    "contract_identity": "tekroo.kernel.contracts/0.8.0"
+  },
+  "local_runtime": {
+    "openhands_endpoint": "http://127.0.0.1:8000",
+    "model_endpoint": "http://127.0.0.1:8802/v1",
+    "model": "ddalcu--Qwen3.8-27B-MLX-Serve-8bit",
+    "model_state_before_cleanup": "ready",
+    "model_quantization": "8-bit",
+    "model_context_length": 200704,
+    "hook_sha256": "e50005e82ac6de4aa11efd552cbf1586a764dbf09fc6fd617cc462ba73b0d3d9",
+    "teams_database": "tekroo_phase4_step8_20260831",
+    "sma_database": "sma_phase4_step8_20260831",
+    "sma_semantic_collection": "sma_phase4_step8_20260831_semantic",
+    "sma_episodic_collection": "sma_phase4_step8_20260831_episodic"
+  },
+  "operator_controls": {
+    "start": "PASS",
+    "inspect": "PASS",
+    "pause": "PASS",
+    "paused_admission_check": "PASS_NO_OPENHANDS_CONVERSATIONS_CREATED",
+    "resume": "PASS",
+    "durable_cancel": "PASS",
+    "stop": "PASS"
+  },
+  "primary_task": {
+    "task_id": "00000000-0000-7000-8000-00000000138a",
+    "invocation_id": "00000000-0000-7000-8000-000000001390",
+    "conversation_id": "00000000-0000-7000-8000-000000001390",
+    "openhands_status_before_cleanup": "finished",
+    "openhands_event_count": 27,
+    "openhands_event_kinds": {
+      "ActionEvent": 7,
+      "ConversationStateUpdateEvent": 10,
+      "HookExecutionEvent": 1,
+      "MessageEvent": 1,
+      "ObservationEvent": 7,
+      "SystemPromptEvent": 1
+    },
+    "teams_state": "SUCCEEDED",
+    "teams_revision": 4,
+    "output_digest": "caacf514c2e64f3e0599ee1cb41967da0ed2074f5c89bf575a4ff7dbdac79103",
+    "baseline_sha": "0bfcb16726dd5d5a33efcf782b940f9374896551",
+    "changed_files": [
+      "calculator/calculator.go"
+    ],
+    "test_files_changed": false,
+    "sandbox_go_test": "PASS"
+  },
+  "cancellation_probe": {
+    "task_id": "00000000-0000-7000-8000-000000001772",
+    "invocation_id": "00000000-0000-7000-8000-000000001778",
+    "conversation_id": "00000000-0000-7000-8000-000000001778",
+    "openhands_status_before_cleanup": "paused",
+    "openhands_event_count": 8,
+    "openhands_event_kinds": {
+      "ConversationStateUpdateEvent": 4,
+      "HookExecutionEvent": 1,
+      "InterruptEvent": 1,
+      "MessageEvent": 1,
+      "SystemPromptEvent": 1
+    },
+    "teams_state": "CANCELLED",
+    "teams_revision": 5,
+    "output_digest": "6315c85602da855808a2396ae53256ae76dc68cdac16bd807562af0b864aeab5",
+    "sandbox_changed_files": []
+  },
+  "read_models": {
+    "task_projection_count": 2,
+    "story_projection_count": 2,
+    "primary_latest_invocation": "SUCCEEDED",
+    "cancellation_latest_invocation": "CANCELLED",
+    "story_task_state_summary_available": true,
+    "raw_transcript_required_for_operator_status": false
+  },
+  "sma_boundary": {
+    "captured_memory_count_before_cleanup": 2,
+    "memory_ids": [
+      "oh_25a0e83b79a61f3860d03e7d3913369a1e166166e3563f70995dcdfb0c003ec1",
+      "oh_566b9e0e54384a5381444a83fb1f7fcc1aa86103f18437bd9bbecbe1b6ab1029"
+    ],
+    "captured_source_type": "user_prompt",
+    "captured_model": "openai/ddalcu--Qwen3.8-27B-MLX-Serve-8bit",
+    "teams_state_owned_by_sma": false
+  },
+  "runtime_repair": {
+    "observed_defect": "A yielded in-flight outbox intent was not redelivered by the already-open Mongo change-stream feed.",
+    "repair": "The feed now observes inserts and transitions back to PENDING and deduplicates by immutable intent ID plus claim epoch.",
+    "continuation_behavior": "The existing completed OpenHands conversation was reconciled without another prompt or task execution.",
+    "regression_test": "TestIntentFeedRedeliversYieldedIntentInSameSession"
+  },
+  "retained_execution_evidence_sha256": [
+    "5734ce0092165c1c3d2ffc60f30dbaa72d1558549f7519093274b19ec0011e7b",
+    "caacf514c2e64f3e0599ee1cb41967da0ed2074f5c89bf575a4ff7dbdac79103",
+    "6d5bdb8161a960702cff109e59001617a6b2d07aaca18a510a0845c540b599ba",
+    "6315c85602da855808a2396ae53256ae76dc68cdac16bd807562af0b864aeab5",
+    "a159459af073fd17d3c0fcd4f94f0080b854c51f9dc32ce4f021436009979bac"
+  ],
+  "verification": {
+    "go_test_all": "PASS",
+    "go_test_race_all": "PASS",
+    "go_vet_all": "PASS",
+    "mongo_and_operational_integration_tests": "PASS",
+    "git_diff_check": "PASS"
+  },
+  "cleanup": {
+    "disposable_sma_process": "STOPPED",
+    "openhands_conversations": "DELETED_AND_VERIFIED_404",
+    "teams_database": "DROPPED_AND_VERIFIED_ABSENT",
+    "sma_database": "DROPPED_AND_VERIFIED_ABSENT",
+    "sma_qdrant_collections": "DELETED_AND_VERIFIED_ABSENT",
+    "sandbox_evidence": "RETAINED_UNDER_OUTPUT"
+  },
+  "not_run": [
+    "PRODUCTION_DEPLOYMENT",
+    "TEKROO_V3_MIGRATION",
+    "PRODUCTION_OR_HISTORICAL_DATA_ACCESS"
+  ]
+}

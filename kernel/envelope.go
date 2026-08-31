@@ -118,6 +118,7 @@ type Decision struct {
 	Guards             DecisionGuards
 	Provenance         DecisionProvenance
 	AttemptBudget      *AttemptBudgetDecision
+	WorkBudget         *WorkBudgetDebitDecision
 }
 
 type DecisionGuards struct {
@@ -135,25 +136,29 @@ type DecisionGuards struct {
 }
 
 type Snapshot struct {
-	Exists               bool
-	Revision             uint64
-	State                *AggregateState
-	AcceptedEvents       map[UUIDv7]AcceptedEvent
-	CurrentExecutions    map[ActorFQN]ExecutionTuple
-	Evidence             map[UUIDv7]EvidenceMetadata
-	Related              map[AggregateRef]RelatedSnapshot
-	Authorization        AuthorizationPolicy
-	OpenReviews          map[CompletionReviewKey]AggregateRef
-	Reviews              map[AggregateRef]CompletionReviewSnapshot
-	Escalations          map[AggregateRef]EscalationSnapshot
-	EscalationKeys       map[EscalationKey]AggregateRef
-	ReleasePlans         map[AggregateRef]ReleasePlanSnapshot
-	ReleasePlanKeys      map[ReleasePlanKey]AggregateRef
-	AttemptBudgets       map[AttemptBudgetKey]AttemptBudgetSnapshot
-	WorkProfiles         map[AggregateRef]WorkProfileSnapshot
-	QualifiedAssignments map[AggregateRef]QualifiedAssignmentAuthorization
-	VariantGroups        map[AggregateRef]VariantGroupSnapshot
-	VariantGroupKeys     map[VariantGroupKey]AggregateRef
+	Exists                bool
+	Revision              uint64
+	State                 *AggregateState
+	AcceptedEvents        map[UUIDv7]AcceptedEvent
+	CurrentExecutions     map[ActorFQN]ExecutionTuple
+	Evidence              map[UUIDv7]EvidenceMetadata
+	Related               map[AggregateRef]RelatedSnapshot
+	Authorization         AuthorizationPolicy
+	OpenReviews           map[CompletionReviewKey]AggregateRef
+	Reviews               map[AggregateRef]CompletionReviewSnapshot
+	Escalations           map[AggregateRef]EscalationSnapshot
+	EscalationKeys        map[EscalationKey]AggregateRef
+	ReleasePlans          map[AggregateRef]ReleasePlanSnapshot
+	ReleasePlanKeys       map[ReleasePlanKey]AggregateRef
+	AttemptBudgets        map[AttemptBudgetKey]AttemptBudgetSnapshot
+	WorkProfiles          map[AggregateRef]WorkProfileSnapshot
+	QualifiedAssignments  map[AggregateRef]QualifiedAssignmentAuthorization
+	VariantGroups         map[AggregateRef]VariantGroupSnapshot
+	VariantGroupKeys      map[VariantGroupKey]AggregateRef
+	WorkBudgetAccounts    map[AggregateRef]WorkBudgetAccount
+	TaskWorkBudgets       map[AggregateRef]TaskWorkBudgetBinding
+	TaskOperationalScopes map[AggregateRef]TaskOperationalScope
+	WorkInvocations       map[AggregateRef]WorkInvocation
 }
 
 type RelatedSnapshot struct {

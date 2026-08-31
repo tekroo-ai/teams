@@ -1,0 +1,93 @@
+{
+  "schemaVersion": "1.0.0",
+  "recordType": "PHASE_4_STEP_5_OPERATIONAL_EXECUTION_COORDINATION_RECEIPT",
+  "status": "PASS",
+  "date": "2026-08-31",
+  "startingIdentity": {
+    "commit": "6a4a262461e967498e876090079c05a0cbb8ce1d",
+    "tree": "86061116c9eb58e5c55d231d73d121fb174be34f"
+  },
+  "contract": {
+    "identity": "tekroo.kernel.contracts/0.8.0",
+    "manifestSHA256": "c7eb4baae3a8312e44f9946fabde5a9cddb1937c7a41eb02d9b014ef21027ad1",
+    "structure": {
+      "status": "PASS",
+      "cases": 3604,
+      "reportSHA256": "fe88ec20d984ee2a547bb010847abd09d7aaea82dd0939921e39e97e2336b958"
+    },
+    "reference": {
+      "status": "PASS",
+      "cases": 297,
+      "reportSHA256": "0327158c444d5159d8d797378cafa61b5508f6bed68fbd104c52eb6f1aaa3f7a"
+    }
+  },
+  "implementationFiles": {
+    "kernel/work_invocation.go": "503530fa06b4e025cc3f76177e84b75185549ffbd32c53e1158370cb495a2188",
+    "application/operational_execution.go": "07382250722e76863218df67282c85b2d7428b5a20e5b26b97f438178166523d",
+    "application/operational_execution_coordinator.go": "7f50f45b5341be31d1f36a68046a171468032ccf4341e1ae4863e4b468a26d54",
+    "application/execution_evidence_recorder.go": "b58e8fbd8509d3de599a9e8e2aea1a55d63dabc6622e26f75a6d57a42e65e88e",
+    "adapters/filesystem/execution_evidence.go": "d82a7d43e5774c78c414589d0d9097d682972eb449d4983696b082d2d0b5788e",
+    "adapters/memory/operational_execution.go": "5358689d4795f9271740a4775037dee18bf0261e4668b7a0a6def4502f1ceac4",
+    "adapters/mongo/operational_execution.go": "d0bdb8aa1da2ed02c992faafa909326daf62a915e4ea2bbedc7aab5f959faa86",
+    "adapters/mongo/outbox.go": "6ce0be2845d51b114b396c2bcf07447f60d43dfebd4aab415163cd53cf784cd8",
+    "adapters/openhands/client.go": "84d31c72b0ebaf027f1085c7b2eb78beabc1abcf2643dfb15c5c9d573abdd471",
+    "adapters/openhands/bindings.go": "e2145415b89aeae8cc1362c691fd56ef63bfed2f05964a8777cac40389af3500",
+    "adapters/executionruntime/worker.go": "227f669c8214cca1820b4ec4ac454ba1202a6915fee4e295e97ba9ff79c30da3",
+    "docs/architecture/112-phase-4-step-5-operational-execution-coordination.md": "4c6be5ddbcfc4b771eecd417f63c14c6f94784e475c321fbae44f4f93c8a9d07"
+  },
+  "testFiles": {
+    "application/operational_execution_coordinator_test.go": "f4339cdbd8c016b3261899bfab13fe40937abacf2cdd1ab914f4b22edfb0745c",
+    "application/execution_evidence_recorder_test.go": "67d0449b745456bbfc7f815801f845e6eb16538b48143d7f194bda5f20c4ac88",
+    "adapters/filesystem/execution_evidence_test.go": "8194555b9e425dacebf3bb789b3a02eb6ff953ccadf18c8d8759f76ca4c99cc8",
+    "adapters/mongo/operational_execution_integration_test.go": "e690b171d0e98bb80e370e52dae2ad60e829df5ec9eb11a2514ad5505f238ea7",
+    "adapters/mongo/integration_test.go": "d50c3318eae291651319be9b363a2348b6d04fc32b20d69359335b011796d6c2",
+    "adapters/openhands/client_test.go": "a53efe15c9a7d33992da16fdc686f485b45aba562e695b613a2095cd041db599",
+    "adapters/openhands/bindings_test.go": "97fec7d22ab35a336883a85b72ce1e7779e7848dd9951ef3480c84f0e86fceeb",
+    "adapters/executionruntime/worker_test.go": "d328e17bfb5cbcb941169a81dbb358b6cbb508cd43c7cc3212222a88fb4057f4"
+  },
+  "openhandsSourceBinding": {
+    "repository": "/Users/paul/work/tekroo-ai/openhands-sma-p1",
+    "commit": "87b19b1e2418c79c770f2cc6f8a6c5ffe1f99e02",
+    "files": {
+      "openhands-sdk/openhands/sdk/conversation/request.py": "f1d05f7a7032eaf6aced15e7443a988781b2940072a56476bb77bbf03412f855",
+      "openhands-sdk/openhands/sdk/conversation/state.py": "8a9cfc18683afb339b074d8d5a7b03f1fdbe116fc5c8ad18a7d82387199a7722",
+      "openhands-sdk/openhands/sdk/conversation/types.py": "d5e955b491e9decc987595d4a61803368c2f7fdf9b6cceded60f753a5b6d34ef",
+      "openhands-sdk/openhands/sdk/conversation/impl/remote_conversation.py": "36a1f8be075d5bf2ef73298385939de63418e89a1b321d1cdbb30e06fde8df0f",
+      "openhands-agent-server/openhands/agent_server/conversation_router.py": "fdce62ede9a09c4b314728f14ec9778ad73dc52463fa31648938a6d7b69846be",
+      "openhands-agent-server/openhands/agent_server/dependencies.py": "178437e3012e5eb1572b43da37df8fef9ccd3cac10883e868d36096f4ccc606c"
+    }
+  },
+  "verification": {
+    "fullGoSuite": "PASS",
+    "focusedRaceSuite": "PASS",
+    "realMongoIntegrationSuite": "PASS",
+    "realMongoOperationalContext": "PASS",
+    "realMongoKindFilteredFeed": "PASS",
+    "goVet": "PASS",
+    "gitDiffCheck": "PASS"
+  },
+  "demonstratedProperties": [
+    "ONLY_WORK_INVOCATION_AUTHORIZED_WAKES_EXECUTION",
+    "EXACT_AUTHORITY_AND_EXECUTION_FENCE_REVALIDATED",
+    "SINGLE_USE_CLAIM_AND_BUDGET_DEBIT_PRESERVED",
+    "AMBIGUOUS_START_RECONCILED_WITHOUT_DUPLICATE_SUBMISSION",
+    "RESTART_FROM_CLAIMED_OR_STARTED_DOES_NOT_REPLAY_TASK",
+    "TOOLS_ARTIFACTS_PROVIDER_OUTPUT_AND_TERMINAL_STATE_RETAINED_AS_EVIDENCE",
+    "AGENT_PROSE_CANNOT_CREATE_OR_FORWARD_AN_INVOCATION",
+    "OPENHANDS_SUBAGENT_TOOLS_REJECTED",
+    "CANCELLATION_TIMEOUT_AND_EVIDENCE_FAILURE_ARE_DURABLY_RECOVERABLE"
+  ],
+  "notRun": [
+    "LIVE_OPENHANDS_CONVERSATION",
+    "MODEL_CALL",
+    "SMA_CALL_OR_MODIFICATION",
+    "SERVICE_START_OR_RESTART",
+    "DEPLOYMENT",
+    "PRODUCTION_DATABASE_ACCESS",
+    "HISTORICAL_DATA_ACCESS",
+    "MIGRATION",
+    "PHASE_4_STEP_6",
+    "PHASE_4_STEP_7",
+    "PHASE_4_STEP_8"
+  ]
+}

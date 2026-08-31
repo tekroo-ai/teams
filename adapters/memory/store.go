@@ -35,33 +35,37 @@ const (
 )
 
 type Store struct {
-	mu                   sync.RWMutex
-	states               map[kernel.AggregateRef]kernel.AggregateState
-	revisions            map[kernel.AggregateRef]uint64
-	receipts             map[kernel.UUIDv7]kernel.CommandReceipt
-	commandBindings      map[kernel.UUIDv7]decisionIdentity
-	idempotency          map[kernel.Digest]decisionIdentity
-	events               map[kernel.UUIDv7]kernel.DomainEvent
-	executions           map[kernel.ActorFQN]kernel.ExecutionTuple
-	evidence             map[kernel.UUIDv7]kernel.EvidenceMetadata
-	authority            map[kernel.UUIDv7]kernel.AuthorityDecision
-	outbox               map[kernel.UUIDv7]kernel.OutboxIntent
-	identityConflicts    []kernel.IdentityConflictAudit
-	provenance           map[kernel.Digest]kernel.DecisionProvenance
-	authorizationPolicy  kernel.AuthorizationPolicy
-	openReviews          map[kernel.CompletionReviewKey]kernel.AggregateRef
-	reviews              map[kernel.AggregateRef]kernel.CompletionReviewSnapshot
-	escalations          map[kernel.AggregateRef]kernel.EscalationSnapshot
-	escalationKeys       map[kernel.EscalationKey]kernel.AggregateRef
-	releasePlans         map[kernel.AggregateRef]kernel.ReleasePlanSnapshot
-	releasePlanKeys      map[kernel.ReleasePlanKey]kernel.AggregateRef
-	eventQualifications  map[kernel.UUIDv7]string
-	attemptBudgets       map[kernel.AttemptBudgetKey]kernel.AttemptBudgetSnapshot
-	workProfiles         map[kernel.AggregateRef]kernel.WorkProfileSnapshot
-	qualifiedAssignments map[kernel.AggregateRef]kernel.QualifiedAssignmentAuthorization
-	variantGroups        map[kernel.AggregateRef]kernel.VariantGroupSnapshot
-	variantGroupKeys     map[kernel.VariantGroupKey]kernel.AggregateRef
-	faultPoint           FaultPoint
+	mu                    sync.RWMutex
+	states                map[kernel.AggregateRef]kernel.AggregateState
+	revisions             map[kernel.AggregateRef]uint64
+	receipts              map[kernel.UUIDv7]kernel.CommandReceipt
+	commandBindings       map[kernel.UUIDv7]decisionIdentity
+	idempotency           map[kernel.Digest]decisionIdentity
+	events                map[kernel.UUIDv7]kernel.DomainEvent
+	executions            map[kernel.ActorFQN]kernel.ExecutionTuple
+	evidence              map[kernel.UUIDv7]kernel.EvidenceMetadata
+	authority             map[kernel.UUIDv7]kernel.AuthorityDecision
+	outbox                map[kernel.UUIDv7]kernel.OutboxIntent
+	identityConflicts     []kernel.IdentityConflictAudit
+	provenance            map[kernel.Digest]kernel.DecisionProvenance
+	authorizationPolicy   kernel.AuthorizationPolicy
+	openReviews           map[kernel.CompletionReviewKey]kernel.AggregateRef
+	reviews               map[kernel.AggregateRef]kernel.CompletionReviewSnapshot
+	escalations           map[kernel.AggregateRef]kernel.EscalationSnapshot
+	escalationKeys        map[kernel.EscalationKey]kernel.AggregateRef
+	releasePlans          map[kernel.AggregateRef]kernel.ReleasePlanSnapshot
+	releasePlanKeys       map[kernel.ReleasePlanKey]kernel.AggregateRef
+	eventQualifications   map[kernel.UUIDv7]string
+	attemptBudgets        map[kernel.AttemptBudgetKey]kernel.AttemptBudgetSnapshot
+	workProfiles          map[kernel.AggregateRef]kernel.WorkProfileSnapshot
+	qualifiedAssignments  map[kernel.AggregateRef]kernel.QualifiedAssignmentAuthorization
+	variantGroups         map[kernel.AggregateRef]kernel.VariantGroupSnapshot
+	variantGroupKeys      map[kernel.VariantGroupKey]kernel.AggregateRef
+	workBudgetAccounts    map[kernel.AggregateRef]kernel.WorkBudgetAccount
+	taskWorkBudgets       map[kernel.AggregateRef]kernel.TaskWorkBudgetBinding
+	taskOperationalScopes map[kernel.AggregateRef]kernel.TaskOperationalScope
+	workInvocations       map[kernel.AggregateRef]kernel.WorkInvocation
+	faultPoint            FaultPoint
 }
 
 func (s *Store) RecordIdentityConflict(ctx context.Context, audit kernel.IdentityConflictAudit) error {
@@ -97,29 +101,33 @@ func NewStoreWithFault(point FaultPoint, policy ...kernel.AuthorizationPolicy) *
 
 func NewStore(policy ...kernel.AuthorizationPolicy) *Store {
 	store := &Store{
-		states:               make(map[kernel.AggregateRef]kernel.AggregateState),
-		revisions:            make(map[kernel.AggregateRef]uint64),
-		receipts:             make(map[kernel.UUIDv7]kernel.CommandReceipt),
-		commandBindings:      make(map[kernel.UUIDv7]decisionIdentity),
-		idempotency:          make(map[kernel.Digest]decisionIdentity),
-		events:               make(map[kernel.UUIDv7]kernel.DomainEvent),
-		executions:           make(map[kernel.ActorFQN]kernel.ExecutionTuple),
-		evidence:             make(map[kernel.UUIDv7]kernel.EvidenceMetadata),
-		authority:            make(map[kernel.UUIDv7]kernel.AuthorityDecision),
-		outbox:               make(map[kernel.UUIDv7]kernel.OutboxIntent),
-		provenance:           make(map[kernel.Digest]kernel.DecisionProvenance),
-		openReviews:          make(map[kernel.CompletionReviewKey]kernel.AggregateRef),
-		reviews:              make(map[kernel.AggregateRef]kernel.CompletionReviewSnapshot),
-		escalations:          make(map[kernel.AggregateRef]kernel.EscalationSnapshot),
-		escalationKeys:       make(map[kernel.EscalationKey]kernel.AggregateRef),
-		releasePlans:         make(map[kernel.AggregateRef]kernel.ReleasePlanSnapshot),
-		releasePlanKeys:      make(map[kernel.ReleasePlanKey]kernel.AggregateRef),
-		eventQualifications:  make(map[kernel.UUIDv7]string),
-		attemptBudgets:       make(map[kernel.AttemptBudgetKey]kernel.AttemptBudgetSnapshot),
-		workProfiles:         make(map[kernel.AggregateRef]kernel.WorkProfileSnapshot),
-		qualifiedAssignments: make(map[kernel.AggregateRef]kernel.QualifiedAssignmentAuthorization),
-		variantGroups:        make(map[kernel.AggregateRef]kernel.VariantGroupSnapshot),
-		variantGroupKeys:     make(map[kernel.VariantGroupKey]kernel.AggregateRef),
+		states:                make(map[kernel.AggregateRef]kernel.AggregateState),
+		revisions:             make(map[kernel.AggregateRef]uint64),
+		receipts:              make(map[kernel.UUIDv7]kernel.CommandReceipt),
+		commandBindings:       make(map[kernel.UUIDv7]decisionIdentity),
+		idempotency:           make(map[kernel.Digest]decisionIdentity),
+		events:                make(map[kernel.UUIDv7]kernel.DomainEvent),
+		executions:            make(map[kernel.ActorFQN]kernel.ExecutionTuple),
+		evidence:              make(map[kernel.UUIDv7]kernel.EvidenceMetadata),
+		authority:             make(map[kernel.UUIDv7]kernel.AuthorityDecision),
+		outbox:                make(map[kernel.UUIDv7]kernel.OutboxIntent),
+		provenance:            make(map[kernel.Digest]kernel.DecisionProvenance),
+		openReviews:           make(map[kernel.CompletionReviewKey]kernel.AggregateRef),
+		reviews:               make(map[kernel.AggregateRef]kernel.CompletionReviewSnapshot),
+		escalations:           make(map[kernel.AggregateRef]kernel.EscalationSnapshot),
+		escalationKeys:        make(map[kernel.EscalationKey]kernel.AggregateRef),
+		releasePlans:          make(map[kernel.AggregateRef]kernel.ReleasePlanSnapshot),
+		releasePlanKeys:       make(map[kernel.ReleasePlanKey]kernel.AggregateRef),
+		eventQualifications:   make(map[kernel.UUIDv7]string),
+		attemptBudgets:        make(map[kernel.AttemptBudgetKey]kernel.AttemptBudgetSnapshot),
+		workProfiles:          make(map[kernel.AggregateRef]kernel.WorkProfileSnapshot),
+		qualifiedAssignments:  make(map[kernel.AggregateRef]kernel.QualifiedAssignmentAuthorization),
+		variantGroups:         make(map[kernel.AggregateRef]kernel.VariantGroupSnapshot),
+		variantGroupKeys:      make(map[kernel.VariantGroupKey]kernel.AggregateRef),
+		workBudgetAccounts:    make(map[kernel.AggregateRef]kernel.WorkBudgetAccount),
+		taskWorkBudgets:       make(map[kernel.AggregateRef]kernel.TaskWorkBudgetBinding),
+		taskOperationalScopes: make(map[kernel.AggregateRef]kernel.TaskOperationalScope),
+		workInvocations:       make(map[kernel.AggregateRef]kernel.WorkInvocation),
 	}
 	if len(policy) == 1 {
 		store.authorizationPolicy = cloneAuthorizationPolicy(policy[0])
@@ -226,6 +234,22 @@ func (s *Store) loadLocked(target kernel.AggregateRef, preconditions []kernel.Ag
 	snapshot.VariantGroupKeys = make(map[kernel.VariantGroupKey]kernel.AggregateRef, len(s.variantGroupKeys))
 	for key, group := range s.variantGroupKeys {
 		snapshot.VariantGroupKeys[key] = group
+	}
+	snapshot.WorkBudgetAccounts = make(map[kernel.AggregateRef]kernel.WorkBudgetAccount, len(s.workBudgetAccounts))
+	for reference, account := range s.workBudgetAccounts {
+		snapshot.WorkBudgetAccounts[reference] = account.Clone()
+	}
+	snapshot.TaskWorkBudgets = make(map[kernel.AggregateRef]kernel.TaskWorkBudgetBinding, len(s.taskWorkBudgets))
+	for reference, binding := range s.taskWorkBudgets {
+		snapshot.TaskWorkBudgets[reference] = binding.Clone()
+	}
+	snapshot.TaskOperationalScopes = make(map[kernel.AggregateRef]kernel.TaskOperationalScope, len(s.taskOperationalScopes))
+	for reference, scope := range s.taskOperationalScopes {
+		snapshot.TaskOperationalScopes[reference] = scope.Clone()
+	}
+	snapshot.WorkInvocations = make(map[kernel.AggregateRef]kernel.WorkInvocation, len(s.workInvocations))
+	for reference, invocation := range s.workInvocations {
+		snapshot.WorkInvocations[reference] = invocation.Clone()
 	}
 	return snapshot
 }
@@ -391,6 +415,11 @@ func (s *Store) Commit(ctx context.Context, expected kernel.Snapshot, decision k
 			return err
 		}
 	}
+	if decision.WorkBudget != nil {
+		if err := validateWorkBudgetCommit(s.workBudgetAccounts, s.taskWorkBudgets, *decision.WorkBudget); err != nil {
+			return err
+		}
+	}
 	escalationProjections, err := s.prepareEscalationProjections(decision.Events)
 	if err != nil {
 		return err
@@ -404,6 +433,10 @@ func (s *Store) Commit(ctx context.Context, expected kernel.Snapshot, decision k
 		return err
 	}
 	variantProjections, err := s.prepareVariantProjections(decision.Events)
+	if err != nil {
+		return err
+	}
+	phase4Projections, err := s.preparePhase4Projections(decision.Events, decision.WorkBudget)
 	if err != nil {
 		return err
 	}
@@ -447,6 +480,9 @@ func (s *Store) Commit(ctx context.Context, expected kernel.Snapshot, decision k
 		if projection.newKey != nil {
 			s.variantGroupKeys[*projection.newKey] = projection.reference
 		}
+	}
+	for _, projection := range phase4Projections {
+		projection.apply(s)
 	}
 	if decision.AttemptBudget != nil {
 		applyAttemptBudget(s.attemptBudgets, *decision.AttemptBudget)
@@ -664,6 +700,9 @@ func validDecisionTuple(expected kernel.Snapshot, decision kernel.Decision) bool
 		return false
 	}
 	if decision.AttemptBudget != nil && (!decision.AttemptBudget.Valid() || decision.AttemptBudget.Key.Subject != decision.Receipt.Target) {
+		return false
+	}
+	if decision.WorkBudget != nil && (!decision.WorkBudget.Valid() || decision.Receipt.CommandType != "tekroo.command.work-invocation.authorize") {
 		return false
 	}
 	if len(decision.Events) == 0 {

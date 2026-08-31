@@ -1,0 +1,69 @@
+{
+  "schemaVersion": "1.0.0",
+  "phase": "4",
+  "step": "2",
+  "verdict": "READY_FOR_PRINCIPAL_ACCEPTANCE",
+  "contract": {
+    "identity": "tekroo.kernel.contracts/0.8.0",
+    "status": "FROZEN_CANDIDATE",
+    "manifestPath": "CONTRACTS/tekroo.kernel.contracts/0.8.0/manifest.json",
+    "manifestSHA256": "c7eb4baae3a8312e44f9946fabde5a9cddb1937c7a41eb02d9b014ef21027ad1",
+    "detachedManifestPath": "CONTRACTS/tekroo.kernel.contracts/0.8.0/manifest.sha256",
+    "detachedManifestFileSHA256": "5e1f5853350d029044994c724f4f7905081396d433193f1464f7d7051ecce564"
+  },
+  "predecessor": {
+    "identity": "tekroo.kernel.contracts/0.7.0",
+    "manifestSHA256": "e2b9b5224a860a3eaa07451cf48fb5ac16a440b22b8dd592ff1662c1cff67f16",
+    "modified": false
+  },
+  "counts": {
+    "catalogueEntries": 134,
+    "commands": 67,
+    "events": 67,
+    "additiveProtocolTypes": 22,
+    "schemas": 17,
+    "fixtures": 297,
+    "invariants": 52,
+    "traceabilityRequirements": 185
+  },
+  "qualification": {
+    "structure": {
+      "status": "PASS",
+      "checks": 3604,
+      "failed": 0,
+      "reportPath": "OUTPUT/phase-4/contract-0.8.0-structure-report.json",
+      "reportFileSHA256": "4c77c26c1e5db663419c85b509315e6262be060584373310ae20da08449cfe4e",
+      "reportIdentity": "fe88ec20d984ee2a547bb010847abd09d7aaea82dd0939921e39e97e2336b958"
+    },
+    "reference": {
+      "status": "PASS",
+      "cases": 297,
+      "failed": 0,
+      "reportPath": "OUTPUT/phase-4/contract-0.8.0-reference-report.json",
+      "reportFileSHA256": "bc02542ed52dfa0dbfb09c5e3d82016d690d32569b0fef2fdb51a6647a7f55ec",
+      "reportIdentity": "0327158c444d5159d8d797378cafa61b5508f6bed68fbd104c52eb6f1aaa3f7a"
+    },
+    "reproducibleGeneration": {
+      "status": "PASS",
+      "comparison": "BYTE_IDENTICAL",
+      "generatorPath": "scripts/generate_phase4_contract_0_8.mjs",
+      "generatorSHA256": "a28e4aacbd1d7af7028eb975e5399f1d187e8beb5db53f2c23ccc522b22ba4ab"
+    },
+    "repositoryTests": {
+      "command": "go test -count=1 ./...",
+      "status": "PASS"
+    }
+  },
+  "notRun": [
+    "contract 0.8.0 Go implementation",
+    "MongoDB task and story projections",
+    "OpenHands operational invocation coordinator",
+    "SMA boundary modification",
+    "live or measured Phase 4 qualification",
+    "v3 migration",
+    "production deployment"
+  ],
+  "recommendedDecision": "ACCEPT_FREEZE_CONTRACT_0_8_0_AND_AUTHORIZE_PHASE_4_STEP_3",
+  "accepted": false,
+  "step3Authorized": false
+}

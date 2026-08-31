@@ -152,6 +152,104 @@ func TestStoreTracksRevisionWithoutWorkState(t *testing.T) {
 	}
 }
 
+func TestStoreAtomicallyConsumesWorkBudgetWithInvocationAuthorization(t *testing.T) {
+	store := memory.NewStore()
+	budget := kernel.AggregateRef{Kind: kernel.AggregateWorkBudget, ID: uuid("00000000-0000-7000-8000-000000000701")}
+	task := kernel.AggregateRef{Kind: kernel.AggregateTask, ID: uuid("00000000-0000-7000-8000-000000000702")}
+	purposeLimits := make(kernel.PurposeCounters, len(kernel.AllWorkPurposes))
+	for _, purpose := range kernel.AllWorkPurposes {
+		purposeLimits[purpose] = 1
+	}
+	purposeLimits[kernel.PurposeImplementation] = 2
+	budgetPayload, err := json.Marshal(map[string]any{
+		"authority": kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "principal"}, "budget_account_id": budget.ID,
+		"deadline_at": "2026-09-30T00:00:00Z", "evidence_ids": []kernel.UUIDv7{uuid("00000000-0000-7000-8000-000000000703")},
+		"lifecycle_epoch": 1, "model_invocation_limit": 3, "policy_digest": kernel.Digest("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
+		"policy_revision": 1, "purpose_limits": purposeLimits, "root_work": task,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	createBudget := releaseProjectionDecision(t, 70, budget, "tekroo.command.work-budget.create", "tekroo.event.work-budget.created", 1, budgetPayload)
+	if err := store.Commit(context.Background(), kernel.Snapshot{}, createBudget); err != nil {
+		t.Fatalf("create budget: %v", err)
+	}
+
+	bindingPayload, err := json.Marshal(map[string]any{
+		"budget_account_id": budget.ID, "expected_task_revision": 0, "lifecycle_epoch": 1,
+		"purpose_limits": purposeLimits, "scope_revision": 1, "task_id": task.ID, "task_model_invocation_limit": 3,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	bindBudget := releaseProjectionDecision(t, 71, task, "tekroo.command.task.bind-work-budget", "tekroo.event.task.work-budget-bound", 1, bindingPayload)
+	if err := store.Commit(context.Background(), kernel.Snapshot{}, bindBudget); err != nil {
+		t.Fatalf("bind budget: %v", err)
+	}
+
+	profile := kernel.WorkProfileBinding{
+		ProfileID: uuid("00000000-0000-7000-8000-000000000704"), ProfileRevision: 1,
+		ProfileDigest: kernel.Digest("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"), LifecycleEpoch: 1, ScopeRevision: 1,
+	}
+	invocationID := uuid("00000000-0000-7000-8000-000000000705")
+	invocationPayload := func(id kernel.UUIDv7) json.RawMessage {
+		t.Helper()
+		payload, marshalErr := json.Marshal(map[string]any{
+			"actor_fqn": kernel.ActorFQN("teams::coder-1"), "admission_policy_digest": kernel.Digest("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
+			"admission_policy_revision": 1, "allowed_terminal_outcomes": []kernel.WorkInvocationState{kernel.InvocationSucceeded, kernel.InvocationFailed},
+			"attempt_family": "implementation", "attempt_ordinal": 1, "budget_account_id": budget.ID,
+			"condition_digest": kernel.Digest("cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"),
+			"deadline_at":      "2026-09-01T00:00:00Z", "effect_policy_digest": kernel.Digest("dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"),
+			"execution_id": uuid("00000000-0000-7000-8000-000000000706"), "expected_budget_revision": 1, "expected_task_revision": 1,
+			"fencing_epoch": 1, "global_debit_ordinal": 1, "idempotency_key": "invocation-1", "invocation_id": id,
+			"lifecycle_epoch": 1, "model_profile_digest": kernel.Digest("eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"),
+			"output_predicate_digest": kernel.Digest("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
+			"parent_event_id":         uuid("00000000-0000-7000-8000-000000000707"), "purpose": kernel.PurposeImplementation,
+			"purpose_debit_ordinal": 1, "qualified_assignment_id": uuid("00000000-0000-7000-8000-000000000708"),
+			"remaining_global_budget": 2, "remaining_purpose_budget": 1, "retry_of_invocation_id": nil, "retry_ordinal": 0,
+			"runtime_identity_digest": kernel.Digest("1111111111111111111111111111111111111111111111111111111111111111"),
+			"scope_revision":          1, "task_id": task.ID, "tool_policy_digest": kernel.Digest("2222222222222222222222222222222222222222222222222222222222222222"),
+			"work_profile": profile, "workspace_id": "workspace-1",
+		})
+		if marshalErr != nil {
+			t.Fatal(marshalErr)
+		}
+		return payload
+	}
+	invocation := kernel.AggregateRef{Kind: kernel.AggregateWorkInvocation, ID: invocationID}
+	authorize := releaseProjectionDecision(t, 72, invocation, "tekroo.command.work-invocation.authorize", "tekroo.event.work-invocation.authorized", 1, invocationPayload(invocationID))
+	authorize.Outbox[0].Kind = "WORK_INVOCATION_AUTHORIZED"
+	authorize.WorkBudget = &kernel.WorkBudgetDebitDecision{
+		Account: budget, Task: task, Purpose: kernel.PurposeImplementation, ExpectedAccountRevision: 1,
+		ExpectedGlobalUsed: 0, ExpectedGlobalPurposeUsed: 0, ExpectedTaskUsed: 0, ExpectedTaskPurposeUsed: 0,
+		NextGlobalUsed: 1, NextGlobalPurposeUsed: 1, NextTaskUsed: 1, NextTaskPurposeUsed: 1,
+	}
+	authorize = attachProvenance(t, authorize)
+	if err := store.Commit(context.Background(), kernel.Snapshot{}, authorize); err != nil {
+		t.Fatalf("authorize invocation: %v", err)
+	}
+	account, found := store.WorkBudgetAccount(budget)
+	if !found || account.ModelInvocationsUsed != 1 || account.PurposeUsed[kernel.PurposeImplementation] != 1 {
+		t.Fatalf("budget after debit = %#v, found=%t", account, found)
+	}
+	projected, found := store.WorkInvocation(invocation)
+	if !found || projected.State != kernel.InvocationAuthorized || projected.GlobalDebitOrdinal != 1 {
+		t.Fatalf("invocation projection = %#v, found=%t", projected, found)
+	}
+
+	secondID := uuid("00000000-0000-7000-8000-000000000709")
+	stale := releaseProjectionDecision(t, 73, kernel.AggregateRef{Kind: kernel.AggregateWorkInvocation, ID: secondID}, "tekroo.command.work-invocation.authorize", "tekroo.event.work-invocation.authorized", 1, invocationPayload(secondID))
+	stale.WorkBudget = authorize.WorkBudget
+	stale = attachProvenance(t, stale)
+	if err := store.Commit(context.Background(), kernel.Snapshot{}, stale); !errors.Is(err, memory.ErrConflict) {
+		t.Fatalf("stale competing debit error = %v, want ErrConflict", err)
+	}
+	account, _ = store.WorkBudgetAccount(budget)
+	if account.ModelInvocationsUsed != 1 {
+		t.Fatalf("stale debit changed usage to %d", account.ModelInvocationsUsed)
+	}
+}
+
 func TestStoreProjectsModelCapabilityState(t *testing.T) {
 	store := memory.NewStore()
 	task := kernel.AggregateRef{Kind: kernel.AggregateTask, ID: uuid("00000000-0000-7000-8000-000000000801")}

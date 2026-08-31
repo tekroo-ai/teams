@@ -1,0 +1,150 @@
+{
+  "schemaVersion": "1.0.0",
+  "phase": "4",
+  "step": "1",
+  "status": "READY_FOR_PRINCIPAL_REVIEW",
+  "baseline": {
+    "teamsContract": "0.7.0",
+    "teamsCommit": "6a4a262461e967498e876090079c05a0cbb8ce1d",
+    "designRecord": "docs/architecture/108-phase-4-step-1-design-closure.md"
+  },
+  "authorityClasses": [
+    "TEAMS_CANONICAL",
+    "OPENHANDS_EXECUTION_LOCAL",
+    "SMA_SEMANTIC_MEMORY",
+    "READ_ONLY_MIRROR",
+    "EXTERNAL_EVIDENCE"
+  ],
+  "decisions": [
+    {
+      "state": "story and task definition, scope, criteria, dependencies, DAG and lifecycle",
+      "authority": "TEAMS_CANONICAL",
+      "writeOwner": "Teams kernel",
+      "smaTreatment": "exact event mirror and semantic reference only"
+    },
+    {
+      "state": "work-risk profile, routing, complexity classification and qualification",
+      "authority": "TEAMS_CANONICAL",
+      "writeOwner": "Teams kernel",
+      "smaTreatment": "suggestions are external evidence; never current truth"
+    },
+    {
+      "state": "task ownership, writable-path lease, worktree assignment and review state",
+      "authority": "TEAMS_CANONICAL",
+      "writeOwner": "Teams kernel",
+      "smaTreatment": "read-only exact Teams-event mirror; no lease arbitration"
+    },
+    {
+      "state": "root work budget and all invocation/task/purpose counters",
+      "authority": "TEAMS_CANONICAL",
+      "writeOwner": "Teams kernel",
+      "smaTreatment": "request label only"
+    },
+    {
+      "state": "single-use work invocation authority and terminal result",
+      "authority": "TEAMS_CANONICAL",
+      "writeOwner": "Teams kernel",
+      "smaTreatment": "may remember terminal evidence after Teams accepts it"
+    },
+    {
+      "state": "OpenHands conversation, provider process, tool output and unsaved scratch state",
+      "authority": "OPENHANDS_EXECUTION_LOCAL",
+      "writeOwner": "OpenHands",
+      "smaTreatment": "capturable evidence or task-local AMW"
+    },
+    {
+      "state": "AgentMemoryWorktree observations, hypotheses, attempts and task-local notes",
+      "authority": "SMA_SEMANTIC_MEMORY",
+      "writeOwner": "SMA",
+      "smaTreatment": "bounded working memory; never workflow authority"
+    },
+    {
+      "state": "semantic memories, interpretations, edges, provenance, contradiction and supersession",
+      "authority": "SMA_SEMANTIC_MEMORY",
+      "writeOwner": "SMA",
+      "smaTreatment": "canonical SMA domain"
+    },
+    {
+      "state": "SMA programming session delivery manifest",
+      "authority": "SMA_SEMANTIC_MEMORY",
+      "writeOwner": "SMA",
+      "smaTreatment": "delivery bookkeeping only"
+    },
+    {
+      "state": "copied Teams source event and provenance",
+      "authority": "READ_ONLY_MIRROR",
+      "writeOwner": "SMA intake from exact Teams export",
+      "smaTreatment": "immutable evidence mirror; Teams event remains authoritative"
+    },
+    {
+      "state": "agent difficulty, recommendation, proposed blocker or proposed coordination fact",
+      "authority": "EXTERNAL_EVIDENCE",
+      "writeOwner": "originating agent or SMA",
+      "smaTreatment": "cannot affect current work until accepted by Teams"
+    }
+  ],
+  "ambiguousCurrentInterfaces": [
+    {
+      "interface": "ProgrammingAdapterRepository.acquireLease/renewLease/releaseLease",
+      "observed": "SMA repository can arbitrate active ownership lease conflicts",
+      "resolution": "remove from the organizational authority path; Teams owns lease transitions; SMA retains read-only exact references only"
+    },
+    {
+      "interface": "SharedProjectWorkingEntry operational kinds",
+      "observed": "SMA can store ownership, path lease, blocker, review and operational facts",
+      "resolution": "Teams projections are current truth; SMA entries, if retained, are exact read-only Teams-event mirrors"
+    },
+    {
+      "interface": "OpenHandsProgrammingSourceEvent coordination map",
+      "observed": "OpenHands source may publish arbitrary coordination facts into SMA shared state",
+      "resolution": "treat as task-local evidence/proposal only; it cannot update authoritative shared state"
+    },
+    {
+      "interface": "task.dispatch",
+      "observed": "records accepted dispatch but does not represent a single-use model invocation",
+      "resolution": "retain as non-executable assignment fact; only a Teams work_invocation authorization can wake model execution"
+    }
+  ],
+  "terminationProof": {
+    "rootCounter": "model_invocations_used",
+    "rootLimit": "model_invocation_limit",
+    "formula": "max(0, model_invocation_limit - model_invocations_used)",
+    "inheritedBy": [
+      "child tasks",
+      "handoffs",
+      "replans",
+      "reviews and repairs",
+      "model promotions",
+      "actor or process replacements",
+      "restarts"
+    ],
+    "excludedFromProgressIdentity": [
+      "role label",
+      "actor name",
+      "model name",
+      "provider",
+      "channel",
+      "conversation ID",
+      "process ID",
+      "message type"
+    ]
+  },
+  "projectionCollections": [
+    "story_projections",
+    "task_projections",
+    "projection_checkpoints"
+  ],
+  "nextStep": {
+    "step": "2",
+    "recommendedContract": "0.8.0",
+    "authorized": false
+  },
+  "notRun": [
+    "contract construction",
+    "Teams implementation",
+    "SMA modification",
+    "service start or restart",
+    "database migration",
+    "live qualification"
+  ]
+}

@@ -1,0 +1,115 @@
+{
+  "schemaVersion": "1.0.0",
+  "phase": 4,
+  "step": 4,
+  "title": "MongoDB task and story operational projections",
+  "status": "PASS",
+  "startingCommit": "6a4a262461e967498e876090079c05a0cbb8ce1d",
+  "branch": "codex/phase4-step1-design-closure",
+  "contract": {
+    "identity": "tekroo.kernel.contracts/0.8.0",
+    "manifestSHA256": "c7eb4baae3a8312e44f9946fabde5a9cddb1937c7a41eb02d9b014ef21027ad1",
+    "structureReport": {
+      "path": "OUTPUT/phase-4/contract-0.8.0-structure-report.json",
+      "sha256": "4c77c26c1e5db663419c85b509315e6262be060584373310ae20da08449cfe4e",
+      "result": "PASS",
+      "checks": 3604
+    },
+    "referenceReport": {
+      "path": "OUTPUT/phase-4/contract-0.8.0-reference-report.json",
+      "sha256": "bc02542ed52dfa0dbfb09c5e3d82016d690d32569b0fef2fdb51a6647a7f55ec",
+      "result": "PASS",
+      "fixtures": 297
+    }
+  },
+  "implementationFiles": [
+    {
+      "path": "adapters/mongo/operational_projection.go",
+      "sha256": "13e8d7b22600decb4185ac4dded8279b713ffd359bc68efa0fc343652549f856"
+    },
+    {
+      "path": "adapters/mongo/projection_materialize.go",
+      "sha256": "52ee85430955556b640e6e8cb93349a000a8bf1376c6678314363eadea8ac19b"
+    },
+    {
+      "path": "adapters/mongo/projection_store.go",
+      "sha256": "a4ced477a52deff2d0b39cb100d726301d25a5bfd34b74e343264cfd69e4b8fb"
+    },
+    {
+      "path": "adapters/mongo/projection_rebuild.go",
+      "sha256": "aab72db49ad9e7b51b8d22889bf69621ecc4e381857f48098ed19ee5130bd3b1"
+    },
+    {
+      "path": "adapters/mongo/store.go",
+      "sha256": "506de9d428ea58598e6d6dbc1eeb7d09df6c80198f4dfa06e7366bf93452141d"
+    }
+  ],
+  "verificationFiles": [
+    {
+      "path": "adapters/mongo/operational_projection_test.go",
+      "sha256": "08266c4b1c63d27ad2e4cacb534bfcdbe73d3ea3093dc8fbff567508d5f3bf75"
+    },
+    {
+      "path": "adapters/mongo/integration_test.go",
+      "sha256": "5ce54329a45016fbe9c295faeece399119bc0d009e26219dbf85706730d48ab7"
+    }
+  ],
+  "architectureRecord": {
+    "path": "docs/architecture/111-phase-4-step-4-mongodb-operational-projections.md",
+    "sha256": "8c49b948cf2e7745268b6dba986b32106e49f8e4c9691b592a1f6463e2a50980"
+  },
+  "collections": {
+    "authoritativeViews": [
+      "story_projections",
+      "task_projections"
+    ],
+    "checkpoints": "projection_checkpoints",
+    "nonAuthoritativeFaultEvidence": "projection_faults"
+  },
+  "tests": [
+    {
+      "command": "go test -count=1 ./...",
+      "result": "PASS"
+    },
+    {
+      "command": "go test -tags=mongo_integration -count=1 ./adapters/mongo",
+      "result": "PASS"
+    },
+    {
+      "command": "go test -race -count=1 ./adapters/mongo",
+      "result": "PASS"
+    },
+    {
+      "command": "go test -race -tags=mongo_integration -count=1 ./adapters/mongo -run TestOperationalProjection",
+      "result": "PASS"
+    },
+    {
+      "command": "go vet ./...",
+      "result": "PASS"
+    },
+    {
+      "command": "git diff --check",
+      "result": "PASS"
+    }
+  ],
+  "provedProperties": [
+    "projection documents and source checkpoints commit in one MongoDB transaction",
+    "exact current and older event redelivery is idempotent",
+    "revision gaps and conflicts fail closed without checkpoint advancement",
+    "projection faults are retained as non-authoritative record-fault payloads",
+    "projected state survives store restart",
+    "clean rebuild begins from revision zero and validates every task/story fold",
+    "rebuild writes and rereads temporary collections before comparison",
+    "live projections are replaced only after canonical exact equality and complete checkpoint coverage",
+    "rebuild mismatch leaves live projections unchanged",
+    "kernel decisions and authoritative snapshots do not read task/story projections"
+  ],
+  "notRun": [
+    "Phase 4 Step 5 operational execution coordination",
+    "projector service deployment",
+    "OpenHands work-invocation consumption",
+    "SMA modification",
+    "production or historical data access"
+  ],
+  "recommendation": "ACCEPT_PHASE_4_STEP_4_AND_AUTHORIZE_STEP_5"
+}

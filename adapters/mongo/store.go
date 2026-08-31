@@ -218,6 +218,13 @@ func (s *Store) ensureIndexes(ctx context.Context) error {
 		"identity_conflicts": {
 			{Keys: bson.D{{Key: "command_id", Value: 1}, {Key: "observed_at", Value: 1}}, Options: options.Index().SetName("command_observed")},
 		},
+		"story_projections": {
+			{Keys: bson.D{{Key: "phase", Value: 1}}, Options: options.Index().SetName("story_phase")},
+		},
+		"task_projections": {
+			{Keys: bson.D{{Key: "story_id", Value: 1}, {Key: "phase", Value: 1}}, Options: options.Index().SetName("task_story_phase")},
+			{Keys: bson.D{{Key: "owner_fqn", Value: 1}, {Key: "phase", Value: 1}}, Options: options.Index().SetName("task_owner_phase")},
+		},
 	}
 	for collection, indexes := range definitions {
 		if _, err := s.db.Collection(collection).Indexes().CreateMany(ctx, indexes); err != nil {
@@ -480,6 +487,9 @@ func (s *Store) loadSnapshot(ctx context.Context, target kernel.AggregateRef, pr
 			return kernel.Snapshot{}, ErrCorruptAggregate
 		}
 	}
+	if err := s.loadPhase4State(ctx, &snapshot); err != nil {
+		return kernel.Snapshot{}, err
+	}
 	return snapshot, nil
 }
 
@@ -684,7 +694,7 @@ func (s *Store) commitTransaction(ctx context.Context, expected kernel.Snapshot,
 		if err != nil {
 			return err
 		}
-		qualification, err := s.applyRegistryAndReview(ctx, event)
+		qualification, err := s.applyRegistryAndReview(ctx, event, decision.WorkBudget)
 		if err != nil {
 			return err
 		}
@@ -847,7 +857,10 @@ func (s *Store) checkGuards(ctx context.Context, expected kernel.Snapshot, decis
 	return nil
 }
 
-func (s *Store) applyRegistryAndReview(ctx context.Context, event kernel.DomainEvent) (string, error) {
+func (s *Store) applyRegistryAndReview(ctx context.Context, event kernel.DomainEvent, debit *kernel.WorkBudgetDebitDecision) (string, error) {
+	if handled, err := s.applyPhase4Event(ctx, event, debit); handled {
+		return "", err
+	}
 	switch event.EventType {
 	case "tekroo.event.execution.registered":
 		var payload struct {
@@ -1207,6 +1220,9 @@ func (s *Store) inject(point string) error {
 
 func validateDecision(expected kernel.Snapshot, decision kernel.Decision) error {
 	if !decision.CommandFingerprint.Valid() || !decision.IdempotencyScope.Valid() || !decision.Receipt.CommandID.Valid() || !decision.Receipt.Target.Valid() || !decision.Authority.Principal.Valid() {
+		return ErrInvalidDecision
+	}
+	if decision.WorkBudget != nil && (!decision.WorkBudget.Valid() || decision.Receipt.CommandType != "tekroo.command.work-invocation.authorize") {
 		return ErrInvalidDecision
 	}
 	provenanceDigest, err := decision.Provenance.Digest()

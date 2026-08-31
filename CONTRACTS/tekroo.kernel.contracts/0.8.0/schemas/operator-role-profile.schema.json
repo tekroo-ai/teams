@@ -1,0 +1,122 @@
+{
+  "$id": "https://contracts.tekroo.ai/tekroo.kernel.contracts/0.8.0/schemas/operator-role-profile.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "authority_policy_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "authority_policy_revision": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "binding_id": {
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "type": "string"
+    },
+    "capability_ids": {
+      "items": {
+        "enum": [
+          "COORDINATE_DAG",
+          "INSPECT_ORGANIZATION",
+          "INSPECT_EXECUTION",
+          "INVOKE_AUTHORIZED_COMMAND",
+          "PREPARE_DECISION",
+          "PROPOSE_ASSIGNMENT",
+          "PROPOSE_DECOMPOSITION",
+          "PROPOSE_ESCALATION",
+          "ROUTE_HUMAN_REQUIRED",
+          "SURFACE_OPERATIONAL_CONDITION"
+        ],
+        "type": "string"
+      },
+      "maxItems": 10,
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "evidence_ids": {
+      "items": {
+        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+        "type": "string"
+      },
+      "maxItems": 64,
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "expected_system_revision": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "human_selection_policy_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "human_selection_policy_revision": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "operator_actor_fqn": {
+      "pattern": "^(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])::operator-[1-9][0-9]{0,19}$",
+      "type": "string"
+    },
+    "replaces_binding_id": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "role_bundle_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "role_bundle_signature_evidence_ids": {
+      "items": {
+        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+        "type": "string"
+      },
+      "maxItems": 16,
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "role_bundle_version": {
+      "maxLength": 128,
+      "minLength": 1,
+      "type": "string"
+    },
+    "role_definition_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "role_id": {
+      "const": "operator"
+    }
+  },
+  "required": [
+    "binding_id",
+    "expected_system_revision",
+    "role_id",
+    "operator_actor_fqn",
+    "role_bundle_version",
+    "role_bundle_digest",
+    "role_bundle_signature_evidence_ids",
+    "role_definition_digest",
+    "capability_ids",
+    "human_selection_policy_revision",
+    "human_selection_policy_digest",
+    "authority_policy_revision",
+    "authority_policy_digest",
+    "replaces_binding_id",
+    "evidence_ids"
+  ],
+  "title": "Explicit operator actor role binding distinct from human principal and control surface",
+  "type": "object"
+}
