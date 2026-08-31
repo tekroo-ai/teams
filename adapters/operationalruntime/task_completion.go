@@ -28,6 +28,37 @@ func (service *ProductionService) reconcileTaskCompletions(ctx context.Context, 
 		if !found || invocation.State != kernel.InvocationSucceeded || invocation.OutputDigest == nil {
 			continue
 		}
+		profileSnapshot, profileFound := snapshot.WorkProfiles[kernel.AggregateRef{Kind: kernel.AggregateTask, ID: task.ID}]
+		criteria, marshalErr := json.Marshal(task.AcceptanceCriteria)
+		if marshalErr != nil || !profileFound || !profileSnapshot.Valid() {
+			return false, errors.Join(organization.ErrInvalidFeature, marshalErr)
+		}
+		validatedTargets := make(map[kernel.UUIDv7]struct{}, len(task.Validates))
+		for _, targetID := range task.Validates {
+			validatedTargets[targetID] = struct{}{}
+		}
+		conditionDigests := make([]kernel.Digest, 0, len(task.Validates))
+		for _, dependencyID := range task.DependsOn {
+			if _, validates := validatedTargets[dependencyID]; !validates {
+				continue
+			}
+			candidate, present := invocations[dependencyID]
+			if !present || candidate.State != kernel.InvocationSucceeded || candidate.OutputDigest == nil {
+				conditionDigests = nil
+				break
+			}
+			conditionDigests = append(conditionDigests, *candidate.OutputDigest)
+		}
+		if len(conditionDigests) != len(task.Validates) {
+			continue
+		}
+		expectedCondition, digestErr := taskInvocationConditionDigest(profileSnapshot.Profile.ProfileDigest, digestBytes(criteria), conditionDigests)
+		if digestErr != nil {
+			return false, digestErr
+		}
+		if invocation.ConditionDigest != expectedCondition {
+			continue
+		}
 		output, err := service.Runtime.ReadExecutionOutput(ctx, *invocation.OutputDigest)
 		if err != nil {
 			return false, fmt.Errorf("read validator %s output: %w", task.ID, err)
@@ -44,7 +75,7 @@ func (service *ProductionService) reconcileTaskCompletions(ctx context.Context, 
 	changed := false
 	for _, target := range plan.Tasks {
 		validators := validatorsByTarget[target.ID]
-		if len(validators) == 0 || states[target.ID].Phase != kernel.PhaseActive {
+		if len(validators) == 0 || states[target.ID].Phase != kernel.PhaseActive || states[target.ID].Condition != kernel.ConditionRunnable {
 			continue
 		}
 		expected := 0
@@ -68,6 +99,11 @@ func (service *ProductionService) reconcileTaskCompletions(ctx context.Context, 
 			return false, err
 		}
 		if status != "PASS" {
+			authorized, repairErr := service.authorizeRepairAfterFailedReview(ctx, feature, target, states[target.ID], heads[target.ID], implementer, validators, snapshot)
+			if repairErr != nil {
+				return false, repairErr
+			}
+			changed = changed || authorized
 			continue
 		}
 		targetState := states[target.ID]
@@ -88,6 +124,64 @@ func (service *ProductionService) reconcileTaskCompletions(ctx context.Context, 
 		}
 	}
 	return changed, nil
+}
+
+func (service *ProductionService) authorizeRepairAfterFailedReview(ctx context.Context, feature organization.FeatureRequest, target organization.PlannedTask, state kernel.AggregateState, head kernel.UUIDv7, implementer kernel.WorkInvocation, validators []taskValidatorResult, snapshot kernel.Snapshot) (bool, error) {
+	if implementer.OutputDigest == nil || target.ReviewRoundLimit == 0 {
+		return false, organization.ErrInvalidFeature
+	}
+	conditionParts := []kernel.Digest{*implementer.OutputDigest}
+	for _, validator := range validators {
+		if validator.Invocation.OutputDigest == nil {
+			return false, organization.ErrInvalidFeature
+		}
+		conditionParts = append(conditionParts, *validator.Invocation.OutputDigest)
+	}
+	profileSnapshot, profileFound := snapshot.WorkProfiles[kernel.AggregateRef{Kind: kernel.AggregateTask, ID: target.ID}]
+	criteria, marshalErr := json.Marshal(target.AcceptanceCriteria)
+	if marshalErr != nil || !profileFound || !profileSnapshot.Valid() {
+		return false, errors.Join(organization.ErrInvalidFeature, marshalErr)
+	}
+	conditionDigest, digestErr := taskInvocationConditionDigest(profileSnapshot.Profile.ProfileDigest, digestBytes(criteria), conditionParts)
+	if digestErr != nil {
+		return false, digestErr
+	}
+	nextRound := uint64(1)
+	for _, invocation := range snapshot.WorkInvocations {
+		if invocation.TaskID != target.ID || invocation.Purpose != kernel.PurposeRepair {
+			continue
+		}
+		if invocation.ConditionDigest == conditionDigest {
+			return false, nil
+		}
+		if invocation.AttemptOrdinal >= nextRound {
+			nextRound = invocation.AttemptOrdinal + 1
+		}
+	}
+	if nextRound > uint64(target.ReviewRoundLimit) {
+		reviewID := deterministicOperationalUUID("completion-review", string(feature.ID), string(target.ID), string(*implementer.OutputDigest))
+		_, reviewHead, reviewFound, reviewErr := service.Store.ReadAggregateHead(ctx, kernel.AggregateRef{Kind: kernel.AggregateCompletionReview, ID: reviewID})
+		owner, active, ownerErr := service.RoleHost.Status(ctx, target.Owner)
+		evidence, evidenceErr := evidenceForInvocations(snapshot, append([]kernel.WorkInvocation{implementer}, validatorInvocations(validators)...)...)
+		if reviewErr != nil || !reviewFound || ownerErr != nil || !active || evidenceErr != nil {
+			return false, errors.Join(organization.ErrInvalidFeature, reviewErr, ownerErr, evidenceErr)
+		}
+		payload, _ := json.Marshal(map[string]any{"blocker_refs": []string{"teams://completion-review/" + string(reviewID)}, "reason": "independent validation still fails after the authorized repair rounds", "review_policy": "operator-or-product-owner-must-amend-scope-or-cancel"})
+		_, err := service.submitDeterministicActorTargetCommand(ctx, feature, "tekroo.command.work.block", kernel.AggregateTask, target.ID, service.policyAuthority, owner.ActorFQN, owner.Execution, state.Revision, payload, []kernel.DagParent{{ParentEventID: reviewHead, EdgeKind: kernel.EdgeResponse}}, evidence, "repair-exhausted-"+string(target.ID)+"-"+string(*implementer.OutputDigest))
+		return err == nil, err
+	}
+	profileConfig, configured := service.profilesByModel[target.ModelProfile]
+	owner, active, ownerErr := service.RoleHost.Status(ctx, target.Owner)
+	workspace, workspaceFound := service.workspacesByID[owner.WorkspaceID]
+	budget := snapshot.WorkBudgetAccounts[kernel.AggregateRef{Kind: kernel.AggregateWorkBudget, ID: feature.BudgetAccountID}]
+	if !configured || ownerErr != nil || !active || owner.Status != organization.RoleIdle || owner.Execution != implementer.Execution || !workspaceFound || !budget.Valid() {
+		return false, errors.Join(organization.ErrRoleNotRunning, ownerErr)
+	}
+	tracked := &trackedTask{plan: target, revision: state.Revision, last: head, profile: profileSnapshot.Profile, owner: owner}
+	if err := service.authorizeTaskInvocationWithCondition(ctx, feature, tracked, profileConfig, workspace, budget.Revision, kernel.PurposeRepair, nextRound, nil, conditionParts); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func (service *ProductionService) finalizeTaskReview(ctx context.Context, feature organization.FeatureRequest, target organization.PlannedTask, state kernel.AggregateState, head kernel.UUIDv7, implementer kernel.WorkInvocation, validators []taskValidatorResult, snapshot kernel.Snapshot) (string, error) {
@@ -317,5 +411,5 @@ func reviewFindings(feature organization.FeatureRequest, targetID kernel.UUIDv7,
 	}
 	summary := strings.Join(result.Reasons, "; ")
 	key := digestBytes([]byte(string(targetID) + "\x00" + branchID + "\x00" + summary))
-	return []map[string]any{{"finding_id": deterministicOperationalUUID("review-finding", string(feature.ID), string(targetID), branchID, string(key)), "finding_key": key, "classification": "VALIDATION_FAILURE", "summary": summary, "evidence_ids": evidence}}
+	return []map[string]any{{"finding_id": deterministicOperationalUUID("review-finding", string(feature.ID), string(targetID), branchID, string(key)), "finding_key": key, "classification": "DEFECT", "summary": summary, "evidence_ids": evidence}}
 }

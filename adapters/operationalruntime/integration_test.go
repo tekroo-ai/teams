@@ -406,7 +406,7 @@ func integratedPolicy() kernel.AuthorizationPolicy {
 		PolicyDigest: digestByte('9'), Revision: 1,
 		Grants: []kernel.AuthorityGrant{
 			{GrantDigest: digestByte('a'), Grantee: kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "principal"}, Scope: kernel.AuthorityScope{CommandTypes: []string{"tekroo.command.story.create", "tekroo.command.story.begin-planning", "tekroo.command.story.authorize", "tekroo.command.story.activate", "tekroo.command.task.create", "tekroo.command.evidence.register", "tekroo.command.work-invocation.request-cancellation", "tekroo.command.story.request-completion", "tekroo.command.story.approve-release", "tekroo.command.story.request-acceptance"}, TargetKinds: []kernel.AggregateKind{kernel.AggregateStory, kernel.AggregateTask, kernel.AggregateEvidence, kernel.AggregateWorkInvocation}, CanReadTarget: true}},
-			{GrantDigest: digestByte('b'), Grantee: kernel.PrincipalRef{Kind: kernel.PrincipalPolicy, ID: "teams-admission-policy"}, Scope: kernel.AuthorityScope{CommandTypes: []string{"tekroo.command.task.bind-work-profile", "tekroo.command.task.mark-ready", "tekroo.command.task.authorize-qualified-assignment", "tekroo.command.work-budget.create", "tekroo.command.task.bind-work-budget", "tekroo.command.task.bind-operational-scope", "tekroo.command.work-invocation.authorize", "tekroo.command.work-invocation.expire", "tekroo.command.completion-review.open", "tekroo.command.completion-review.finalize", "tekroo.command.release-plan.create", "tekroo.command.release-plan.finalize"}, TargetKinds: []kernel.AggregateKind{kernel.AggregateTask, kernel.AggregateStory, kernel.AggregateCompletionReview, kernel.AggregateReleasePlan, kernel.AggregateWorkBudget, kernel.AggregateWorkInvocation}, CanReadTarget: true}},
+			{GrantDigest: digestByte('b'), Grantee: kernel.PrincipalRef{Kind: kernel.PrincipalPolicy, ID: "teams-admission-policy"}, Scope: kernel.AuthorityScope{CommandTypes: []string{"tekroo.command.task.bind-work-profile", "tekroo.command.task.mark-ready", "tekroo.command.task.authorize-qualified-assignment", "tekroo.command.work-budget.create", "tekroo.command.task.bind-work-budget", "tekroo.command.task.bind-operational-scope", "tekroo.command.work-invocation.authorize", "tekroo.command.work-invocation.expire", "tekroo.command.work.block", "tekroo.command.completion-review.open", "tekroo.command.completion-review.finalize", "tekroo.command.release-plan.create", "tekroo.command.release-plan.finalize"}, TargetKinds: []kernel.AggregateKind{kernel.AggregateTask, kernel.AggregateStory, kernel.AggregateCompletionReview, kernel.AggregateReleasePlan, kernel.AggregateWorkBudget, kernel.AggregateWorkInvocation}, CanReadTarget: true}},
 			{GrantDigest: digestByte('c'), Grantee: kernel.PrincipalRef{Kind: kernel.PrincipalService, ID: "teams-operational-runtime"}, Scope: kernel.AuthorityScope{CommandTypes: []string{"tekroo.command.execution.register", "tekroo.command.execution.replace", "tekroo.command.evidence.register", "tekroo.command.work-invocation.claim", "tekroo.command.work-invocation.record-started", "tekroo.command.work-invocation.record-terminal"}, TargetKinds: []kernel.AggregateKind{kernel.AggregateExecution, kernel.AggregateEvidence, kernel.AggregateWorkInvocation}, CanReadTarget: true}},
 			{GrantDigest: digestByte('d'), Grantee: kernel.PrincipalRef{Kind: kernel.PrincipalActor, ID: "teams::coder-1"}, Scope: kernel.AuthorityScope{CommandTypes: []string{"tekroo.command.task.acquire-ownership", "tekroo.command.task.activate", "tekroo.command.task.request-completion"}, TargetKinds: []kernel.AggregateKind{kernel.AggregateTask}, CanReadTarget: true}},
 			{GrantDigest: digestByte('e'), Grantee: kernel.PrincipalRef{Kind: kernel.PrincipalActor, ID: "teams::coder-2"}, Scope: kernel.AuthorityScope{CommandTypes: []string{"tekroo.command.task.acquire-ownership", "tekroo.command.task.activate"}, TargetKinds: []kernel.AggregateKind{kernel.AggregateTask}, CanReadTarget: true}},
@@ -417,18 +417,20 @@ func integratedPolicy() kernel.AuthorizationPolicy {
 
 type integratedConversation struct {
 	workspace, requestDigest, prompt string
+	response                         string
 	created, submitted, finished     bool
 	interrupted                      bool
 	readyAt                          time.Time
 }
 
 type integratedOpenHands struct {
-	t             *testing.T
-	mu            sync.Mutex
-	conversations map[string]*integratedConversation
-	delays        map[string]time.Duration
-	active        int
-	peakActive    int
+	t               *testing.T
+	mu              sync.Mutex
+	conversations   map[string]*integratedConversation
+	delays          map[string]time.Duration
+	active          int
+	peakActive      int
+	failValidations int
 }
 
 func (server *integratedOpenHands) serveHTTP(writer http.ResponseWriter, request *http.Request) {
@@ -527,8 +529,17 @@ func (server *integratedOpenHands) serveHTTP(writer http.ResponseWriter, request
 			if conversation.finished {
 				agentText := "completed authorized task"
 				var brief application.ExecutionBrief
-				if json.Unmarshal([]byte(conversation.prompt), &brief) == nil && brief.ResultProtocol != nil && brief.ResultProtocol.Marker == application.ValidationResultMarker {
-					agentText = "completed independent validation\n" + application.ValidationResultMarker + "\n{\"schema_version\":\"1.0.0\",\"outcome\":\"PASS\",\"reasons\":[\"repository checks passed\"]}"
+				if conversation.response != "" {
+					agentText = conversation.response
+				} else if json.Unmarshal([]byte(conversation.prompt), &brief) == nil && brief.ResultProtocol != nil && brief.ResultProtocol.Marker == application.ValidationResultMarker {
+					outcome, reason := "PASS", "repository checks passed"
+					if server.failValidations > 0 {
+						server.failValidations--
+						outcome, reason = "FAIL", "repair is required"
+					}
+					agentText = "completed independent validation\n" + application.ValidationResultMarker + "\n{\"schema_version\":\"1.0.0\",\"outcome\":\"" + outcome + "\",\"reasons\":[\"" + reason + "\"]}"
+				} else if brief.Purpose == kernel.PurposeRepair {
+					agentText = "completed bounded repair for " + string(brief.InvocationID)
 				} else if brief.ResultProtocol != nil && brief.ResultProtocol.Marker == application.OrganizationalResultMarker {
 					switch brief.Task.Title {
 					case "Refine feature request":
@@ -539,6 +550,7 @@ func (server *integratedOpenHands) serveHTTP(writer http.ResponseWriter, request
 						agentText = application.OrganizationalResultMarker + "\n{\"schema_version\":\"1.0.0\",\"result_type\":\"FEATURE_PLAN\",\"architecture\":\"One implementation followed by independent validation.\",\"design_decisions\":[\"use the existing interface\"],\"assumptions\":[],\"tasks\":[{\"story_index\":0,\"title\":\"Implement behavior\",\"description\":\"Implement the accepted behavior.\",\"acceptance_criteria\":[\"the requested behavior works\"],\"depends_on\":[],\"validates\":[],\"role\":\"coder\",\"purpose\":\"IMPLEMENTATION\",\"complexity\":3,\"risk\":\"LOW\",\"critical_path\":true,\"attempt_limit\":2,\"review_round_limit\":2}]}"
 					}
 				}
+				conversation.response = agentText
 				items = append(items, map[string]any{"id": "agent-" + conversationID, "kind": "MessageEvent", "source": "agent", "timestamp": time.Now().UTC(), "llm_message": map[string]any{"content": []map[string]any{{"type": "text", "text": agentText}}}})
 			}
 		}

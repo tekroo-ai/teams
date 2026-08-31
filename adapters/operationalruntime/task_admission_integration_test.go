@@ -156,7 +156,7 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 		Stories: []organization.PlannedStory{{ID: kernel.UUIDv7("00000000-0000-7000-8000-000000006012"), Title: "Executable story", Description: "Materialize an admitted task.", AcceptanceCriteria: []string{"root task is active"}, Priority: organization.PriorityHigh}},
 		Tasks: []organization.PlannedTask{
 			{ID: kernel.UUIDv7("00000000-0000-7000-8000-000000006013"), StoryID: kernel.UUIDv7("00000000-0000-7000-8000-000000006012"), Title: "Implement", Description: "Implement the accepted change.", AcceptanceCriteria: []string{"go test passes"}, Owner: "example::coder-1", ModelProfile: modelDigest, DecisionRoute: kernel.RouteBoundedExecution, Purpose: kernel.PurposeImplementation, Complexity: 3, Risk: organization.RiskLow, CriticalPath: true, AttemptLimit: 2, ReviewRoundLimit: 1},
-			{ID: kernel.UUIDv7("00000000-0000-7000-8000-000000006018"), StoryID: kernel.UUIDv7("00000000-0000-7000-8000-000000006012"), Title: "Validate", Description: "Independently validate the accepted change.", AcceptanceCriteria: []string{"validation passes"}, DependsOn: []kernel.UUIDv7{kernel.UUIDv7("00000000-0000-7000-8000-000000006013")}, Validates: []kernel.UUIDv7{kernel.UUIDv7("00000000-0000-7000-8000-000000006013")}, Owner: "example::coder-2", ModelProfile: modelDigest, DecisionRoute: kernel.RouteBoundedExecution, Purpose: kernel.PurposeValidation, Complexity: 2, Risk: organization.RiskLow, CriticalPath: true, AttemptLimit: 1, ReviewRoundLimit: 1},
+			{ID: kernel.UUIDv7("00000000-0000-7000-8000-000000006018"), StoryID: kernel.UUIDv7("00000000-0000-7000-8000-000000006012"), Title: "Validate", Description: "Independently validate the accepted change.", AcceptanceCriteria: []string{"validation passes"}, DependsOn: []kernel.UUIDv7{kernel.UUIDv7("00000000-0000-7000-8000-000000006013")}, Validates: []kernel.UUIDv7{kernel.UUIDv7("00000000-0000-7000-8000-000000006013")}, Owner: "example::coder-2", ModelProfile: modelDigest, DecisionRoute: kernel.RouteBoundedExecution, Purpose: kernel.PurposeValidation, Complexity: 2, Risk: organization.RiskLow, CriticalPath: true, AttemptLimit: 2, ReviewRoundLimit: 1},
 		},
 	}
 	runContext, cancelRun := context.WithCancel(context.Background())
@@ -174,11 +174,13 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 	if err := service.reconcileFeaturePlan(contextWithTimeout(t), feature, plan); err != nil {
 		t.Fatal(err)
 	}
-	secondInvocationID := deterministicOperationalUUID("work-invocation", string(feature.ID), string(plan.Tasks[1].ID), string(plan.Tasks[1].Purpose), "1")
-	waitForInvocationState(t, store, secondInvocationID, kernel.InvocationSucceeded)
+	waitForTaskInvocationState(t, store, plan.Tasks[1].ID, kernel.PurposeValidation, kernel.InvocationSucceeded)
 	if err := service.reconcileFeaturePlan(contextWithTimeout(t), feature, plan); err != nil {
 		t.Fatal(err)
 	}
+	serverState.mu.Lock()
+	serverState.failValidations = 1
+	serverState.mu.Unlock()
 	automated, created := submitAutomatedFeature(t, service)
 	if !created {
 		t.Fatal("automated feature was not created")
@@ -215,7 +217,21 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 	if err := service.reconcileFeaturePlan(contextWithTimeout(t), automated, *automated.Plan); err != nil {
 		t.Fatal(err)
 	}
-	waitForInvocationState(t, store, deterministicOperationalUUID("work-invocation", string(automated.ID), string(automatedValidation.ID), string(automatedValidation.Purpose), "1"), kernel.InvocationSucceeded)
+	firstValidation := waitForTaskInvocationState(t, store, automatedValidation.ID, kernel.PurposeValidation, kernel.InvocationSucceeded)
+	if err := service.reconcileFeaturePlan(contextWithTimeout(t), automated, *automated.Plan); err != nil {
+		t.Fatal(err)
+	}
+	repair := waitForTaskInvocationState(t, store, automatedImplementation.ID, kernel.PurposeRepair, kernel.InvocationSucceeded)
+	if repair.AttemptOrdinal != 1 || repair.OutputDigest == nil {
+		t.Fatalf("repair invocation = %#v", repair)
+	}
+	if err := service.reconcileFeaturePlan(contextWithTimeout(t), automated, *automated.Plan); err != nil {
+		t.Fatal(err)
+	}
+	secondValidation := waitForTaskInvocationState(t, store, automatedValidation.ID, kernel.PurposeValidation, kernel.InvocationSucceeded)
+	if secondValidation.ID == firstValidation.ID || secondValidation.AttemptOrdinal != 2 || secondValidation.ConditionDigest == firstValidation.ConditionDigest {
+		t.Fatalf("validation rounds first=%#v second=%#v", firstValidation, secondValidation)
+	}
 	if err := service.reconcileFeaturePlan(contextWithTimeout(t), automated, *automated.Plan); err != nil {
 		t.Fatal(err)
 	}
@@ -259,6 +275,24 @@ func waitForInvocationState(t *testing.T, store *mongo.Store, invocationID kerne
 		}
 		if time.Now().After(deadline) {
 			t.Fatalf("invocation %s state=%s err=%v", invocationID, current.Invocation.State, err)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+func waitForTaskInvocationState(t *testing.T, store *mongo.Store, taskID kernel.UUIDv7, purpose kernel.WorkPurpose, expected kernel.WorkInvocationState) kernel.WorkInvocation {
+	t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		snapshot, err := store.LoadDecision(contextWithTimeout(t), kernel.KernelCommand{Target: kernel.AggregateRef{Kind: kernel.AggregateTask, ID: taskID}})
+		if err == nil {
+			latest, found := latestTaskInvocation(snapshot.WorkInvocations, taskID)
+			if found && latest.Purpose == purpose && latest.State == expected {
+				return latest
+			}
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("task %s purpose=%s state=%s err=%v", taskID, purpose, expected, err)
 		}
 		time.Sleep(10 * time.Millisecond)
 	}

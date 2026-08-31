@@ -1025,7 +1025,7 @@ func productionPolicyValid(policy kernel.AuthorizationPolicy, service, expiry ke
 			return false
 		}
 	}
-	return directGrantCovers(policy.Grants, expiry, "tekroo.command.work-invocation.expire")
+	return directGrantCovers(policy.Grants, expiry, "tekroo.command.work-invocation.expire") && directGrantCovers(policy.Grants, expiry, "tekroo.command.work.block")
 }
 
 func directGrantCovers(grants []kernel.AuthorityGrant, principal kernel.PrincipalRef, command string) bool {
@@ -1034,7 +1034,7 @@ func directGrantCovers(grants []kernel.AuthorityGrant, principal kernel.Principa
 			continue
 		}
 		for _, kind := range grant.Scope.TargetKinds {
-			if (command == "tekroo.command.execution.register" || command == "tekroo.command.execution.replace") && kind == kernel.AggregateExecution || command == "tekroo.command.evidence.register" && kind == kernel.AggregateEvidence || strings.HasPrefix(command, "tekroo.command.work-invocation.") && kind == kernel.AggregateWorkInvocation {
+			if (command == "tekroo.command.execution.register" || command == "tekroo.command.execution.replace") && kind == kernel.AggregateExecution || command == "tekroo.command.evidence.register" && kind == kernel.AggregateEvidence || strings.HasPrefix(command, "tekroo.command.work-invocation.") && kind == kernel.AggregateWorkInvocation || command == "tekroo.command.work.block" && kind == kernel.AggregateTask {
 				return true
 			}
 		}

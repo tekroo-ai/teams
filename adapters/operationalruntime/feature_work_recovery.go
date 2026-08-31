@@ -63,6 +63,13 @@ func (service *ProductionService) reconcileFeaturePlan(ctx context.Context, feat
 	if !found || !budget.Valid() {
 		return errors.New("feature work budget is missing")
 	}
+	revalidationAuthorized, err := service.reconcileValidationRounds(ctx, feature, plan, states, heads, invocations, snapshot, budget.Revision)
+	if err != nil {
+		return err
+	}
+	if revalidationAuthorized {
+		return nil
+	}
 	completed, err := service.reconcileTaskCompletions(ctx, feature, plan, states, heads, invocations, snapshot)
 	if err != nil {
 		return err
@@ -74,6 +81,9 @@ func (service *ProductionService) reconcileFeaturePlan(ctx context.Context, feat
 	for _, item := range plan.Tasks {
 		state := states[item.ID]
 		if state.Phase == kernel.PhaseActive {
+			if state.Condition != kernel.ConditionRunnable {
+				continue
+			}
 			latest, found := invocations[item.ID]
 			if found && (latest.State == kernel.InvocationFailed || latest.State == kernel.InvocationTimedOut || latest.State == kernel.InvocationStartFailed) && latest.Retryable != nil && *latest.Retryable && latest.AttemptOrdinal < uint64(item.AttemptLimit) {
 				profileConfig, configured := service.profilesByModel[item.ModelProfile]
@@ -84,7 +94,7 @@ func (service *ProductionService) reconcileFeaturePlan(ctx context.Context, feat
 					return errors.Join(organization.ErrRoleNotRunning, ownerErr)
 				}
 				tracked := &trackedTask{plan: item, revision: state.Revision, last: heads[item.ID], profile: profileSnapshot.Profile, owner: owner}
-				if err := service.authorizeTaskInvocation(ctx, feature, tracked, profileConfig, workspace, budget.Revision, latest.AttemptOrdinal+1, &latest); err != nil {
+				if err := service.authorizeTaskInvocationWithCondition(ctx, feature, tracked, profileConfig, workspace, budget.Revision, latest.Purpose, latest.AttemptOrdinal+1, &latest, nil); err != nil {
 					return err
 				}
 				budget.Revision++
@@ -95,6 +105,7 @@ func (service *ProductionService) reconcileFeaturePlan(ctx context.Context, feat
 			continue
 		}
 		dependencyEvents := make([]kernel.UUIDv7, 0, len(item.DependsOn))
+		conditionDigests := make([]kernel.Digest, 0, len(item.Validates))
 		ready := len(item.DependsOn) > 0
 		validationTargets := make(map[kernel.UUIDv7]struct{}, len(item.Validates))
 		for _, targetID := range item.Validates {
@@ -103,11 +114,12 @@ func (service *ProductionService) reconcileFeaturePlan(ctx context.Context, feat
 		for _, dependencyID := range item.DependsOn {
 			if _, validationTarget := validationTargets[dependencyID]; validationTarget {
 				invocation, succeeded := invocations[dependencyID]
-				if !succeeded || invocation.State != kernel.InvocationSucceeded {
+				if !succeeded || invocation.State != kernel.InvocationSucceeded || invocation.OutputDigest == nil {
 					ready = false
 					break
 				}
 				dependencyEvents = append(dependencyEvents, invocation.LastEventID)
+				conditionDigests = append(conditionDigests, *invocation.OutputDigest)
 				continue
 			}
 			dependency := states[dependencyID]
@@ -147,12 +159,74 @@ func (service *ProductionService) reconcileFeaturePlan(ctx context.Context, feat
 			return organization.ErrInvalidFeature
 		}
 		tracked := &trackedTask{plan: item, revision: state.Revision, last: heads[item.ID], profile: profileSnapshot.Profile, owner: owner}
-		if err := service.activateTask(ctx, feature, tracked, profileConfig, workspace, budget.Revision, dependencyEvents, evidence, evidenceID); err != nil {
+		if err := service.activateTask(ctx, feature, tracked, profileConfig, workspace, budget.Revision, dependencyEvents, evidence, evidenceID, conditionDigests); err != nil {
 			return err
 		}
 		budget.Revision++
 	}
 	return nil
+}
+
+func (service *ProductionService) reconcileValidationRounds(ctx context.Context, feature organization.FeatureRequest, plan organization.FeaturePlan, states map[kernel.UUIDv7]kernel.AggregateState, heads map[kernel.UUIDv7]kernel.UUIDv7, invocations map[kernel.UUIDv7]kernel.WorkInvocation, snapshot kernel.Snapshot, budgetRevision uint64) (bool, error) {
+	for _, validator := range plan.Tasks {
+		if len(validator.Validates) == 0 || states[validator.ID].Phase != kernel.PhaseActive {
+			continue
+		}
+		latest, found := invocations[validator.ID]
+		if !found || latest.State != kernel.InvocationSucceeded {
+			continue
+		}
+		validationTargets := make(map[kernel.UUIDv7]struct{}, len(validator.Validates))
+		for _, targetID := range validator.Validates {
+			validationTargets[targetID] = struct{}{}
+		}
+		conditionDigests := make([]kernel.Digest, 0, len(validator.Validates))
+		repairedCandidate := false
+		ready := true
+		for _, dependencyID := range validator.DependsOn {
+			if _, validates := validationTargets[dependencyID]; !validates {
+				continue
+			}
+			candidate, present := invocations[dependencyID]
+			if !present || candidate.State != kernel.InvocationSucceeded || candidate.OutputDigest == nil {
+				ready = false
+				break
+			}
+			conditionDigests = append(conditionDigests, *candidate.OutputDigest)
+			repairedCandidate = repairedCandidate || candidate.Purpose == kernel.PurposeRepair
+		}
+		if !ready || !repairedCandidate {
+			continue
+		}
+		profileSnapshot, profileFound := snapshot.WorkProfiles[kernel.AggregateRef{Kind: kernel.AggregateTask, ID: validator.ID}]
+		criteria, marshalErr := json.Marshal(validator.AcceptanceCriteria)
+		if marshalErr != nil || !profileFound || !profileSnapshot.Valid() {
+			return false, errors.Join(organization.ErrInvalidFeature, marshalErr)
+		}
+		expectedCondition, digestErr := taskInvocationConditionDigest(profileSnapshot.Profile.ProfileDigest, digestBytes(criteria), conditionDigests)
+		if digestErr != nil {
+			return false, digestErr
+		}
+		if latest.ConditionDigest == expectedCondition {
+			continue
+		}
+		nextAttempt := latest.AttemptOrdinal + 1
+		if nextAttempt > uint64(validator.AttemptLimit) {
+			return false, organization.ErrInvalidFeature
+		}
+		profileConfig, configured := service.profilesByModel[validator.ModelProfile]
+		owner, active, ownerErr := service.RoleHost.Status(ctx, validator.Owner)
+		workspace, workspaceFound := service.workspacesByID[owner.WorkspaceID]
+		if !configured || ownerErr != nil || !active || owner.Status != organization.RoleIdle || owner.Execution != latest.Execution || !workspaceFound {
+			return false, errors.Join(organization.ErrRoleNotRunning, ownerErr)
+		}
+		tracked := &trackedTask{plan: validator, revision: states[validator.ID].Revision, last: heads[validator.ID], profile: profileSnapshot.Profile, owner: owner}
+		if err := service.authorizeTaskInvocationWithCondition(ctx, feature, tracked, profileConfig, workspace, budgetRevision, validator.Purpose, nextAttempt, nil, conditionDigests); err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+	return false, nil
 }
 
 func latestTaskInvocation(values map[kernel.AggregateRef]kernel.WorkInvocation, taskID kernel.UUIDv7) (kernel.WorkInvocation, bool) {
@@ -162,7 +236,7 @@ func latestTaskInvocation(values map[kernel.AggregateRef]kernel.WorkInvocation, 
 		if candidate.TaskID != taskID {
 			continue
 		}
-		if !found || candidate.AttemptOrdinal > latest.AttemptOrdinal || candidate.AttemptOrdinal == latest.AttemptOrdinal && candidate.Revision > latest.Revision {
+		if !found || candidate.GlobalDebitOrdinal > latest.GlobalDebitOrdinal || candidate.GlobalDebitOrdinal == latest.GlobalDebitOrdinal && candidate.Revision > latest.Revision {
 			latest, found = candidate.Clone(), true
 		}
 	}

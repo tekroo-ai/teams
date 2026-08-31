@@ -126,7 +126,7 @@ func (service *ProductionService) preparePlannedTasks(ctx context.Context, featu
 			return err
 		}
 		if len(item.DependsOn) == 0 {
-			if err := service.activateTask(ctx, feature, tracked, profileConfig, workspace, budgetRevision, nil, evidenceRefs, evidenceID); err != nil {
+			if err := service.activateTask(ctx, feature, tracked, profileConfig, workspace, budgetRevision, nil, evidenceRefs, evidenceID, nil); err != nil {
 				return err
 			}
 		}
@@ -202,7 +202,7 @@ func (service *ProductionService) registerExecution(ctx context.Context, feature
 	return nil
 }
 
-func (service *ProductionService) activateTask(ctx context.Context, feature organization.FeatureRequest, task *trackedTask, profileConfig ProductionProfile, workspace ProductionWorkspace, budgetRevision uint64, dependencyEvents []kernel.UUIDv7, evidence []kernel.EvidenceRef, evidenceID kernel.UUIDv7) error {
+func (service *ProductionService) activateTask(ctx context.Context, feature organization.FeatureRequest, task *trackedTask, profileConfig ProductionProfile, workspace ProductionWorkspace, budgetRevision uint64, dependencyEvents []kernel.UUIDv7, evidence []kernel.EvidenceRef, evidenceID kernel.UUIDv7, conditionDigests []kernel.Digest) error {
 	if err := service.applyTaskCommand(ctx, feature, task, "tekroo.command.task.mark-ready", kernel.SchemaVersion, service.policyAuthority, map[string]any{"dependency_event_ids": append([]kernel.UUIDv7{}, dependencyEvents...), "readiness_policy_revision": service.planning.PolicyRevision}, nil, nil, "ready"); err != nil {
 		return err
 	}
@@ -233,7 +233,7 @@ func (service *ProductionService) activateTask(ctx context.Context, feature orga
 		taskLimits[purpose] = 0
 	}
 	taskLimits[task.plan.Purpose] = uint64(task.plan.AttemptLimit)
-	taskLimits[kernel.PurposeRepair] = uint64(task.plan.AttemptLimit)
+	taskLimits[kernel.PurposeRepair] = uint64(task.plan.ReviewRoundLimit)
 	taskLimits[kernel.PurposeEscalation] = 1
 	budgetPayload := map[string]any{"task_id": task.plan.ID, "budget_account_id": feature.BudgetAccountID, "expected_task_revision": task.revision, "lifecycle_epoch": feature.LifecycleEpoch, "scope_revision": feature.ScopeRevision, "task_model_invocation_limit": taskModelLimit, "purpose_limits": taskLimits, "evidence_ids": []kernel.UUIDv7{evidenceID}}
 	preconditions := []kernel.AggregatePrecondition{{Aggregate: kernel.AggregateRef{Kind: kernel.AggregateWorkBudget, ID: feature.BudgetAccountID}, Expected: kernel.NewExpectedRevision(budgetRevision)}}
@@ -244,23 +244,41 @@ func (service *ProductionService) activateTask(ctx context.Context, feature orga
 	if err := service.applyTaskCommand(ctx, feature, task, "tekroo.command.task.bind-operational-scope", kernel.OperationalSchemaVersion, service.policyAuthority, scopePayload, evidence, nil, "scope"); err != nil {
 		return err
 	}
-	return service.authorizeTaskInvocation(ctx, feature, task, profileConfig, workspace, budgetRevision, 1, nil)
+	return service.authorizeTaskInvocationWithCondition(ctx, feature, task, profileConfig, workspace, budgetRevision, task.plan.Purpose, 1, nil, conditionDigests)
 }
 
 func (service *ProductionService) authorizeTaskInvocation(ctx context.Context, feature organization.FeatureRequest, task *trackedTask, profile ProductionProfile, workspace ProductionWorkspace, budgetRevision, attempt uint64, retry *kernel.WorkInvocation) error {
-	if attempt == 0 || attempt > uint64(task.plan.AttemptLimit) || retry == nil && attempt != 1 || retry != nil && (attempt != retry.AttemptOrdinal+1 || retry.State != kernel.InvocationFailed && retry.State != kernel.InvocationTimedOut && retry.State != kernel.InvocationStartFailed || retry.Retryable == nil || !*retry.Retryable) {
+	return service.authorizeTaskInvocationWithCondition(ctx, feature, task, profile, workspace, budgetRevision, task.plan.Purpose, attempt, retry, nil)
+}
+
+func (service *ProductionService) authorizeTaskInvocationWithCondition(ctx context.Context, feature organization.FeatureRequest, task *trackedTask, profile ProductionProfile, workspace ProductionWorkspace, budgetRevision uint64, purpose kernel.WorkPurpose, attempt uint64, retry *kernel.WorkInvocation, conditionDigests []kernel.Digest) error {
+	limit := uint64(task.plan.AttemptLimit)
+	if purpose == kernel.PurposeRepair {
+		limit = uint64(task.plan.ReviewRoundLimit)
+	}
+	if attempt == 0 || attempt > limit || purpose != task.plan.Purpose && purpose != kernel.PurposeRepair || retry == nil && attempt != 1 && len(conditionDigests) == 0 || retry != nil && (purpose != retry.Purpose || attempt != retry.AttemptOrdinal+1 || retry.State != kernel.InvocationFailed && retry.State != kernel.InvocationTimedOut && retry.State != kernel.InvocationStartFailed || retry.Retryable == nil || !*retry.Retryable) {
 		return organization.ErrInvalidFeature
 	}
 	attemptLabel := fmt.Sprint(attempt)
-	invocationID := deterministicOperationalUUID("work-invocation", string(feature.ID), string(task.plan.ID), string(task.plan.Purpose), attemptLabel)
-	idempotencyKey := "feature:" + string(feature.ID) + ":invocation-" + string(task.plan.ID) + "-" + attemptLabel
 	criteria, err := json.Marshal(task.plan.AcceptanceCriteria)
 	if err != nil {
 		return err
 	}
 	criteriaDigest := digestBytes(criteria)
-	conditionDigest := digestBytes([]byte(string(task.profile.ProfileDigest) + "\x00" + string(criteriaDigest)))
-	outputPredicateDigest := digestBytes([]byte("accepted-task-output\x00" + string(task.plan.ID) + "\x00" + string(criteriaDigest)))
+	conditionDigest, err := taskInvocationConditionDigest(task.profile.ProfileDigest, criteriaDigest, conditionDigests)
+	if err != nil {
+		return err
+	}
+	if retry != nil {
+		conditionDigest = retry.ConditionDigest
+	}
+	invocationIDParts := []string{"work-invocation", string(feature.ID), string(task.plan.ID), string(purpose), attemptLabel}
+	if len(conditionDigests) > 0 {
+		invocationIDParts = append(invocationIDParts, string(conditionDigest))
+	}
+	invocationID := deterministicOperationalUUID(invocationIDParts...)
+	idempotencyKey := "feature:" + string(feature.ID) + ":invocation-" + string(task.plan.ID) + "-" + strings.ToLower(string(purpose)) + "-" + attemptLabel + "-" + string(conditionDigest)
+	outputPredicateDigest := digestBytes([]byte("accepted-task-output\x00" + string(task.plan.ID) + "\x00" + string(criteriaDigest) + "\x00" + string(conditionDigest)))
 	var retryID *kernel.UUIDv7
 	retryOrdinal := uint64(0)
 	if retry != nil {
@@ -273,7 +291,7 @@ func (service *ProductionService) authorizeTaskInvocation(ctx context.Context, f
 		"expected_budget_revision": budgetRevision, "expected_task_revision": task.revision,
 		"lifecycle_epoch": feature.LifecycleEpoch, "scope_revision": feature.ScopeRevision, "parent_event_id": task.last,
 		"work_profile": task.profile.Binding(), "qualified_assignment_id": deterministicOperationalUUID("assignment", string(feature.ID), string(task.plan.ID)),
-		"purpose": task.plan.Purpose, "attempt_family": strings.ToLower(string(task.plan.Purpose)), "attempt_ordinal": attempt,
+		"purpose": purpose, "attempt_family": strings.ToLower(string(purpose)), "attempt_ordinal": attempt,
 		"condition_digest": conditionDigest, "retry_of_invocation_id": retryID, "retry_ordinal": retryOrdinal,
 		"output_predicate_digest": outputPredicateDigest, "allowed_terminal_outcomes": []kernel.WorkInvocationState{kernel.InvocationSucceeded, kernel.InvocationFailed, kernel.InvocationTimedOut, kernel.InvocationCancelled, kernel.InvocationStartFailed},
 		"tool_policy_digest": profile.ToolPolicyDigest, "effect_policy_digest": profile.EffectPolicyDigest,
@@ -307,6 +325,20 @@ func (service *ProductionService) authorizeTaskInvocation(ctx context.Context, f
 		return fmt.Errorf("%s rejected: %s", command.CommandType, receipt.ReasonCode)
 	}
 	return nil
+}
+
+func taskInvocationConditionDigest(profileDigest, criteriaDigest kernel.Digest, conditionDigests []kernel.Digest) (kernel.Digest, error) {
+	if !profileDigest.Valid() || !criteriaDigest.Valid() {
+		return "", organization.ErrInvalidFeature
+	}
+	conditionInput := string(profileDigest) + "\x00" + string(criteriaDigest)
+	for _, digest := range conditionDigests {
+		if !digest.Valid() {
+			return "", organization.ErrInvalidFeature
+		}
+		conditionInput += "\x00" + string(digest)
+	}
+	return digestBytes([]byte(conditionInput)), nil
 }
 
 func workKindForPurpose(purpose kernel.WorkPurpose, risk organization.RiskLevel) kernel.WorkKind {

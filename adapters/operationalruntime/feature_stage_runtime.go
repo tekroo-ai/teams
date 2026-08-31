@@ -155,7 +155,7 @@ func (service *ProductionService) ensureFeaturePlanningTask(ctx context.Context,
 	for _, parent := range parents[1:] {
 		dependencyEvents = append(dependencyEvents, parent.ParentEventID)
 	}
-	if err := service.activateTask(ctx, feature, tracked, profileConfig, workspace, budgetRevision, dependencyEvents, evidence, evidenceID); err != nil {
+	if err := service.activateTask(ctx, feature, tracked, profileConfig, workspace, budgetRevision, dependencyEvents, evidence, evidenceID, nil); err != nil {
 		return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, err
 	}
 	state, head, _, err = service.Store.ReadAggregateHead(ctx, kernel.AggregateRef{Kind: kernel.AggregateTask, ID: task.ID})
@@ -346,7 +346,7 @@ func (service *ProductionService) addRequiredValidationTasks(ctx context.Context
 			}
 			profile := service.profilesByModel[validator.ModelProfile]
 			id := deterministicOperationalUUID("required-validator", string(feature.ID), string(target.ID), "tester")
-			tasks = append(tasks, organization.PlannedTask{ID: id, StoryID: target.StoryID, Title: "Validate: " + target.Title, Description: "Independently inspect the implementation, run the acceptance checks, and report the structured validation result.", AcceptanceCriteria: append([]string(nil), target.AcceptanceCriteria...), DependsOn: []kernel.UUIDv7{target.ID}, Validates: []kernel.UUIDv7{target.ID}, Owner: validator.ActorFQN, ModelProfile: validator.ModelProfile, DecisionRoute: profile.Qualification.DecisionRoute, Purpose: kernel.PurposeValidation, Complexity: target.Complexity, Risk: target.Risk, CriticalPath: true, AttemptLimit: 2, ReviewRoundLimit: target.ReviewRoundLimit})
+			tasks = append(tasks, organization.PlannedTask{ID: id, StoryID: target.StoryID, Title: "Validate: " + target.Title, Description: "Independently inspect the implementation, run the acceptance checks, and report the structured validation result.", AcceptanceCriteria: append([]string(nil), target.AcceptanceCriteria...), DependsOn: []kernel.UUIDv7{target.ID}, Validates: []kernel.UUIDv7{target.ID}, Owner: validator.ActorFQN, ModelProfile: validator.ModelProfile, DecisionRoute: profile.Qualification.DecisionRoute, Purpose: kernel.PurposeValidation, Complexity: target.Complexity, Risk: target.Risk, CriticalPath: true, AttemptLimit: target.ReviewRoundLimit + 1, ReviewRoundLimit: target.ReviewRoundLimit})
 			if coverage[target.ID] == nil {
 				coverage[target.ID] = make(map[kernel.WorkPurpose]bool)
 			}

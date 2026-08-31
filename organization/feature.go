@@ -284,6 +284,13 @@ func (plan FeaturePlan) Validate(feature FeatureRequest) error {
 		if validationPurpose != (len(task.Validates) > 0) {
 			return ErrInvalidFeature
 		}
+		if validationPurpose {
+			for targetID := range validated {
+				if task.AttemptLimit < tasks[targetID].ReviewRoundLimit+1 {
+					return ErrInvalidFeature
+				}
+			}
+		}
 	}
 	for _, task := range plan.Tasks {
 		if task.Purpose == kernel.PurposeImplementation || task.Purpose == kernel.PurposeRepair {
