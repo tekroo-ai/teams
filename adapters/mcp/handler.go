@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -19,6 +20,12 @@ const (
 	MethodHeader           = "Mcp-Method"
 	NameHeader             = "Mcp-Name"
 	CommandToolName        = "tekroo.command.invoke"
+	RolesListToolName      = "tekroo.roles.list"
+	RoleControlToolName    = "tekroo.role.control"
+	MessageSendToolName    = "tekroo.message.send"
+	MessageGetToolName     = "tekroo.message.get"
+	MessageTraceToolName   = "tekroo.message.trace"
+	DeadLettersToolName    = "tekroo.deadletters.list"
 	DefaultMaxBodyBytes    = int64(1 << 20)
 	codeHeaderMismatch     = -32020
 	codeUnsupportedVersion = -32022
@@ -28,10 +35,15 @@ var ErrInvalidConfiguration = errors.New("invalid MCP adapter configuration")
 
 type Handler struct {
 	endpoint      protocol.Endpoint
+	focused       FocusedTools
 	authenticator httpapi.Authenticator
 	origins       httpapi.OriginPolicy
 	limiter       httpapi.RateLimiter
 	maxBodyBytes  int64
+}
+
+type FocusedTools interface {
+	CallTool(context.Context, string, json.RawMessage) (any, error)
 }
 
 func NewHandler(endpoint protocol.Endpoint, authenticator httpapi.Authenticator, origins httpapi.OriginPolicy, limiter httpapi.RateLimiter, maxBodyBytes int64) (*Handler, error) {
@@ -39,6 +51,15 @@ func NewHandler(endpoint protocol.Endpoint, authenticator httpapi.Authenticator,
 		return nil, ErrInvalidConfiguration
 	}
 	return &Handler{endpoint: endpoint, authenticator: authenticator, origins: origins, limiter: limiter, maxBodyBytes: maxBodyBytes}, nil
+}
+
+func NewFocusedHandler(endpoint protocol.Endpoint, focused FocusedTools, authenticator httpapi.Authenticator, origins httpapi.OriginPolicy, limiter httpapi.RateLimiter, maxBodyBytes int64) (*Handler, error) {
+	handler, err := NewHandler(endpoint, authenticator, origins, limiter, maxBodyBytes)
+	if err != nil || focused == nil {
+		return nil, ErrInvalidConfiguration
+	}
+	handler.focused = focused
+	return handler, nil
 }
 
 func (handler *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
@@ -193,7 +214,11 @@ func (handler *Handler) listTools(writer http.ResponseWriter, message message) {
 		handler.writeError(writer, http.StatusOK, message.ID, codeInvalidParams, "invalid tools/list parameters", nil)
 		return
 	}
-	handler.writeResult(writer, message.ID, completeResult(map[string]any{"tools": []any{commandTool()}, "cacheScope": "private"}))
+	tools := []any{commandTool()}
+	if handler.focused != nil {
+		tools = append(tools, organizationalTools()...)
+	}
+	handler.writeResult(writer, message.ID, completeResult(map[string]any{"tools": tools, "cacheScope": "private"}))
 }
 
 func (handler *Handler) callTool(writer http.ResponseWriter, request *http.Request, message message, identity protocol.AuthenticatedContext) {
@@ -209,7 +234,7 @@ func (handler *Handler) callTool(writer http.ResponseWriter, request *http.Reque
 		return
 	}
 	if params.Name != CommandToolName {
-		handler.writeError(writer, http.StatusOK, message.ID, codeInvalidParams, "unknown tool", map[string]any{"name": params.Name})
+		handler.callFocusedTool(writer, request, message, params.Name, params.Arguments)
 		return
 	}
 	invocation, err := protocol.DecodeInvocation(bytes.NewReader(params.Arguments))
@@ -229,6 +254,28 @@ func (handler *Handler) callTool(writer http.ResponseWriter, request *http.Reque
 		"isError":           commandResponse.Status != protocol.StatusReceipt,
 	})
 	handler.writeResult(writer, message.ID, result)
+}
+
+func (handler *Handler) callFocusedTool(writer http.ResponseWriter, request *http.Request, message message, name string, arguments json.RawMessage) {
+	if handler.focused == nil {
+		handler.writeError(writer, http.StatusOK, message.ID, codeInvalidParams, "unknown tool", map[string]any{"name": name})
+		return
+	}
+	result, err := handler.focused.CallTool(request.Context(), name, arguments)
+	if err != nil {
+		handler.writeError(writer, http.StatusOK, message.ID, codeInvalidParams, err.Error(), nil)
+		return
+	}
+	encoded, err := json.Marshal(result)
+	if err != nil {
+		handler.writeError(writer, http.StatusInternalServerError, message.ID, codeInternalError, "could not encode tool result", nil)
+		return
+	}
+	handler.writeResult(writer, message.ID, completeResult(map[string]any{
+		"content":           []any{map[string]any{"type": "text", "text": string(encoded)}},
+		"structuredContent": result,
+		"isError":           false,
+	}))
 }
 
 func completeResult(fields map[string]any) map[string]any {
@@ -305,6 +352,29 @@ func commandTool() map[string]any {
 				"provenance":       map[string]any{"type": "object"},
 			},
 		},
+	}
+}
+
+func organizationalTools() []any {
+	object := func(required []string, properties map[string]any) map[string]any {
+		return map[string]any{"$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object", "additionalProperties": false, "required": required, "properties": properties}
+	}
+	actor := map[string]any{"type": "string", "description": "Exact team::role-instance FQN."}
+	uuid := map[string]any{"type": "string", "format": "uuid"}
+	return []any{
+		map[string]any{"name": RolesListToolName, "title": "List configured team roles", "description": "Inspect exact role identities and lifecycle state.", "inputSchema": object(nil, map[string]any{})},
+		map[string]any{
+			"name": RoleControlToolName, "title": "Control one role",
+			"description": "Start, stop, restart, pause, or resume one exact role actor.",
+			"inputSchema": object([]string{"actor_fqn", "operation"}, map[string]any{
+				"actor_fqn": actor,
+				"operation": map[string]any{"type": "string", "enum": []string{"start", "stop", "restart", "pause", "resume"}},
+			}),
+		},
+		map[string]any{"name": MessageSendToolName, "title": "Send directed team message", "description": "Send one fully bound message between exact active actors.", "inputSchema": map[string]any{"$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object"}},
+		map[string]any{"name": MessageGetToolName, "title": "Inspect directed message", "description": "Read one message and its delivery/claim state.", "inputSchema": object([]string{"message_id"}, map[string]any{"message_id": uuid})},
+		map[string]any{"name": MessageTraceToolName, "title": "Trace message thread", "description": "Inspect a directed message thread in causal order.", "inputSchema": object([]string{"thread_id"}, map[string]any{"thread_id": uuid})},
+		map[string]any{"name": DeadLettersToolName, "title": "List dead letters", "description": "Inspect messages that exhausted bounded delivery.", "inputSchema": object(nil, map[string]any{"recipient": actor})},
 	}
 }
 

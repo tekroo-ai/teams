@@ -17,6 +17,7 @@ import (
 
 	"github.com/tekroo-ai/teams/adapters/operationalruntime"
 	"github.com/tekroo-ai/teams/kernel"
+	"github.com/tekroo-ai/teams/organization"
 )
 
 func main() {
@@ -76,6 +77,21 @@ func run(arguments []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		method, path, err = identityRead("/v1/stories/", operands)
 	case "invocation":
 		method, path, err = identityRead("/v1/invocations/", operands)
+	case "roles":
+		method, path, err = noOperand(http.MethodGet, "/v1/roles", operands)
+	case "role":
+		method, path, err = roleOperation(operands)
+	case "inbox":
+		method, path, err = actorRead("/v1/roles/", "/inbox", operands)
+	case "message":
+		method, path = http.MethodPost, "/v1/messages"
+		body, err = loadMessage(operands, stdin, config.Operator.MaximumBodyBytes)
+	case "message-status":
+		method, path, err = identityRead("/v1/messages/", operands)
+	case "message-trace":
+		method, path, err = identityRead("/v1/message-threads/", operands)
+	case "deadletters":
+		method, path, err = deadLetterRead(operands)
 	case "submit":
 		method, path = http.MethodPost, "/v1/commands"
 		body, _, err = loadCommand(operands, stdin, config.Operator.MaximumBodyBytes)
@@ -99,6 +115,74 @@ func run(arguments []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		_, err = io.WriteString(stdout, "\n")
 	}
 	return err
+}
+
+func roleOperation(operands []string) (string, string, error) {
+	if len(operands) != 2 || !kernel.ActorFQN(operands[0]).Valid() {
+		return "", "", usageError()
+	}
+	switch operands[1] {
+	case "start", "stop", "restart", "pause", "resume":
+		return http.MethodPost, "/v1/roles/" + operands[0] + "/" + operands[1], nil
+	default:
+		return "", "", usageError()
+	}
+}
+
+func actorRead(prefix, suffix string, operands []string) (string, string, error) {
+	if len(operands) != 1 || !kernel.ActorFQN(operands[0]).Valid() {
+		return "", "", usageError()
+	}
+	return http.MethodGet, prefix + operands[0] + suffix, nil
+}
+
+func deadLetterRead(operands []string) (string, string, error) {
+	if len(operands) == 0 {
+		return http.MethodGet, "/v1/dead-letters", nil
+	}
+	if len(operands) != 1 || !kernel.ActorFQN(operands[0]).Valid() {
+		return "", "", usageError()
+	}
+	return http.MethodGet, "/v1/dead-letters?recipient=" + url.QueryEscape(operands[0]), nil
+}
+
+func loadMessage(operands []string, stdin io.Reader, maximum int64) ([]byte, error) {
+	raw, err := loadDocument(operands, stdin, maximum)
+	if err != nil {
+		return nil, err
+	}
+	var message organization.OrganizationalMessage
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&message); err != nil || message.Validate() != nil {
+		return nil, errors.New("message document is invalid")
+	}
+	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		return nil, errors.New("message document contains trailing JSON content")
+	}
+	return raw, nil
+}
+
+func loadDocument(operands []string, stdin io.Reader, maximum int64) ([]byte, error) {
+	if len(operands) != 1 {
+		return nil, usageError()
+	}
+	var source io.Reader
+	if operands[0] == "-" {
+		source = stdin
+	} else {
+		file, err := os.Open(operands[0])
+		if err != nil {
+			return nil, err
+		}
+		defer file.Close()
+		source = file
+	}
+	raw, err := io.ReadAll(io.LimitReader(source, maximum+1))
+	if err != nil || int64(len(raw)) > maximum {
+		return nil, errors.New("input file is unreadable or exceeds configured limit")
+	}
+	return raw, nil
 }
 
 type operatorClient struct {
@@ -187,23 +271,9 @@ func loadCancellation(operands []string, stdin io.Reader, maximum int64) ([]byte
 }
 
 func loadCommand(operands []string, stdin io.Reader, maximum int64) ([]byte, kernel.KernelCommand, error) {
-	if len(operands) != 1 {
-		return nil, kernel.KernelCommand{}, usageError()
-	}
-	var source io.Reader
-	if operands[0] == "-" {
-		source = stdin
-	} else {
-		file, err := os.Open(operands[0])
-		if err != nil {
-			return nil, kernel.KernelCommand{}, err
-		}
-		defer file.Close()
-		source = file
-	}
-	raw, err := io.ReadAll(io.LimitReader(source, maximum+1))
-	if err != nil || int64(len(raw)) > maximum {
-		return nil, kernel.KernelCommand{}, errors.New("command file is unreadable or exceeds configured limit")
+	raw, err := loadDocument(operands, stdin, maximum)
+	if err != nil {
+		return nil, kernel.KernelCommand{}, err
 	}
 	var command kernel.KernelCommand
 	decoder := json.NewDecoder(bytes.NewReader(raw))
@@ -218,5 +288,5 @@ func loadCommand(operands []string, stdin io.Reader, maximum int64) ([]byte, ker
 }
 
 func usageError() error {
-	return errors.New("usage: tekroo -config /absolute/path/tekrood.json health|status|pause|resume|stop|task ID|story ID|invocation ID|submit FILE|-|cancel INVOCATION_ID FILE|-")
+	return errors.New("usage: tekroo -config CONFIG health|status|pause|resume|stop|roles|role ACTOR start|stop|restart|pause|resume|inbox ACTOR|message FILE|-|message-status ID|message-trace THREAD_ID|deadletters [ACTOR]|task ID|story ID|invocation ID|submit FILE|-|cancel INVOCATION_ID FILE|-")
 }

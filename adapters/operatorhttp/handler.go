@@ -15,6 +15,7 @@ import (
 	"github.com/tekroo-ai/teams/adapters/mongo"
 	"github.com/tekroo-ai/teams/adapters/operationalruntime"
 	"github.com/tekroo-ai/teams/kernel"
+	"github.com/tekroo-ai/teams/organization"
 )
 
 var ErrInvalidConfiguration = errors.New("invalid operator HTTP configuration")
@@ -37,19 +38,35 @@ type Service interface {
 	ReadInvocation(context.Context, kernel.UUIDv7) (operationalruntime.InvocationStatus, bool, error)
 }
 
+type OrganizationalService interface {
+	RoleRoster(context.Context) ([]organization.RoleInstanceState, error)
+	StartRole(context.Context, kernel.ActorFQN) (organization.RoleInstanceState, error)
+	StopRole(context.Context, kernel.ActorFQN) (organization.RoleInstanceState, error)
+	RestartRole(context.Context, kernel.ActorFQN) (organization.RoleInstanceState, error)
+	PauseRole(context.Context, kernel.ActorFQN) (organization.RoleInstanceState, error)
+	ResumeRole(context.Context, kernel.ActorFQN) (organization.RoleInstanceState, error)
+	RoleInboxSnapshot(kernel.ActorFQN) []organization.OrganizationalMessage
+	SendMessage(context.Context, organization.OrganizationalMessage) error
+	ReadMessage(context.Context, kernel.UUIDv7) (organization.MessageClaim, bool, error)
+	TraceMessages(context.Context, kernel.UUIDv7) ([]organization.MessageClaim, error)
+	DeadLetters(context.Context, kernel.ActorFQN, int64) ([]organization.MessageClaim, error)
+}
+
 type Handler struct {
-	service     Service
-	tokenDigest [32]byte
-	timeout     time.Duration
-	maxBody     int64
-	requestStop func()
+	service      Service
+	organization OrganizationalService
+	tokenDigest  [32]byte
+	timeout      time.Duration
+	maxBody      int64
+	requestStop  func()
 }
 
 func NewHandler(config Config) (*Handler, error) {
-	if config.Service == nil || len(config.BearerToken) < 32 || config.OperationTimeout <= 0 || config.MaximumBodyBytes <= 0 || config.MaximumBodyBytes > 1<<20 || config.RequestStop == nil {
+	organizationService, ok := config.Service.(OrganizationalService)
+	if config.Service == nil || !ok || len(config.BearerToken) < 32 || config.OperationTimeout <= 0 || config.MaximumBodyBytes <= 0 || config.MaximumBodyBytes > 1<<20 || config.RequestStop == nil {
 		return nil, ErrInvalidConfiguration
 	}
-	return &Handler{service: config.Service, tokenDigest: sha256.Sum256([]byte(config.BearerToken)), timeout: config.OperationTimeout, maxBody: config.MaximumBodyBytes, requestStop: config.RequestStop}, nil
+	return &Handler{service: config.Service, organization: organizationService, tokenDigest: sha256.Sum256([]byte(config.BearerToken)), timeout: config.OperationTimeout, maxBody: config.MaximumBodyBytes, requestStop: config.RequestStop}, nil
 }
 
 func (handler *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
@@ -92,9 +109,131 @@ func (handler *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Requ
 		handler.story(writer, request, strings.TrimPrefix(request.URL.Path, "/v1/stories/"))
 	case request.Method == http.MethodGet && strings.HasPrefix(request.URL.Path, "/v1/invocations/"):
 		handler.invocation(writer, request, strings.TrimPrefix(request.URL.Path, "/v1/invocations/"))
+	case request.Method == http.MethodGet && request.URL.Path == "/v1/roles":
+		handler.roles(writer, request)
+	case request.Method == http.MethodGet && strings.HasPrefix(request.URL.Path, "/v1/roles/") && strings.HasSuffix(request.URL.Path, "/inbox"):
+		handler.roleInbox(writer, strings.TrimSuffix(strings.TrimPrefix(request.URL.Path, "/v1/roles/"), "/inbox"))
+	case request.Method == http.MethodPost && strings.HasPrefix(request.URL.Path, "/v1/roles/"):
+		handler.roleControl(writer, request, strings.TrimPrefix(request.URL.Path, "/v1/roles/"))
+	case request.Method == http.MethodPost && request.URL.Path == "/v1/messages":
+		handler.sendMessage(writer, request)
+	case request.Method == http.MethodGet && strings.HasPrefix(request.URL.Path, "/v1/messages/"):
+		handler.readMessage(writer, request, strings.TrimPrefix(request.URL.Path, "/v1/messages/"))
+	case request.Method == http.MethodGet && strings.HasPrefix(request.URL.Path, "/v1/message-threads/"):
+		handler.traceMessages(writer, request, strings.TrimPrefix(request.URL.Path, "/v1/message-threads/"))
+	case request.Method == http.MethodGet && request.URL.Path == "/v1/dead-letters":
+		handler.deadLetters(writer, request)
 	default:
 		writeError(writer, http.StatusNotFound, "NOT_FOUND")
 	}
+}
+
+func (handler *Handler) roles(writer http.ResponseWriter, request *http.Request) {
+	roster, err := handler.organization.RoleRoster(request.Context())
+	if err != nil {
+		writeError(writer, http.StatusInternalServerError, "ROLE_ROSTER_FAILED")
+		return
+	}
+	writeJSON(writer, http.StatusOK, roster)
+}
+
+func (handler *Handler) roleInbox(writer http.ResponseWriter, value string) {
+	actor := kernel.ActorFQN(value)
+	if !actor.Valid() || strings.Contains(value, "/") {
+		writeError(writer, http.StatusBadRequest, "INVALID_ACTOR_FQN")
+		return
+	}
+	writeJSON(writer, http.StatusOK, handler.organization.RoleInboxSnapshot(actor))
+}
+
+func (handler *Handler) roleControl(writer http.ResponseWriter, request *http.Request, value string) {
+	parts := strings.Split(value, "/")
+	if len(parts) != 2 || !kernel.ActorFQN(parts[0]).Valid() || !emptyBody(request, handler.maxBody) {
+		writeError(writer, http.StatusBadRequest, "INVALID_ROLE_OPERATION")
+		return
+	}
+	actor := kernel.ActorFQN(parts[0])
+	var state organization.RoleInstanceState
+	var err error
+	switch parts[1] {
+	case "start":
+		state, err = handler.organization.StartRole(request.Context(), actor)
+	case "stop":
+		state, err = handler.organization.StopRole(request.Context(), actor)
+	case "restart":
+		state, err = handler.organization.RestartRole(request.Context(), actor)
+	case "pause":
+		state, err = handler.organization.PauseRole(request.Context(), actor)
+	case "resume":
+		state, err = handler.organization.ResumeRole(request.Context(), actor)
+	default:
+		writeError(writer, http.StatusNotFound, "ROLE_OPERATION_NOT_FOUND")
+		return
+	}
+	if err != nil {
+		writeError(writer, http.StatusConflict, "ROLE_OPERATION_FAILED")
+		return
+	}
+	writeJSON(writer, http.StatusOK, state)
+}
+
+func (handler *Handler) sendMessage(writer http.ResponseWriter, request *http.Request) {
+	var message organization.OrganizationalMessage
+	if err := decodeBody(writer, request, handler.maxBody, &message); err != nil {
+		writeError(writer, http.StatusBadRequest, "INVALID_MESSAGE_JSON")
+		return
+	}
+	if err := handler.organization.SendMessage(request.Context(), message); err != nil {
+		writeError(writer, http.StatusConflict, "MESSAGE_REJECTED")
+		return
+	}
+	writeJSON(writer, http.StatusCreated, map[string]any{"message_id": message.ID, "recipient": message.Recipient})
+}
+
+func (handler *Handler) readMessage(writer http.ResponseWriter, request *http.Request, value string) {
+	id := kernel.UUIDv7(value)
+	if !id.Valid() || strings.Contains(value, "/") {
+		writeError(writer, http.StatusBadRequest, "INVALID_MESSAGE_ID")
+		return
+	}
+	claim, found, err := handler.organization.ReadMessage(request.Context(), id)
+	if err != nil {
+		writeError(writer, http.StatusInternalServerError, "MESSAGE_READ_FAILED")
+		return
+	}
+	if !found {
+		writeError(writer, http.StatusNotFound, "MESSAGE_NOT_FOUND")
+		return
+	}
+	writeJSON(writer, http.StatusOK, claim)
+}
+
+func (handler *Handler) traceMessages(writer http.ResponseWriter, request *http.Request, value string) {
+	id := kernel.UUIDv7(value)
+	if !id.Valid() || strings.Contains(value, "/") {
+		writeError(writer, http.StatusBadRequest, "INVALID_THREAD_ID")
+		return
+	}
+	trace, err := handler.organization.TraceMessages(request.Context(), id)
+	if err != nil {
+		writeError(writer, http.StatusInternalServerError, "MESSAGE_TRACE_FAILED")
+		return
+	}
+	writeJSON(writer, http.StatusOK, trace)
+}
+
+func (handler *Handler) deadLetters(writer http.ResponseWriter, request *http.Request) {
+	recipient := kernel.ActorFQN(request.URL.Query().Get("recipient"))
+	if recipient != "" && !recipient.Valid() {
+		writeError(writer, http.StatusBadRequest, "INVALID_ACTOR_FQN")
+		return
+	}
+	letters, err := handler.organization.DeadLetters(request.Context(), recipient, 100)
+	if err != nil {
+		writeError(writer, http.StatusInternalServerError, "DEAD_LETTER_READ_FAILED")
+		return
+	}
+	writeJSON(writer, http.StatusOK, letters)
 }
 
 func (handler *Handler) invocation(writer http.ResponseWriter, request *http.Request, value string) {

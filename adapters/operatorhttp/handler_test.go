@@ -11,6 +11,7 @@ import (
 	"github.com/tekroo-ai/teams/adapters/mongo"
 	"github.com/tekroo-ai/teams/adapters/operationalruntime"
 	"github.com/tekroo-ai/teams/kernel"
+	"github.com/tekroo-ai/teams/organization"
 )
 
 const testToken = "0123456789abcdef0123456789abcdef"
@@ -149,4 +150,49 @@ func (service *operatorService) ReadInvocation(context.Context, kernel.UUIDv7) (
 	return operationalruntime.InvocationStatus{InvocationID: "00000000-0000-7000-8000-000000000003", Revision: 2, State: kernel.InvocationStarted, LastEventID: "00000000-0000-7000-8000-000000000004"}, true, nil
 }
 
+func (service *operatorService) RoleRoster(context.Context) ([]organization.RoleInstanceState, error) {
+	return []organization.RoleInstanceState{}, nil
+}
+
+func (service *operatorService) StartRole(_ context.Context, actor kernel.ActorFQN) (organization.RoleInstanceState, error) {
+	return organization.RoleInstanceState{ActorFQN: actor}, nil
+}
+
+func (service *operatorService) StopRole(_ context.Context, actor kernel.ActorFQN) (organization.RoleInstanceState, error) {
+	return organization.RoleInstanceState{ActorFQN: actor}, nil
+}
+
+func (service *operatorService) RestartRole(_ context.Context, actor kernel.ActorFQN) (organization.RoleInstanceState, error) {
+	return organization.RoleInstanceState{ActorFQN: actor}, nil
+}
+
+func (service *operatorService) PauseRole(_ context.Context, actor kernel.ActorFQN) (organization.RoleInstanceState, error) {
+	return organization.RoleInstanceState{ActorFQN: actor}, nil
+}
+
+func (service *operatorService) ResumeRole(_ context.Context, actor kernel.ActorFQN) (organization.RoleInstanceState, error) {
+	return organization.RoleInstanceState{ActorFQN: actor}, nil
+}
+
+func (service *operatorService) RoleInboxSnapshot(kernel.ActorFQN) []organization.OrganizationalMessage {
+	return nil
+}
+
+func (service *operatorService) SendMessage(context.Context, organization.OrganizationalMessage) error {
+	return nil
+}
+
+func (service *operatorService) ReadMessage(context.Context, kernel.UUIDv7) (organization.MessageClaim, bool, error) {
+	return organization.MessageClaim{}, true, nil
+}
+
+func (service *operatorService) TraceMessages(context.Context, kernel.UUIDv7) ([]organization.MessageClaim, error) {
+	return []organization.MessageClaim{}, nil
+}
+
+func (service *operatorService) DeadLetters(context.Context, kernel.ActorFQN, int64) ([]organization.MessageClaim, error) {
+	return []organization.MessageClaim{}, nil
+}
+
 var _ Service = (*operatorService)(nil)
+var _ OrganizationalService = (*operatorService)(nil)

@@ -222,6 +222,60 @@ func TestMCPToolPreservesGatewayTimeoutUncertainty(t *testing.T) {
 	}
 }
 
+func TestMCPOrganizationalToolsAreDiscoverableAndInvokeExactRole(t *testing.T) {
+	identity := mcpIdentity("operator")
+	focusedTools := &focusedToolsFake{}
+	handler, err := mcp.NewFocusedHandler(
+		endpointFunc(func(context.Context, protocol.Request) protocol.Response { return protocol.Response{} }),
+		focusedTools,
+		mcpAuthenticator(identity),
+		allowOrigin(),
+		allowRate(),
+		mcp.DefaultMaxBodyBytes,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	list := mcpRequest(t, "tools/list", 1, map[string]any{})
+	listed := httptest.NewRecorder()
+	handler.ServeHTTP(listed, list)
+	if listed.Code != http.StatusOK || !strings.Contains(listed.Body.String(), mcp.RolesListToolName) || !strings.Contains(listed.Body.String(), mcp.MessageTraceToolName) {
+		t.Fatalf("tools/list status=%d body=%s", listed.Code, listed.Body.String())
+	}
+	call := mcpRequest(t, "tools/call", 2, map[string]any{
+		"name":      mcp.RoleControlToolName,
+		"arguments": map[string]any{"actor_fqn": "teams::coder-1", "operation": "restart"},
+	})
+	call.Header.Set(mcp.NameHeader, mcp.RoleControlToolName)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, call)
+	if response.Code != http.StatusOK || focusedTools.name != mcp.RoleControlToolName || !strings.Contains(string(focusedTools.arguments), `"actor_fqn":"teams::coder-1"`) || !strings.Contains(response.Body.String(), `"structuredContent"`) {
+		t.Fatalf("tools/call status=%d name=%q args=%s body=%s", response.Code, focusedTools.name, focusedTools.arguments, response.Body.String())
+	}
+
+	invalid := mcpRequest(t, "tools/call", 3, map[string]any{
+		"name":      mcp.RoleControlToolName,
+		"arguments": map[string]any{"actor_fqn": "teams::coder-1", "operation": "launch-unbounded"},
+	})
+	invalid.Header.Set(mcp.NameHeader, mcp.RoleControlToolName)
+	rejected := httptest.NewRecorder()
+	handler.ServeHTTP(rejected, invalid)
+	if rejected.Code != http.StatusOK || !strings.Contains(rejected.Body.String(), `"structuredContent"`) {
+		t.Fatalf("delegated validation status=%d body=%s", rejected.Code, rejected.Body.String())
+	}
+}
+
+type focusedToolsFake struct {
+	name      string
+	arguments json.RawMessage
+}
+
+func (fake *focusedToolsFake) CallTool(_ context.Context, name string, arguments json.RawMessage) (any, error) {
+	fake.name = name
+	fake.arguments = append([]byte(nil), arguments...)
+	return map[string]any{"accepted": true}, nil
+}
+
 type serviceFunc func(context.Context, kernel.KernelCommand, kernel.ProvenanceBasis) (kernel.CommandReceipt, error)
 
 func (function serviceFunc) Handle(ctx context.Context, command kernel.KernelCommand, provenance kernel.ProvenanceBasis) (kernel.CommandReceipt, error) {

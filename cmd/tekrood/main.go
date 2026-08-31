@@ -14,8 +14,12 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/tekroo-ai/teams/adapters/httpapi"
+	"github.com/tekroo-ai/teams/adapters/mcp"
 	"github.com/tekroo-ai/teams/adapters/operationalruntime"
 	"github.com/tekroo-ai/teams/adapters/operatorhttp"
+	"github.com/tekroo-ai/teams/adapters/operatortools"
+	"github.com/tekroo-ai/teams/adapters/protocol"
 	"github.com/tekroo-ai/teams/kernel"
 )
 
@@ -74,7 +78,7 @@ func run(arguments []string, stdout, stderr io.Writer) error {
 	}
 	stopRequested := make(chan struct{}, 1)
 	token, operationTimeout, maximumBodyBytes := service.OperatorCredentials()
-	handler, err := operatorhttp.NewHandler(operatorhttp.Config{Service: service, BearerToken: token, OperationTimeout: operationTimeout, MaximumBodyBytes: maximumBodyBytes, RequestStop: func() {
+	operatorHandler, err := operatorhttp.NewHandler(operatorhttp.Config{Service: service, BearerToken: token, OperationTimeout: operationTimeout, MaximumBodyBytes: maximumBodyBytes, RequestStop: func() {
 		select {
 		case stopRequested <- struct{}{}:
 		default:
@@ -83,7 +87,33 @@ func run(arguments []string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	server := &http.Server{Addr: config.Operator.Address, Handler: handler, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 15 * time.Second, IdleTimeout: time.Minute}
+	gateway, err := protocol.NewGateway(service.Runtime, operationTimeout)
+	if err != nil {
+		return err
+	}
+	authenticator, err := httpapi.NewStaticBearerAuthenticator(token, service.OperatorIdentity())
+	if err != nil {
+		return err
+	}
+	focusedTools, err := operatortools.New(service)
+	if err != nil {
+		return err
+	}
+	mcpHandler, err := mcp.NewFocusedHandler(
+		gateway,
+		focusedTools,
+		authenticator,
+		httpapi.OriginPolicyFunc(func(string) bool { return false }),
+		httpapi.RateLimiterFunc(func(protocol.AuthenticatedContext) bool { return true }),
+		maximumBodyBytes,
+	)
+	if err != nil {
+		return err
+	}
+	router := http.NewServeMux()
+	router.Handle("/mcp", mcpHandler)
+	router.Handle("/", operatorHandler)
+	server := &http.Server{Addr: config.Operator.Address, Handler: router, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 15 * time.Second, IdleTimeout: time.Minute}
 	serverResult := make(chan error, 1)
 	go func() { serverResult <- server.Serve(listener) }()
 	writeLog(stdout, serviceLog{Event: "tekrood_started", At: time.Now().UTC(), Contract: kernel.ContractIdentity, Database: config.Mongo.Database, OpenHands: config.OpenHands.BaseURL, Operator: config.Operator.Address, Workspaces: len(config.Workspaces), Profiles: len(config.Profiles)})

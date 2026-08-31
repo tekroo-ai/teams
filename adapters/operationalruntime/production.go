@@ -21,6 +21,7 @@ import (
 	"github.com/tekroo-ai/teams/adapters/executionruntime"
 	"github.com/tekroo-ai/teams/adapters/mongo"
 	"github.com/tekroo-ai/teams/adapters/openhands"
+	"github.com/tekroo-ai/teams/adapters/protocol"
 	"github.com/tekroo-ai/teams/application"
 	"github.com/tekroo-ai/teams/contract"
 	"github.com/tekroo-ai/teams/kernel"
@@ -342,6 +343,7 @@ type ProductionService struct {
 	failures               chan error
 	provenance             kernel.ProvenanceBasis
 	operatorToken          string
+	operatorIdentity       protocol.AuthenticatedContext
 	operatorTimeout        time.Duration
 	operatorMaxBody        int64
 	roleReconciliation     time.Duration
@@ -423,7 +425,7 @@ func NewProductionService(ctx context.Context, config ProductionConfig) (*Produc
 		_ = runtime.Close(context.WithoutCancel(ctx))
 		return fail(err)
 	}
-	return &ProductionService{Store: store, Runtime: runtime, Controller: controller, RoleHost: roleHost, RoleRuntime: roleRuntime, MessageBus: messageBus, RoleInbox: roleInbox, projectionInterval: resolved.projectionInterval, projectionTimeout: resolved.projectionTimeout, recoveryInterval: resolved.reconciliation, recoveryTimeout: resolved.leaseOperationTimeout, recoveryAttempts: config.Worker.MaximumReconciliations, failures: make(chan error, 4), provenance: resolved.provenance, operatorToken: resolved.operatorBearerToken, operatorTimeout: resolved.operatorTimeout, operatorMaxBody: config.Operator.MaximumBodyBytes, roleReconciliation: resolved.roleReconciliation, roleMaximumRestarts: config.Organization.MaximumRestarts, messageMaximumAttempts: config.Organization.MaximumDeliveryAttempts}, nil
+	return &ProductionService{Store: store, Runtime: runtime, Controller: controller, RoleHost: roleHost, RoleRuntime: roleRuntime, MessageBus: messageBus, RoleInbox: roleInbox, projectionInterval: resolved.projectionInterval, projectionTimeout: resolved.projectionTimeout, recoveryInterval: resolved.reconciliation, recoveryTimeout: resolved.leaseOperationTimeout, recoveryAttempts: config.Worker.MaximumReconciliations, failures: make(chan error, 4), provenance: resolved.provenance, operatorToken: resolved.operatorBearerToken, operatorIdentity: protocol.AuthenticatedContext{Principal: config.ServiceAuthority}, operatorTimeout: resolved.operatorTimeout, operatorMaxBody: config.Operator.MaximumBodyBytes, roleReconciliation: resolved.roleReconciliation, roleMaximumRestarts: config.Organization.MaximumRestarts, messageMaximumAttempts: config.Organization.MaximumDeliveryAttempts}, nil
 }
 
 func (service *ProductionService) Submit(ctx context.Context, command kernel.KernelCommand) (kernel.CommandReceipt, error) {
@@ -522,6 +524,13 @@ func (service *ProductionService) OperatorCredentials() (string, time.Duration, 
 	return service.operatorToken, service.operatorTimeout, service.operatorMaxBody
 }
 
+func (service *ProductionService) OperatorIdentity() protocol.AuthenticatedContext {
+	if service == nil {
+		return protocol.AuthenticatedContext{}
+	}
+	return service.operatorIdentity
+}
+
 func (service *ProductionService) RoleRoster(ctx context.Context) ([]organization.RoleInstanceState, error) {
 	if service == nil || service.RoleHost == nil {
 		return nil, application.ErrInvalidConfiguration
@@ -583,6 +592,27 @@ func (service *ProductionService) RoleInboxSnapshot(actor kernel.ActorFQN) []org
 		return nil
 	}
 	return service.RoleInbox.Snapshot(actor)
+}
+
+func (service *ProductionService) ReadMessage(ctx context.Context, id kernel.UUIDv7) (organization.MessageClaim, bool, error) {
+	if service == nil || service.MessageBus == nil {
+		return organization.MessageClaim{}, false, application.ErrInvalidConfiguration
+	}
+	return service.MessageBus.Read(ctx, id)
+}
+
+func (service *ProductionService) TraceMessages(ctx context.Context, thread kernel.UUIDv7) ([]organization.MessageClaim, error) {
+	if service == nil || service.MessageBus == nil {
+		return nil, application.ErrInvalidConfiguration
+	}
+	return service.MessageBus.Trace(ctx, thread)
+}
+
+func (service *ProductionService) DeadLetters(ctx context.Context, recipient kernel.ActorFQN, limit int64) ([]organization.MessageClaim, error) {
+	if service == nil || service.MessageBus == nil {
+		return nil, application.ErrInvalidConfiguration
+	}
+	return service.MessageBus.DeadLetters(ctx, recipient, limit)
 }
 
 func (service *ProductionService) Start(ctx context.Context) error {
