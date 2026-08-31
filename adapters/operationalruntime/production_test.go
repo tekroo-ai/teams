@@ -142,7 +142,7 @@ func writeProductionFixture(t *testing.T) (string, ProductionConfig) {
 	policy := kernel.AuthorizationPolicy{
 		PolicyDigest: provenance.PolicyDigest, Revision: provenance.PolicyRevision,
 		Grants: []kernel.AuthorityGrant{
-			{GrantDigest: provenance.GrantDigests[0], Grantee: kernel.PrincipalRef{Kind: kernel.PrincipalService, ID: "teams-operational-runtime"}, Scope: kernel.AuthorityScope{CommandTypes: []string{"tekroo.command.execution.register", "tekroo.command.evidence.register", "tekroo.command.work-invocation.claim", "tekroo.command.work-invocation.record-started", "tekroo.command.work-invocation.record-terminal"}, TargetKinds: []kernel.AggregateKind{kernel.AggregateExecution, kernel.AggregateEvidence, kernel.AggregateWorkInvocation}, CanReadTarget: true}},
+			{GrantDigest: provenance.GrantDigests[0], Grantee: kernel.PrincipalRef{Kind: kernel.PrincipalService, ID: "teams-operational-runtime"}, Scope: kernel.AuthorityScope{CommandTypes: []string{"tekroo.command.execution.register", "tekroo.command.execution.replace", "tekroo.command.evidence.register", "tekroo.command.work-invocation.claim", "tekroo.command.work-invocation.record-started", "tekroo.command.work-invocation.record-terminal"}, TargetKinds: []kernel.AggregateKind{kernel.AggregateExecution, kernel.AggregateEvidence, kernel.AggregateWorkInvocation}, CanReadTarget: true}},
 			{GrantDigest: repeatedDigest('b'), Grantee: kernel.PrincipalRef{Kind: kernel.PrincipalPolicy, ID: "teams-admission-policy"}, Scope: kernel.AuthorityScope{CommandTypes: []string{"tekroo.command.work-invocation.expire"}, TargetKinds: []kernel.AggregateKind{kernel.AggregateWorkInvocation}, CanReadTarget: true}},
 		},
 	}

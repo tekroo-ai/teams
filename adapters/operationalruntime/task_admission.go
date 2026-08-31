@@ -88,7 +88,10 @@ func (service *ProductionService) preparePlannedTasks(ctx context.Context, featu
 	if len(plan.Stories) == 0 {
 		return organization.ErrInvalidFeature
 	}
-	deadline := plan.CreatedAt.Add(service.planningDeadline)
+	// Every stage and task consumes the one feature-level deadline established
+	// at intake. Re-basing it on a later plan timestamp can make a task deadline
+	// exceed its already-created budget account and must fail closed.
+	deadline := feature.CreatedAt.Add(service.planningDeadline)
 	budgetRevision, err := service.ensureFeatureWorkBudget(ctx, feature, evidenceID, evidenceRefs, deadline)
 	if err != nil {
 		return err
@@ -167,12 +170,36 @@ func (service *ProductionService) workProfile(feature organization.FeatureReques
 }
 
 func (service *ProductionService) registerExecution(ctx context.Context, feature organization.FeatureRequest, owner organization.RoleInstanceState, profile ProductionProfile) error {
-	payload, err := json.Marshal(map[string]any{"actor_fqn": owner.ActorFQN, "execution_id": owner.Execution.ExecutionID, "fencing_epoch": owner.Execution.FencingEpoch, "runtime_identity": profile.RuntimeIdentityDigest})
+	target := kernel.AggregateRef{Kind: kernel.AggregateExecution, ID: owner.Execution.ExecutionID}
+	snapshot, err := service.Store.LoadDecision(ctx, kernel.KernelCommand{Target: target})
 	if err != nil {
 		return err
 	}
-	_, err = service.submitDeterministicCommand(ctx, feature, "tekroo.command.execution.register", kernel.SchemaVersion, kernel.AggregateExecution, owner.Execution.ExecutionID, service.serviceAuthority, 0, payload, nil, nil, "execution-"+string(owner.Execution.ExecutionID))
-	return err
+	current, registered := snapshot.CurrentExecutions[owner.ActorFQN]
+	if registered && current == owner.Execution {
+		return nil
+	}
+	if snapshot.Exists {
+		return fmt.Errorf("execution target %s already belongs to a different registration", owner.Execution.ExecutionID)
+	}
+	commandType := "tekroo.command.execution.register"
+	payloadValue := map[string]any{"actor_fqn": owner.ActorFQN, "execution_id": owner.Execution.ExecutionID, "fencing_epoch": owner.Execution.FencingEpoch, "runtime_identity": profile.RuntimeIdentityDigest}
+	if registered {
+		if owner.Execution.FencingEpoch != current.FencingEpoch+1 || owner.Execution.ExecutionID == current.ExecutionID {
+			return fmt.Errorf("execution replacement for %s is not the next fenced execution", owner.ActorFQN)
+		}
+		commandType = "tekroo.command.execution.replace"
+		payloadValue = map[string]any{"actor_fqn": owner.ActorFQN, "prior_execution_id": current.ExecutionID, "new_execution_id": owner.Execution.ExecutionID, "new_fencing_epoch": owner.Execution.FencingEpoch, "reason": "role process restarted"}
+	}
+	payload, err := json.Marshal(payloadValue)
+	if err != nil {
+		return err
+	}
+	_, err = service.submitDeterministicCommand(ctx, feature, commandType, kernel.SchemaVersion, kernel.AggregateExecution, owner.Execution.ExecutionID, service.serviceAuthority, 0, payload, nil, nil, "execution-"+string(owner.Execution.ExecutionID))
+	if err != nil {
+		return fmt.Errorf("%s %s for %s: %w", commandType, owner.Execution.ExecutionID, owner.ActorFQN, err)
+	}
+	return nil
 }
 
 func (service *ProductionService) activateTask(ctx context.Context, feature organization.FeatureRequest, task *trackedTask, profileConfig ProductionProfile, workspace ProductionWorkspace, budgetRevision uint64, dependencyEvents []kernel.UUIDv7, evidence []kernel.EvidenceRef, evidenceID kernel.UUIDv7) error {

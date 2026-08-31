@@ -1019,7 +1019,7 @@ func productionPolicyValid(policy kernel.AuthorizationPolicy, service, expiry ke
 		}
 		seen[grant.GrantDigest] = struct{}{}
 	}
-	serviceCommands := []string{"tekroo.command.execution.register", "tekroo.command.evidence.register", "tekroo.command.work-invocation.claim", "tekroo.command.work-invocation.record-started", "tekroo.command.work-invocation.record-terminal"}
+	serviceCommands := []string{"tekroo.command.execution.register", "tekroo.command.execution.replace", "tekroo.command.evidence.register", "tekroo.command.work-invocation.claim", "tekroo.command.work-invocation.record-started", "tekroo.command.work-invocation.record-terminal"}
 	for _, command := range serviceCommands {
 		if !directGrantCovers(policy.Grants, service, command) {
 			return false
@@ -1034,7 +1034,7 @@ func directGrantCovers(grants []kernel.AuthorityGrant, principal kernel.Principa
 			continue
 		}
 		for _, kind := range grant.Scope.TargetKinds {
-			if command == "tekroo.command.execution.register" && kind == kernel.AggregateExecution || command == "tekroo.command.evidence.register" && kind == kernel.AggregateEvidence || strings.HasPrefix(command, "tekroo.command.work-invocation.") && kind == kernel.AggregateWorkInvocation {
+			if (command == "tekroo.command.execution.register" || command == "tekroo.command.execution.replace") && kind == kernel.AggregateExecution || command == "tekroo.command.evidence.register" && kind == kernel.AggregateEvidence || strings.HasPrefix(command, "tekroo.command.work-invocation.") && kind == kernel.AggregateWorkInvocation {
 				return true
 			}
 		}

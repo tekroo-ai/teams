@@ -37,6 +37,16 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 	policy.Grants[4].Scope.TargetKinds = append(policy.Grants[4].Scope.TargetKinds, kernel.AggregateCompletionReview)
 	policy.Grants[2].Scope.CommandTypes = append(policy.Grants[2].Scope.CommandTypes, "tekroo.command.completion-review.record-result")
 	policy.Grants[2].Scope.TargetKinds = append(policy.Grants[2].Scope.TargetKinds, kernel.AggregateCompletionReview)
+	roleCommands := []string{"tekroo.command.task.acquire-ownership", "tekroo.command.task.activate", "tekroo.command.task.request-completion"}
+	for index, actor := range []kernel.ActorFQN{"example::product-owner-1", "example::project-manager-1", "example::architect-1", "example::tester-1"} {
+		commands := append([]string(nil), roleCommands...)
+		targets := []kernel.AggregateKind{kernel.AggregateTask}
+		if actor == "example::tester-1" {
+			commands = append(commands, "tekroo.command.completion-review.record-result")
+			targets = append(targets, kernel.AggregateCompletionReview)
+		}
+		policy.Grants = append(policy.Grants, kernel.AuthorityGrant{GrantDigest: digestByte(byte('2' + index)), Grantee: kernel.PrincipalRef{Kind: kernel.PrincipalActor, ID: string(actor)}, Scope: kernel.AuthorityScope{CommandTypes: commands, TargetKinds: targets, CanReadTarget: true}})
+	}
 	store, err := mongo.Open(contextWithTimeout(t), mongo.Config{
 		URI: uri, Database: "tekroo_phase6_task_admission", ContractIdentity: kernel.ContractIdentity,
 		ManifestSHA256: phase4ManifestSHA, MigrationLevel: 1, Policy: policy,
@@ -63,9 +73,16 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 	runtimeDigest := digestByte('3')
 	toolDigest := digestByte('4')
 	effectDigest := digestByte('5')
-	profile, err := openhands.NewAcceptedExecutionProfile(modelDigest, runtimeDigest, toolDigest, effectDigest, 24, "tekroo_phase6_task_admission", "sma_step15_memory")
-	if err != nil {
-		t.Fatal(err)
+	modelDigests := []kernel.Digest{digestByte('1'), modelDigest, digestByte('4'), digestByte('5'), digestByte('8')}
+	executionProfiles := make([]openhands.ExecutionProfile, 0, len(modelDigests))
+	productionProfiles := make(map[kernel.Digest]ProductionProfile, len(modelDigests))
+	for index, currentModel := range modelDigests {
+		profile, profileErr := openhands.NewAcceptedExecutionProfile(currentModel, runtimeDigest, toolDigest, effectDigest, 24, "tekroo_phase6_task_admission", "sma_step15_memory")
+		if profileErr != nil {
+			t.Fatal(profileErr)
+		}
+		executionProfiles = append(executionProfiles, profile)
+		productionProfiles[currentModel] = ProductionProfile{ModelProfileDigest: currentModel, RuntimeIdentityDigest: runtimeDigest, ToolPolicyDigest: toolDigest, EffectPolicyDigest: effectDigest, MaximumIterations: 24, Qualification: kernel.AssignmentQualificationReceipt{QualificationID: deterministicOperationalUUID("qualification", string(currentModel)), QualificationDigest: digestByte(byte('9' - index)), QualificationCorpusDigest: digestByte('7'), ModelProfileDigest: currentModel, DecisionRoute: kernel.RouteBoundedExecution, QualifiedRole: "programmer", Status: kernel.QualificationPass, ObservedAt: now.Add(-time.Minute)}}
 	}
 	clock := SystemClock{}
 	ids, err := NewUUIDv7Source(clock)
@@ -76,8 +93,8 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 		Store: store, Catalogue: catalogue, Clock: clock, IDs: ids,
 		OpenHandsBaseURL: server.URL, OpenHandsSessionAPIKey: "step7-session-key",
 		HTTPClient:        &http.Client{Timeout: time.Second},
-		WorkspaceBindings: []openhands.WorkspaceBinding{{WorkspaceID: "coder-1", WorktreeID: "worktree-coder-1", WorkingDirectory: workspace}, {WorkspaceID: "coder-2", WorktreeID: "worktree-coder-2", WorkingDirectory: workspace}},
-		ExecutionProfiles: []openhands.ExecutionProfile{profile}, OpenHandsPollInterval: time.Millisecond,
+		WorkspaceBindings: []openhands.WorkspaceBinding{{WorkspaceID: "coder-1", WorktreeID: "worktree-coder-1", WorkingDirectory: workspace}, {WorkspaceID: "coder-2", WorktreeID: "worktree-coder-2", WorkingDirectory: workspace}, {WorkspaceID: "product-owner-1", WorktreeID: "worktree-product-owner-1", WorkingDirectory: workspace}, {WorkspaceID: "project-manager-1", WorktreeID: "worktree-project-manager-1", WorkingDirectory: workspace}, {WorkspaceID: "architect-1", WorktreeID: "worktree-architect-1", WorkingDirectory: workspace}, {WorkspaceID: "tester-1", WorktreeID: "worktree-tester-1", WorkingDirectory: workspace}},
+		ExecutionProfiles: executionProfiles, OpenHandsPollInterval: time.Millisecond,
 		OpenHandsMaximumPages: 8, OpenHandsMaximumEvidence: 1 << 20, EvidenceRoot: t.TempDir(),
 		ExecutionPolicy: application.OperationalExecutionPolicy{OperationTimeout: time.Second, MaximumBriefBytes: 1 << 20, ConsumerID: "phase6-admission", PolicyRevision: 1, ServiceAuthority: kernel.PrincipalRef{Kind: kernel.PrincipalService, ID: "teams-operational-runtime"}, ExpiryAuthority: kernel.PrincipalRef{Kind: kernel.PrincipalPolicy, ID: "teams-admission-policy"}, Provenance: provenance},
 		EvidencePolicy:  application.CommandEvidenceRecorderPolicy{PolicyRevision: 1, Authority: kernel.PrincipalRef{Kind: kernel.PrincipalService, ID: "teams-operational-runtime"}, Provenance: provenance, ProducingVersion: "phase6", RetentionPolicy: "phase6"},
@@ -96,28 +113,37 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	roleHost, err := organization.NewHost(team, organization.NewMemoryRoleStore(), roleRuntime, clock, ids)
+	roleHost, err := organization.NewHost(team, store, roleRuntime, clock, ids)
+	if err != nil {
+		t.Fatal(err)
+	}
+	messageBus, err := organization.NewMessageBus(store, store)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	qualification := kernel.AssignmentQualificationReceipt{
-		QualificationID: kernel.UUIDv7("00000000-0000-7000-8000-000000006001"), QualificationDigest: digestByte('6'),
-		QualificationCorpusDigest: digestByte('7'), ModelProfileDigest: modelDigest, DecisionRoute: kernel.RouteBoundedExecution,
-		QualifiedRole: "programmer", Status: kernel.QualificationPass, ObservedAt: now.Add(-time.Minute),
-	}
 	service := &ProductionService{
-		Store: store, Runtime: runtime, RoleHost: roleHost, provenance: provenance, clock: clock, ids: ids,
+		Store: store, Runtime: runtime, RoleHost: roleHost, MessageBus: messageBus, provenance: provenance, clock: clock, ids: ids,
 		planningDeadline: 2 * time.Hour,
-		planning:         ProductionPlanning{PolicyRevision: 1, ClassificationPolicyDigest: digestByte('8'), PromotionPolicyDigest: digestByte('6'), VerificationTopologyDigest: digestByte('d'), SelectionPolicyDigest: digestByte('9'), BudgetPolicyDigest: digestByte('b'), RequiredGateIDs: []string{"go-test"}, Deadline: "2h"},
-		profilesByModel:  map[kernel.Digest]ProductionProfile{modelDigest: {ModelProfileDigest: modelDigest, RuntimeIdentityDigest: runtimeDigest, ToolPolicyDigest: toolDigest, EffectPolicyDigest: effectDigest, MaximumIterations: 24, Qualification: qualification}},
+		recoveryTimeout:  time.Second, messageMaximumAttempts: 3,
+		planning:        ProductionPlanning{PolicyRevision: 1, ClassificationPolicyDigest: digestByte('8'), PromotionPolicyDigest: digestByte('6'), VerificationTopologyDigest: digestByte('d'), SelectionPolicyDigest: digestByte('9'), BudgetPolicyDigest: digestByte('b'), RequiredGateIDs: []string{"go-test"}, Deadline: "2h"},
+		profilesByModel: productionProfiles,
 		workspacesByID: map[string]ProductionWorkspace{
-			"coder-1": {WorkspaceID: "coder-1", WorktreeID: "worktree-coder-1", WorkingDirectory: workspace, Branch: "task/phase6", BaselineSHA: strings.Repeat("1", 40), WritablePaths: []string{"src/"}},
-			"coder-2": {WorkspaceID: "coder-2", WorktreeID: "worktree-coder-2", WorkingDirectory: workspace, Branch: "task/phase6-review", BaselineSHA: strings.Repeat("1", 40), WritablePaths: []string{"src/"}},
+			"coder-1":           {WorkspaceID: "coder-1", WorktreeID: "worktree-coder-1", WorkingDirectory: workspace, Branch: "task/phase6", BaselineSHA: strings.Repeat("1", 40), WritablePaths: []string{"src/"}},
+			"coder-2":           {WorkspaceID: "coder-2", WorktreeID: "worktree-coder-2", WorkingDirectory: workspace, Branch: "task/phase6-review", BaselineSHA: strings.Repeat("1", 40), WritablePaths: []string{"src/"}},
+			"product-owner-1":   {WorkspaceID: "product-owner-1", WorktreeID: "worktree-product-owner-1", WorkingDirectory: workspace, Branch: "planning/product-owner", BaselineSHA: strings.Repeat("1", 40), WritablePaths: []string{"."}},
+			"project-manager-1": {WorkspaceID: "project-manager-1", WorktreeID: "worktree-project-manager-1", WorkingDirectory: workspace, Branch: "planning/project-manager", BaselineSHA: strings.Repeat("1", 40), WritablePaths: []string{"."}},
+			"architect-1":       {WorkspaceID: "architect-1", WorktreeID: "worktree-architect-1", WorkingDirectory: workspace, Branch: "planning/architect", BaselineSHA: strings.Repeat("1", 40), WritablePaths: []string{"."}},
+			"tester-1":          {WorkspaceID: "tester-1", WorktreeID: "worktree-tester-1", WorkingDirectory: workspace, Branch: "validation/tester", BaselineSHA: strings.Repeat("1", 40), WritablePaths: []string{"."}},
 		},
 		serviceAuthority: kernel.PrincipalRef{Kind: kernel.PrincipalService, ID: "teams-operational-runtime"},
 		policyAuthority:  kernel.PrincipalRef{Kind: kernel.PrincipalPolicy, ID: "teams-admission-policy"},
 	}
+	features, err := organization.NewFeatureCoordinator(store, roleHost, service, clock, ids)
+	if err != nil {
+		t.Fatal(err)
+	}
+	service.Features = features
 	feature := organization.FeatureRequest{
 		SchemaVersion: organization.FeatureSchemaVersion, ID: kernel.UUIDv7("00000000-0000-7000-8000-000000006010"), Revision: 3, Status: organization.FeatureSpecified,
 		Input:       organization.FeatureRequestInput{Team: "example", Title: "Admission integration", Description: "Create one executable root task.", AcceptanceCriteria: []string{"task is executable"}, Priority: organization.PriorityHigh, Repository: "tekroo-ai/teams", WorkspaceID: "engineering", IdempotencyKey: "phase6-admission", MaximumStories: 4, MaximumTasks: 8, MaximumHops: 8},
@@ -153,6 +179,50 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 	if err := service.reconcileFeaturePlan(contextWithTimeout(t), feature, plan); err != nil {
 		t.Fatal(err)
 	}
+	automated, created := submitAutomatedFeature(t, service)
+	if !created {
+		t.Fatal("automated feature was not created")
+	}
+	for _, expected := range []struct {
+		stage featurePlanningStage
+		next  organization.FeatureStatus
+	}{{stageRefinement, organization.FeatureReadyForPlanning}, {stageSpecification, organization.FeatureSpecified}, {stageArchitecture, organization.FeaturePlanned}} {
+		if err := service.reconcileFeaturePlanning(contextWithTimeout(t)); err != nil {
+			t.Fatal(err)
+		}
+		taskID := deterministicOperationalUUID("feature-planning-task", string(automated.ID), string(expected.stage))
+		purpose := kernel.PurposeHandoff
+		if expected.stage == stageArchitecture {
+			purpose = kernel.PurposeReplan
+		}
+		invocationID := deterministicOperationalUUID("work-invocation", string(automated.ID), string(taskID), string(purpose), "1")
+		waitForInvocationState(t, store, invocationID, kernel.InvocationSucceeded)
+		if err := service.reconcileFeaturePlanning(contextWithTimeout(t)); err != nil {
+			t.Fatal(err)
+		}
+		var found bool
+		automated, found, err = service.ReadFeature(contextWithTimeout(t), automated.ID)
+		if err != nil || !found || automated.Status != expected.next {
+			t.Fatalf("automated feature stage %s = %#v found=%t err=%v", expected.stage, automated, found, err)
+		}
+	}
+	if automated.Plan == nil || len(automated.Plan.Tasks) != 2 || automated.Plan.Tasks[1].Purpose != kernel.PurposeValidation || len(automated.Plan.Tasks[1].Validates) != 1 || automated.Plan.Tasks[1].Validates[0] != automated.Plan.Tasks[0].ID {
+		t.Fatalf("automated plan = %#v", automated.Plan)
+	}
+	automatedImplementation := automated.Plan.Tasks[0]
+	automatedValidation := automated.Plan.Tasks[1]
+	waitForInvocationState(t, store, deterministicOperationalUUID("work-invocation", string(automated.ID), string(automatedImplementation.ID), string(automatedImplementation.Purpose), "1"), kernel.InvocationSucceeded)
+	if err := service.reconcileFeaturePlan(contextWithTimeout(t), automated, *automated.Plan); err != nil {
+		t.Fatal(err)
+	}
+	waitForInvocationState(t, store, deterministicOperationalUUID("work-invocation", string(automated.ID), string(automatedValidation.ID), string(automatedValidation.Purpose), "1"), kernel.InvocationSucceeded)
+	if err := service.reconcileFeaturePlan(contextWithTimeout(t), automated, *automated.Plan); err != nil {
+		t.Fatal(err)
+	}
+	automatedState, _, found, err := store.ReadAggregateHead(contextWithTimeout(t), kernel.AggregateRef{Kind: kernel.AggregateTask, ID: automatedImplementation.ID})
+	if err != nil || !found || automatedState.Phase != kernel.PhaseCompleted {
+		t.Fatalf("automated implementation state=%#v found=%t err=%v", automatedState, found, err)
+	}
 	cancelRun()
 	if err := <-runResult; !errors.Is(err, context.Canceled) {
 		t.Fatalf("runtime stop = %v", err)
@@ -168,6 +238,15 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 	if err != nil || !found || !dependent.Valid() || dependent.Phase != string(kernel.PhaseCompleted) || dependent.LatestInvocation == nil || dependent.LatestInvocation.State != kernel.InvocationSucceeded {
 		t.Fatalf("dependent projection=%+v found=%t err=%v", dependent, found, err)
 	}
+}
+
+func submitAutomatedFeature(t *testing.T, service *ProductionService) (organization.FeatureRequest, bool) {
+	t.Helper()
+	returnValue, created, err := service.SubmitFeature(contextWithTimeout(t), kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "principal"}, organization.FeatureRequestInput{IdempotencyKey: "phase6-automated-feature", Team: "example", Title: "Automate a bounded change", Description: "Implement one small repository change and verify it independently.", AcceptanceCriteria: []string{"the requested behavior works"}, Priority: organization.PriorityHigh, Constraints: []string{"preserve current interfaces"}, Repository: "tekroo-ai/teams", WorkspaceID: "engineering", MaximumStories: 4, MaximumTasks: 8, MaximumHops: 8})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return returnValue, created
 }
 
 func waitForInvocationState(t *testing.T, store *mongo.Store, invocationID kernel.UUIDv7, expected kernel.WorkInvocationState) {

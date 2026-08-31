@@ -198,8 +198,10 @@ func writeProductSurfaceConfiguration(t *testing.T, mongoURI, openHandsURL, work
 	config.DeploymentIdentity = digestByte('6')
 	config.OpenHands.BaseURL = openHandsURL
 	config.Operator.Address = freeProductSurfaceAddress(t)
-	config.Workspaces = []ProductionWorkspace{{WorkspaceID: fixture.workspaceID, WorktreeID: fixture.worktreeID, WorkingDirectory: workspace}}
-	config.Profiles = []ProductionProfile{{ModelProfileDigest: fixture.modelDigest, RuntimeIdentityDigest: fixture.runtimeDigest, ToolPolicyDigest: fixture.toolDigest, EffectPolicyDigest: fixture.effectDigest, MaximumIterations: 24}}
+	config.Workspaces = []ProductionWorkspace{{WorkspaceID: fixture.workspaceID, WorktreeID: fixture.worktreeID, WorkingDirectory: workspace, Branch: "task/product-surface", BaselineSHA: strings.Repeat("1", 40), WritablePaths: []string{"."}}}
+	qualification := config.Profiles[0].Qualification
+	qualification.ModelProfileDigest = fixture.modelDigest
+	config.Profiles = []ProductionProfile{{ModelProfileDigest: fixture.modelDigest, RuntimeIdentityDigest: fixture.runtimeDigest, ToolPolicyDigest: fixture.toolDigest, EffectPolicyDigest: fixture.effectDigest, MaximumIterations: 24, Qualification: qualification}}
 	config.Execution.ConsumerID = "teams-phase5-product-surface"
 	config.Execution.OperationTimeout = "3s"
 	config.Worker.LeaseDuration = "4s"
