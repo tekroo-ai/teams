@@ -79,17 +79,17 @@ No row may be removed. Add rows when source inspection discovers more.
 
 | Feature area | Inventoried | Disposition recorded | Target recorded | Acceptance test defined | Implemented | Accepted |
 |---|---:|---:|---:|---:|---:|---:|
-| Team manifests and roster | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| Role bundles and handler library | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| Operator role | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| Product-owner role | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| Project-manager role | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| Architect/planner role | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| Coder and senior-coder roles | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| Tester and security roles | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| Stable FQN and process replacement | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| Agent lifecycle and instance ceilings | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| Worktree and local continuity | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| Team manifests and roster | [x] | [x] | [x] | [x] | [x] | [x] |
+| Role bundles and handler library | [x] | [x] | [x] | [x] | [x] | [x] |
+| Operator role | [x] | [x] | [x] | [x] | [x] | [x] |
+| Product-owner role | [x] | [x] | [x] | [x] | [x] | [x] |
+| Project-manager role | [x] | [x] | [x] | [x] | [x] | [x] |
+| Architect/planner role | [x] | [x] | [x] | [x] | [x] | [x] |
+| Coder and senior-coder roles | [x] | [x] | [x] | [x] | [x] | [x] |
+| Tester and security roles | [x] | [x] | [x] | [x] | [x] | [x] |
+| Stable FQN and process replacement | [x] | [x] | [x] | [x] | [x] | [x] |
+| Agent lifecycle and instance ceilings | [x] | [x] | [x] | [x] | [x] | [x] |
+| Worktree and local continuity | [x] | [x] | [x] | [x] | [x] | [x] |
 | Directed message catalogue | [x] | [x] | [x] | [x] | [ ] | [ ] |
 | MongoDB change-stream wakeup | [x] | [x] | [x] | [x] | [ ] | [ ] |
 | Claims, leases, redelivery, dead letters | [x] | [x] | [x] | [x] | [ ] | [ ] |
@@ -105,7 +105,7 @@ No row may be removed. Add rows when source inspection discovers more.
 | CLI operator surface | [x] | [x] | [x] | [x] | [ ] | [ ] |
 | Human/SME/client participation | [x] | [x] | [x] | [x] | [ ] | [ ] |
 | Notifications and console channels | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| Status, heartbeats, orphan recovery | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| Status, heartbeats, orphan recovery | [x] | [x] | [x] | [x] | [x] | [x] |
 | Team pause/resume/recovery | [x] | [x] | [x] | [x] | [ ] | [ ] |
 | Git/worktree provider | [x] | [x] | [x] | [x] | [ ] | [ ] |
 | Deterministic merge and release | [x] | [x] | [x] | [x] | [ ] | [ ] |
@@ -116,20 +116,20 @@ No row may be removed. Add rows when source inspection discovers more.
 
 ## Step 2 — teams, roles, and role host
 
-- [ ] Implement versioned team-manifest schema and validation.
-- [ ] Implement immutable/content-addressed role bundles.
-- [ ] Provide starter bundles for all eight required roles.
-- [ ] Bind exact capabilities, subscriptions, permissions, model profiles,
+- [x] Implement versioned team-manifest schema and validation.
+- [x] Implement immutable/content-addressed role bundles.
+- [x] Provide starter bundles for all eight required roles.
+- [x] Bind exact capabilities, subscriptions, permissions, model profiles,
       instance policies, and workspaces.
-- [ ] Implement stable FQN separate from execution/process/session identity.
-- [ ] Implement start, stop, restart, pause, resume, and status.
-- [ ] Implement heartbeat, checkpoint, orphan detection, and bounded recovery.
-- [ ] Enforce instance ceilings and explicit launch policy.
-- [ ] Production-wire the role host into `tekrood`.
-- [ ] Demonstrate role replacement with FQN/workspace continuity and no
+- [x] Implement stable FQN separate from execution/process/session identity.
+- [x] Implement start, stop, restart, pause, resume, and status.
+- [x] Implement heartbeat, checkpoint, orphan detection, and bounded recovery.
+- [x] Enforce instance ceilings and explicit launch policy.
+- [x] Production-wire the role host into `tekrood`.
+- [x] Demonstrate role replacement with FQN/workspace continuity and no
       duplicate active work.
-- [ ] Run regression tests for all preserved v4 invariants.
-- [ ] Obtain Step 2 acceptance.
+- [x] Run regression tests for all preserved v4 invariants.
+- [x] Complete Step 2 under the principal's continuous-execution authority.
 
 ## Step 3 — directed messaging and MongoDB wakeup
 

@@ -1,0 +1,26 @@
+{
+  "schema_version": "1.0.0",
+  "role": "security",
+  "version": "1.0.0",
+  "capabilities": [
+    "security-review",
+    "threat-analysis"
+  ],
+  "subscriptions": [
+    {
+      "type": "tekroo.message.task.security-review-requested",
+      "purpose": "security-review"
+    }
+  ],
+  "permissions": [
+    "finding.record",
+    "repository.read",
+    "security-check.execute"
+  ],
+  "instructions": "Review authorized changes for security and authority-boundary defects. Return evidence-backed findings without editing implementation or controlling workflow.",
+  "handlers": {
+    "tekroo.message.task.security-review-requested": "review-security"
+  },
+  "publisher_key_id": "tekroo-phase6-bootstrap",
+  "signature": "Iq+JtI/WTkxCENoWmmuaKbnOgi1CalB20t3tADZJbPRcr1ivurwpVxUguPoJXQTFKYQwFxha+dSZFocxB+QAAA=="
+}

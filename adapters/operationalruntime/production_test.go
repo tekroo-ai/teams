@@ -2,6 +2,11 @@ package operationalruntime
 
 import (
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"os"
@@ -14,6 +19,7 @@ import (
 	"github.com/tekroo-ai/teams/adapters/fake"
 	"github.com/tekroo-ai/teams/adapters/mongo"
 	"github.com/tekroo-ai/teams/kernel"
+	"github.com/tekroo-ai/teams/organization"
 )
 
 func TestExpiredLeaseRecoverySweepsImmediatelyAndAfterInterval(t *testing.T) {
@@ -65,7 +71,7 @@ func TestLoadProductionConfigResolvesAndValidatesExactLocalBindings(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	if observed.Mongo.Database != expected.Mongo.Database || observed.TeamsDatabaseIdentity != expected.TeamsDatabaseIdentity || observed.SMADatabaseIdentity != expected.SMADatabaseIdentity || len(observed.Workspaces) != 1 || !filepath.IsAbs(observed.Workspaces[0].WorkingDirectory) || !filepath.IsAbs(observed.OpenHands.SessionAPIKeyFile) {
+	if observed.Mongo.Database != expected.Mongo.Database || observed.TeamsDatabaseIdentity != expected.TeamsDatabaseIdentity || observed.SMADatabaseIdentity != expected.SMADatabaseIdentity || len(observed.Workspaces) != 1 || !filepath.IsAbs(observed.Workspaces[0].WorkingDirectory) || !filepath.IsAbs(observed.OpenHands.SessionAPIKeyFile) || !filepath.IsAbs(observed.Organization.ManifestFile) || !filepath.IsAbs(observed.Organization.Publishers[0].PublicKeyFile) {
 		t.Fatalf("resolved config = %#v", observed)
 	}
 }
@@ -142,6 +148,7 @@ func writeProductionFixture(t *testing.T) (string, ProductionConfig) {
 	}
 	writeJSON(t, filepath.Join(directory, "authorization.json"), policy, 0o600)
 	writeJSON(t, filepath.Join(directory, "provenance.json"), provenance, 0o600)
+	organizationConfig := writeOrganizationFixture(t, directory)
 	config := ProductionConfig{
 		ContractRoot:          root,
 		Mongo:                 ProductionMongoConfig{URIFile: "mongo-uri", Database: "tekroo_v4", BacklogLimit: 1024, DeliveryPolicyRevision: 1},
@@ -149,16 +156,65 @@ func writeProductionFixture(t *testing.T) (string, ProductionConfig) {
 		Operator:              ProductionOperatorConfig{Address: "127.0.0.1:8787", BearerTokenFile: "operator-token", OperationTimeout: "10s", MaximumBodyBytes: 1 << 20},
 		TeamsDatabaseIdentity: "tekroo_v4", SMADatabaseIdentity: "sma_v4", DeploymentIdentity: repeatedDigest('1'), AuthorizationPolicyFile: "authorization.json", ProvenanceFile: "provenance.json", EvidenceRoot: "evidence",
 		ServiceAuthority: kernel.PrincipalRef{Kind: kernel.PrincipalService, ID: "teams-operational-runtime"}, ExpiryAuthority: kernel.PrincipalRef{Kind: kernel.PrincipalPolicy, ID: "teams-admission-policy"},
-		Workspaces: []ProductionWorkspace{{WorkspaceID: "workspace-1", WorktreeID: "worktree-1", WorkingDirectory: "workspace"}},
-		Profiles:   []ProductionProfile{{ModelProfileDigest: repeatedDigest('2'), RuntimeIdentityDigest: repeatedDigest('3'), ToolPolicyDigest: repeatedDigest('4'), EffectPolicyDigest: repeatedDigest('5'), MaximumIterations: 24}},
-		Execution:  ProductionExecution{ConsumerID: "tekrood", OperationTimeout: "130s", MaximumBriefBytes: 1 << 20, PolicyRevision: 1},
-		Evidence:   ProductionEvidence{PolicyRevision: 1, ProducingVersion: "phase5", RetentionPolicy: "local-operational"},
-		Worker:     ProductionWorker{LeaseDuration: "150s", ReconciliationInterval: "1s", MaximumReconciliations: 600, MaximumConcurrentInvocations: 4, LeaseOperationTimeout: "5s"},
-		Projection: ProductionProjection{Interval: "100ms", OperationTimeout: "5s"},
+		Workspaces:   []ProductionWorkspace{{WorkspaceID: "workspace-1", WorktreeID: "worktree-1", WorkingDirectory: "workspace"}},
+		Profiles:     []ProductionProfile{{ModelProfileDigest: repeatedDigest('2'), RuntimeIdentityDigest: repeatedDigest('3'), ToolPolicyDigest: repeatedDigest('4'), EffectPolicyDigest: repeatedDigest('5'), MaximumIterations: 24}},
+		Execution:    ProductionExecution{ConsumerID: "tekrood", OperationTimeout: "130s", MaximumBriefBytes: 1 << 20, PolicyRevision: 1},
+		Evidence:     ProductionEvidence{PolicyRevision: 1, ProducingVersion: "phase5", RetentionPolicy: "local-operational"},
+		Worker:       ProductionWorker{LeaseDuration: "150s", ReconciliationInterval: "1s", MaximumReconciliations: 600, MaximumConcurrentInvocations: 4, LeaseOperationTimeout: "5s"},
+		Projection:   ProductionProjection{Interval: "100ms", OperationTimeout: "5s"},
+		Organization: organizationConfig,
 	}
 	path := filepath.Join(directory, "tekrood.json")
 	writeJSON(t, path, config, 0o600)
 	return path, config
+}
+
+func writeOrganizationFixture(t *testing.T, directory string) ProductionOrganization {
+	t.Helper()
+	publicKey, privateKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bundle := organization.RoleBundle{
+		SchemaVersion: organization.RoleBundleSchemaVersion, Role: "coder", Version: "1.0.0",
+		Capabilities: []string{"implement"}, Subscriptions: []organization.Subscription{{Type: "tekroo.message.task.assigned", Purpose: "implementation"}},
+		Permissions: []string{"repository.read"}, Instructions: "Implement bounded tasks and return evidence.",
+		Handlers: map[string]string{"tekroo.message.task.assigned": "implement"}, PublisherKeyID: "fixture-publisher",
+	}
+	bundleDigest, err := bundle.ContentDigest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	digestBytes, err := hex.DecodeString(string(bundleDigest))
+	if err != nil {
+		t.Fatal(err)
+	}
+	bundle.Signature = base64.StdEncoding.EncodeToString(ed25519.Sign(privateKey, digestBytes))
+	if err := os.Mkdir(filepath.Join(directory, "roles"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	writeJSON(t, filepath.Join(directory, "roles", "coder.json"), bundle, 0o600)
+	manifest := organization.TeamManifest{
+		SchemaVersion: organization.TeamManifestSchemaVersion, Team: "fixture", Version: "1.0.0",
+		Roles: []organization.RoleBinding{{
+			Role: "coder", BundlePath: "roles/coder.json", BundleDigest: bundleDigest, PublisherKeyID: "fixture-publisher",
+			InitialInstances: 1, MaximumInstances: 1, LaunchMode: organization.LaunchEager,
+			ModelProfileDigest: repeatedDigest('2'), WorkspaceIDs: []string{"workspace-1"},
+		}},
+	}
+	manifestPath := filepath.Join(directory, "team.json")
+	writeJSON(t, manifestPath, manifest, 0o600)
+	raw, err := os.ReadFile(manifestPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifestHash := sha256.Sum256(raw)
+	writeText(t, filepath.Join(directory, "role-publisher.pub"), base64.StdEncoding.EncodeToString(publicKey)+"\n", 0o644)
+	return ProductionOrganization{
+		ManifestFile: "team.json", ManifestDigest: kernel.Digest(hex.EncodeToString(manifestHash[:])),
+		Publishers:             []ProductionPublisher{{KeyID: "fixture-publisher", PublicKeyFile: "role-publisher.pub"}},
+		ReconciliationInterval: "100ms", MaximumRestarts: 3,
+	}
 }
 
 func writeJSON(t *testing.T, path string, value any, mode os.FileMode) {

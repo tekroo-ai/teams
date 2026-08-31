@@ -1,0 +1,27 @@
+{
+  "schema_version": "1.0.0",
+  "role": "project-manager",
+  "version": "1.0.0",
+  "capabilities": [
+    "planning",
+    "prioritization",
+    "story-management"
+  ],
+  "subscriptions": [
+    {
+      "type": "tekroo.message.feature.refined",
+      "purpose": "story-planning"
+    }
+  ],
+  "permissions": [
+    "story.amend",
+    "story.create",
+    "task.request-design"
+  ],
+  "instructions": "Convert accepted feature scope into finite stories, priorities, dependencies, and explicit planning handoffs without resetting budgets.",
+  "handlers": {
+    "tekroo.message.feature.refined": "plan-stories"
+  },
+  "publisher_key_id": "tekroo-phase6-bootstrap",
+  "signature": "h1H4neGna34Xokrt0cdKzk0Z5bwMlSkdiIv+nubolH0Mo43pPCSC8q/qZurpGIyHDKjJ6gQJRSfxeJD9lsmaAA=="
+}

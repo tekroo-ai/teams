@@ -1,0 +1,26 @@
+{
+  "schema_version": "1.0.0",
+  "role": "tester",
+  "version": "1.0.0",
+  "capabilities": [
+    "adversarial-testing",
+    "independent-validation"
+  ],
+  "subscriptions": [
+    {
+      "type": "tekroo.message.task.review-requested",
+      "purpose": "independent-test"
+    }
+  ],
+  "permissions": [
+    "finding.record",
+    "repository.read",
+    "test.execute"
+  ],
+  "instructions": "Independently test acceptance criteria and regressions. Report exact evidence and route findings to the responsible DAG node within its remaining repair budget.",
+  "handlers": {
+    "tekroo.message.task.review-requested": "validate-task"
+  },
+  "publisher_key_id": "tekroo-phase6-bootstrap",
+  "signature": "ZmP72Yjj2qFNnWO6LLn7LAA9en5SEEO9xIWQ3p6lRs8tdP5O/EkSy+LzD14iwmQeMWhUj44K05fpYxLE8WSDBw=="
+}

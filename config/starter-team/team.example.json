@@ -1,0 +1,95 @@
+{
+  "schema_version": "1.0.0",
+  "team": "example",
+  "version": "1.0.0",
+  "roles": [
+    {
+      "role": "architect",
+      "bundle_path": "roles/architect.json",
+      "bundle_digest": "6f8cd95ba54322a30970de933a9fd1c1519dcba4ff8e214fa69719c0cee3b64d",
+      "publisher_key_id": "tekroo-phase6-bootstrap",
+      "initial_instances": 1,
+      "maximum_instances": 1,
+      "launch_mode": "ON_DEMAND",
+      "model_profile_digest": "1111111111111111111111111111111111111111111111111111111111111111",
+      "workspace_ids": ["architect-1"]
+    },
+    {
+      "role": "coder",
+      "bundle_path": "roles/coder.json",
+      "bundle_digest": "65b65b479693d0a8fdaa1a74fe1dcb5b1c3e6f7ac50f3971e091f2e574124cdf",
+      "publisher_key_id": "tekroo-phase6-bootstrap",
+      "initial_instances": 1,
+      "maximum_instances": 4,
+      "launch_mode": "ON_DEMAND",
+      "model_profile_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+      "workspace_ids": ["coder-1", "coder-2", "coder-3", "coder-4"]
+    },
+    {
+      "role": "operator",
+      "bundle_path": "roles/operator.json",
+      "bundle_digest": "cb01046c79d69e04743362e0d38ebe48e5b0d30a5fc619b8487af4387528ad51",
+      "publisher_key_id": "tekroo-phase6-bootstrap",
+      "initial_instances": 1,
+      "maximum_instances": 1,
+      "launch_mode": "MANUAL",
+      "model_profile_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+      "workspace_ids": ["operator-1"]
+    },
+    {
+      "role": "product-owner",
+      "bundle_path": "roles/product-owner.json",
+      "bundle_digest": "3c9242ace6deae75115220d47f5261eed30998a65938fe6eea43444d9b0fe690",
+      "publisher_key_id": "tekroo-phase6-bootstrap",
+      "initial_instances": 1,
+      "maximum_instances": 1,
+      "launch_mode": "EAGER",
+      "model_profile_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+      "workspace_ids": ["product-owner-1"]
+    },
+    {
+      "role": "project-manager",
+      "bundle_path": "roles/project-manager.json",
+      "bundle_digest": "52368dc78f7ed1b3c0d0f1cc6d95de06bfab7d56bab243ba746a8e8f5ce42ab8",
+      "publisher_key_id": "tekroo-phase6-bootstrap",
+      "initial_instances": 1,
+      "maximum_instances": 1,
+      "launch_mode": "ON_DEMAND",
+      "model_profile_digest": "5555555555555555555555555555555555555555555555555555555555555555",
+      "workspace_ids": ["project-manager-1"]
+    },
+    {
+      "role": "security",
+      "bundle_path": "roles/security.json",
+      "bundle_digest": "6ea6a4f19e7c1e6556cd8f8249e1e6654feb48ca26853649d44ee1a3e8a43527",
+      "publisher_key_id": "tekroo-phase6-bootstrap",
+      "initial_instances": 1,
+      "maximum_instances": 1,
+      "launch_mode": "ON_DEMAND",
+      "model_profile_digest": "6666666666666666666666666666666666666666666666666666666666666666",
+      "workspace_ids": ["security-1"]
+    },
+    {
+      "role": "senior-coder",
+      "bundle_path": "roles/senior-coder.json",
+      "bundle_digest": "9169c9fa79add5d5d329efb97912da9d6da8c30246431dac5d138e500938dd5c",
+      "publisher_key_id": "tekroo-phase6-bootstrap",
+      "initial_instances": 1,
+      "maximum_instances": 2,
+      "launch_mode": "ON_DEMAND",
+      "model_profile_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+      "workspace_ids": ["senior-coder-1", "senior-coder-2"]
+    },
+    {
+      "role": "tester",
+      "bundle_path": "roles/tester.json",
+      "bundle_digest": "69d585b8b8ef8cab59951b55f5496de2fbec34a045eb6818fe27e1e5af1d1ed1",
+      "publisher_key_id": "tekroo-phase6-bootstrap",
+      "initial_instances": 1,
+      "maximum_instances": 2,
+      "launch_mode": "ON_DEMAND",
+      "model_profile_digest": "8888888888888888888888888888888888888888888888888888888888888888",
+      "workspace_ids": ["tester-1", "tester-2"]
+    }
+  ]
+}

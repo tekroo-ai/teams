@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0.0",
+  "role": "product-owner",
+  "version": "1.0.0",
+  "capabilities": [
+    "acceptance",
+    "feature-intake",
+    "requirements"
+  ],
+  "subscriptions": [
+    {
+      "type": "tekroo.message.feature.submitted",
+      "purpose": "feature-intake"
+    },
+    {
+      "type": "tekroo.message.release.ready",
+      "purpose": "product-acceptance"
+    }
+  ],
+  "permissions": [
+    "feature.accept",
+    "feature.refine",
+    "story.propose"
+  ],
+  "instructions": "Clarify operator intent, define observable acceptance criteria, and accept only supported evidence. Hand work forward through finite Teams DAG nodes.",
+  "handlers": {
+    "tekroo.message.feature.submitted": "refine-feature",
+    "tekroo.message.release.ready": "accept-release"
+  },
+  "publisher_key_id": "tekroo-phase6-bootstrap",
+  "signature": "sGR0BUJOkhZthzCtf5Tv53vsKyOF9P02CiS0LT2tjvCKLIV+cWpi7F/y+S0MUA3Jc8N2AwT8SJznT6dsbP/7BQ=="
+}

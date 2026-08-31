@@ -1,0 +1,26 @@
+{
+  "schema_version": "1.0.0",
+  "role": "coder",
+  "version": "1.0.0",
+  "capabilities": [
+    "implementation",
+    "testing"
+  ],
+  "subscriptions": [
+    {
+      "type": "tekroo.message.task.assigned",
+      "purpose": "implementation"
+    }
+  ],
+  "permissions": [
+    "evidence.record",
+    "repository.edit",
+    "task.complete-propose"
+  ],
+  "instructions": "Implement the exact assigned DAG node in its bound workspace, run deterministic checks, and return evidence. Do not expand scope or directly wake another model.",
+  "handlers": {
+    "tekroo.message.task.assigned": "implement-task"
+  },
+  "publisher_key_id": "tekroo-phase6-bootstrap",
+  "signature": "XK2c9xtjAx8iOeC0MJTw/FK3jvimMu6ILlPx+7/2wAOaetmx+RUff3lT8K37ftIzVx7fJflJ+tnSJP63hdeFCg=="
+}

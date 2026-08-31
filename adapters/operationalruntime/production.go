@@ -3,6 +3,8 @@ package operationalruntime
 import (
 	"bytes"
 	"context"
+	"crypto/ed25519"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -22,6 +24,7 @@ import (
 	"github.com/tekroo-ai/teams/application"
 	"github.com/tekroo-ai/teams/contract"
 	"github.com/tekroo-ai/teams/kernel"
+	"github.com/tekroo-ai/teams/organization"
 )
 
 const (
@@ -54,6 +57,7 @@ type ProductionConfig struct {
 	Evidence                ProductionEvidence        `json:"evidence"`
 	Worker                  ProductionWorker          `json:"worker"`
 	Projection              ProductionProjection      `json:"projection"`
+	Organization            ProductionOrganization    `json:"organization"`
 }
 
 type ProductionMongoConfig struct {
@@ -119,6 +123,19 @@ type ProductionProjection struct {
 	OperationTimeout string `json:"operation_timeout"`
 }
 
+type ProductionOrganization struct {
+	ManifestFile           string                `json:"manifest_file"`
+	ManifestDigest         kernel.Digest         `json:"manifest_digest"`
+	Publishers             []ProductionPublisher `json:"trusted_publishers"`
+	ReconciliationInterval string                `json:"reconciliation_interval"`
+	MaximumRestarts        uint32                `json:"maximum_restarts"`
+}
+
+type ProductionPublisher struct {
+	KeyID         string `json:"key_id"`
+	PublicKeyFile string `json:"public_key_file"`
+}
+
 type resolvedProductionConfig struct {
 	ProductionConfig
 	mongoURI              string
@@ -135,6 +152,8 @@ type resolvedProductionConfig struct {
 	projectionInterval    time.Duration
 	projectionTimeout     time.Duration
 	operatorTimeout       time.Duration
+	team                  organization.LoadedTeam
+	roleReconciliation    time.Duration
 }
 
 // LoadProductionConfig strictly decodes and validates a tekrood configuration.
@@ -162,6 +181,10 @@ func LoadProductionConfig(path string) (ProductionConfig, error) {
 	config.AuthorizationPolicyFile = absoluteFrom(base, config.AuthorizationPolicyFile)
 	config.ProvenanceFile = absoluteFrom(base, config.ProvenanceFile)
 	config.EvidenceRoot = absoluteFrom(base, config.EvidenceRoot)
+	config.Organization.ManifestFile = absoluteFrom(base, config.Organization.ManifestFile)
+	for index := range config.Organization.Publishers {
+		config.Organization.Publishers[index].PublicKeyFile = absoluteFrom(base, config.Organization.Publishers[index].PublicKeyFile)
+	}
 	for index := range config.Workspaces {
 		config.Workspaces[index].WorkingDirectory = absoluteFrom(base, config.Workspaces[index].WorkingDirectory)
 	}
@@ -232,6 +255,10 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 	if err != nil {
 		return resolvedProductionConfig{}, err
 	}
+	roleReconciliation, err := positiveDuration("organization.reconciliation_interval", config.Organization.ReconciliationInterval)
+	if err != nil || config.Organization.MaximumRestarts == 0 {
+		return resolvedProductionConfig{}, invalidConfig("organization recovery policy is invalid")
+	}
 	if config.OpenHands.MaximumPages == 0 || config.OpenHands.MaximumPages > 1000 || config.OpenHands.MaximumEvidenceBytes <= 0 || config.OpenHands.MaximumEvidenceBytes > 16<<20 || config.Execution.ConsumerID == "" || len(config.Execution.ConsumerID) > 256 || config.Execution.MaximumBriefBytes <= 0 || config.Execution.MaximumBriefBytes > 1<<20 || config.Execution.PolicyRevision == 0 || config.Evidence.PolicyRevision == 0 || config.Evidence.ProducingVersion == "" || config.Evidence.RetentionPolicy == "" || config.Worker.MaximumReconciliations == 0 || config.Worker.MaximumConcurrentInvocations == 0 || config.Worker.MaximumConcurrentInvocations > 64 || reconciliation >= leaseDuration {
 		return resolvedProductionConfig{}, invalidConfig("execution, evidence, OpenHands, or worker limits are invalid")
 	}
@@ -260,6 +287,25 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 	if _, err := openhands.NewBoundExecutionProfileResolver(profiles); err != nil {
 		return resolvedProductionConfig{}, invalidConfig("execution profiles are not unique and exact")
 	}
+	trustedKeys := make(map[string]ed25519.PublicKey, len(config.Organization.Publishers))
+	for _, publisher := range config.Organization.Publishers {
+		if publisher.KeyID == "" || publisher.PublicKeyFile == "" || trustedKeys[publisher.KeyID] != nil {
+			return resolvedProductionConfig{}, invalidConfig("trusted role publishers are invalid or duplicated")
+		}
+		raw, readErr := os.ReadFile(publisher.PublicKeyFile)
+		if readErr != nil {
+			return resolvedProductionConfig{}, invalidConfig("trusted role publisher key is missing")
+		}
+		decoded, decodeErr := base64.StdEncoding.Strict().DecodeString(strings.TrimSpace(string(raw)))
+		if decodeErr != nil || len(decoded) != ed25519.PublicKeySize {
+			return resolvedProductionConfig{}, invalidConfig("trusted role publisher key is invalid")
+		}
+		trustedKeys[publisher.KeyID] = ed25519.PublicKey(decoded)
+	}
+	team, err := organization.LoadTeamManifest(config.Organization.ManifestFile, config.Organization.ManifestDigest, trustedKeys)
+	if err != nil {
+		return resolvedProductionConfig{}, invalidConfig("team manifest or role bundle is invalid")
+	}
 	var policy kernel.AuthorizationPolicy
 	if err := readStrictJSONFile(config.AuthorizationPolicyFile, &policy); err != nil || !productionPolicyValid(policy, config.ServiceAuthority, config.ExpiryAuthority) || config.Execution.PolicyRevision != policy.Revision || config.Evidence.PolicyRevision != policy.Revision {
 		return resolvedProductionConfig{}, invalidConfig("authorization policy file is invalid")
@@ -268,30 +314,35 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 	if err := readStrictJSONFile(config.ProvenanceFile, &provenance); err != nil || !provenance.Valid() || provenance.PolicyDigest != policy.PolicyDigest || provenance.PolicyRevision != policy.Revision {
 		return resolvedProductionConfig{}, invalidConfig("provenance file is invalid or does not bind the authorization policy")
 	}
-	return resolvedProductionConfig{ProductionConfig: config, mongoURI: mongoURI, sessionAPIKey: sessionKey, operatorBearerToken: operatorToken, authorizationPolicy: policy, provenance: provenance, requestTimeout: requestTimeout, pollInterval: pollInterval, operationTimeout: operationTimeout, leaseDuration: leaseDuration, reconciliation: reconciliation, leaseOperationTimeout: leaseOperationTimeout, projectionInterval: projectionInterval, projectionTimeout: projectionTimeout, operatorTimeout: operatorTimeout}, nil
+	return resolvedProductionConfig{ProductionConfig: config, mongoURI: mongoURI, sessionAPIKey: sessionKey, operatorBearerToken: operatorToken, authorizationPolicy: policy, provenance: provenance, requestTimeout: requestTimeout, pollInterval: pollInterval, operationTimeout: operationTimeout, leaseDuration: leaseDuration, reconciliation: reconciliation, leaseOperationTimeout: leaseOperationTimeout, projectionInterval: projectionInterval, projectionTimeout: projectionTimeout, operatorTimeout: operatorTimeout, team: team, roleReconciliation: roleReconciliation}, nil
 }
 
 // ProductionService owns the Mongo store, assembled runtime, and lifecycle
 // controller created from one validated production configuration.
 type ProductionService struct {
-	Store      *mongo.Store
-	Runtime    *Runtime
-	Controller *Controller
+	Store       *mongo.Store
+	Runtime     *Runtime
+	Controller  *Controller
+	RoleHost    *organization.Host
+	RoleRuntime *organization.InProcessRuntime
 
-	projectionInterval time.Duration
-	projectionTimeout  time.Duration
-	recoveryInterval   time.Duration
-	recoveryTimeout    time.Duration
-	recoveryAttempts   uint32
-	mu                 sync.Mutex
-	projectionCancel   context.CancelFunc
-	projectionDone     chan error
-	recoveryDone       chan error
-	failures           chan error
-	provenance         kernel.ProvenanceBasis
-	operatorToken      string
-	operatorTimeout    time.Duration
-	operatorMaxBody    int64
+	projectionInterval  time.Duration
+	projectionTimeout   time.Duration
+	recoveryInterval    time.Duration
+	recoveryTimeout     time.Duration
+	recoveryAttempts    uint32
+	mu                  sync.Mutex
+	projectionCancel    context.CancelFunc
+	projectionDone      chan error
+	recoveryDone        chan error
+	roleRecoveryDone    chan error
+	failures            chan error
+	provenance          kernel.ProvenanceBasis
+	operatorToken       string
+	operatorTimeout     time.Duration
+	operatorMaxBody     int64
+	roleReconciliation  time.Duration
+	roleMaximumRestarts uint32
 }
 
 func NewProductionService(ctx context.Context, config ProductionConfig) (*ProductionService, error) {
@@ -352,7 +403,20 @@ func NewProductionService(ctx context.Context, config ProductionConfig) (*Produc
 		_ = runtime.Close(context.WithoutCancel(ctx))
 		return fail(err)
 	}
-	return &ProductionService{Store: store, Runtime: runtime, Controller: controller, projectionInterval: resolved.projectionInterval, projectionTimeout: resolved.projectionTimeout, recoveryInterval: resolved.reconciliation, recoveryTimeout: resolved.leaseOperationTimeout, recoveryAttempts: config.Worker.MaximumReconciliations, failures: make(chan error, 3), provenance: resolved.provenance, operatorToken: resolved.operatorBearerToken, operatorTimeout: resolved.operatorTimeout, operatorMaxBody: config.Operator.MaximumBodyBytes}, nil
+	roleRuntime, err := organization.NewInProcessRuntime(organization.RoleWorkerFunc(func(ctx context.Context, _ organization.StartRoleRequest) error {
+		<-ctx.Done()
+		return ctx.Err()
+	}))
+	if err != nil {
+		_ = runtime.Close(context.WithoutCancel(ctx))
+		return fail(err)
+	}
+	roleHost, err := organization.NewHost(resolved.team, store, roleRuntime, clock, ids)
+	if err != nil {
+		_ = runtime.Close(context.WithoutCancel(ctx))
+		return fail(err)
+	}
+	return &ProductionService{Store: store, Runtime: runtime, Controller: controller, RoleHost: roleHost, RoleRuntime: roleRuntime, projectionInterval: resolved.projectionInterval, projectionTimeout: resolved.projectionTimeout, recoveryInterval: resolved.reconciliation, recoveryTimeout: resolved.leaseOperationTimeout, recoveryAttempts: config.Worker.MaximumReconciliations, failures: make(chan error, 4), provenance: resolved.provenance, operatorToken: resolved.operatorBearerToken, operatorTimeout: resolved.operatorTimeout, operatorMaxBody: config.Operator.MaximumBodyBytes, roleReconciliation: resolved.roleReconciliation, roleMaximumRestarts: config.Organization.MaximumRestarts}, nil
 }
 
 func (service *ProductionService) Submit(ctx context.Context, command kernel.KernelCommand) (kernel.CommandReceipt, error) {
@@ -451,22 +515,69 @@ func (service *ProductionService) OperatorCredentials() (string, time.Duration, 
 	return service.operatorToken, service.operatorTimeout, service.operatorMaxBody
 }
 
+func (service *ProductionService) RoleRoster(ctx context.Context) ([]organization.RoleInstanceState, error) {
+	if service == nil || service.RoleHost == nil {
+		return nil, application.ErrInvalidConfiguration
+	}
+	return service.RoleHost.Roster(ctx)
+}
+
+func (service *ProductionService) StartRole(ctx context.Context, actor kernel.ActorFQN) (organization.RoleInstanceState, error) {
+	if service == nil || service.RoleHost == nil {
+		return organization.RoleInstanceState{}, application.ErrInvalidConfiguration
+	}
+	return service.RoleHost.EnsureStarted(ctx, actor)
+}
+
+func (service *ProductionService) StopRole(ctx context.Context, actor kernel.ActorFQN) (organization.RoleInstanceState, error) {
+	if service == nil || service.RoleHost == nil {
+		return organization.RoleInstanceState{}, application.ErrInvalidConfiguration
+	}
+	return service.RoleHost.Stop(ctx, actor)
+}
+
+func (service *ProductionService) RestartRole(ctx context.Context, actor kernel.ActorFQN) (organization.RoleInstanceState, error) {
+	if service == nil || service.RoleHost == nil {
+		return organization.RoleInstanceState{}, application.ErrInvalidConfiguration
+	}
+	return service.RoleHost.Restart(ctx, actor)
+}
+
+func (service *ProductionService) PauseRole(ctx context.Context, actor kernel.ActorFQN) (organization.RoleInstanceState, error) {
+	if service == nil || service.RoleHost == nil {
+		return organization.RoleInstanceState{}, application.ErrInvalidConfiguration
+	}
+	return service.RoleHost.Pause(ctx, actor)
+}
+
+func (service *ProductionService) ResumeRole(ctx context.Context, actor kernel.ActorFQN) (organization.RoleInstanceState, error) {
+	if service == nil || service.RoleHost == nil {
+		return organization.RoleInstanceState{}, application.ErrInvalidConfiguration
+	}
+	return service.RoleHost.Resume(ctx, actor)
+}
+
 func (service *ProductionService) Start(ctx context.Context) error {
 	if service == nil {
 		return application.ErrInvalidConfiguration
 	}
 	service.mu.Lock()
 	defer service.mu.Unlock()
-	if service.Controller == nil || service.Store == nil || service.projectionCancel != nil || service.recoveryDone != nil {
+	if service.Controller == nil || service.Store == nil || service.RoleHost == nil || service.projectionCancel != nil || service.recoveryDone != nil || service.roleRecoveryDone != nil {
 		return application.ErrInvalidConfiguration
 	}
 	if err := service.Controller.Start(ctx); err != nil {
 		return err
 	}
+	if _, err := service.RoleHost.StartEager(ctx); err != nil {
+		_ = service.Controller.Stop(context.WithoutCancel(ctx))
+		return fmt.Errorf("start eager roles: %w", err)
+	}
 	projectionContext, cancel := context.WithCancel(context.Background())
 	service.projectionCancel = cancel
 	service.projectionDone = make(chan error, 1)
 	service.recoveryDone = make(chan error, 1)
+	service.roleRecoveryDone = make(chan error, 1)
 	go func() {
 		err := service.runProjector(projectionContext)
 		if err != nil && !errors.Is(err, context.Canceled) {
@@ -480,6 +591,13 @@ func (service *ProductionService) Start(ctx context.Context) error {
 			service.failures <- err
 		}
 		service.recoveryDone <- err
+	}()
+	go func() {
+		err := service.runRoleRecovery(projectionContext)
+		if err != nil && !errors.Is(err, context.Canceled) {
+			service.failures <- err
+		}
+		service.roleRecoveryDone <- err
 	}()
 	go func() {
 		select {
@@ -504,11 +622,22 @@ func (service *ProductionService) Stop(ctx context.Context) error {
 	}
 	service.mu.Lock()
 	defer service.mu.Unlock()
-	if service.Controller == nil || service.projectionCancel == nil || service.projectionDone == nil || service.recoveryDone == nil {
+	if service.Controller == nil || service.projectionCancel == nil || service.projectionDone == nil || service.recoveryDone == nil || service.roleRecoveryDone == nil {
 		return application.ErrInvalidConfiguration
 	}
 	service.projectionCancel()
 	var result error
+	if service.RoleHost != nil {
+		roster, err := service.RoleHost.Roster(ctx)
+		result = errors.Join(result, err)
+		for index := len(roster) - 1; index >= 0; index-- {
+			if roster[index].Status == organization.RoleStopped {
+				continue
+			}
+			_, err := service.RoleHost.Stop(ctx, roster[index].ActorFQN)
+			result = errors.Join(result, err)
+		}
+	}
 	switch service.Controller.Inspect().State {
 	case ControlRunning, ControlPaused, ControlFailed:
 		result = errors.Join(result, service.Controller.Stop(ctx))
@@ -529,9 +658,18 @@ func (service *ProductionService) Stop(ctx context.Context) error {
 	case <-ctx.Done():
 		result = errors.Join(result, ctx.Err())
 	}
+	select {
+	case err := <-service.roleRecoveryDone:
+		if err != nil && !errors.Is(err, context.Canceled) {
+			result = errors.Join(result, err)
+		}
+	case <-ctx.Done():
+		result = errors.Join(result, ctx.Err())
+	}
 	service.projectionCancel = nil
 	service.projectionDone = nil
 	service.recoveryDone = nil
+	service.roleRecoveryDone = nil
 	return result
 }
 
@@ -563,6 +701,53 @@ func (service *ProductionService) runProjector(ctx context.Context) error {
 // the configured attempt limit and become observable dead letters.
 func (service *ProductionService) runExpiredLeaseRecovery(ctx context.Context) error {
 	return runExpiredLeaseRecovery(ctx, service.Store, time.Now, service.recoveryInterval, service.recoveryTimeout, service.recoveryAttempts)
+}
+
+func (service *ProductionService) runRoleRecovery(ctx context.Context) error {
+	if service.RoleHost == nil || service.roleReconciliation <= 0 || service.roleMaximumRestarts == 0 {
+		return application.ErrInvalidConfiguration
+	}
+	attempts := make(map[kernel.ActorFQN]uint32)
+	for {
+		operationContext, cancel := context.WithTimeout(ctx, service.recoveryTimeout)
+		roster, err := service.RoleHost.Roster(operationContext)
+		if err == nil {
+			for _, role := range roster {
+				if role.Status == organization.RoleStopped {
+					delete(attempts, role.ActorFQN)
+					continue
+				}
+				if attempts[role.ActorFQN] >= service.roleMaximumRestarts {
+					err = fmt.Errorf("role %s exceeded restart limit %d", role.ActorFQN, service.roleMaximumRestarts)
+					break
+				}
+				_, restarted, reconcileErr := service.RoleHost.Reconcile(operationContext, role.ActorFQN)
+				if reconcileErr != nil {
+					err = reconcileErr
+					break
+				}
+				if restarted {
+					attempts[role.ActorFQN]++
+				} else if !role.StartedAt.IsZero() && time.Since(role.StartedAt) >= 3*service.roleReconciliation {
+					attempts[role.ActorFQN] = 0
+				}
+			}
+		}
+		cancel()
+		if err != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			return fmt.Errorf("recover role runtime: %w", err)
+		}
+		timer := time.NewTimer(service.roleReconciliation)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return ctx.Err()
+		case <-timer.C:
+		}
+	}
 }
 
 type expiredIntentSweeper interface {

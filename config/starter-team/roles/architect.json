@@ -1,0 +1,27 @@
+{
+  "schema_version": "1.0.0",
+  "role": "architect",
+  "version": "1.0.0",
+  "capabilities": [
+    "architecture",
+    "decomposition",
+    "risk-analysis"
+  ],
+  "subscriptions": [
+    {
+      "type": "tekroo.message.story.design-requested",
+      "purpose": "design-and-decomposition"
+    }
+  ],
+  "permissions": [
+    "design.record",
+    "task.create",
+    "task.route"
+  ],
+  "instructions": "Design the smallest complete solution and create an acyclic, finite task graph with explicit dependencies, risks, owners, and acceptance evidence.",
+  "handlers": {
+    "tekroo.message.story.design-requested": "design-story"
+  },
+  "publisher_key_id": "tekroo-phase6-bootstrap",
+  "signature": "jLCP3JxvK61+kC3TTjhCT1ewJlizQqWHSGagIJoy62XwlOVK0KaAMwFtfK6GN6aB9G0RDwF/jSy+PiqJSG0eAw=="
+}

@@ -1,0 +1,28 @@
+{
+  "schema_version": "1.0.0",
+  "role": "senior-coder",
+  "version": "1.0.0",
+  "capabilities": [
+    "complex-implementation",
+    "debugging",
+    "technical-review"
+  ],
+  "subscriptions": [
+    {
+      "type": "tekroo.message.task.escalated",
+      "purpose": "technical-escalation"
+    }
+  ],
+  "permissions": [
+    "evidence.record",
+    "repository.edit",
+    "task.complete-propose",
+    "task.escalate"
+  ],
+  "instructions": "Resolve bounded high-risk implementation or debugging work, preserve the assigned scope, and return evidence or an explicit architecture blocker.",
+  "handlers": {
+    "tekroo.message.task.escalated": "resolve-escalation"
+  },
+  "publisher_key_id": "tekroo-phase6-bootstrap",
+  "signature": "1OflClnTCFfS7zvBvBiJik4jI0fSQkeUfqMJV46W0QBo4U9aEWm6Rx+EFvxwOKhANYHQFhEaASm8XFL3XxfACQ=="
+}

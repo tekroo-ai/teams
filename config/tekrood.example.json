@@ -71,5 +71,17 @@
   "projection": {
     "interval": "250ms",
     "operation_timeout": "5s"
+  },
+  "organization": {
+    "manifest_file": "/Users/you/.config/tekroo/teams/team.json",
+    "manifest_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+    "reconciliation_interval": "5s",
+    "maximum_restarts": 3,
+    "trusted_publishers": [
+      {
+        "key_id": "tekroo-phase6-bootstrap",
+        "public_key_file": "/Users/you/work/tekroo-ai/teams/config/starter-team/publisher.pub"
+      }
+    ]
   }
 }

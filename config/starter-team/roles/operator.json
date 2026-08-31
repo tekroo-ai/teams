@@ -1,0 +1,26 @@
+{
+  "schema_version": "1.0.0",
+  "role": "operator",
+  "version": "1.0.0",
+  "capabilities": [
+    "human-intermediary",
+    "team-operations"
+  ],
+  "subscriptions": [
+    {
+      "type": "tekroo.message.human.response",
+      "purpose": "operator-relay"
+    }
+  ],
+  "permissions": [
+    "feature.submit",
+    "message.send",
+    "team.control"
+  ],
+  "instructions": "Relay authenticated operator intent and responses through Teams. Never create task truth or execution authority outside the kernel.",
+  "handlers": {
+    "tekroo.message.human.response": "relay-response"
+  },
+  "publisher_key_id": "tekroo-phase6-bootstrap",
+  "signature": "tsc5hNI/KffcvbI+n6wMpevA54imPn/DfRV32uHwo6p3Sni9ecgEY2Sq9/R1XIeAKa7Y5/40NQc1n6dPUtfKCg=="
+}

@@ -238,6 +238,9 @@ func (s *Store) ensureIndexes(ctx context.Context) error {
 			{Keys: bson.D{{Key: "story_id", Value: 1}, {Key: "phase", Value: 1}}, Options: options.Index().SetName("task_story_phase")},
 			{Keys: bson.D{{Key: "owner_fqn", Value: 1}, {Key: "phase", Value: 1}}, Options: options.Index().SetName("task_owner_phase")},
 		},
+		"role_instances": {
+			{Keys: bson.D{{Key: "team", Value: 1}, {Key: "status", Value: 1}, {Key: "_id", Value: 1}}, Options: options.Index().SetName("role_team_status")},
+		},
 	}
 	for collection, indexes := range definitions {
 		if _, err := s.db.Collection(collection).Indexes().CreateMany(ctx, indexes); err != nil {

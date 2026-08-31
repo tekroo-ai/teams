@@ -67,6 +67,28 @@
       "v3 data migration"
     ]
   },
+  "implementationUpdates": {
+    "step2": {
+      "status": "COMPLETE",
+      "featureIds": ["F001", "F002", "F003", "F004", "F005", "F006", "F007", "F008", "F009", "F010", "F011", "F012", "F013", "F014", "F015"],
+      "productionEvidence": [
+        "V4:organization/manifest.go",
+        "V4:organization/host.go",
+        "V4:organization/inprocess_runtime.go",
+        "V4:adapters/mongo/role_store.go",
+        "V4:adapters/operationalruntime/production.go",
+        "V4:config/starter-team"
+      ],
+      "testEvidence": [
+        "V4:organization/manifest_test.go",
+        "V4:organization/host_test.go",
+        "V4:organization/inprocess_runtime_test.go",
+        "V4:organization/starter_acceptance_test.go",
+        "V4:adapters/mongo/role_store_test.go",
+        "V4:adapters/operationalruntime/production_test.go"
+      ]
+    }
+  },
   "features": [
     {
       "id": "F001",
