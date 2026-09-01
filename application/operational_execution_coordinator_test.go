@@ -58,6 +58,8 @@ func TestOperationalCoordinatorExecutesOneInvocationAndNeverChainsAgentProse(t *
 
 func TestRetryExecutionBriefDirectsAgentToContinueFromRetainedState(t *testing.T) {
 	runtime := newOperationalRuntime(t)
+	retryOf := testUUID(778)
+	runtime.context.Invocation.RetryOfInvocationID = &retryOf
 	runtime.context.Invocation.RetryOrdinal = 1
 	brief, _, err := BuildExecutionBrief(runtime.context, 1<<20)
 	if err != nil {
@@ -68,6 +70,9 @@ func TestRetryExecutionBriefDirectsAgentToContinueFromRetainedState(t *testing.T
 		if !strings.Contains(guidance, required) {
 			t.Fatalf("retry guidance omitted %q: %v", required, brief.ExecutionGuidance)
 		}
+	}
+	if brief.RetryOfInvocationID == nil || *brief.RetryOfInvocationID != retryOf {
+		t.Fatalf("retry source = %v, want %s", brief.RetryOfInvocationID, retryOf)
 	}
 }
 

@@ -268,7 +268,8 @@ func (client *Client) Start(ctx context.Context, brief application.ExecutionBrie
 		return application.ExternalExecutionObservation{}, err
 	}
 	if status == http.StatusNotFound {
-		status, _, err = client.createConversation(ctx, brief, prepared)
+		var forked bool
+		status, _, forked, err = client.createOrForkConversation(ctx, brief, prepared)
 		if err != nil {
 			return application.ExternalExecutionObservation{}, err
 		}
@@ -277,6 +278,9 @@ func (client *Client) Start(ctx context.Context, brief application.ExecutionBrie
 		}
 		info, status, err = client.getConversation(ctx, conversationID)
 		if err != nil || status != http.StatusOK {
+			return application.ExternalExecutionObservation{}, ErrProtocol
+		}
+		if forked && (brief.RetryOfInvocationID == nil || info.ForkedFromConversationID != string(*brief.RetryOfInvocationID)) {
 			return application.ExternalExecutionObservation{}, ErrProtocol
 		}
 	}
@@ -321,6 +325,35 @@ func (client *Client) Start(ctx context.Context, brief application.ExecutionBrie
 			return application.ExternalExecutionObservation{}, err
 		}
 	}
+}
+
+func (client *Client) createOrForkConversation(ctx context.Context, brief application.ExecutionBrief, prepared preparedExecution) (int, []byte, bool, error) {
+	if brief.RetryOfInvocationID == nil {
+		status, body, err := client.createConversation(ctx, brief, prepared)
+		return status, body, false, err
+	}
+	priorID := string(*brief.RetryOfInvocationID)
+	prior, status, err := client.getConversation(ctx, priorID)
+	if err != nil {
+		return 0, nil, false, err
+	}
+	if status == http.StatusNotFound {
+		status, body, createErr := client.createConversation(ctx, brief, prepared)
+		return status, body, false, createErr
+	}
+	if status != http.StatusOK || prior.ID != priorID || prior.Workspace.Kind != "LocalWorkspace" || prior.Workspace.WorkingDir != prepared.workspace.WorkingDirectory || prior.Tags["tekrooinvocation"] != priorID || !kernel.Digest(prior.Tags["tekroorequest"]).Valid() || executionStillActive(prior.ExecutionStatus) {
+		return 0, nil, false, ErrProtocol
+	}
+	payload := map[string]any{
+		"id":            brief.InvocationID,
+		"reset_metrics": true,
+		"tags": map[string]string{
+			"tekrooinvocation": string(brief.InvocationID),
+			"tekroorequest":    string(prepared.requestDigest),
+		},
+	}
+	status, body, err := client.request(ctx, http.MethodPost, "/api/conversations/"+url.PathEscape(priorID)+"/fork", payload)
+	return status, body, true, err
 }
 
 func (client *Client) ReconcileStart(ctx context.Context, brief application.ExecutionBrief, requestDigest kernel.Digest) (application.ExternalExecutionObservation, error) {
@@ -444,7 +477,8 @@ func (client *Client) prepare(ctx context.Context, brief application.ExecutionBr
 		return preparedExecution{}, err
 	}
 	digest := sha256.Sum256(encoded)
-	if kernel.Digest(hex.EncodeToString(digest[:])) != requestDigest || brief.ContractManifest != kernel.ContractIdentity || brief.CoordinationRule == "" {
+	invalidRetry := brief.RetryOfInvocationID == nil && brief.RetryOrdinal != 0 || brief.RetryOfInvocationID != nil && (!brief.RetryOfInvocationID.Valid() || *brief.RetryOfInvocationID == brief.InvocationID || brief.RetryOrdinal == 0)
+	if kernel.Digest(hex.EncodeToString(digest[:])) != requestDigest || brief.ContractManifest != kernel.ContractIdentity || brief.CoordinationRule == "" || invalidRetry {
 		return preparedExecution{}, ErrProtocol
 	}
 	workspace, err := client.workspaces.ResolveWorkspace(ctx, brief.Scope)
@@ -511,11 +545,12 @@ func (client *Client) createConversation(ctx context.Context, brief application.
 }
 
 type conversationInfo struct {
-	ID              string `json:"id"`
-	ExecutionStatus string `json:"execution_status"`
-	CreatedAt       string `json:"created_at"`
-	UpdatedAt       string `json:"updated_at"`
-	Workspace       struct {
+	ID                       string `json:"id"`
+	ExecutionStatus          string `json:"execution_status"`
+	CreatedAt                string `json:"created_at"`
+	UpdatedAt                string `json:"updated_at"`
+	ForkedFromConversationID string `json:"forked_from_conversation_id"`
+	Workspace                struct {
 		Kind       string `json:"kind"`
 		WorkingDir string `json:"working_dir"`
 	} `json:"workspace"`

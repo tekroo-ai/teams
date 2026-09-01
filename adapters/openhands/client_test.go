@@ -79,6 +79,34 @@ func TestClientAcceptsFinishObservationAsFinalOutput(t *testing.T) {
 	}
 }
 
+func TestClientForksPriorConversationForRetryContinuity(t *testing.T) {
+	brief, _ := openHandsTestBrief(t)
+	priorID := kernel.UUIDv7("00000000-0000-7000-8000-000000000200")
+	brief.RetryOfInvocationID = &priorID
+	brief.RetryOrdinal = 1
+	brief.AttemptOrdinal = 2
+	brief.ExecutionGuidance = append(brief.ExecutionGuidance, "reuse the prior conversation")
+	encoded := mustJSON(brief)
+	hash := sha256.Sum256(encoded)
+	digest := kernel.Digest(hex.EncodeToString(hash[:]))
+	workspace := filepath.Join(t.TempDir(), "workspace")
+	state := &retryForkServerState{t: t, prompt: string(encoded), workspace: workspace, priorID: string(priorID), currentID: string(brief.InvocationID), requestDigest: string(digest)}
+	server := httptest.NewServer(http.HandlerFunc(state.serveHTTP))
+	defer server.Close()
+	client := newOpenHandsTestClient(t, server.URL, workspace, brief)
+
+	observation, err := client.Start(context.Background(), brief, digest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if observation.State != application.ExternalSucceeded || string(observation.Output) != "continued" {
+		t.Fatalf("observation = %#v", observation)
+	}
+	if state.forkCalls != 1 || state.createCalls != 0 || state.submitCalls != 1 {
+		t.Fatalf("fork=%d create=%d submit=%d", state.forkCalls, state.createCalls, state.submitCalls)
+	}
+}
+
 func TestClientReconcileStartReturnsAbsentWithoutSubmittingDuplicate(t *testing.T) {
 	brief, digest := openHandsTestBrief(t)
 	workspace := filepath.Join(t.TempDir(), "workspace")
@@ -283,6 +311,68 @@ type openHandsServerState struct {
 	eventPageCalls int
 	createPayload  map[string]any
 	finalAsFinish  bool
+}
+
+type retryForkServerState struct {
+	t             *testing.T
+	prompt        string
+	workspace     string
+	priorID       string
+	currentID     string
+	requestDigest string
+	forked        bool
+	submitted     bool
+	forkCalls     int
+	createCalls   int
+	submitCalls   int
+}
+
+func (state *retryForkServerState) serveHTTP(writer http.ResponseWriter, request *http.Request) {
+	if request.Header.Get("X-Session-API-Key") != "session-key" {
+		writer.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	switch {
+	case request.Method == http.MethodGet && request.URL.Path == "/api/conversations/"+state.currentID:
+		if !state.forked {
+			writer.WriteHeader(http.StatusNotFound)
+			return
+		}
+		status := "idle"
+		if state.submitted {
+			status = "finished"
+		}
+		writeJSON(writer, map[string]any{"id": state.currentID, "execution_status": status, "created_at": "2026-08-31T12:00:00Z", "forked_from_conversation_id": state.priorID, "workspace": map[string]any{"kind": "LocalWorkspace", "working_dir": state.workspace}, "tags": map[string]string{"tekrooinvocation": state.currentID, "tekroorequest": state.requestDigest}})
+	case request.Method == http.MethodGet && request.URL.Path == "/api/conversations/"+state.priorID:
+		writeJSON(writer, map[string]any{"id": state.priorID, "execution_status": "paused", "created_at": "2026-08-31T11:00:00Z", "workspace": map[string]any{"kind": "LocalWorkspace", "working_dir": state.workspace}, "tags": map[string]string{"tekrooinvocation": state.priorID, "tekroorequest": strings.Repeat("a", 64)}})
+	case request.Method == http.MethodPost && request.URL.Path == "/api/conversations/"+state.priorID+"/fork":
+		state.forkCalls++
+		var payload struct {
+			ID           string            `json:"id"`
+			ResetMetrics bool              `json:"reset_metrics"`
+			Tags         map[string]string `json:"tags"`
+		}
+		if json.NewDecoder(request.Body).Decode(&payload) != nil || payload.ID != state.currentID || !payload.ResetMetrics || payload.Tags["tekrooinvocation"] != state.currentID || payload.Tags["tekroorequest"] != state.requestDigest {
+			state.t.Errorf("fork payload = %#v", payload)
+		}
+		state.forked = true
+		writer.WriteHeader(http.StatusCreated)
+	case request.Method == http.MethodPost && request.URL.Path == "/api/conversations":
+		state.createCalls++
+		writer.WriteHeader(http.StatusCreated)
+	case request.Method == http.MethodPost && request.URL.Path == "/api/conversations/"+state.currentID+"/events":
+		state.submitCalls++
+		state.submitted = true
+		writeJSON(writer, map[string]any{"accepted": true})
+	case request.Method == http.MethodGet && request.URL.Path == "/api/conversations/"+state.currentID+"/events/search":
+		if !state.submitted {
+			writeJSON(writer, map[string]any{"items": []any{}, "next_page_id": nil})
+			return
+		}
+		writeJSON(writer, map[string]any{"items": []any{event("evt-user", "MessageEvent", "user", state.prompt), event("evt-agent", "MessageEvent", "agent", "continued")}, "next_page_id": nil})
+	default:
+		writer.WriteHeader(http.StatusNotFound)
+	}
 }
 
 func (state *openHandsServerState) serveHTTP(writer http.ResponseWriter, request *http.Request) {

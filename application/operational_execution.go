@@ -164,6 +164,7 @@ type ExecutionBrief struct {
 	Purpose                kernel.WorkPurpose          `json:"purpose"`
 	AttemptFamily          string                      `json:"attempt_family"`
 	AttemptOrdinal         uint64                      `json:"attempt_ordinal"`
+	RetryOfInvocationID    *kernel.UUIDv7              `json:"retry_of_invocation_id"`
 	RetryOrdinal           uint64                      `json:"retry_ordinal"`
 	ConditionDigest        kernel.Digest               `json:"condition_digest"`
 	OutputPredicateDigest  kernel.Digest               `json:"output_predicate_digest"`
@@ -329,6 +330,14 @@ func SemanticContextForbiddenEffects() []string {
 	return append([]string(nil), semanticContextForbiddenEffects...)
 }
 
+func cloneUUID(value *kernel.UUIDv7) *kernel.UUIDv7 {
+	if value == nil {
+		return nil
+	}
+	copy := *value
+	return &copy
+}
+
 func BuildExecutionBrief(current OperationalExecutionContext, maximumBytes int) (ExecutionBrief, kernel.Digest, error) {
 	if maximumBytes <= 0 || maximumBytes > 1<<20 {
 		return ExecutionBrief{}, "", ErrInvalidOperationalExecution
@@ -342,7 +351,7 @@ func BuildExecutionBrief(current OperationalExecutionContext, maximumBytes int) 
 		Task: current.Specification, TaskRevision: invocation.TaskRevision,
 		LifecycleEpoch: invocation.LifecycleEpoch, ScopeRevision: invocation.ScopeRevision,
 		Purpose: invocation.Purpose, AttemptFamily: invocation.AttemptFamily,
-		AttemptOrdinal: invocation.AttemptOrdinal, RetryOrdinal: invocation.RetryOrdinal,
+		AttemptOrdinal: invocation.AttemptOrdinal, RetryOfInvocationID: cloneUUID(invocation.RetryOfInvocationID), RetryOrdinal: invocation.RetryOrdinal,
 		ConditionDigest: invocation.ConditionDigest, OutputPredicateDigest: invocation.OutputPredicateDigest,
 		ToolPolicyDigest: invocation.ToolPolicyDigest, EffectPolicyDigest: invocation.EffectPolicyDigest,
 		WorkProfile: current.Profile.Profile.Clone(), AssignmentID: invocation.QualifiedAssignmentID,
