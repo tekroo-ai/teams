@@ -144,6 +144,8 @@ func run(arguments []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		body, _, err = loadCommand(operands, stdin, config.Operator.MaximumBodyBytes)
 	case "cancel":
 		method, path, body, err = loadCancellation(operands, stdin, config.Operator.MaximumBodyBytes)
+	case "retry-planning":
+		method, path, body, err = loadPlanningRecovery(operands, stdin, config.Operator.MaximumBodyBytes)
 	default:
 		err = usageError()
 	}
@@ -465,6 +467,21 @@ func loadCancellation(operands []string, stdin io.Reader, maximum int64) (string
 	return http.MethodPost, "/v1/invocations/" + operands[0] + "/cancel", raw, nil
 }
 
+func loadPlanningRecovery(operands []string, stdin io.Reader, maximum int64) (string, string, []byte, error) {
+	if len(operands) != 2 || !kernel.UUIDv7(operands[0]).Valid() {
+		return "", "", nil, usageError()
+	}
+	raw, err := loadDocument(operands[1:], stdin, maximum)
+	if err != nil {
+		return "", "", nil, err
+	}
+	var input operationalruntime.PlanningRecoveryRequest
+	if err := strictDocument(raw, &input); err != nil || !input.Valid() {
+		return "", "", nil, errors.New("planning recovery request is invalid")
+	}
+	return http.MethodPost, "/v1/invocations/" + operands[0] + "/retry-planning", raw, nil
+}
+
 func loadCommand(operands []string, stdin io.Reader, maximum int64) ([]byte, kernel.KernelCommand, error) {
 	raw, err := loadDocument(operands, stdin, maximum)
 	if err != nil {
@@ -483,5 +500,5 @@ func loadCommand(operands []string, stdin io.Reader, maximum int64) ([]byte, ker
 }
 
 func usageError() error {
-	return errors.New("usage: tekroo init-local [OPTIONS] | tekroo -config CONFIG health|status|diagnostics|federation|federation-alias NAME|federation-send ALIAS FILE|-|pause|resume|stop|feature FILE|-|feature-status ID|feature-plan ID FILE|-|feature-accept ID REVISION NO_RELEASE_REASON|feature-release ID FILE|-|human-register FILE|-|human-ask FILE|-|human-notifications [open|all]|human-respond FILE|-|human-interaction ID|roles|libraries|library-sync|role ACTOR start|stop|restart|pause|resume|inbox ACTOR|message FILE|-|message-status ID|message-trace THREAD_ID|deadletters [ACTOR]|deadletter-repair ID FILE|-|task ID|story ID|invocation ID|submit FILE|-|cancel INVOCATION_ID FILE|-")
+	return errors.New("usage: tekroo init-local [OPTIONS] | tekroo -config CONFIG health|status|diagnostics|federation|federation-alias NAME|federation-send ALIAS FILE|-|pause|resume|stop|feature FILE|-|feature-status ID|feature-plan ID FILE|-|feature-accept ID REVISION NO_RELEASE_REASON|feature-release ID FILE|-|human-register FILE|-|human-ask FILE|-|human-notifications [open|all]|human-respond FILE|-|human-interaction ID|roles|libraries|library-sync|role ACTOR start|stop|restart|pause|resume|inbox ACTOR|message FILE|-|message-status ID|message-trace THREAD_ID|deadletters [ACTOR]|deadletter-repair ID FILE|-|task ID|story ID|invocation ID|submit FILE|-|cancel INVOCATION_ID FILE|-|retry-planning INVOCATION_ID FILE|-")
 }

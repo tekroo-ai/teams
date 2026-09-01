@@ -52,6 +52,7 @@ type Service interface {
 	ReadHumanInteraction(context.Context, kernel.UUIDv7) (kernel.HumanInteractionSnapshot, error)
 	HumanNotifications(context.Context, kernel.PrincipalRef, bool) ([]organization.HumanNotification, error)
 	RequestInvocationCancellation(context.Context, kernel.PrincipalRef, kernel.UUIDv7, operationalruntime.CancellationRequest) (operationalruntime.InvocationStatus, error)
+	RetryCancelledFeaturePlanning(context.Context, kernel.PrincipalRef, kernel.UUIDv7, operationalruntime.PlanningRecoveryRequest) (operationalruntime.InvocationStatus, error)
 	FederationSnapshot() operationalruntime.FederationSnapshot
 	ResolveFederationAlias(context.Context, string) (organization.AliasBinding, organization.FederationRoute, error)
 	SendFederatedMessage(context.Context, string, organization.OrganizationalMessage) (organization.FederationDeliveryReceipt, error)
@@ -131,6 +132,8 @@ func (handler *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Requ
 		handler.invocation(writer, request, strings.TrimPrefix(request.URL.Path, "/v1/invocations/"))
 	case request.Method == http.MethodPost && strings.HasPrefix(request.URL.Path, "/v1/invocations/") && strings.HasSuffix(request.URL.Path, "/cancel"):
 		handler.cancelInvocation(writer, request, strings.TrimSuffix(strings.TrimPrefix(request.URL.Path, "/v1/invocations/"), "/cancel"))
+	case request.Method == http.MethodPost && strings.HasPrefix(request.URL.Path, "/v1/invocations/") && strings.HasSuffix(request.URL.Path, "/retry-planning"):
+		handler.retryPlanningInvocation(writer, request, strings.TrimSuffix(strings.TrimPrefix(request.URL.Path, "/v1/invocations/"), "/retry-planning"))
 	case request.Method == http.MethodGet && request.URL.Path == "/v1/roles":
 		handler.roles(writer, request)
 	case request.Method == http.MethodGet && request.URL.Path == "/v1/libraries":
@@ -238,6 +241,21 @@ func (handler *Handler) cancelInvocation(writer http.ResponseWriter, request *ht
 	status, err := handler.service.RequestInvocationCancellation(request.Context(), handler.principal, id, input)
 	if err != nil {
 		writeError(writer, http.StatusConflict, "CANCELLATION_REJECTED")
+		return
+	}
+	writeJSON(writer, http.StatusOK, status)
+}
+
+func (handler *Handler) retryPlanningInvocation(writer http.ResponseWriter, request *http.Request, value string) {
+	id := kernel.UUIDv7(value)
+	var input operationalruntime.PlanningRecoveryRequest
+	if !id.Valid() || strings.Contains(value, "/") || decodeBody(writer, request, handler.maxBody, &input) != nil || !input.Valid() {
+		writeError(writer, http.StatusBadRequest, "INVALID_PLANNING_RECOVERY_REQUEST")
+		return
+	}
+	status, err := handler.service.RetryCancelledFeaturePlanning(request.Context(), handler.principal, id, input)
+	if err != nil {
+		writeError(writer, http.StatusConflict, "PLANNING_RECOVERY_REJECTED")
 		return
 	}
 	writeJSON(writer, http.StatusOK, status)

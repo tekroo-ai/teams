@@ -105,6 +105,29 @@ func TestLoadCancellationBuildsFocusedExactInvocationRequest(t *testing.T) {
 	}
 }
 
+func TestLoadPlanningRecoveryBuildsFocusedExactInvocationRequest(t *testing.T) {
+	t.Parallel()
+	request := operationalruntime.PlanningRecoveryRequest{ExpectedRevision: 5, Reason: "correct observed planning drift", EvidenceRefs: []kernel.EvidenceRef{{EvidenceID: "018f0000-0000-7000-8000-000000000003", SHA256: kernel.Digest(strings.Repeat("a", 64))}}, IdempotencyKey: "planning-recovery-1"}
+	raw, err := json.Marshal(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "planning-recovery.json")
+	if err := os.WriteFile(path, raw, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	method, target, loaded, err := loadPlanningRecovery([]string{string(testInvocationID), path}, bytes.NewReader(nil), 4096)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if method != http.MethodPost || target != "/v1/invocations/"+string(testInvocationID)+"/retry-planning" || !bytes.Equal(loaded, raw) {
+		t.Fatalf("planning recovery method=%s target=%s", method, target)
+	}
+	if _, _, _, err := loadPlanningRecovery([]string{"not-an-invocation", path}, bytes.NewReader(nil), 4096); err == nil {
+		t.Fatal("invalid invocation accepted")
+	}
+}
+
 func TestLoadCommandRejectsUnknownAndTrailingJSON(t *testing.T) {
 	t.Parallel()
 	for _, input := range []string{

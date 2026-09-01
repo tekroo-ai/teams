@@ -132,6 +132,23 @@ func TestHandlerReportsDurableFeatureWhenMaterializationIsPending(t *testing.T) 
 	}
 }
 
+func TestHandlerRetriesCancelledPlanningOnlyWithExplicitOperatorRequest(t *testing.T) {
+	service := &operatorService{state: operationalruntime.ControlRunning}
+	handler := newTestHandler(t, service, func() {})
+	body := `{"expected_revision":5,"reason":"correct observed repository-search drift","evidence_refs":[{"evidence_id":"00000000-0000-7000-8000-000000000090","sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}],"idempotency_key":"planning-recovery-1"}`
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, authorizedRequest(http.MethodPost, "/v1/invocations/00000000-0000-7000-8000-000000000003/retry-planning", strings.NewReader(body)))
+	if response.Code != http.StatusOK || service.planningRecoveryCalls != 1 || service.planningRecovery.Reason != "correct observed repository-search drift" {
+		t.Fatalf("status=%d calls=%d request=%#v body=%s", response.Code, service.planningRecoveryCalls, service.planningRecovery, response.Body.String())
+	}
+
+	response = httptest.NewRecorder()
+	handler.ServeHTTP(response, authorizedRequest(http.MethodPost, "/v1/invocations/00000000-0000-7000-8000-000000000003/retry-planning", strings.NewReader(`{"expected_revision":5}`)))
+	if response.Code != http.StatusBadRequest || service.planningRecoveryCalls != 1 {
+		t.Fatalf("invalid status=%d calls=%d", response.Code, service.planningRecoveryCalls)
+	}
+}
+
 func newTestHandler(t *testing.T, service Service, stop func()) *Handler {
 	t.Helper()
 	handler, err := NewHandler(Config{Service: service, BearerToken: testToken, OperatorPrincipal: kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "operator"}, OperationTimeout: time.Second, MaximumBodyBytes: 4096, RequestStop: stop})
@@ -153,11 +170,13 @@ func authorizedRequest(method, target string, body *strings.Reader) *http.Reques
 }
 
 type operatorService struct {
-	state            operationalruntime.ControlState
-	submissions      int
-	lastCommand      kernel.KernelCommand
-	featurePrincipal kernel.PrincipalRef
-	featureErr       error
+	state                 operationalruntime.ControlState
+	submissions           int
+	lastCommand           kernel.KernelCommand
+	featurePrincipal      kernel.PrincipalRef
+	featureErr            error
+	planningRecoveryCalls int
+	planningRecovery      operationalruntime.PlanningRecoveryRequest
 }
 
 func (service *operatorService) Status() operationalruntime.ControlStatus {
@@ -300,6 +319,12 @@ func (service *operatorService) HumanNotifications(context.Context, kernel.Princ
 }
 
 func (service *operatorService) RequestInvocationCancellation(context.Context, kernel.PrincipalRef, kernel.UUIDv7, operationalruntime.CancellationRequest) (operationalruntime.InvocationStatus, error) {
+	return operationalruntime.InvocationStatus{}, nil
+}
+
+func (service *operatorService) RetryCancelledFeaturePlanning(_ context.Context, _ kernel.PrincipalRef, _ kernel.UUIDv7, request operationalruntime.PlanningRecoveryRequest) (operationalruntime.InvocationStatus, error) {
+	service.planningRecoveryCalls++
+	service.planningRecovery = request
 	return operationalruntime.InvocationStatus{}, nil
 }
 
