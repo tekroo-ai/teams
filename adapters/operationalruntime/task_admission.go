@@ -23,26 +23,27 @@ type trackedTask struct {
 	owner    organization.RoleInstanceState
 }
 
-func (service *ProductionService) ensureFeatureWorkBudget(ctx context.Context, feature organization.FeatureRequest, evidenceID kernel.UUIDv7, evidence []kernel.EvidenceRef, deadline time.Time) (uint64, error) {
+func (service *ProductionService) ensureFeatureWorkBudget(ctx context.Context, feature organization.FeatureRequest, evidenceID kernel.UUIDv7, evidence []kernel.EvidenceRef, deadline time.Time) (kernel.WorkBudgetAccount, error) {
 	budgetRef := kernel.AggregateRef{Kind: kernel.AggregateWorkBudget, ID: feature.BudgetAccountID}
 	snapshot, err := service.Store.LoadDecision(ctx, kernel.KernelCommand{Target: budgetRef})
 	if err != nil {
-		return 0, err
+		return kernel.WorkBudgetAccount{}, err
 	}
 	if account, found := snapshot.WorkBudgetAccounts[budgetRef]; found {
-		if !account.Valid() || account.LifecycleEpoch != feature.LifecycleEpoch || account.PolicyRevision != service.planning.PolicyRevision || account.PolicyDigest != service.planning.BudgetPolicyDigest {
-			return 0, organization.ErrInvalidFeature
+		planningStory := kernel.AggregateRef{Kind: kernel.AggregateStory, ID: deterministicOperationalUUID("feature-planning-story", string(feature.ID))}
+		if !account.Valid() || account.LifecycleEpoch != feature.LifecycleEpoch || account.RootWork != planningStory || account.PolicyRevision < service.planning.PolicyRevision || account.PolicyRevision == service.planning.PolicyRevision && account.PolicyDigest != service.planning.BudgetPolicyDigest || account.DeadlineAt.Before(deadline) {
+			return kernel.WorkBudgetAccount{}, organization.ErrInvalidFeature
 		}
-		return account.Revision, nil
+		return account, nil
 	}
 	planningStoryID := deterministicOperationalUUID("feature-planning-story", string(feature.ID))
 	storyState, storyEvent, found, err := service.Store.ReadAggregateHead(ctx, kernel.AggregateRef{Kind: kernel.AggregateStory, ID: planningStoryID})
 	if err != nil || !found || storyState.Revision == 0 {
-		return 0, errors.Join(organization.ErrInvalidFeature, err)
+		return kernel.WorkBudgetAccount{}, errors.Join(organization.ErrInvalidFeature, err)
 	}
 	modelLimit := uint64(feature.Input.MaximumTasks)*4 + uint64(feature.Input.MaximumHops) + 16
 	if modelLimit == 0 || modelLimit > 1000 {
-		return 0, organization.ErrInvalidFeature
+		return kernel.WorkBudgetAccount{}, organization.ErrInvalidFeature
 	}
 	limits := make(kernel.PurposeCounters, len(kernel.AllWorkPurposes))
 	for _, purpose := range kernel.AllWorkPurposes {
@@ -54,13 +55,21 @@ func (service *ProductionService) ensureFeatureWorkBudget(ctx context.Context, f
 		"model_invocation_limit": modelLimit, "purpose_limits": limits, "deadline_at": deadline, "evidence_ids": []kernel.UUIDv7{evidenceID}, "authority": service.policyAuthority,
 	})
 	if err != nil {
-		return 0, err
+		return kernel.WorkBudgetAccount{}, err
 	}
-	receipt, err := service.submitDeterministicCommand(ctx, feature, "tekroo.command.work-budget.create", kernel.OperationalSchemaVersion, kernel.AggregateWorkBudget, feature.BudgetAccountID, service.policyAuthority, 0, payload, []kernel.DagParent{{ParentEventID: storyEvent, EdgeKind: kernel.EdgeDerivation}}, evidence, "budget", kernel.AggregatePrecondition{Aggregate: kernel.AggregateRef{Kind: kernel.AggregateStory, ID: planningStoryID}, Expected: kernel.NewExpectedRevision(storyState.Revision)})
+	_, err = service.submitDeterministicCommand(ctx, feature, "tekroo.command.work-budget.create", kernel.OperationalSchemaVersion, kernel.AggregateWorkBudget, feature.BudgetAccountID, service.policyAuthority, 0, payload, []kernel.DagParent{{ParentEventID: storyEvent, EdgeKind: kernel.EdgeDerivation}}, evidence, "budget", kernel.AggregatePrecondition{Aggregate: kernel.AggregateRef{Kind: kernel.AggregateStory, ID: planningStoryID}, Expected: kernel.NewExpectedRevision(storyState.Revision)})
 	if err != nil {
-		return 0, err
+		return kernel.WorkBudgetAccount{}, err
 	}
-	return revisionOrOne(receipt), nil
+	snapshot, err = service.Store.LoadDecision(ctx, kernel.KernelCommand{Target: budgetRef})
+	if err != nil {
+		return kernel.WorkBudgetAccount{}, err
+	}
+	account, found := snapshot.WorkBudgetAccounts[budgetRef]
+	if !found || !account.Valid() {
+		return kernel.WorkBudgetAccount{}, organization.ErrInvalidFeature
+	}
+	return account, nil
 }
 
 func (service *ProductionService) preparePlannedTasks(ctx context.Context, feature organization.FeatureRequest, plan organization.FeaturePlan, storyEvents map[kernel.UUIDv7]kernel.UUIDv7, taskEvents map[kernel.UUIDv7]kernel.UUIDv7) error {
@@ -89,14 +98,15 @@ func (service *ProductionService) preparePlannedTasks(ctx context.Context, featu
 	if len(plan.Stories) == 0 {
 		return organization.ErrInvalidFeature
 	}
-	// Every stage and task consumes the one feature-level deadline established
-	// at intake. Re-basing it on a later plan timestamp can make a task deadline
-	// exceed its already-created budget account and must fail closed.
+	// Every stage and task consumes the durable feature budget deadline. The
+	// account begins at the intake deadline and may move only through an
+	// authorized work-budget amendment; a plan timestamp never rebases it.
 	deadline := feature.CreatedAt.Add(service.planningDeadline)
-	budgetRevision, err := service.ensureFeatureWorkBudget(ctx, feature, evidenceID, evidenceRefs, deadline)
+	budget, err := service.ensureFeatureWorkBudget(ctx, feature, evidenceID, evidenceRefs, deadline)
 	if err != nil {
 		return err
 	}
+	deadline = budget.DeadlineAt
 
 	tasks := make(map[kernel.UUIDv7]*trackedTask, len(plan.Tasks))
 	for _, item := range plan.Tasks {
@@ -127,7 +137,7 @@ func (service *ProductionService) preparePlannedTasks(ctx context.Context, featu
 			return err
 		}
 		if len(item.DependsOn) == 0 {
-			if err := service.activateTask(ctx, feature, tracked, profileConfig, workspace, budgetRevision, nil, evidenceRefs, evidenceID, nil); err != nil {
+			if err := service.activateTask(ctx, feature, tracked, profileConfig, workspace, budget.Revision, nil, evidenceRefs, evidenceID, nil); err != nil {
 				return err
 			}
 		}
@@ -291,6 +301,14 @@ func (service *ProductionService) authorizeTaskInvocationWithConditionPolicy(ctx
 	if err := service.refreshTaskExecutionBinding(ctx, feature, task, profile, workspace); err != nil {
 		return err
 	}
+	snapshot, err := service.Store.LoadDecision(ctx, kernel.KernelCommand{Target: kernel.AggregateRef{Kind: kernel.AggregateTask, ID: task.plan.ID}})
+	if err != nil {
+		return err
+	}
+	account, found := snapshot.WorkBudgetAccounts[kernel.AggregateRef{Kind: kernel.AggregateWorkBudget, ID: feature.BudgetAccountID}]
+	if !found || !account.Valid() || account.Revision != budgetRevision || task.profile.Budgets.DeadlineAt.After(account.DeadlineAt) {
+		return organization.ErrInvalidFeature
+	}
 	attemptLabel := fmt.Sprint(attempt)
 	criteria, err := json.Marshal(task.plan.AcceptanceCriteria)
 	if err != nil {
@@ -330,7 +348,7 @@ func (service *ProductionService) authorizeTaskInvocationWithConditionPolicy(ctx
 		"actor_fqn": task.owner.ActorFQN, "execution_id": task.owner.Execution.ExecutionID, "fencing_epoch": task.owner.Execution.FencingEpoch,
 		"model_profile_digest": profile.ModelProfileDigest, "runtime_identity_digest": profile.RuntimeIdentityDigest,
 		"workspace_id": workspace.WorkspaceID, "deadline_at": task.profile.Budgets.DeadlineAt,
-		"idempotency_key": idempotencyKey, "admission_policy_revision": service.planning.PolicyRevision, "admission_policy_digest": service.planning.BudgetPolicyDigest,
+		"idempotency_key": idempotencyKey, "admission_policy_revision": account.PolicyRevision, "admission_policy_digest": account.PolicyDigest,
 	})
 	if err != nil {
 		return err

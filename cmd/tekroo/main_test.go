@@ -107,7 +107,7 @@ func TestLoadCancellationBuildsFocusedExactInvocationRequest(t *testing.T) {
 
 func TestLoadPlanningRecoveryBuildsFocusedExactInvocationRequest(t *testing.T) {
 	t.Parallel()
-	request := operationalruntime.PlanningRecoveryRequest{ExpectedRevision: 5, Reason: "correct observed planning drift", EvidenceRefs: []kernel.EvidenceRef{{EvidenceID: "018f0000-0000-7000-8000-000000000003", SHA256: kernel.Digest(strings.Repeat("a", 64))}}, IdempotencyKey: "planning-recovery-1"}
+	request := operationalruntime.PlanningRecoveryRequest{ExpectedRevision: 5, Reason: "correct observed planning drift", EvidenceRefs: []kernel.EvidenceRef{{EvidenceID: "018f0000-0000-7000-8000-000000000003", SHA256: kernel.Digest(strings.Repeat("a", 64))}}, DeadlineAt: time.Date(2026, 9, 1, 15, 0, 0, 0, time.UTC), IdempotencyKey: "planning-recovery-1"}
 	raw, err := json.Marshal(request)
 	if err != nil {
 		t.Fatal(err)

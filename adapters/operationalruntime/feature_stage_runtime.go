@@ -125,10 +125,11 @@ func (service *ProductionService) ensureFeaturePlanningTask(ctx context.Context,
 		return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, err
 	}
 	deadline := feature.CreatedAt.Add(service.planningDeadline)
-	budgetRevision, err := service.ensureFeatureWorkBudget(ctx, feature, evidenceID, evidence, deadline)
+	budget, err := service.ensureFeatureWorkBudget(ctx, feature, evidenceID, evidence, deadline)
 	if err != nil {
 		return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, err
 	}
+	deadline = budget.DeadlineAt
 	planningStoryID := deterministicOperationalUUID("feature-planning-story", string(feature.ID))
 	taskID := deterministicOperationalUUID("feature-planning-task", string(feature.ID), string(stage))
 	dependsOn := []kernel.UUIDv7{}
@@ -185,7 +186,7 @@ func (service *ProductionService) ensureFeaturePlanningTask(ctx context.Context,
 	for _, parent := range parents[1:] {
 		dependencyEvents = append(dependencyEvents, parent.ParentEventID)
 	}
-	if err := service.activateTask(ctx, feature, tracked, profileConfig, workspace, budgetRevision, dependencyEvents, evidence, evidenceID, nil); err != nil {
+	if err := service.activateTask(ctx, feature, tracked, profileConfig, workspace, budget.Revision, dependencyEvents, evidence, evidenceID, nil); err != nil {
 		return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, err
 	}
 	state, head, _, err = service.Store.ReadAggregateHead(ctx, kernel.AggregateRef{Kind: kernel.AggregateTask, ID: task.ID})

@@ -135,7 +135,7 @@ func TestHandlerReportsDurableFeatureWhenMaterializationIsPending(t *testing.T) 
 func TestHandlerRetriesCancelledPlanningOnlyWithExplicitOperatorRequest(t *testing.T) {
 	service := &operatorService{state: operationalruntime.ControlRunning}
 	handler := newTestHandler(t, service, func() {})
-	body := `{"expected_revision":5,"reason":"correct observed repository-search drift","evidence_refs":[{"evidence_id":"00000000-0000-7000-8000-000000000090","sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}],"idempotency_key":"planning-recovery-1"}`
+	body := `{"expected_revision":5,"reason":"correct observed repository-search drift","evidence_refs":[{"evidence_id":"00000000-0000-7000-8000-000000000090","sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}],"deadline_at":"2026-09-01T15:00:00Z","idempotency_key":"planning-recovery-1"}`
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, authorizedRequest(http.MethodPost, "/v1/invocations/00000000-0000-7000-8000-000000000003/retry-planning", strings.NewReader(body)))
 	if response.Code != http.StatusOK || service.planningRecoveryCalls != 1 || service.planningRecovery.Reason != "correct observed repository-search drift" {

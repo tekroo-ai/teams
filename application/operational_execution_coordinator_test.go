@@ -211,6 +211,26 @@ func TestOperationalCoordinatorHonorsDurableCancellationAndRecordsTerminalEviden
 	}
 }
 
+func TestOperationalCoordinatorRecordsDeadlineCancellationAsRetryableTimeout(t *testing.T) {
+	runtime := newOperationalRuntime(t)
+	runtime.applyClaim(t)
+	runtime.applyStarted(t)
+	runtime.clock.current = runtime.context.Invocation.DeadlineAt.Add(time.Second)
+	runtime.cancelState = ExternalCancelled
+	coordinator := newTestOperationalCoordinator(t, runtime)
+
+	result, err := coordinator.Process(context.Background(), runtime.intent)
+	if err != nil || result.State != kernel.InvocationTimedOut {
+		t.Fatalf("result=%#v err=%v", result, err)
+	}
+	if runtime.cancelCalls != 1 || runtime.inspectCalls != 0 {
+		t.Fatalf("calls cancel=%d inspect=%d", runtime.cancelCalls, runtime.inspectCalls)
+	}
+	if runtime.context.Invocation.Retryable == nil || !*runtime.context.Invocation.Retryable {
+		t.Fatalf("retryable = %v", runtime.context.Invocation.Retryable)
+	}
+}
+
 func TestOperationalCoordinatorRecordsProviderTimeoutAsTerminalEvidence(t *testing.T) {
 	runtime := newOperationalRuntime(t)
 	runtime.startState = ExternalTimedOut

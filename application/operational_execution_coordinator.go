@@ -193,6 +193,11 @@ func (coordinator *OperationalExecutionCoordinator) Process(ctx context.Context,
 			}
 			outcome := terminalOutcome(observation.State)
 			if deadlineExceeded && observation.State == ExternalCancelled {
+				// A successful provider cancellation proves that the in-flight work
+				// stopped cleanly; the deadline, rather than the work product, ended
+				// this attempt. Preserve that distinction so an explicitly
+				// authorized successor can continue the task.
+				observation.Retryable = true
 				outcome = kernel.InvocationTimedOut
 			}
 			return coordinator.recordTerminalObservation(ctx, current, observation, outcome)
