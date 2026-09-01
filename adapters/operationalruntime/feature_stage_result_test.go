@@ -1,6 +1,7 @@
 package operationalruntime
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -97,7 +98,7 @@ func TestFeaturePlanningDescriptionCarriesAuthoritativeFeatureState(t *testing.T
 			}
 		}
 		if stage == stageArchitecture {
-			for _, required := range []string{"role class", "exactly one of coder, senior-coder, tester, or security", "JSON integer from 1 through 10", "arrays containing only zero-based integer task indexes", "bounded local coding model", "three or more architectural layers", "two through four causal IMPLEMENTATION tasks", "complexity no greater than 6", "read AGENTS.md", "use rg for discovery", "finish.message is the only result Teams receives", "Do not put a summary or paraphrase in finish.message", "reasoning-only task", "Do not choose or mention an actor instance, branch"} {
+			for _, required := range []string{"role class", "exactly one of coder, senior-coder, tester, or security", "JSON integer from 1 through 10", "arrays containing only zero-based integer task indexes", "IMPLEMENTATION and INVESTIGATION tasks must always use", "bounded local coding model", "three or more architectural layers", "two through six causal IMPLEMENTATION tasks", "complexity no greater than 6", "single causal order", "read AGENTS.md", "use rg for discovery", "finish.message is the only result Teams receives", "Do not put a summary or paraphrase in finish.message", "reasoning-only task", "Do not choose or mention an actor instance, branch"} {
 				if !strings.Contains(description, required) {
 					t.Fatalf("architecture schema instruction omitted %q", required)
 				}
@@ -116,6 +117,28 @@ func TestFeaturePlanningDescriptionCarriesAuthoritativeFeatureState(t *testing.T
 				}
 			}
 		}
+	}
+}
+
+func TestNormalizeArchitectureTaskRelationsSerializesImplementationAndRemovesRedundantValidationEdges(t *testing.T) {
+	tasks := []architectureTaskResult{
+		{Purpose: kernel.PurposeImplementation},
+		{Purpose: kernel.PurposeImplementation, DependsOn: []uint32{0}, Validates: []uint32{0}},
+		{Purpose: kernel.PurposeImplementation, DependsOn: []uint32{0}, Validates: []uint32{0}},
+	}
+	normalized, err := normalizeArchitectureTaskRelations(tasks)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(normalized[1].Validates) != 0 || len(normalized[2].Validates) != 0 {
+		t.Fatalf("implementation validation edges remain: %#v", normalized)
+	}
+	if !reflect.DeepEqual(normalized[2].DependsOn, []uint32{0, 1}) {
+		t.Fatalf("third task dependencies = %v", normalized[2].DependsOn)
+	}
+	invalid := []architectureTaskResult{{Purpose: kernel.PurposeImplementation}, {Purpose: kernel.PurposeImplementation, Validates: []uint32{0}}}
+	if _, err := normalizeArchitectureTaskRelations(invalid); err == nil {
+		t.Fatal("implementation validation edge without matching dependency was accepted")
 	}
 }
 
