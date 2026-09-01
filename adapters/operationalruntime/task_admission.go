@@ -372,17 +372,16 @@ func (service *ProductionService) extendTaskTechnicalRetryBudget(ctx context.Con
 	if snapshot.State == nil || snapshot.State.Revision != task.revision || !bindingFound || !binding.Valid() || binding.BudgetAccountID != feature.BudgetAccountID || !accountFound || !account.Valid() || !profileFound || !profile.Valid() {
 		return 0, organization.ErrInvalidFeature
 	}
-	limits := binding.PurposeLimits.Clone()
-	requiredPurposeLimit := binding.PurposeUsed[purpose] + 1
-	if limits[purpose] < requiredPurposeLimit {
-		limits[purpose] = requiredPurposeLimit
+	modelLimit, limits, extensionRequired, err := technicalRetryBudgetExtension(binding, account, purpose)
+	if err != nil {
+		return 0, err
 	}
-	modelLimit := binding.ModelInvocationLimit
-	if modelLimit < binding.ModelInvocationsUsed+1 {
-		modelLimit = binding.ModelInvocationsUsed + 1
-	}
-	if modelLimit > account.ModelInvocationLimit || limits[purpose] > account.PurposeLimits[purpose] {
-		return 0, organization.ErrInvalidFeature
+	// A recovery pass can be interrupted after the budget binding commits but
+	// before the replacement invocation is authorized. Treat the committed
+	// capacity as the durable checkpoint instead of submitting the same command
+	// again with a newer task revision.
+	if !extensionRequired {
+		return account.Revision, nil
 	}
 	evidenceIDs := profile.Profile.ClassificationEvidenceIDs
 	evidence, err := evidenceRefsForIDs(snapshot, evidenceIDs)
@@ -400,6 +399,26 @@ func (service *ProductionService) extendTaskTechnicalRetryBudget(ctx context.Con
 		return 0, err
 	}
 	return account.Revision, nil
+}
+
+func technicalRetryBudgetExtension(binding kernel.TaskWorkBudgetBinding, account kernel.WorkBudgetAccount, purpose kernel.WorkPurpose) (uint64, kernel.PurposeCounters, bool, error) {
+	limits := binding.PurposeLimits.Clone()
+	requiredPurposeLimit := binding.PurposeUsed[purpose] + 1
+	extensionRequired := false
+	if limits[purpose] < requiredPurposeLimit {
+		limits[purpose] = requiredPurposeLimit
+		extensionRequired = true
+	}
+	modelLimit := binding.ModelInvocationLimit
+	requiredModelLimit := binding.ModelInvocationsUsed + 1
+	if modelLimit < requiredModelLimit {
+		modelLimit = requiredModelLimit
+		extensionRequired = true
+	}
+	if modelLimit > account.ModelInvocationLimit || limits[purpose] > account.PurposeLimits[purpose] {
+		return 0, nil, false, organization.ErrInvalidFeature
+	}
+	return modelLimit, limits, extensionRequired, nil
 }
 
 func workInvocationAuthorizationCommandID(featureID, invocationID, executionID kernel.UUIDv7) kernel.UUIDv7 {

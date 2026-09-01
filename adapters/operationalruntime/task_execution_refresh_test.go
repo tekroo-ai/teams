@@ -81,6 +81,48 @@ func TestWorkInvocationAuthorizationCommandIdentityChangesWithExecution(t *testi
 	}
 }
 
+func TestTechnicalRetryBudgetExtensionUsesCommittedBindingAsCheckpoint(t *testing.T) {
+	binding := kernel.TaskWorkBudgetBinding{
+		ModelInvocationLimit: 3,
+		ModelInvocationsUsed: 3,
+		PurposeLimits:        kernel.PurposeCounters{kernel.PurposeReplan: 3},
+		PurposeUsed:          kernel.PurposeCounters{kernel.PurposeReplan: 3},
+	}
+	account := kernel.WorkBudgetAccount{
+		ModelInvocationLimit: 96,
+		PurposeLimits:        kernel.PurposeCounters{kernel.PurposeReplan: 96},
+	}
+
+	modelLimit, limits, required, err := technicalRetryBudgetExtension(binding, account, kernel.PurposeReplan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !required || modelLimit != 4 || limits[kernel.PurposeReplan] != 4 {
+		t.Fatalf("extension = model:%d purpose:%d required:%t, want 4, 4, true", modelLimit, limits[kernel.PurposeReplan], required)
+	}
+	if binding.ModelInvocationLimit != 3 || binding.PurposeLimits[kernel.PurposeReplan] != 3 {
+		t.Fatalf("extension mutated durable binding: %+v", binding)
+	}
+
+	committed := binding
+	committed.ModelInvocationLimit = modelLimit
+	committed.PurposeLimits = limits
+	modelLimit, limits, required, err = technicalRetryBudgetExtension(committed, account, kernel.PurposeReplan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if required || modelLimit != 4 || limits[kernel.PurposeReplan] != 4 {
+		t.Fatalf("committed checkpoint = model:%d purpose:%d required:%t, want 4, 4, false", modelLimit, limits[kernel.PurposeReplan], required)
+	}
+
+	exhausted := account
+	exhausted.ModelInvocationLimit = 3
+	exhausted.PurposeLimits = kernel.PurposeCounters{kernel.PurposeReplan: 3}
+	if _, _, _, err := technicalRetryBudgetExtension(binding, exhausted, kernel.PurposeReplan); !errors.Is(err, organization.ErrInvalidFeature) {
+		t.Fatalf("exhausted account error = %v", err)
+	}
+}
+
 func taskExecutionRefreshFixture(t *testing.T) (*trackedTask, ProductionProfile, ProductionWorkspace, kernel.Snapshot) {
 	t.Helper()
 	now := time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC)
