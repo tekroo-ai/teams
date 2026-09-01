@@ -412,8 +412,11 @@ func (client *Client) Inspect(ctx context.Context, brief application.ExecutionBr
 	if err != nil || promptIndex(events, prepared.prompt) < 0 {
 		return application.ExternalExecutionObservation{}, ErrProtocol
 	}
+	currentPromptIndex := promptIndex(events, prepared.prompt)
+	if command, violated := shellDisciplineViolation(events, currentPromptIndex); violated {
+		return client.failForExecutionPolicyViolation(ctx, brief, requestDigest, info, events, "SHELL_DISCIPLINE_VIOLATION", command)
+	}
 	if progressGuardApplies(brief) {
-		currentPromptIndex := promptIndex(events, prepared.prompt)
 		discoveryActions, mutationObserved := repositoryProgress(events, currentPromptIndex)
 		discoveryLimit := maximumRepositoryDiscoveryActions
 		if brief.RetryOrdinal > 0 && currentPromptIndex > 0 {
@@ -428,6 +431,86 @@ func (client *Client) Inspect(ctx context.Context, brief application.ExecutionBr
 		}
 	}
 	return client.observation(brief, requestDigest, info, events, false)
+}
+
+func shellDisciplineViolation(events []rawEvent, promptIndex int) (string, bool) {
+	for index, event := range events {
+		if index <= promptIndex || event.Kind != "ActionEvent" || event.Source != "agent" || event.ToolName != "terminal" {
+			continue
+		}
+		command := strings.TrimSpace(event.ActionCommand)
+		if violatesShellDiscipline(command) {
+			return command, true
+		}
+	}
+	return "", false
+}
+
+func violatesShellDiscipline(command string) bool {
+	command = strings.TrimSpace(command)
+	if command == "cd" || strings.HasPrefix(command, "cd ") || strings.ContainsAny(command, "\r\n") {
+		return true
+	}
+	var singleQuoted, doubleQuoted, escaped bool
+	for _, character := range command {
+		if escaped {
+			escaped = false
+			continue
+		}
+		if character == '\\' && !singleQuoted {
+			escaped = true
+			continue
+		}
+		if character == '\'' && !doubleQuoted {
+			singleQuoted = !singleQuoted
+			continue
+		}
+		if character == '"' && !singleQuoted {
+			doubleQuoted = !doubleQuoted
+			continue
+		}
+		if singleQuoted {
+			continue
+		}
+		if character == '$' || character == '`' {
+			return true
+		}
+		if !doubleQuoted && (character == ';' || character == '|' || character == '&') {
+			return true
+		}
+	}
+	return false
+}
+
+func (client *Client) failForExecutionPolicyViolation(ctx context.Context, brief application.ExecutionBrief, requestDigest kernel.Digest, info conversationInfo, events []rawEvent, reason, command string) (application.ExternalExecutionObservation, error) {
+	conversationID := string(brief.InvocationID)
+	if executionStillActive(info.ExecutionStatus) {
+		status, _, err := client.request(ctx, http.MethodPost, "/api/conversations/"+url.PathEscape(conversationID)+"/interrupt", nil)
+		if err != nil || status != http.StatusOK && status != http.StatusNoContent && status != http.StatusConflict {
+			return application.ExternalExecutionObservation{}, ErrProtocol
+		}
+		if refreshed, refreshedStatus, refreshErr := client.getConversation(ctx, conversationID); refreshErr == nil && refreshedStatus == http.StatusOK {
+			info = refreshed
+		}
+		if refreshed, refreshErr := client.events(ctx, conversationID); refreshErr == nil {
+			events = refreshed
+		}
+	}
+	observation, err := client.observation(brief, requestDigest, info, events, true)
+	if err != nil {
+		return application.ExternalExecutionObservation{}, err
+	}
+	output, err := json.Marshal(struct {
+		Reason  string `json:"reason"`
+		Command string `json:"command"`
+	}{reason, command})
+	if err != nil {
+		return application.ExternalExecutionObservation{}, err
+	}
+	observation.State = application.ExternalFailed
+	observation.Retryable = true
+	observation.Output = output
+	return observation, nil
 }
 
 func progressGuardApplies(brief application.ExecutionBrief) bool {

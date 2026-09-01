@@ -262,6 +262,7 @@ var sharedExecutionGuidance = []string{
 	"Before acting, inspect role_grounding: actor_fqn identifies this running instance, role_fqrn identifies its signed role bundle, and the bundle instructions, capabilities, and permissions define the role you must perform.",
 	"Read and follow AGENTS.md before taking repository actions.",
 	"Use rg or rg --files for repository discovery.",
+	"The authorized workspace is already the terminal working directory. Issue exactly one shell command per terminal action: do not use cd, &&, semicolons, pipes, command substitution, environment-variable expansion, or multiple commands separated by newlines.",
 	"Never repeat an identical read-only command unless repository state changed; when a search identifies a relevant file, inspect that file next.",
 	"Treat semantically equivalent searches as repeats; after locating a candidate file, inspect it instead of varying the same query.",
 	"Do not inspect or modify accepted CONTRACTS packages during ordinary implementation tasks; their immutability is already established by AGENTS.md.",

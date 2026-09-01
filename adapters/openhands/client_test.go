@@ -220,8 +220,8 @@ func TestClientInterruptsImplementationAfterTwelveReadOnlyRepositoryActions(t *t
 	// Retained regression for the observed alias-feature loop: the commands kept
 	// changing text while remaining read-only repository discovery.
 	commands := []string{
-		"ls -la && cat AGENTS.md | head -100",
-		"ls organization/ && rg -l 'ActorFQN|type Actor' organization/",
+		"rg --files",
+		"rg -l 'ActorFQN|type Actor' organization/",
 		"rg -n 'type Actor|ActorFQN|type Team' organization/*.go",
 		"rg -n 'type ActorFQN|func ParseActorFQN' kernel/*.go",
 		"sed -n '1,80p' kernel/types.go",
@@ -345,11 +345,66 @@ func TestClientProgressGuardRequiresSuccessfulMutationObservation(t *testing.T) 
 	}
 }
 
+func TestClientInterruptsCompoundShellAction(t *testing.T) {
+	brief, digest := openHandsTestBrief(t)
+	workspace := filepath.Join(t.TempDir(), "workspace")
+	tests := []struct {
+		name          string
+		terminal      bool
+		wantInterrupt int
+	}{
+		{name: "active", wantInterrupt: 1},
+		{name: "already terminal", terminal: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			events := []map[string]any{
+				event("evt-user", "MessageEvent", "user", string(mustJSON(brief))),
+				actionEvent("compound-action", "terminal", "cd /tmp && rg -n name . | head"),
+				observationEvent("compound-observation", "terminal", false, 0),
+			}
+			state := &progressGuardServerState{prompt: string(mustJSON(brief)), workspace: workspace, events: events, terminal: test.terminal}
+			server := httptest.NewServer(http.HandlerFunc(state.serveHTTP))
+			defer server.Close()
+			client := newOpenHandsTestClient(t, server.URL, workspace, brief)
+
+			observation, err := client.Inspect(context.Background(), brief, string(brief.InvocationID), digest)
+			if err != nil || observation.State != application.ExternalFailed || !observation.Retryable || state.interruptCalls != test.wantInterrupt || !strings.Contains(string(observation.Output), "SHELL_DISCIPLINE_VIOLATION") {
+				t.Fatalf("observation=%#v err=%v interrupts=%d", observation, err, state.interruptCalls)
+			}
+		})
+	}
+}
+
+func TestViolatesShellDisciplineDistinguishesQuotedLiteralsFromOperators(t *testing.T) {
+	tests := []struct {
+		command string
+		want    bool
+	}{
+		{command: "rg -n 'ActorFQN|type Actor' organization/", want: false},
+		{command: `rg -n "literal;pipe|text" organization/`, want: false},
+		{command: `printf '%s' '$HOME'`, want: false},
+		{command: `rg -n ActorFQN organization/`, want: false},
+		{command: `cd /tmp`, want: true},
+		{command: `rg -n ActorFQN organization/ | head`, want: true},
+		{command: `rg --files && pwd`, want: true},
+		{command: `rg --files; pwd`, want: true},
+		{command: `printf "%s" "$HOME"`, want: true},
+		{command: "rg --files\npwd", want: true},
+	}
+	for _, test := range tests {
+		if got := violatesShellDiscipline(test.command); got != test.want {
+			t.Fatalf("command=%q got=%t want=%t", test.command, got, test.want)
+		}
+	}
+}
+
 type progressGuardServerState struct {
 	prompt         string
 	workspace      string
 	events         []map[string]any
 	interruptCalls int
+	terminal       bool
 }
 
 func (state *progressGuardServerState) serveHTTP(writer http.ResponseWriter, request *http.Request) {
@@ -357,7 +412,9 @@ func (state *progressGuardServerState) serveHTTP(writer http.ResponseWriter, req
 	switch {
 	case request.Method == http.MethodGet && request.URL.Path == "/api/conversations/"+conversationID:
 		status := "running"
-		if state.interruptCalls > 0 {
+		if state.terminal {
+			status = "paused"
+		} else if state.interruptCalls > 0 {
 			status = "paused"
 		}
 		writeJSON(writer, map[string]any{"id": conversationID, "execution_status": status, "created_at": "2026-08-31T12:00:00Z", "workspace": map[string]any{"kind": "LocalWorkspace", "working_dir": state.workspace}, "tags": map[string]string{"tekrooinvocation": conversationID, "tekroorequest": testRequestDigest(state.prompt)}})
