@@ -100,7 +100,7 @@ func (service *ProductionService) reconcileFeaturePlan(ctx context.Context, feat
 				owner, active, ownerErr := service.RoleHost.Status(ctx, item.Owner)
 				workspace, workspaceFound := service.workspacesByID[owner.WorkspaceID]
 				profileSnapshot, profileFound := snapshot.WorkProfiles[kernel.AggregateRef{Kind: kernel.AggregateTask, ID: item.ID}]
-				if !configured || ownerErr != nil || !active || owner.Status != organization.RoleIdle || owner.Execution != latest.Execution || !workspaceFound || !profileFound || !profileSnapshot.Valid() {
+				if !configured || ownerErr != nil || !active || owner.Status != organization.RoleIdle || !workspaceFound || !profileFound || !profileSnapshot.Valid() {
 					return errors.Join(organization.ErrRoleNotRunning, ownerErr)
 				}
 				tracked := &trackedTask{plan: item, revision: state.Revision, last: heads[item.ID], profile: profileSnapshot.Profile, owner: owner}
@@ -266,7 +266,7 @@ func (service *ProductionService) reconcileValidationRounds(ctx context.Context,
 		profileConfig, configured := service.profilesByModel[validator.ModelProfile]
 		owner, active, ownerErr := service.RoleHost.Status(ctx, validator.Owner)
 		workspace, workspaceFound := service.workspacesByID[owner.WorkspaceID]
-		if !configured || ownerErr != nil || !active || owner.Status != organization.RoleIdle || owner.Execution != latest.Execution || !workspaceFound {
+		if !configured || ownerErr != nil || !active || owner.Status != organization.RoleIdle || !workspaceFound {
 			return false, errors.Join(organization.ErrRoleNotRunning, ownerErr)
 		}
 		tracked := &trackedTask{plan: validator, revision: states[validator.ID].Revision, last: heads[validator.ID], profile: profileSnapshot.Profile, owner: owner}

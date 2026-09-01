@@ -180,7 +180,7 @@ func (service *ProductionService) handleInvalidStructuredTaskOutput(ctx context.
 		if !configured || !profileFound || !profileSnapshot.Valid() || !budgetFound || !budget.Valid() {
 			return false, organization.ErrInvalidFeature
 		}
-		if !active || owner.Status != organization.RoleIdle || owner.Execution != invocation.Execution {
+		if !active || owner.Status != organization.RoleIdle {
 			return false, nil
 		}
 		workspace, workspaceFound := service.workspacesByID[owner.WorkspaceID]
@@ -276,7 +276,7 @@ func (service *ProductionService) authorizeRepairAfterFailedReview(ctx context.C
 	owner, active, ownerErr := service.RoleHost.Status(ctx, target.Owner)
 	workspace, workspaceFound := service.workspacesByID[owner.WorkspaceID]
 	budget := snapshot.WorkBudgetAccounts[kernel.AggregateRef{Kind: kernel.AggregateWorkBudget, ID: feature.BudgetAccountID}]
-	if !configured || ownerErr != nil || !active || owner.Status != organization.RoleIdle || owner.Execution != implementer.Execution || !workspaceFound || !budget.Valid() {
+	if !configured || ownerErr != nil || !active || owner.Status != organization.RoleIdle || !workspaceFound || !budget.Valid() {
 		return false, errors.Join(organization.ErrRoleNotRunning, ownerErr)
 	}
 	tracked := &trackedTask{plan: target, revision: state.Revision, last: head, profile: profileSnapshot.Profile, owner: owner}

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -283,6 +284,9 @@ func (service *ProductionService) authorizeTaskInvocationWithCondition(ctx conte
 	if attempt == 0 || attempt > limit || purpose != task.plan.Purpose && purpose != kernel.PurposeRepair || retry == nil && attempt != 1 && len(conditionDigests) == 0 || retry != nil && (purpose != retry.Purpose || attempt != retry.AttemptOrdinal+1 || retry.State != kernel.InvocationFailed && retry.State != kernel.InvocationTimedOut && retry.State != kernel.InvocationStartFailed || retry.Retryable == nil || !*retry.Retryable) {
 		return organization.ErrInvalidFeature
 	}
+	if err := service.refreshTaskExecutionBinding(ctx, feature, task, profile, workspace); err != nil {
+		return err
+	}
 	attemptLabel := fmt.Sprint(attempt)
 	criteria, err := json.Marshal(task.plan.AcceptanceCriteria)
 	if err != nil {
@@ -349,6 +353,106 @@ func (service *ProductionService) authorizeTaskInvocationWithCondition(ctx conte
 		return fmt.Errorf("%s rejected: %s", command.CommandType, receipt.ReasonCode)
 	}
 	return nil
+}
+
+type taskExecutionRefreshPlan struct {
+	assignment bool
+	scope      bool
+}
+
+func planTaskExecutionRefresh(task *trackedTask, profile ProductionProfile, workspace ProductionWorkspace, snapshot kernel.Snapshot) (taskExecutionRefreshPlan, error) {
+	if task == nil || task.plan.Owner != task.owner.ActorFQN || task.owner.WorkspaceID != workspace.WorkspaceID || task.owner.ModelProfile != task.plan.ModelProfile || task.owner.Execution.Valid() == false {
+		return taskExecutionRefreshPlan{}, organization.ErrInvalidFeature
+	}
+	taskRef := kernel.AggregateRef{Kind: kernel.AggregateTask, ID: task.plan.ID}
+	assignment, assignmentFound := snapshot.QualifiedAssignments[taskRef]
+	scope, scopeFound := snapshot.TaskOperationalScopes[taskRef]
+	profileSnapshot, profileFound := snapshot.WorkProfiles[taskRef]
+	currentExecution, executionFound := snapshot.CurrentExecutions[task.owner.ActorFQN]
+	if snapshot.State == nil || snapshot.State.Revision != task.revision || snapshot.State.Ownership.OwnerFQN == nil || *snapshot.State.Ownership.OwnerFQN != task.owner.ActorFQN || !assignmentFound || !assignment.Valid() || !scopeFound || !scope.Valid() || !profileFound || !profileSnapshot.Valid() || !executionFound || currentExecution != task.owner.Execution {
+		return taskExecutionRefreshPlan{}, organization.ErrInvalidFeature
+	}
+	if assignment.TaskID != task.plan.ID || assignment.SelectedActorFQN != task.owner.ActorFQN || assignment.WorkProfile != task.profile.Binding() || assignment.ModelProfileDigest != profile.ModelProfileDigest || assignment.RuntimeIdentityDigest != profile.RuntimeIdentityDigest || assignment.Qualification.QualificationID != profile.Qualification.QualificationID || assignment.Qualification.QualificationDigest != profile.Qualification.QualificationDigest || assignment.Qualification.QualificationCorpusDigest != profile.Qualification.QualificationCorpusDigest || assignment.Qualification.ModelProfileDigest != profile.Qualification.ModelProfileDigest || assignment.Qualification.DecisionRoute != profile.Qualification.DecisionRoute || assignment.Qualification.QualifiedRole != profile.Qualification.QualifiedRole || assignment.Qualification.Status != profile.Qualification.Status || !assignment.Qualification.ObservedAt.Equal(profile.Qualification.ObservedAt) {
+		return taskExecutionRefreshPlan{}, organization.ErrInvalidFeature
+	}
+	if scope.TaskID != task.plan.ID || scope.OwnerFQN != task.owner.ActorFQN || scope.WorkspaceID != workspace.WorkspaceID || scope.WorktreeID != workspace.WorktreeID || scope.Branch != workspace.Branch || !slices.Equal(scope.WritablePaths, sortedStrings(workspace.WritablePaths)) {
+		return taskExecutionRefreshPlan{}, organization.ErrInvalidFeature
+	}
+	return taskExecutionRefreshPlan{
+		assignment: assignment.SelectedExecution() != task.owner.Execution,
+		scope:      scope.Execution != task.owner.Execution || scope.BaselineSHA != workspace.BaselineSHA,
+	}, nil
+}
+
+func (service *ProductionService) refreshTaskExecutionBinding(ctx context.Context, feature organization.FeatureRequest, task *trackedTask, profile ProductionProfile, workspace ProductionWorkspace) error {
+	taskRef := kernel.AggregateRef{Kind: kernel.AggregateTask, ID: task.plan.ID}
+	snapshot, err := service.Store.LoadDecision(ctx, kernel.KernelCommand{Target: taskRef})
+	if err != nil {
+		return err
+	}
+	plan, err := planTaskExecutionRefresh(task, profile, workspace, snapshot)
+	if err != nil {
+		return err
+	}
+	assignment := snapshot.QualifiedAssignments[taskRef]
+	scope := snapshot.TaskOperationalScopes[taskRef]
+	if plan.assignment {
+		evidence, err := evidenceRefsForIDs(snapshot, assignment.EvidenceIDs)
+		if err != nil {
+			return err
+		}
+		payload := map[string]any{
+			"assignment_id": assignment.AssignmentID, "task_id": task.plan.ID, "expected_task_revision": task.revision,
+			"work_profile": assignment.WorkProfile, "required_decision_route": assignment.RequiredDecisionRoute,
+			"selected_decision_route": assignment.SelectedDecisionRoute, "selected_actor_fqn": task.owner.ActorFQN,
+			"selected_execution_id": task.owner.Execution.ExecutionID, "selected_fencing_epoch": task.owner.Execution.FencingEpoch,
+			"model_profile_digest": assignment.ModelProfileDigest, "runtime_identity_digest": assignment.RuntimeIdentityDigest,
+			"qualification": assignment.Qualification, "selection_policy_revision": assignment.SelectionPolicyRevision,
+			"selection_policy_digest": assignment.SelectionPolicyDigest, "hard_constraint_results": assignment.HardConstraintResults,
+			"selection_reasons": assignment.SelectionReasons, "evidence_ids": assignment.EvidenceIDs,
+		}
+		key := "assignment-execution-refresh-" + string(task.owner.Execution.ExecutionID)
+		if err := service.applyTaskCommand(ctx, feature, task, "tekroo.command.task.authorize-qualified-assignment", kernel.SchemaVersion, service.policyAuthority, payload, evidence, nil, key); err != nil {
+			return err
+		}
+	}
+	if plan.scope {
+		evidence, err := evidenceRefsForIDs(snapshot, scope.InterfaceEvidenceIDs)
+		if err != nil {
+			return err
+		}
+		payload := map[string]any{
+			"task_id": task.plan.ID, "expected_task_revision": task.revision, "lifecycle_epoch": feature.LifecycleEpoch,
+			"scope_revision": feature.ScopeRevision, "owner_fqn": task.owner.ActorFQN,
+			"execution_id": task.owner.Execution.ExecutionID, "fencing_epoch": task.owner.Execution.FencingEpoch,
+			"workspace_id": workspace.WorkspaceID, "worktree_id": workspace.WorktreeID, "branch": workspace.Branch,
+			"baseline_sha": workspace.BaselineSHA, "writable_paths": workspace.WritablePaths,
+			"interface_constraint_evidence_ids": scope.InterfaceEvidenceIDs,
+		}
+		key := "scope-execution-refresh-" + string(task.owner.Execution.ExecutionID) + "-" + workspace.BaselineSHA
+		if err := service.applyTaskCommand(ctx, feature, task, "tekroo.command.task.bind-operational-scope", kernel.OperationalSchemaVersion, service.policyAuthority, payload, evidence, nil, key); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func evidenceRefsForIDs(snapshot kernel.Snapshot, ids []kernel.UUIDv7) ([]kernel.EvidenceRef, error) {
+	refs := make([]kernel.EvidenceRef, 0, len(ids))
+	for _, id := range ids {
+		metadata, found := snapshot.Evidence[id]
+		if !found || !metadata.Available || !metadata.SHA256.Valid() {
+			return nil, organization.ErrInvalidFeature
+		}
+		refs = append(refs, kernel.EvidenceRef{EvidenceID: id, SHA256: metadata.SHA256})
+	}
+	return refs, nil
+}
+
+func sortedStrings(values []string) []string {
+	result := append([]string(nil), values...)
+	slices.Sort(result)
+	return result
 }
 
 func taskInvocationConditionDigest(profileDigest, criteriaDigest kernel.Digest, conditionDigests []kernel.Digest) (kernel.Digest, error) {
