@@ -68,6 +68,19 @@ func TestPlanTaskExecutionRefreshRejectsActorOrWorkspaceSubstitution(t *testing.
 	}
 }
 
+func TestWorkInvocationAuthorizationCommandIdentityChangesWithExecution(t *testing.T) {
+	featureID := kernel.UUIDv7("00000000-0000-7000-8000-000000000111")
+	invocationID := kernel.UUIDv7("00000000-0000-7000-8000-000000000112")
+	first := workInvocationAuthorizationCommandID(featureID, invocationID, "00000000-0000-7000-8000-000000000113")
+	replacement := workInvocationAuthorizationCommandID(featureID, invocationID, "00000000-0000-7000-8000-000000000114")
+	if first == replacement {
+		t.Fatalf("process replacement reused authorization command identity %s", first)
+	}
+	if repeated := workInvocationAuthorizationCommandID(featureID, invocationID, "00000000-0000-7000-8000-000000000114"); repeated != replacement {
+		t.Fatalf("same execution command identity = %s, want %s", repeated, replacement)
+	}
+}
+
 func taskExecutionRefreshFixture(t *testing.T) (*trackedTask, ProductionProfile, ProductionWorkspace, kernel.Snapshot) {
 	t.Helper()
 	now := time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC)

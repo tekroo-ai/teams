@@ -305,7 +305,7 @@ func (service *ProductionService) authorizeTaskInvocationWithCondition(ctx conte
 		invocationIDParts = append(invocationIDParts, string(conditionDigest))
 	}
 	invocationID := deterministicOperationalUUID(invocationIDParts...)
-	idempotencyKey := "feature:" + string(feature.ID) + ":invocation-" + string(task.plan.ID) + "-" + strings.ToLower(string(purpose)) + "-" + attemptLabel + "-" + string(conditionDigest)
+	idempotencyKey := "feature:" + string(feature.ID) + ":invocation-" + string(task.plan.ID) + "-" + strings.ToLower(string(purpose)) + "-" + attemptLabel + "-" + string(conditionDigest) + "-execution-" + string(task.owner.Execution.ExecutionID)
 	outputPredicateDigest := digestBytes([]byte("accepted-task-output\x00" + string(task.plan.ID) + "\x00" + string(criteriaDigest) + "\x00" + string(conditionDigest)))
 	var retryID *kernel.UUIDv7
 	retryOrdinal := uint64(0)
@@ -333,7 +333,7 @@ func (service *ProductionService) authorizeTaskInvocationWithCondition(ctx conte
 	}
 	command := kernel.KernelCommand{
 		ContractManifest: kernel.ContractIdentity,
-		CommandID:        deterministicOperationalUUID("command", string(feature.ID), "tekroo.command.work-invocation.authorize", string(invocationID)),
+		CommandID:        workInvocationAuthorizationCommandID(feature.ID, invocationID, task.owner.Execution.ExecutionID),
 		CommandType:      "tekroo.command.work-invocation.authorize", CommandVersion: kernel.OperationalSchemaVersion,
 		Target: kernel.AggregateRef{Kind: kernel.AggregateWorkInvocation, ID: invocationID}, Authority: service.policyAuthority,
 		ExpectedRevision: kernel.MustNotExist(),
@@ -353,6 +353,10 @@ func (service *ProductionService) authorizeTaskInvocationWithCondition(ctx conte
 		return fmt.Errorf("%s rejected: %s", command.CommandType, receipt.ReasonCode)
 	}
 	return nil
+}
+
+func workInvocationAuthorizationCommandID(featureID, invocationID, executionID kernel.UUIDv7) kernel.UUIDv7 {
+	return deterministicOperationalUUID("command", string(featureID), "tekroo.command.work-invocation.authorize", string(invocationID), string(executionID))
 }
 
 type taskExecutionRefreshPlan struct {
