@@ -38,7 +38,7 @@ func TestBoundResolversRequireExactImmutableIdentityTuple(t *testing.T) {
 		t.Fatalf("stale worktree error = %v", err)
 	}
 
-	profile := ExecutionProfile{ModelProfileDigest: digest('a'), RuntimeIdentityDigest: digest('b'), ToolPolicyDigest: digest('c'), EffectPolicyDigest: digest('d'), AgentSettings: qualifiedSMAAgentSettings, HookConfig: qualifiedSMAHookConfig, MaxIterations: 12, AgentDelegationDisabled: true}
+	profile := ExecutionProfile{ModelProfileDigest: digest('a'), RuntimeIdentityDigest: digest('b'), ToolPolicyDigest: digest('c'), EffectPolicyDigest: digest('d'), AgentSettings: qualifiedSMAAgentSettings, HookConfig: qualifiedSMAHookConfig, MaxIterations: 0, AgentDelegationDisabled: true}
 	profile.SemanticMemory = acceptedSemanticMemoryBinding(t, profile.HookConfig)
 	profiles, err := NewBoundExecutionProfileResolver([]ExecutionProfile{profile})
 	if err != nil {

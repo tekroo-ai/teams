@@ -326,7 +326,7 @@ func localProductionProfiles(manifest organization.TeamManifest) []operationalru
 		profiles = append(profiles, operationalruntime.ProductionProfile{
 			ModelProfileDigest:    role.ModelProfileDigest,
 			RuntimeIdentityDigest: labelDigest("runtime:" + localModelEndpoint + ":" + localModelIdentity + ":" + role.Role),
-			ToolPolicyDigest:      labelDigest("tool-policy:no-delegation:v1"), EffectPolicyDigest: labelDigest("effect-policy:teams-only:v1"), MaximumIterations: 24,
+			ToolPolicyDigest:      labelDigest("tool-policy:no-delegation:v1"), EffectPolicyDigest: labelDigest("effect-policy:teams-only:v1"), MaximumIterations: 0,
 			Qualification: kernel.AssignmentQualificationReceipt{
 				QualificationID: deterministicUUID("qualification:" + role.Role + fmt.Sprint(index)), QualificationDigest: kernel.Digest(acceptedQualification), QualificationCorpusDigest: kernel.Digest(acceptedCorpus),
 				ModelProfileDigest: role.ModelProfileDigest, DecisionRoute: kernel.RouteBoundedExecution, QualifiedRole: role.Role, Status: kernel.QualificationPass, ObservedAt: time.Date(2026, 8, 31, 0, 0, 0, 0, time.UTC),

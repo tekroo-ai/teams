@@ -40,19 +40,32 @@ type WorkspaceResolver interface {
 }
 
 type ExecutionProfile struct {
-	ModelProfileDigest      kernel.Digest
-	RuntimeIdentityDigest   kernel.Digest
-	ToolPolicyDigest        kernel.Digest
-	EffectPolicyDigest      kernel.Digest
-	AgentSettings           json.RawMessage
-	HookConfig              json.RawMessage
+	ModelProfileDigest    kernel.Digest
+	RuntimeIdentityDigest kernel.Digest
+	ToolPolicyDigest      kernel.Digest
+	EffectPolicyDigest    kernel.Digest
+	AgentSettings         json.RawMessage
+	HookConfig            json.RawMessage
+	// MaxIterations is a transport compatibility setting. Zero means that
+	// Teams does not impose an iteration limit; the OpenHands 1.40.1 API
+	// requires a positive integer, so the adapter encodes zero using the
+	// largest safe signed value accepted by that API.
 	MaxIterations           uint32
 	AgentDelegationDisabled bool
 	SemanticMemory          SemanticMemoryBinding
 }
 
 func (profile ExecutionProfile) valid() bool {
-	return profile.ModelProfileDigest.Valid() && profile.RuntimeIdentityDigest.Valid() && profile.ToolPolicyDigest.Valid() && profile.EffectPolicyDigest.Valid() && profile.MaxIterations > 0 && profile.AgentDelegationDisabled && jsonObject(profile.AgentSettings) && qualifiedAgentSettings(profile.AgentSettings) && jsonObject(profile.HookConfig) && !containsDelegationTool(profile.AgentSettings) && profile.SemanticMemory.valid(profile.HookConfig)
+	return profile.ModelProfileDigest.Valid() && profile.RuntimeIdentityDigest.Valid() && profile.ToolPolicyDigest.Valid() && profile.EffectPolicyDigest.Valid() && profile.AgentDelegationDisabled && jsonObject(profile.AgentSettings) && qualifiedAgentSettings(profile.AgentSettings) && jsonObject(profile.HookConfig) && !containsDelegationTool(profile.AgentSettings) && profile.SemanticMemory.valid(profile.HookConfig)
+}
+
+const openHandsOperationallyUnboundedIterations = uint32(1<<31 - 1)
+
+func openHandsIterationLimit(configured uint32) uint32 {
+	if configured == 0 {
+		return openHandsOperationallyUnboundedIterations
+	}
+	return configured
 }
 
 const (
@@ -79,7 +92,8 @@ const (
 
 // NewAcceptedExecutionProfile returns the exact OpenHands/SMA/model profile
 // accepted by Phase 3 Step 15. Callers bind only the four Teams policy digests,
-// iteration limit, and the physically separate Teams/SMA database identities.
+// iteration policy, and the physically separate Teams/SMA database identities.
+// A maximumIterations value of zero means unbounded.
 func NewAcceptedExecutionProfile(modelProfile, runtimeIdentity, toolPolicy, effectPolicy kernel.Digest, maximumIterations uint32, teamsAuthorityDatabaseIdentity, smaMemoryDatabaseIdentity string) (ExecutionProfile, error) {
 	agentSettings := json.RawMessage(qualifiedAgentSettingsJSON)
 	hookConfig := json.RawMessage(qualifiedSMAHookConfigJSON)
@@ -498,7 +512,7 @@ func (client *Client) prepare(ctx context.Context, brief application.ExecutionBr
 		return preparedExecution{}, ErrProtocol
 	}
 	profile, err := client.profiles.ResolveExecutionProfile(ctx, brief.ModelProfileDigest, brief.RuntimeIdentityDigest, brief.ToolPolicyDigest, brief.EffectPolicyDigest)
-	if err != nil || profile.ModelProfileDigest != brief.ModelProfileDigest || profile.RuntimeIdentityDigest != brief.RuntimeIdentityDigest || profile.ToolPolicyDigest != brief.ToolPolicyDigest || profile.EffectPolicyDigest != brief.EffectPolicyDigest || profile.MaxIterations == 0 || !profile.AgentDelegationDisabled || !jsonObject(profile.AgentSettings) || !qualifiedAgentSettings(profile.AgentSettings) || !jsonObject(profile.HookConfig) || containsDelegationTool(profile.AgentSettings) || !profile.SemanticMemory.valid(profile.HookConfig) || !brief.SemanticContextValid() {
+	if err != nil || profile.ModelProfileDigest != brief.ModelProfileDigest || profile.RuntimeIdentityDigest != brief.RuntimeIdentityDigest || profile.ToolPolicyDigest != brief.ToolPolicyDigest || profile.EffectPolicyDigest != brief.EffectPolicyDigest || !profile.AgentDelegationDisabled || !jsonObject(profile.AgentSettings) || !qualifiedAgentSettings(profile.AgentSettings) || !jsonObject(profile.HookConfig) || containsDelegationTool(profile.AgentSettings) || !profile.SemanticMemory.valid(profile.HookConfig) || !brief.SemanticContextValid() {
 		return preparedExecution{}, ErrProtocol
 	}
 	return preparedExecution{prompt: string(encoded), requestDigest: requestDigest, workspace: workspace, profile: profile}, nil
@@ -545,7 +559,7 @@ func (client *Client) createConversation(ctx context.Context, brief application.
 		"secrets_encrypted":      true,
 		"workspace":              map[string]any{"kind": "LocalWorkspace", "working_dir": prepared.workspace.WorkingDirectory},
 		"worktree":               false,
-		"max_iterations":         prepared.profile.MaxIterations,
+		"max_iterations":         openHandsIterationLimit(prepared.profile.MaxIterations),
 		"stuck_detection":        true,
 		"autotitle":              false,
 		"hook_config":            hookConfig,

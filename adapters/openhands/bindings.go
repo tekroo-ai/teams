@@ -63,7 +63,7 @@ func NewBoundExecutionProfileResolver(profiles []ExecutionProfile) (*BoundExecut
 	}
 	for _, profile := range profiles {
 		key := executionProfileKey{profile.ModelProfileDigest, profile.RuntimeIdentityDigest, profile.ToolPolicyDigest, profile.EffectPolicyDigest}
-		if !key.model.Valid() || !key.runtime.Valid() || !key.tool.Valid() || !key.effect.Valid() || profile.MaxIterations == 0 || !profile.AgentDelegationDisabled || !jsonObject(profile.AgentSettings) || !qualifiedAgentSettings(profile.AgentSettings) || !jsonObject(profile.HookConfig) || containsDelegationTool(profile.AgentSettings) || !profile.SemanticMemory.valid(profile.HookConfig) {
+		if !key.model.Valid() || !key.runtime.Valid() || !key.tool.Valid() || !key.effect.Valid() || !profile.AgentDelegationDisabled || !jsonObject(profile.AgentSettings) || !qualifiedAgentSettings(profile.AgentSettings) || !jsonObject(profile.HookConfig) || containsDelegationTool(profile.AgentSettings) || !profile.SemanticMemory.valid(profile.HookConfig) {
 			return nil, ErrInvalidConfiguration
 		}
 		if _, duplicate := resolver.profiles[key]; duplicate {

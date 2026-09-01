@@ -60,6 +60,18 @@ func TestClientUsesExactQualifiedOpenHandsSurfaceAndRetainsAllEventPages(t *test
 	if !ok || tags["tekrooinvocation"] != string(brief.InvocationID) || tags["tekroorequest"] != string(digest) {
 		t.Fatalf("conversation tags = %#v", state.createPayload["tags"])
 	}
+	if state.createPayload["max_iterations"] != float64(openHandsOperationallyUnboundedIterations) {
+		t.Fatalf("max iterations = %#v", state.createPayload["max_iterations"])
+	}
+}
+
+func TestOpenHandsIterationLimitPreservesExplicitBoundsAndEncodesUnbounded(t *testing.T) {
+	if got := openHandsIterationLimit(37); got != 37 {
+		t.Fatalf("explicit limit = %d", got)
+	}
+	if got := openHandsIterationLimit(0); got != openHandsOperationallyUnboundedIterations {
+		t.Fatalf("unbounded transport value = %d", got)
+	}
 }
 
 func TestClientAcceptsFinishObservationAsFinalOutput(t *testing.T) {
@@ -541,7 +553,7 @@ func newOpenHandsTestClient(t *testing.T, baseURL, workspace string, brief appli
 	client, err := NewClient(Config{
 		BaseURL: baseURL, SessionAPIKey: "session-key", HTTPClient: &http.Client{Timeout: time.Second},
 		Workspaces:   staticWorkspace{binding: WorkspaceBinding{WorkspaceID: brief.Scope.WorkspaceID, WorktreeID: brief.Scope.WorktreeID, WorkingDirectory: workspace}},
-		Profiles:     staticProfile{profile: ExecutionProfile{ModelProfileDigest: brief.ModelProfileDigest, RuntimeIdentityDigest: brief.RuntimeIdentityDigest, ToolPolicyDigest: brief.ToolPolicyDigest, EffectPolicyDigest: brief.EffectPolicyDigest, AgentSettings: qualifiedSMAAgentSettings, HookConfig: hookConfig, MaxIterations: 30, AgentDelegationDisabled: true, SemanticMemory: acceptedSemanticMemoryBinding(t, hookConfig)}},
+		Profiles:     staticProfile{profile: ExecutionProfile{ModelProfileDigest: brief.ModelProfileDigest, RuntimeIdentityDigest: brief.RuntimeIdentityDigest, ToolPolicyDigest: brief.ToolPolicyDigest, EffectPolicyDigest: brief.EffectPolicyDigest, AgentSettings: qualifiedSMAAgentSettings, HookConfig: hookConfig, MaxIterations: 0, AgentDelegationDisabled: true, SemanticMemory: acceptedSemanticMemoryBinding(t, hookConfig)}},
 		PollInterval: time.Millisecond, MaximumPages: 4, MaximumEvidenceBytes: 1 << 20,
 	})
 	if err != nil {
