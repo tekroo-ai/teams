@@ -56,7 +56,7 @@ func (service *ProductionService) reconcileFeaturePlanning(ctx context.Context) 
 			return err
 		}
 		if state.Phase != kernel.PhaseCompleted {
-			if err := service.validateFeatureStageOutput(stage, output); err != nil {
+			if err := service.validateFeatureStageOutput(feature, stage, output); err != nil {
 				if invocation.AttemptOrdinal < uint64(task.AttemptLimit) {
 					if retryErr := service.retryFeaturePlanningInvocation(ctx, feature, task, state, head, invocation, snapshot, nil, []kernel.Digest{*invocation.OutputDigest}); retryErr != nil {
 						return fmt.Errorf("feature %s %s invalid-output retry: %w", feature.ID, stage, retryErr)
@@ -309,16 +309,17 @@ func (service *ProductionService) ensureFeaturePlanningEvidence(ctx context.Cont
 	return id, []kernel.EvidenceRef{{EvidenceID: id, SHA256: digest}}, nil
 }
 
-func (service *ProductionService) validateFeatureStageOutput(stage featurePlanningStage, output []byte) error {
+func (service *ProductionService) validateFeatureStageOutput(feature organization.FeatureRequest, stage featurePlanningStage, output []byte) error {
+	allowedActorFQNs := featureAuthorizedActorFQNs(feature)
 	switch stage {
 	case stageRefinement:
-		_, err := parseRefinementStageResult(output)
+		_, err := parseRefinementStageResult(output, allowedActorFQNs...)
 		return err
 	case stageSpecification:
-		_, err := parseSpecificationStageResult(output)
+		_, err := parseSpecificationStageResult(output, allowedActorFQNs...)
 		return err
 	case stageArchitecture:
-		_, err := parseArchitectureStageResult(output)
+		_, err := parseArchitectureStageResult(output, allowedActorFQNs...)
 		return err
 	default:
 		return organization.ErrInvalidFeature
@@ -326,20 +327,21 @@ func (service *ProductionService) validateFeatureStageOutput(stage featurePlanni
 }
 
 func (service *ProductionService) applyFeatureStageOutput(ctx context.Context, feature organization.FeatureRequest, stage featurePlanningStage, invocation kernel.WorkInvocation, output []byte) error {
+	allowedActorFQNs := featureAuthorizedActorFQNs(feature)
 	preparedAt := service.clock.Now().UTC()
 	if invocation.FinishedAt != nil {
 		preparedAt = invocation.FinishedAt.UTC()
 	}
 	switch stage {
 	case stageRefinement:
-		result, err := parseRefinementStageResult(output)
+		result, err := parseRefinementStageResult(output, allowedActorFQNs...)
 		if err != nil {
 			return err
 		}
 		_, err = service.Features.Refine(ctx, feature.ID, feature.Revision, organization.FeatureRefinement{PreparedBy: invocation.ActorFQN, PreparedExecution: invocation.Execution, AcceptanceCriteria: result.AcceptanceCriteria, ClarificationQuestions: result.ClarificationQuestions, Priority: result.Priority, PreparedAt: preparedAt})
 		return err
 	case stageSpecification:
-		result, err := parseSpecificationStageResult(output)
+		result, err := parseSpecificationStageResult(output, allowedActorFQNs...)
 		if err != nil {
 			return err
 		}
@@ -350,7 +352,7 @@ func (service *ProductionService) applyFeatureStageOutput(ctx context.Context, f
 		_, err = service.Features.Specify(ctx, feature.ID, feature.Revision, organization.FeatureSpecification{PreparedBy: invocation.ActorFQN, PreparedExecution: invocation.Execution, Stories: stories, DesignConstraints: result.DesignConstraints, PreparedAt: preparedAt})
 		return err
 	case stageArchitecture:
-		result, err := parseArchitectureStageResult(output)
+		result, err := parseArchitectureStageResult(output, allowedActorFQNs...)
 		if err != nil {
 			return err
 		}

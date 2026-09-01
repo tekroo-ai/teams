@@ -41,6 +41,24 @@ func TestPreAssignmentPlanningResultsRejectOperationalIdentity(t *testing.T) {
 	}
 }
 
+func TestPreAssignmentPlanningResultsPreserveOperatorSuppliedActorFQN(t *testing.T) {
+	feature := organization.FeatureRequest{Input: organization.FeatureRequestInput{
+		Title:              "Add a local name",
+		Description:        "Start teams::coder-1 as Bob.",
+		AcceptanceCriteria: []string{"teams::coder-1 remains the authoritative identity"},
+		Constraints:        []string{"Do not assign a different actor"},
+	}}
+	allowed := featureAuthorizedActorFQNs(feature)
+	refinement := []byte(application.OrganizationalResultMarker + "\n{\"schema_version\":\"1.0.0\",\"result_type\":\"FEATURE_REFINEMENT\",\"acceptance_criteria\":[\"teams::coder-1 remains the authoritative identity\"],\"clarification_questions\":[],\"priority\":\"HIGH\"}")
+	if _, err := parseRefinementStageResult(refinement, allowed...); err != nil {
+		t.Fatalf("operator-supplied FQN was rejected: %v", err)
+	}
+	invented := []byte(application.OrganizationalResultMarker + "\n{\"schema_version\":\"1.0.0\",\"result_type\":\"FEATURE_REFINEMENT\",\"acceptance_criteria\":[\"teams::coder-2 performs the work\"],\"clarification_questions\":[],\"priority\":\"HIGH\"}")
+	if _, err := parseRefinementStageResult(invented, allowed...); err == nil {
+		t.Fatal("model-invented FQN was accepted")
+	}
+}
+
 func TestFeaturePlanningDescriptionCarriesAuthoritativeFeatureState(t *testing.T) {
 	feature := organization.FeatureRequest{
 		ID: "00000000-0000-7000-8000-000000000101",
