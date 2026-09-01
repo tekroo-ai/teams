@@ -64,7 +64,11 @@ func (service *ProductionService) RetryFailedTask(ctx context.Context, principal
 	if err != nil || !sameEvidenceSet(registered, request.EvidenceRefs) {
 		return InvocationStatus{}, errors.Join(organization.ErrInvalidFeature, err)
 	}
-	successorProfile, profileBound, err := planningRecoveryProfile(profileSnapshot.Profile, terminal.WorkProfile, service.planning, recoveryCondition, deadline, evidenceIDs)
+	profileEvidenceIDs := recoveryProfileEvidenceIDs(terminal, evidenceIDs)
+	if _, err := evidenceRefsForIDs(snapshot, profileEvidenceIDs); err != nil {
+		return InvocationStatus{}, err
+	}
+	successorProfile, profileBound, err := planningRecoveryProfile(profileSnapshot.Profile, terminal.WorkProfile, service.planning, recoveryCondition, deadline, profileEvidenceIDs)
 	if err != nil {
 		return InvocationStatus{}, err
 	}

@@ -142,6 +142,23 @@ func TestChangedConditionAllowsOnlyEvidenceBoundOperatorRecovery(t *testing.T) {
 	if !decision.Accepted {
 		t.Fatalf("retryable failed operator recovery = %#v", decision)
 	}
+	intermediateProfileID := fixture.profile.Profile.ProfileID
+	fixture.profile.Profile.ProfileID = UUIDv7("00000000-0000-7000-8000-000000000954")
+	fixture.profile.Profile.ProfileRevision++
+	fixture.profile.Profile.ProfileDigest = Digest("abababababababababababababababababababababababababababababababab")
+	fixture.profile.Profile.SupersedesProfileID = &intermediateProfileID
+	fixture.assignment.WorkProfile = fixture.profile.Profile.Binding()
+	value = fixture.authorizationObject(t, fixture.invocationID, nextCondition, &prior.ID, prior.RetryOrdinal+1)
+	value["attempt_ordinal"] = float64(prior.AttemptOrdinal + 1)
+	value["deadline_at"] = fixture.account.DeadlineAt.Format(time.RFC3339)
+	payload, err = json.Marshal(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decision = PlanWorkInvocationAuthorization(payload, fixture.task, fixture.account, fixture.binding, fixture.scope, fixture.profile, fixture.assignment, fixture.execution, invocations, fixture.now, fixture.eventID)
+	if !decision.Accepted {
+		t.Fatalf("recovery after durable intermediate profile = %#v", decision)
+	}
 	notRetryable := false
 	prior.Retryable = &notRetryable
 	invocations[prior.Ref()] = prior

@@ -82,7 +82,11 @@ func (service *ProductionService) RetryCancelledFeaturePlanning(ctx context.Cont
 	if err != nil || !sameEvidenceSet(registered, request.EvidenceRefs) {
 		return InvocationStatus{}, errors.Join(organization.ErrInvalidFeature, err)
 	}
-	successorProfile, profileBound, err := planningRecoveryProfile(profileSnapshot.Profile, terminal.WorkProfile, service.planning, recoveryCondition, deadline, evidenceIDs)
+	profileEvidenceIDs := recoveryProfileEvidenceIDs(terminal, evidenceIDs)
+	if _, err := evidenceRefsForIDs(snapshot, profileEvidenceIDs); err != nil {
+		return InvocationStatus{}, err
+	}
+	successorProfile, profileBound, err := planningRecoveryProfile(profileSnapshot.Profile, terminal.WorkProfile, service.planning, recoveryCondition, deadline, profileEvidenceIDs)
 	if err != nil {
 		return InvocationStatus{}, err
 	}
@@ -200,17 +204,39 @@ func planningRecoveryProfile(current kernel.WorkRiskProfile, prior kernel.WorkPr
 	targetID := deterministicOperationalUUID("planning-recovery-profile", string(prior.ProfileID), string(condition))
 	targetRevision := prior.ProfileRevision + 1
 	if current.Binding() != prior {
-		if current.ProfileID != targetID || current.ProfileRevision != targetRevision || current.SupersedesProfileID == nil || *current.SupersedesProfileID != prior.ProfileID || current.ClassificationPolicyRevision != planning.PolicyRevision || current.ClassificationPolicyDigest != planning.ClassificationPolicyDigest || current.PromotionPolicyRevision != planning.PolicyRevision || current.PromotionPolicyDigest != planning.PromotionPolicyDigest || current.VerificationTopologyDigest != planning.VerificationTopologyDigest || !current.Budgets.DeadlineAt.Equal(deadline) || !containsEveryUUID(current.ClassificationEvidenceIDs, evidenceIDs) {
+		completionID := deterministicOperationalUUID("planning-recovery-profile-completion", string(targetID), string(condition))
+		if current.ProfileID == completionID && current.ProfileRevision == targetRevision+1 && current.SupersedesProfileID != nil && *current.SupersedesProfileID == targetID && current.ClassificationPolicyRevision == planning.PolicyRevision && current.ClassificationPolicyDigest == planning.ClassificationPolicyDigest && current.PromotionPolicyRevision == planning.PolicyRevision && current.PromotionPolicyDigest == planning.PromotionPolicyDigest && current.VerificationTopologyDigest == planning.VerificationTopologyDigest && current.Budgets.DeadlineAt.Equal(deadline) && containsEveryUUID(current.ClassificationEvidenceIDs, evidenceIDs) && planningRecoveryProfileDigestMatches(current) {
+			return current, true, nil
+		}
+		if current.ProfileID != targetID || current.ProfileRevision != targetRevision || current.SupersedesProfileID == nil || *current.SupersedesProfileID != prior.ProfileID || current.ClassificationPolicyRevision != planning.PolicyRevision || current.ClassificationPolicyDigest != planning.ClassificationPolicyDigest || current.PromotionPolicyRevision != planning.PolicyRevision || current.PromotionPolicyDigest != planning.PromotionPolicyDigest || current.VerificationTopologyDigest != planning.VerificationTopologyDigest || !current.Budgets.DeadlineAt.Equal(deadline) {
 			return kernel.WorkRiskProfile{}, false, organization.ErrInvalidFeature
 		}
-		claimedDigest := current.ProfileDigest
-		current.ProfileDigest = ""
-		encoded, err := json.Marshal(current)
-		if err != nil || digestBytes(encoded) != claimedDigest {
-			return kernel.WorkRiskProfile{}, false, errors.Join(organization.ErrInvalidFeature, err)
+		if !planningRecoveryProfileDigestMatches(current) {
+			return kernel.WorkRiskProfile{}, false, organization.ErrInvalidFeature
 		}
-		current.ProfileDigest = claimedDigest
-		return current, true, nil
+		if containsEveryUUID(current.ClassificationEvidenceIDs, evidenceIDs) {
+			return current, true, nil
+		}
+		completed := current.Clone()
+		completed.ProfileID = completionID
+		completed.ProfileRevision = current.ProfileRevision + 1
+		currentID := current.ProfileID
+		completed.SupersedesProfileID = &currentID
+		completed.ClassificationEvidenceIDs = append(completed.ClassificationEvidenceIDs, evidenceIDs...)
+		sort.Slice(completed.ClassificationEvidenceIDs, func(left, right int) bool {
+			return completed.ClassificationEvidenceIDs[left] < completed.ClassificationEvidenceIDs[right]
+		})
+		completed.ClassificationEvidenceIDs = uniqueUUIDs(completed.ClassificationEvidenceIDs)
+		completed.ProfileDigest = ""
+		encoded, err := json.Marshal(completed)
+		if err != nil {
+			return kernel.WorkRiskProfile{}, false, err
+		}
+		completed.ProfileDigest = digestBytes(encoded)
+		if !completed.Valid() {
+			return kernel.WorkRiskProfile{}, false, organization.ErrInvalidFeature
+		}
+		return completed, false, nil
 	}
 	next := current.Clone()
 	next.ProfileID = targetID
@@ -238,6 +264,19 @@ func planningRecoveryProfile(current kernel.WorkRiskProfile, prior kernel.WorkPr
 		return kernel.WorkRiskProfile{}, false, organization.ErrInvalidFeature
 	}
 	return next, false, nil
+}
+
+func planningRecoveryProfileDigestMatches(profile kernel.WorkRiskProfile) bool {
+	claimed := profile.ProfileDigest
+	profile.ProfileDigest = ""
+	encoded, err := json.Marshal(profile)
+	return err == nil && digestBytes(encoded) == claimed
+}
+
+func recoveryProfileEvidenceIDs(terminal kernel.WorkInvocation, requested []kernel.UUIDv7) []kernel.UUIDv7 {
+	result := append(append([]kernel.UUIDv7(nil), requested...), terminal.TerminalEvidenceIDs...)
+	sort.Slice(result, func(left, right int) bool { return result[left] < result[right] })
+	return uniqueUUIDs(result)
 }
 
 func (service *ProductionService) amendPlanningRecoveryBudget(ctx context.Context, principal kernel.PrincipalRef, feature organization.FeatureRequest, terminal kernel.WorkInvocation, account kernel.WorkBudgetAccount, request PlanningRecoveryRequest, condition kernel.Digest, evidence []kernel.EvidenceRef) (kernel.WorkBudgetAccount, error) {

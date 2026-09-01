@@ -658,7 +658,7 @@ func validChangedConditionContinuation(value invocationAuthorizationPayload, pro
 			break
 		}
 	}
-	if !found || !prior.Valid() || prior.TaskID != value.TaskID || prior.Purpose != value.Purpose || value.AttemptOrdinal != prior.AttemptOrdinal+1 || value.RetryOrdinal != prior.RetryOrdinal+1 || value.ConditionDigest == prior.ConditionDigest || *profile.SupersedesProfileID != prior.WorkProfile.ProfileID || profile.ProfileRevision != prior.WorkProfile.ProfileRevision+1 || value.WorkProfile != profile.Binding() || !value.DeadlineAt.After(prior.DeadlineAt) || !profile.Budgets.DeadlineAt.Equal(value.DeadlineAt) || account.PolicyRevision <= prior.AdmissionPolicyRevision || len(prior.TerminalEvidenceIDs) == 0 {
+	if !found || !prior.Valid() || prior.TaskID != value.TaskID || prior.Purpose != value.Purpose || value.AttemptOrdinal != prior.AttemptOrdinal+1 || value.RetryOrdinal != prior.RetryOrdinal+1 || value.ConditionDigest == prior.ConditionDigest || profile.ProfileRevision <= prior.WorkProfile.ProfileRevision || value.WorkProfile != profile.Binding() || !value.DeadlineAt.After(prior.DeadlineAt) || !profile.Budgets.DeadlineAt.Equal(value.DeadlineAt) || account.PolicyRevision <= prior.AdmissionPolicyRevision || len(prior.TerminalEvidenceIDs) == 0 {
 		return false
 	}
 	recoverable := prior.State == InvocationTimedOut ||

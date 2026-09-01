@@ -71,6 +71,49 @@ func TestPlanningRecoveryProfileSupersedesDeadlineAndIsIdempotent(t *testing.T) 
 	}
 }
 
+func TestPlanningRecoveryProfileCompletesDurablePartialBinding(t *testing.T) {
+	tracked, _, _, _ := taskExecutionRefreshFixture(t)
+	prior := tracked.profile.Binding()
+	deadline := tracked.profile.Budgets.DeadlineAt.Add(time.Hour)
+	firstEvidence := kernel.UUIDv7("00000000-0000-7000-8000-000000000304")
+	terminalEvidence := kernel.UUIDv7("00000000-0000-7000-8000-000000000305")
+	condition := repeatedDigest('c')
+	planning := ProductionPlanning{PolicyRevision: 2, ClassificationPolicyDigest: repeatedDigest('d'), PromotionPolicyDigest: repeatedDigest('e'), VerificationTopologyDigest: repeatedDigest('f')}
+
+	partial, _, err := planningRecoveryProfile(tracked.profile, prior, planning, condition, deadline, []kernel.UUIDv7{firstEvidence})
+	if err != nil {
+		t.Fatal(err)
+	}
+	completed, alreadyBound, err := planningRecoveryProfile(partial, prior, planning, condition, deadline, []kernel.UUIDv7{firstEvidence, terminalEvidence})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if alreadyBound || completed.ProfileRevision != partial.ProfileRevision+1 || completed.SupersedesProfileID == nil || *completed.SupersedesProfileID != partial.ProfileID || !containsEveryUUID(completed.ClassificationEvidenceIDs, []kernel.UUIDv7{firstEvidence, terminalEvidence}) {
+		t.Fatalf("completed = %#v alreadyBound=%t", completed, alreadyBound)
+	}
+	reloaded, alreadyBound, err := planningRecoveryProfile(completed, prior, planning, condition, deadline, []kernel.UUIDv7{firstEvidence, terminalEvidence})
+	if err != nil || !alreadyBound || reloaded.ProfileDigest != completed.ProfileDigest {
+		t.Fatalf("reloaded = %#v alreadyBound=%t err=%v", reloaded, alreadyBound, err)
+	}
+}
+
+func TestRecoveryProfileEvidenceIncludesEveryTerminalReceipt(t *testing.T) {
+	terminal := recoveryTerminalFixture(kernel.InvocationFailed, boolPointer(true), nil)
+	terminal.TerminalEvidenceIDs = []kernel.UUIDv7{
+		"00000000-0000-7000-8000-000000000306",
+		"00000000-0000-7000-8000-000000000307",
+	}
+	result := recoveryProfileEvidenceIDs(terminal, []kernel.UUIDv7{
+		"00000000-0000-7000-8000-000000000305",
+		"00000000-0000-7000-8000-000000000306",
+	})
+	if len(result) != 3 || result[0] != "00000000-0000-7000-8000-000000000305" || result[2] != "00000000-0000-7000-8000-000000000307" {
+		t.Fatalf("evidence ids = %v", result)
+	}
+}
+
+func boolPointer(value bool) *bool { return &value }
+
 func TestFeatureBudgetPolicyAcceptsOnlyExpiredPredecessorForRecovery(t *testing.T) {
 	now := time.Date(2026, 9, 1, 16, 0, 0, 0, time.UTC)
 	planning := ProductionPlanning{PolicyRevision: 2, BudgetPolicyDigest: repeatedDigest('b')}
