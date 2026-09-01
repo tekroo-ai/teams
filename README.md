@@ -62,7 +62,8 @@ Initialize a fresh deployment with the installed CLI:
   -repository /absolute/path/to/repository \
   -openhands-key /absolute/path/to/openhands-api-key \
   -sma-hook /absolute/path/to/sma_context_hook.py \
-  -tekrood /absolute/install/root/bin/tekrood
+  -tekrood /absolute/install/root/bin/tekrood \
+  -branch-prefix tekroo/
 ```
 
 Initialization fails closed if the deployment root is nonempty, the source has
@@ -70,6 +71,9 @@ tracked changes, a role branch already exists, MongoDB or the operator endpoint
 is not loopback, Teams and SMA database identities overlap, required accepted
 assets are missing, or the generated production configuration does not pass the
 same loader used by `tekrood`.
+
+Use a different valid branch prefix when two preserved deployments must share
+one repository; initialization never overwrites an existing deployment branch.
 
 The command creates deployment-owned secrets and provenance, copies the signed
 starter role library, creates isolated role worktrees, installs the accepted

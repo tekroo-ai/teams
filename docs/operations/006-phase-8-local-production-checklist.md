@@ -8,11 +8,11 @@
 - [x] Bind the accepted OpenHands/model/SMA profile without granting SMA Teams
   authority.
 - [x] Generate a disabled-by-default LaunchAgent definition.
-- [ ] Install current `tekrood` and `tekroo` binaries locally.
-- [ ] Initialize one fresh local deployment.
-- [ ] Verify MongoDB, OpenHands, exact model, and SMA endpoints.
-- [ ] Start `tekrood` and verify health, status, roles, and diagnostics.
-- [ ] Complete one bounded operator feature smoke run.
-- [ ] Restart and verify durable continuity.
-- [ ] Run final normal and Mongo integration regression suites.
-- [ ] Publish Phase 8 acceptance and commit the completed work.
+- [x] Install current `tekrood` and `tekroo` binaries locally.
+- [x] Initialize one fresh local deployment.
+- [x] Verify MongoDB, OpenHands, exact model, and SMA endpoints.
+- [x] Start `tekrood` and verify health, status, roles, and diagnostics.
+- [x] Complete one bounded operator feature smoke run.
+- [x] Restart and verify durable continuity.
+- [x] Run final normal and Mongo integration regression suites.
+- [x] Publish Phase 8 acceptance and commit the completed work.

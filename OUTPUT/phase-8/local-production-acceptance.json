@@ -1,0 +1,53 @@
+{
+  "schemaVersion": "1.0.0",
+  "phase": "PHASE_8_LOCAL_PRODUCTION",
+  "status": "ACCEPTED",
+  "source": {
+    "commit": "2b3f6b9a820e0a79be6b4af54afce48b6901c767",
+    "tree": "929a5cff88b464003d68b30296cd9414bfb62c08"
+  },
+  "deployment": {
+    "root": "/Users/paul/.local/share/tekroo/teams-v4-final",
+    "teamsDatabase": "tekroo_teams_v4_prod_final",
+    "smaDatabase": "sma",
+    "operatorAddress": "127.0.0.1:8788",
+    "branchPrefix": "tekroo-prod/",
+    "workspaceCount": 13,
+    "automaticStartup": false
+  },
+  "dependencies": {
+    "mongoReplicaSetStatus": 1,
+    "openHandsHealth": "ok",
+    "model": "ddalcu--Qwen3.8-27B-MLX-Serve-8bit",
+    "modelState": "ready",
+    "smaBridgeLoopbackPort": 8130
+  },
+  "operatingProof": {
+    "featureId": "01a05ce6-94e5-73a8-b452-805107167589",
+    "featureRevision": 6,
+    "featureStatus": "ACCEPTED",
+    "implementationTaskId": "8f55c5e7-d8b7-71c4-873a-6e3663c6914e",
+    "validationTaskId": "c1daf06b-05a2-71bb-86b1-e0e7c60165f3",
+    "acceptanceTaskId": "3af7b1dd-1c50-7b81-8e73-ebc9e4b7b1dd",
+    "implementationCommit": "8f8f45f0cf1e78e28d9c6444422804376b0e0e80",
+    "implementationValidation": "PASS",
+    "productAcceptance": "PASS",
+    "restartRecovery": "PASS"
+  },
+  "verification": {
+    "normalGoTests": "PASS",
+    "mongoIntegrationTests": "PASS",
+    "focusedRaceTests": "PASS",
+    "goVet": "PASS",
+    "contractStructure": "PASS 3642",
+    "contractStructureResultSHA256": "8a40edfddb4a8bb82cb31d45f8db367ee352c56b641dc38cdfa3060b7a83e35f",
+    "contractReference": "PASS 297",
+    "contractReferenceResultSHA256": "16c3f5e42d0e27890f5a213a3824bad89d2662649177c3dec1dfa19ae6dcc662"
+  },
+  "preservation": {
+    "diagnosticDeployment": "PRESERVED",
+    "v3Migration": "NOT_RUN",
+    "smaModification": "NOT_RUN",
+    "publicNetworkDeployment": "NOT_RUN"
+  }
+}

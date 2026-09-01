@@ -35,11 +35,13 @@ not configure automatic startup.
   -mongo-uri mongodb://127.0.0.1:27017 \
   -database tekroo_teams_v4_prod \
   -sma-database sma \
-  -operator-address 127.0.0.1:8787
+  -operator-address 127.0.0.1:8787 \
+  -branch-prefix tekroo/
 ```
 
 The root must be absent or empty. The command will not merge, overwrite, or
-adopt an existing deployment.
+adopt an existing deployment. Use a distinct valid branch prefix to preserve
+multiple deployments against the same repository.
 
 ## Dependency check
 
