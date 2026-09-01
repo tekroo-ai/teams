@@ -206,6 +206,23 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	priorPolicyRevision := service.provenance.PolicyRevision
+	service.provenance.PolicyRevision++
+	existingPlanningStory, err := service.ensureFeaturePlanningStory(contextWithTimeout(t), automated)
+	service.provenance.PolicyRevision = priorPolicyRevision
+	if err != nil || existingPlanningStory != planningStory {
+		t.Fatalf("resume existing planning story after policy revision: event=%s want=%s err=%v", existingPlanningStory, planningStory, err)
+	}
+	planningEvidenceID, planningEvidence, err := service.ensureFeaturePlanningEvidence(contextWithTimeout(t), automated)
+	if err != nil {
+		t.Fatal(err)
+	}
+	service.provenance.PolicyRevision++
+	existingEvidenceID, existingEvidence, err := service.ensureFeaturePlanningEvidence(contextWithTimeout(t), automated)
+	service.provenance.PolicyRevision = priorPolicyRevision
+	if err != nil || existingEvidenceID != planningEvidenceID || len(existingEvidence) != 1 || len(planningEvidence) != 1 || existingEvidence[0] != planningEvidence[0] {
+		t.Fatalf("resume existing planning evidence after policy revision: id=%s want=%s evidence=%v want_evidence=%v err=%v", existingEvidenceID, planningEvidenceID, existingEvidence, planningEvidence, err)
+	}
 	refinementTaskID := deterministicOperationalUUID("feature-planning-task", string(automated.ID), string(stageRefinement))
 	if _, err := service.submitPlannedCommand(contextWithTimeout(t), automated, "tekroo.command.task.create", kernel.AggregateTask, refinementTaskID, "planning-task-"+string(stageRefinement), mustJSON(map[string]any{
 		"story_id":            deterministicOperationalUUID("feature-planning-story", string(automated.ID)),
@@ -213,7 +230,7 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 		"description":         "A prior binary created this durable task with an older planning prompt.",
 		"acceptance_criteria": []string{"requirements are testable and ambiguities are explicit"},
 		"depends_on":          []kernel.UUIDv7{},
-	}), []kernel.DagParent{{ParentEventID: planningStory.EventIDs[0], EdgeKind: kernel.EdgeCausal}}); err != nil {
+	}), []kernel.DagParent{{ParentEventID: planningStory, EdgeKind: kernel.EdgeCausal}}); err != nil {
 		t.Fatal(err)
 	}
 	for _, expected := range []struct {

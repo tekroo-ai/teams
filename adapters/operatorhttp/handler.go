@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -255,6 +256,7 @@ func (handler *Handler) retryPlanningInvocation(writer http.ResponseWriter, requ
 	}
 	status, err := handler.service.RetryCancelledFeaturePlanning(request.Context(), handler.principal, id, input)
 	if err != nil {
+		log.Printf("planning recovery rejected invocation=%s: %v", id, err)
 		writeError(writer, http.StatusConflict, "PLANNING_RECOVERY_REJECTED")
 		return
 	}

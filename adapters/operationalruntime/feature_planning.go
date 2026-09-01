@@ -166,17 +166,35 @@ func mustJSON(value any) []byte {
 	return encoded
 }
 
-func (service *ProductionService) ensureFeaturePlanningStory(ctx context.Context, feature organization.FeatureRequest) (kernel.CommandReceipt, error) {
+func (service *ProductionService) ensureFeaturePlanningStory(ctx context.Context, feature organization.FeatureRequest) (kernel.UUIDv7, error) {
 	id := deterministicOperationalUUID("feature-planning-story", string(feature.ID))
+	ref := kernel.AggregateRef{Kind: kernel.AggregateStory, ID: id}
+	state, head, found, err := service.Store.ReadAggregateHead(ctx, ref)
+	if err != nil {
+		return "", err
+	}
+	if found {
+		if state.Revision == 0 || !head.Valid() {
+			return "", organization.ErrInvalidFeature
+		}
+		return head, nil
+	}
 	payload, err := json.Marshal(map[string]any{
 		"title":               "Plan feature: " + feature.Input.Title,
 		"description":         feature.Input.Description,
 		"acceptance_criteria": feature.Input.AcceptanceCriteria,
 	})
 	if err != nil {
-		return kernel.CommandReceipt{}, err
+		return "", err
 	}
-	return service.submitPlannedCommand(ctx, feature, "tekroo.command.story.create", kernel.AggregateStory, id, "planning-story", payload, nil)
+	receipt, err := service.submitPlannedCommand(ctx, feature, "tekroo.command.story.create", kernel.AggregateStory, id, "planning-story", payload, nil)
+	if err != nil {
+		return "", err
+	}
+	if len(receipt.EventIDs) != 1 || !receipt.EventIDs[0].Valid() {
+		return "", organization.ErrInvalidFeature
+	}
+	return receipt.EventIDs[0], nil
 }
 
 func (service *ProductionService) submitPlannedCommand(ctx context.Context, feature organization.FeatureRequest, commandType string, kind kernel.AggregateKind, id kernel.UUIDv7, label string, payload []byte, parents []kernel.DagParent) (kernel.CommandReceipt, error) {

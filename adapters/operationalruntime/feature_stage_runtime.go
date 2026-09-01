@@ -116,7 +116,7 @@ func (service *ProductionService) ensureFeaturePlanningTask(ctx context.Context,
 	if !found || !workspaceFound || profileConfig.Qualification.DecisionRoute.ModelExecutable() == false {
 		return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, organization.ErrInvalidFeature
 	}
-	storyReceipt, err := service.ensureFeaturePlanningStory(ctx, feature)
+	storyEvent, err := service.ensureFeaturePlanningStory(ctx, feature)
 	if err != nil {
 		return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, err
 	}
@@ -133,7 +133,7 @@ func (service *ProductionService) ensureFeaturePlanningTask(ctx context.Context,
 	planningStoryID := deterministicOperationalUUID("feature-planning-story", string(feature.ID))
 	taskID := deterministicOperationalUUID("feature-planning-task", string(feature.ID), string(stage))
 	dependsOn := []kernel.UUIDv7{}
-	parents := []kernel.DagParent{{ParentEventID: storyReceipt.EventIDs[0], EdgeKind: kernel.EdgeCausal}}
+	parents := []kernel.DagParent{{ParentEventID: storyEvent, EdgeKind: kernel.EdgeCausal}}
 	if prior, hasPrior := priorPlanningStage(stage); hasPrior {
 		priorID := deterministicOperationalUUID("feature-planning-task", string(feature.ID), string(prior))
 		priorState, priorHead, priorFound, priorErr := service.Store.ReadAggregateHead(ctx, kernel.AggregateRef{Kind: kernel.AggregateTask, ID: priorID})
@@ -355,6 +355,17 @@ func (service *ProductionService) ensureFeaturePlanningEvidence(ctx context.Cont
 	}
 	digest := digestBytes(encoded)
 	id := deterministicOperationalUUID("feature-request-evidence", string(feature.ID), string(digest))
+	ref := kernel.AggregateRef{Kind: kernel.AggregateEvidence, ID: id}
+	snapshot, err := service.Store.LoadDecision(ctx, kernel.KernelCommand{Target: ref})
+	if err != nil {
+		return "", nil, err
+	}
+	if metadata, found := snapshot.Evidence[id]; found {
+		if !metadata.Available || metadata.SHA256 != digest {
+			return "", nil, organization.ErrInvalidFeature
+		}
+		return id, []kernel.EvidenceRef{{EvidenceID: id, SHA256: digest}}, nil
+	}
 	payload, _ := json.Marshal(map[string]any{"access_partition": feature.Input.WorkspaceID, "availability": "AVAILABLE", "byte_length": len(encoded), "canonical_digest": digest, "computation": nil, "deletion_tombstone": nil, "evidence_kind": "DECISION_RECORD", "integrity_state": "DIGEST_VERIFIED", "locator": "teams://feature/" + string(feature.ID) + "/request", "locator_immutable": true, "media_type": "application/json", "producing_component": "tekrood-feature-intake", "producing_version": FeaturePlanningVersion, "redacts": nil, "retention_policy": "feature-lifecycle", "sensitivity": "INTERNAL", "sha256": digest, "source_evidence_ids": []kernel.UUIDv7{}, "source_timestamp": feature.CreatedAt, "transport_provenance": "teams-operator-feature-intake"})
 	if _, err := service.submitDeterministicCommand(ctx, feature, "tekroo.command.evidence.register", kernel.SchemaVersion, kernel.AggregateEvidence, id, service.serviceAuthority, 0, payload, nil, nil, "feature-request-evidence"); err != nil {
 		return "", nil, err
