@@ -1,319 +1,117 @@
-# Tekroo v4
+# Tekroo Teams v4
 
-Tekroo v4 is a contract-first reimplementation of the Tekroo organizational
-kernel. It is not a port of the Tekroo v3 codebase.
+Tekroo Teams is a local-first autonomous software-engineering organization. It
+turns an operator feature request into a finite story/task DAG, assigns exact
+role actors and qualified model profiles, executes through OpenHands, uses SMA
+as non-authoritative semantic memory, validates independently, and performs a
+deterministic release only after explicit operator acceptance.
 
 ## Current state
 
-This repository is implementing the contract-bound kernel and MongoDB adapter in Go. It
-contains the principal-authorized, content-addressed kernel contract release
-`tekroo.kernel.contracts/0.2.0`, the preserved `0.1.0` release, their exact
-compatibility and gate records, and a
-standard-library-only deterministic kernel foundation. The MongoDB adapter is
-qualified only against the pinned local integration topology; no production
-runtime or deployment is qualified by this slice.
+The supported implementation is contract
+`tekroo.kernel.contracts/0.10.0`. It includes:
 
-**COMPUTED GATE RESULT:** The Phase 2 Step 2 `core-hermetic` profile is `PASS`.
-The executable evidence covers all 26 frozen commands, lifecycle and DAG
-properties, exact execution fencing, semantic idempotency, in-memory atomic fault
-schedules, event folding, unknown-event quarantine, and content-addressed
-provenance/evidence primitives. Authorization/delegation, exact internal
-multi-aggregate guards, lifecycle decision gates, durable attempt budgets, and
-evidence access/redaction/deletion/audit rebuild are also executable. Fourteen
-disposable-copy implementation mutants across all core-hermetic invariant
-families are detected. MongoDB is reported separately below; synthesized-merge
-remains `NOT_RUN`, and optional provider E2E also remains `NOT_RUN`. The four
-previously reported `0.1.0` encoding gaps are resolved by the
-authorized `0.2.0` contract; `1.0.0` commands lacking exact context require an
-explicit migration and are not silently upgraded.
+- versioned team manifests and signed role bundles;
+- stable actor FQNs with replaceable process/execution identities;
+- product-owner, project-manager, architect, coder, senior-coder, tester,
+  security, and operator roles;
+- feature intake, planning, complexity/risk classification, finite task DAGs,
+  exact assignment, bounded work, independent review, repair, acceptance, and
+  deterministic Git release;
+- MongoDB persistence, projections, change-stream wakeup, leases, recovery,
+  redelivery, and dead letters;
+- OpenHands execution with the accepted local Qwen model profile and SMA prompt
+  hook;
+- focused operator HTTP, MCP, and `tekroo` commands;
+- human participant questions, responses, and durable notifications; and
+- exact revisioned aliases plus Ed25519-signed, replay-safe cross-team routing.
 
-**COMPUTED GATE RESULT:** The Phase 2 Step 3 `mongo-integration` profile is
-`PASS` for MongoDB 8.3.4 on the tested local replica-set topology with official
-Go driver v2.8.0. Its race-enabled raw receipt contains 17 top-level tests and 5
-subtests with zero failures. The suite executes majority transactions, five
-all-or-none fault boundaries, lost-ack reconciliation, 32-writer contention,
-event-fold corruption detection, stream-before-backlog delivery, 24-way claim
-contention, epoch/lease fencing, finite sweep/dead-letter behavior, durable
-resume checkpoints, readdress isolation, application restart, abrupt MongoDB
-crash/recovery, and differential state against the accepted in-memory reference.
-This does not qualify an untested production cluster, migration,
-`synthesized-merge`, provider E2E, performance, or deployment.
+Agent messages carry facts, requests, and evidence. They cannot directly start
+another model. Only a current Teams decision backed by a finite DAG, budget,
+assignment, and single-use invocation can wake an execution worker. This is the
+structural replacement for v3's unbounded conversational loops.
 
-**OBSERVED RELEASE RECEIPT:** Phase 2 Step 4 qualified candidate commit
-`e19e3fc647d20e5c487b04bbd08c80d8d9289a6d` with tree
-`2f5460d4a35d6f6a83de6735dd3b81f8e76917b6`; that exact commit is now
-`origin/main`. The receipt does not extend qualification beyond the recorded
-synthesized-merge profile.
-
-**COMPUTED GATE RESULT:** Phase 3 Step 1 `thin-adapter-bootstrap` is `PASS`.
-Its raw race-enabled receipts contain 23 focused adapter test cases across 4
-packages and 183 full-regression test cases across 10 packages, with zero test
-or vet failures. The slice adds a provider-neutral typed command gateway,
-strict JSON and newline-delimited stdio framing, a cancellation-aware daemon
-host, and an injectable CLI runner. Its gate distinguishes known no effect
-before dispatch from uncertain outcomes after dispatch, and verifies that the
-production thin adapters do not import persistence. HTTP/MCP, channel
-transports, OpenHands, SMA, provider E2E, deployment, migration, and performance
-remain unqualified.
-
-**COMPUTED GATE RESULT:** Phase 3 Step 2 `http-mcp-adapter` is `PASS`.
-Its raw race-enabled receipts contain 53 focused HTTP/MCP test cases across 3
-packages and 218 full-regression test cases across 12 packages, with zero test
-or vet failures. The MCP adapter targets the current official `2026-07-28`
-stateless protocol: every POST supplies body metadata and matching protocol,
-method, and tool-name headers. The server derives organizational identity from
-trusted authentication rather than MCP client metadata or command JSON.
-Request-scoped SSE, subscriptions, multi-round-trip requests, legacy MCP
-sessions, public deployment, and performance remain unqualified.
-
-**COMPUTED GATE RESULT:** Phase 3 Step 3 `exact-directed-channel` is `PASS`.
-Its raw race-enabled receipts contain 32 focused channel/protocol test cases
-across 2 packages and 229 full-regression test cases across 13 packages, with
-zero test or vet failures. The provider-neutral frame addresses one exact actor
-FQN and execution tuple, injects authenticated sender identity outside client
-JSON, preserves only declared DAG parents, and relies on kernel idempotency for
-at-least-once redelivery. Bounded unknown or unsupported input is quarantined
-losslessly; `tekroo-agent-chat`, `tekroo-agent-ping`, and `tekroo-agent-pong`
-remain undefined and are not aliases. Broad routing, live providers, changes to
-MongoDB delivery mechanics, OpenHands/SMA E2E, deployment, migration, and
-performance remain unqualified.
-
-**COMPUTED GATE RESULT:** Phase 3 Step 4
-`deterministic-execution-coordinator` is `PASS`. Its raw race-enabled receipts
-contain 92 focused kernel/application/reference-adapter test cases across 4
-packages and 238 full-regression test cases across 13 packages, with zero test
-or vet failures. The coordinator commits an exact execution-registry command
-before provider start, binds FQN, execution fence, runtime identity, and
-idempotency, and records provider timeout or identity mismatch as explicit
-`UNCERTAIN` state requiring finite reconciliation. Atomic instance and restart
-window limits fail closed. Only the deterministic fake engine and in-memory
-operational control store are qualified; live providers, production control
-persistence, automated work-DAG/release coordination, OpenHands, SMA,
-deployment, migration, security isolation, and performance remain unqualified.
-
-**COMPUTED GATE RESULT:** Phase 3 Step 5
-`deterministic-assignment-readiness` is `PASS`. Its raw race-enabled receipts
-contain 104 focused kernel/application/protocol test cases across 3 packages
-and 247 full-regression test cases across 13 packages, with zero test or vet
-failures.
-The pure planner requires exact terminal dependency predicates and explicit DAG
-lineage, then deterministically selects the least-loaded eligible actor with
-lexical FQN tie-breaking. The application coordinator emits an ordered
-readiness and exact-directed dispatch sequence without forging actor
-acceptance; the exact actor acquires ownership separately through the
-authenticated execution-fenced compare-and-set command. Blocked, ineligible,
-already-owned, non-runnable, and invalid snapshots produce finite no-effect
-decisions. Live scheduling policy discovery, durable queueing, provider
-execution, synthesized merge/release, OpenHands, SMA, deployment, migration,
-security isolation, and performance remain unqualified.
-
-**COMPUTED GATE RESULT:** Phase 3 Step 6 `deterministic-validation-join` is
-`PASS`. Its raw race-enabled receipts contain 118 focused
-kernel/application/protocol test cases across 3 packages and 261
-full-regression test cases across 13 packages, with zero test or vet failures.
-Review branches, causal parents, results, and missing branches are canonical;
-`WAIT_ALL` and `FAIL_FAST` have stable outcomes, with `FAIL` deterministically
-preceding `INCONCLUSIVE`. Policy may open a frozen-schema completion review but
-cannot forge validator identity. Resolution-owner, deadline, adjudicator,
-per-branch round-budget, and finding-supersession fields require a later
-contract revision; completion, reopening, escalation, acceptance, release,
-live providers, deployment, migration, and performance remain unqualified.
-
-The frozen contract identity is:
-
-```text
-tekroo.kernel.contracts/0.2.0
-manifest SHA-256: cd582fb163e17d49a1a0a627f33cdbb184d15ecace3200981738782cca977dae
-```
-
-The preserved `0.1.0` manifest SHA-256 is
-`db3f38d4794a6993aad0b9ddf6d8f093eebf36b484d99de42dddc21bf3877c2f`.
-Released contract files are immutable. Any normative change requires a new
-contract version, compatibility analysis, a new detached manifest digest, and
-the appropriate decision gate.
-
-## Architectural boundary
-
-The kernel owns organizational truth: durable actor identity, the versioned
-catalogue, schemas, the directed acyclic work graph, stories and tasks,
-ownership, authorization, validation, acceptance, completion, reopening,
-escalation, release policy, and provenance.
-
-MongoDB is the approved organizational persistence and change-stream wakeup
-substrate. The adapter keeps transaction, index, change-stream, claim, lease,
-resume, readdress, and dead-letter mechanics outside the pure kernel.
-Execution providers and semantic memory remain replaceable behind explicit
-ports. OpenHands and SMA adoption require separate qualification and authority.
-
-## Bootstrap sequence
-
-1. Preserve and validate the frozen contract package.
-2. Implement a pure deterministic kernel with in-memory repositories, fake
-   clock and ID sources, and a deterministic fake execution engine.
-3. Qualify that implementation against the normative fixtures and invariants.
-4. Qualify MongoDB transactions, indexes, change streams, claims, and recovery.
-5. Establish the canonical build and synthesized-merge gate.
-6. Add external adapters only in separately qualified slices.
-
-## Go implementation
-
-The Go module is pinned to the toolchain recorded in `go.mod`. The initial
-packages are deliberately narrow:
-
-- `kernel` — provider-neutral values, envelopes, lifecycle/DAG/idempotency
-  models, pure evaluation, decisions, and semantic ports;
-- `application` — receipt-first orchestration of snapshot load, pure evaluation,
-  and one atomic decision commit;
-- `contract` — read-only loading and payload validation for the frozen catalogue;
-- `adapters/memory` — atomic in-memory state/event/receipt storage;
-- `adapters/mongo` — majority-transaction persistence and change-stream outbox
-  delivery with epoch-fenced claims; and
-- `adapters/fake` — deterministic clock, ID source, and execution engine;
-- `adapters/protocol` — authenticated transport DTOs and the typed command
-  gateway;
-- `adapters/httpapi` — strict authenticated HTTP command invocation;
-- `adapters/mcp` — stateless MCP `2026-07-28` Streamable HTTP tool discovery
-  and command invocation;
-- `adapters/stdio` and `adapters/daemon` — bounded framing and host lifecycle;
-  and
-- `adapters/cli` — an injectable command/stdio runner with stable exit codes.
-
-`internal/conformance` runs the Go implementation against all 72 frozen fixtures.
-That is corpus coverage, not full `core-hermetic`, MongoDB, synthesized-merge,
-provider, performance, or production qualification.
-
-The Step 3 evidence runner starts disposable MongoDB processes, including a
-standalone negative control, replica-set integration topology, and isolated
-crash/recovery topology. It writes and verifies a self-digesting report plus the
-raw Go test JSONL receipt:
+## Build and verify
 
 ```sh
-go run ./cmd/mongo-integration-report
-go run ./cmd/mongo-integration-report -verify OUTPUT/phase-2/step-3-mongo-integration-gate.json
+go test ./... -count=1
+go test -tags=mongo_integration ./... -count=1
+go vet ./...
 ```
 
-The Phase 3 Step 1 runner preserves raw race-enabled adapter and full-regression
-test receipts, runs `go vet`, and writes a self-verifying gate report:
+Validate the current contract with:
 
 ```sh
-go run ./cmd/thin-adapter-report
-go run ./cmd/thin-adapter-report -verify OUTPUT/phase-3/step-1-thin-adapter-gate.json
+node CONTRACTS/tekroo.kernel.contracts/0.10.0/runner/validate-package.mjs /tmp/tekroo-contract-structure.json
 ```
 
-The Phase 3 Step 2 runner preserves raw HTTP/MCP and full-regression receipts,
-runs `go vet`, and binds the report to the official MCP wire revision:
+## Local production installation
+
+Install the two product binaries and lifecycle scripts into an isolated root:
 
 ```sh
-go run ./cmd/http-mcp-report
-go run ./cmd/http-mcp-report -verify OUTPUT/phase-3/step-2-http-mcp-gate.json
+./scripts/tekroo-install-local /absolute/install/root
 ```
 
-The Phase 3 Step 3 runner preserves raw channel/protocol and full-regression
-receipts, runs `go vet`, and verifies the accepted-base and artifact digests:
+Initialize a fresh deployment with the installed CLI:
 
 ```sh
-go run ./cmd/channel-report
-go run ./cmd/channel-report -verify OUTPUT/phase-3/step-3-channel-gate.json
+/absolute/install/root/bin/tekroo init-local \
+  -root /absolute/deployment/root \
+  -source-root /absolute/path/to/teams \
+  -repository /absolute/path/to/repository \
+  -openhands-key /absolute/path/to/openhands-api-key \
+  -sma-hook /absolute/path/to/sma_context_hook.py \
+  -tekrood /absolute/install/root/bin/tekrood
 ```
 
-The Phase 3 Step 4 runner preserves raw execution-coordinator and
-full-regression receipts, runs `go vet`, and verifies accepted-base, source-tree,
-and artifact digests:
+Initialization fails closed if the deployment root is nonempty, the source has
+tracked changes, a role branch already exists, MongoDB or the operator endpoint
+is not loopback, Teams and SMA database identities overlap, required accepted
+assets are missing, or the generated production configuration does not pass the
+same loader used by `tekrood`.
+
+The command creates deployment-owned secrets and provenance, copies the signed
+starter role library, creates isolated role worktrees, installs the accepted
+SMA hook in each workspace, and writes `tekrood.json` plus a disabled-by-default
+LaunchAgent definition. It never reads or migrates v3 data.
+
+Start and inspect the service with:
 
 ```sh
-go run ./cmd/execution-coordinator-report
-go run ./cmd/execution-coordinator-report -verify OUTPUT/phase-3/step-4-execution-coordinator-gate.json
+/absolute/install/root/scripts/tekroo-start \
+  --config /absolute/deployment/root/config/tekrood.json \
+  --state-dir /absolute/deployment/root/state
+
+/absolute/install/root/bin/tekroo \
+  -config /absolute/deployment/root/config/tekrood.json status
 ```
 
-The Phase 3 Step 5 runner preserves raw assignment/readiness and full-regression
-receipts, runs `go vet`, and verifies accepted-base, source-tree, and artifact
-digests:
+See [the operator workflow](docs/operations/002-normal-operator-workflow.md) and
+[the local deployment runbook](docs/operations/005-local-production-deployment.md).
 
-```sh
-go run ./cmd/assignment-readiness-report
-go run ./cmd/assignment-readiness-report -verify OUTPUT/phase-3/step-5-assignment-readiness-gate.json
-```
+## Architecture boundary
 
-The Phase 3 Step 6 runner preserves raw validation-join and full-regression
-receipts, runs `go vet`, and verifies accepted-base, source-tree, and artifact
-digests:
+Teams owns organizational state and process control: teams, roles, features,
+stories, tasks, DAGs, routing, assignment, budgets, invocations, evidence,
+review, acceptance, release, and operational recovery.
 
-```sh
-go run ./cmd/validation-join-report
-go run ./cmd/validation-join-report -verify OUTPUT/phase-3/step-6-validation-join-gate.json
-```
+SMA owns semantic memory. Its retrieved context is advisory and cannot mutate
+Teams state, grant authority, assign work, reset a budget, or complete a task.
+OpenHands owns model/tool execution and returns observations; it does not decide
+organizational truth.
 
-## Contract validation
+MongoDB is the Teams persistence and change-stream wakeup substrate. Local model
+and provider choices remain behind exact qualified execution profiles.
 
-The checked-in reference tools require Node.js and write their reports only to
-the paths supplied by the caller:
+## Scope
 
-```sh
-node CONTRACTS/tekroo.kernel.contracts/0.2.0/runner/validate-package.mjs /tmp/tekroo-contract-structure.json
-node CONTRACTS/tekroo.kernel.contracts/0.2.0/runner/reference-runner.mjs /tmp/tekroo-reference-corpus.json
-```
+Tekroo v3 remains read-only historical source material. No v3 data migration is
+required. Public-network exposure, wildcard routing, cloud trust brokerage, and
+billing are deliberate non-goals rather than incomplete product steps.
 
-These checks validate the contract structure and reference corpus. They do not
-qualify a Tekroo implementation, MongoDB deployment, provider, migration, or
-production system.
+Current acceptance records:
 
-The current local verification entrypoint runs Go tests with the race detector,
-Go vet, the deterministic mutation-sensitivity suite, and both frozen reference
-checks:
-
-```sh
-./scripts/verify.sh
-```
-
-The Step 2 evidence runner independently executes the race suite, Go vet, and
-both frozen contract runners before writing a self-digesting report:
-
-```sh
-go run ./cmd/core-hermetic-report -output build/reports/core-hermetic.json
-go run ./cmd/core-hermetic-report -verify build/reports/core-hermetic.json
-```
-
-## Authoritative records
-
-- [Final architecture handoff](PHASE-1B/008-final-architecture-handoff.md)
-- [Kernel contract freeze](PHASE-2/001-kernel-contract-freeze.md)
-- [Accepted contract package](CONTRACTS/tekroo.kernel.contracts/0.2.0/manifest.json)
-- [0.1.0 to 0.2.0 compatibility rule](CONTRACTS/tekroo.kernel.contracts/0.2.0/compatibility/from-0.1.0.json)
-- [Step 2 contract-revision authorization](OUTPUT/phase-2/step-2-contract-revision-authorization.json)
-- [Phase 2 Step 1 principal gate](OUTPUT/phase-2/step-1-gate.json)
-- [Repository bootstrap authority](docs/architecture/000-bootstrap-authority.md)
-- [Go kernel bootstrap decision](docs/architecture/001-go-kernel-bootstrap.md)
-- [Phase 2 Step 2 core-hermetic gate](OUTPUT/phase-2/step-2-core-hermetic-gate.json)
-- [Phase 2 Step 2 principal acceptance](OUTPUT/phase-2/step-2-acceptance.json)
-- [Phase 2 Step 3 Mongo integration gate](OUTPUT/phase-2/step-3-mongo-integration-gate.json)
-- [Phase 2 Step 4 synthesized-merge gate](OUTPUT/phase-2/step-4-synthesized-merge-gate.json)
-- [Phase 2 Step 4 release receipt](OUTPUT/phase-2/step-4-release-receipt.json)
-- [Phase 3 Step 1 authority](OUTPUT/phase-3/step-1-authorization.json)
-- [Phase 3 thin-adapter bootstrap boundary](docs/architecture/002-thin-adapter-bootstrap.md)
-- [Phase 3 Step 1 thin-adapter gate](OUTPUT/phase-3/step-1-thin-adapter-gate.json)
-- [Phase 3 Step 1 acceptance](OUTPUT/phase-3/step-1-acceptance.json)
-- [Phase 3 Step 1 release receipt](OUTPUT/phase-3/step-1-release-receipt.json)
-- [Phase 3 Step 2 authority](OUTPUT/phase-3/step-2-authorization.json)
-- [Phase 3 HTTP/MCP boundary](docs/architecture/003-http-mcp-adapter.md)
-- [Phase 3 Step 2 HTTP/MCP gate](OUTPUT/phase-3/step-2-http-mcp-gate.json)
-- [Phase 3 Step 2 acceptance](OUTPUT/phase-3/step-2-acceptance.json)
-- [Phase 3 Step 2 release receipt](OUTPUT/phase-3/step-2-release-receipt.json)
-- [Phase 3 Step 3 authority](OUTPUT/phase-3/step-3-authorization.json)
-- [Phase 3 exact-directed channel boundary](docs/architecture/004-exact-directed-channel-adapter.md)
-- [Phase 3 Step 3 exact-directed channel gate](OUTPUT/phase-3/step-3-channel-gate.json)
-- [Phase 3 Step 3 acceptance](OUTPUT/phase-3/step-3-acceptance.json)
-- [Phase 3 Step 3 release receipt](OUTPUT/phase-3/step-3-release-receipt.json)
-- [Phase 3 Step 4 authority](OUTPUT/phase-3/step-4-authorization.json)
-- [Phase 3 deterministic execution-coordinator boundary](docs/architecture/005-deterministic-execution-coordinator.md)
-- [Phase 3 Step 4 execution-coordinator gate](OUTPUT/phase-3/step-4-execution-coordinator-gate.json)
-- [Phase 3 Step 4 acceptance](OUTPUT/phase-3/step-4-acceptance.json)
-- [Phase 3 Step 4 release receipt](OUTPUT/phase-3/step-4-release-receipt.json)
-- [Phase 3 Step 5 authority](OUTPUT/phase-3/step-5-authorization.json)
-- [Phase 3 deterministic assignment/readiness boundary](docs/architecture/006-deterministic-assignment-readiness.md)
-- [Phase 3 Step 5 assignment/readiness gate](OUTPUT/phase-3/step-5-assignment-readiness-gate.json)
-- [Phase 3 Step 5 acceptance](OUTPUT/phase-3/step-5-acceptance.json)
-- [Phase 3 Step 5 release receipt](OUTPUT/phase-3/step-5-release-receipt.json)
-- [Phase 3 Step 6 authority](OUTPUT/phase-3/step-6-authorization.json)
-- [Phase 3 deterministic validation-join boundary](docs/architecture/007-deterministic-validation-join.md)
-- [Phase 3 Step 6 validation-join gate](OUTPUT/phase-3/step-6-validation-join-gate.json)
-- [Historical Step 2 `0.1.0` encoding-gap record](OUTPUT/phase-2/step-2-contract-encoding-gaps.md)
+- [Phase 6 local-team acceptance](docs/architecture/121-phase-6-integrated-acceptance.md)
+- [Phase 7 federated-routing acceptance](docs/architecture/123-phase-7-integrated-acceptance.md)
+- [Phase 8 local-production plan](docs/architecture/124-phase-8-local-production-plan.md)
