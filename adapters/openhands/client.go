@@ -24,7 +24,10 @@ var (
 	ErrProtocol             = errors.New("OpenHands execution protocol mismatch")
 )
 
-const maximumRepositoryDiscoveryActions = 12
+const (
+	maximumRepositoryDiscoveryActions = 12
+	maximumRetryDiscoveryActions      = 3
+)
 
 type WorkspaceBinding struct {
 	WorkspaceID      string
@@ -396,9 +399,18 @@ func (client *Client) Inspect(ctx context.Context, brief application.ExecutionBr
 		return application.ExternalExecutionObservation{}, ErrProtocol
 	}
 	if progressGuardApplies(brief) {
-		discoveryActions, mutationObserved := repositoryProgress(events, promptIndex(events, prepared.prompt))
-		if !mutationObserved && discoveryActions >= maximumRepositoryDiscoveryActions && executionStillActive(info.ExecutionStatus) {
-			return client.stopForNoProgress(ctx, brief, requestDigest, info, events, discoveryActions)
+		currentPromptIndex := promptIndex(events, prepared.prompt)
+		discoveryActions, mutationObserved := repositoryProgress(events, currentPromptIndex)
+		discoveryLimit := maximumRepositoryDiscoveryActions
+		if brief.RetryOrdinal > 0 && currentPromptIndex > 0 {
+			priorDiscoveryActions, priorMutationObserved := repositoryProgress(events[:currentPromptIndex], -1)
+			if !priorMutationObserved {
+				discoveryActions += priorDiscoveryActions
+				discoveryLimit += maximumRetryDiscoveryActions
+			}
+		}
+		if !mutationObserved && discoveryActions >= discoveryLimit && executionStillActive(info.ExecutionStatus) {
+			return client.stopForNoProgress(ctx, brief, requestDigest, info, events, discoveryActions, discoveryLimit)
 		}
 	}
 	return client.observation(brief, requestDigest, info, events, false)
@@ -412,7 +424,7 @@ func executionStillActive(status string) bool {
 	return status == "idle" || status == "running" || status == "waiting_for_confirmation"
 }
 
-func (client *Client) stopForNoProgress(ctx context.Context, brief application.ExecutionBrief, requestDigest kernel.Digest, info conversationInfo, events []rawEvent, discoveryActions int) (application.ExternalExecutionObservation, error) {
+func (client *Client) stopForNoProgress(ctx context.Context, brief application.ExecutionBrief, requestDigest kernel.Digest, info conversationInfo, events []rawEvent, discoveryActions, discoveryLimit int) (application.ExternalExecutionObservation, error) {
 	conversationID := string(brief.InvocationID)
 	status, _, err := client.request(ctx, http.MethodPost, "/api/conversations/"+url.PathEscape(conversationID)+"/interrupt", nil)
 	if err != nil || status != http.StatusOK && status != http.StatusNoContent && status != http.StatusConflict {
@@ -432,7 +444,7 @@ func (client *Client) stopForNoProgress(ctx context.Context, brief application.E
 		Reason           string `json:"reason"`
 		DiscoveryActions int    `json:"repository_discovery_actions"`
 		Limit            int    `json:"repository_discovery_limit"`
-	}{"REPOSITORY_DISCOVERY_LIMIT_EXCEEDED", discoveryActions, maximumRepositoryDiscoveryActions})
+	}{"REPOSITORY_DISCOVERY_LIMIT_EXCEEDED", discoveryActions, discoveryLimit})
 	if err != nil {
 		return application.ExternalExecutionObservation{}, err
 	}

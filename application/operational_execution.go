@@ -235,7 +235,8 @@ var boundedExecutionGuidance = []string{
 
 var retryExecutionGuidance = []string{
 	"This is a bounded retry. Reuse the current workspace and retained task evidence; do not restart repository discovery from the beginning.",
-	"Address the prior failed attempt directly. If a concrete edit is still not justified after inspecting the smallest relevant surface, report an explicit blocker.",
+	"The prior OpenHands conversation is retained in this retry. Do not reread AGENTS.md or repeat ls, rg, find, sed, cat, or file-view actions already present in that history.",
+	"Make the smallest justified code or test edit immediately from the retained findings. At most three additional read-only repository actions are allowed across the entire retry lineage; if an edit is still not justified, report an explicit blocker.",
 }
 
 // SemanticContextRequest is read-only metadata supplied to the qualified

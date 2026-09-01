@@ -66,7 +66,7 @@ func TestRetryExecutionBriefDirectsAgentToContinueFromRetainedState(t *testing.T
 		t.Fatal(err)
 	}
 	guidance := strings.Join(brief.ExecutionGuidance, "\n")
-	for _, required := range []string{"bounded retry", "do not restart repository discovery", "prior failed attempt", "explicit blocker"} {
+	for _, required := range []string{"bounded retry", "do not restart repository discovery", "prior OpenHands conversation", "three additional read-only", "explicit blocker"} {
 		if !strings.Contains(guidance, required) {
 			t.Fatalf("retry guidance omitted %q: %v", required, brief.ExecutionGuidance)
 		}
