@@ -80,6 +80,10 @@ func run(arguments []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		method, path, err = identityRead("/v1/invocations/", operands)
 	case "roles":
 		method, path, err = noOperand(http.MethodGet, "/v1/roles", operands)
+	case "libraries":
+		method, path, err = noOperand(http.MethodGet, "/v1/libraries", operands)
+	case "library-sync":
+		method, path, err = noOperand(http.MethodPost, "/v1/libraries/sync", operands)
 	case "feature":
 		method, path = http.MethodPost, "/v1/features"
 		body, err = loadFeature(operands, stdin, config.Operator.MaximumBodyBytes)
@@ -402,5 +406,5 @@ func loadCommand(operands []string, stdin io.Reader, maximum int64) ([]byte, ker
 }
 
 func usageError() error {
-	return errors.New("usage: tekroo -config CONFIG health|status|pause|resume|stop|feature FILE|-|feature-status ID|feature-plan ID FILE|-|feature-accept ID REVISION NO_RELEASE_REASON|feature-release ID FILE|-|human-register FILE|-|human-ask FILE|-|roles|role ACTOR start|stop|restart|pause|resume|inbox ACTOR|message FILE|-|message-status ID|message-trace THREAD_ID|deadletters [ACTOR]|task ID|story ID|invocation ID|submit FILE|-|cancel INVOCATION_ID FILE|-")
+	return errors.New("usage: tekroo -config CONFIG health|status|pause|resume|stop|feature FILE|-|feature-status ID|feature-plan ID FILE|-|feature-accept ID REVISION NO_RELEASE_REASON|feature-release ID FILE|-|human-register FILE|-|human-ask FILE|-|roles|libraries|library-sync|role ACTOR start|stop|restart|pause|resume|inbox ACTOR|message FILE|-|message-status ID|message-trace THREAD_ID|deadletters [ACTOR]|task ID|story ID|invocation ID|submit FILE|-|cancel INVOCATION_ID FILE|-")
 }

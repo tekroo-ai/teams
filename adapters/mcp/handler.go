@@ -40,6 +40,8 @@ const (
 	TaskGetToolName        = "tekroo.task.get"
 	StoryGetToolName       = "tekroo.story.get"
 	InvocationGetToolName  = "tekroo.invocation.get"
+	LibrariesListToolName  = "tekroo.libraries.list"
+	LibrariesSyncToolName  = "tekroo.libraries.sync"
 	DefaultMaxBodyBytes    = int64(1 << 20)
 	codeHeaderMismatch     = -32020
 	codeUnsupportedVersion = -32022
@@ -390,6 +392,8 @@ func organizationalTools() []any {
 		map[string]any{"name": TaskGetToolName, "title": "Inspect task", "description": "Read one canonical task projection, assignment, scope, budget, and latest invocation.", "inputSchema": object([]string{"task_id"}, map[string]any{"task_id": uuid})},
 		map[string]any{"name": StoryGetToolName, "title": "Inspect story", "description": "Read one canonical story projection and its task DAG.", "inputSchema": object([]string{"story_id"}, map[string]any{"story_id": uuid})},
 		map[string]any{"name": InvocationGetToolName, "title": "Inspect invocation", "description": "Read one single-use work invocation and terminal evidence state.", "inputSchema": object([]string{"invocation_id"}, map[string]any{"invocation_id": uuid})},
+		map[string]any{"name": LibrariesListToolName, "title": "List role libraries", "description": "Inspect exact versions and content identities of configured role libraries.", "inputSchema": object(nil, map[string]any{})},
+		map[string]any{"name": LibrariesSyncToolName, "title": "Synchronize role libraries", "description": "Revalidate and synchronize only the exact signed library sources bound by tekrood configuration.", "inputSchema": object(nil, map[string]any{})},
 		map[string]any{"name": RolesListToolName, "title": "List configured team roles", "description": "Inspect exact role identities and lifecycle state.", "inputSchema": object(nil, map[string]any{})},
 		map[string]any{
 			"name": RoleControlToolName, "title": "Control one role",

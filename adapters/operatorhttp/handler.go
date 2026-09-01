@@ -44,6 +44,8 @@ type Service interface {
 	AcceptFeatureWithRelease(context.Context, kernel.UUIDv7, kernel.PrincipalRef, organization.FeatureAcceptanceInput) (organization.FeatureRequest, error)
 	RegisterHumanParticipant(context.Context, kernel.PrincipalRef, organization.HumanParticipantRegistration) (kernel.HumanParticipantSnapshot, error)
 	AskHuman(context.Context, kernel.PrincipalRef, organization.HumanQuestionRequest) (organization.HumanNotification, error)
+	RoleLibraries() []organization.RoleLibraryEntry
+	SyncRoleLibraries() ([]organization.RoleLibraryEntry, error)
 }
 
 type OrganizationalService interface {
@@ -120,6 +122,19 @@ func (handler *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Requ
 		handler.invocation(writer, request, strings.TrimPrefix(request.URL.Path, "/v1/invocations/"))
 	case request.Method == http.MethodGet && request.URL.Path == "/v1/roles":
 		handler.roles(writer, request)
+	case request.Method == http.MethodGet && request.URL.Path == "/v1/libraries":
+		writeJSON(writer, http.StatusOK, handler.service.RoleLibraries())
+	case request.Method == http.MethodPost && request.URL.Path == "/v1/libraries/sync":
+		if !emptyBody(request, handler.maxBody) {
+			writeError(writer, http.StatusBadRequest, "BODY_MUST_BE_EMPTY")
+			return
+		}
+		libraries, err := handler.service.SyncRoleLibraries()
+		if err != nil {
+			writeError(writer, http.StatusConflict, "LIBRARY_SYNC_REJECTED")
+			return
+		}
+		writeJSON(writer, http.StatusOK, libraries)
 	case request.Method == http.MethodPost && request.URL.Path == "/v1/features":
 		handler.submitFeature(writer, request)
 	case request.Method == http.MethodPost && request.URL.Path == "/v1/humans":

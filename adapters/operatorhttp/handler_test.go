@@ -235,5 +235,13 @@ func (service *operatorService) DeadLetters(context.Context, kernel.ActorFQN, in
 	return []organization.MessageClaim{}, nil
 }
 
+func (service *operatorService) RoleLibraries() []organization.RoleLibraryEntry {
+	return []organization.RoleLibraryEntry{{Team: "teams", Version: "1.0.0", ManifestDigest: kernel.Digest(strings.Repeat("a", 64)), Roles: []string{"operator"}}}
+}
+
+func (service *operatorService) SyncRoleLibraries() ([]organization.RoleLibraryEntry, error) {
+	return service.RoleLibraries(), nil
+}
+
 var _ Service = (*operatorService)(nil)
 var _ OrganizationalService = (*operatorService)(nil)

@@ -161,12 +161,18 @@ type ProductionProjection struct {
 }
 
 type ProductionOrganization struct {
-	ManifestFile            string                `json:"manifest_file"`
-	ManifestDigest          kernel.Digest         `json:"manifest_digest"`
-	Publishers              []ProductionPublisher `json:"trusted_publishers"`
-	ReconciliationInterval  string                `json:"reconciliation_interval"`
-	MaximumRestarts         uint32                `json:"maximum_restarts"`
-	MaximumDeliveryAttempts uint32                `json:"maximum_delivery_attempts"`
+	ManifestFile            string                 `json:"manifest_file"`
+	ManifestDigest          kernel.Digest          `json:"manifest_digest"`
+	LibraryManifests        []ProductionTeamSource `json:"library_manifests,omitempty"`
+	Publishers              []ProductionPublisher  `json:"trusted_publishers"`
+	ReconciliationInterval  string                 `json:"reconciliation_interval"`
+	MaximumRestarts         uint32                 `json:"maximum_restarts"`
+	MaximumDeliveryAttempts uint32                 `json:"maximum_delivery_attempts"`
+}
+
+type ProductionTeamSource struct {
+	ManifestFile   string        `json:"manifest_file"`
+	ManifestDigest kernel.Digest `json:"manifest_digest"`
 }
 
 type ProductionPublisher struct {
@@ -192,6 +198,8 @@ type resolvedProductionConfig struct {
 	projectionTimeout     time.Duration
 	operatorTimeout       time.Duration
 	team                  organization.LoadedTeam
+	libraryTeams          []organization.LoadedTeam
+	trustedRolePublishers map[string]ed25519.PublicKey
 	roleReconciliation    time.Duration
 	planningDeadline      time.Duration
 	gitOperationTimeout   time.Duration
@@ -231,6 +239,9 @@ func LoadProductionConfig(path string) (ProductionConfig, error) {
 	config.ProvenanceFile = absoluteFrom(base, config.ProvenanceFile)
 	config.EvidenceRoot = absoluteFrom(base, config.EvidenceRoot)
 	config.Organization.ManifestFile = absoluteFrom(base, config.Organization.ManifestFile)
+	for index := range config.Organization.LibraryManifests {
+		config.Organization.LibraryManifests[index].ManifestFile = absoluteFrom(base, config.Organization.LibraryManifests[index].ManifestFile)
+	}
 	for index := range config.Organization.Publishers {
 		config.Organization.Publishers[index].PublicKeyFile = absoluteFrom(base, config.Organization.Publishers[index].PublicKeyFile)
 	}
@@ -391,6 +402,14 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 	if err != nil {
 		return resolvedProductionConfig{}, invalidConfig("team manifest or role bundle is invalid")
 	}
+	libraryTeams := make([]organization.LoadedTeam, 0, len(config.Organization.LibraryManifests))
+	for _, source := range config.Organization.LibraryManifests {
+		loaded, loadErr := organization.LoadTeamManifest(source.ManifestFile, source.ManifestDigest, trustedKeys)
+		if loadErr != nil {
+			return resolvedProductionConfig{}, invalidConfig("role-library manifest or bundle is invalid")
+		}
+		libraryTeams = append(libraryTeams, loaded)
+	}
 	var policy kernel.AuthorizationPolicy
 	if err := readStrictJSONFile(config.AuthorizationPolicyFile, &policy); err != nil || !productionPolicyValid(policy, config.ServiceAuthority, config.ExpiryAuthority) || config.Execution.PolicyRevision != policy.Revision || config.Evidence.PolicyRevision != policy.Revision {
 		return resolvedProductionConfig{}, invalidConfig("authorization policy file is invalid")
@@ -399,7 +418,7 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 	if err := readStrictJSONFile(config.ProvenanceFile, &provenance); err != nil || !provenance.Valid() || provenance.PolicyDigest != policy.PolicyDigest || provenance.PolicyRevision != policy.Revision {
 		return resolvedProductionConfig{}, invalidConfig("provenance file is invalid or does not bind the authorization policy")
 	}
-	return resolvedProductionConfig{ProductionConfig: config, mongoURI: mongoURI, sessionAPIKey: sessionKey, operatorBearerToken: operatorToken, humanCredentials: humanCredentials, authorizationPolicy: policy, provenance: provenance, requestTimeout: requestTimeout, pollInterval: pollInterval, operationTimeout: operationTimeout, leaseDuration: leaseDuration, reconciliation: reconciliation, leaseOperationTimeout: leaseOperationTimeout, projectionInterval: projectionInterval, projectionTimeout: projectionTimeout, operatorTimeout: operatorTimeout, team: team, roleReconciliation: roleReconciliation, planningDeadline: planningDeadline, gitOperationTimeout: gitOperationTimeout}, nil
+	return resolvedProductionConfig{ProductionConfig: config, mongoURI: mongoURI, sessionAPIKey: sessionKey, operatorBearerToken: operatorToken, humanCredentials: humanCredentials, authorizationPolicy: policy, provenance: provenance, requestTimeout: requestTimeout, pollInterval: pollInterval, operationTimeout: operationTimeout, leaseDuration: leaseDuration, reconciliation: reconciliation, leaseOperationTimeout: leaseOperationTimeout, projectionInterval: projectionInterval, projectionTimeout: projectionTimeout, operatorTimeout: operatorTimeout, team: team, libraryTeams: libraryTeams, trustedRolePublishers: trustedKeys, roleReconciliation: roleReconciliation, planningDeadline: planningDeadline, gitOperationTimeout: gitOperationTimeout}, nil
 }
 
 // ProductionService owns the Mongo store, assembled runtime, and lifecycle
@@ -412,6 +431,7 @@ type ProductionService struct {
 	RoleRuntime *organization.InProcessRuntime
 	MessageBus  *organization.MessageBus
 	RoleInbox   *organization.RoleInbox
+	RoleLibrary *organization.RoleLibrary
 	Features    *organization.FeatureCoordinator
 	Releases    *application.ReleaseCoordinator
 
@@ -443,6 +463,8 @@ type ProductionService struct {
 	policyAuthority        kernel.PrincipalRef
 	clock                  kernel.Clock
 	ids                    kernel.IDSource
+	librarySources         []ProductionTeamSource
+	trustedRolePublishers  map[string]ed25519.PublicKey
 }
 
 func NewProductionService(ctx context.Context, config ProductionConfig) (*ProductionService, error) {
@@ -521,11 +543,22 @@ func NewProductionService(ctx context.Context, config ProductionConfig) (*Produc
 		_ = runtime.Close(context.WithoutCancel(ctx))
 		return fail(err)
 	}
+	libraryTeams := append([]organization.LoadedTeam{resolved.team}, resolved.libraryTeams...)
+	roleLibrary, err := organization.NewRoleLibrary(libraryTeams...)
+	if err != nil {
+		_ = runtime.Close(context.WithoutCancel(ctx))
+		return fail(err)
+	}
 	workspacesByID := make(map[string]ProductionWorkspace, len(config.Workspaces))
 	for _, workspace := range config.Workspaces {
 		workspacesByID[workspace.WorkspaceID] = workspace
 	}
-	service := &ProductionService{Store: store, Runtime: runtime, Controller: controller, RoleHost: roleHost, RoleRuntime: roleRuntime, MessageBus: messageBus, RoleInbox: roleInbox, projectionInterval: resolved.projectionInterval, projectionTimeout: resolved.projectionTimeout, recoveryInterval: resolved.reconciliation, recoveryTimeout: resolved.leaseOperationTimeout, recoveryAttempts: config.Worker.MaximumReconciliations, failures: make(chan error, 4), provenance: resolved.provenance, operatorToken: resolved.operatorBearerToken, operatorIdentity: protocol.AuthenticatedContext{Principal: config.Operator.Principal}, humanCredentials: append([]HumanTransportCredential(nil), resolved.humanCredentials...), operatorTimeout: resolved.operatorTimeout, operatorMaxBody: config.Operator.MaximumBodyBytes, roleReconciliation: resolved.roleReconciliation, roleMaximumRestarts: config.Organization.MaximumRestarts, messageMaximumAttempts: config.Organization.MaximumDeliveryAttempts, clock: clock, ids: ids, planningDeadline: resolved.planningDeadline, planning: config.Planning, profilesByModel: profilesByModel, workspacesByID: workspacesByID, serviceAuthority: config.ServiceAuthority, policyAuthority: config.ExpiryAuthority}
+	librarySources := append([]ProductionTeamSource{{ManifestFile: config.Organization.ManifestFile, ManifestDigest: config.Organization.ManifestDigest}}, config.Organization.LibraryManifests...)
+	trustedPublishers := make(map[string]ed25519.PublicKey, len(resolved.trustedRolePublishers))
+	for key, value := range resolved.trustedRolePublishers {
+		trustedPublishers[key] = append(ed25519.PublicKey(nil), value...)
+	}
+	service := &ProductionService{Store: store, Runtime: runtime, Controller: controller, RoleHost: roleHost, RoleRuntime: roleRuntime, MessageBus: messageBus, RoleInbox: roleInbox, RoleLibrary: roleLibrary, projectionInterval: resolved.projectionInterval, projectionTimeout: resolved.projectionTimeout, recoveryInterval: resolved.reconciliation, recoveryTimeout: resolved.leaseOperationTimeout, recoveryAttempts: config.Worker.MaximumReconciliations, failures: make(chan error, 4), provenance: resolved.provenance, operatorToken: resolved.operatorBearerToken, operatorIdentity: protocol.AuthenticatedContext{Principal: config.Operator.Principal}, humanCredentials: append([]HumanTransportCredential(nil), resolved.humanCredentials...), operatorTimeout: resolved.operatorTimeout, operatorMaxBody: config.Operator.MaximumBodyBytes, roleReconciliation: resolved.roleReconciliation, roleMaximumRestarts: config.Organization.MaximumRestarts, messageMaximumAttempts: config.Organization.MaximumDeliveryAttempts, clock: clock, ids: ids, planningDeadline: resolved.planningDeadline, planning: config.Planning, profilesByModel: profilesByModel, workspacesByID: workspacesByID, serviceAuthority: config.ServiceAuthority, policyAuthority: config.ExpiryAuthority, librarySources: librarySources, trustedRolePublishers: trustedPublishers}
 	features, err := organization.NewFeatureCoordinator(store, roleHost, service, clock, ids)
 	if err != nil {
 		return fail(err)
@@ -739,6 +772,32 @@ func (service *ProductionService) DeadLetters(ctx context.Context, recipient ker
 		return nil, application.ErrInvalidConfiguration
 	}
 	return service.MessageBus.DeadLetters(ctx, recipient, limit)
+}
+
+func (service *ProductionService) RoleLibraries() []organization.RoleLibraryEntry {
+	if service == nil || service.RoleLibrary == nil {
+		return nil
+	}
+	return service.RoleLibrary.List()
+}
+
+// SyncRoleLibraries reloads only the exact, digest-bound sources from the
+// validated daemon configuration. Callers cannot supply an arbitrary path or
+// publisher key through the operator surface.
+func (service *ProductionService) SyncRoleLibraries() ([]organization.RoleLibraryEntry, error) {
+	if service == nil || service.RoleLibrary == nil || len(service.librarySources) == 0 || len(service.trustedRolePublishers) == 0 {
+		return nil, application.ErrInvalidConfiguration
+	}
+	for _, source := range service.librarySources {
+		team, err := organization.LoadTeamManifest(source.ManifestFile, source.ManifestDigest, service.trustedRolePublishers)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := service.RoleLibrary.Sync(team); err != nil {
+			return nil, err
+		}
+	}
+	return service.RoleLibrary.List(), nil
 }
 
 func (service *ProductionService) Start(ctx context.Context) error {

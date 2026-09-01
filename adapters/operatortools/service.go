@@ -47,6 +47,8 @@ type Organization interface {
 	RespondToHumanQuestion(context.Context, kernel.PrincipalRef, organization.HumanResponseInput) (organization.HumanNotification, error)
 	ReadHumanInteraction(context.Context, kernel.UUIDv7) (kernel.HumanInteractionSnapshot, error)
 	HumanNotifications(context.Context, kernel.PrincipalRef, bool) ([]organization.HumanNotification, error)
+	RoleLibraries() []organization.RoleLibraryEntry
+	SyncRoleLibraries() ([]organization.RoleLibraryEntry, error)
 }
 
 // Service translates focused operator operations into domain calls while the
@@ -121,6 +123,18 @@ func (service *Service) CallTool(ctx context.Context, identity protocol.Authenti
 			return nil, ErrNotFound
 		}
 		return value, nil
+	case mcp.LibrariesListToolName:
+		var input struct{}
+		if err := decodeStrict(arguments, &input); err != nil {
+			return nil, ErrInvalidArguments
+		}
+		return service.organization.RoleLibraries(), nil
+	case mcp.LibrariesSyncToolName:
+		var input struct{}
+		if err := decodeStrict(arguments, &input); err != nil {
+			return nil, ErrInvalidArguments
+		}
+		return service.organization.SyncRoleLibraries()
 	case mcp.FeatureSubmitToolName:
 		var input organization.FeatureRequestInput
 		if err := decodeStrict(arguments, &input); err != nil || input.Validate() != nil {

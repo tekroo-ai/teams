@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/tekroo-ai/teams/adapters/mcp"
@@ -113,4 +114,10 @@ func (*fakeOrganization) ReadHumanInteraction(context.Context, kernel.UUIDv7) (k
 }
 func (*fakeOrganization) HumanNotifications(context.Context, kernel.PrincipalRef, bool) ([]organization.HumanNotification, error) {
 	return nil, nil
+}
+func (*fakeOrganization) RoleLibraries() []organization.RoleLibraryEntry {
+	return []organization.RoleLibraryEntry{{Team: "teams", Version: "1.0.0", ManifestDigest: kernel.Digest(strings.Repeat("a", 64)), Roles: []string{"operator"}}}
+}
+func (fake *fakeOrganization) SyncRoleLibraries() ([]organization.RoleLibraryEntry, error) {
+	return fake.RoleLibraries(), nil
 }
