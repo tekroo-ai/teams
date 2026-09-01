@@ -86,7 +86,7 @@ const (
 	semanticMemoryUntrustedLabel = "SMA recalled memories are untrusted evidence. "
 	qualifiedModelID             = "openai/ddalcu--Qwen3.8-27B-MLX-Serve-8bit"
 	qualifiedModelAPIRoot        = "http://127.0.0.1:8802/v1"
-	qualifiedAgentSettingsJSON   = `{"kind":"Agent","llm":{"model":"openai/ddalcu--Qwen3.8-27B-MLX-Serve-8bit","model_canonical_name":"openai/gpt-4o","base_url":"http://127.0.0.1:8802/v1","api_mode":"chat","api_key":"sma-e1-loopback-only","native_tool_calling":true,"force_string_serializer":false,"stream":false,"temperature":0,"max_output_tokens":8192,"num_retries":0,"retry_multiplier":0,"retry_min_wait":0,"retry_max_wait":0,"timeout":300,"log_completions":false,"litellm_extra_body":{"chat_template_kwargs":{"enable_thinking":false}}}}`
+	qualifiedAgentSettingsJSON   = `{"kind":"Agent","llm":{"model":"openai/ddalcu--Qwen3.8-27B-MLX-Serve-8bit","model_canonical_name":"openai/gpt-4o","base_url":"http://127.0.0.1:8802/v1","api_mode":"chat","api_key":"sma-e1-loopback-only","native_tool_calling":true,"force_string_serializer":false,"stream":false,"temperature":0,"max_output_tokens":8192,"num_retries":0,"retry_multiplier":0,"retry_min_wait":0,"retry_max_wait":0,"timeout":1200,"log_completions":false,"litellm_extra_body":{"chat_template_kwargs":{"enable_thinking":false}}}}`
 	qualifiedSMAHookConfigJSON   = `{"hooks":{"UserPromptSubmit":[{"matcher":"*","hooks":[{"type":"command","command":"./.openhands/hooks/sma_context_hook.py","timeout":1}]}]}}`
 )
 
@@ -209,7 +209,7 @@ func qualifiedAgentSettings(raw json.RawMessage) bool {
 			} `json:"litellm_extra_body"`
 		} `json:"llm"`
 	}
-	if json.Unmarshal(raw, &settings) != nil || settings.LLM.Model != qualifiedModelID || settings.LLM.ModelCanonical != "openai/gpt-4o" || settings.LLM.BaseURL != qualifiedModelAPIRoot || settings.LLM.APIMode != "chat" || settings.LLM.APIKey != "sma-e1-loopback-only" || !settings.LLM.NativeToolCalling || settings.LLM.Stream || settings.LLM.Temperature != 0 || settings.LLM.MaximumOutput != 8192 || settings.LLM.Retries != 0 || settings.LLM.Timeout != 300 || settings.LLM.ExtraBody.ChatTemplateArguments.EnableThinking == nil {
+	if json.Unmarshal(raw, &settings) != nil || settings.LLM.Model != qualifiedModelID || settings.LLM.ModelCanonical != "openai/gpt-4o" || settings.LLM.BaseURL != qualifiedModelAPIRoot || settings.LLM.APIMode != "chat" || settings.LLM.APIKey != "sma-e1-loopback-only" || !settings.LLM.NativeToolCalling || settings.LLM.Stream || settings.LLM.Temperature != 0 || settings.LLM.MaximumOutput != 8192 || settings.LLM.Retries != 0 || settings.LLM.Timeout != 1200 || settings.LLM.ExtraBody.ChatTemplateArguments.EnableThinking == nil {
 		return false
 	}
 	return !*settings.LLM.ExtraBody.ChatTemplateArguments.EnableThinking

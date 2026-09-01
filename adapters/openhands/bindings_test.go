@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/tekroo-ai/teams/kernel"
@@ -116,6 +117,16 @@ func TestAcceptedSemanticMemoryBindingRequiresQualifiedHookAndSeparateStores(t *
 	}
 	if _, err := NewAcceptedSemanticMemoryBinding(qualifiedSMAHookConfig, "shared", "shared"); err != ErrInvalidConfiguration {
 		t.Fatalf("shared store error = %v", err)
+	}
+}
+
+func TestQualifiedAgentSettingsUseOperationalRequestTimeout(t *testing.T) {
+	if !qualifiedAgentSettings(qualifiedSMAAgentSettings) {
+		t.Fatal("accepted settings rejected")
+	}
+	shortTimeout := json.RawMessage(strings.Replace(string(qualifiedSMAAgentSettings), `"timeout":1200`, `"timeout":300`, 1))
+	if qualifiedAgentSettings(shortTimeout) {
+		t.Fatal("five-minute LLM timeout accepted")
 	}
 }
 

@@ -183,6 +183,9 @@ func TestTechnicalPlanningFailureClassification(t *testing.T) {
 			t.Fatalf("technical reason %q was not recognized", reason)
 		}
 	}
+	if !technicalPlanningFailure([]byte(`{"invocation_id":"invocation-1","request_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","conversation_id":"conversation-1","state":"FAILED"}`)) {
+		t.Fatal("retryable runtime failure receipt was not recognized")
+	}
 	for _, output := range [][]byte{[]byte(`{"reason":"TEST_FAILURE"}`), []byte(`{"reason":""}`), []byte(`not-json`)} {
 		if technicalPlanningFailure(output) {
 			t.Fatalf("substantive or malformed output classified as technical: %s", output)

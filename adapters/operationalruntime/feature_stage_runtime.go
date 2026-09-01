@@ -273,7 +273,11 @@ func (service *ProductionService) retryableTechnicalPlanningFailure(ctx context.
 
 func technicalPlanningFailure(output []byte) bool {
 	var value struct {
-		Reason string `json:"reason"`
+		Reason         string `json:"reason"`
+		State          string `json:"state"`
+		InvocationID   string `json:"invocation_id"`
+		ConversationID string `json:"conversation_id"`
+		RequestDigest  string `json:"request_digest"`
 	}
 	if json.Unmarshal(output, &value) != nil {
 		return false
@@ -281,9 +285,8 @@ func technicalPlanningFailure(output []byte) bool {
 	switch value.Reason {
 	case "EXECUTION_BRIEF_SUPERSEDED", "SHELL_DISCIPLINE_VIOLATION", "REPEATED_SHELL_DISCIPLINE_VIOLATION", "REPEATED_REPOSITORY_SEARCH", "REPOSITORY_DISCOVERY_LIMIT_EXCEEDED":
 		return true
-	default:
-		return false
 	}
+	return value.State == string(kernel.InvocationFailed) && value.InvocationID != "" && value.ConversationID != "" && value.RequestDigest != ""
 }
 
 func featurePlanningDescription(feature organization.FeatureRequest, stage featurePlanningStage, instruction string) (string, error) {
