@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -86,6 +87,8 @@ func run(arguments []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		method, path, err = identityRead("/v1/features/", operands)
 	case "feature-plan":
 		method, path, body, err = loadFeaturePlan(operands, stdin, config.Operator.MaximumBodyBytes)
+	case "feature-accept":
+		method, path, body, err = featureAccept(operands)
 	case "role":
 		method, path, err = roleOperation(operands)
 	case "inbox":
@@ -134,6 +137,21 @@ func roleOperation(operands []string) (string, string, error) {
 	default:
 		return "", "", usageError()
 	}
+}
+
+func featureAccept(operands []string) (string, string, []byte, error) {
+	if len(operands) != 3 || !kernel.UUIDv7(operands[0]).Valid() || operands[2] == "" || len(operands[2]) > 4096 {
+		return "", "", nil, usageError()
+	}
+	revision, err := strconv.ParseUint(operands[1], 10, 64)
+	if err != nil || revision == 0 {
+		return "", "", nil, usageError()
+	}
+	body, err := json.Marshal(map[string]any{"expected_revision": revision, "no_release_reason": operands[2]})
+	if err != nil {
+		return "", "", nil, err
+	}
+	return http.MethodPost, "/v1/features/" + operands[0] + "/accept", body, nil
 }
 
 func actorRead(prefix, suffix string, operands []string) (string, string, error) {
@@ -337,5 +355,5 @@ func loadCommand(operands []string, stdin io.Reader, maximum int64) ([]byte, ker
 }
 
 func usageError() error {
-	return errors.New("usage: tekroo -config CONFIG health|status|pause|resume|stop|feature FILE|-|feature-status ID|feature-plan ID FILE|-|roles|role ACTOR start|stop|restart|pause|resume|inbox ACTOR|message FILE|-|message-status ID|message-trace THREAD_ID|deadletters [ACTOR]|task ID|story ID|invocation ID|submit FILE|-|cancel INVOCATION_ID FILE|-")
+	return errors.New("usage: tekroo -config CONFIG health|status|pause|resume|stop|feature FILE|-|feature-status ID|feature-plan ID FILE|-|feature-accept ID REVISION NO_RELEASE_REASON|roles|role ACTOR start|stop|restart|pause|resume|inbox ACTOR|message FILE|-|message-status ID|message-trace THREAD_ID|deadletters [ACTOR]|task ID|story ID|invocation ID|submit FILE|-|cancel INVOCATION_ID FILE|-")
 }

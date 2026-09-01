@@ -40,6 +40,7 @@ type Organization interface {
 	SubmitFeature(context.Context, kernel.PrincipalRef, organization.FeatureRequestInput) (organization.FeatureRequest, bool, error)
 	ReadFeature(context.Context, kernel.UUIDv7) (organization.FeatureRequest, bool, error)
 	ApplyFeaturePlan(context.Context, kernel.UUIDv7, uint64, organization.FeaturePlan) (organization.FeatureRequest, error)
+	AcceptFeature(context.Context, kernel.UUIDv7, uint64, kernel.PrincipalRef, string) (organization.FeatureRequest, error)
 }
 
 // Service translates focused operator operations into domain calls while the
@@ -149,6 +150,16 @@ func (service *Service) CallTool(ctx context.Context, identity protocol.Authenti
 			return nil, ErrInvalidArguments
 		}
 		return service.organization.ApplyFeaturePlan(ctx, input.ID, input.ExpectedRevision, input.Plan)
+	case mcp.FeatureAcceptToolName:
+		var input struct {
+			ID               kernel.UUIDv7 `json:"feature_id"`
+			ExpectedRevision uint64        `json:"expected_revision"`
+			NoReleaseReason  string        `json:"no_release_reason"`
+		}
+		if err := decodeStrict(arguments, &input); err != nil || !input.ID.Valid() || input.ExpectedRevision == 0 || input.NoReleaseReason == "" {
+			return nil, ErrInvalidArguments
+		}
+		return service.organization.AcceptFeature(ctx, input.ID, input.ExpectedRevision, identity.Principal, input.NoReleaseReason)
 	case mcp.RolesListToolName:
 		var input struct{}
 		if err := decodeStrict(arguments, &input); err != nil {

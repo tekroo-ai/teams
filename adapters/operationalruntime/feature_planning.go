@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/tekroo-ai/teams/kernel"
@@ -125,7 +126,40 @@ func (service *ProductionService) MaterializeFeaturePlan(ctx context.Context, fe
 			return organization.ErrInvalidFeature
 		}
 	}
+	for _, story := range plan.Stories {
+		storyTaskIDs := make([]kernel.UUIDv7, 0)
+		for _, task := range plan.Tasks {
+			if task.StoryID == story.ID {
+				storyTaskIDs = append(storyTaskIDs, task.ID)
+			}
+		}
+		if err := service.activatePlannedStory(ctx, feature, story.ID, storyEvents[story.ID], storyTaskIDs); err != nil {
+			return err
+		}
+	}
 	return service.preparePlannedTasks(ctx, feature, plan, storyEvents, taskEvents)
+}
+
+func (service *ProductionService) activatePlannedStory(ctx context.Context, feature organization.FeatureRequest, storyID, createdEventID kernel.UUIDv7, taskIDs []kernel.UUIDv7) error {
+	sort.Slice(taskIDs, func(left, right int) bool { return taskIDs[left] < taskIDs[right] })
+	authorized, err := service.submitDeterministicCommand(ctx, feature, "tekroo.command.story.authorize", kernel.SchemaVersion, kernel.AggregateStory, storyID, feature.SubmittedBy, 1, mustJSON(map[string]any{"reason": "operator-authorized feature scope", "scope_revision": feature.ScopeRevision}), []kernel.DagParent{{ParentEventID: createdEventID, EdgeKind: kernel.EdgeCausal}}, nil, "story-authorize-"+string(storyID))
+	if err != nil {
+		return err
+	}
+	planning, err := service.submitDeterministicCommand(ctx, feature, "tekroo.command.story.begin-planning", kernel.SchemaVersion, kernel.AggregateStory, storyID, feature.SubmittedBy, 2, mustJSON(map[string]any{"accountable_owner_fqn": feature.ProductOwnerActor, "planning_budget": uint64(feature.Input.MaximumTasks)}), []kernel.DagParent{{ParentEventID: authorized.EventIDs[0], EdgeKind: kernel.EdgeCausal}}, nil, "story-planning-"+string(storyID))
+	if err != nil {
+		return err
+	}
+	_, err = service.submitDeterministicCommand(ctx, feature, "tekroo.command.story.activate", kernel.SchemaVersion, kernel.AggregateStory, storyID, feature.SubmittedBy, 3, mustJSON(map[string]any{"plan_digest": digestBytes([]byte(string(feature.ID) + "\x00" + string(storyID))), "required_task_ids": taskIDs}), []kernel.DagParent{{ParentEventID: planning.EventIDs[0], EdgeKind: kernel.EdgeCausal}}, nil, "story-activate-"+string(storyID))
+	return err
+}
+
+func mustJSON(value any) []byte {
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		panic(err)
+	}
+	return encoded
 }
 
 func (service *ProductionService) ensureFeaturePlanningStory(ctx context.Context, feature organization.FeatureRequest) (kernel.CommandReceipt, error) {

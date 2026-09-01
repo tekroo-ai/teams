@@ -77,6 +77,16 @@ func (service *ProductionService) reconcileFeaturePlan(ctx context.Context, feat
 	if completed {
 		return nil
 	}
+	allCompleted := true
+	for _, item := range plan.Tasks {
+		if states[item.ID].Phase != kernel.PhaseCompleted {
+			allCompleted = false
+			break
+		}
+	}
+	if allCompleted {
+		return service.recordFeatureAcceptanceRecommendation(ctx, feature, plan, invocations)
+	}
 
 	for _, item := range plan.Tasks {
 		state := states[item.ID]
@@ -165,6 +175,45 @@ func (service *ProductionService) reconcileFeaturePlan(ctx context.Context, feat
 		budget.Revision++
 	}
 	return nil
+}
+
+func (service *ProductionService) recordFeatureAcceptanceRecommendation(ctx context.Context, feature organization.FeatureRequest, plan organization.FeaturePlan, invocations map[kernel.UUIDv7]kernel.WorkInvocation) error {
+	var acceptanceTask *organization.PlannedTask
+	for index := range plan.Tasks {
+		if plan.Tasks[index].Purpose != kernel.PurposePromotion {
+			continue
+		}
+		if acceptanceTask != nil {
+			return organization.ErrInvalidFeature
+		}
+		acceptanceTask = &plan.Tasks[index]
+	}
+	if acceptanceTask == nil {
+		return nil
+	}
+	invocation, found := invocations[acceptanceTask.ID]
+	if !found || invocation.State != kernel.InvocationSucceeded || invocation.OutputDigest == nil || invocation.ActorFQN != feature.ProductOwnerActor {
+		return organization.ErrInvalidFeature
+	}
+	output, err := service.Runtime.ReadExecutionOutput(ctx, *invocation.OutputDigest)
+	if err != nil {
+		return err
+	}
+	result, err := parseStructuredValidationResult(output)
+	if err != nil || result.Outcome != "PASS" {
+		return errors.Join(organization.ErrInvalidFeature, err)
+	}
+	stories := make([]kernel.UUIDv7, len(plan.Stories))
+	for index := range plan.Stories {
+		stories[index] = plan.Stories[index].ID
+	}
+	sort.Slice(stories, func(left, right int) bool { return stories[left] < stories[right] })
+	_, err = service.Features.RecordAcceptanceRecommendation(ctx, feature.ID, feature.Revision, organization.FeatureAcceptance{
+		RecommendedBy: feature.ProductOwnerActor, RecommendationRun: invocation.Execution,
+		Recommendation: "PASS", RecommendationHash: *invocation.OutputDigest,
+		StoryIDs: stories, RecordedAt: service.clock.Now().UTC(),
+	})
+	return err
 }
 
 func (service *ProductionService) reconcileValidationRounds(ctx context.Context, feature organization.FeatureRequest, plan organization.FeaturePlan, states map[kernel.UUIDv7]kernel.AggregateState, heads map[kernel.UUIDv7]kernel.UUIDv7, invocations map[kernel.UUIDv7]kernel.WorkInvocation, snapshot kernel.Snapshot, budgetRevision uint64) (bool, error) {

@@ -208,11 +208,13 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 			t.Fatalf("automated feature stage %s = %#v found=%t err=%v", expected.stage, automated, found, err)
 		}
 	}
-	if automated.Plan == nil || len(automated.Plan.Tasks) != 2 || automated.Plan.Tasks[1].Purpose != kernel.PurposeValidation || len(automated.Plan.Tasks[1].Validates) != 1 || automated.Plan.Tasks[1].Validates[0] != automated.Plan.Tasks[0].ID {
+	if automated.Plan == nil || len(automated.Plan.Tasks) != 4 || automated.Plan.Tasks[1].Purpose != kernel.PurposeValidation || len(automated.Plan.Tasks[1].Validates) != 1 || automated.Plan.Tasks[1].Validates[0] != automated.Plan.Tasks[0].ID || automated.Plan.Tasks[2].Purpose != kernel.PurposePromotion || automated.Plan.Tasks[2].Owner != automated.ProductOwnerActor || automated.Plan.Tasks[3].Purpose != kernel.PurposeValidation || len(automated.Plan.Tasks[3].Validates) != 1 || automated.Plan.Tasks[3].Validates[0] != automated.Plan.Tasks[2].ID {
 		t.Fatalf("automated plan = %#v", automated.Plan)
 	}
 	automatedImplementation := automated.Plan.Tasks[0]
 	automatedValidation := automated.Plan.Tasks[1]
+	automatedAcceptance := automated.Plan.Tasks[2]
+	automatedAcceptanceValidation := automated.Plan.Tasks[3]
 	waitForInvocationState(t, store, deterministicOperationalUUID("work-invocation", string(automated.ID), string(automatedImplementation.ID), string(automatedImplementation.Purpose), "1"), kernel.InvocationSucceeded)
 	if err := service.reconcileFeaturePlan(contextWithTimeout(t), automated, *automated.Plan); err != nil {
 		t.Fatal(err)
@@ -239,12 +241,38 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 	if err != nil || !found || automatedState.Phase != kernel.PhaseCompleted {
 		t.Fatalf("automated implementation state=%#v found=%t err=%v", automatedState, found, err)
 	}
+	if err := service.reconcileFeaturePlan(contextWithTimeout(t), automated, *automated.Plan); err != nil {
+		t.Fatal(err)
+	}
+	waitForTaskInvocationState(t, store, automatedAcceptance.ID, kernel.PurposePromotion, kernel.InvocationSucceeded)
+	if err := service.reconcileFeaturePlan(contextWithTimeout(t), automated, *automated.Plan); err != nil {
+		t.Fatal(err)
+	}
+	waitForTaskInvocationState(t, store, automatedAcceptanceValidation.ID, kernel.PurposeValidation, kernel.InvocationSucceeded)
+	if err := service.reconcileFeaturePlan(contextWithTimeout(t), automated, *automated.Plan); err != nil {
+		t.Fatal(err)
+	}
+	if err := service.reconcileFeaturePlan(contextWithTimeout(t), automated, *automated.Plan); err != nil {
+		t.Fatal(err)
+	}
+	automated, found, err = service.ReadFeature(contextWithTimeout(t), automated.ID)
+	if err != nil || !found || automated.Status != organization.FeatureAwaitingAcceptance || automated.Acceptance == nil || automated.Acceptance.RecommendedBy != automated.ProductOwnerActor || automated.Acceptance.AcceptedBy != nil {
+		t.Fatalf("automated acceptance recommendation = %#v found=%t err=%v", automated, found, err)
+	}
+	automated, err = service.AcceptFeature(contextWithTimeout(t), automated.ID, automated.Revision, automated.SubmittedBy, "this integration feature produces retained evidence but no repository release")
+	if err != nil || automated.Status != organization.FeatureAccepted || automated.Acceptance == nil || automated.Acceptance.AcceptedBy == nil || len(automated.Acceptance.ReleasePlanIDs) != len(automated.Plan.Stories) {
+		t.Fatalf("automated feature acceptance = %#v err=%v", automated, err)
+	}
 	cancelRun()
 	if err := <-runResult; !errors.Is(err, context.Canceled) {
 		t.Fatalf("runtime stop = %v", err)
 	}
 	if _, err := store.ProjectPendingOperationalEvents(contextWithTimeout(t), now.Add(time.Minute)); err != nil {
 		t.Fatal(err)
+	}
+	automatedStory, found, err := store.ReadStoryProjection(contextWithTimeout(t), automated.Plan.Stories[0].ID)
+	if err != nil || !found || automatedStory.Phase != string(kernel.PhaseAccepted) || automatedStory.Release.State != string(kernel.ReleaseNotRequired) || automatedStory.Acceptance.State != "ACCEPTED" {
+		t.Fatalf("automated accepted story = %#v found=%t err=%v", automatedStory, found, err)
 	}
 	projection, found, err := store.ReadTaskProjection(contextWithTimeout(t), plan.Tasks[0].ID)
 	if err != nil || !found || !projection.Valid() || projection.Phase != string(kernel.PhaseCompleted) || projection.OwnerFQN == nil || *projection.OwnerFQN != plan.Tasks[0].Owner || !projection.WorkProfileID.Valid() || projection.QualifiedAssignment == nil || projection.Budget.AccountID != feature.BudgetAccountID || projection.OperationalScope == nil || projection.OperationalScope.WorkspaceID != "coder-1" || projection.LatestInvocation == nil || projection.LatestInvocation.State != kernel.InvocationSucceeded {

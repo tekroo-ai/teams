@@ -341,6 +341,12 @@ func BuildExecutionBrief(current OperationalExecutionContext, maximumBytes int) 
 			Outcomes:    []string{"PASS", "FAIL", "BLOCKED", "INCONCLUSIVE"},
 			Instruction: "End the final response with the marker on its own line followed by exactly one JSON object containing schema_version, outcome, and non-empty reasons. Teams will reject missing or malformed results.",
 		}
+	} else if invocation.Purpose == kernel.PurposePromotion {
+		brief.ResultProtocol = &ExecutionResultProtocol{
+			SchemaVersion: "1.0.0", Marker: ValidationResultMarker,
+			Outcomes:    []string{"PASS", "FAIL", "BLOCKED", "INCONCLUSIVE"},
+			Instruction: "Act as the product owner. End the final response with the marker on its own line followed by exactly one JSON object containing schema_version, outcome, and non-empty reasons. PASS means every story acceptance criterion is supported by the supplied completion evidence; Teams remains the authority that records acceptance and release state.",
+		}
 	} else if invocation.Purpose == kernel.PurposeHandoff || invocation.Purpose == kernel.PurposeReplan {
 		brief.ResultProtocol = &ExecutionResultProtocol{
 			SchemaVersion: "1.0.0", Marker: OrganizationalResultMarker,

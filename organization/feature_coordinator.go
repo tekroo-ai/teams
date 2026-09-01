@@ -143,6 +143,45 @@ func (coordinator *FeatureCoordinator) ApplyPlan(ctx context.Context, featureID 
 	return coordinator.store.ApplyFeaturePlan(ctx, feature.ID, expectedRevision, plan, coordinator.clock.Now().UTC())
 }
 
+func (coordinator *FeatureCoordinator) RecordAcceptanceRecommendation(ctx context.Context, featureID kernel.UUIDv7, expectedRevision uint64, acceptance FeatureAcceptance) (FeatureRequest, error) {
+	feature, err := coordinator.currentFeature(ctx, featureID, expectedRevision, FeaturePlanned)
+	if err != nil {
+		return FeatureRequest{}, err
+	}
+	if acceptance.AcceptedBy != nil || acceptance.Validate(feature) != nil {
+		return FeatureRequest{}, ErrInvalidFeature
+	}
+	next := feature
+	next.Revision++
+	next.Status = FeatureAwaitingAcceptance
+	next.Acceptance = &acceptance
+	next.UpdatedAt = coordinator.clock.Now().UTC()
+	return coordinator.store.AdvanceFeature(ctx, next, expectedRevision, nil)
+}
+
+func (coordinator *FeatureCoordinator) Accept(ctx context.Context, featureID kernel.UUIDv7, expectedRevision uint64, principal kernel.PrincipalRef, releasePlanIDs []kernel.UUIDv7) (FeatureRequest, error) {
+	feature, err := coordinator.currentFeature(ctx, featureID, expectedRevision, FeatureAwaitingAcceptance)
+	if err != nil {
+		return FeatureRequest{}, err
+	}
+	if principal.Kind != kernel.PrincipalHuman || !principal.Valid() || feature.Acceptance == nil || len(releasePlanIDs) != len(feature.Acceptance.StoryIDs) {
+		return FeatureRequest{}, ErrInvalidFeature
+	}
+	next := feature
+	next.Revision++
+	next.Status = FeatureAccepted
+	accepted := *feature.Acceptance
+	accepted.AcceptedBy = &principal
+	accepted.ReleasePlanIDs = append([]kernel.UUIDv7(nil), releasePlanIDs...)
+	accepted.RecordedAt = coordinator.clock.Now().UTC()
+	next.Acceptance = &accepted
+	next.UpdatedAt = accepted.RecordedAt
+	if next.Validate() != nil {
+		return FeatureRequest{}, ErrInvalidFeature
+	}
+	return coordinator.store.AdvanceFeature(ctx, next, expectedRevision, nil)
+}
+
 func (coordinator *FeatureCoordinator) Refine(ctx context.Context, featureID kernel.UUIDv7, expectedRevision uint64, refinement FeatureRefinement) (FeatureRequest, error) {
 	feature, err := coordinator.currentFeature(ctx, featureID, expectedRevision, FeatureSubmitted)
 	if err != nil {

@@ -175,6 +175,10 @@ func (service *operatorService) ApplyFeaturePlan(context.Context, kernel.UUIDv7,
 	return organization.FeatureRequest{ID: "00000000-0000-7000-8000-000000000005"}, nil
 }
 
+func (service *operatorService) AcceptFeature(context.Context, kernel.UUIDv7, uint64, kernel.PrincipalRef, string) (organization.FeatureRequest, error) {
+	return organization.FeatureRequest{ID: "00000000-0000-7000-8000-000000000005"}, nil
+}
+
 func (service *operatorService) RoleRoster(context.Context) ([]organization.RoleInstanceState, error) {
 	return []organization.RoleInstanceState{}, nil
 }

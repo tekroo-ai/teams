@@ -93,3 +93,6 @@ func (*fakeOrganization) ReadFeature(context.Context, kernel.UUIDv7) (organizati
 func (*fakeOrganization) ApplyFeaturePlan(context.Context, kernel.UUIDv7, uint64, organization.FeaturePlan) (organization.FeatureRequest, error) {
 	return organization.FeatureRequest{}, nil
 }
+func (*fakeOrganization) AcceptFeature(context.Context, kernel.UUIDv7, uint64, kernel.PrincipalRef, string) (organization.FeatureRequest, error) {
+	return organization.FeatureRequest{}, nil
+}

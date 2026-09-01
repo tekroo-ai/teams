@@ -50,12 +50,14 @@ const (
 	FeatureSpecified             FeatureStatus = "SPECIFIED"
 	FeaturePlanned               FeatureStatus = "PLANNED"
 	FeatureApproved              FeatureStatus = "APPROVED"
+	FeatureAwaitingAcceptance    FeatureStatus = "AWAITING_ACCEPTANCE"
+	FeatureAccepted              FeatureStatus = "ACCEPTED"
 	FeatureCancelled             FeatureStatus = "CANCELLED"
 )
 
 func (status FeatureStatus) Valid() bool {
 	switch status {
-	case FeatureSubmitted, FeatureClarificationRequired, FeatureReadyForPlanning, FeatureSpecified, FeaturePlanned, FeatureApproved, FeatureCancelled:
+	case FeatureSubmitted, FeatureClarificationRequired, FeatureReadyForPlanning, FeatureSpecified, FeaturePlanned, FeatureApproved, FeatureAwaitingAcceptance, FeatureAccepted, FeatureCancelled:
 		return true
 	default:
 		return false
@@ -110,6 +112,7 @@ type FeatureRequest struct {
 	Refinement        *FeatureRefinement    `json:"refinement,omitempty"`
 	Specification     *FeatureSpecification `json:"specification,omitempty"`
 	Plan              *FeaturePlan          `json:"plan,omitempty"`
+	Acceptance        *FeatureAcceptance    `json:"acceptance,omitempty"`
 }
 
 func (feature FeatureRequest) Validate() error {
@@ -124,6 +127,48 @@ func (feature FeatureRequest) Validate() error {
 	}
 	if feature.Specification != nil && feature.Specification.Validate(feature) != nil {
 		return ErrInvalidFeature
+	}
+	if feature.Acceptance != nil && feature.Acceptance.Validate(feature) != nil {
+		return ErrInvalidFeature
+	}
+	return nil
+}
+
+type FeatureAcceptance struct {
+	RecommendedBy      kernel.ActorFQN       `json:"recommended_by"`
+	RecommendationRun  kernel.ExecutionTuple `json:"recommendation_execution"`
+	Recommendation     string                `json:"recommendation"`
+	RecommendationHash kernel.Digest         `json:"recommendation_digest"`
+	AcceptedBy         *kernel.PrincipalRef  `json:"accepted_by,omitempty"`
+	StoryIDs           []kernel.UUIDv7       `json:"story_ids"`
+	ReleasePlanIDs     []kernel.UUIDv7       `json:"release_plan_ids,omitempty"`
+	RecordedAt         time.Time             `json:"recorded_at"`
+}
+
+func (acceptance FeatureAcceptance) Validate(feature FeatureRequest) error {
+	if !acceptance.RecommendedBy.Valid() || !acceptance.RecommendationRun.Valid() || acceptance.Recommendation != "PASS" || !acceptance.RecommendationHash.Valid() || len(acceptance.StoryIDs) == 0 || acceptance.RecordedAt.Before(feature.CreatedAt) {
+		return ErrInvalidFeature
+	}
+	if acceptance.AcceptedBy != nil && (acceptance.AcceptedBy.Kind != kernel.PrincipalHuman || !acceptance.AcceptedBy.Valid() || len(acceptance.ReleasePlanIDs) != len(acceptance.StoryIDs)) {
+		return ErrInvalidFeature
+	}
+	if acceptance.AcceptedBy == nil && len(acceptance.ReleasePlanIDs) != 0 {
+		return ErrInvalidFeature
+	}
+	seen := make(map[kernel.UUIDv7]struct{}, len(acceptance.StoryIDs))
+	for _, id := range acceptance.StoryIDs {
+		if !id.Valid() {
+			return ErrInvalidFeature
+		}
+		if _, duplicate := seen[id]; duplicate {
+			return ErrInvalidFeature
+		}
+		seen[id] = struct{}{}
+	}
+	for _, id := range acceptance.ReleasePlanIDs {
+		if !id.Valid() {
+			return ErrInvalidFeature
+		}
 	}
 	return nil
 }

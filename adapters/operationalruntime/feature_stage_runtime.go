@@ -310,6 +310,14 @@ func (service *ProductionService) buildExecutableFeaturePlan(ctx context.Context
 	if err != nil {
 		return organization.FeaturePlan{}, err
 	}
+	tasks, err = service.addStoryAcceptanceTasks(ctx, feature, tasks)
+	if err != nil {
+		return organization.FeaturePlan{}, err
+	}
+	tasks, err = service.addRequiredValidationTasks(ctx, feature, tasks)
+	if err != nil {
+		return organization.FeaturePlan{}, err
+	}
 	plan := organization.FeaturePlan{Version: 1, PreparedBy: invocation.ActorFQN, PreparedExecution: invocation.Execution, Architecture: result.Architecture, DesignDecisions: result.DesignDecisions, Assumptions: result.Assumptions, Stories: append([]organization.PlannedStory(nil), feature.Specification.Stories...), Tasks: tasks, CreatedAt: createdAt}
 	if plan.Validate(feature) != nil {
 		return organization.FeaturePlan{}, organization.ErrInvalidFeature
@@ -336,7 +344,7 @@ func (service *ProductionService) addRequiredValidationTasks(ctx context.Context
 		}
 	}
 	for _, target := range append([]organization.PlannedTask(nil), tasks...) {
-		if target.Purpose != kernel.PurposeImplementation && target.Purpose != kernel.PurposeRepair {
+		if target.Purpose != kernel.PurposeImplementation && target.Purpose != kernel.PurposeRepair && target.Purpose != kernel.PurposePromotion {
 			continue
 		}
 		if !coverage[target.ID][kernel.PurposeValidation] {
@@ -366,6 +374,62 @@ func (service *ProductionService) addRequiredValidationTasks(ctx context.Context
 		}
 	}
 	return tasks, nil
+}
+
+func (service *ProductionService) addStoryAcceptanceTasks(ctx context.Context, feature organization.FeatureRequest, tasks []organization.PlannedTask) ([]organization.PlannedTask, error) {
+	productOwner, err := service.ensureExactPlanningRole(ctx, "product-owner")
+	if err != nil {
+		return nil, err
+	}
+	profile, found := service.profilesByModel[productOwner.ModelProfile]
+	if !found {
+		return nil, organization.ErrInvalidFeature
+	}
+	dependencies := make([]kernel.UUIDv7, len(tasks))
+	criteria := make([]string, 0)
+	maximumComplexity := uint8(1)
+	risk := organization.RiskLow
+	for index, task := range tasks {
+		dependencies[index] = task.ID
+		if task.Complexity > maximumComplexity {
+			maximumComplexity = task.Complexity
+		}
+		if riskOrdinal(task.Risk) > riskOrdinal(risk) {
+			risk = task.Risk
+		}
+	}
+	for _, story := range feature.Specification.Stories {
+		for _, criterion := range story.AcceptanceCriteria {
+			criteria = append(criteria, story.Title+": "+criterion)
+		}
+	}
+	sort.Slice(dependencies, func(left, right int) bool { return dependencies[left] < dependencies[right] })
+	id := deterministicOperationalUUID("feature-acceptance", string(feature.ID))
+	tasks = append(tasks, organization.PlannedTask{
+		ID: id, StoryID: feature.Specification.Stories[0].ID, Title: "Accept feature: " + feature.Input.Title,
+		Description:        "Review the completed feature evidence against every story acceptance criterion and return the structured product acceptance result. Do not delegate or start another agent.",
+		AcceptanceCriteria: criteria, DependsOn: dependencies,
+		Owner: productOwner.ActorFQN, ModelProfile: productOwner.ModelProfile, DecisionRoute: profile.Qualification.DecisionRoute,
+		Purpose: kernel.PurposePromotion, Complexity: maximumComplexity, Risk: risk, CriticalPath: true,
+		AttemptLimit: 2, ReviewRoundLimit: 1,
+	})
+	if len(tasks) > int(feature.Input.MaximumTasks) {
+		return nil, organization.ErrInvalidFeature
+	}
+	return tasks, nil
+}
+
+func riskOrdinal(risk organization.RiskLevel) int {
+	switch risk {
+	case organization.RiskCritical:
+		return 4
+	case organization.RiskHigh:
+		return 3
+	case organization.RiskModerate:
+		return 2
+	default:
+		return 1
+	}
 }
 
 func (service *ProductionService) resolveFeatureStageMessage(ctx context.Context, feature organization.FeatureRequest, invocation kernel.WorkInvocation) error {
