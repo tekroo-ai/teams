@@ -99,7 +99,7 @@ func TestFeaturePlanningDescriptionCarriesAuthoritativeFeatureState(t *testing.T
 				}
 			}
 		} else {
-			for _, required := range []string{"Do not add or change product requirements", "actor instance", "Teams assigns operational identities"} {
+			for _, required := range []string{"Do not add or change product requirements", "actor instance", "Teams assigns operational identities", "Call the OpenHands finish tool exactly once", "finish.message is the only result Teams receives", "A prose assessment is not a result"} {
 				if !strings.Contains(description, required) {
 					t.Fatalf("%s instruction omitted %q", stage, required)
 				}
