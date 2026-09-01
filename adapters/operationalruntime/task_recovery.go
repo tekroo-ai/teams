@@ -82,7 +82,7 @@ func (service *ProductionService) RetryFailedTask(ctx context.Context, principal
 		if evidenceErr != nil {
 			return InvocationStatus{}, evidenceErr
 		}
-		key := "task-recovery-profile-" + string(terminal.ID) + "-" + request.IdempotencyKey
+		key := "task-recovery-profile-" + string(terminal.ID) + "-" + string(successorProfile.ProfileID) + "-" + request.IdempotencyKey
 		if err := service.applyTaskCommand(ctx, feature, tracked, "tekroo.command.task.bind-work-profile", kernel.SchemaVersion, service.policyAuthority, successorProfile, profileEvidence, nil, key); err != nil {
 			return InvocationStatus{}, err
 		}

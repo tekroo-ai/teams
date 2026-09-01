@@ -116,7 +116,7 @@ func (service *ProductionService) RetryCancelledFeaturePlanning(ctx context.Cont
 		if evidenceErr != nil {
 			return InvocationStatus{}, evidenceErr
 		}
-		key := "planning-recovery-profile-" + string(terminal.ID) + "-" + request.IdempotencyKey
+		key := "planning-recovery-profile-" + string(terminal.ID) + "-" + string(successorProfile.ProfileID) + "-" + request.IdempotencyKey
 		if err := service.applyTaskCommand(ctx, feature, tracked, "tekroo.command.task.bind-work-profile", kernel.SchemaVersion, service.policyAuthority, successorProfile, profileEvidence, nil, key); err != nil {
 			return InvocationStatus{}, err
 		}
