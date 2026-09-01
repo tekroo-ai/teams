@@ -232,6 +232,11 @@ var boundedExecutionGuidance = []string{
 	"Stay inside the authorized workspace and task scope.",
 }
 
+var retryExecutionGuidance = []string{
+	"This is a bounded retry. Reuse the current workspace and retained task evidence; do not restart repository discovery from the beginning.",
+	"Address the prior failed attempt directly. If a concrete edit is still not justified after inspecting the smallest relevant surface, report an explicit blocker.",
+}
+
 // SemanticContextRequest is read-only metadata supplied to the qualified
 // OpenHands prompt hook. It helps SMA select useful memories but grants no
 // authority: Teams does not parse recalled context into commands or state.
@@ -348,6 +353,9 @@ func BuildExecutionBrief(current OperationalExecutionContext, maximumBytes int) 
 		RemainingPurposeBudget: invocation.RemainingPurposeBudget, DeadlineAt: invocation.DeadlineAt,
 		CoordinationRule:  evidenceOnlyCoordinationRule,
 		ExecutionGuidance: append([]string(nil), boundedExecutionGuidance...),
+	}
+	if invocation.RetryOrdinal > 0 && (invocation.Purpose == kernel.PurposeImplementation || invocation.Purpose == kernel.PurposeRepair) {
+		brief.ExecutionGuidance = append(brief.ExecutionGuidance, retryExecutionGuidance...)
 	}
 	if invocation.Purpose == kernel.PurposeValidation || invocation.Purpose == kernel.PurposeReview {
 		brief.ResultProtocol = &ExecutionResultProtocol{

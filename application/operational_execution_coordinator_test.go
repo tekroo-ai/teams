@@ -56,6 +56,21 @@ func TestOperationalCoordinatorExecutesOneInvocationAndNeverChainsAgentProse(t *
 	}
 }
 
+func TestRetryExecutionBriefDirectsAgentToContinueFromRetainedState(t *testing.T) {
+	runtime := newOperationalRuntime(t)
+	runtime.context.Invocation.RetryOrdinal = 1
+	brief, _, err := BuildExecutionBrief(runtime.context, 1<<20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	guidance := strings.Join(brief.ExecutionGuidance, "\n")
+	for _, required := range []string{"bounded retry", "do not restart repository discovery", "prior failed attempt", "explicit blocker"} {
+		if !strings.Contains(guidance, required) {
+			t.Fatalf("retry guidance omitted %q: %v", required, brief.ExecutionGuidance)
+		}
+	}
+}
+
 func TestOperationalCoordinatorReconcilesAmbiguousStartWithoutDuplicateSubmission(t *testing.T) {
 	runtime := newOperationalRuntime(t)
 	runtime.startErr = errors.New("response lost after provider acceptance")

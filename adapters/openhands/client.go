@@ -24,6 +24,8 @@ var (
 	ErrProtocol             = errors.New("OpenHands execution protocol mismatch")
 )
 
+const maximumRepositoryDiscoveryActions = 12
+
 type WorkspaceBinding struct {
 	WorkspaceID      string
 	WorktreeID       string
@@ -360,7 +362,51 @@ func (client *Client) Inspect(ctx context.Context, brief application.ExecutionBr
 	if err != nil || promptIndex(events, prepared.prompt) < 0 {
 		return application.ExternalExecutionObservation{}, ErrProtocol
 	}
+	if progressGuardApplies(brief) {
+		discoveryActions, mutationObserved := repositoryProgress(events, promptIndex(events, prepared.prompt))
+		if !mutationObserved && discoveryActions >= maximumRepositoryDiscoveryActions && executionStillActive(info.ExecutionStatus) {
+			return client.stopForNoProgress(ctx, brief, requestDigest, info, events, discoveryActions)
+		}
+	}
 	return client.observation(brief, requestDigest, info, events, false)
+}
+
+func progressGuardApplies(brief application.ExecutionBrief) bool {
+	return brief.Purpose == kernel.PurposeImplementation || brief.Purpose == kernel.PurposeRepair
+}
+
+func executionStillActive(status string) bool {
+	return status == "idle" || status == "running" || status == "waiting_for_confirmation"
+}
+
+func (client *Client) stopForNoProgress(ctx context.Context, brief application.ExecutionBrief, requestDigest kernel.Digest, info conversationInfo, events []rawEvent, discoveryActions int) (application.ExternalExecutionObservation, error) {
+	conversationID := string(brief.InvocationID)
+	status, _, err := client.request(ctx, http.MethodPost, "/api/conversations/"+url.PathEscape(conversationID)+"/interrupt", nil)
+	if err != nil || status != http.StatusOK && status != http.StatusNoContent && status != http.StatusConflict {
+		return application.ExternalExecutionObservation{}, ErrProtocol
+	}
+	if refreshed, refreshedStatus, refreshErr := client.getConversation(ctx, conversationID); refreshErr == nil && refreshedStatus == http.StatusOK {
+		info = refreshed
+	}
+	if refreshed, refreshErr := client.events(ctx, conversationID); refreshErr == nil {
+		events = refreshed
+	}
+	observation, err := client.observation(brief, requestDigest, info, events, true)
+	if err != nil {
+		return application.ExternalExecutionObservation{}, err
+	}
+	output, err := json.Marshal(struct {
+		Reason           string `json:"reason"`
+		DiscoveryActions int    `json:"repository_discovery_actions"`
+		Limit            int    `json:"repository_discovery_limit"`
+	}{"REPOSITORY_DISCOVERY_LIMIT_EXCEEDED", discoveryActions, maximumRepositoryDiscoveryActions})
+	if err != nil {
+		return application.ExternalExecutionObservation{}, err
+	}
+	observation.State = application.ExternalFailed
+	observation.Retryable = true
+	observation.Output = output
+	return observation, nil
 }
 
 func (client *Client) Cancel(ctx context.Context, brief application.ExecutionBrief, conversationID string, requestDigest kernel.Digest) (application.ExternalExecutionObservation, error) {
@@ -489,13 +535,18 @@ func (client *Client) getConversation(ctx context.Context, conversationID string
 }
 
 type rawEvent struct {
-	Raw             json.RawMessage
-	ID              string
-	Kind            string
-	Source          string
-	ObservationKind string
-	Timestamp       time.Time
-	Text            string
+	Raw                 json.RawMessage
+	ID                  string
+	Kind                string
+	Source              string
+	ObservationKind     string
+	Timestamp           time.Time
+	Text                string
+	ToolName            string
+	ActionCommand       string
+	ObservationError    bool
+	ObservationTimeout  bool
+	ObservationExitCode *int
 }
 
 func (client *Client) events(ctx context.Context, conversationID string) ([]rawEvent, error) {
@@ -555,12 +606,20 @@ func decodeEvent(raw json.RawMessage) (rawEvent, error) {
 			} `json:"content"`
 		} `json:"llm_message"`
 		Observation struct {
-			Kind    string `json:"kind"`
-			Content []struct {
+			Kind     string `json:"kind"`
+			IsError  bool   `json:"is_error"`
+			Timeout  bool   `json:"timeout"`
+			ExitCode *int   `json:"exit_code"`
+			Content  []struct {
 				Type string `json:"type"`
 				Text string `json:"text"`
 			} `json:"content"`
 		} `json:"observation"`
+		ToolName string `json:"tool_name"`
+		Action   struct {
+			Command string `json:"command"`
+			Kind    string `json:"kind"`
+		} `json:"action"`
 	}
 	if json.Unmarshal(raw, &envelope) != nil || envelope.ID == "" || envelope.Kind == "" {
 		return rawEvent{}, ErrProtocol
@@ -582,7 +641,62 @@ func decodeEvent(raw json.RawMessage) (rawEvent, error) {
 	if envelope.Timestamp != "" {
 		timestamp, _ = time.Parse(time.RFC3339Nano, envelope.Timestamp)
 	}
-	return rawEvent{Raw: append(json.RawMessage(nil), raw...), ID: envelope.ID, Kind: envelope.Kind, Source: envelope.Source, ObservationKind: envelope.Observation.Kind, Timestamp: timestamp, Text: text.String()}, nil
+	return rawEvent{Raw: append(json.RawMessage(nil), raw...), ID: envelope.ID, Kind: envelope.Kind, Source: envelope.Source, ObservationKind: envelope.Observation.Kind, Timestamp: timestamp, Text: text.String(), ToolName: envelope.ToolName, ActionCommand: envelope.Action.Command, ObservationError: envelope.Observation.IsError, ObservationTimeout: envelope.Observation.Timeout, ObservationExitCode: envelope.Observation.ExitCode}, nil
+}
+
+func repositoryProgress(events []rawEvent, promptIndex int) (int, bool) {
+	discoveryActions := 0
+	pendingMutationTool := ""
+	for index, event := range events {
+		if index <= promptIndex {
+			continue
+		}
+		if event.Kind == "ActionEvent" && event.Source == "agent" {
+			pendingMutationTool = ""
+			if mutationAction(event) {
+				pendingMutationTool = event.ToolName
+				continue
+			}
+			if repositoryDiscoveryAction(event) {
+				discoveryActions++
+			}
+			continue
+		}
+		if pendingMutationTool != "" && event.Kind == "ObservationEvent" && event.ToolName == pendingMutationTool {
+			if !event.ObservationError && !event.ObservationTimeout && (event.ObservationExitCode == nil || *event.ObservationExitCode == 0) {
+				return discoveryActions, true
+			}
+			pendingMutationTool = ""
+		}
+	}
+	return discoveryActions, false
+}
+
+func repositoryDiscoveryAction(event rawEvent) bool {
+	if event.ToolName == "file_editor" {
+		return strings.EqualFold(strings.TrimSpace(event.ActionCommand), "view")
+	}
+	return event.ToolName == "terminal" && strings.TrimSpace(event.ActionCommand) != ""
+}
+
+func mutationAction(event rawEvent) bool {
+	command := strings.ToLower(strings.TrimSpace(event.ActionCommand))
+	if event.ToolName == "file_editor" {
+		return command != "" && command != "view"
+	}
+	if event.ToolName != "terminal" || command == "" {
+		return false
+	}
+	markers := []string{
+		"apply_patch", "git apply", "sed -i", "perl -pi", "gofmt -w", "go fmt", "tee ",
+		"touch ", "mkdir ", "rm ", "mv ", "cp ", "truncate ", " >", ">>",
+	}
+	for _, marker := range markers {
+		if strings.Contains(command, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 func (client *Client) observation(brief application.ExecutionBrief, requestDigest kernel.Digest, info conversationInfo, events []rawEvent, interrupted bool) (application.ExternalExecutionObservation, error) {
