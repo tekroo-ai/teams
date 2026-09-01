@@ -31,7 +31,7 @@ func (service *ProductionService) ensureFeatureWorkBudget(ctx context.Context, f
 	}
 	if account, found := snapshot.WorkBudgetAccounts[budgetRef]; found {
 		planningStory := kernel.AggregateRef{Kind: kernel.AggregateStory, ID: deterministicOperationalUUID("feature-planning-story", string(feature.ID))}
-		if !account.Valid() || account.LifecycleEpoch != feature.LifecycleEpoch || account.RootWork != planningStory || account.PolicyRevision < service.planning.PolicyRevision || account.PolicyRevision == service.planning.PolicyRevision && account.PolicyDigest != service.planning.BudgetPolicyDigest || account.DeadlineAt.Before(deadline) {
+		if !account.Valid() || account.LifecycleEpoch != feature.LifecycleEpoch || account.RootWork != planningStory || !featureBudgetPolicyAccepted(account, service.planning, service.clock.Now().UTC()) || account.DeadlineAt.Before(deadline) {
 			return kernel.WorkBudgetAccount{}, organization.ErrInvalidFeature
 		}
 		return account, nil
@@ -70,6 +70,13 @@ func (service *ProductionService) ensureFeatureWorkBudget(ctx context.Context, f
 		return kernel.WorkBudgetAccount{}, organization.ErrInvalidFeature
 	}
 	return account, nil
+}
+
+func featureBudgetPolicyAccepted(account kernel.WorkBudgetAccount, planning ProductionPlanning, now time.Time) bool {
+	currentPolicy := account.PolicyRevision == planning.PolicyRevision && account.PolicyDigest == planning.BudgetPolicyDigest
+	successorPolicy := account.PolicyRevision > planning.PolicyRevision
+	expiredPredecessorPolicy := account.PolicyRevision < planning.PolicyRevision && !now.Before(account.DeadlineAt)
+	return currentPolicy || successorPolicy || expiredPredecessorPolicy
 }
 
 func (service *ProductionService) preparePlannedTasks(ctx context.Context, feature organization.FeatureRequest, plan organization.FeaturePlan, storyEvents map[kernel.UUIDv7]kernel.UUIDv7, taskEvents map[kernel.UUIDv7]kernel.UUIDv7) error {

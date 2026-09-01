@@ -70,3 +70,24 @@ func TestPlanningRecoveryProfileSupersedesDeadlineAndIsIdempotent(t *testing.T) 
 		t.Fatalf("idempotent successor = %#v alreadyBound=%t err=%v", reloaded, alreadyBound, err)
 	}
 }
+
+func TestFeatureBudgetPolicyAcceptsOnlyExpiredPredecessorForRecovery(t *testing.T) {
+	now := time.Date(2026, 9, 1, 16, 0, 0, 0, time.UTC)
+	planning := ProductionPlanning{PolicyRevision: 2, BudgetPolicyDigest: repeatedDigest('b')}
+	account := kernel.WorkBudgetAccount{PolicyRevision: 1, PolicyDigest: repeatedDigest('a'), DeadlineAt: now.Add(time.Minute)}
+	if featureBudgetPolicyAccepted(account, planning, now) {
+		t.Fatal("unexpired predecessor policy was accepted")
+	}
+	account.DeadlineAt = now.Add(-time.Minute)
+	if !featureBudgetPolicyAccepted(account, planning, now) {
+		t.Fatal("expired predecessor policy was not accepted for recovery")
+	}
+	account.PolicyRevision = planning.PolicyRevision
+	if featureBudgetPolicyAccepted(account, planning, now) {
+		t.Fatal("current revision with the wrong digest was accepted")
+	}
+	account.PolicyDigest = planning.BudgetPolicyDigest
+	if !featureBudgetPolicyAccepted(account, planning, now) {
+		t.Fatal("current policy was rejected")
+	}
+}
