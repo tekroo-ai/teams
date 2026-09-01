@@ -99,6 +99,48 @@ func TestUnchangedConditionRequiresExactRetryableTerminal(t *testing.T) {
 	}
 }
 
+func TestChangedConditionAllowsOnlyEvidenceBoundOperatorRecovery(t *testing.T) {
+	fixture := phase4Fixture(t)
+	priorCondition := Digest("dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd")
+	prior := fixture.authorizedInvocation(t, UUIDv7("00000000-0000-7000-8000-000000000951"), priorCondition)
+	prior.State = InvocationCancelled
+	prior.Revision = 5
+	cancelledAt := fixture.now.Add(time.Minute)
+	prior.CancellationRequestedAt = &cancelledAt
+	prior.TerminalEvidenceIDs = append([]UUIDv7(nil), fixture.profile.Profile.ClassificationEvidenceIDs...)
+	invocations := map[AggregateRef]WorkInvocation{prior.Ref(): prior}
+
+	priorProfileID := fixture.profile.Profile.ProfileID
+	fixture.profile.Profile.ProfileID = UUIDv7("00000000-0000-7000-8000-000000000952")
+	fixture.profile.Profile.ProfileRevision++
+	fixture.profile.Profile.ProfileDigest = Digest("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
+	fixture.profile.Profile.SupersedesProfileID = &priorProfileID
+	fixture.profile.Profile.Budgets.DeadlineAt = prior.DeadlineAt.Add(time.Hour)
+	fixture.assignment.WorkProfile = fixture.profile.Profile.Binding()
+	fixture.account.PolicyRevision++
+	fixture.account.PolicyDigest = Digest("eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee")
+	fixture.account.DeadlineAt = fixture.profile.Profile.Budgets.DeadlineAt
+
+	nextCondition := Digest("cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc")
+	value := fixture.authorizationObject(t, fixture.invocationID, nextCondition, &prior.ID, prior.RetryOrdinal+1)
+	value["attempt_ordinal"] = float64(prior.AttemptOrdinal + 1)
+	value["deadline_at"] = fixture.account.DeadlineAt.Format(time.RFC3339)
+	payload, err := json.Marshal(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decision := PlanWorkInvocationAuthorization(payload, fixture.task, fixture.account, fixture.binding, fixture.scope, fixture.profile, fixture.assignment, fixture.execution, invocations, fixture.now, fixture.eventID)
+	if !decision.Accepted || decision.Invocation.RetryOfInvocationID == nil || *decision.Invocation.RetryOfInvocationID != prior.ID {
+		t.Fatalf("operator recovery = %#v", decision)
+	}
+
+	fixture.profile.Profile.ClassificationEvidenceIDs = []UUIDv7{"00000000-0000-7000-8000-000000000953"}
+	rejected := PlanWorkInvocationAuthorization(payload, fixture.task, fixture.account, fixture.binding, fixture.scope, fixture.profile, fixture.assignment, fixture.execution, invocations, fixture.now, fixture.eventID)
+	if rejected.Accepted || rejected.Reason != "INVALID_RETRY" {
+		t.Fatalf("recovery without terminal evidence = %#v", rejected)
+	}
+}
+
 func TestWorkInvocationPermitIsSingleUseAndCancellationIsNotTerminal(t *testing.T) {
 	fixture := phase4Fixture(t)
 	current := fixture.authorizedInvocation(t, fixture.invocationID, Digest("dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"))

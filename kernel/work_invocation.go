@@ -592,7 +592,9 @@ func PlanWorkInvocationAuthorization(payload []byte, task AggregateState, accoun
 	}
 	if latest == nil {
 		if value.RetryOfInvocationID != nil || value.RetryOrdinal != 0 {
-			return reject("INVALID_RETRY")
+			if !validChangedConditionContinuation(value, profile.Profile, account, invocations) {
+				return reject("INVALID_RETRY")
+			}
 		}
 	} else {
 		if value.RetryOfInvocationID == nil || *value.RetryOfInvocationID != latest.ID || value.RetryOrdinal != latest.RetryOrdinal+1 || !latest.State.Terminal() || latest.Retryable == nil || !*latest.Retryable {
@@ -641,6 +643,38 @@ func PlanWorkInvocationAuthorization(payload []byte, task AggregateState, accoun
 		NextTaskPurposeUsed: binding.PurposeUsed[value.Purpose] + 1,
 	}
 	return InvocationAdmissionDecision{Accepted: true, Reason: "ACCEPTED", Invocation: invocation, BudgetDebit: &debit, EventPayload: eventPayload}
+}
+
+func validChangedConditionContinuation(value invocationAuthorizationPayload, profile WorkRiskProfile, account WorkBudgetAccount, invocations map[AggregateRef]WorkInvocation) bool {
+	if value.RetryOfInvocationID == nil || value.RetryOrdinal == 0 || profile.SupersedesProfileID == nil {
+		return false
+	}
+	var prior WorkInvocation
+	found := false
+	for _, candidate := range invocations {
+		if candidate.ID == *value.RetryOfInvocationID {
+			prior = candidate
+			found = true
+			break
+		}
+	}
+	if !found || !prior.Valid() || prior.TaskID != value.TaskID || prior.Purpose != value.Purpose || value.AttemptOrdinal != prior.AttemptOrdinal+1 || value.RetryOrdinal != prior.RetryOrdinal+1 || value.ConditionDigest == prior.ConditionDigest || *profile.SupersedesProfileID != prior.WorkProfile.ProfileID || profile.ProfileRevision != prior.WorkProfile.ProfileRevision+1 || value.WorkProfile != profile.Binding() || !value.DeadlineAt.After(prior.DeadlineAt) || !profile.Budgets.DeadlineAt.Equal(value.DeadlineAt) || account.PolicyRevision <= prior.AdmissionPolicyRevision || len(prior.TerminalEvidenceIDs) == 0 {
+		return false
+	}
+	recoverable := prior.State == InvocationTimedOut || prior.State == InvocationCancelled && prior.CancellationRequestedAt != nil
+	if !recoverable {
+		return false
+	}
+	evidence := make(map[UUIDv7]struct{}, len(profile.ClassificationEvidenceIDs))
+	for _, id := range profile.ClassificationEvidenceIDs {
+		evidence[id] = struct{}{}
+	}
+	for _, id := range prior.TerminalEvidenceIDs {
+		if _, ok := evidence[id]; !ok {
+			return false
+		}
+	}
+	return true
 }
 
 func WorkInvocationFromAuthorizedEvent(event DomainEvent) (WorkInvocation, error) {
