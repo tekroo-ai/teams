@@ -108,6 +108,13 @@ func TestFeaturePlanningDescriptionCarriesAuthoritativeFeatureState(t *testing.T
 					t.Fatalf("%s instruction omitted %q", stage, required)
 				}
 			}
+			if stage == stageSpecification {
+				for _, required := range []string{"smallest complete specification", "exactly one story", "verify that the result parses as JSON", "ends with ]}, never ]}}"} {
+					if !strings.Contains(description, required) {
+						t.Fatalf("specification schema instruction omitted %q", required)
+					}
+				}
+			}
 		}
 	}
 }
