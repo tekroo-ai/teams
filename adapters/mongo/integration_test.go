@@ -28,7 +28,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
-const testManifestSHA = kernel.Digest("c7eb4baae3a8312e44f9946fabde5a9cddb1937c7a41eb02d9b014ef21027ad1")
+const testManifestSHA = kernel.Digest("dade26b7f02164b7d366735a15bd0e4253ac6796c6120bed0c5f02fda1bbeb9c")
 
 var (
 	testMongoURI string

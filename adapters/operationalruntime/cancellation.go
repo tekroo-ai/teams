@@ -44,8 +44,29 @@ func (service *ProductionService) RequestInvocationCancellation(ctx context.Cont
 		"invocation_id": invocationID, "expected_invocation_revision": current.Revision,
 		"reason": request.Reason, "evidence_ids": evidenceIDs, "authority": principal, "requested_at": now,
 	})
-	if _, err := service.submitStandaloneCommand(ctx, "tekroo.command.work-invocation.request-cancellation", kernel.AggregateWorkInvocation, invocationID, principal, current.Revision, payload, []kernel.DagParent{{ParentEventID: current.LastEventID, EdgeKind: kernel.EdgeCausal}}, request.EvidenceRefs, request.IdempotencyKey); err != nil {
+	command := kernel.KernelCommand{
+		ContractManifest:          kernel.ContractIdentity,
+		CommandID:                 deterministicOperationalUUID("cancellation-command", string(invocationID), request.IdempotencyKey),
+		CommandType:               "tekroo.command.work-invocation.request-cancellation",
+		CommandVersion:            kernel.OperationalSchemaVersion,
+		Target:                    kernel.AggregateRef{Kind: kernel.AggregateWorkInvocation, ID: invocationID},
+		Authority:                 principal,
+		ExpectedRevision:          kernel.NewExpectedRevision(current.Revision),
+		ExpectedPolicyRevision:    service.provenance.PolicyRevision,
+		ExpectedCatalogueRevision: kernel.CatalogueRevision,
+		IdempotencyKey:            request.IdempotencyKey,
+		CorrelationID:             invocationID,
+		Causation:                 []kernel.DagParent{{ParentEventID: current.LastEventID, EdgeKind: kernel.EdgeCausal}},
+		IssuedAt:                  &now,
+		Payload:                   payload,
+		EvidenceRefs:              append([]kernel.EvidenceRef(nil), request.EvidenceRefs...),
+	}
+	receipt, err := service.Submit(ctx, command)
+	if err != nil {
 		return InvocationStatus{}, err
+	}
+	if receipt.OutcomeCode != kernel.OutcomeApplied && receipt.OutcomeCode != kernel.OutcomeNoChange {
+		return InvocationStatus{}, errors.New("cancellation rejected: " + receipt.ReasonCode)
 	}
 	updated, found, err := service.ReadInvocation(ctx, invocationID)
 	if err != nil || !found {

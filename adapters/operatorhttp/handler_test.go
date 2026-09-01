@@ -62,7 +62,7 @@ func TestHandlerSubmitsStrictCommandAndReadsProjections(t *testing.T) {
 		t.Fatalf("unknown command status=%d submissions=%d", response.Code, service.submissions)
 	}
 	response = httptest.NewRecorder()
-	handler.ServeHTTP(response, authorizedRequest(http.MethodPost, "/v1/commands", strings.NewReader(`{}`)))
+	handler.ServeHTTP(response, authorizedRequest(http.MethodPost, "/v1/commands", strings.NewReader(`{"authority":{"kind":"HUMAN","id":"operator"}}`)))
 	if response.Code != http.StatusOK || service.submissions != 1 {
 		t.Fatalf("command status=%d submissions=%d", response.Code, service.submissions)
 	}
@@ -78,11 +78,21 @@ func TestHandlerSubmitsStrictCommandAndReadsProjections(t *testing.T) {
 func TestHandlerDecodesCanonicalContractCommandShape(t *testing.T) {
 	service := &operatorService{state: operationalruntime.ControlRunning}
 	handler := newTestHandler(t, service, func() {})
-	body := `{"contract_manifest":"tekroo.kernel.contracts/0.9.0","command_id":"00000000-0000-7000-8000-000000000001","command_type":"tekroo.command.story.create","command_version":"1.6.0","target":{"kind":"story","id":"00000000-0000-7000-8000-000000000002"},"authority":{"kind":"HUMAN","id":"principal"},"actor_fqn":null,"execution":null,"expected_revision":{"must_not_exist":true,"revision":0},"preconditions":[],"expected_lifecycle_epoch":null,"expected_policy_revision":1,"expected_catalogue_revision":8,"idempotency_key":"canonical-shape","correlation_id":"00000000-0000-7000-8000-000000000003","causation":[],"issued_at":null,"payload":{},"evidence_refs":[]}`
+	body := `{"contract_manifest":"tekroo.kernel.contracts/0.9.0","command_id":"00000000-0000-7000-8000-000000000001","command_type":"tekroo.command.story.create","command_version":"1.6.0","target":{"kind":"story","id":"00000000-0000-7000-8000-000000000002"},"authority":{"kind":"HUMAN","id":"operator"},"actor_fqn":null,"execution":null,"expected_revision":{"must_not_exist":true,"revision":0},"preconditions":[],"expected_lifecycle_epoch":null,"expected_policy_revision":1,"expected_catalogue_revision":8,"idempotency_key":"canonical-shape","correlation_id":"00000000-0000-7000-8000-000000000003","causation":[],"issued_at":null,"payload":{},"evidence_refs":[]}`
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, authorizedRequest(http.MethodPost, "/v1/commands", strings.NewReader(body)))
 	if response.Code != http.StatusOK || service.lastCommand.CommandType != "tekroo.command.story.create" || service.lastCommand.Target.Kind != kernel.AggregateStory {
 		t.Fatalf("canonical command status=%d command=%#v", response.Code, service.lastCommand)
+	}
+}
+
+func TestHandlerRejectsRawCommandAuthoritySpoofing(t *testing.T) {
+	service := &operatorService{state: operationalruntime.ControlRunning}
+	handler := newTestHandler(t, service, func() {})
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, authorizedRequest(http.MethodPost, "/v1/commands", strings.NewReader(`{"authority":{"kind":"HUMAN","id":"different-human"}}`)))
+	if response.Code != http.StatusForbidden || service.submissions != 0 {
+		t.Fatalf("spoofed command status=%d submissions=%d", response.Code, service.submissions)
 	}
 }
 

@@ -565,6 +565,10 @@ func (handler *Handler) command(writer http.ResponseWriter, request *http.Reques
 		writeError(writer, http.StatusBadRequest, "INVALID_COMMAND_JSON")
 		return
 	}
+	if command.Authority != handler.principal {
+		writeError(writer, http.StatusForbidden, "COMMAND_AUTHORITY_MISMATCH")
+		return
+	}
 	receipt, err := handler.service.Submit(request.Context(), command)
 	if err != nil {
 		status := http.StatusUnprocessableEntity

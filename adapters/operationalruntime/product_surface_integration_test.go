@@ -36,6 +36,19 @@ func TestTekroodAndTekrooExecuteNormalTaskThroughSupportedSurface(t *testing.T) 
 	defer openHands.Close()
 
 	configPath := writeProductSurfaceConfiguration(t, uri, openHands.URL, workspace, fixture)
+	bootstrapConfig, err := LoadProductionConfig(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bootstrap, err := NewProductionService(contextWithTimeout(t), bootstrapConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if closeErr := bootstrap.Close(contextWithTimeout(t)); closeErr != nil {
+			t.Errorf("close bootstrap service: %v", closeErr)
+		}
+	}()
 	tekrood, tekroo := buildProductSurfaceBinaries(t)
 	var stdout, stderr bytes.Buffer
 	service := exec.Command(tekrood, "-config", configPath)
@@ -67,12 +80,9 @@ func TestTekroodAndTekrooExecuteNormalTaskThroughSupportedSurface(t *testing.T) 
 	}
 	submit := func(t *testing.T, command kernel.KernelCommand) kernel.CommandReceipt {
 		t.Helper()
-		path := filepath.Join(commandDirectory, string(command.CommandID)+".json")
-		writeJSON(t, path, command, 0o600)
-		raw := productCLI(t, tekroo, configPath, "submit", path)
-		var receipt kernel.CommandReceipt
-		if err := json.Unmarshal(raw, &receipt); err != nil {
-			t.Fatalf("decode %s receipt: %v\n%s", command.CommandType, err, raw)
+		receipt, submitErr := bootstrap.Submit(contextWithTimeout(t), command)
+		if submitErr != nil {
+			t.Fatalf("submit %s: %v", command.CommandType, submitErr)
 		}
 		if receipt.OutcomeCode != kernel.OutcomeApplied || len(receipt.EventIDs) != 1 {
 			t.Fatalf("%s receipt = %#v", command.CommandType, receipt)
@@ -115,20 +125,13 @@ func TestTekroodAndTekrooExecuteNormalTaskThroughSupportedSurface(t *testing.T) 
 	active := waitForProductInvocation(t, tekroo, configPath, cancelFixture.invocationID, func(status InvocationStatus) bool {
 		return status.State == kernel.InvocationStarted
 	})
-	cancelPayload := map[string]any{
-		"invocation_id": cancelFixture.invocationID, "expected_invocation_revision": active.Revision,
-		"reason": "operator product-surface cancellation", "evidence_ids": []kernel.UUIDv7{cancelFixture.evidenceID},
-		"authority": cancelFixture.human, "requested_at": time.Now().UTC(),
-	}
-	cancelCommand := cancelFixture.command(t, "tekroo.command.work-invocation.request-cancellation", kernel.OperationalSchemaVersion, kernel.AggregateWorkInvocation, cancelFixture.invocationID, cancelFixture.human, active.Revision, cancelPayload,
-		[]kernel.DagParent{{ParentEventID: active.LastEventID, EdgeKind: kernel.EdgeCausal}}, []kernel.EvidenceRef{{EvidenceID: cancelFixture.evidenceID, SHA256: digestByte('e')}}, nil)
-	cancelCommand.ExpectedLifecycleEpoch = nil
-	cancelPath := filepath.Join(commandDirectory, string(cancelCommand.CommandID)+".json")
-	writeJSON(t, cancelPath, cancelCommand, 0o600)
+	cancelRequest := CancellationRequest{ExpectedRevision: active.Revision, Reason: "operator product-surface cancellation", EvidenceRefs: []kernel.EvidenceRef{{EvidenceID: cancelFixture.evidenceID, SHA256: digestByte('e')}}, IdempotencyKey: "product-surface-cancel"}
+	cancelPath := filepath.Join(commandDirectory, "cancellation-request.json")
+	writeJSON(t, cancelPath, cancelRequest, 0o600)
 	cancelRaw := productCLI(t, tekroo, configPath, "cancel", string(cancelFixture.invocationID), cancelPath)
-	var cancelReceipt kernel.CommandReceipt
-	if err := json.Unmarshal(cancelRaw, &cancelReceipt); err != nil || cancelReceipt.OutcomeCode != kernel.OutcomeApplied {
-		t.Fatalf("cancellation receipt = %#v err=%v raw=%s", cancelReceipt, err, cancelRaw)
+	var cancellationStatus InvocationStatus
+	if err := json.Unmarshal(cancelRaw, &cancellationStatus); err != nil || cancellationStatus.CancellationRequestedAt == nil {
+		t.Fatalf("cancellation status = %#v err=%v raw=%s", cancellationStatus, err, cancelRaw)
 	}
 	cancelled := waitForProductInvocation(t, tekroo, configPath, cancelFixture.invocationID, func(status InvocationStatus) bool {
 		return status.State == kernel.InvocationCancelled
@@ -198,6 +201,7 @@ func writeProductSurfaceConfiguration(t *testing.T, mongoURI, openHandsURL, work
 	config.DeploymentIdentity = digestByte('6')
 	config.OpenHands.BaseURL = openHandsURL
 	config.Operator.Address = freeProductSurfaceAddress(t)
+	config.Operator.Principal = fixture.human
 	config.Workspaces = []ProductionWorkspace{{WorkspaceID: fixture.workspaceID, WorktreeID: fixture.worktreeID, WorkingDirectory: workspace, Branch: "task/product-surface", BaselineSHA: strings.Repeat("1", 40), WritablePaths: []string{"."}}}
 	qualification := config.Profiles[0].Qualification
 	qualification.ModelProfileDigest = fixture.modelDigest
