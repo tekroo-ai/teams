@@ -122,7 +122,7 @@ func (coordinator *FeatureCoordinator) ApplyPlan(ctx context.Context, featureID 
 		return FeatureRequest{}, ErrInvalidFeature
 	}
 	planner, found, err := coordinator.host.Status(ctx, plan.PreparedBy)
-	if err != nil || !found || planner.Status != RoleIdle || planner.Execution != plan.PreparedExecution {
+	if err != nil || !found || planner.Status != RoleIdle {
 		return FeatureRequest{}, errors.Join(ErrStaleOrganizationalClaim, err)
 	}
 	for _, task := range plan.Tasks {
@@ -191,7 +191,7 @@ func (coordinator *FeatureCoordinator) Refine(ctx context.Context, featureID ker
 		return FeatureRequest{}, ErrInvalidFeature
 	}
 	actor, found, err := coordinator.host.Status(ctx, refinement.PreparedBy)
-	if err != nil || !found || actor.Status != RoleIdle || actor.Execution != refinement.PreparedExecution {
+	if err != nil || !found || actor.Status != RoleIdle {
 		return FeatureRequest{}, errors.Join(ErrStaleOrganizationalClaim, err)
 	}
 	next := feature
@@ -224,7 +224,7 @@ func (coordinator *FeatureCoordinator) Specify(ctx context.Context, featureID ke
 		return FeatureRequest{}, ErrInvalidFeature
 	}
 	actor, found, err := coordinator.host.Status(ctx, specification.PreparedBy)
-	if err != nil || !found || actor.Status != RoleIdle || actor.Execution != specification.PreparedExecution {
+	if err != nil || !found || actor.Status != RoleIdle {
 		return FeatureRequest{}, errors.Join(ErrStaleOrganizationalClaim, err)
 	}
 	recipient, err := coordinator.ensureSingleRole(ctx, "architect")

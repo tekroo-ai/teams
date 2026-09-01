@@ -63,6 +63,9 @@ func TestFeaturePlanRejectsCyclesAndMaterializesFiniteDAG(t *testing.T) {
 	feature.Status = organization.FeatureSpecified
 	feature.Specification = &organization.FeatureSpecification{PreparedBy: "teams::project-manager-1", PreparedExecution: kernel.ExecutionTuple{ExecutionID: featureUUID(95), FencingEpoch: 1}, Stories: plan.Stories, PreparedAt: now.Add(time.Minute)}
 	store.feature = feature
+	restartedPlanner := planner
+	restartedPlanner.Execution = kernel.ExecutionTuple{ExecutionID: featureUUID(97), FencingEpoch: planner.Execution.FencingEpoch + 1}
+	host.roles[planner.ActorFQN] = restartedPlanner
 	planned, err := coordinator.ApplyPlan(context.Background(), feature.ID, 1, plan)
 	if err != nil || materializer.calls != 1 || planned.Status != organization.FeaturePlanned || len(planned.Plan.Tasks) != 2 {
 		t.Fatalf("apply calls=%d feature=%#v err=%v", materializer.calls, planned, err)
@@ -89,12 +92,18 @@ func TestFeatureRoleHandoffsFormFiniteProductOwnerProjectManagerArchitectDAG(t *
 		t.Fatal(err)
 	}
 	refinement := organization.FeatureRefinement{PreparedBy: productOwner.ActorFQN, PreparedExecution: productOwner.Execution, AcceptanceCriteria: []string{"finite DAG"}, Priority: organization.PriorityHigh, PreparedAt: now.Add(time.Minute)}
+	restartedProductOwner := productOwner
+	restartedProductOwner.Execution = kernel.ExecutionTuple{ExecutionID: featureUUID(75), FencingEpoch: productOwner.Execution.FencingEpoch + 1}
+	host.roles[productOwner.ActorFQN] = restartedProductOwner
 	refined, err := coordinator.Refine(context.Background(), feature.ID, 1, refinement)
 	if err != nil || refined.Status != organization.FeatureReadyForPlanning || store.message.Recipient != projectManager.ActorFQN || store.message.Flow.Hop != 2 {
 		t.Fatalf("refine feature=%#v message=%#v err=%v", refined, store.message, err)
 	}
 	story := organization.PlannedStory{ID: featureUUID(30), Title: "Restore runtime", Description: "Implement the bounded team path.", AcceptanceCriteria: []string{"works"}, Priority: organization.PriorityHigh}
 	specification := organization.FeatureSpecification{PreparedBy: projectManager.ActorFQN, PreparedExecution: projectManager.Execution, Stories: []organization.PlannedStory{story}, PreparedAt: now.Add(2 * time.Minute)}
+	restartedProjectManager := projectManager
+	restartedProjectManager.Execution = kernel.ExecutionTuple{ExecutionID: featureUUID(76), FencingEpoch: projectManager.Execution.FencingEpoch + 1}
+	host.roles[projectManager.ActorFQN] = restartedProjectManager
 	specified, err := coordinator.Specify(context.Background(), feature.ID, 2, specification)
 	if err != nil || specified.Status != organization.FeatureSpecified || store.message.Recipient != architect.ActorFQN || store.message.Type != "tekroo.message.story.design-requested" || store.message.Flow.Hop != 3 {
 		t.Fatalf("specify feature=%#v message=%#v err=%v", specified, store.message, err)
