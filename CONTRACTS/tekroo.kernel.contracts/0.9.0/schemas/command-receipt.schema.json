@@ -1,0 +1,82 @@
+{
+  "$id": "https://contracts.tekroo.ai/tekroo.kernel.contracts/0.9.0/schemas/command-receipt.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "command_id": {
+      "$ref": "./core.schema.json#/$defs/UUIDv7"
+    },
+    "command_type": {
+      "pattern": "^tekroo\\.command\\.",
+      "type": "string"
+    },
+    "contract_manifest": {
+      "$ref": "./core.schema.json#/$defs/ContractManifestIdentity"
+    },
+    "decided_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "event_ids": {
+      "items": {
+        "$ref": "./core.schema.json#/$defs/UUIDv7"
+      },
+      "maxItems": 64,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "outcome_code": {
+      "enum": [
+        "APPLIED",
+        "NO_CHANGE",
+        "REJECTED_INVALID",
+        "REJECTED_UNAUTHORIZED",
+        "REJECTED_NOT_FOUND",
+        "REJECTED_CONFLICT",
+        "REJECTED_STALE_EXECUTION",
+        "REJECTED_CLOSED",
+        "REJECTED_POLICY"
+      ]
+    },
+    "provenance_digest": {
+      "$ref": "./core.schema.json#/$defs/Sha256"
+    },
+    "reason_code": {
+      "pattern": "^[A-Z][A-Z0-9_]{0,127}$",
+      "type": "string"
+    },
+    "received_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "resulting_revision": {
+      "minimum": 1,
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "state_changed": {
+      "type": "boolean"
+    },
+    "target": {
+      "$ref": "./core.schema.json#/$defs/AggregateRef"
+    }
+  },
+  "required": [
+    "contract_manifest",
+    "command_id",
+    "command_type",
+    "target",
+    "outcome_code",
+    "reason_code",
+    "state_changed",
+    "resulting_revision",
+    "event_ids",
+    "received_at",
+    "decided_at",
+    "provenance_digest"
+  ],
+  "title": "CommandReceipt",
+  "type": "object"
+}

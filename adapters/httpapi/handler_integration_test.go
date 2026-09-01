@@ -24,7 +24,7 @@ func TestHTTPHandlerThroughGatewayAndApplicationCommitsOnceOnReplay(t *testing.T
 		t.Fatal("locate integration test")
 	}
 	repositoryRoot := filepath.Clean(filepath.Join(filepath.Dir(file), "../.."))
-	catalogue, err := contract.Load(os.DirFS(repositoryRoot), "CONTRACTS/tekroo.kernel.contracts/0.8.0")
+	catalogue, err := contract.Load(os.DirFS(repositoryRoot), "CONTRACTS/tekroo.kernel.contracts/0.9.0")
 	if err != nil {
 		t.Fatal(err)
 	}

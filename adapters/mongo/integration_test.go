@@ -62,7 +62,7 @@ func TestStartupRejectsUnsupportedTopology(t *testing.T) {
 }
 
 func TestStartupPinsMetadataAndRequiredIndexes(t *testing.T) {
-	manifest, err := os.ReadFile("../../CONTRACTS/tekroo.kernel.contracts/0.8.0/manifest.json")
+	manifest, err := os.ReadFile("../../CONTRACTS/tekroo.kernel.contracts/0.9.0/manifest.json")
 	if err != nil {
 		t.Fatal(err)
 	}

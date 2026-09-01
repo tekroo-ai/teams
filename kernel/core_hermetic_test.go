@@ -44,11 +44,11 @@ func TestAllFrozenCommandsReachTheirDeclaredEventThroughEvaluator(t *testing.T) 
 	}
 
 	root := testRepositoryRoot(t)
-	fixtureBytes, err := os.ReadFile(filepath.Join(root, "CONTRACTS/tekroo.kernel.contracts/0.8.0/fixtures/catalogue-coverage.json"))
+	fixtureBytes, err := os.ReadFile(filepath.Join(root, "CONTRACTS/tekroo.kernel.contracts/0.9.0/fixtures/catalogue-coverage.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	catalogueBytes, err := os.ReadFile(filepath.Join(root, "CONTRACTS/tekroo.kernel.contracts/0.8.0/catalogue/kernel-catalogue.json"))
+	catalogueBytes, err := os.ReadFile(filepath.Join(root, "CONTRACTS/tekroo.kernel.contracts/0.9.0/catalogue/kernel-catalogue.json"))
 	if err != nil {
 		t.Fatal(err)
 	}

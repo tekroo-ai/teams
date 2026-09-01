@@ -1,0 +1,5222 @@
+{
+  "contractIdentity": "tekroo.kernel.contracts/0.9.0",
+  "fixtures": [
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-001-EXECUTION-REGISTER-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.execution.register",
+        "payload": {
+          "execution_id": "00000000-0000-7000-8000-000000000001",
+          "fencing_epoch": 1,
+          "runtime_identity": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-001-EXECUTION-REGISTER-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.execution.registered"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.execution.register",
+        "payload": {
+          "actor_fqn": "teams::coder-1",
+          "execution_id": "00000000-0000-7000-8000-000000000001",
+          "fencing_epoch": 1,
+          "runtime_identity": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-002-EXECUTION-REPLACE-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.execution.replace",
+        "payload": {
+          "new_execution_id": "00000000-0000-7000-8000-000000000002",
+          "new_fencing_epoch": 2,
+          "prior_execution_id": "00000000-0000-7000-8000-000000000001",
+          "reason": "planned restart"
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-002-EXECUTION-REPLACE-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.execution.replaced"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.execution.replace",
+        "payload": {
+          "actor_fqn": "teams::coder-1",
+          "new_execution_id": "00000000-0000-7000-8000-000000000002",
+          "new_fencing_epoch": 2,
+          "prior_execution_id": "00000000-0000-7000-8000-000000000001",
+          "reason": "planned restart"
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-003-EVIDENCE-REGISTER-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.evidence.register",
+        "payload": {
+          "access_partition": "engineering",
+          "availability": "AVAILABLE",
+          "byte_length": 42,
+          "canonical_digest": null,
+          "computation": null,
+          "deletion_tombstone": null,
+          "integrity_state": "DIGEST_VERIFIED",
+          "locator": "artifact://tests/result-1",
+          "locator_immutable": true,
+          "media_type": "application/json",
+          "producing_component": "go-test",
+          "producing_version": "go1.26.4",
+          "redacts": null,
+          "retention_policy": "phase-2",
+          "sensitivity": "INTERNAL",
+          "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "source_evidence_ids": [],
+          "source_timestamp": null,
+          "transport_provenance": "kernel-adapter://test-runner"
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-003-EVIDENCE-REGISTER-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.evidence.registered"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.evidence.register",
+        "payload": {
+          "access_partition": "engineering",
+          "availability": "AVAILABLE",
+          "byte_length": 42,
+          "canonical_digest": null,
+          "computation": null,
+          "deletion_tombstone": null,
+          "evidence_kind": "TEST_RESULT",
+          "integrity_state": "DIGEST_VERIFIED",
+          "locator": "artifact://tests/result-1",
+          "locator_immutable": true,
+          "media_type": "application/json",
+          "producing_component": "go-test",
+          "producing_version": "go1.26.4",
+          "redacts": null,
+          "retention_policy": "phase-2",
+          "sensitivity": "INTERNAL",
+          "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "source_evidence_ids": [],
+          "source_timestamp": null,
+          "transport_provenance": "kernel-adapter://test-runner"
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-004-STORY-CREATE-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.story.create",
+        "payload": {
+          "acceptance_criteria": [
+            "one owner wins",
+            "restart preserves ownership"
+          ],
+          "description": "Define and verify exact-FQN ownership."
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-004-STORY-CREATE-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.story.created"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.story.create",
+        "payload": {
+          "acceptance_criteria": [
+            "one owner wins",
+            "restart preserves ownership"
+          ],
+          "description": "Define and verify exact-FQN ownership.",
+          "title": "Implement deterministic ownership"
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-005-STORY-AUTHORIZE-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.story.authorize",
+        "payload": {
+          "reason": "scope approved"
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-005-STORY-AUTHORIZE-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.story.authorized"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.story.authorize",
+        "payload": {
+          "reason": "scope approved",
+          "scope_revision": 1
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-006-STORY-BEGIN-PLANNING-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.story.begin-planning",
+        "payload": {
+          "accountable_owner_fqn": "teams::pm-1"
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-006-STORY-BEGIN-PLANNING-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.story.planning-started"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.story.begin-planning",
+        "payload": {
+          "accountable_owner_fqn": "teams::pm-1",
+          "planning_budget": 4
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-007-STORY-ACTIVATE-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.story.activate",
+        "payload": {
+          "required_task_ids": [
+            "00000000-0000-7000-8000-000000000101"
+          ]
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-007-STORY-ACTIVATE-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.story.activated"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.story.activate",
+        "payload": {
+          "plan_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "required_task_ids": [
+            "00000000-0000-7000-8000-000000000101"
+          ]
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-008-WORK-BLOCK-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.work.block",
+        "payload": {
+          "reason": "dependency unavailable",
+          "review_policy": "review-after-evidence-change"
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-008-WORK-BLOCK-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.work.blocked"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.work.block",
+        "payload": {
+          "blocker_refs": [
+            "external://dependency/42"
+          ],
+          "reason": "dependency unavailable",
+          "review_policy": "review-after-evidence-change"
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-009-WORK-UNBLOCK-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.work.unblock",
+        "payload": {
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000201"
+          ]
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-009-WORK-UNBLOCK-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.work.unblocked"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.work.unblock",
+        "payload": {
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000201"
+          ],
+          "resolved_blocker_refs": [
+            "external://dependency/42"
+          ]
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-010-TASK-CREATE-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.task.create",
+        "payload": {
+          "acceptance_criteria": [
+            "concurrent acquisition has one winner"
+          ],
+          "depends_on": [],
+          "description": "Specify CAS ownership.",
+          "title": "Write ownership model"
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-010-TASK-CREATE-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.task.created"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.task.create",
+        "payload": {
+          "acceptance_criteria": [
+            "concurrent acquisition has one winner"
+          ],
+          "depends_on": [],
+          "description": "Specify CAS ownership.",
+          "story_id": "00000000-0000-7000-8000-000000000100",
+          "title": "Write ownership model"
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-011-TASK-MARK-READY-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.task.mark-ready",
+        "payload": {
+          "readiness_policy_revision": 1
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-011-TASK-MARK-READY-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.task.readied"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.task.mark-ready",
+        "payload": {
+          "dependency_event_ids": [],
+          "readiness_policy_revision": 1
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-012-TASK-DISPATCH-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.task.dispatch",
+        "payload": {
+          "routing_mode": "EXACT"
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-012-TASK-DISPATCH-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.task.dispatched"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.task.dispatch",
+        "payload": {
+          "destination": "teams::coder-1",
+          "routing_mode": "EXACT"
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-013-TASK-ACQUIRE-OWNERSHIP-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.task.acquire-ownership",
+        "payload": {
+          "expected_ownership_version": 0
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-013-TASK-ACQUIRE-OWNERSHIP-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.task.ownership-acquired"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.task.acquire-ownership",
+        "payload": {
+          "expected_ownership_version": 0,
+          "owner_fqn": "teams::coder-1"
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-014-TASK-RELEASE-OWNERSHIP-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.task.release-ownership",
+        "payload": {
+          "expected_ownership_version": 1,
+          "reason": "authorized release"
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-014-TASK-RELEASE-OWNERSHIP-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.task.ownership-released"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.task.release-ownership",
+        "payload": {
+          "expected_ownership_version": 1,
+          "owner_fqn": "teams::coder-1",
+          "reason": "authorized release"
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-015-TASK-HANDOFF-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.task.handoff",
+        "payload": {
+          "expected_ownership_version": 1,
+          "new_owner_fqn": "teams::coder-2",
+          "reason": "bounded handoff"
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-015-TASK-HANDOFF-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.task.handed-off"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.task.handoff",
+        "payload": {
+          "expected_ownership_version": 1,
+          "new_owner_fqn": "teams::coder-2",
+          "prior_owner_fqn": "teams::coder-1",
+          "reason": "bounded handoff"
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-016-TASK-FORCE-REASSIGN-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.task.force-reassign",
+        "payload": {
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000202"
+          ],
+          "expected_ownership_version": 1,
+          "new_owner_fqn": "teams::coder-2",
+          "reason": "owner unavailable after verified fencing"
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-016-TASK-FORCE-REASSIGN-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.task.force-reassigned"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.task.force-reassign",
+        "payload": {
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000202"
+          ],
+          "expected_ownership_version": 1,
+          "new_owner_fqn": "teams::coder-2",
+          "prior_owner_fqn": "teams::coder-1",
+          "reason": "owner unavailable after verified fencing"
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-017-TASK-ACTIVATE-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.task.activate",
+        "payload": {
+          "ownership_version": 1
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-017-TASK-ACTIVATE-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.task.activated"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.task.activate",
+        "payload": {
+          "owner_fqn": "teams::coder-1",
+          "ownership_version": 1
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-018-TASK-REQUEST-COMPLETION-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.task.request-completion",
+        "payload": {
+          "artifact_digests": [
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          ],
+          "criteria_revision": 1,
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000203"
+          ],
+          "owner_fqn": "teams::coder-1",
+          "unresolved_exceptions": []
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-018-TASK-REQUEST-COMPLETION-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.task.completed"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.task.request-completion",
+        "payload": {
+          "artifact_digests": [
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          ],
+          "branch_policy_revision": 1,
+          "completion_review_id": "00000000-0000-7000-8000-000000000501",
+          "completion_review_revision": 3,
+          "criteria_revision": 1,
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000203"
+          ],
+          "lifecycle_epoch": 1,
+          "owner_fqn": "teams::coder-1",
+          "unresolved_exceptions": [],
+          "validation_finalized_event_id": "00000000-0000-7000-8000-000000000602"
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-019-STORY-REQUEST-COMPLETION-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.story.request-completion",
+        "payload": {
+          "artifact_digests": [
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          ],
+          "criteria_revision": 1,
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000204"
+          ],
+          "unresolved_exceptions": [],
+          "validation_event_ids": [
+            "00000000-0000-7000-8000-000000000304"
+          ]
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-019-STORY-REQUEST-COMPLETION-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.story.completed"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.story.request-completion",
+        "payload": {
+          "artifact_digests": [
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          ],
+          "branch_policy_revision": 1,
+          "completion_review_id": "00000000-0000-7000-8000-000000000501",
+          "completion_review_revision": 3,
+          "criteria_revision": 1,
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000204"
+          ],
+          "lifecycle_epoch": 1,
+          "unresolved_exceptions": [],
+          "validation_finalized_event_id": "00000000-0000-7000-8000-000000000602"
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-020-STORY-REQUEST-ACCEPTANCE-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.story.request-acceptance",
+        "payload": {
+          "acceptance_policy_revision": 1,
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000205"
+          ],
+          "qualified_tree_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-020-STORY-REQUEST-ACCEPTANCE-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P1B-V3-INTERNAL-RELEASE",
+        "P2-KCF-012"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.story.accepted"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.story.request-acceptance",
+        "payload": {
+          "acceptance_policy_revision": 1,
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000750"
+          ],
+          "lifecycle_epoch": 1,
+          "qualified_tree_digest": "3333333333333333333333333333333333333333",
+          "release_finalized_event_id": "00000000-0000-7000-8000-000000000760",
+          "release_mode": "CODE",
+          "release_plan_id": "00000000-0000-7000-8000-000000000751",
+          "release_plan_revision": 8
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-021-WORK-REOPEN-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.work.reopen",
+        "payload": {
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000206"
+          ],
+          "new_scope_revision": 2,
+          "owner_carry_forward": false,
+          "reason": "verified remedial work"
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-021-WORK-REOPEN-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.work.reopened"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.work.reopen",
+        "payload": {
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000206"
+          ],
+          "new_scope_revision": 2,
+          "owner_carry_forward": false,
+          "prior_epoch": 1,
+          "reason": "verified remedial work"
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-022-WORK-CLOSE-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.work.close",
+        "payload": {
+          "reason": "replaced by narrower successor",
+          "successor_ids": [
+            "00000000-0000-7000-8000-000000000401"
+          ]
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-022-WORK-CLOSE-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.work.closed"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.work.close",
+        "payload": {
+          "disposition": "SUPERSEDED",
+          "reason": "replaced by narrower successor",
+          "successor_ids": [
+            "00000000-0000-7000-8000-000000000401"
+          ]
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-023-WORK-CREATE-SUCCESSOR-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.work.create-successor",
+        "payload": {
+          "dependency_rule": "EXPLICIT",
+          "ownership_rule": "UNOWNED",
+          "reason": "scope replacement",
+          "relation": "SUPERSESSION"
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-023-WORK-CREATE-SUCCESSOR-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.work.successor-created"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.work.create-successor",
+        "payload": {
+          "dependency_rule": "EXPLICIT",
+          "ownership_rule": "UNOWNED",
+          "reason": "scope replacement",
+          "relation": "SUPERSESSION",
+          "successor_ids": [
+            "00000000-0000-7000-8000-000000000401"
+          ]
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-024-COMPLETION-REVIEW-OPEN-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.completion-review.open",
+        "payload": {
+          "branch_policy_revision": 1,
+          "criteria_revision": 1,
+          "evidence_set_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "join_rule": "ALL_PASS",
+          "lifecycle_epoch": 1,
+          "partial_result_policy": "WAIT_ALL",
+          "required_branch_ids": [
+            "tests",
+            "review"
+          ],
+          "subject_id": "00000000-0000-7000-8000-000000000101"
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-024-COMPLETION-REVIEW-OPEN-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.completion-review.opened"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.completion-review.open",
+        "payload": {
+          "adjudication": {
+            "adjudicator": {
+              "id": "validation-adjudicator",
+              "kind": "POLICY"
+            },
+            "deadline_at": "2026-08-13T00:00:00Z",
+            "round_limit": 1
+          },
+          "branch_policy_revision": 1,
+          "branches": [
+            {
+              "acceptance_criteria": [
+                "all required tests pass"
+              ],
+              "branch_id": "tests",
+              "deadline_at": "2026-08-12T00:00:00Z",
+              "input_evidence_ids": [
+                "00000000-0000-7000-8000-000000000207"
+              ],
+              "required_independence_dimensions": [
+                "PRINCIPAL",
+                "ACTOR",
+                "EXECUTION",
+                "CONTEXT",
+                "WORKSPACE",
+                "METHOD"
+              ],
+              "required_method_ids": [
+                "go-test"
+              ],
+              "resolution_owner_fqn": "teams::coder-1",
+              "round_limit": 2,
+              "validator": {
+                "id": "validator-tests",
+                "kind": "SERVICE"
+              }
+            },
+            {
+              "acceptance_criteria": [
+                "review findings resolved"
+              ],
+              "branch_id": "review",
+              "deadline_at": "2026-08-12T00:00:00Z",
+              "input_evidence_ids": [
+                "00000000-0000-7000-8000-000000000208"
+              ],
+              "required_independence_dimensions": [
+                "PRINCIPAL",
+                "ACTOR",
+                "EXECUTION",
+                "CONTEXT",
+                "WORKSPACE",
+                "METHOD"
+              ],
+              "required_method_ids": [
+                "go-test"
+              ],
+              "resolution_owner_fqn": "teams::coder-1",
+              "round_limit": 2,
+              "validator": {
+                "id": "teams::reviewer-1",
+                "kind": "ACTOR"
+              }
+            }
+          ],
+          "candidate_artifact_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+          "criteria_revision": 1,
+          "evidence_set_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "implementer": {
+            "actor_fqn": "teams::coder-1",
+            "context_digest": "9999999999999999999999999999999999999999999999999999999999999999",
+            "execution_id": "00000000-0000-7000-8000-000000000804",
+            "fencing_epoch": 1,
+            "model_profile_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "principal": {
+              "id": "teams::coder-1",
+              "kind": "ACTOR"
+            },
+            "workspace_digest": "8888888888888888888888888888888888888888888888888888888888888888"
+          },
+          "join_rule": "ALL_PASS",
+          "lifecycle_epoch": 1,
+          "partial_result_policy": "WAIT_ALL",
+          "scope_revision": 1,
+          "subject_id": "00000000-0000-7000-8000-000000000101",
+          "subject_kind": "task",
+          "variant_group_id": null,
+          "verification_topology_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "work_profile": {
+            "lifecycle_epoch": 1,
+            "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "profile_id": "00000000-0000-7000-8000-000000000802",
+            "profile_revision": 1,
+            "scope_revision": 1
+          }
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-025-COMPLETION-REVIEW-RECORD-RESULT-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.completion-review.record-result",
+        "payload": {
+          "branch_id": "tests",
+          "branch_policy_revision": 1,
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000207"
+          ],
+          "reasons": [],
+          "result": "PASS"
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-025-COMPLETION-REVIEW-RECORD-RESULT-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.completion-review.result-recorded"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.completion-review.record-result",
+        "payload": {
+          "branch_id": "tests",
+          "branch_policy_revision": 1,
+          "candidate_artifact_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+          "changed_condition_evidence_ids": [],
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000207"
+          ],
+          "findings": [],
+          "independence_receipt": {
+            "evidence_ids": [
+              "00000000-0000-7000-8000-000000000806"
+            ],
+            "identity_comparison_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "method_ids": [
+              "go-test"
+            ],
+            "proven_dimensions": [
+              "PRINCIPAL",
+              "ACTOR",
+              "EXECUTION",
+              "CONTEXT",
+              "WORKSPACE",
+              "METHOD"
+            ]
+          },
+          "reasons": [],
+          "result": "PASS",
+          "review_id": "00000000-0000-7000-8000-000000000501",
+          "round": 1,
+          "source_role": "VALIDATOR",
+          "supersedes_result_event_ids": []
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-026-RECORD-CORRECT-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.record.correct",
+        "payload": {
+          "corrected_fields": {
+            "title": "Corrected title"
+          },
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000208"
+          ],
+          "reason": "verified source correction"
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-026-RECORD-CORRECT-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.record.corrected"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.record.correct",
+        "payload": {
+          "corrected_fields": {
+            "title": "Corrected title"
+          },
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000208"
+          ],
+          "reason": "verified source correction",
+          "target_event_id": "00000000-0000-7000-8000-000000000601"
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-027-COMPLETION-REVIEW-FINALIZE-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-008"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.completion-review.finalize",
+        "payload": {
+          "branch_policy_revision": 1,
+          "expected_review_revision": 3,
+          "lifecycle_epoch": 1,
+          "result_event_ids": [
+            "00000000-0000-7000-8000-000000000601"
+          ],
+          "review_id": "00000000-0000-7000-8000-000000000501",
+          "subject_id": "00000000-0000-7000-8000-000000000101",
+          "subject_kind": "task",
+          "terminal_status": "PASS"
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-027-COMPLETION-REVIEW-FINALIZE-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-008"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.completion-review.finalized"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.completion-review.finalize",
+        "payload": {
+          "branch_policy_revision": 1,
+          "candidate_artifact_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000207"
+          ],
+          "expected_review_revision": 3,
+          "lifecycle_epoch": 1,
+          "result_event_ids": [
+            "00000000-0000-7000-8000-000000000601"
+          ],
+          "review_id": "00000000-0000-7000-8000-000000000501",
+          "scope_revision": 1,
+          "subject_id": "00000000-0000-7000-8000-000000000101",
+          "subject_kind": "task",
+          "terminal_status": "PASS",
+          "verification_topology_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "work_profile": {
+            "lifecycle_epoch": 1,
+            "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "profile_id": "00000000-0000-7000-8000-000000000802",
+            "profile_revision": 1,
+            "scope_revision": 1
+          }
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-028-ESCALATION-OPEN-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-005",
+        "P2-KCF-007"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.escalation.open",
+        "payload": {
+          "adjudicator": {
+            "id": "principal-adjudicator",
+            "kind": "HUMAN"
+          },
+          "causal_path_event_ids": [
+            "00000000-0000-7000-8000-000000000702"
+          ],
+          "deadline_at": "2026-08-12T00:00:00Z",
+          "escalation_id": "00000000-0000-7000-8000-000000000701",
+          "escalation_policy_revision": 1,
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000703"
+          ],
+          "expected_subject_revision": 7,
+          "resolution_owner_fqn": "teams::coder-1",
+          "resolution_round_limit": 1,
+          "route_limit": 2,
+          "subject_id": "00000000-0000-7000-8000-000000000101",
+          "subject_kind": "task",
+          "subject_lifecycle_epoch": 1,
+          "timeout_policy": {
+            "id": "escalation-timeout-policy",
+            "kind": "POLICY"
+          },
+          "trigger": "HANDOFF_CYCLE_DETECTED",
+          "triggering_condition_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "unresolved_question": "Which directed successor resolves the detected handoff cycle?"
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-028-ESCALATION-OPEN-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-005",
+        "P2-KCF-007"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.escalation.opened"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.escalation.open",
+        "payload": {
+          "adjudicator": {
+            "id": "principal-adjudicator",
+            "kind": "HUMAN"
+          },
+          "causal_path_event_ids": [
+            "00000000-0000-7000-8000-000000000702"
+          ],
+          "deadline_at": "2026-08-12T00:00:00Z",
+          "escalation_id": "00000000-0000-7000-8000-000000000701",
+          "escalation_policy_revision": 1,
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000703"
+          ],
+          "expected_subject_revision": 7,
+          "resolution_owner_fqn": "teams::coder-1",
+          "resolution_round_limit": 1,
+          "route_limit": 1,
+          "subject_id": "00000000-0000-7000-8000-000000000101",
+          "subject_kind": "task",
+          "subject_lifecycle_epoch": 1,
+          "timeout_policy": {
+            "id": "escalation-timeout-policy",
+            "kind": "POLICY"
+          },
+          "trigger": "HANDOFF_CYCLE_DETECTED",
+          "triggering_condition_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "unresolved_question": "Which directed successor resolves the detected handoff cycle?"
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-029-ESCALATION-RESOLVE-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-007"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.escalation.resolve",
+        "payload": {
+          "decided_at": "2026-08-11T12:00:00Z",
+          "escalation_id": "00000000-0000-7000-8000-000000000701",
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000703"
+          ],
+          "expected_escalation_revision": 1,
+          "outcome": "RESOLVED",
+          "reasons": [],
+          "round": 1,
+          "source_role": "ADJUDICATOR",
+          "subject_id": "00000000-0000-7000-8000-000000000101",
+          "subject_kind": "task",
+          "subject_lifecycle_epoch": 1
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-029-ESCALATION-RESOLVE-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-007"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.escalation.resolved"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.escalation.resolve",
+        "payload": {
+          "decided_at": "2026-08-11T12:00:00Z",
+          "escalation_id": "00000000-0000-7000-8000-000000000701",
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000703"
+          ],
+          "expected_escalation_revision": 1,
+          "outcome": "RESOLVED",
+          "reasons": [
+            "A directed successor was selected."
+          ],
+          "round": 1,
+          "source_role": "ADJUDICATOR",
+          "subject_id": "00000000-0000-7000-8000-000000000101",
+          "subject_kind": "task",
+          "subject_lifecycle_epoch": 1
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-030-RELEASE-CREATE-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P1B-V3-INTERNAL-RELEASE",
+        "P2-KCF-012"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.release-plan.create",
+        "payload": {
+          "author": {
+            "id": "principal-author",
+            "kind": "HUMAN"
+          },
+          "author_approval_revision": 1,
+          "base_commit": "1111111111111111111111111111111111111111",
+          "base_ref": "main",
+          "conflict_policy": "FAIL_NO_IMPROVISATION",
+          "contract_manifest": "tekroo.kernel.contracts/0.9.0",
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000750"
+          ],
+          "execution_round_limit": 2,
+          "expected_qualified_tree": "3333333333333333333333333333333333333333",
+          "expected_story_revision": 8,
+          "git_version": "git version 2.51.0",
+          "manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "merge_strategy": "FF_ONLY_ORDERED",
+          "ordered_merges": [
+            {
+              "change_ref": "refs/heads/story-1",
+              "head_commit": "2222222222222222222222222222222222222222",
+              "merge_id": "00000000-0000-7000-8000-000000000752",
+              "role": "story"
+            }
+          ],
+          "plan_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "release_mode": "CODE",
+          "release_plan_id": "00000000-0000-7000-8000-000000000751",
+          "release_policy_revision": 1,
+          "repository_url": "https://example.invalid/tekroo/teams.git",
+          "required_profiles": [
+            "contract-structure",
+            "core-hermetic",
+            "mongo-integration",
+            "synthesized-merge"
+          ],
+          "story_id": "00000000-0000-7000-8000-000000000101",
+          "story_lifecycle_epoch": 1
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-030-RELEASE-CREATE-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P1B-V3-INTERNAL-RELEASE",
+        "P2-KCF-012"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.release-plan.created"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.release-plan.create",
+        "payload": {
+          "author": {
+            "id": "principal-author",
+            "kind": "HUMAN"
+          },
+          "author_approval_event_id": "00000000-0000-7000-8000-000000000749",
+          "author_approval_revision": 1,
+          "base_commit": "1111111111111111111111111111111111111111",
+          "base_ref": "main",
+          "conflict_policy": "FAIL_NO_IMPROVISATION",
+          "contract_manifest": "tekroo.kernel.contracts/0.9.0",
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000750"
+          ],
+          "execution_round_limit": 2,
+          "expected_qualified_tree": "3333333333333333333333333333333333333333",
+          "expected_story_revision": 8,
+          "git_version": "git version 2.51.0",
+          "manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "merge_strategy": "FF_ONLY_ORDERED",
+          "ordered_merges": [
+            {
+              "change_ref": "refs/heads/story-1",
+              "head_commit": "2222222222222222222222222222222222222222",
+              "merge_id": "00000000-0000-7000-8000-000000000752",
+              "role": "story"
+            }
+          ],
+          "plan_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "release_mode": "CODE",
+          "release_plan_id": "00000000-0000-7000-8000-000000000751",
+          "release_policy_revision": 1,
+          "repository_url": "https://example.invalid/tekroo/teams.git",
+          "required_profiles": [
+            "contract-structure",
+            "core-hermetic",
+            "mongo-integration",
+            "synthesized-merge"
+          ],
+          "story_id": "00000000-0000-7000-8000-000000000101",
+          "story_lifecycle_epoch": 1
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-031-RELEASE-QUALIFY-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P1B-V3-INTERNAL-RELEASE",
+        "P2-KCF-012"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.release-plan.record-qualification",
+        "payload": {
+          "artifact_digests": [],
+          "contract_manifest": "tekroo.kernel.contracts/0.9.0",
+          "dependency_lock_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000750"
+          ],
+          "expected_release_revision": 1,
+          "gate_definition_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "ordered_head_commits": [
+            "2222222222222222222222222222222222222222"
+          ],
+          "plan_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "qualification_id": "00000000-0000-7000-8000-000000000754",
+          "qualified_base_commit": "1111111111111111111111111111111111111111",
+          "qualified_tree_digest": "3333333333333333333333333333333333333333",
+          "release_plan_id": "00000000-0000-7000-8000-000000000751",
+          "required_profiles": [
+            "contract-structure",
+            "core-hermetic",
+            "mongo-integration",
+            "synthesized-merge"
+          ],
+          "toolchain_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-031-RELEASE-QUALIFY-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P1B-V3-INTERNAL-RELEASE",
+        "P2-KCF-012"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.release-plan.qualification-recorded"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.release-plan.record-qualification",
+        "payload": {
+          "artifact_digests": [
+            "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+          ],
+          "contract_manifest": "tekroo.kernel.contracts/0.9.0",
+          "dependency_lock_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000750"
+          ],
+          "expected_release_revision": 1,
+          "gate_definition_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "ordered_head_commits": [
+            "2222222222222222222222222222222222222222"
+          ],
+          "plan_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "qualification_id": "00000000-0000-7000-8000-000000000754",
+          "qualified_base_commit": "1111111111111111111111111111111111111111",
+          "qualified_tree_digest": "3333333333333333333333333333333333333333",
+          "release_plan_id": "00000000-0000-7000-8000-000000000751",
+          "required_profiles": [
+            "contract-structure",
+            "core-hermetic",
+            "mongo-integration",
+            "synthesized-merge"
+          ],
+          "toolchain_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-032-RELEASE-EXECUTE-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P1B-V3-INTERNAL-RELEASE",
+        "P2-KCF-012"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.release-plan.request-execution",
+        "payload": {
+          "attempt_id": "00000000-0000-7000-8000-000000000755",
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000750"
+          ],
+          "expected_release_revision": 2,
+          "merge_id": "00000000-0000-7000-8000-000000000752",
+          "plan_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "provider_idempotency_key": "release-751-merge-752-round-1",
+          "release_plan_id": "00000000-0000-7000-8000-000000000751",
+          "round": 0
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-032-RELEASE-EXECUTE-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P1B-V3-INTERNAL-RELEASE",
+        "P2-KCF-012"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.release-plan.execution-requested"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.release-plan.request-execution",
+        "payload": {
+          "attempt_id": "00000000-0000-7000-8000-000000000755",
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000750"
+          ],
+          "expected_release_revision": 2,
+          "merge_id": "00000000-0000-7000-8000-000000000752",
+          "plan_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "provider_idempotency_key": "release-751-merge-752-round-1",
+          "release_plan_id": "00000000-0000-7000-8000-000000000751",
+          "round": 1
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-033-RELEASE-RESULT-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P1B-V3-INTERNAL-RELEASE",
+        "P2-KCF-012"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.release-plan.record-result",
+        "payload": {
+          "attempt_id": "00000000-0000-7000-8000-000000000755",
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000756"
+          ],
+          "expected_release_revision": 3,
+          "merge_id": "00000000-0000-7000-8000-000000000752",
+          "observed_at": "2026-08-11T12:00:00Z",
+          "outcome": "UNKNOWN",
+          "plan_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "reasons": [],
+          "release_plan_id": "00000000-0000-7000-8000-000000000751"
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-033-RELEASE-RESULT-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P1B-V3-INTERNAL-RELEASE",
+        "P2-KCF-012"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.release-plan.result-recorded"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.release-plan.record-result",
+        "payload": {
+          "attempt_id": "00000000-0000-7000-8000-000000000755",
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000756"
+          ],
+          "expected_release_revision": 3,
+          "merge_id": "00000000-0000-7000-8000-000000000752",
+          "observed_at": "2026-08-11T12:00:00Z",
+          "outcome": "UNKNOWN",
+          "plan_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "reasons": [
+            "provider response was not terminal"
+          ],
+          "release_plan_id": "00000000-0000-7000-8000-000000000751"
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-034-RELEASE-RECONCILE-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P1B-V3-INTERNAL-RELEASE",
+        "P2-KCF-012"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.release-plan.record-reconciliation",
+        "payload": {
+          "attempt_id": "00000000-0000-7000-8000-000000000755",
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000756"
+          ],
+          "expected_release_revision": 4,
+          "merge_id": "00000000-0000-7000-8000-000000000752",
+          "observed_at": "2026-08-11T12:01:00Z",
+          "observed_base_commit": "1111111111111111111111111111111111111111",
+          "observed_head_commit": "2222222222222222222222222222222222222222",
+          "observed_tree_digest": "3333333333333333333333333333333333333333",
+          "outcome": "MERGED",
+          "plan_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "provider_state": "MERGED",
+          "reasons": [
+            "provider reports exact planned head merged"
+          ],
+          "reconciliation_id": "00000000-0000-7000-8000-000000000759",
+          "release_plan_id": "00000000-0000-7000-8000-000000000751"
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-034-RELEASE-RECONCILE-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P1B-V3-INTERNAL-RELEASE",
+        "P2-KCF-012"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.release-plan.reconciliation-recorded"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.release-plan.record-reconciliation",
+        "payload": {
+          "attempt_id": "00000000-0000-7000-8000-000000000755",
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000756"
+          ],
+          "expected_release_revision": 4,
+          "merge_id": "00000000-0000-7000-8000-000000000752",
+          "observed_at": "2026-08-11T12:01:00Z",
+          "observed_base_commit": "1111111111111111111111111111111111111111",
+          "observed_head_commit": "2222222222222222222222222222222222222222",
+          "observed_tree_digest": "3333333333333333333333333333333333333333",
+          "outcome": "MERGED",
+          "plan_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "provider_state": "MERGED",
+          "reasons": [
+            "provider reports exact planned head merged"
+          ],
+          "reconciliation_id": "00000000-0000-7000-8000-000000000759",
+          "release_plan_id": "00000000-0000-7000-8000-000000000751",
+          "supersedes_result_event_id": "00000000-0000-7000-8000-000000000757"
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-035-RELEASE-FINALIZE-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P1B-V3-INTERNAL-RELEASE",
+        "P2-KCF-012"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.release-plan.finalize",
+        "payload": {
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000750"
+          ],
+          "expected_release_revision": 5,
+          "plan_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "provider_tree_digest": "3333333333333333333333333333333333333333",
+          "qualification_event_id": "00000000-0000-7000-8000-000000000758",
+          "qualified_tree_digest": "3333333333333333333333333333333333333333",
+          "reasons": [],
+          "release_mode": "CODE",
+          "release_plan_id": "00000000-0000-7000-8000-000000000751",
+          "result_event_ids": [
+            "00000000-0000-7000-8000-000000000759"
+          ],
+          "terminal_status": "READY_FOR_ACCEPTANCE"
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-035-RELEASE-FINALIZE-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P1B-V3-INTERNAL-RELEASE",
+        "P2-KCF-012"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.release-plan.finalized"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.release-plan.finalize",
+        "payload": {
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000750"
+          ],
+          "expected_release_revision": 5,
+          "plan_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "provider_tree_digest": "3333333333333333333333333333333333333333",
+          "qualification_event_id": "00000000-0000-7000-8000-000000000758",
+          "qualified_tree_digest": "3333333333333333333333333333333333333333",
+          "reasons": [
+            "all planned merges and the provider tree are verified"
+          ],
+          "release_mode": "CODE",
+          "release_plan_id": "00000000-0000-7000-8000-000000000751",
+          "result_event_ids": [
+            "00000000-0000-7000-8000-000000000759"
+          ],
+          "terminal_status": "READY_FOR_ACCEPTANCE"
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-036-RELEASE-APPROVAL-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P1B-V3-INTERNAL-RELEASE",
+        "P2-KCF-012"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.story.approve-release",
+        "payload": {
+          "approval_revision": 1,
+          "author": {
+            "id": "principal-author",
+            "kind": "HUMAN"
+          },
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000750"
+          ],
+          "expected_story_revision": 8,
+          "lifecycle_epoch": 1,
+          "reasons": [],
+          "release_policy_revision": 1,
+          "story_id": "00000000-0000-7000-8000-000000000101"
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-036-RELEASE-APPROVAL-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P1B-V3-INTERNAL-RELEASE",
+        "P2-KCF-012"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.story.release-approved"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.story.approve-release",
+        "payload": {
+          "approval_revision": 1,
+          "author": {
+            "id": "principal-author",
+            "kind": "HUMAN"
+          },
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000750"
+          ],
+          "expected_story_revision": 8,
+          "lifecycle_epoch": 1,
+          "reasons": [
+            "author approves the exact release scope"
+          ],
+          "release_policy_revision": 1,
+          "story_id": "00000000-0000-7000-8000-000000000101"
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-037-WORK-PROFILE-BIND-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "MC-DEC-008"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.task.bind-work-profile",
+        "payload": {
+          "acceptance_criteria_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "ambiguity": "LOW",
+          "blast_radius": "LOCAL",
+          "budgets": {
+            "attempt_limit": 2,
+            "deadline_at": "2026-08-14T00:00:00Z",
+            "escalation_limit": 1,
+            "promotion_limit": 1,
+            "review_round_limit": 2
+          },
+          "classification_authority": {
+            "id": "principal",
+            "kind": "HUMAN"
+          },
+          "classification_evidence_ids": [
+            "00000000-0000-7000-8000-000000000806"
+          ],
+          "classification_policy_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "classification_policy_revision": 1,
+          "implementation_variant_count": 1,
+          "lifecycle_epoch": 1,
+          "minimum_decision_route": "BOUNDED_EXECUTION",
+          "novelty": "ROUTINE",
+          "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "profile_id": "00000000-0000-7000-8000-000000000802",
+          "profile_revision": 1,
+          "promotion_policy_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "promotion_policy_revision": 1,
+          "required_deterministic_gate_ids": [
+            "go-test"
+          ],
+          "required_independence_dimensions": [
+            "PRINCIPAL",
+            "ACTOR",
+            "EXECUTION",
+            "CONTEXT",
+            "WORKSPACE",
+            "METHOD"
+          ],
+          "required_validation_branches": 1,
+          "scope_revision": 0,
+          "security_sensitivity": "ORDINARY",
+          "supersedes_profile_id": null,
+          "task_id": "00000000-0000-7000-8000-000000000801",
+          "valid_candidate_quorum": 1,
+          "verification_topology_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "work_kind": "IMPLEMENTATION"
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-037-WORK-PROFILE-BIND-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "MC-DEC-008"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.task.work-profile-bound"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.task.bind-work-profile",
+        "payload": {
+          "acceptance_criteria_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "ambiguity": "LOW",
+          "blast_radius": "LOCAL",
+          "budgets": {
+            "attempt_limit": 2,
+            "deadline_at": "2026-08-14T00:00:00Z",
+            "escalation_limit": 1,
+            "promotion_limit": 1,
+            "review_round_limit": 2
+          },
+          "classification_authority": {
+            "id": "principal",
+            "kind": "HUMAN"
+          },
+          "classification_evidence_ids": [
+            "00000000-0000-7000-8000-000000000806"
+          ],
+          "classification_policy_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "classification_policy_revision": 1,
+          "implementation_variant_count": 1,
+          "lifecycle_epoch": 1,
+          "minimum_decision_route": "BOUNDED_EXECUTION",
+          "novelty": "ROUTINE",
+          "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "profile_id": "00000000-0000-7000-8000-000000000802",
+          "profile_revision": 1,
+          "promotion_policy_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "promotion_policy_revision": 1,
+          "required_deterministic_gate_ids": [
+            "go-test"
+          ],
+          "required_independence_dimensions": [
+            "PRINCIPAL",
+            "ACTOR",
+            "EXECUTION",
+            "CONTEXT",
+            "WORKSPACE",
+            "METHOD"
+          ],
+          "required_validation_branches": 1,
+          "scope_revision": 1,
+          "security_sensitivity": "ORDINARY",
+          "supersedes_profile_id": null,
+          "task_id": "00000000-0000-7000-8000-000000000801",
+          "valid_candidate_quorum": 1,
+          "verification_topology_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "work_kind": "IMPLEMENTATION"
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-038-QUALIFIED-ASSIGNMENT-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "MC-DEC-008"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.task.authorize-qualified-assignment",
+        "payload": {
+          "assignment_id": "00000000-0000-7000-8000-000000000803",
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000806"
+          ],
+          "expected_task_revision": 2,
+          "hard_constraint_results": [],
+          "model_profile_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "qualification": {
+            "decision_route": "BOUNDED_EXECUTION",
+            "model_profile_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "observed_at": "2026-08-13T12:00:00Z",
+            "qualification_corpus_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+            "qualification_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+            "qualification_id": "00000000-0000-7000-8000-000000000805",
+            "qualified_role": "programmer",
+            "status": "PASS"
+          },
+          "required_decision_route": "BOUNDED_EXECUTION",
+          "runtime_identity_digest": "1111111111111111111111111111111111111111111111111111111111111111",
+          "selected_actor_fqn": "teams::coder-1",
+          "selected_decision_route": "BOUNDED_EXECUTION",
+          "selected_execution_id": "00000000-0000-7000-8000-000000000804",
+          "selected_fencing_epoch": 1,
+          "selection_policy_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+          "selection_policy_revision": 1,
+          "selection_reasons": [
+            "least-cost qualified profile"
+          ],
+          "task_id": "00000000-0000-7000-8000-000000000801",
+          "work_profile": {
+            "lifecycle_epoch": 1,
+            "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "profile_id": "00000000-0000-7000-8000-000000000802",
+            "profile_revision": 1,
+            "scope_revision": 1
+          }
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-038-QUALIFIED-ASSIGNMENT-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "MC-DEC-008"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.task.qualified-assignment-authorized"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.task.authorize-qualified-assignment",
+        "payload": {
+          "assignment_id": "00000000-0000-7000-8000-000000000803",
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000806"
+          ],
+          "expected_task_revision": 2,
+          "hard_constraint_results": [
+            {
+              "constraint_id": "data-residency",
+              "evidence_ids": [
+                "00000000-0000-7000-8000-000000000806"
+              ],
+              "outcome": "PASS"
+            }
+          ],
+          "model_profile_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "qualification": {
+            "decision_route": "BOUNDED_EXECUTION",
+            "model_profile_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "observed_at": "2026-08-13T12:00:00Z",
+            "qualification_corpus_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+            "qualification_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+            "qualification_id": "00000000-0000-7000-8000-000000000805",
+            "qualified_role": "programmer",
+            "status": "PASS"
+          },
+          "required_decision_route": "BOUNDED_EXECUTION",
+          "runtime_identity_digest": "1111111111111111111111111111111111111111111111111111111111111111",
+          "selected_actor_fqn": "teams::coder-1",
+          "selected_decision_route": "BOUNDED_EXECUTION",
+          "selected_execution_id": "00000000-0000-7000-8000-000000000804",
+          "selected_fencing_epoch": 1,
+          "selection_policy_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+          "selection_policy_revision": 1,
+          "selection_reasons": [
+            "least-cost qualified profile"
+          ],
+          "task_id": "00000000-0000-7000-8000-000000000801",
+          "work_profile": {
+            "lifecycle_epoch": 1,
+            "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "profile_id": "00000000-0000-7000-8000-000000000802",
+            "profile_revision": 1,
+            "scope_revision": 1
+          }
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-039-VARIANT-GROUP-OPEN-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "MC-DEC-008"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.variant-group.open",
+        "payload": {
+          "acceptance_manifest_digest": "9999999999999999999999999999999999999999999999999999999999999999",
+          "adjudicator": {
+            "id": "principal",
+            "kind": "HUMAN"
+          },
+          "base_artifact_digest": "5555555555555555555555555555555555555555555555555555555555555555",
+          "candidate_count": 1,
+          "comparator": {
+            "id": "teams::reviewer-1",
+            "kind": "ACTOR"
+          },
+          "comparison_method_id": "structured-diff-v1",
+          "comparison_policy_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "decision_deadline_at": "2026-08-15T00:00:00Z",
+          "dependency_lock_digest": "8888888888888888888888888888888888888888888888888888888888888888",
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000806"
+          ],
+          "input_evidence_set_digest": "6666666666666666666666666666666666666666666666666666666666666666",
+          "materiality_policy_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "replacement_budget": 1,
+          "required_independence_dimensions": [
+            "ACTOR",
+            "EXECUTION",
+            "CONTEXT",
+            "WORKSPACE"
+          ],
+          "submission_deadline_at": "2026-08-14T00:00:00Z",
+          "task_id": "00000000-0000-7000-8000-000000000801",
+          "toolchain_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+          "valid_candidate_quorum": 2,
+          "variant_group_id": "00000000-0000-7000-8000-000000000807",
+          "work_profile": {
+            "lifecycle_epoch": 1,
+            "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "profile_id": "00000000-0000-7000-8000-000000000802",
+            "profile_revision": 1,
+            "scope_revision": 1
+          }
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-039-VARIANT-GROUP-OPEN-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "MC-DEC-008"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.variant-group.opened"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.variant-group.open",
+        "payload": {
+          "acceptance_manifest_digest": "9999999999999999999999999999999999999999999999999999999999999999",
+          "adjudicator": {
+            "id": "principal",
+            "kind": "HUMAN"
+          },
+          "base_artifact_digest": "5555555555555555555555555555555555555555555555555555555555555555",
+          "candidate_count": 2,
+          "comparator": {
+            "id": "teams::reviewer-1",
+            "kind": "ACTOR"
+          },
+          "comparison_method_id": "structured-diff-v1",
+          "comparison_policy_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "decision_deadline_at": "2026-08-15T00:00:00Z",
+          "dependency_lock_digest": "8888888888888888888888888888888888888888888888888888888888888888",
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000806"
+          ],
+          "input_evidence_set_digest": "6666666666666666666666666666666666666666666666666666666666666666",
+          "materiality_policy_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "replacement_budget": 1,
+          "required_independence_dimensions": [
+            "ACTOR",
+            "EXECUTION",
+            "CONTEXT",
+            "WORKSPACE"
+          ],
+          "submission_deadline_at": "2026-08-14T00:00:00Z",
+          "task_id": "00000000-0000-7000-8000-000000000801",
+          "toolchain_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+          "valid_candidate_quorum": 2,
+          "variant_group_id": "00000000-0000-7000-8000-000000000807",
+          "work_profile": {
+            "lifecycle_epoch": 1,
+            "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "profile_id": "00000000-0000-7000-8000-000000000802",
+            "profile_revision": 1,
+            "scope_revision": 1
+          }
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-040-VARIANT-CANDIDATE-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "MC-DEC-008"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.variant-group.submit-candidate",
+        "payload": {
+          "actor_fqn": "teams::coder-1",
+          "artifact_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+          "assumptions": [],
+          "candidate_id": "00000000-0000-7000-8000-000000000808",
+          "changed_file_inventory_digest": "5555555555555555555555555555555555555555555555555555555555555555",
+          "context_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+          "deterministic_gate_receipt_ids": [],
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000806"
+          ],
+          "execution_id": "00000000-0000-7000-8000-000000000804",
+          "expected_group_revision": 1,
+          "fencing_epoch": 1,
+          "model_profile_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "runtime_identity_digest": "1111111111111111111111111111111111111111111111111111111111111111",
+          "unresolved_exceptions": [],
+          "variant_group_id": "00000000-0000-7000-8000-000000000807",
+          "workspace_digest": "3333333333333333333333333333333333333333333333333333333333333333"
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-040-VARIANT-CANDIDATE-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "MC-DEC-008"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.variant-group.candidate-submitted"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.variant-group.submit-candidate",
+        "payload": {
+          "actor_fqn": "teams::coder-1",
+          "artifact_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+          "assumptions": [],
+          "candidate_id": "00000000-0000-7000-8000-000000000808",
+          "changed_file_inventory_digest": "5555555555555555555555555555555555555555555555555555555555555555",
+          "context_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+          "deterministic_gate_receipt_ids": [
+            "00000000-0000-7000-8000-000000000806"
+          ],
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000806"
+          ],
+          "execution_id": "00000000-0000-7000-8000-000000000804",
+          "expected_group_revision": 1,
+          "fencing_epoch": 1,
+          "model_profile_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "runtime_identity_digest": "1111111111111111111111111111111111111111111111111111111111111111",
+          "unresolved_exceptions": [],
+          "variant_group_id": "00000000-0000-7000-8000-000000000807",
+          "workspace_digest": "3333333333333333333333333333333333333333333333333333333333333333"
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-041-VARIANT-COMPARISON-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "MC-DEC-008"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.variant-group.record-comparison",
+        "payload": {
+          "candidate_ids": [
+            "00000000-0000-7000-8000-000000000808"
+          ],
+          "classification": "MATERIAL_AGREEMENT",
+          "comparator": {
+            "id": "teams::reviewer-1",
+            "kind": "ACTOR"
+          },
+          "comparator_execution_id": "00000000-0000-7000-8000-000000000811",
+          "comparison_method_id": "structured-diff-v1",
+          "comparison_receipt_digest": "6666666666666666666666666666666666666666666666666666666666666666",
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000806"
+          ],
+          "expected_group_revision": 3,
+          "reasons": [
+            "behavior and architecture agree"
+          ],
+          "variant_group_id": "00000000-0000-7000-8000-000000000807"
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-041-VARIANT-COMPARISON-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "MC-DEC-008"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.variant-group.comparison-recorded"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.variant-group.record-comparison",
+        "payload": {
+          "candidate_ids": [
+            "00000000-0000-7000-8000-000000000808",
+            "00000000-0000-7000-8000-000000000809"
+          ],
+          "classification": "MATERIAL_AGREEMENT",
+          "comparator": {
+            "id": "teams::reviewer-1",
+            "kind": "ACTOR"
+          },
+          "comparator_execution_id": "00000000-0000-7000-8000-000000000811",
+          "comparison_method_id": "structured-diff-v1",
+          "comparison_receipt_digest": "6666666666666666666666666666666666666666666666666666666666666666",
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000806"
+          ],
+          "expected_group_revision": 3,
+          "reasons": [
+            "behavior and architecture agree"
+          ],
+          "variant_group_id": "00000000-0000-7000-8000-000000000807"
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-042-VARIANT-SELECTION-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "MC-DEC-008"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.variant-group.select",
+        "payload": {
+          "adjudicator": {
+            "id": "principal",
+            "kind": "HUMAN"
+          },
+          "comparison_event_id": "00000000-0000-7000-8000-000000000810",
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000806"
+          ],
+          "expected_group_revision": 4,
+          "outcome": "SELECT_CANDIDATE",
+          "reasons": [
+            "candidate satisfies frozen policy"
+          ],
+          "variant_group_id": "00000000-0000-7000-8000-000000000807"
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-042-VARIANT-SELECTION-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "MC-DEC-008"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.variant-group.selected"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.variant-group.select",
+        "payload": {
+          "adjudicator": {
+            "id": "principal",
+            "kind": "HUMAN"
+          },
+          "comparison_event_id": "00000000-0000-7000-8000-000000000810",
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000806"
+          ],
+          "expected_group_revision": 4,
+          "outcome": "SELECT_CANDIDATE",
+          "reasons": [
+            "candidate satisfies frozen policy"
+          ],
+          "selected_candidate_id": "00000000-0000-7000-8000-000000000808",
+          "variant_group_id": "00000000-0000-7000-8000-000000000807"
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-043-OPERATOR-ROLE-BIND-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "OP-DEC-001",
+        "HC-DEC-002"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.system.bind-operator-role",
+        "payload": {
+          "authority_policy_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "authority_policy_revision": 1,
+          "binding_id": "00000000-0000-7000-8000-000000000902",
+          "capability_ids": [
+            "COORDINATE_DAG",
+            "INSPECT_ORGANIZATION",
+            "PREPARE_DECISION",
+            "ROUTE_HUMAN_REQUIRED"
+          ],
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000903"
+          ],
+          "expected_system_revision": 0,
+          "human_selection_policy_digest": "5555555555555555555555555555555555555555555555555555555555555555",
+          "human_selection_policy_revision": 1,
+          "operator_actor_fqn": "teams::coder-1",
+          "replaces_binding_id": null,
+          "role_bundle_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "role_bundle_signature_evidence_ids": [
+            "00000000-0000-7000-8000-000000000903"
+          ],
+          "role_bundle_version": "4.0.0",
+          "role_definition_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "role_id": "operator"
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-043-OPERATOR-ROLE-BIND-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "OP-DEC-001",
+        "HC-DEC-002"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.system.operator-role-bound"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.system.bind-operator-role",
+        "payload": {
+          "authority_policy_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "authority_policy_revision": 1,
+          "binding_id": "00000000-0000-7000-8000-000000000902",
+          "capability_ids": [
+            "COORDINATE_DAG",
+            "INSPECT_ORGANIZATION",
+            "PREPARE_DECISION",
+            "ROUTE_HUMAN_REQUIRED"
+          ],
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000903"
+          ],
+          "expected_system_revision": 0,
+          "human_selection_policy_digest": "5555555555555555555555555555555555555555555555555555555555555555",
+          "human_selection_policy_revision": 1,
+          "operator_actor_fqn": "teams::operator-1",
+          "replaces_binding_id": null,
+          "role_bundle_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "role_bundle_signature_evidence_ids": [
+            "00000000-0000-7000-8000-000000000903"
+          ],
+          "role_bundle_version": "4.0.0",
+          "role_definition_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "role_id": "operator"
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-044-CONTINUITY-CONFIGURE-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "OP-DEC-001",
+        "HC-DEC-002"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.system.configure-continuity",
+        "payload": {
+          "configured_by": {
+            "id": "principal",
+            "kind": "HUMAN"
+          },
+          "continuity_policy_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "continuity_policy_revision": 1,
+          "default_quiesce_timeout_ms": 30000,
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000903"
+          ],
+          "expected_system_revision": 0,
+          "health_requirement_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "initial_power_epoch": 1,
+          "operating_posture": "CONTINUOUS",
+          "provider_dispositions": []
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-044-CONTINUITY-CONFIGURE-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "OP-DEC-001",
+        "HC-DEC-002"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.system.continuity-configured"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.system.configure-continuity",
+        "payload": {
+          "configured_by": {
+            "id": "principal",
+            "kind": "HUMAN"
+          },
+          "continuity_policy_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "continuity_policy_revision": 1,
+          "default_quiesce_timeout_ms": 30000,
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000903"
+          ],
+          "expected_system_revision": 0,
+          "health_requirement_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "initial_power_epoch": 1,
+          "operating_posture": "CONTINUOUS",
+          "provider_dispositions": [
+            {
+              "disposition": "CANCEL_ON_SUSPEND",
+              "provider_profile_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "quiesce_deadline_ms": 10000
+            }
+          ]
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-045-QUIESCENCE-REQUEST-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "OP-DEC-001",
+        "HC-DEC-002"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.system.request-quiescence",
+        "payload": {
+          "deadline_at": "2026-08-13T23:59:00Z",
+          "disposition_plan_digest": "1111111111111111111111111111111111111111111111111111111111111111",
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000903"
+          ],
+          "expected_power_epoch": 1,
+          "expected_system_revision": 1,
+          "in_flight_execution_ids": [
+            "00000000-0000-7000-8000-000000000904",
+            "00000000-0000-7000-8000-000000000905"
+          ],
+          "next_power_epoch": 1,
+          "reason": "LID_CLOSE",
+          "requested_by": {
+            "id": "principal",
+            "kind": "HUMAN"
+          }
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-045-QUIESCENCE-REQUEST-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "OP-DEC-001",
+        "HC-DEC-002"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.system.quiescence-requested"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.system.request-quiescence",
+        "payload": {
+          "deadline_at": "2026-08-13T23:59:00Z",
+          "disposition_plan_digest": "1111111111111111111111111111111111111111111111111111111111111111",
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000903"
+          ],
+          "expected_power_epoch": 1,
+          "expected_system_revision": 1,
+          "in_flight_execution_ids": [
+            "00000000-0000-7000-8000-000000000904",
+            "00000000-0000-7000-8000-000000000905"
+          ],
+          "next_power_epoch": 2,
+          "reason": "LID_CLOSE",
+          "requested_by": {
+            "id": "principal",
+            "kind": "HUMAN"
+          }
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-046-SUSPENDED-RECORD-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "OP-DEC-001",
+        "HC-DEC-002"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.system.record-suspended",
+        "payload": {
+          "all_in_flight_executions_recorded": false,
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000903"
+          ],
+          "execution_records": [
+            {
+              "actor_fqn": "teams::coder-1",
+              "disposition": "CANCEL_ON_SUSPEND",
+              "evidence_ids": [
+                "00000000-0000-7000-8000-000000000903"
+              ],
+              "execution_fencing_epoch": 1,
+              "execution_id": "00000000-0000-7000-8000-000000000904",
+              "outcome": "CANCELLED",
+              "provider_profile_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "result_evidence_id": "00000000-0000-7000-8000-000000000903"
+            },
+            {
+              "actor_fqn": "teams::reviewer-1",
+              "disposition": "DETACH_AND_RECONCILE",
+              "evidence_ids": [
+                "00000000-0000-7000-8000-000000000903"
+              ],
+              "execution_fencing_epoch": 1,
+              "execution_id": "00000000-0000-7000-8000-000000000905",
+              "outcome": "DETACHED",
+              "provider_profile_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+              "result_evidence_id": null
+            }
+          ],
+          "expected_power_epoch": 2,
+          "expected_system_revision": 2,
+          "quiescence_request_event_id": "00000000-0000-7000-8000-000000000906",
+          "recorded_by": {
+            "id": "execution-coordinator",
+            "kind": "SERVICE"
+          },
+          "unresolved_execution_ids": [
+            "00000000-0000-7000-8000-000000000905"
+          ]
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-046-SUSPENDED-RECORD-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "OP-DEC-001",
+        "HC-DEC-002"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.system.suspended"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.system.record-suspended",
+        "payload": {
+          "all_in_flight_executions_recorded": true,
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000903"
+          ],
+          "execution_records": [
+            {
+              "actor_fqn": "teams::coder-1",
+              "disposition": "CANCEL_ON_SUSPEND",
+              "evidence_ids": [
+                "00000000-0000-7000-8000-000000000903"
+              ],
+              "execution_fencing_epoch": 1,
+              "execution_id": "00000000-0000-7000-8000-000000000904",
+              "outcome": "CANCELLED",
+              "provider_profile_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "result_evidence_id": "00000000-0000-7000-8000-000000000903"
+            },
+            {
+              "actor_fqn": "teams::reviewer-1",
+              "disposition": "DETACH_AND_RECONCILE",
+              "evidence_ids": [
+                "00000000-0000-7000-8000-000000000903"
+              ],
+              "execution_fencing_epoch": 1,
+              "execution_id": "00000000-0000-7000-8000-000000000905",
+              "outcome": "DETACHED",
+              "provider_profile_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+              "result_evidence_id": null
+            }
+          ],
+          "expected_power_epoch": 2,
+          "expected_system_revision": 2,
+          "quiescence_request_event_id": "00000000-0000-7000-8000-000000000906",
+          "recorded_by": {
+            "id": "execution-coordinator",
+            "kind": "SERVICE"
+          },
+          "unresolved_execution_ids": [
+            "00000000-0000-7000-8000-000000000905"
+          ]
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-047-UNEXPECTED-OUTAGE-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "OP-DEC-001",
+        "HC-DEC-002"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.system.record-unexpected-outage",
+        "payload": {
+          "detected_at": "2026-08-13T12:00:00Z",
+          "detected_by": {
+            "id": "execution-coordinator",
+            "kind": "SERVICE"
+          },
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000903"
+          ],
+          "expected_system_revision": 1,
+          "known_in_flight_execution_ids": [
+            "00000000-0000-7000-8000-000000000904"
+          ],
+          "last_durable_event_id": "00000000-0000-7000-8000-000000000906",
+          "next_power_epoch": 1,
+          "observed_power_epoch": 1,
+          "outage_kind": "HOST_SLEEP",
+          "previous_control_state": "ACTIVE"
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-047-UNEXPECTED-OUTAGE-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "OP-DEC-001",
+        "HC-DEC-002"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.system.unexpected-outage-recorded"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.system.record-unexpected-outage",
+        "payload": {
+          "detected_at": "2026-08-13T12:00:00Z",
+          "detected_by": {
+            "id": "execution-coordinator",
+            "kind": "SERVICE"
+          },
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000903"
+          ],
+          "expected_system_revision": 1,
+          "known_in_flight_execution_ids": [
+            "00000000-0000-7000-8000-000000000904"
+          ],
+          "last_durable_event_id": "00000000-0000-7000-8000-000000000906",
+          "next_power_epoch": 2,
+          "observed_power_epoch": 1,
+          "outage_kind": "HOST_SLEEP",
+          "previous_control_state": "ACTIVE"
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-048-RECONCILIATION-BEGIN-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "OP-DEC-001",
+        "HC-DEC-002"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.system.begin-reconciliation",
+        "payload": {
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000903"
+          ],
+          "expected_power_epoch": 2,
+          "expected_system_revision": 3,
+          "initiated_by": {
+            "id": "execution-coordinator",
+            "kind": "SERVICE"
+          },
+          "provider_snapshot_digest": "invalid",
+          "trigger": "WAKE",
+          "unresolved_execution_ids": [
+            "00000000-0000-7000-8000-000000000905"
+          ]
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-048-RECONCILIATION-BEGIN-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "OP-DEC-001",
+        "HC-DEC-002"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.system.reconciliation-started"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.system.begin-reconciliation",
+        "payload": {
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000903"
+          ],
+          "expected_power_epoch": 2,
+          "expected_system_revision": 3,
+          "initiated_by": {
+            "id": "execution-coordinator",
+            "kind": "SERVICE"
+          },
+          "provider_snapshot_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+          "trigger": "WAKE",
+          "unresolved_execution_ids": [
+            "00000000-0000-7000-8000-000000000905"
+          ]
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-049-RESUME-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "OP-DEC-001",
+        "HC-DEC-002"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.system.resume",
+        "payload": {
+          "admission_reopen": true,
+          "change_stream_reconciled": true,
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000903"
+          ],
+          "expected_power_epoch": 2,
+          "expected_system_revision": 4,
+          "outbox_reconciled": true,
+          "reconciliation_records": [
+            {
+              "authoritative_state_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+              "evidence_ids": [
+                "00000000-0000-7000-8000-000000000903"
+              ],
+              "execution_id": "00000000-0000-7000-8000-000000000905",
+              "outcome": "TERMINAL_EVIDENCE_CAPTURED"
+            }
+          ],
+          "required_services_healthy": false,
+          "resumed_by": {
+            "id": "continuity-policy",
+            "kind": "POLICY"
+          }
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-049-RESUME-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "OP-DEC-001",
+        "HC-DEC-002"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.system.resumed"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.system.resume",
+        "payload": {
+          "admission_reopen": true,
+          "change_stream_reconciled": true,
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000903"
+          ],
+          "expected_power_epoch": 2,
+          "expected_system_revision": 4,
+          "outbox_reconciled": true,
+          "reconciliation_records": [
+            {
+              "authoritative_state_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+              "evidence_ids": [
+                "00000000-0000-7000-8000-000000000903"
+              ],
+              "execution_id": "00000000-0000-7000-8000-000000000905",
+              "outcome": "TERMINAL_EVIDENCE_CAPTURED"
+            }
+          ],
+          "required_services_healthy": true,
+          "resumed_by": {
+            "id": "continuity-policy",
+            "kind": "POLICY"
+          }
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-050-HUMAN-PARTICIPANT-BIND-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "HP-DEC-001"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.human-participant.bind-profile",
+        "payload": {
+          "authentication_bindings": [
+            {
+              "active": true,
+              "assurance": "STANDARD",
+              "authentication_binding_id": "00000000-0000-7000-8000-000000000911",
+              "binding_revision": 1,
+              "evidence_ids": [
+                "00000000-0000-7000-8000-000000000903"
+              ],
+              "issuer_digest": "8888888888888888888888888888888888888888888888888888888888888888",
+              "method": "OIDC",
+              "subject_digest": "9999999999999999999999999999999999999999999999999999999999999999"
+            }
+          ],
+          "delivery_bindings": [
+            {
+              "active": true,
+              "adapter_profile_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "authentication_binding_ids": [
+                "00000000-0000-7000-8000-000000000911"
+              ],
+              "binding_revision": 1,
+              "channel": "WEB_PORTAL",
+              "confidentiality_ceiling": "CONFIDENTIAL",
+              "delivery_binding_id": "00000000-0000-7000-8000-000000000912",
+              "endpoint_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "evidence_ids": [
+                "00000000-0000-7000-8000-000000000903"
+              ]
+            }
+          ],
+          "display_label": "Alice — payments SME",
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000903"
+          ],
+          "expected_participant_revision": 0,
+          "participant": {
+            "id": "human:alice",
+            "kind": "HUMAN"
+          },
+          "participant_policy_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "participant_policy_revision": 1,
+          "privacy_classification": "INTERNAL",
+          "profile_digest": "6666666666666666666666666666666666666666666666666666666666666666",
+          "profile_id": "00000000-0000-7000-8000-000000000909",
+          "profile_revision": 1,
+          "role_bindings": [],
+          "supersedes_profile_id": null
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-050-HUMAN-PARTICIPANT-BIND-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "HP-DEC-001",
+        "HP-DEC-002"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.human-participant.profile-bound"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.human-participant.bind-profile",
+        "payload": {
+          "authentication_bindings": [
+            {
+              "active": true,
+              "assurance": "STANDARD",
+              "authentication_binding_id": "00000000-0000-7000-8000-000000000911",
+              "binding_revision": 1,
+              "evidence_ids": [
+                "00000000-0000-7000-8000-000000000903"
+              ],
+              "issuer_digest": "8888888888888888888888888888888888888888888888888888888888888888",
+              "method": "OIDC",
+              "subject_digest": "9999999999999999999999999999999999999999999999999999999999999999"
+            }
+          ],
+          "delivery_bindings": [
+            {
+              "active": true,
+              "adapter_profile_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "authentication_binding_ids": [
+                "00000000-0000-7000-8000-000000000911"
+              ],
+              "binding_revision": 1,
+              "channel": "WEB_PORTAL",
+              "confidentiality_ceiling": "CONFIDENTIAL",
+              "delivery_binding_id": "00000000-0000-7000-8000-000000000912",
+              "endpoint_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "evidence_ids": [
+                "00000000-0000-7000-8000-000000000903"
+              ]
+            }
+          ],
+          "display_label": "Alice — payments SME",
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000903"
+          ],
+          "expected_participant_revision": 0,
+          "participant": {
+            "id": "human:alice",
+            "kind": "HUMAN"
+          },
+          "participant_policy_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "participant_policy_revision": 1,
+          "privacy_classification": "INTERNAL",
+          "profile_digest": "6666666666666666666666666666666666666666666666666666666666666666",
+          "profile_id": "00000000-0000-7000-8000-000000000909",
+          "profile_revision": 1,
+          "role_bindings": [
+            {
+              "active": true,
+              "advisory_topic_ids": [
+                "payments"
+              ],
+              "authority_policy_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+              "authority_policy_revision": 1,
+              "authorized_command_types": [],
+              "evidence_ids": [
+                "00000000-0000-7000-8000-000000000903"
+              ],
+              "role_binding_id": "00000000-0000-7000-8000-000000000910",
+              "role_class": "SME",
+              "role_id": "payments-sme",
+              "scope_id": "tekroo-v4",
+              "scope_kind": "PROJECT",
+              "valid_from": "2026-08-13T00:00:00Z",
+              "valid_until": null
+            }
+          ],
+          "supersedes_profile_id": null
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-051-HUMAN-PARTICIPANT-REVOKE-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "HP-DEC-001"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.human-participant.revoke",
+        "payload": {
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000903"
+          ],
+          "expected_participant_revision": 1,
+          "expected_profile_id": "00000000-0000-7000-8000-000000000909",
+          "participant": {
+            "id": "teams::operator-1",
+            "kind": "ACTOR"
+          },
+          "reason": "participant left project",
+          "revoked_at": "2026-08-14T00:00:00Z",
+          "revoked_by": {
+            "id": "principal",
+            "kind": "HUMAN"
+          }
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-051-HUMAN-PARTICIPANT-REVOKE-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "HP-DEC-001",
+        "HP-DEC-002"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.human-participant.revoked"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.human-participant.revoke",
+        "payload": {
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000903"
+          ],
+          "expected_participant_revision": 1,
+          "expected_profile_id": "00000000-0000-7000-8000-000000000909",
+          "participant": {
+            "id": "human:alice",
+            "kind": "HUMAN"
+          },
+          "reason": "participant left project",
+          "revoked_at": "2026-08-14T00:00:00Z",
+          "revoked_by": {
+            "id": "principal",
+            "kind": "HUMAN"
+          }
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-052-HUMAN-INTERACTION-OPEN-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "HP-DEC-003"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.human-interaction.open",
+        "payload": {
+          "canonical_question_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "causal_path_event_ids": [
+            "00000000-0000-7000-8000-000000000903"
+          ],
+          "confidentiality": "INTERNAL",
+          "deadline_at": "2026-08-14T00:00:00Z",
+          "declared_effect": "ADVISORY_ONLY",
+          "disclosure_scope_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000903"
+          ],
+          "expected_subject_revision": 2,
+          "interaction_id": "00000000-0000-7000-8000-000000000913",
+          "interaction_policy_digest": "1111111111111111111111111111111111111111111111111111111111111111",
+          "interaction_policy_revision": 1,
+          "origin_actor_fqn": "teams::coder-1",
+          "origin_execution_fencing_epoch": 1,
+          "origin_execution_id": "00000000-0000-7000-8000-000000000904",
+          "origin_principal": {
+            "id": "teams::coder-1",
+            "kind": "ACTOR"
+          },
+          "predecessor_interaction_id": null,
+          "purpose": "ADVISORY_CONSULTATION",
+          "question_revision": 1,
+          "recipients": [],
+          "response_policy": {
+            "kind": "EXACT_ONE"
+          },
+          "response_specification_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "subject_id": "00000000-0000-7000-8000-000000000901",
+          "subject_kind": "task",
+          "subject_lifecycle_epoch": 1,
+          "timeout_policy": {
+            "id": "human-interaction-timeout",
+            "kind": "POLICY"
+          }
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-052-HUMAN-INTERACTION-OPEN-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "HP-DEC-003"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.human-interaction.opened"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.human-interaction.open",
+        "payload": {
+          "canonical_question_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "causal_path_event_ids": [
+            "00000000-0000-7000-8000-000000000903"
+          ],
+          "confidentiality": "INTERNAL",
+          "deadline_at": "2026-08-14T00:00:00Z",
+          "declared_effect": "ADVISORY_ONLY",
+          "disclosure_scope_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000903"
+          ],
+          "expected_subject_revision": 2,
+          "interaction_id": "00000000-0000-7000-8000-000000000913",
+          "interaction_policy_digest": "1111111111111111111111111111111111111111111111111111111111111111",
+          "interaction_policy_revision": 1,
+          "origin_actor_fqn": "teams::coder-1",
+          "origin_execution_fencing_epoch": 1,
+          "origin_execution_id": "00000000-0000-7000-8000-000000000904",
+          "origin_principal": {
+            "id": "teams::coder-1",
+            "kind": "ACTOR"
+          },
+          "predecessor_interaction_id": null,
+          "purpose": "ADVISORY_CONSULTATION",
+          "question_revision": 1,
+          "recipients": [
+            {
+              "delivery_binding_id": "00000000-0000-7000-8000-000000000912",
+              "participant_profile_digest": "6666666666666666666666666666666666666666666666666666666666666666",
+              "participant_profile_id": "00000000-0000-7000-8000-000000000909",
+              "participant_profile_revision": 1,
+              "principal": {
+                "id": "human:alice",
+                "kind": "HUMAN"
+              },
+              "role_binding_id": "00000000-0000-7000-8000-000000000910"
+            }
+          ],
+          "response_policy": {
+            "kind": "EXACT_ONE"
+          },
+          "response_specification_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "subject_id": "00000000-0000-7000-8000-000000000901",
+          "subject_kind": "task",
+          "subject_lifecycle_epoch": 1,
+          "timeout_policy": {
+            "id": "human-interaction-timeout",
+            "kind": "POLICY"
+          }
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-053-HUMAN-DELIVERY-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "HP-DEC-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.human-interaction.record-delivery",
+        "payload": {
+          "adapter_profile_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "attempted_at": "2026-08-13T12:00:00Z",
+          "canonical_question_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "channel_provenance_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+          "delivery_binding_id": "00000000-0000-7000-8000-000000000912",
+          "delivery_id": "00000000-0000-7000-8000-000000000914",
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000903"
+          ],
+          "expected_interaction_revision": 1,
+          "interaction_id": "00000000-0000-7000-8000-000000000913",
+          "material_equivalence_evidence_id": "00000000-0000-7000-8000-000000000903",
+          "outcome": "READ",
+          "presenter_actor_fqn": "teams::operator-1",
+          "presenter_execution_id": "00000000-0000-7000-8000-000000000905",
+          "question_revision": 1,
+          "recipient": {
+            "id": "human:alice",
+            "kind": "HUMAN"
+          },
+          "rendered_question_digest": "2222222222222222222222222222222222222222222222222222222222222222"
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-053-HUMAN-DELIVERY-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "HP-DEC-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.human-interaction.delivery-recorded"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.human-interaction.record-delivery",
+        "payload": {
+          "adapter_profile_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "attempted_at": "2026-08-13T12:00:00Z",
+          "canonical_question_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "channel_provenance_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+          "delivery_binding_id": "00000000-0000-7000-8000-000000000912",
+          "delivery_id": "00000000-0000-7000-8000-000000000914",
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000903"
+          ],
+          "expected_interaction_revision": 1,
+          "interaction_id": "00000000-0000-7000-8000-000000000913",
+          "material_equivalence_evidence_id": "00000000-0000-7000-8000-000000000903",
+          "outcome": "DELIVERED",
+          "presenter_actor_fqn": "teams::operator-1",
+          "presenter_execution_id": "00000000-0000-7000-8000-000000000905",
+          "question_revision": 1,
+          "recipient": {
+            "id": "human:alice",
+            "kind": "HUMAN"
+          },
+          "rendered_question_digest": "2222222222222222222222222222222222222222222222222222222222222222"
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-054-HUMAN-RESPONSE-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "HP-DEC-005"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.human-interaction.respond",
+        "payload": {
+          "asserted_effect": "ADVISORY_ONLY",
+          "authentication_binding_id": "00000000-0000-7000-8000-000000000911",
+          "channel_provenance_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+          "credential_provenance_digest": "5555555555555555555555555555555555555555555555555555555555555555",
+          "delivery_event_id": "00000000-0000-7000-8000-000000000915",
+          "delivery_id": "00000000-0000-7000-8000-000000000914",
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000903"
+          ],
+          "expected_interaction_revision": 2,
+          "interaction_id": "00000000-0000-7000-8000-000000000913",
+          "participant_profile_id": "00000000-0000-7000-8000-000000000909",
+          "participant_profile_revision": 1,
+          "question_revision": 1,
+          "responded_at": "2026-08-13T12:05:00Z",
+          "respondent": {
+            "id": "teams::operator-1",
+            "kind": "ACTOR"
+          },
+          "response_artifact_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+          "response_classification": "ANSWER",
+          "response_specification_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "role_binding_id": "00000000-0000-7000-8000-000000000910"
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-054-HUMAN-RESPONSE-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "HP-DEC-005"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.human-interaction.response-recorded"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.human-interaction.respond",
+        "payload": {
+          "asserted_effect": "ADVISORY_ONLY",
+          "authentication_binding_id": "00000000-0000-7000-8000-000000000911",
+          "channel_provenance_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+          "credential_provenance_digest": "5555555555555555555555555555555555555555555555555555555555555555",
+          "delivery_event_id": "00000000-0000-7000-8000-000000000915",
+          "delivery_id": "00000000-0000-7000-8000-000000000914",
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000903"
+          ],
+          "expected_interaction_revision": 2,
+          "interaction_id": "00000000-0000-7000-8000-000000000913",
+          "participant_profile_id": "00000000-0000-7000-8000-000000000909",
+          "participant_profile_revision": 1,
+          "question_revision": 1,
+          "responded_at": "2026-08-13T12:05:00Z",
+          "respondent": {
+            "id": "human:alice",
+            "kind": "HUMAN"
+          },
+          "response_artifact_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+          "response_classification": "ANSWER",
+          "response_specification_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "role_binding_id": "00000000-0000-7000-8000-000000000910"
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-055-HUMAN-INTERACTION-CLOSE-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "HP-DEC-005"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.human-interaction.close",
+        "payload": {
+          "accepted_respondents": [
+            {
+              "id": "human:alice",
+              "kind": "HUMAN"
+            }
+          ],
+          "accepted_response_event_ids": [
+            "00000000-0000-7000-8000-000000000916"
+          ],
+          "authorization_evidence_id": null,
+          "closed_at": "2026-08-13T12:06:00Z",
+          "closed_by": {
+            "id": "human-interaction-policy",
+            "kind": "POLICY"
+          },
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000903"
+          ],
+          "expected_interaction_revision": 3,
+          "interaction_id": "00000000-0000-7000-8000-000000000913",
+          "outcome": "SATISFIED",
+          "question_revision": 1,
+          "reasons": [
+            "exact selected respondent answered"
+          ],
+          "resolved_effect": "ADVISORY_ONLY",
+          "response_policy_satisfied": false
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-055-HUMAN-INTERACTION-CLOSE-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "HP-DEC-005",
+        "HP-DEC-006"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.human-interaction.closed"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.human-interaction.close",
+        "payload": {
+          "accepted_respondents": [
+            {
+              "id": "human:alice",
+              "kind": "HUMAN"
+            }
+          ],
+          "accepted_response_event_ids": [
+            "00000000-0000-7000-8000-000000000916"
+          ],
+          "authorization_evidence_id": null,
+          "closed_at": "2026-08-13T12:06:00Z",
+          "closed_by": {
+            "id": "human-interaction-policy",
+            "kind": "POLICY"
+          },
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000903"
+          ],
+          "expected_interaction_revision": 3,
+          "interaction_id": "00000000-0000-7000-8000-000000000913",
+          "outcome": "SATISFIED",
+          "question_revision": 1,
+          "reasons": [
+            "exact selected respondent answered"
+          ],
+          "resolved_effect": "ADVISORY_ONLY",
+          "response_policy_satisfied": true
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-056-HUMAN-INTERACTION-EXPIRE-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "HP-DEC-006"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.human-interaction.expire",
+        "payload": {
+          "deadline_at": "2026-08-14T00:00:00Z",
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000903"
+          ],
+          "expected_interaction_revision": 2,
+          "expired_at": "2026-08-14T00:00:01Z",
+          "interaction_id": "00000000-0000-7000-8000-000000000913",
+          "outcome": "EXPIRED",
+          "question_revision": 1,
+          "silence_is_consent": true,
+          "timeout_policy": {
+            "id": "human-interaction-timeout",
+            "kind": "POLICY"
+          }
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-056-HUMAN-INTERACTION-EXPIRE-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "HP-DEC-006"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.human-interaction.expired"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.human-interaction.expire",
+        "payload": {
+          "deadline_at": "2026-08-14T00:00:00Z",
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000903"
+          ],
+          "expected_interaction_revision": 2,
+          "expired_at": "2026-08-14T00:00:01Z",
+          "interaction_id": "00000000-0000-7000-8000-000000000913",
+          "outcome": "EXPIRED",
+          "question_revision": 1,
+          "silence_is_consent": false,
+          "timeout_policy": {
+            "id": "human-interaction-timeout",
+            "kind": "POLICY"
+          }
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-UNKNOWN-COMMAND",
+      "given": {},
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-004"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.unknown.operation",
+        "payload": {
+          "raw": "preserved"
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-057-PHASE4-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-039"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.work-budget.created"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.work-budget.create",
+        "payload": {
+          "authority": {
+            "id": "teams-admission-policy",
+            "kind": "POLICY"
+          },
+          "budget_account_id": "00000000-0000-7000-8000-000000000901",
+          "deadline_at": "2026-09-30T00:00:00Z",
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000904"
+          ],
+          "lifecycle_epoch": 1,
+          "model_invocation_limit": 8,
+          "policy_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "policy_revision": 1,
+          "purpose_limits": {
+            "ESCALATION": 1,
+            "HANDOFF": 1,
+            "IMPLEMENTATION": 4,
+            "INVESTIGATION": 1,
+            "PROMOTION": 1,
+            "REPAIR": 1,
+            "REPLAN": 1,
+            "REVIEW": 1,
+            "VALIDATION": 1
+          },
+          "root_work": {
+            "id": "00000000-0000-7000-8000-000000000902",
+            "kind": "story"
+          }
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-057-PHASE4-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-039"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.work-budget.create",
+        "payload": {}
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-058-PHASE4-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-040"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.work-budget.amended"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.work-budget.amend",
+        "payload": {
+          "authority": {
+            "id": "teams-admission-policy",
+            "kind": "POLICY"
+          },
+          "budget_account_id": "00000000-0000-7000-8000-000000000901",
+          "deadline_at": "2026-10-01T00:00:00Z",
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000904"
+          ],
+          "expected_budget_revision": 1,
+          "expected_lifecycle_epoch": 1,
+          "model_invocation_limit": 9,
+          "policy_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "policy_revision": 2,
+          "purpose_limits": {
+            "ESCALATION": 1,
+            "HANDOFF": 1,
+            "IMPLEMENTATION": 4,
+            "INVESTIGATION": 1,
+            "PROMOTION": 1,
+            "REPAIR": 1,
+            "REPLAN": 1,
+            "REVIEW": 1,
+            "VALIDATION": 1
+          },
+          "reason": "operator-approved scope revision"
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-058-PHASE4-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-040"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.work-budget.amend",
+        "payload": {}
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-059-PHASE4-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-041"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.task.work-budget-bound"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.task.bind-work-budget",
+        "payload": {
+          "budget_account_id": "00000000-0000-7000-8000-000000000901",
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000904"
+          ],
+          "expected_task_revision": 2,
+          "lifecycle_epoch": 1,
+          "purpose_limits": {
+            "ESCALATION": 1,
+            "HANDOFF": 1,
+            "IMPLEMENTATION": 4,
+            "INVESTIGATION": 1,
+            "PROMOTION": 1,
+            "REPAIR": 1,
+            "REPLAN": 1,
+            "REVIEW": 1,
+            "VALIDATION": 1
+          },
+          "scope_revision": 1,
+          "task_id": "00000000-0000-7000-8000-000000000903",
+          "task_model_invocation_limit": 4
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-059-PHASE4-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-041"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.task.bind-work-budget",
+        "payload": {}
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-060-PHASE4-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-042"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.task.operational-scope-bound"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.task.bind-operational-scope",
+        "payload": {
+          "baseline_sha": "1111111111111111111111111111111111111111",
+          "branch": "task-903",
+          "execution_id": "00000000-0000-7000-8000-000000000908",
+          "expected_task_revision": 3,
+          "fencing_epoch": 1,
+          "interface_constraint_evidence_ids": [
+            "00000000-0000-7000-8000-000000000904"
+          ],
+          "lifecycle_epoch": 1,
+          "owner_fqn": "teams::coder-1",
+          "scope_revision": 1,
+          "task_id": "00000000-0000-7000-8000-000000000903",
+          "workspace_id": "workspace-task-903",
+          "worktree_id": "/tmp/task-903",
+          "writable_paths": [
+            "src/"
+          ]
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-060-PHASE4-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-042"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.task.bind-operational-scope",
+        "payload": {}
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-061-PHASE4-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-043"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.work-invocation.authorized"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.work-invocation.authorize",
+        "payload": {
+          "actor_fqn": "teams::coder-1",
+          "admission_policy_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+          "admission_policy_revision": 1,
+          "allowed_terminal_outcomes": [
+            "SUCCEEDED",
+            "FAILED",
+            "TIMED_OUT",
+            "CANCELLED",
+            "START_FAILED"
+          ],
+          "attempt_family": "implementation",
+          "attempt_ordinal": 1,
+          "budget_account_id": "00000000-0000-7000-8000-000000000901",
+          "condition_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "deadline_at": "2026-09-30T00:00:00Z",
+          "effect_policy_digest": "1111111111111111111111111111111111111111111111111111111111111111",
+          "execution_id": "00000000-0000-7000-8000-000000000908",
+          "expected_budget_revision": 2,
+          "expected_task_revision": 4,
+          "fencing_epoch": 1,
+          "idempotency_key": "invoke-task-903-1",
+          "invocation_id": "00000000-0000-7000-8000-000000000905",
+          "lifecycle_epoch": 1,
+          "model_profile_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+          "output_predicate_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "parent_event_id": "00000000-0000-7000-8000-000000000909",
+          "purpose": "IMPLEMENTATION",
+          "qualified_assignment_id": "00000000-0000-7000-8000-000000000907",
+          "retry_of_invocation_id": null,
+          "retry_ordinal": 0,
+          "runtime_identity_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+          "scope_revision": 1,
+          "task_id": "00000000-0000-7000-8000-000000000903",
+          "tool_policy_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "work_profile": {
+            "lifecycle_epoch": 1,
+            "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "profile_id": "00000000-0000-7000-8000-000000000906",
+            "profile_revision": 1,
+            "scope_revision": 1
+          },
+          "workspace_id": "workspace-task-903"
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-061-PHASE4-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-043"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.work-invocation.authorize",
+        "payload": {}
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-062-PHASE4-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-044"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.work-invocation.claimed"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.work-invocation.claim",
+        "payload": {
+          "actor_fqn": "teams::coder-1",
+          "claim_id": "00000000-0000-7000-8000-000000000910",
+          "claimed_at": "2026-08-31T12:00:00Z",
+          "consumer_id": "teams-openhands-runtime",
+          "execution_id": "00000000-0000-7000-8000-000000000908",
+          "expected_invocation_revision": 1,
+          "fencing_epoch": 1,
+          "invocation_id": "00000000-0000-7000-8000-000000000905",
+          "model_profile_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+          "runtime_identity_digest": "3333333333333333333333333333333333333333333333333333333333333333"
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-062-PHASE4-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-044"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.work-invocation.claim",
+        "payload": {}
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-063-PHASE4-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-045"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.work-invocation.started"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.work-invocation.record-started",
+        "payload": {
+          "claim_id": "00000000-0000-7000-8000-000000000910",
+          "conversation_id": "openhands-conversation-1",
+          "expected_invocation_revision": 2,
+          "invocation_id": "00000000-0000-7000-8000-000000000905",
+          "request_digest": "5555555555555555555555555555555555555555555555555555555555555555",
+          "started_at": "2026-08-31T12:00:01Z"
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-063-PHASE4-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-045"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.work-invocation.record-started",
+        "payload": {}
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-064-PHASE4-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-046"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.work-invocation.terminal-recorded"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.work-invocation.record-terminal",
+        "payload": {
+          "claim_id": "00000000-0000-7000-8000-000000000910",
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000904"
+          ],
+          "expected_invocation_revision": 3,
+          "finished_at": "2026-08-31T12:01:00Z",
+          "invocation_id": "00000000-0000-7000-8000-000000000905",
+          "outcome": "SUCCEEDED",
+          "output_digest": "6666666666666666666666666666666666666666666666666666666666666666",
+          "retryable": false
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-064-PHASE4-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-046"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.work-invocation.record-terminal",
+        "payload": {}
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-065-PHASE4-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-047"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.work-invocation.cancellation-requested"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.work-invocation.request-cancellation",
+        "payload": {
+          "authority": {
+            "id": "principal",
+            "kind": "HUMAN"
+          },
+          "evidence_ids": [
+            "00000000-0000-7000-8000-000000000904"
+          ],
+          "expected_invocation_revision": 3,
+          "invocation_id": "00000000-0000-7000-8000-000000000905",
+          "reason": "operator cancellation",
+          "requested_at": "2026-08-31T12:00:30Z"
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-065-PHASE4-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-047"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.work-invocation.request-cancellation",
+        "payload": {}
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-066-PHASE4-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-048"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.work-invocation.expired"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.work-invocation.expire",
+        "payload": {
+          "authority": {
+            "id": "teams-admission-policy",
+            "kind": "POLICY"
+          },
+          "deadline_at": "2026-08-31T12:00:00Z",
+          "expected_invocation_revision": 1,
+          "invocation_id": "00000000-0000-7000-8000-000000000905",
+          "observed_at": "2026-08-31T12:00:01Z"
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-066-PHASE4-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-048"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.work-invocation.expire",
+        "payload": {}
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "CAT-067-PHASE4-VALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-049"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [
+            "tekroo.event.projection.fault-recorded"
+          ],
+          "outcomeCode": "APPLIED"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.projection.record-fault",
+        "payload": {
+          "aggregate": {
+            "id": "00000000-0000-7000-8000-000000000903",
+            "kind": "task"
+          },
+          "event_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+          "event_id": "00000000-0000-7000-8000-000000000911",
+          "expected_revision": 4,
+          "fault_kind": "REVISION_GAP",
+          "observed_at": "2026-08-31T12:00:00Z",
+          "observed_revision": 6,
+          "projection_kind": "TASK"
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "CAT-067-PHASE4-INVALID",
+      "given": {
+        "contractManifest": "tekroo.kernel.contracts/0.9.0"
+      },
+      "kind": "CATALOGUE_COMMAND",
+      "sourceDecisionIds": [
+        "P2-KCF-049"
+      ],
+      "then": {
+        "expected": {
+          "eventTypes": [],
+          "outcomeCode": "REJECTED_INVALID"
+        }
+      },
+      "when": {
+        "commandType": "tekroo.command.projection.record-fault",
+        "payload": {}
+      }
+    }
+  ],
+  "schemaVersion": "1.7.0"
+}

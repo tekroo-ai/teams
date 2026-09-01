@@ -33,7 +33,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
-const phase4ManifestSHA kernel.Digest = "c7eb4baae3a8312e44f9946fabde5a9cddb1937c7a41eb02d9b014ef21027ad1"
+const phase4ManifestSHA kernel.Digest = "dade26b7f02164b7d366735a15bd0e4253ac6796c6120bed0c5f02fda1bbeb9c"
 
 func TestAssembledRuntimeExecutesIndependentAuthorizedTasksConcurrentlyAndBuildsOperationalViews(t *testing.T) {
 	process, uri := startRuntimeMongod(t)
@@ -51,7 +51,7 @@ func TestAssembledRuntimeExecutesIndependentAuthorizedTasksConcurrentlyAndBuilds
 	}
 	defer closeRuntimeStore(t, store)
 
-	catalogue, err := contract.Load(os.DirFS(filepath.Join("..", "..")), "CONTRACTS/tekroo.kernel.contracts/0.8.0")
+	catalogue, err := contract.Load(os.DirFS(filepath.Join("..", "..")), "CONTRACTS/tekroo.kernel.contracts/0.9.0")
 	if err != nil {
 		t.Fatal(err)
 	}

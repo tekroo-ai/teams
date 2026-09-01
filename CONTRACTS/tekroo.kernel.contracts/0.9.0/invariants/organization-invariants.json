@@ -1,0 +1,66 @@
+{
+  "contractIdentity": "tekroo.kernel.contracts/0.9.0",
+  "invariants": [
+    {
+      "invariantId": "P6-INV-001",
+      "statement": "Stable actor FQN is independent of replaceable process and execution identity.",
+      "testIds": [
+        "P6-ORG-001",
+        "P6-ORG-002"
+      ]
+    },
+    {
+      "invariantId": "P6-INV-002",
+      "statement": "Organizational messages carry information but never execution authority.",
+      "testIds": [
+        "P6-ORG-003",
+        "P6-ORG-004"
+      ]
+    },
+    {
+      "invariantId": "P6-INV-003",
+      "statement": "Every fanout recipient owns a distinct durable delivery.",
+      "testIds": [
+        "P6-ORG-005"
+      ]
+    },
+    {
+      "invariantId": "P6-INV-004",
+      "statement": "Hop, progress, and root-work budgets survive role and message changes.",
+      "testIds": [
+        "P6-ORG-006"
+      ]
+    },
+    {
+      "invariantId": "P6-INV-005",
+      "statement": "Recovery is bounded, duplicate-safe, and terminal for poison work.",
+      "testIds": [
+        "P6-ORG-007",
+        "P6-ORG-008"
+      ]
+    },
+    {
+      "invariantId": "P6-INV-006",
+      "statement": "Feature decomposition is finite and Teams-authoritative.",
+      "testIds": [
+        "P6-ORG-009"
+      ]
+    },
+    {
+      "invariantId": "P6-INV-007",
+      "statement": "Human identity, response, and task linkage are exact and durable.",
+      "testIds": [
+        "P6-ORG-010",
+        "P6-ORG-011"
+      ]
+    },
+    {
+      "invariantId": "P6-INV-008",
+      "statement": "External cognition and transport remain non-authoritative.",
+      "testIds": [
+        "P6-ORG-012"
+      ]
+    }
+  ],
+  "schemaVersion": "1.0.0"
+}

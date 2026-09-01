@@ -29,8 +29,8 @@ import (
 )
 
 const (
-	ContractPackagePath = "CONTRACTS/tekroo.kernel.contracts/0.8.0"
-	ManifestSHA256      = kernel.Digest("c7eb4baae3a8312e44f9946fabde5a9cddb1937c7a41eb02d9b014ef21027ad1")
+	ContractPackagePath = "CONTRACTS/tekroo.kernel.contracts/0.9.0"
+	ManifestSHA256      = kernel.Digest("dade26b7f02164b7d366735a15bd0e4253ac6796c6120bed0c5f02fda1bbeb9c")
 	maximumConfigBytes  = 1 << 20
 )
 
@@ -239,7 +239,7 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 		return resolvedProductionConfig{}, invalidConfig("required identity, storage, workspace, or profile binding is missing")
 	}
 	if info, err := os.Stat(filepath.Join(config.ContractRoot, ContractPackagePath, "manifest.json")); err != nil || !info.Mode().IsRegular() {
-		return resolvedProductionConfig{}, invalidConfig("contract root does not contain contract 0.8.0")
+		return resolvedProductionConfig{}, invalidConfig("contract root does not contain contract 0.9.0")
 	}
 	if !loopbackHTTPURL(config.OpenHands.BaseURL) {
 		return resolvedProductionConfig{}, invalidConfig("OpenHands base URL must be an explicit loopback HTTP endpoint with no path")

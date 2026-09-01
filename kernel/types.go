@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	ContractIdentity         = "tekroo.kernel.contracts/0.8.0"
+	ContractIdentity         = "tekroo.kernel.contracts/0.9.0"
 	SchemaVersion            = "1.6.0"
 	OperationalSchemaVersion = "1.7.0"
 	CatalogueRevision        = uint64(8)
