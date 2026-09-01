@@ -122,9 +122,9 @@ func TestFeaturePlanningDescriptionCarriesAuthoritativeFeatureState(t *testing.T
 
 func TestNormalizeArchitectureTaskRelationsSerializesImplementationAndRemovesRedundantValidationEdges(t *testing.T) {
 	tasks := []architectureTaskResult{
-		{Purpose: kernel.PurposeImplementation},
-		{Purpose: kernel.PurposeImplementation, DependsOn: []uint32{0}, Validates: []uint32{0}},
-		{Purpose: kernel.PurposeImplementation, DependsOn: []uint32{0}, Validates: []uint32{0}},
+		{Role: "coder", Purpose: kernel.PurposeImplementation},
+		{Role: "senior-coder", Purpose: kernel.PurposeImplementation, DependsOn: []uint32{0}, Validates: []uint32{0}},
+		{Role: "tester", Purpose: kernel.PurposeImplementation, DependsOn: []uint32{0}, Validates: []uint32{0}},
 	}
 	normalized, err := normalizeArchitectureTaskRelations(tasks)
 	if err != nil {
@@ -135,6 +135,16 @@ func TestNormalizeArchitectureTaskRelationsSerializesImplementationAndRemovesRed
 	}
 	if !reflect.DeepEqual(normalized[2].DependsOn, []uint32{0, 1}) {
 		t.Fatalf("third task dependencies = %v", normalized[2].DependsOn)
+	}
+	for index, task := range normalized {
+		if task.Role != "coder" {
+			t.Fatalf("implementation task %d role = %q, want coder", index, task.Role)
+		}
+	}
+	invalidFirstRole := []architectureTaskResult{{Role: "tester", Purpose: kernel.PurposeImplementation}}
+	normalized, err = normalizeArchitectureTaskRelations(invalidFirstRole)
+	if err != nil || normalized[0].Role != "coder" {
+		t.Fatalf("invalid first implementation role normalized = %#v err=%v", normalized, err)
 	}
 	invalid := []architectureTaskResult{{Purpose: kernel.PurposeImplementation}, {Purpose: kernel.PurposeImplementation, Validates: []uint32{0}}}
 	if _, err := normalizeArchitectureTaskRelations(invalid); err == nil {

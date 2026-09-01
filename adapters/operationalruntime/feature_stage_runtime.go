@@ -424,11 +424,19 @@ func (service *ProductionService) buildExecutableFeaturePlan(ctx context.Context
 func normalizeArchitectureTaskRelations(tasks []architectureTaskResult) ([]architectureTaskResult, error) {
 	result := append([]architectureTaskResult(nil), tasks...)
 	lastImplementation := -1
+	implementationRole := ""
 	for index := range result {
 		result[index].DependsOn = append([]uint32(nil), result[index].DependsOn...)
 		result[index].Validates = append([]uint32(nil), result[index].Validates...)
 		switch result[index].Purpose {
 		case kernel.PurposeImplementation:
+			if implementationRole == "" {
+				implementationRole = result[index].Role
+				if implementationRole != "coder" && implementationRole != "senior-coder" {
+					implementationRole = "coder"
+				}
+			}
+			result[index].Role = implementationRole
 			dependencies := make(map[uint32]struct{}, len(result[index].DependsOn)+1)
 			for _, dependency := range result[index].DependsOn {
 				dependencies[dependency] = struct{}{}
