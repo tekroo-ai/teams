@@ -37,7 +37,7 @@ func TestOperationalCoordinatorExecutesOneInvocationAndNeverChainsAgentProse(t *
 		t.Fatalf("brief = %#v", runtime.lastBrief)
 	}
 	guidance := strings.Join(runtime.lastBrief.ExecutionGuidance, "\n")
-	for _, required := range []string{"AGENTS.md", "rg or rg --files", "Never repeat an identical read-only command", "focused tests"} {
+	for _, required := range []string{"AGENTS.md", "rg or rg --files", "Never repeat an identical read-only command", "semantically equivalent searches", "accepted CONTRACTS packages", "within twelve repository-discovery commands", "focused tests"} {
 		if !strings.Contains(guidance, required) {
 			t.Fatalf("execution guidance omitted %q: %v", required, runtime.lastBrief.ExecutionGuidance)
 		}
