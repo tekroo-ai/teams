@@ -46,6 +46,7 @@ type localInitOptions struct {
 	Database         string
 	SMADatabase      string
 	OperatorAddress  string
+	BranchPrefix     string
 }
 
 type localInitResult struct {
@@ -56,6 +57,7 @@ type localInitResult struct {
 	Database         string   `json:"database"`
 	SMADatabase      string   `json:"sma_database"`
 	OperatorAddress  string   `json:"operator_address"`
+	BranchPrefix     string   `json:"branch_prefix"`
 	OpenHands        string   `json:"openhands"`
 	Model            string   `json:"model"`
 	Team             string   `json:"team"`
@@ -79,6 +81,7 @@ func runLocalInit(arguments []string, stdout, stderr io.Writer) error {
 	database := flags.String("database", "tekroo_teams_v4_prod", "fresh Teams database identity")
 	smaDatabase := flags.String("sma-database", "sma", "physically separate SMA database identity")
 	operatorAddress := flags.String("operator-address", "127.0.0.1:8787", "loopback operator listener")
+	branchPrefix := flags.String("branch-prefix", "tekroo/", "Git branch prefix for role worktrees")
 	if err := flags.Parse(arguments); err != nil {
 		return err
 	}
@@ -90,6 +93,7 @@ func runLocalInit(arguments []string, stdout, stderr io.Writer) error {
 		OpenHandsKeyFile: *openHandsKey, SMAHookFile: *smaHook, TekroodPath: *tekrood,
 		MongoURI: *mongoURI, Database: *database, SMADatabase: *smaDatabase,
 		OperatorAddress: *operatorAddress,
+		BranchPrefix:    *branchPrefix,
 	})
 	if err != nil {
 		return err
@@ -103,6 +107,9 @@ func runLocalInit(arguments []string, stdout, stderr io.Writer) error {
 }
 
 func initializeLocalDeployment(ctx context.Context, options localInitOptions) (result localInitResult, err error) {
+	if options.BranchPrefix == "" {
+		options.BranchPrefix = "tekroo/"
+	}
 	if err := validateLocalInitOptions(options); err != nil {
 		return result, err
 	}
@@ -192,7 +199,7 @@ func initializeLocalDeployment(ctx context.Context, options localInitOptions) (r
 	workspaceIDs := make([]string, 0)
 	for _, role := range manifest.Roles {
 		for _, workspaceID := range role.WorkspaceIDs {
-			branch := "tekroo/" + workspaceID
+			branch := options.BranchPrefix + workspaceID
 			if gitRefExists(ctx, options.RepositoryRoot, "refs/heads/"+branch) {
 				return result, fmt.Errorf("deployment branch already exists: %s", branch)
 			}
@@ -276,7 +283,8 @@ func initializeLocalDeployment(ctx context.Context, options localInitOptions) (r
 		Root: options.Root, ConfigPath: configPath, StateDirectory: stateRoot,
 		LaunchAgentPath: launchAgentPath, Database: options.Database, SMADatabase: options.SMADatabase,
 		OperatorAddress: options.OperatorAddress, OpenHands: "http://127.0.0.1:8000",
-		Model: localModelIdentity, Team: localDeploymentTeam, WorkspaceCount: len(workspaces),
+		BranchPrefix: options.BranchPrefix,
+		Model:        localModelIdentity, Team: localDeploymentTeam, WorkspaceCount: len(workspaces),
 		WorkspaceIDs: workspaceIDs, BaselineCommit: baseline, ContractIdentity: kernel.ContractIdentity,
 		AutomaticStartup: false,
 	}, nil
@@ -290,6 +298,9 @@ func validateLocalInitOptions(options localInitOptions) error {
 	}
 	if options.Database == "" || options.SMADatabase == "" || options.Database == options.SMADatabase || strings.ContainsAny(options.Database+options.SMADatabase, " /\\") {
 		return errors.New("Teams and SMA database identities must be distinct and simple")
+	}
+	if options.BranchPrefix == "" || !strings.HasSuffix(options.BranchPrefix, "/") || exec.Command("git", "check-ref-format", "refs/heads/"+options.BranchPrefix+"probe").Run() != nil {
+		return errors.New("branch prefix must form a valid Git branch namespace ending in slash")
 	}
 	parsed, err := url.Parse(options.MongoURI)
 	if err != nil || parsed.Scheme != "mongodb" || parsed.Hostname() == "" || !isLoopbackHost(parsed.Hostname()) || parsed.User != nil {

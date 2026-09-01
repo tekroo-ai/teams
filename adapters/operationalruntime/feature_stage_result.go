@@ -91,9 +91,34 @@ func validStageStrings(values []string, required bool) bool {
 	return true
 }
 
+var preAssignmentOperationalIdentityMarkers = []string{
+	"::",
+	"tekroo/",
+	"refs/heads/",
+	"/Users/",
+	".worktrees/",
+	"model_profile_digest",
+	"runtime_identity_digest",
+	"execution_id",
+	"fencing_epoch",
+	"worktree_id",
+	"workspace_id",
+}
+
+func containsPreAssignmentOperationalIdentity(values ...string) bool {
+	for _, value := range values {
+		for _, marker := range preAssignmentOperationalIdentityMarkers {
+			if strings.Contains(value, marker) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func parseRefinementStageResult(output []byte) (refinementStageResult, error) {
 	var result refinementStageResult
-	if decodeOrganizationalStageResult(output, &result) != nil || result.SchemaVersion != "1.0.0" || result.ResultType != "FEATURE_REFINEMENT" || !result.Priority.Valid() || !validStageStrings(result.AcceptanceCriteria, true) || len(result.AcceptanceCriteria) > 32 || !validStageStrings(result.ClarificationQuestions, false) || len(result.ClarificationQuestions) > 16 {
+	if decodeOrganizationalStageResult(output, &result) != nil || result.SchemaVersion != "1.0.0" || result.ResultType != "FEATURE_REFINEMENT" || !result.Priority.Valid() || !validStageStrings(result.AcceptanceCriteria, true) || len(result.AcceptanceCriteria) > 32 || !validStageStrings(result.ClarificationQuestions, false) || len(result.ClarificationQuestions) > 16 || containsPreAssignmentOperationalIdentity(append(append([]string(nil), result.AcceptanceCriteria...), result.ClarificationQuestions...)...) {
 		return refinementStageResult{}, organization.ErrInvalidFeature
 	}
 	return result, nil
@@ -105,9 +130,13 @@ func parseSpecificationStageResult(output []byte) (specificationStageResult, err
 		return specificationStageResult{}, organization.ErrInvalidFeature
 	}
 	for _, story := range result.Stories {
-		if strings.TrimSpace(story.Title) == "" || len(story.Title) > 256 || strings.TrimSpace(story.Description) == "" || len(story.Description) > 64<<10 || !story.Priority.Valid() || !validStageStrings(story.AcceptanceCriteria, true) || len(story.AcceptanceCriteria) > 32 {
+		storyFields := append([]string{story.Title, story.Description}, story.AcceptanceCriteria...)
+		if strings.TrimSpace(story.Title) == "" || len(story.Title) > 256 || strings.TrimSpace(story.Description) == "" || len(story.Description) > 64<<10 || !story.Priority.Valid() || !validStageStrings(story.AcceptanceCriteria, true) || len(story.AcceptanceCriteria) > 32 || containsPreAssignmentOperationalIdentity(storyFields...) {
 			return specificationStageResult{}, organization.ErrInvalidFeature
 		}
+	}
+	if containsPreAssignmentOperationalIdentity(result.DesignConstraints...) {
+		return specificationStageResult{}, organization.ErrInvalidFeature
 	}
 	return result, nil
 }

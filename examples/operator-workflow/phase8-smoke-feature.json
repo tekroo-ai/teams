@@ -1,0 +1,22 @@
+{
+  "idempotency_key": "phase8-local-production-smoke-v1",
+  "team": "teams",
+  "title": "Add a local-production readiness note",
+  "description": "Create docs/operations/LOCAL_PRODUCTION_READY.md containing a concise statement that this role workspace was reached through the supported Tekroo Teams feature path. Preserve all existing behavior, run go test ./..., and commit the change on the assigned role branch.",
+  "acceptance_criteria": [
+    "docs/operations/LOCAL_PRODUCTION_READY.md exists and describes the supported feature path",
+    "go test ./... passes",
+    "the implementation is committed on the assigned role branch"
+  ],
+  "priority": "NORMAL",
+  "constraints": [
+    "Do not change production behavior",
+    "Do not delegate to another agent",
+    "Do not edit the main checkout"
+  ],
+  "repository": "tekroo-teams-v4",
+  "workspace_id": "teams-local-production",
+  "maximum_stories": 1,
+  "maximum_tasks": 8,
+  "maximum_hops": 8
+}

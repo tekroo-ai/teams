@@ -41,12 +41,12 @@ func TestInitializeLocalDeploymentProducesValidatedIsolatedInstallation(t *testi
 		Root: root, SourceRoot: sourceRoot, RepositoryRoot: repository,
 		OpenHandsKeyFile: key, SMAHookFile: hook, TekroodPath: "/usr/bin/true",
 		MongoURI: "mongodb://127.0.0.1:27017", Database: "teams_test_prod",
-		SMADatabase: "sma_test", OperatorAddress: "127.0.0.1:18787",
+		SMADatabase: "sma_test", OperatorAddress: "127.0.0.1:18787", BranchPrefix: "tekroo-test/",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Team != "teams" || result.WorkspaceCount != 13 || result.AutomaticStartup || result.ContractIdentity != "tekroo.kernel.contracts/0.10.0" {
+	if result.Team != "teams" || result.WorkspaceCount != 13 || result.AutomaticStartup || result.ContractIdentity != "tekroo.kernel.contracts/0.10.0" || result.BranchPrefix != "tekroo-test/" {
 		t.Fatalf("result = %#v", result)
 	}
 	config, err := operationalruntime.LoadProductionConfig(result.ConfigPath)
@@ -57,6 +57,9 @@ func TestInitializeLocalDeploymentProducesValidatedIsolatedInstallation(t *testi
 		t.Fatalf("config = %#v", config)
 	}
 	for _, workspace := range config.Workspaces {
+		if len(workspace.Branch) <= len("tekroo-test/") || workspace.Branch[:len("tekroo-test/")] != "tekroo-test/" {
+			t.Fatalf("workspace %s branch = %q", workspace.WorkspaceID, workspace.Branch)
+		}
 		if _, err := os.Stat(filepath.Join(workspace.WorkingDirectory, ".openhands", "hooks", "sma_context_hook.py")); err != nil {
 			t.Fatalf("workspace %s hook: %v", workspace.WorkspaceID, err)
 		}
@@ -77,6 +80,11 @@ func TestInitializeLocalDeploymentFailsClosed(t *testing.T) {
 	base.SMADatabase = base.Database
 	if err := validateLocalInitOptions(base); err == nil {
 		t.Fatal("shared Teams/SMA database identity accepted")
+	}
+	base.SMADatabase = "sma"
+	base.BranchPrefix = "bad prefix/"
+	if err := validateLocalInitOptions(base); err == nil {
+		t.Fatal("invalid branch prefix accepted")
 	}
 }
 

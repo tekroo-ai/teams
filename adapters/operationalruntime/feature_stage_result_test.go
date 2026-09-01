@@ -30,6 +30,17 @@ func TestFeatureStageResultsAreStrictAndBounded(t *testing.T) {
 	}
 }
 
+func TestPreAssignmentPlanningResultsRejectOperationalIdentity(t *testing.T) {
+	refinement := []byte(application.OrganizationalResultMarker + "\n{\"schema_version\":\"1.0.0\",\"result_type\":\"FEATURE_REFINEMENT\",\"acceptance_criteria\":[\"Implementation is committed on tekroo/product-owner-1\"],\"clarification_questions\":[],\"priority\":\"HIGH\"}")
+	if _, err := parseRefinementStageResult(refinement); err == nil {
+		t.Fatal("refinement accepted a pre-assignment branch identity")
+	}
+	specification := []byte(application.OrganizationalResultMarker + "\n{\"schema_version\":\"1.0.0\",\"result_type\":\"FEATURE_SPECIFICATION\",\"stories\":[{\"title\":\"Story\",\"description\":\"Deliver it from /Users/operator/worktree.\",\"acceptance_criteria\":[\"works\"],\"priority\":\"HIGH\"}],\"design_constraints\":[]}")
+	if _, err := parseSpecificationStageResult(specification); err == nil {
+		t.Fatal("specification accepted a pre-assignment workspace identity")
+	}
+}
+
 func TestFeaturePlanningDescriptionCarriesAuthoritativeFeatureState(t *testing.T) {
 	feature := organization.FeatureRequest{
 		ID: "00000000-0000-7000-8000-000000000101",
@@ -67,6 +78,12 @@ func TestFeaturePlanningDescriptionCarriesAuthoritativeFeatureState(t *testing.T
 			for _, required := range []string{"role class", "exactly one of coder, senior-coder, tester, or security", "JSON integer from 1 through 10", "arrays containing only zero-based integer task indexes", "both arrays must be empty", "finish.message is the only result Teams receives", "Do not put a summary or paraphrase in finish.message", "reasoning-only task", "Do not choose or mention an actor instance, branch"} {
 				if !strings.Contains(description, required) {
 					t.Fatalf("architecture schema instruction omitted %q", required)
+				}
+			}
+		} else {
+			for _, required := range []string{"Do not add or change product requirements", "actor instance", "Teams assigns operational identities"} {
+				if !strings.Contains(description, required) {
+					t.Fatalf("%s instruction omitted %q", stage, required)
 				}
 			}
 		}
