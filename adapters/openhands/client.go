@@ -425,6 +425,9 @@ func (client *Client) Inspect(ctx context.Context, brief application.ExecutionBr
 		if brief.RetryOrdinal > 0 && currentPromptIndex > 0 {
 			priorDiscoveryActions, priorMutationObserved := repositoryProgress(events[:currentPromptIndex], -1)
 			if !priorMutationObserved {
+				if priorDiscoveryActions > maximumRepositoryDiscoveryActions {
+					priorDiscoveryActions = maximumRepositoryDiscoveryActions
+				}
 				discoveryActions += priorDiscoveryActions
 				discoveryLimit += maximumRetryDiscoveryActions
 			}

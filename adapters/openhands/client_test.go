@@ -327,6 +327,50 @@ func TestClientRetryProgressGuardCountsRetainedDiscoveryHistory(t *testing.T) {
 	}
 }
 
+func TestClientRetryProgressGuardCapsPreEnforcementHistory(t *testing.T) {
+	brief, _ := openHandsTestBrief(t)
+	priorID := kernel.UUIDv7("00000000-0000-7000-8000-000000000200")
+	brief.RetryOfInvocationID = &priorID
+	brief.RetryOrdinal = 1
+	brief.AttemptOrdinal = 2
+	encoded := mustJSON(brief)
+	hash := sha256.Sum256(encoded)
+	digest := kernel.Digest(hex.EncodeToString(hash[:]))
+	workspace := filepath.Join(t.TempDir(), "workspace")
+	events := []map[string]any{event("prior-user", "MessageEvent", "user", "prior attempt")}
+	for index := 0; index < maximumRepositoryDiscoveryActions+4; index++ {
+		events = append(events,
+			actionEvent(fmt.Sprintf("prior-action-%02d", index), "terminal", "ls adapters"),
+			observationEvent(fmt.Sprintf("prior-observation-%02d", index), "terminal", false, 0),
+		)
+	}
+	events = append(events, event("retry-user", "MessageEvent", "user", string(encoded)))
+	for index := 0; index < maximumRetryDiscoveryActions-1; index++ {
+		events = append(events,
+			actionEvent(fmt.Sprintf("retry-action-%02d", index), "terminal", "sed -n '1,80p' organization/host.go"),
+			observationEvent(fmt.Sprintf("retry-observation-%02d", index), "terminal", false, 0),
+		)
+	}
+	state := &progressGuardServerState{prompt: string(encoded), workspace: workspace, events: events}
+	server := httptest.NewServer(http.HandlerFunc(state.serveHTTP))
+	defer server.Close()
+	client := newOpenHandsTestClient(t, server.URL, workspace, brief)
+
+	observation, err := client.Inspect(context.Background(), brief, string(brief.InvocationID), digest)
+	if err != nil || observation.State != application.ExternalRunning || state.interruptCalls != 0 {
+		t.Fatalf("allowed continuation observation=%#v err=%v interrupts=%d", observation, err, state.interruptCalls)
+	}
+	events = append(events,
+		actionEvent("retry-action-final", "terminal", "sed -n '1,80p' adapters/operatorhttp/handler.go"),
+		observationEvent("retry-observation-final", "terminal", false, 0),
+	)
+	state.events = events
+	observation, err = client.Inspect(context.Background(), brief, string(brief.InvocationID), digest)
+	if err != nil || observation.State != application.ExternalFailed || state.interruptCalls != 1 || !strings.Contains(string(observation.Output), `"repository_discovery_actions":15`) {
+		t.Fatalf("bounded continuation observation=%#v err=%v interrupts=%d", observation, err, state.interruptCalls)
+	}
+}
+
 func TestClientProgressGuardRequiresSuccessfulMutationObservation(t *testing.T) {
 	brief, digest := openHandsTestBrief(t)
 	workspace := filepath.Join(t.TempDir(), "workspace")
