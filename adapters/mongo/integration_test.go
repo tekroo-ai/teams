@@ -1222,6 +1222,48 @@ func TestOperationsRequireBoundedContexts(t *testing.T) {
 	}
 }
 
+func TestExecutionRegistrationKeepsStableAggregateAcrossReplacement(t *testing.T) {
+	store := openTestStore(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	actor := kernel.ActorFQN("teams::coder-1")
+	first := kernel.ExecutionTuple{ExecutionID: testUUID(5101), FencingEpoch: 1}
+	second := kernel.ExecutionTuple{ExecutionID: testUUID(5102), FencingEpoch: 2}
+	registeredEvent := kernel.DomainEvent{
+		EventID: testUUID(5103), EventType: "tekroo.event.execution.registered",
+		Aggregate: kernel.AggregateRef{Kind: kernel.AggregateExecution, ID: first.ExecutionID}, AggregateRevision: 1,
+		Payload: mustTestJSON(t, map[string]any{"actor_fqn": actor, "execution_id": first.ExecutionID, "fencing_epoch": first.FencingEpoch}),
+	}
+	if _, err := store.applyRegistryAndReview(ctx, registeredEvent, nil); err != nil {
+		t.Fatal(err)
+	}
+	registration, found, err := store.ReadExecutionRegistration(ctx, actor)
+	if err != nil || !found || registration.Execution != first || registration.AggregateID != first.ExecutionID || registration.AggregateRevision != 1 || registration.LastEventID != registeredEvent.EventID {
+		t.Fatalf("registration after create = %#v found=%v err=%v", registration, found, err)
+	}
+	replacedEvent := kernel.DomainEvent{
+		EventID: testUUID(5104), EventType: "tekroo.event.execution.replaced",
+		Aggregate: registeredEvent.Aggregate, AggregateRevision: 2,
+		Payload: mustTestJSON(t, map[string]any{"actor_fqn": actor, "prior_execution_id": first.ExecutionID, "new_execution_id": second.ExecutionID, "new_fencing_epoch": second.FencingEpoch}),
+	}
+	if _, err := store.applyRegistryAndReview(ctx, replacedEvent, nil); err != nil {
+		t.Fatal(err)
+	}
+	registration, found, err = store.ReadExecutionRegistration(ctx, actor)
+	if err != nil || !found || registration.Execution != second || registration.AggregateID != first.ExecutionID || registration.AggregateRevision != 2 || registration.LastEventID != replacedEvent.EventID {
+		t.Fatalf("registration after replacement = %#v found=%v err=%v", registration, found, err)
+	}
+}
+
+func mustTestJSON(t *testing.T, value any) json.RawMessage {
+	t.Helper()
+	raw, err := json.Marshal(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return raw
+}
+
 func openTestStore(t *testing.T) *Store {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)

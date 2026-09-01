@@ -216,6 +216,9 @@ func (service *Service) CallTool(ctx context.Context, identity protocol.Authenti
 		}
 		feature, created, err := service.organization.SubmitFeature(ctx, identity.Principal, input)
 		if err != nil {
+			if errors.Is(err, operationalruntime.ErrFeatureMaterializationPending) {
+				return map[string]any{"created": created, "feature": feature, "materialization": "PENDING", "error": err.Error()}, nil
+			}
 			return nil, err
 		}
 		return map[string]any{"created": created, "feature": feature}, nil

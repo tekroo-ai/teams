@@ -12,6 +12,8 @@ import (
 	"github.com/tekroo-ai/teams/organization"
 )
 
+var ErrFeatureMaterializationPending = errors.New("feature accepted but materialization is pending")
+
 func (service *ProductionService) SubmitFeature(ctx context.Context, principal kernel.PrincipalRef, input organization.FeatureRequestInput) (organization.FeatureRequest, bool, error) {
 	if service == nil || service.Features == nil {
 		return organization.FeatureRequest{}, false, organization.ErrInvalidFeature
@@ -22,8 +24,10 @@ func (service *ProductionService) SubmitFeature(ctx context.Context, principal k
 	}
 	if feature.Status == organization.FeatureSubmitted {
 		if err := service.materializeFeatureIntake(ctx, feature); err != nil {
-			return feature, created, err
+			service.recordRecoveryFault("feature-intake:"+string(feature.ID), err)
+			return feature, created, fmt.Errorf("%w: %v", ErrFeatureMaterializationPending, err)
 		}
+		service.clearRecoveryFault("feature-intake:" + string(feature.ID))
 	}
 	return feature, created, nil
 }

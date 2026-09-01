@@ -83,9 +83,12 @@ type valueDocument struct {
 }
 
 type executionDocument struct {
-	ID           string `bson:"_id"`
-	ExecutionID  string `bson:"execution_id"`
-	FencingEpoch uint64 `bson:"fencing_epoch"`
+	ID                string `bson:"_id"`
+	ExecutionID       string `bson:"execution_id"`
+	FencingEpoch      uint64 `bson:"fencing_epoch"`
+	AggregateID       string `bson:"aggregate_id,omitempty"`
+	AggregateRevision uint64 `bson:"aggregate_revision,omitempty"`
+	LastEventID       string `bson:"last_event_id,omitempty"`
 }
 
 type evidenceDocument struct {
@@ -904,18 +907,38 @@ func (s *Store) applyRegistryAndReview(ctx context.Context, event kernel.DomainE
 		if err := decode(event.Payload, &payload); err != nil {
 			return "", err
 		}
-		_, err := s.db.Collection("executions").InsertOne(ctx, executionDocument{ID: string(payload.ActorFQN), ExecutionID: string(payload.ExecutionID), FencingEpoch: payload.FencingEpoch})
+		if !payload.ActorFQN.Valid() || !payload.ExecutionID.Valid() || payload.FencingEpoch == 0 || event.Aggregate.Kind != kernel.AggregateExecution || event.Aggregate.ID != payload.ExecutionID || event.AggregateRevision != 1 {
+			return "", ErrInvalidDecision
+		}
+		_, err := s.db.Collection("executions").InsertOne(ctx, executionDocument{
+			ID: string(payload.ActorFQN), ExecutionID: string(payload.ExecutionID), FencingEpoch: payload.FencingEpoch,
+			AggregateID: string(event.Aggregate.ID), AggregateRevision: event.AggregateRevision, LastEventID: string(event.EventID),
+		})
 		return "", err
 	case "tekroo.event.execution.replaced":
 		var payload struct {
-			ActorFQN        kernel.ActorFQN `json:"actor_fqn"`
-			NewExecutionID  kernel.UUIDv7   `json:"new_execution_id"`
-			NewFencingEpoch uint64          `json:"new_fencing_epoch"`
+			ActorFQN         kernel.ActorFQN `json:"actor_fqn"`
+			PriorExecutionID kernel.UUIDv7   `json:"prior_execution_id"`
+			NewExecutionID   kernel.UUIDv7   `json:"new_execution_id"`
+			NewFencingEpoch  uint64          `json:"new_fencing_epoch"`
 		}
 		if err := decode(event.Payload, &payload); err != nil {
 			return "", err
 		}
-		result, err := s.db.Collection("executions").UpdateOne(ctx, bson.D{{Key: "_id", Value: string(payload.ActorFQN)}}, bson.D{{Key: "$set", Value: bson.D{{Key: "execution_id", Value: string(payload.NewExecutionID)}, {Key: "fencing_epoch", Value: payload.NewFencingEpoch}}}})
+		if !payload.ActorFQN.Valid() || !payload.PriorExecutionID.Valid() || !payload.NewExecutionID.Valid() || payload.NewExecutionID == payload.PriorExecutionID || payload.NewFencingEpoch < 2 || event.Aggregate.Kind != kernel.AggregateExecution || event.AggregateRevision < 2 {
+			return "", ErrInvalidDecision
+		}
+		result, err := s.db.Collection("executions").UpdateOne(ctx, bson.D{
+			{Key: "_id", Value: string(payload.ActorFQN)},
+			{Key: "execution_id", Value: string(payload.PriorExecutionID)},
+			{Key: "fencing_epoch", Value: payload.NewFencingEpoch - 1},
+		}, bson.D{{Key: "$set", Value: bson.D{
+			{Key: "execution_id", Value: string(payload.NewExecutionID)},
+			{Key: "fencing_epoch", Value: payload.NewFencingEpoch},
+			{Key: "aggregate_id", Value: string(event.Aggregate.ID)},
+			{Key: "aggregate_revision", Value: event.AggregateRevision},
+			{Key: "last_event_id", Value: string(event.EventID)},
+		}}})
 		if err != nil || result.MatchedCount != 1 {
 			return "", ErrConflict
 		}

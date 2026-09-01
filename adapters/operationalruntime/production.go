@@ -546,6 +546,8 @@ type ProductionService struct {
 	roleReconciliation     time.Duration
 	roleMaximumRestarts    uint32
 	messageMaximumAttempts uint32
+	faultMu                sync.Mutex
+	recoveryFaults         map[string]RecoveryFault
 	planningDeadline       time.Duration
 	planning               ProductionPlanning
 	profilesByModel        map[kernel.Digest]ProductionProfile
@@ -651,7 +653,7 @@ func NewProductionService(ctx context.Context, config ProductionConfig) (*Produc
 	for key, value := range resolved.trustedRolePublishers {
 		trustedPublishers[key] = append(ed25519.PublicKey(nil), value...)
 	}
-	service := &ProductionService{Store: store, Runtime: runtime, Controller: controller, RoleHost: roleHost, RoleRuntime: roleRuntime, MessageBus: messageBus, RoleInbox: roleInbox, RoleLibrary: roleLibrary, projectionInterval: resolved.projectionInterval, projectionTimeout: resolved.projectionTimeout, recoveryInterval: resolved.reconciliation, recoveryTimeout: resolved.leaseOperationTimeout, recoveryAttempts: config.Worker.MaximumReconciliations, failures: make(chan error, 4), provenance: resolved.provenance, operatorToken: resolved.operatorBearerToken, operatorIdentity: protocol.AuthenticatedContext{Principal: config.Operator.Principal}, humanCredentials: append([]HumanTransportCredential(nil), resolved.humanCredentials...), operatorTimeout: resolved.operatorTimeout, operatorMaxBody: config.Operator.MaximumBodyBytes, roleReconciliation: resolved.roleReconciliation, roleMaximumRestarts: config.Organization.MaximumRestarts, messageMaximumAttempts: config.Organization.MaximumDeliveryAttempts, clock: clock, ids: ids, planningDeadline: resolved.planningDeadline, planning: config.Planning, profilesByModel: profilesByModel, workspacesByID: workspacesByID, serviceAuthority: config.ServiceAuthority, policyAuthority: config.ExpiryAuthority, librarySources: librarySources, trustedRolePublishers: trustedPublishers}
+	service := &ProductionService{Store: store, Runtime: runtime, Controller: controller, RoleHost: roleHost, RoleRuntime: roleRuntime, MessageBus: messageBus, RoleInbox: roleInbox, RoleLibrary: roleLibrary, projectionInterval: resolved.projectionInterval, projectionTimeout: resolved.projectionTimeout, recoveryInterval: resolved.reconciliation, recoveryTimeout: resolved.leaseOperationTimeout, recoveryAttempts: config.Worker.MaximumReconciliations, failures: make(chan error, 4), provenance: resolved.provenance, operatorToken: resolved.operatorBearerToken, operatorIdentity: protocol.AuthenticatedContext{Principal: config.Operator.Principal}, humanCredentials: append([]HumanTransportCredential(nil), resolved.humanCredentials...), operatorTimeout: resolved.operatorTimeout, operatorMaxBody: config.Operator.MaximumBodyBytes, roleReconciliation: resolved.roleReconciliation, roleMaximumRestarts: config.Organization.MaximumRestarts, messageMaximumAttempts: config.Organization.MaximumDeliveryAttempts, recoveryFaults: make(map[string]RecoveryFault), clock: clock, ids: ids, planningDeadline: resolved.planningDeadline, planning: config.Planning, profilesByModel: profilesByModel, workspacesByID: workspacesByID, serviceAuthority: config.ServiceAuthority, policyAuthority: config.ExpiryAuthority, librarySources: librarySources, trustedRolePublishers: trustedPublishers}
 	if config.Federation != nil {
 		federationIngress, ingressErr := organization.NewFederationIngress(resolved.federationRegistry, store, config.DeploymentIdentity, resolved.federationFutureSkew)
 		if ingressErr != nil {
@@ -671,7 +673,7 @@ func NewProductionService(ctx context.Context, config ProductionConfig) (*Produc
 		service.federationAddress = config.Federation.Address
 		service.federationMaximumBody = config.Federation.MaximumBodyBytes
 	}
-	features, err := organization.NewFeatureCoordinator(store, roleHost, service, clock, ids)
+	features, err := organization.NewFeatureCoordinator(store, productionFeatureRoleHost{service: service}, service, clock, ids)
 	if err != nil {
 		return fail(err)
 	}
@@ -813,7 +815,14 @@ func (service *ProductionService) StartRole(ctx context.Context, actor kernel.Ac
 	if service == nil || service.RoleHost == nil {
 		return organization.RoleInstanceState{}, application.ErrInvalidConfiguration
 	}
-	return service.RoleHost.EnsureStarted(ctx, actor)
+	state, err := service.RoleHost.EnsureStarted(ctx, actor)
+	if err != nil {
+		return state, err
+	}
+	if err := service.registerRoleState(ctx, state); err != nil {
+		return state, err
+	}
+	return state, nil
 }
 
 func (service *ProductionService) StopRole(ctx context.Context, actor kernel.ActorFQN) (organization.RoleInstanceState, error) {
@@ -827,7 +836,14 @@ func (service *ProductionService) RestartRole(ctx context.Context, actor kernel.
 	if service == nil || service.RoleHost == nil {
 		return organization.RoleInstanceState{}, application.ErrInvalidConfiguration
 	}
-	return service.RoleHost.Restart(ctx, actor)
+	state, err := service.RoleHost.Restart(ctx, actor)
+	if err != nil {
+		return state, err
+	}
+	if err := service.registerRoleState(ctx, state); err != nil {
+		return state, err
+	}
+	return state, nil
 }
 
 func (service *ProductionService) PauseRole(ctx context.Context, actor kernel.ActorFQN) (organization.RoleInstanceState, error) {
@@ -959,9 +975,20 @@ func (service *ProductionService) Start(ctx context.Context) error {
 	if err := service.Controller.Start(ctx); err != nil {
 		return err
 	}
-	if _, err := service.RoleHost.StartEager(ctx); err != nil {
+	if err := service.reconcileDurableRoleExecutions(ctx); err != nil {
+		_ = service.Controller.Stop(context.WithoutCancel(ctx))
+		return fmt.Errorf("reconcile durable role executions: %w", err)
+	}
+	eager, err := service.RoleHost.StartEager(ctx)
+	if err != nil {
 		_ = service.Controller.Stop(context.WithoutCancel(ctx))
 		return fmt.Errorf("start eager roles: %w", err)
+	}
+	for _, state := range eager {
+		if err := service.registerRoleState(ctx, state); err != nil {
+			_ = service.Controller.Stop(context.WithoutCancel(ctx))
+			return fmt.Errorf("register eager role %s: %w", state.ActorFQN, err)
+		}
 	}
 	projectionContext, cancel := context.WithCancel(context.Background())
 	service.projectionCancel = cancel
@@ -1115,9 +1142,13 @@ func (service *ProductionService) runRoleRecovery(ctx context.Context) error {
 					err = fmt.Errorf("role %s exceeded restart limit %d", role.ActorFQN, service.roleMaximumRestarts)
 					break
 				}
-				_, restarted, reconcileErr := service.RoleHost.Reconcile(operationContext, role.ActorFQN)
+				state, restarted, reconcileErr := service.RoleHost.Reconcile(operationContext, role.ActorFQN)
 				if reconcileErr != nil {
 					err = reconcileErr
+					break
+				}
+				if registerErr := service.registerRoleState(operationContext, state); registerErr != nil {
+					err = registerErr
 					break
 				}
 				if restarted {
@@ -1128,10 +1159,16 @@ func (service *ProductionService) runRoleRecovery(ctx context.Context) error {
 			}
 		}
 		if err == nil {
-			err = service.reconcileFeaturePlanning(operationContext)
-		}
-		if err == nil {
-			err = service.reconcilePlannedFeatureWork(operationContext)
+			if planningErr := service.reconcileFeaturePlanning(operationContext); planningErr != nil {
+				service.recordRecoveryFault("feature-planning", planningErr)
+			} else {
+				service.clearRecoveryFault("feature-planning")
+			}
+			if workErr := service.reconcilePlannedFeatureWork(operationContext); workErr != nil {
+				service.recordRecoveryFault("feature-work", workErr)
+			} else {
+				service.clearRecoveryFault("feature-work")
+			}
 		}
 		cancel()
 		if err != nil {

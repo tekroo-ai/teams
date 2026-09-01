@@ -121,6 +121,17 @@ func TestHandlerSubmitsFeatureWithBoundHumanIdentity(t *testing.T) {
 	}
 }
 
+func TestHandlerReportsDurableFeatureWhenMaterializationIsPending(t *testing.T) {
+	service := &operatorService{state: operationalruntime.ControlRunning, featureErr: operationalruntime.ErrFeatureMaterializationPending}
+	handler := newTestHandler(t, service, func() {})
+	body := `{"idempotency_key":"feature-1","team":"teams","title":"Restore workflow","description":"Recover the working team path.","acceptance_criteria":["finite DAG"],"priority":"HIGH","constraints":["no loops"],"repository":"/work/teams","workspace_id":"operator-1","maximum_stories":4,"maximum_tasks":16,"maximum_hops":16}`
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, authorizedRequest(http.MethodPost, "/v1/features", strings.NewReader(body)))
+	if response.Code != http.StatusAccepted || !strings.Contains(response.Body.String(), `"materialization":"PENDING"`) || !strings.Contains(response.Body.String(), `"id":"00000000-0000-7000-8000-000000000005"`) {
+		t.Fatalf("pending feature status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
 func newTestHandler(t *testing.T, service Service, stop func()) *Handler {
 	t.Helper()
 	handler, err := NewHandler(Config{Service: service, BearerToken: testToken, OperatorPrincipal: kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "operator"}, OperationTimeout: time.Second, MaximumBodyBytes: 4096, RequestStop: stop})
@@ -146,6 +157,7 @@ type operatorService struct {
 	submissions      int
 	lastCommand      kernel.KernelCommand
 	featurePrincipal kernel.PrincipalRef
+	featureErr       error
 }
 
 func (service *operatorService) Status() operationalruntime.ControlStatus {
@@ -188,7 +200,7 @@ func (service *operatorService) ReadInvocation(context.Context, kernel.UUIDv7) (
 
 func (service *operatorService) SubmitFeature(_ context.Context, principal kernel.PrincipalRef, input organization.FeatureRequestInput) (organization.FeatureRequest, bool, error) {
 	service.featurePrincipal = principal
-	return organization.FeatureRequest{ID: "00000000-0000-7000-8000-000000000005", Input: input}, true, nil
+	return organization.FeatureRequest{ID: "00000000-0000-7000-8000-000000000005", Input: input}, true, service.featureErr
 }
 
 func (service *operatorService) ReadFeature(context.Context, kernel.UUIDv7) (organization.FeatureRequest, bool, error) {

@@ -344,6 +344,10 @@ func (handler *Handler) submitFeature(writer http.ResponseWriter, request *http.
 	}
 	feature, created, err := handler.service.SubmitFeature(request.Context(), handler.principal, input)
 	if err != nil {
+		if errors.Is(err, operationalruntime.ErrFeatureMaterializationPending) {
+			writeJSON(writer, http.StatusAccepted, map[string]any{"feature": feature, "materialization": "PENDING", "error": err.Error()})
+			return
+		}
 		writeError(writer, http.StatusConflict, "FEATURE_SUBMISSION_FAILED")
 		return
 	}

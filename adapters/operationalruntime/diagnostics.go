@@ -2,6 +2,7 @@ package operationalruntime
 
 import (
 	"context"
+	"sort"
 	"time"
 
 	"github.com/tekroo-ai/teams/adapters/mongo"
@@ -20,6 +21,15 @@ type Diagnostics struct {
 	DeadLetters      []organization.MessageClaim      `json:"dead_letters"`
 	ProjectionFaults []mongo.ProjectionFault          `json:"projection_faults"`
 	RoleLibraries    []organization.RoleLibraryEntry  `json:"role_libraries"`
+	RecoveryFaults   []RecoveryFault                  `json:"recovery_faults"`
+}
+
+type RecoveryFault struct {
+	Scope         string    `json:"scope"`
+	Error         string    `json:"error"`
+	FirstObserved time.Time `json:"first_observed"`
+	LastObserved  time.Time `json:"last_observed"`
+	Occurrences   uint64    `json:"occurrences"`
 }
 
 func (service *ProductionService) Diagnostics(ctx context.Context) (Diagnostics, error) {
@@ -50,7 +60,49 @@ func (service *ProductionService) Diagnostics(ctx context.Context) (Diagnostics,
 	if err != nil {
 		return Diagnostics{}, err
 	}
-	return Diagnostics{ObservedAt: service.clock.Now().UTC(), Control: service.Status(), Roles: roles, ActiveTasks: activeTasks, PendingMessages: pending, ClaimedMessages: claimed, DeadLetters: deadLetters, ProjectionFaults: faults, RoleLibraries: service.RoleLibraries()}, nil
+	return Diagnostics{ObservedAt: service.clock.Now().UTC(), Control: service.Status(), Roles: roles, ActiveTasks: activeTasks, PendingMessages: pending, ClaimedMessages: claimed, DeadLetters: deadLetters, ProjectionFaults: faults, RoleLibraries: service.RoleLibraries(), RecoveryFaults: service.readRecoveryFaults()}, nil
+}
+
+func (service *ProductionService) recordRecoveryFault(scope string, cause error) {
+	if service == nil || scope == "" || cause == nil {
+		return
+	}
+	now := time.Now().UTC()
+	if service.clock != nil {
+		now = service.clock.Now().UTC()
+	}
+	service.faultMu.Lock()
+	defer service.faultMu.Unlock()
+	if service.recoveryFaults == nil {
+		service.recoveryFaults = make(map[string]RecoveryFault)
+	}
+	fault, found := service.recoveryFaults[scope]
+	if !found || fault.Error != cause.Error() {
+		fault = RecoveryFault{Scope: scope, Error: cause.Error(), FirstObserved: now}
+	}
+	fault.LastObserved = now
+	fault.Occurrences++
+	service.recoveryFaults[scope] = fault
+}
+
+func (service *ProductionService) clearRecoveryFault(scope string) {
+	if service == nil || scope == "" {
+		return
+	}
+	service.faultMu.Lock()
+	defer service.faultMu.Unlock()
+	delete(service.recoveryFaults, scope)
+}
+
+func (service *ProductionService) readRecoveryFaults() []RecoveryFault {
+	service.faultMu.Lock()
+	defer service.faultMu.Unlock()
+	result := make([]RecoveryFault, 0, len(service.recoveryFaults))
+	for _, fault := range service.recoveryFaults {
+		result = append(result, fault)
+	}
+	sort.Slice(result, func(left, right int) bool { return result[left].Scope < result[right].Scope })
+	return result
 }
 
 func (service *ProductionService) RepairDeadLetter(ctx context.Context, failedID kernel.UUIDv7, successor organization.OrganizationalMessage) error {

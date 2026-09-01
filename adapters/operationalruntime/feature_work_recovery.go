@@ -161,7 +161,7 @@ func (service *ProductionService) reconcileFeaturePlan(ctx context.Context, feat
 		if !found {
 			return organization.ErrInvalidFeature
 		}
-		if err := service.registerExecution(ctx, feature, owner, profileConfig); err != nil {
+		if err := service.registerExecution(ctx, owner, profileConfig); err != nil {
 			return err
 		}
 		profileSnapshot, found := snapshot.WorkProfiles[kernel.AggregateRef{Kind: kernel.AggregateTask, ID: item.ID}]

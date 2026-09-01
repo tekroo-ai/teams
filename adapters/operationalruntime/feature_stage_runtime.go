@@ -162,7 +162,7 @@ func (service *ProductionService) ensureFeaturePlanningTask(ctx context.Context,
 	if state.Phase != kernel.PhasePlanned && state.Phase != kernel.PhaseReady && state.Phase != kernel.PhaseActive {
 		return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, organization.ErrInvalidFeature
 	}
-	if err := service.registerExecution(ctx, feature, owner, profileConfig); err != nil {
+	if err := service.registerExecution(ctx, owner, profileConfig); err != nil {
 		return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, err
 	}
 	profile := service.workProfile(feature, task, evidenceID, deadline)

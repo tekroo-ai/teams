@@ -117,7 +117,7 @@ func (service *ProductionService) preparePlannedTasks(ctx context.Context, featu
 		if !found {
 			return organization.ErrInvalidFeature
 		}
-		if err := service.registerExecution(ctx, feature, owner, profileConfig); err != nil {
+		if err := service.registerExecution(ctx, owner, profileConfig); err != nil {
 			return err
 		}
 		profile := service.workProfile(feature, item, evidenceID, deadline)
@@ -169,35 +169,59 @@ func (service *ProductionService) workProfile(feature organization.FeatureReques
 	}
 }
 
-func (service *ProductionService) registerExecution(ctx context.Context, feature organization.FeatureRequest, owner organization.RoleInstanceState, profile ProductionProfile) error {
-	target := kernel.AggregateRef{Kind: kernel.AggregateExecution, ID: owner.Execution.ExecutionID}
-	snapshot, err := service.Store.LoadDecision(ctx, kernel.KernelCommand{Target: target})
+func (service *ProductionService) registerExecution(ctx context.Context, owner organization.RoleInstanceState, profile ProductionProfile) error {
+	if service == nil || service.Store == nil || !owner.ActorFQN.Valid() || !owner.Execution.Valid() || profile.ModelProfileDigest != owner.ModelProfile || !profile.RuntimeIdentityDigest.Valid() {
+		return organization.ErrRoleRuntime
+	}
+	registration, registered, err := service.Store.ReadExecutionRegistration(ctx, owner.ActorFQN)
 	if err != nil {
 		return err
 	}
-	current, registered := snapshot.CurrentExecutions[owner.ActorFQN]
-	if registered && current == owner.Execution {
+	if registered && registration.Execution == owner.Execution {
 		return nil
 	}
-	if snapshot.Exists {
-		return fmt.Errorf("execution target %s already belongs to a different registration", owner.Execution.ExecutionID)
-	}
 	commandType := "tekroo.command.execution.register"
-	payloadValue := map[string]any{"actor_fqn": owner.ActorFQN, "execution_id": owner.Execution.ExecutionID, "fencing_epoch": owner.Execution.FencingEpoch, "runtime_identity": profile.RuntimeIdentityDigest}
+	targetID := owner.Execution.ExecutionID
+	expected := kernel.MustNotExist()
+	parents := []kernel.DagParent(nil)
+	payloadValue := map[string]any{
+		"actor_fqn": owner.ActorFQN, "execution_id": owner.Execution.ExecutionID,
+		"fencing_epoch": owner.Execution.FencingEpoch, "runtime_identity": profile.RuntimeIdentityDigest,
+	}
 	if registered {
-		if owner.Execution.FencingEpoch != current.FencingEpoch+1 || owner.Execution.ExecutionID == current.ExecutionID {
+		if owner.Execution.FencingEpoch != registration.Execution.FencingEpoch+1 || owner.Execution.ExecutionID == registration.Execution.ExecutionID {
 			return fmt.Errorf("execution replacement for %s is not the next fenced execution", owner.ActorFQN)
 		}
 		commandType = "tekroo.command.execution.replace"
-		payloadValue = map[string]any{"actor_fqn": owner.ActorFQN, "prior_execution_id": current.ExecutionID, "new_execution_id": owner.Execution.ExecutionID, "new_fencing_epoch": owner.Execution.FencingEpoch, "reason": "role process restarted"}
+		targetID = registration.AggregateID
+		expected = kernel.NewExpectedRevision(registration.AggregateRevision)
+		parents = []kernel.DagParent{{ParentEventID: registration.LastEventID, EdgeKind: kernel.EdgeCausal}}
+		payloadValue = map[string]any{
+			"actor_fqn": owner.ActorFQN, "prior_execution_id": registration.Execution.ExecutionID,
+			"new_execution_id": owner.Execution.ExecutionID, "new_fencing_epoch": owner.Execution.FencingEpoch,
+			"reason": "role process restarted",
+		}
 	}
 	payload, err := json.Marshal(payloadValue)
 	if err != nil {
 		return err
 	}
-	_, err = service.submitDeterministicCommand(ctx, feature, commandType, kernel.SchemaVersion, kernel.AggregateExecution, owner.Execution.ExecutionID, service.serviceAuthority, 0, payload, nil, nil, "execution-"+string(owner.Execution.ExecutionID))
+	command := kernel.KernelCommand{
+		ContractManifest: kernel.ContractIdentity,
+		CommandID:        deterministicOperationalUUID("role-execution-command", string(owner.ActorFQN), string(owner.Execution.ExecutionID)),
+		CommandType:      commandType, CommandVersion: kernel.SchemaVersion,
+		Target: kernel.AggregateRef{Kind: kernel.AggregateExecution, ID: targetID}, Authority: service.serviceAuthority,
+		ExpectedRevision: expected, Preconditions: []kernel.AggregatePrecondition{},
+		ExpectedPolicyRevision: service.provenance.PolicyRevision, ExpectedCatalogueRevision: kernel.CatalogueRevision,
+		IdempotencyKey: "role-execution:" + string(owner.ActorFQN) + ":" + string(owner.Execution.ExecutionID),
+		CorrelationID:  owner.Execution.ExecutionID, Causation: parents, Payload: payload, EvidenceRefs: []kernel.EvidenceRef{},
+	}
+	receipt, err := service.Submit(ctx, command)
 	if err != nil {
 		return fmt.Errorf("%s %s for %s: %w", commandType, owner.Execution.ExecutionID, owner.ActorFQN, err)
+	}
+	if receipt.OutcomeCode != kernel.OutcomeApplied && receipt.OutcomeCode != kernel.OutcomeNoChange {
+		return fmt.Errorf("%s %s for %s rejected: %s", commandType, owner.Execution.ExecutionID, owner.ActorFQN, receipt.ReasonCode)
 	}
 	return nil
 }
