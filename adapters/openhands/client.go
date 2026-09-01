@@ -554,7 +554,9 @@ func violatesShellDiscipline(command string) bool {
 
 func repositorySearchLoopViolation(events []rawEvent, promptIndex int) (rawEvent, bool) {
 	lastSuccessfulSearch := ""
+	lastSuccessfulWasDiscovery := false
 	pendingSearch := ""
+	pendingWasDiscovery := false
 	for index, event := range events {
 		if index <= promptIndex {
 			continue
@@ -562,26 +564,54 @@ func repositorySearchLoopViolation(events []rawEvent, promptIndex int) (rawEvent
 		if event.Kind == "ActionEvent" && event.Source == "agent" {
 			signature, search := repositorySearchSignature(event.ActionCommand)
 			if search {
-				if signature == lastSuccessfulSearch && !repositoryProgressViolationCorrected(events, index, event.ID) {
+				if lastSuccessfulSearch != "" && (lastSuccessfulWasDiscovery || signature == lastSuccessfulSearch) && !repositoryProgressViolationCorrected(events, index, event.ID) {
 					return event, true
 				}
 				pendingSearch = signature
+				pendingWasDiscovery = repositorySearchIsDiscovery(event.ActionCommand)
 				continue
 			}
 			if repositoryDiscoveryAction(event) {
 				lastSuccessfulSearch = ""
+				lastSuccessfulWasDiscovery = false
 				pendingSearch = ""
+				pendingWasDiscovery = false
 			}
 			continue
 		}
 		if pendingSearch != "" && event.Kind == "ObservationEvent" && event.ToolName == "terminal" {
 			if !event.ObservationError && !event.ObservationTimeout && (event.ObservationExitCode == nil || *event.ObservationExitCode == 0) && strings.TrimSpace(event.Text) != "" {
 				lastSuccessfulSearch = pendingSearch
+				lastSuccessfulWasDiscovery = pendingWasDiscovery
 			}
 			pendingSearch = ""
+			pendingWasDiscovery = false
 		}
 	}
 	return rawEvent{}, false
+}
+
+func repositorySearchIsDiscovery(command string) bool {
+	fields := strings.Fields(strings.TrimSpace(command))
+	for _, field := range fields[1:] {
+		option := strings.TrimLeft(field, "-")
+		if field == "--files" || field == "--files-with-matches" || strings.HasPrefix(field, "-") && !strings.HasPrefix(field, "--") && strings.Contains(option, "l") {
+			return true
+		}
+	}
+	if len(fields) < 2 {
+		return true
+	}
+	target := strings.Trim(fields[len(fields)-1], "\"'")
+	if strings.ContainsAny(target, "*?[") || strings.HasSuffix(target, "/") {
+		return true
+	}
+	switch filepath.Ext(target) {
+	case ".go", ".md", ".json", ".yaml", ".yml", ".toml", ".mod", ".sum", ".sh", ".py", ".js", ".mjs", ".ts":
+		return false
+	default:
+		return true
+	}
 }
 
 func repositorySearchSignature(command string) (string, bool) {
@@ -712,7 +742,7 @@ func (client *Client) correctRepositorySearchLoop(ctx context.Context, brief app
 	if repositoryProgressViolationCorrected(events, promptIndex, violation.ID) {
 		return client.observation(brief, requestDigest, info, events, false)
 	}
-	correction := repositoryProgressCorrectionPrefix + violation.ID + "\nThe previous repository search repeated a question that had already returned results. Continue this same task by inspecting one of the files already located and then produce the assigned result. Do not run another repository search in this retry."
+	correction := repositoryProgressCorrectionPrefix + violation.ID + "\nThe previous action ran another repository search after a successful search had already returned concrete results. Continue this same task by inspecting one of the files already located and then produce the assigned result. Do not run another repository search in this retry."
 	status, _, err := client.request(ctx, http.MethodPost, "/api/conversations/"+url.PathEscape(conversationID)+"/events", map[string]any{
 		"role": "user", "run": true,
 		"content": []map[string]any{{"type": "text", "text": correction}},

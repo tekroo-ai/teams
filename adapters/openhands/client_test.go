@@ -417,6 +417,22 @@ func TestRepositorySearchLoopRequiresSuccessfulResultAndNoInterveningInspection(
 	}
 }
 
+func TestRepositorySearchLoopRequiresInspectionAfterDiscoveryEvenWhenPatternChanges(t *testing.T) {
+	events := []rawEvent{
+		{Kind: "MessageEvent", Source: "user"},
+		{ID: "discovery", Kind: "ActionEvent", Source: "agent", ToolName: "terminal", ActionCommand: `rg -l "role-name|RoleName" --type go`},
+		{Kind: "ObservationEvent", ToolName: "terminal", Text: "organization/host.go\norganization/manifest.go", ObservationExitCode: intPointer(0)},
+		{ID: "changed-query", Kind: "ActionEvent", Source: "agent", ToolName: "terminal", ActionCommand: `rg -l "tekroo_roles_control" --type go`},
+	}
+	violation, found := repositorySearchLoopViolation(events, 0)
+	if !found || violation.ID != "changed-query" {
+		t.Fatalf("violation=%+v found=%t", violation, found)
+	}
+	if !repositorySearchIsDiscovery(`rg -l "Actor" --type go`) || !repositorySearchIsDiscovery(`rg -n "Actor" organization/*.go`) || repositorySearchIsDiscovery(`rg -n "Actor" organization/host.go`) {
+		t.Fatal("repository search classification did not distinguish discovery from exact-file inspection")
+	}
+}
+
 func TestViolatesShellDisciplineDistinguishesQuotedLiteralsFromOperators(t *testing.T) {
 	tests := []struct {
 		command string
