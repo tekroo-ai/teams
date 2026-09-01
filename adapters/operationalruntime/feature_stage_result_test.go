@@ -176,3 +176,16 @@ func TestRetryableFeaturePlanningInvocation(t *testing.T) {
 		})
 	}
 }
+
+func TestTechnicalPlanningFailureClassification(t *testing.T) {
+	for _, reason := range []string{"EXECUTION_BRIEF_SUPERSEDED", "SHELL_DISCIPLINE_VIOLATION", "REPEATED_SHELL_DISCIPLINE_VIOLATION"} {
+		if !technicalPlanningFailure([]byte(`{"reason":"` + reason + `"}`)) {
+			t.Fatalf("technical reason %q was not recognized", reason)
+		}
+	}
+	for _, output := range [][]byte{[]byte(`{"reason":"TEST_FAILURE"}`), []byte(`{"reason":""}`), []byte(`not-json`)} {
+		if technicalPlanningFailure(output) {
+			t.Fatalf("substantive or malformed output classified as technical: %s", output)
+		}
+	}
+}

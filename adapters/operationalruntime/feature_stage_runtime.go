@@ -42,8 +42,14 @@ func (service *ProductionService) reconcileFeaturePlanning(ctx context.Context) 
 		}
 		if invocation.State != kernel.InvocationSucceeded {
 			if retryableFeaturePlanningInvocation(invocation, task.AttemptLimit) {
-				if retryErr := service.retryFeaturePlanningInvocation(ctx, feature, task, state, head, invocation, snapshot, &invocation, nil); retryErr != nil {
+				if retryErr := service.retryFeaturePlanningInvocation(ctx, feature, task, state, head, invocation, snapshot, &invocation, nil, false); retryErr != nil {
 					return fmt.Errorf("feature %s %s execution retry: %w", feature.ID, stage, retryErr)
+				}
+			} else if recoverable, recoveryErr := service.retryableTechnicalPlanningFailure(ctx, task, invocation); recoveryErr != nil {
+				return fmt.Errorf("feature %s %s technical failure inspection: %w", feature.ID, stage, recoveryErr)
+			} else if recoverable {
+				if retryErr := service.retryFeaturePlanningInvocation(ctx, feature, task, state, head, invocation, snapshot, &invocation, nil, true); retryErr != nil {
+					return fmt.Errorf("feature %s %s technical execution recovery: %w", feature.ID, stage, retryErr)
 				}
 			}
 			continue
@@ -58,7 +64,7 @@ func (service *ProductionService) reconcileFeaturePlanning(ctx context.Context) 
 		if state.Phase != kernel.PhaseCompleted {
 			if err := service.validateFeatureStageOutput(feature, stage, output); err != nil {
 				if invocation.AttemptOrdinal < uint64(task.AttemptLimit) {
-					if retryErr := service.retryFeaturePlanningInvocation(ctx, feature, task, state, head, invocation, snapshot, nil, []kernel.Digest{*invocation.OutputDigest}); retryErr != nil {
+					if retryErr := service.retryFeaturePlanningInvocation(ctx, feature, task, state, head, invocation, snapshot, nil, []kernel.Digest{*invocation.OutputDigest}, false); retryErr != nil {
 						return fmt.Errorf("feature %s %s invalid-output retry: %w", feature.ID, stage, retryErr)
 					}
 					continue
@@ -219,8 +225,8 @@ func retryableFeaturePlanningInvocation(invocation kernel.WorkInvocation, attemp
 	}
 }
 
-func (service *ProductionService) retryFeaturePlanningInvocation(ctx context.Context, feature organization.FeatureRequest, task organization.PlannedTask, state kernel.AggregateState, head kernel.UUIDv7, invocation kernel.WorkInvocation, snapshot kernel.Snapshot, retry *kernel.WorkInvocation, conditionDigests []kernel.Digest) error {
-	if invocation.AttemptOrdinal == 0 || invocation.AttemptOrdinal >= uint64(task.AttemptLimit) || state.Phase != kernel.PhaseActive {
+func (service *ProductionService) retryFeaturePlanningInvocation(ctx context.Context, feature organization.FeatureRequest, task organization.PlannedTask, state kernel.AggregateState, head kernel.UUIDv7, invocation kernel.WorkInvocation, snapshot kernel.Snapshot, retry *kernel.WorkInvocation, conditionDigests []kernel.Digest, technicalExtension bool) error {
+	if invocation.AttemptOrdinal == 0 || !technicalExtension && invocation.AttemptOrdinal >= uint64(task.AttemptLimit) || state.Phase != kernel.PhaseActive {
 		return organization.ErrInvalidFeature
 	}
 	owner, active, err := service.RoleHost.Status(ctx, task.Owner)
@@ -235,7 +241,48 @@ func (service *ProductionService) retryFeaturePlanningInvocation(ctx context.Con
 		return organization.ErrInvalidFeature
 	}
 	tracked := &trackedTask{plan: task, revision: state.Revision, last: head, profile: profile.Profile, owner: owner}
-	return service.authorizeTaskInvocationWithCondition(ctx, feature, tracked, profileConfig, workspace, budget.Revision, task.Purpose, invocation.AttemptOrdinal+1, retry, conditionDigests)
+	budgetRevision := budget.Revision
+	if technicalExtension {
+		if owner.Execution == invocation.Execution {
+			return organization.ErrInvalidFeature
+		}
+		budgetRevision, err = service.extendTaskTechnicalRetryBudget(ctx, feature, tracked, task.Purpose, invocation.AttemptOrdinal+1)
+		if err != nil {
+			return err
+		}
+	}
+	return service.authorizeTaskInvocationWithConditionPolicy(ctx, feature, tracked, profileConfig, workspace, budgetRevision, task.Purpose, invocation.AttemptOrdinal+1, retry, conditionDigests, technicalExtension)
+}
+
+func (service *ProductionService) retryableTechnicalPlanningFailure(ctx context.Context, task organization.PlannedTask, invocation kernel.WorkInvocation) (bool, error) {
+	if invocation.AttemptOrdinal < uint64(task.AttemptLimit) || invocation.Retryable == nil || !*invocation.Retryable || invocation.OutputDigest == nil {
+		return false, nil
+	}
+	switch invocation.State {
+	case kernel.InvocationFailed, kernel.InvocationTimedOut, kernel.InvocationStartFailed:
+	default:
+		return false, nil
+	}
+	output, err := service.Runtime.ReadExecutionOutput(ctx, *invocation.OutputDigest)
+	if err != nil {
+		return false, err
+	}
+	return technicalPlanningFailure(output), nil
+}
+
+func technicalPlanningFailure(output []byte) bool {
+	var value struct {
+		Reason string `json:"reason"`
+	}
+	if json.Unmarshal(output, &value) != nil {
+		return false
+	}
+	switch value.Reason {
+	case "EXECUTION_BRIEF_SUPERSEDED", "SHELL_DISCIPLINE_VIOLATION", "REPEATED_SHELL_DISCIPLINE_VIOLATION":
+		return true
+	default:
+		return false
+	}
 }
 
 func featurePlanningDescription(feature organization.FeatureRequest, stage featurePlanningStage, instruction string) (string, error) {

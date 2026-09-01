@@ -277,11 +277,15 @@ func (service *ProductionService) authorizeTaskInvocation(ctx context.Context, f
 }
 
 func (service *ProductionService) authorizeTaskInvocationWithCondition(ctx context.Context, feature organization.FeatureRequest, task *trackedTask, profile ProductionProfile, workspace ProductionWorkspace, budgetRevision uint64, purpose kernel.WorkPurpose, attempt uint64, retry *kernel.WorkInvocation, conditionDigests []kernel.Digest) error {
+	return service.authorizeTaskInvocationWithConditionPolicy(ctx, feature, task, profile, workspace, budgetRevision, purpose, attempt, retry, conditionDigests, false)
+}
+
+func (service *ProductionService) authorizeTaskInvocationWithConditionPolicy(ctx context.Context, feature organization.FeatureRequest, task *trackedTask, profile ProductionProfile, workspace ProductionWorkspace, budgetRevision uint64, purpose kernel.WorkPurpose, attempt uint64, retry *kernel.WorkInvocation, conditionDigests []kernel.Digest, technicalExtension bool) error {
 	limit := uint64(task.plan.AttemptLimit)
 	if purpose == kernel.PurposeRepair {
 		limit = uint64(task.plan.ReviewRoundLimit)
 	}
-	if attempt == 0 || attempt > limit || purpose != task.plan.Purpose && purpose != kernel.PurposeRepair || retry == nil && attempt != 1 && len(conditionDigests) == 0 || retry != nil && (purpose != retry.Purpose || attempt != retry.AttemptOrdinal+1 || retry.State != kernel.InvocationFailed && retry.State != kernel.InvocationTimedOut && retry.State != kernel.InvocationStartFailed || retry.Retryable == nil || !*retry.Retryable) {
+	if attempt == 0 || attempt > limit && !technicalExtension || purpose != task.plan.Purpose && purpose != kernel.PurposeRepair || retry == nil && attempt != 1 && len(conditionDigests) == 0 || retry != nil && (purpose != retry.Purpose || attempt != retry.AttemptOrdinal+1 || retry.State != kernel.InvocationFailed && retry.State != kernel.InvocationTimedOut && retry.State != kernel.InvocationStartFailed || retry.Retryable == nil || !*retry.Retryable) {
 		return organization.ErrInvalidFeature
 	}
 	if err := service.refreshTaskExecutionBinding(ctx, feature, task, profile, workspace); err != nil {
@@ -353,6 +357,49 @@ func (service *ProductionService) authorizeTaskInvocationWithCondition(ctx conte
 		return fmt.Errorf("%s rejected: %s", command.CommandType, receipt.ReasonCode)
 	}
 	return nil
+}
+
+func (service *ProductionService) extendTaskTechnicalRetryBudget(ctx context.Context, feature organization.FeatureRequest, task *trackedTask, purpose kernel.WorkPurpose, attempt uint64) (uint64, error) {
+	taskRef := kernel.AggregateRef{Kind: kernel.AggregateTask, ID: task.plan.ID}
+	snapshot, err := service.Store.LoadDecision(ctx, kernel.KernelCommand{Target: taskRef})
+	if err != nil {
+		return 0, err
+	}
+	binding, bindingFound := snapshot.TaskWorkBudgets[taskRef]
+	budgetRef := kernel.AggregateRef{Kind: kernel.AggregateWorkBudget, ID: feature.BudgetAccountID}
+	account, accountFound := snapshot.WorkBudgetAccounts[budgetRef]
+	profile, profileFound := snapshot.WorkProfiles[taskRef]
+	if snapshot.State == nil || snapshot.State.Revision != task.revision || !bindingFound || !binding.Valid() || binding.BudgetAccountID != feature.BudgetAccountID || !accountFound || !account.Valid() || !profileFound || !profile.Valid() {
+		return 0, organization.ErrInvalidFeature
+	}
+	limits := binding.PurposeLimits.Clone()
+	requiredPurposeLimit := binding.PurposeUsed[purpose] + 1
+	if limits[purpose] < requiredPurposeLimit {
+		limits[purpose] = requiredPurposeLimit
+	}
+	modelLimit := binding.ModelInvocationLimit
+	if modelLimit < binding.ModelInvocationsUsed+1 {
+		modelLimit = binding.ModelInvocationsUsed + 1
+	}
+	if modelLimit > account.ModelInvocationLimit || limits[purpose] > account.PurposeLimits[purpose] {
+		return 0, organization.ErrInvalidFeature
+	}
+	evidenceIDs := profile.Profile.ClassificationEvidenceIDs
+	evidence, err := evidenceRefsForIDs(snapshot, evidenceIDs)
+	if err != nil {
+		return 0, err
+	}
+	payload := map[string]any{
+		"task_id": task.plan.ID, "budget_account_id": feature.BudgetAccountID, "expected_task_revision": task.revision,
+		"lifecycle_epoch": feature.LifecycleEpoch, "scope_revision": feature.ScopeRevision,
+		"task_model_invocation_limit": modelLimit, "purpose_limits": limits, "evidence_ids": evidenceIDs,
+	}
+	preconditions := []kernel.AggregatePrecondition{{Aggregate: budgetRef, Expected: kernel.NewExpectedRevision(account.Revision)}}
+	key := "technical-retry-budget-" + strings.ToLower(string(purpose)) + "-" + fmt.Sprint(attempt) + "-" + string(task.owner.Execution.ExecutionID)
+	if err := service.applyTaskCommand(ctx, feature, task, "tekroo.command.task.bind-work-budget", kernel.OperationalSchemaVersion, service.policyAuthority, payload, evidence, preconditions, key); err != nil {
+		return 0, err
+	}
+	return account.Revision, nil
 }
 
 func workInvocationAuthorizationCommandID(featureID, invocationID, executionID kernel.UUIDv7) kernel.UUIDv7 {
