@@ -158,7 +158,7 @@ func (service *ProductionService) RetryCancelledFeaturePlanning(ctx context.Cont
 	if budgetRevision != budget.Revision {
 		return InvocationStatus{}, organization.ErrInvalidFeature
 	}
-	if err := service.authorizeTaskInvocationWithConditionPolicy(ctx, feature, tracked, profileConfig, workspace, budgetRevision, task.Purpose, terminal.AttemptOrdinal+1, nil, []kernel.Digest{recoveryCondition}, true); err != nil {
+	if err := service.authorizeTaskInvocationWithConditionPolicy(ctx, feature, tracked, profileConfig, workspace, budgetRevision, task.Purpose, terminal.AttemptOrdinal+1, &terminal, []kernel.Digest{recoveryCondition}, true, false); err != nil {
 		return InvocationStatus{}, err
 	}
 

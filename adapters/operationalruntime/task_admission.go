@@ -294,15 +294,15 @@ func (service *ProductionService) authorizeTaskInvocation(ctx context.Context, f
 }
 
 func (service *ProductionService) authorizeTaskInvocationWithCondition(ctx context.Context, feature organization.FeatureRequest, task *trackedTask, profile ProductionProfile, workspace ProductionWorkspace, budgetRevision uint64, purpose kernel.WorkPurpose, attempt uint64, retry *kernel.WorkInvocation, conditionDigests []kernel.Digest) error {
-	return service.authorizeTaskInvocationWithConditionPolicy(ctx, feature, task, profile, workspace, budgetRevision, purpose, attempt, retry, conditionDigests, false)
+	return service.authorizeTaskInvocationWithConditionPolicy(ctx, feature, task, profile, workspace, budgetRevision, purpose, attempt, retry, conditionDigests, false, retry != nil)
 }
 
-func (service *ProductionService) authorizeTaskInvocationWithConditionPolicy(ctx context.Context, feature organization.FeatureRequest, task *trackedTask, profile ProductionProfile, workspace ProductionWorkspace, budgetRevision uint64, purpose kernel.WorkPurpose, attempt uint64, retry *kernel.WorkInvocation, conditionDigests []kernel.Digest, technicalExtension bool) error {
+func (service *ProductionService) authorizeTaskInvocationWithConditionPolicy(ctx context.Context, feature organization.FeatureRequest, task *trackedTask, profile ProductionProfile, workspace ProductionWorkspace, budgetRevision uint64, purpose kernel.WorkPurpose, attempt uint64, prior *kernel.WorkInvocation, conditionDigests []kernel.Digest, technicalExtension, reusePriorCondition bool) error {
 	limit := uint64(task.plan.AttemptLimit)
 	if purpose == kernel.PurposeRepair {
 		limit = uint64(task.plan.ReviewRoundLimit)
 	}
-	if attempt == 0 || attempt > limit && !technicalExtension || purpose != task.plan.Purpose && purpose != kernel.PurposeRepair || retry == nil && attempt != 1 && len(conditionDigests) == 0 || retry != nil && (purpose != retry.Purpose || attempt != retry.AttemptOrdinal+1 || retry.State != kernel.InvocationFailed && retry.State != kernel.InvocationTimedOut && retry.State != kernel.InvocationStartFailed || retry.Retryable == nil || !*retry.Retryable) {
+	if attempt == 0 || attempt > limit && !technicalExtension || purpose != task.plan.Purpose && purpose != kernel.PurposeRepair || prior == nil && (reusePriorCondition || attempt != 1 && len(conditionDigests) == 0) || prior != nil && !validInvocationContinuation(*prior, purpose, attempt, technicalExtension, reusePriorCondition) {
 		return organization.ErrInvalidFeature
 	}
 	if err := service.refreshTaskExecutionBinding(ctx, feature, task, profile, workspace); err != nil {
@@ -326,8 +326,8 @@ func (service *ProductionService) authorizeTaskInvocationWithConditionPolicy(ctx
 	if err != nil {
 		return err
 	}
-	if retry != nil {
-		conditionDigest = retry.ConditionDigest
+	if prior != nil && reusePriorCondition {
+		conditionDigest = prior.ConditionDigest
 	}
 	invocationIDParts := []string{"work-invocation", string(feature.ID), string(task.plan.ID), string(purpose), attemptLabel}
 	if len(conditionDigests) > 0 {
@@ -338,10 +338,10 @@ func (service *ProductionService) authorizeTaskInvocationWithConditionPolicy(ctx
 	outputPredicateDigest := digestBytes([]byte("accepted-task-output\x00" + string(task.plan.ID) + "\x00" + string(criteriaDigest) + "\x00" + string(conditionDigest)))
 	var retryID *kernel.UUIDv7
 	retryOrdinal := uint64(0)
-	if retry != nil {
-		value := retry.ID
+	if prior != nil {
+		value := prior.ID
 		retryID = &value
-		retryOrdinal = retry.RetryOrdinal + 1
+		retryOrdinal = prior.RetryOrdinal + 1
 	}
 	payload, err := json.Marshal(map[string]any{
 		"invocation_id": invocationID, "task_id": task.plan.ID, "budget_account_id": feature.BudgetAccountID,
@@ -382,6 +382,19 @@ func (service *ProductionService) authorizeTaskInvocationWithConditionPolicy(ctx
 		return fmt.Errorf("%s rejected: %s", command.CommandType, receipt.ReasonCode)
 	}
 	return nil
+}
+
+func validInvocationContinuation(prior kernel.WorkInvocation, purpose kernel.WorkPurpose, attempt uint64, technicalExtension, reusePriorCondition bool) bool {
+	if !prior.Valid() || purpose != prior.Purpose || attempt != prior.AttemptOrdinal+1 {
+		return false
+	}
+	if !reusePriorCondition {
+		return technicalExtension && recoverablePlanningTerminal(prior)
+	}
+	if prior.Retryable == nil || !*prior.Retryable {
+		return false
+	}
+	return prior.State == kernel.InvocationFailed || prior.State == kernel.InvocationTimedOut || prior.State == kernel.InvocationStartFailed
 }
 
 func (service *ProductionService) extendTaskTechnicalRetryBudget(ctx context.Context, feature organization.FeatureRequest, task *trackedTask, purpose kernel.WorkPurpose, attempt uint64) (uint64, error) {

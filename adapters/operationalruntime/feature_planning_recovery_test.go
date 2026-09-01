@@ -91,3 +91,36 @@ func TestFeatureBudgetPolicyAcceptsOnlyExpiredPredecessorForRecovery(t *testing.
 		t.Fatal("current policy was rejected")
 	}
 }
+
+func TestExplicitPlanningRecoveryPreservesLineageWithoutReusingCondition(t *testing.T) {
+	tracked, profile, workspace, _ := taskExecutionRefreshFixture(t)
+	now := time.Date(2026, 9, 1, 16, 0, 0, 0, time.UTC)
+	prior := kernel.WorkInvocation{
+		ID: "00000000-0000-7000-8000-000000000311", Revision: 5, State: kernel.InvocationCancelled,
+		AuthorizationEventID: "00000000-0000-7000-8000-000000000312", ParentEventID: "00000000-0000-7000-8000-000000000313",
+		TaskID: tracked.plan.ID, BudgetAccountID: "00000000-0000-7000-8000-000000000314",
+		LifecycleEpoch: 1, ScopeRevision: 1, TaskRevision: 5, WorkProfile: tracked.profile.Binding(),
+		QualifiedAssignmentID: "00000000-0000-7000-8000-000000000315", Purpose: kernel.PurposeReplan,
+		AttemptFamily: "replan", AttemptOrdinal: 7, ConditionDigest: repeatedDigest('1'), OutputPredicateDigest: repeatedDigest('2'),
+		AllowedTerminalOutcomes: []kernel.WorkInvocationState{kernel.InvocationSucceeded, kernel.InvocationFailed, kernel.InvocationTimedOut, kernel.InvocationCancelled, kernel.InvocationStartFailed},
+		ToolPolicyDigest:        repeatedDigest('3'), EffectPolicyDigest: repeatedDigest('4'), ActorFQN: tracked.owner.ActorFQN,
+		Execution: tracked.owner.Execution, ModelProfileDigest: profile.ModelProfileDigest, RuntimeIdentityDigest: profile.RuntimeIdentityDigest,
+		WorkspaceID: workspace.WorkspaceID, DeadlineAt: now.Add(time.Hour), IdempotencyKey: "prior-planning-attempt",
+		AdmissionPolicyRevision: 2, AdmissionPolicyDigest: repeatedDigest('5'), GlobalDebitOrdinal: 1, PurposeDebitOrdinal: 1,
+		LastEventID: "00000000-0000-7000-8000-000000000316", CancellationRequestedAt: &now,
+	}
+	if !validInvocationContinuation(prior, kernel.PurposeReplan, 8, true, false) {
+		t.Fatal("explicit cancelled recovery did not preserve prior invocation lineage")
+	}
+	if validInvocationContinuation(prior, kernel.PurposeReplan, 8, true, true) {
+		t.Fatal("cancelled recovery was allowed to reuse the cancelled condition")
+	}
+	prior.CancellationRequestedAt = nil
+	if validInvocationContinuation(prior, kernel.PurposeReplan, 8, true, false) {
+		t.Fatal("unrequested cancellation was accepted for explicit recovery")
+	}
+	prior.State = kernel.InvocationTimedOut
+	if !validInvocationContinuation(prior, kernel.PurposeReplan, 8, true, false) {
+		t.Fatal("timed-out recovery did not preserve prior invocation lineage")
+	}
+}

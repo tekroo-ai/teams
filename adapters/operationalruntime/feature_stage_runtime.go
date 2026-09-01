@@ -252,7 +252,7 @@ func (service *ProductionService) retryFeaturePlanningInvocation(ctx context.Con
 			return err
 		}
 	}
-	return service.authorizeTaskInvocationWithConditionPolicy(ctx, feature, tracked, profileConfig, workspace, budgetRevision, task.Purpose, invocation.AttemptOrdinal+1, retry, conditionDigests, technicalExtension)
+	return service.authorizeTaskInvocationWithConditionPolicy(ctx, feature, tracked, profileConfig, workspace, budgetRevision, task.Purpose, invocation.AttemptOrdinal+1, retry, conditionDigests, technicalExtension, retry != nil)
 }
 
 func (service *ProductionService) retryableTechnicalPlanningFailure(ctx context.Context, task organization.PlannedTask, invocation kernel.WorkInvocation) (bool, error) {
