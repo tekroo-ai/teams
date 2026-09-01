@@ -34,6 +34,9 @@ func (worker *organizationalRoleWorker) Run(ctx context.Context, request organiz
 				return notifyErr
 			}
 		case errors.Is(err, organization.ErrOrganizationalMessageNotFound):
+		case errors.Is(err, context.DeadlineExceeded) && ctx.Err() == nil:
+			// A bounded change-stream poll expiring with no message is the
+			// normal idle path. Only the parent runtime deadline is terminal.
 		case ctx.Err() != nil:
 			return ctx.Err()
 		default:

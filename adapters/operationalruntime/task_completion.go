@@ -19,6 +19,10 @@ type taskValidatorResult struct {
 }
 
 func (service *ProductionService) reconcileTaskCompletions(ctx context.Context, feature organization.FeatureRequest, plan organization.FeaturePlan, states map[kernel.UUIDv7]kernel.AggregateState, heads map[kernel.UUIDv7]kernel.UUIDv7, invocations map[kernel.UUIDv7]kernel.WorkInvocation, snapshot kernel.Snapshot) (bool, error) {
+	promotionChanged, err := service.reconcilePromotionCompletion(ctx, feature, plan, states, heads, invocations, snapshot)
+	if err != nil || promotionChanged {
+		return promotionChanged, err
+	}
 	validatorsByTarget := make(map[kernel.UUIDv7][]taskValidatorResult)
 	for _, task := range plan.Tasks {
 		if len(task.Validates) == 0 {
@@ -56,7 +60,7 @@ func (service *ProductionService) reconcileTaskCompletions(ctx context.Context, 
 		if digestErr != nil {
 			return false, digestErr
 		}
-		if invocation.ConditionDigest != expectedCondition {
+		if !validatorConditionMatches(snapshot, task.ID, invocation, profileSnapshot.Profile.ProfileDigest, digestBytes(criteria), conditionDigests, expectedCondition) {
 			continue
 		}
 		output, err := service.Runtime.ReadExecutionOutput(ctx, *invocation.OutputDigest)
@@ -65,7 +69,11 @@ func (service *ProductionService) reconcileTaskCompletions(ctx context.Context, 
 		}
 		result, err := parseStructuredValidationResult(output)
 		if err != nil {
-			return false, fmt.Errorf("validator %s: %w", task.ID, err)
+			authorized, retryErr := service.handleInvalidStructuredTaskOutput(ctx, feature, task, states[task.ID], heads[task.ID], invocation, snapshot, conditionDigests)
+			if retryErr != nil {
+				return false, fmt.Errorf("validator %s invalid-output handling: %w", task.ID, retryErr)
+			}
+			return authorized, nil
 		}
 		for _, targetID := range task.Validates {
 			validatorsByTarget[targetID] = append(validatorsByTarget[targetID], taskValidatorResult{Task: task, Invocation: invocation, Result: result})
@@ -124,6 +132,100 @@ func (service *ProductionService) reconcileTaskCompletions(ctx context.Context, 
 		}
 	}
 	return changed, nil
+}
+
+func (service *ProductionService) reconcilePromotionCompletion(ctx context.Context, feature organization.FeatureRequest, plan organization.FeaturePlan, states map[kernel.UUIDv7]kernel.AggregateState, heads map[kernel.UUIDv7]kernel.UUIDv7, invocations map[kernel.UUIDv7]kernel.WorkInvocation, snapshot kernel.Snapshot) (bool, error) {
+	for _, task := range plan.Tasks {
+		if task.Purpose != kernel.PurposePromotion || len(task.Validates) != 0 || states[task.ID].Phase != kernel.PhaseActive || states[task.ID].Condition != kernel.ConditionRunnable {
+			continue
+		}
+		invocation, found := invocations[task.ID]
+		if !found || invocation.State != kernel.InvocationSucceeded || invocation.OutputDigest == nil {
+			continue
+		}
+		output, err := service.Runtime.ReadExecutionOutput(ctx, *invocation.OutputDigest)
+		if err != nil {
+			return false, fmt.Errorf("read promotion %s output: %w", task.ID, err)
+		}
+		result, err := parseStructuredValidationResult(output)
+		if err != nil {
+			return service.handleInvalidStructuredTaskOutput(ctx, feature, task, states[task.ID], heads[task.ID], invocation, snapshot, nil)
+		}
+		if result.Outcome != "PASS" {
+			return service.blockStructuredDecisionTask(ctx, feature, task, states[task.ID], invocation, snapshot, "product acceptance did not pass: "+strings.Join(result.Reasons, "; "), "promotion-not-pass")
+		}
+		if err := service.completeEvidenceTask(ctx, feature, task, states[task.ID], heads[task.ID], invocation, snapshot); err != nil {
+			return false, err
+		}
+		promotionState := states[task.ID]
+		promotionState.Phase = kernel.PhaseCompleted
+		states[task.ID] = promotionState
+		return true, nil
+	}
+	return false, nil
+}
+
+func (service *ProductionService) handleInvalidStructuredTaskOutput(ctx context.Context, feature organization.FeatureRequest, task organization.PlannedTask, state kernel.AggregateState, head kernel.UUIDv7, invocation kernel.WorkInvocation, snapshot kernel.Snapshot, conditionDigests []kernel.Digest) (bool, error) {
+	if state.Phase != kernel.PhaseActive || invocation.State != kernel.InvocationSucceeded || invocation.OutputDigest == nil {
+		return false, organization.ErrInvalidFeature
+	}
+	if invocation.AttemptOrdinal < uint64(task.AttemptLimit) {
+		profile, configured := service.profilesByModel[task.ModelProfile]
+		profileSnapshot, profileFound := snapshot.WorkProfiles[kernel.AggregateRef{Kind: kernel.AggregateTask, ID: task.ID}]
+		budget, budgetFound := snapshot.WorkBudgetAccounts[kernel.AggregateRef{Kind: kernel.AggregateWorkBudget, ID: feature.BudgetAccountID}]
+		owner, active, ownerErr := service.RoleHost.Status(ctx, task.Owner)
+		if ownerErr != nil {
+			return false, ownerErr
+		}
+		if !configured || !profileFound || !profileSnapshot.Valid() || !budgetFound || !budget.Valid() {
+			return false, organization.ErrInvalidFeature
+		}
+		if !active || owner.Status != organization.RoleIdle || owner.Execution != invocation.Execution {
+			return false, nil
+		}
+		workspace, workspaceFound := service.workspacesByID[owner.WorkspaceID]
+		if !workspaceFound {
+			return false, organization.ErrInvalidFeature
+		}
+		tracked := &trackedTask{plan: task, revision: state.Revision, last: head, profile: profileSnapshot.Profile, owner: owner}
+		retryConditions := append(append([]kernel.Digest(nil), conditionDigests...), *invocation.OutputDigest)
+		if err := service.authorizeTaskInvocationWithCondition(ctx, feature, tracked, profile, workspace, budget.Revision, task.Purpose, invocation.AttemptOrdinal+1, nil, retryConditions); err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+
+	return service.blockStructuredDecisionTask(ctx, feature, task, state, invocation, snapshot, "task exhausted its bounded attempts without a valid structured result", "invalid-structured-output-exhausted")
+}
+
+func (service *ProductionService) blockStructuredDecisionTask(ctx context.Context, feature organization.FeatureRequest, task organization.PlannedTask, state kernel.AggregateState, invocation kernel.WorkInvocation, snapshot kernel.Snapshot, reason, key string) (bool, error) {
+	evidence, err := evidenceForInvocations(snapshot, invocation)
+	if err != nil {
+		return false, err
+	}
+	payload, err := json.Marshal(map[string]any{"blocker_refs": []string{"teams://work-invocation/" + string(invocation.ID)}, "reason": reason, "review_policy": "operator-or-product-owner-must-amend-scope-or-cancel"})
+	if err != nil {
+		return false, err
+	}
+	_, err = service.submitDeterministicActorTargetCommand(ctx, feature, "tekroo.command.work.block", kernel.AggregateTask, task.ID, service.policyAuthority, invocation.ActorFQN, invocation.Execution, state.Revision, payload, []kernel.DagParent{{ParentEventID: invocation.LastEventID, EdgeKind: kernel.EdgeResponse}}, evidence, key+"-"+string(task.ID)+"-"+string(*invocation.OutputDigest))
+	return err == nil, err
+}
+
+func validatorConditionMatches(snapshot kernel.Snapshot, taskID kernel.UUIDv7, invocation kernel.WorkInvocation, profileDigest, criteriaDigest kernel.Digest, baseConditions []kernel.Digest, baseDigest kernel.Digest) bool {
+	if invocation.ConditionDigest == baseDigest {
+		return true
+	}
+	for _, prior := range snapshot.WorkInvocations {
+		if prior.TaskID != taskID || prior.State != kernel.InvocationSucceeded || prior.OutputDigest == nil || prior.AttemptOrdinal+1 != invocation.AttemptOrdinal {
+			continue
+		}
+		conditions := append(append([]kernel.Digest(nil), baseConditions...), *prior.OutputDigest)
+		digest, err := taskInvocationConditionDigest(profileDigest, criteriaDigest, conditions)
+		if err == nil && invocation.ConditionDigest == digest {
+			return true
+		}
+	}
+	return false
 }
 
 func (service *ProductionService) authorizeRepairAfterFailedReview(ctx context.Context, feature organization.FeatureRequest, target organization.PlannedTask, state kernel.AggregateState, head kernel.UUIDv7, implementer kernel.WorkInvocation, validators []taskValidatorResult, snapshot kernel.Snapshot) (bool, error) {

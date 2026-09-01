@@ -61,6 +61,23 @@ func TestClientUsesExactQualifiedOpenHandsSurfaceAndRetainsAllEventPages(t *test
 	}
 }
 
+func TestClientAcceptsFinishObservationAsFinalOutput(t *testing.T) {
+	brief, digest := openHandsTestBrief(t)
+	workspace := filepath.Join(t.TempDir(), "workspace")
+	state := &openHandsServerState{t: t, prompt: string(mustJSON(brief)), workspace: workspace, finalAsFinish: true}
+	server := httptest.NewServer(http.HandlerFunc(state.serveHTTP))
+	defer server.Close()
+	client := newOpenHandsTestClient(t, server.URL, workspace, brief)
+
+	observation, err := client.Start(context.Background(), brief, digest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if observation.State != application.ExternalSucceeded || string(observation.Output) != "done through finish" || len(observation.Evidence) != 3 || observation.Evidence[2].Kind != "MODEL_OUTPUT" {
+		t.Fatalf("finish observation = %#v", observation)
+	}
+}
+
 func TestClientReconcileStartReturnsAbsentWithoutSubmittingDuplicate(t *testing.T) {
 	brief, digest := openHandsTestBrief(t)
 	workspace := filepath.Join(t.TempDir(), "workspace")
@@ -139,6 +156,7 @@ type openHandsServerState struct {
 	submitCalls    int
 	eventPageCalls int
 	createPayload  map[string]any
+	finalAsFinish  bool
 }
 
 func (state *openHandsServerState) serveHTTP(writer http.ResponseWriter, request *http.Request) {
@@ -190,6 +208,10 @@ func (state *openHandsServerState) serveHTTP(writer http.ResponseWriter, request
 			return
 		}
 		if request.URL.Query().Get("page_id") == "page-2" {
+			if state.finalAsFinish {
+				writeJSON(writer, map[string]any{"items": []any{finishEvent("evt-finish", "done through finish")}, "next_page_id": nil})
+				return
+			}
 			writeJSON(writer, map[string]any{"items": []any{event("evt-agent", "MessageEvent", "agent", "done")}, "next_page_id": nil})
 			return
 		}
@@ -197,6 +219,10 @@ func (state *openHandsServerState) serveHTTP(writer http.ResponseWriter, request
 	default:
 		writer.WriteHeader(http.StatusNotFound)
 	}
+}
+
+func finishEvent(id, text string) map[string]any {
+	return map[string]any{"id": id, "kind": "ObservationEvent", "source": "environment", "timestamp": "2026-08-31T12:00:01Z", "observation": map[string]any{"kind": "FinishObservation", "content": []map[string]any{{"type": "text", "text": text}}}}
 }
 
 func event(id, kind, source, text string) map[string]any {

@@ -195,6 +195,7 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 		t.Fatal(err)
 	}
 	serverState.mu.Lock()
+	serverState.invalidValidations = 1
 	serverState.failValidations = 1
 	serverState.mu.Unlock()
 	automated, created := submitAutomatedFeature(t, service)
@@ -224,18 +225,27 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 			t.Fatalf("automated feature stage %s = %#v found=%t err=%v", expected.stage, automated, found, err)
 		}
 	}
-	if automated.Plan == nil || len(automated.Plan.Tasks) != 4 || automated.Plan.Tasks[1].Purpose != kernel.PurposeValidation || len(automated.Plan.Tasks[1].Validates) != 1 || automated.Plan.Tasks[1].Validates[0] != automated.Plan.Tasks[0].ID || automated.Plan.Tasks[2].Purpose != kernel.PurposePromotion || automated.Plan.Tasks[2].Owner != automated.ProductOwnerActor || automated.Plan.Tasks[3].Purpose != kernel.PurposeValidation || len(automated.Plan.Tasks[3].Validates) != 1 || automated.Plan.Tasks[3].Validates[0] != automated.Plan.Tasks[2].ID {
+	if automated.Plan == nil || len(automated.Plan.Tasks) != 3 || automated.Plan.Tasks[1].Purpose != kernel.PurposeValidation || len(automated.Plan.Tasks[1].Validates) != 1 || automated.Plan.Tasks[1].Validates[0] != automated.Plan.Tasks[0].ID || automated.Plan.Tasks[2].Purpose != kernel.PurposePromotion || automated.Plan.Tasks[2].Owner != automated.ProductOwnerActor {
 		t.Fatalf("automated plan = %#v", automated.Plan)
 	}
 	automatedImplementation := automated.Plan.Tasks[0]
 	automatedValidation := automated.Plan.Tasks[1]
 	automatedAcceptance := automated.Plan.Tasks[2]
-	automatedAcceptanceValidation := automated.Plan.Tasks[3]
+	if !strings.Contains(automatedAcceptance.Description, "AUTHORITATIVE_ACCEPTANCE_TARGETS:") || !strings.Contains(automatedAcceptance.Description, "branch=task/phase6") || !strings.Contains(automatedAcceptance.Description, "The product-owner workspace is not the implementation artifact") {
+		t.Fatalf("acceptance target binding = %q", automatedAcceptance.Description)
+	}
 	waitForInvocationState(t, store, deterministicOperationalUUID("work-invocation", string(automated.ID), string(automatedImplementation.ID), string(automatedImplementation.Purpose), "1"), kernel.InvocationSucceeded)
 	if err := service.reconcileFeaturePlan(contextWithTimeout(t), automated, *automated.Plan); err != nil {
 		t.Fatal(err)
 	}
 	firstValidation := waitForTaskInvocationState(t, store, automatedValidation.ID, kernel.PurposeValidation, kernel.InvocationSucceeded)
+	if err := service.reconcileFeaturePlan(contextWithTimeout(t), automated, *automated.Plan); err != nil {
+		t.Fatal(err)
+	}
+	failedValidation := waitForTaskInvocationState(t, store, automatedValidation.ID, kernel.PurposeValidation, kernel.InvocationSucceeded)
+	if failedValidation.ID == firstValidation.ID || failedValidation.AttemptOrdinal != 2 || failedValidation.ConditionDigest == firstValidation.ConditionDigest {
+		t.Fatalf("invalid-output retry first=%#v second=%#v", firstValidation, failedValidation)
+	}
 	if err := service.reconcileFeaturePlan(contextWithTimeout(t), automated, *automated.Plan); err != nil {
 		t.Fatal(err)
 	}
@@ -247,8 +257,8 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 		t.Fatal(err)
 	}
 	secondValidation := waitForTaskInvocationState(t, store, automatedValidation.ID, kernel.PurposeValidation, kernel.InvocationSucceeded)
-	if secondValidation.ID == firstValidation.ID || secondValidation.AttemptOrdinal != 2 || secondValidation.ConditionDigest == firstValidation.ConditionDigest {
-		t.Fatalf("validation rounds first=%#v second=%#v", firstValidation, secondValidation)
+	if secondValidation.ID == failedValidation.ID || secondValidation.AttemptOrdinal != 3 || secondValidation.ConditionDigest == failedValidation.ConditionDigest {
+		t.Fatalf("validation rounds failed=%#v repaired=%#v", failedValidation, secondValidation)
 	}
 	if err := service.reconcileFeaturePlan(contextWithTimeout(t), automated, *automated.Plan); err != nil {
 		t.Fatal(err)
@@ -261,10 +271,6 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitForTaskInvocationState(t, store, automatedAcceptance.ID, kernel.PurposePromotion, kernel.InvocationSucceeded)
-	if err := service.reconcileFeaturePlan(contextWithTimeout(t), automated, *automated.Plan); err != nil {
-		t.Fatal(err)
-	}
-	waitForTaskInvocationState(t, store, automatedAcceptanceValidation.ID, kernel.PurposeValidation, kernel.InvocationSucceeded)
 	if err := service.reconcileFeaturePlan(contextWithTimeout(t), automated, *automated.Plan); err != nil {
 		t.Fatal(err)
 	}
@@ -340,6 +346,17 @@ func exerciseHumanParticipation(t *testing.T, service *ProductionService, runtim
 	}
 	if _, invoked := latestTaskInvocation(decision.WorkInvocations, fixture.taskID); invoked {
 		t.Fatal("human wait created a model invocation")
+	}
+	// Reconstruct the service from durable ports only. No participant,
+	// interaction, notification, or blocker state is copied in process memory.
+	service = &ProductionService{
+		Store: service.Store, Runtime: service.Runtime, provenance: service.provenance,
+		clock: service.clock, ids: service.ids, serviceAuthority: service.serviceAuthority,
+		policyAuthority: service.policyAuthority, operatorIdentity: service.operatorIdentity,
+	}
+	interactionBeforeResponse, err := service.ReadHumanInteraction(contextWithTimeout(t), notification.InteractionID)
+	if err != nil || interactionBeforeResponse.Phase != kernel.HumanInteractionCollecting {
+		t.Fatalf("restarted service interaction=%+v err=%v", interactionBeforeResponse, err)
 	}
 	notification, err = service.RespondToHumanQuestion(contextWithTimeout(t), participant, organization.HumanResponseInput{InteractionID: notification.InteractionID, ExpectedRevision: 2, Response: "Preserve the existing public interface.", ResponseClassification: "ANSWER"})
 	if err != nil || notification.State != kernel.HumanInteractionClosed || notification.ResponseEventID == nil {

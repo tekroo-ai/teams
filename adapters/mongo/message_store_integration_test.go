@@ -75,6 +75,27 @@ func TestOrganizationalMessageFeedClaimRecoveryAndFencing(t *testing.T) {
 	}
 }
 
+func TestOrganizationalMessageFeedPollNormalizesExpiredMongoDeadline(t *testing.T) {
+	store := openTestStore(t)
+	openCtx, openCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	feed, err := store.OpenOrganizationalMessageFeed(openCtx, "expired-message-poll", "teams::coder-1")
+	openCancel()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		closeCtx, closeCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer closeCancel()
+		_ = feed.Close(closeCtx)
+	}()
+	pollCtx, pollCancel := context.WithTimeout(context.Background(), time.Millisecond)
+	_, err = feed.Poll(pollCtx)
+	pollCancel()
+	if !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, organization.ErrOrganizationalMessageNotFound) {
+		t.Fatalf("expired idle message poll = %v", err)
+	}
+}
+
 func mongoTestMessage(recipient kernel.ActorFQN) organization.OrganizationalMessage {
 	story := testUUID(9802)
 	task := testUUID(9803)

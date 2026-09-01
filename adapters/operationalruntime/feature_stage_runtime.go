@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/tekroo-ai/teams/kernel"
@@ -39,7 +40,15 @@ func (service *ProductionService) reconcileFeaturePlanning(ctx context.Context) 
 		if err != nil {
 			return fmt.Errorf("feature %s %s: %w", feature.ID, stage, err)
 		}
-		if invocation.State != kernel.InvocationSucceeded || invocation.OutputDigest == nil {
+		if invocation.State != kernel.InvocationSucceeded {
+			if retryableFeaturePlanningInvocation(invocation, task.AttemptLimit) {
+				if retryErr := service.retryFeaturePlanningInvocation(ctx, feature, task, state, head, invocation, snapshot, &invocation, nil); retryErr != nil {
+					return fmt.Errorf("feature %s %s execution retry: %w", feature.ID, stage, retryErr)
+				}
+			}
+			continue
+		}
+		if invocation.OutputDigest == nil {
 			continue
 		}
 		output, err := service.Runtime.ReadExecutionOutput(ctx, *invocation.OutputDigest)
@@ -48,7 +57,13 @@ func (service *ProductionService) reconcileFeaturePlanning(ctx context.Context) 
 		}
 		if state.Phase != kernel.PhaseCompleted {
 			if err := service.validateFeatureStageOutput(stage, output); err != nil {
-				return fmt.Errorf("feature %s %s output: %w", feature.ID, stage, err)
+				if invocation.AttemptOrdinal < uint64(task.AttemptLimit) {
+					if retryErr := service.retryFeaturePlanningInvocation(ctx, feature, task, state, head, invocation, snapshot, nil, []kernel.Digest{*invocation.OutputDigest}); retryErr != nil {
+						return fmt.Errorf("feature %s %s invalid-output retry: %w", feature.ID, stage, retryErr)
+					}
+					continue
+				}
+				continue
 			}
 			if err := service.completeEvidenceTask(ctx, feature, task, state, head, invocation, snapshot); err != nil {
 				return err
@@ -79,6 +94,10 @@ func planningStage(status organization.FeatureStatus) (featurePlanningStage, boo
 
 func (service *ProductionService) ensureFeaturePlanningTask(ctx context.Context, feature organization.FeatureRequest, stage featurePlanningStage) (organization.PlannedTask, kernel.AggregateState, kernel.UUIDv7, kernel.WorkInvocation, kernel.Snapshot, error) {
 	role, purpose, title, description, criteria, err := planningStageDefinition(stage)
+	if err != nil {
+		return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, err
+	}
+	description, err = featurePlanningDescription(feature, stage, description)
 	if err != nil {
 		return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, err
 	}
@@ -117,7 +136,7 @@ func (service *ProductionService) ensureFeaturePlanningTask(ctx context.Context,
 		dependsOn = append(dependsOn, priorID)
 		parents = append(parents, kernel.DagParent{ParentEventID: priorHead, EdgeKind: kernel.EdgeCausal})
 	}
-	task := organization.PlannedTask{ID: taskID, StoryID: planningStoryID, Title: title, Description: description, AcceptanceCriteria: criteria, DependsOn: dependsOn, Owner: owner.ActorFQN, ModelProfile: owner.ModelProfile, DecisionRoute: profileConfig.Qualification.DecisionRoute, Purpose: purpose, Complexity: 4, Risk: organization.RiskModerate, CriticalPath: true, AttemptLimit: 2, ReviewRoundLimit: 1}
+	task := organization.PlannedTask{ID: taskID, StoryID: planningStoryID, Title: title, Description: description, AcceptanceCriteria: criteria, DependsOn: dependsOn, Owner: owner.ActorFQN, ModelProfile: owner.ModelProfile, DecisionRoute: profileConfig.Qualification.DecisionRoute, Purpose: purpose, Complexity: 4, Risk: organization.RiskModerate, CriticalPath: true, AttemptLimit: 3, ReviewRoundLimit: 1}
 	payload, _ := json.Marshal(map[string]any{"story_id": planningStoryID, "title": task.Title, "description": task.Description, "acceptance_criteria": task.AcceptanceCriteria, "depends_on": task.DependsOn})
 	created, err := service.submitPlannedCommand(ctx, feature, "tekroo.command.task.create", kernel.AggregateTask, task.ID, "planning-task-"+string(stage), payload, parents)
 	if err != nil {
@@ -173,14 +192,79 @@ func (service *ProductionService) ensureFeaturePlanningTask(ctx context.Context,
 func planningStageDefinition(stage featurePlanningStage) (string, kernel.WorkPurpose, string, string, []string, error) {
 	switch stage {
 	case stageRefinement:
-		return "product-owner", kernel.PurposeHandoff, "Refine feature request", "Analyze the feature request and return FEATURE_REFINEMENT JSON with schema_version, result_type, acceptance_criteria, clarification_questions, and priority. Do not delegate or start another agent.", []string{"requirements are testable and ambiguities are explicit"}, nil
+		return "product-owner", kernel.PurposeHandoff, "Refine feature request", "Analyze only the authoritative feature state below. Return FEATURE_REFINEMENT JSON with schema_version, result_type, acceptance_criteria, clarification_questions, and priority. priority must be exactly one of LOW, NORMAL, HIGH, or CRITICAL. If the request is already unambiguous, return an empty clarification_questions array. This is a reasoning-only task: do not use terminal, browser, repository, or other tools. Do not infer a different feature from workspace contents. Do not delegate or start another agent.", []string{"requirements are testable and ambiguities are explicit"}, nil
 	case stageSpecification:
-		return "project-manager", kernel.PurposeHandoff, "Specify feature stories", "Return FEATURE_SPECIFICATION JSON with schema_version, result_type, stories (title, description, acceptance_criteria, priority), and design_constraints. Do not delegate or start another agent.", []string{"stories are finite, testable, and within the accepted feature scope"}, nil
+		return "project-manager", kernel.PurposeHandoff, "Specify feature stories", "Analyze only the authoritative feature state below. Return FEATURE_SPECIFICATION JSON with schema_version, result_type, stories (title, description, acceptance_criteria, priority), and design_constraints. Every priority must be exactly one of LOW, NORMAL, HIGH, or CRITICAL. This is a reasoning-only task: do not use terminal, browser, repository, or other tools. Do not infer a different feature from workspace contents. Do not delegate or start another agent.", []string{"stories are finite, testable, and within the accepted feature scope"}, nil
 	case stageArchitecture:
-		return "architect", kernel.PurposeReplan, "Design executable feature DAG", "Return FEATURE_PLAN JSON with schema_version, result_type, architecture, design_decisions, assumptions, and tasks. Each task supplies story_index, title, description, acceptance_criteria, depends_on, validates, role, purpose, complexity, risk, critical_path, attempt_limit, and review_round_limit. Index references are zero-based and must point backward. Teams selects exact actors and model profiles. Do not delegate or start another agent.", []string{"the result is a finite acyclic task plan with explicit validation"}, nil
+		return "architect", kernel.PurposeReplan, "Design executable feature DAG", "Analyze only the authoritative feature state below. Return FEATURE_PLAN JSON with schema_version, result_type, architecture, design_decisions, assumptions, and tasks. Each task supplies story_index, title, description, acceptance_criteria, depends_on, validates, role, purpose, complexity, risk, critical_path, attempt_limit, and review_round_limit. role is a role class and must be exactly one of coder, senior-coder, tester, or security; never include an instance suffix. purpose must be exactly one of IMPLEMENTATION, INVESTIGATION, VALIDATION, or REVIEW. complexity must be a JSON integer from 1 through 10, never a string or label. risk must be exactly one of LOW, MODERATE, HIGH, or CRITICAL. attempt_limit and review_round_limit must be JSON integers. depends_on and validates must be JSON arrays containing only zero-based integer task indexes that point backward; they are task relationships, never acceptance-criteria text. For one implementation task, both arrays must be empty: \"depends_on\":[],\"validates\":[] . Return the smallest complete DAG: for a single-file routine change, create exactly one IMPLEMENTATION task and no tester, security, review, or acceptance task because Teams adds required independent validation and product acceptance structurally. The exact minimal shape is: TEKROO_ORGANIZATIONAL_RESULT: followed by {\"schema_version\":\"1.0.0\",\"result_type\":\"FEATURE_PLAN\",\"architecture\":\"...\",\"design_decisions\":[],\"assumptions\":[],\"tasks\":[{\"story_index\":0,\"title\":\"...\",\"description\":\"...\",\"acceptance_criteria\":[\"...\"],\"depends_on\":[],\"validates\":[],\"role\":\"coder\",\"purpose\":\"IMPLEMENTATION\",\"complexity\":1,\"risk\":\"LOW\",\"critical_path\":true,\"attempt_limit\":2,\"review_round_limit\":1}]}. Call the OpenHands finish tool exactly once. Put the marker and JSON themselves in finish.message; finish.message is the only result Teams receives. Do not put a summary or paraphrase in finish.message. Include no prose, Markdown fence, XML, tool call, or trailing content around the marker and JSON. This is a reasoning-only task: do not use terminal, browser, repository, or other tools. Do not choose or mention an actor instance, branch, worktree, workspace path, model profile, or execution identity; Teams binds those after validating the DAG. Do not infer a different feature from workspace contents. Do not delegate or start another agent.", []string{"the result is a finite acyclic task plan with explicit validation"}, nil
 	default:
 		return "", "", "", "", nil, organization.ErrInvalidFeature
 	}
+}
+
+func retryableFeaturePlanningInvocation(invocation kernel.WorkInvocation, attemptLimit uint32) bool {
+	if invocation.AttemptOrdinal == 0 || invocation.AttemptOrdinal >= uint64(attemptLimit) || invocation.Retryable == nil || !*invocation.Retryable {
+		return false
+	}
+	switch invocation.State {
+	case kernel.InvocationFailed, kernel.InvocationTimedOut, kernel.InvocationStartFailed:
+		return true
+	default:
+		return false
+	}
+}
+
+func (service *ProductionService) retryFeaturePlanningInvocation(ctx context.Context, feature organization.FeatureRequest, task organization.PlannedTask, state kernel.AggregateState, head kernel.UUIDv7, invocation kernel.WorkInvocation, snapshot kernel.Snapshot, retry *kernel.WorkInvocation, conditionDigests []kernel.Digest) error {
+	if invocation.AttemptOrdinal == 0 || invocation.AttemptOrdinal >= uint64(task.AttemptLimit) || state.Phase != kernel.PhaseActive {
+		return organization.ErrInvalidFeature
+	}
+	owner, active, err := service.RoleHost.Status(ctx, task.Owner)
+	if err != nil || !active || owner.Status != organization.RoleIdle {
+		return errors.Join(organization.ErrRoleNotRunning, err)
+	}
+	profileConfig, found := service.profilesByModel[owner.ModelProfile]
+	workspace, workspaceFound := service.workspacesByID[owner.WorkspaceID]
+	profile, profileFound := snapshot.WorkProfiles[kernel.AggregateRef{Kind: kernel.AggregateTask, ID: task.ID}]
+	budget, budgetFound := snapshot.WorkBudgetAccounts[kernel.AggregateRef{Kind: kernel.AggregateWorkBudget, ID: feature.BudgetAccountID}]
+	if !found || !workspaceFound || !profileFound || !budgetFound {
+		return organization.ErrInvalidFeature
+	}
+	tracked := &trackedTask{plan: task, revision: state.Revision, last: head, profile: profile.Profile, owner: owner}
+	return service.authorizeTaskInvocationWithCondition(ctx, feature, tracked, profileConfig, workspace, budget.Revision, task.Purpose, invocation.AttemptOrdinal+1, retry, conditionDigests)
+}
+
+func featurePlanningDescription(feature organization.FeatureRequest, stage featurePlanningStage, instruction string) (string, error) {
+	state := struct {
+		FeatureID     kernel.UUIDv7                      `json:"feature_id"`
+		Input         organization.FeatureRequestInput   `json:"input"`
+		Refinement    *organization.FeatureRefinement    `json:"refinement,omitempty"`
+		Specification *organization.FeatureSpecification `json:"specification,omitempty"`
+	}{FeatureID: feature.ID, Input: feature.Input}
+	switch stage {
+	case stageRefinement:
+	case stageSpecification:
+		if feature.Refinement == nil {
+			return "", organization.ErrInvalidFeature
+		}
+		state.Refinement = feature.Refinement
+	case stageArchitecture:
+		if feature.Refinement == nil || feature.Specification == nil {
+			return "", organization.ErrInvalidFeature
+		}
+		state.Refinement = feature.Refinement
+		state.Specification = feature.Specification
+	default:
+		return "", organization.ErrInvalidFeature
+	}
+	encoded, err := json.Marshal(state)
+	if err != nil {
+		return "", err
+	}
+	description := instruction + "\n\nAUTHORITATIVE_FEATURE_STATE_JSON:\n" + string(encoded)
+	if len(description) > 65536 {
+		return "", organization.ErrInvalidFeature
+	}
+	return description, nil
 }
 
 func priorPlanningStage(stage featurePlanningStage) (featurePlanningStage, bool) {
@@ -314,7 +398,7 @@ func (service *ProductionService) buildExecutableFeaturePlan(ctx context.Context
 	if err != nil {
 		return organization.FeaturePlan{}, err
 	}
-	tasks, err = service.addRequiredValidationTasks(ctx, feature, tasks)
+	tasks, err = service.bindValidationWorkspaceContext(ctx, tasks)
 	if err != nil {
 		return organization.FeaturePlan{}, err
 	}
@@ -323,6 +407,40 @@ func (service *ProductionService) buildExecutableFeaturePlan(ctx context.Context
 		return organization.FeaturePlan{}, organization.ErrInvalidFeature
 	}
 	return plan, nil
+}
+
+func (service *ProductionService) bindValidationWorkspaceContext(ctx context.Context, tasks []organization.PlannedTask) ([]organization.PlannedTask, error) {
+	byID := make(map[kernel.UUIDv7]organization.PlannedTask, len(tasks))
+	for _, task := range tasks {
+		byID[task.ID] = task
+	}
+	result := append([]organization.PlannedTask(nil), tasks...)
+	for index := range result {
+		if len(result[index].Validates) == 0 {
+			continue
+		}
+		var contextLines []string
+		for _, targetID := range result[index].Validates {
+			target, found := byID[targetID]
+			if !found {
+				return nil, organization.ErrInvalidFeature
+			}
+			owner, active, err := service.RoleHost.Status(ctx, target.Owner)
+			if err != nil || !active {
+				return nil, errors.Join(organization.ErrRoleNotRunning, err)
+			}
+			workspace, found := service.workspacesByID[owner.WorkspaceID]
+			if !found {
+				return nil, organization.ErrInvalidFeature
+			}
+			contextLines = append(contextLines, fmt.Sprintf("target_task=%s owner=%s branch=%s workspace=%s baseline=%s", target.ID, target.Owner, workspace.Branch, workspace.WorkingDirectory, workspace.BaselineSHA))
+		}
+		result[index].Description += "\n\nAUTHORITATIVE_VALIDATION_TARGETS:\n" + strings.Join(contextLines, "\n") + "\nInspect the exact target branch/workspace without modifying it; base the structured validation result on current repository state and executed checks."
+		if len(result[index].Description) > 65536 {
+			return nil, organization.ErrInvalidFeature
+		}
+	}
+	return result, nil
 }
 
 func indexesToTaskIDs(indexes []uint32, ids []kernel.UUIDv7) []kernel.UUIDv7 {
@@ -344,7 +462,7 @@ func (service *ProductionService) addRequiredValidationTasks(ctx context.Context
 		}
 	}
 	for _, target := range append([]organization.PlannedTask(nil), tasks...) {
-		if target.Purpose != kernel.PurposeImplementation && target.Purpose != kernel.PurposeRepair && target.Purpose != kernel.PurposePromotion {
+		if target.Purpose != kernel.PurposeImplementation && target.Purpose != kernel.PurposeRepair {
 			continue
 		}
 		if !coverage[target.ID][kernel.PurposeValidation] {
@@ -387,10 +505,19 @@ func (service *ProductionService) addStoryAcceptanceTasks(ctx context.Context, f
 	}
 	dependencies := make([]kernel.UUIDv7, len(tasks))
 	criteria := make([]string, 0)
+	acceptanceTargets := make([]string, 0)
 	maximumComplexity := uint8(1)
 	risk := organization.RiskLow
 	for index, task := range tasks {
 		dependencies[index] = task.ID
+		if task.Purpose == kernel.PurposeImplementation || task.Purpose == kernel.PurposeRepair {
+			owner, active, statusErr := service.RoleHost.Status(ctx, task.Owner)
+			workspace, workspaceFound := service.workspacesByID[owner.WorkspaceID]
+			if statusErr != nil || !active || !workspaceFound {
+				return nil, errors.Join(organization.ErrRoleNotRunning, statusErr)
+			}
+			acceptanceTargets = append(acceptanceTargets, fmt.Sprintf("target_task=%s owner=%s branch=%s workspace=%s baseline=%s", task.ID, task.Owner, workspace.Branch, workspace.WorkingDirectory, workspace.BaselineSHA))
+		}
 		if task.Complexity > maximumComplexity {
 			maximumComplexity = task.Complexity
 		}
@@ -404,10 +531,15 @@ func (service *ProductionService) addStoryAcceptanceTasks(ctx context.Context, f
 		}
 	}
 	sort.Slice(dependencies, func(left, right int) bool { return dependencies[left] < dependencies[right] })
+	sort.Strings(acceptanceTargets)
+	description := "Review the completed feature evidence against every story acceptance criterion and return the structured product acceptance result. This is a read-only judgment: do not modify files, commits, branches, worktrees, or Git refs. Do not delegate or start another agent."
+	if len(acceptanceTargets) > 0 {
+		description += "\n\nAUTHORITATIVE_ACCEPTANCE_TARGETS:\n" + strings.Join(acceptanceTargets, "\n") + "\nInspect these exact completed implementation branches/workspaces read-only. The product-owner workspace is not the implementation artifact and must not be used as a substitute."
+	}
 	id := deterministicOperationalUUID("feature-acceptance", string(feature.ID))
 	tasks = append(tasks, organization.PlannedTask{
 		ID: id, StoryID: feature.Specification.Stories[0].ID, Title: "Accept feature: " + feature.Input.Title,
-		Description:        "Review the completed feature evidence against every story acceptance criterion and return the structured product acceptance result. Do not delegate or start another agent.",
+		Description:        description,
 		AcceptanceCriteria: criteria, DependsOn: dependencies,
 		Owner: productOwner.ActorFQN, ModelProfile: productOwner.ModelProfile, DecisionRoute: profile.Qualification.DecisionRoute,
 		Purpose: kernel.PurposePromotion, Complexity: maximumComplexity, Risk: risk, CriticalPath: true,

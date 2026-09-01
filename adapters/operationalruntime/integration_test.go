@@ -424,13 +424,14 @@ type integratedConversation struct {
 }
 
 type integratedOpenHands struct {
-	t               *testing.T
-	mu              sync.Mutex
-	conversations   map[string]*integratedConversation
-	delays          map[string]time.Duration
-	active          int
-	peakActive      int
-	failValidations int
+	t                  *testing.T
+	mu                 sync.Mutex
+	conversations      map[string]*integratedConversation
+	delays             map[string]time.Duration
+	active             int
+	peakActive         int
+	invalidValidations int
+	failValidations    int
 }
 
 func (server *integratedOpenHands) serveHTTP(writer http.ResponseWriter, request *http.Request) {
@@ -532,12 +533,17 @@ func (server *integratedOpenHands) serveHTTP(writer http.ResponseWriter, request
 				if conversation.response != "" {
 					agentText = conversation.response
 				} else if json.Unmarshal([]byte(conversation.prompt), &brief) == nil && brief.ResultProtocol != nil && brief.ResultProtocol.Marker == application.ValidationResultMarker {
-					outcome, reason := "PASS", "repository checks passed"
-					if server.failValidations > 0 {
-						server.failValidations--
-						outcome, reason = "FAIL", "repair is required"
+					if server.invalidValidations > 0 {
+						server.invalidValidations--
+						agentText = "validation completed but the structured result was omitted"
+					} else {
+						outcome, reason := "PASS", "repository checks passed"
+						if server.failValidations > 0 {
+							server.failValidations--
+							outcome, reason = "FAIL", "repair is required"
+						}
+						agentText = "completed independent validation\n" + application.ValidationResultMarker + "\n{\"schema_version\":\"1.0.0\",\"outcome\":\"" + outcome + "\",\"reasons\":[\"" + reason + "\"]}"
 					}
-					agentText = "completed independent validation\n" + application.ValidationResultMarker + "\n{\"schema_version\":\"1.0.0\",\"outcome\":\"" + outcome + "\",\"reasons\":[\"" + reason + "\"]}"
 				} else if brief.Purpose == kernel.PurposeRepair {
 					agentText = "completed bounded repair for " + string(brief.InvocationID)
 				} else if brief.ResultProtocol != nil && brief.ResultProtocol.Marker == application.OrganizationalResultMarker {

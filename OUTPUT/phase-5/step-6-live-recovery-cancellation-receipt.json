@@ -2,38 +2,38 @@
   "checks": [
     "OpenHands proxy outage observed",
     "invocation recovered without reauthorization",
-    "teamsd SIGSTOP/SIGCONT during active execution",
-    "teamsctl cancellation interrupted OpenHands",
+    "tekrood SIGSTOP/SIGCONT during active execution",
+    "tekroo cancellation interrupted OpenHands",
     "budget remained one invocation",
-    "cancelled projection survived teamsd restart",
+    "cancelled projection survived tekrood restart",
     "conversation had no parent agent"
   ],
   "invocation": {
-    "invocation_id": "00000000-0000-7000-8000-eb7f25657008",
+    "invocation_id": "00000000-0000-7000-8000-9782e2eed008",
     "revision": 5,
     "state": "CANCELLED",
-    "task_id": "00000000-0000-7000-8000-eb7f25657002",
-    "budget_account_id": "00000000-0000-7000-8000-eb7f25657007",
+    "task_id": "00000000-0000-7000-8000-9782e2eed002",
+    "budget_account_id": "00000000-0000-7000-8000-9782e2eed007",
     "lifecycle_epoch": 1,
     "scope_revision": 1,
     "actor_fqn": "teams::coder-1",
     "execution": {
-      "execution_id": "00000000-0000-7000-8000-eb7f25657004",
+      "execution_id": "00000000-0000-7000-8000-9782e2eed004",
       "fencing_epoch": 1
     },
     "purpose": "IMPLEMENTATION",
     "attempt_ordinal": 1,
-    "conversation_id": "00000000-0000-7000-8000-eb7f25657008",
+    "conversation_id": "00000000-0000-7000-8000-9782e2eed008",
     "terminal_outcome": "CANCELLED",
     "retryable": false,
     "terminal_evidence_ids": [
-      "4bf423e7-59f9-76c5-840c-203ba4eee4e5",
-      "81287448-c6b8-7bb9-8f3c-e8d4e88890ad"
+      "1df31dd0-4d49-763d-816e-4a25171e9128",
+      "c83d2318-5d35-734c-8ca9-03721c8bbad7"
     ],
-    "output_digest": "fbbd3726f2c4c52f943183849bc40281a8a565ea386291a5b171718058532542",
-    "finished_at": "2026-08-31T19:24:06.377471Z",
-    "cancellation_requested_at": "2026-08-31T19:24:05.306208Z",
-    "last_event_id": "01a05947-656c-7bc2-8788-f9b76f798b80"
+    "output_digest": "bb84963cb36c824e5c37eb8e1e5848bb1f5a57b12b4a95c74caec65fc191d9e3",
+    "finished_at": "2026-09-01T03:46:51.528741Z",
+    "cancellation_requested_at": "2026-09-01T03:46:50.503081Z",
+    "last_event_id": "01a05b13-ae0c-754e-bc33-bd78fea47ddf"
   },
   "model_endpoint": "http://127.0.0.1:8802/v1",
   "model_id": "ddalcu--Qwen3.8-27B-MLX-Serve-8bit",
@@ -44,9 +44,9 @@
     "model-server shutdown"
   ],
   "openhands_endpoint": "http://127.0.0.1:8000",
-  "outage_responses_observed": 2,
+  "outage_responses_observed": 3,
   "record_type": "PHASE_5_LIVE_RECOVERY_AND_CANCELLATION",
-  "recorded_at": "2026-08-31T19:24:06.951535Z",
+  "recorded_at": "2026-09-01T03:46:51.65958Z",
   "sma_database_access_by_teams": false,
   "status": "PASS",
   "teams_database": "disposable_replica_set"

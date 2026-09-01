@@ -1,0 +1,75 @@
+{
+  "schemaVersion": "1.0.0",
+  "phase": "PHASE-6",
+  "step": 9,
+  "recordType": "INTEGRATED_ACCEPTANCE_AND_OPERATING_PILOT",
+  "status": "PASS",
+  "recordedAt": "2026-09-01T03:50:08Z",
+  "source": {
+    "baselineCommit": "447329e27208f32f990115b62eeb269df04adc59",
+    "baselineTree": "4419f7e935258e67814566b21055bdfc7aa9449a",
+    "workingTreeChangesReviewed": true,
+    "contractIdentity": "tekroo.kernel.contracts/0.9.0"
+  },
+  "live": {
+    "openhandsEndpoint": "http://127.0.0.1:8000",
+    "modelEndpoint": "http://127.0.0.1:8802/v1",
+    "modelID": "ddalcu--Qwen3.8-27B-MLX-Serve-8bit",
+    "thinkingEnabled": false,
+    "featureToAcceptedRelease": {
+      "status": "PASS",
+      "elapsedSeconds": 431.91,
+      "test": "TestPhase6LiveFeatureToAcceptance",
+      "normalOperatorSurface": ["tekrood", "tekroo feature", "tekroo feature-release"],
+      "manualKernelCommandChoreography": false,
+      "releasedCommitAndTreeMatchedQualifiedImplementation": true
+    },
+    "concurrency": [
+      {"requests": 1, "observedPeak": 1, "elapsedMilliseconds": 47336, "status": "PASS"},
+      {"requests": 2, "observedPeak": 2, "elapsedMilliseconds": 72207, "status": "PASS"},
+      {"requests": 4, "observedPeak": 4, "elapsedMilliseconds": 116560, "status": "PASS"},
+      {"requests": 8, "observedPeak": 8, "elapsedMilliseconds": 211757, "status": "PASS"}
+    ],
+    "recoveryAndCancellation": {
+      "status": "PASS",
+      "elapsedSeconds": 9.36,
+      "test": "TestPhase5LiveSoakRecoversFromDependencyOutageAndCancelsAfterSuspend",
+      "checks": [
+        "OpenHands outage observed",
+        "recovery required no reauthorization",
+        "tekrood SIGSTOP and SIGCONT",
+        "operator cancellation",
+        "terminal evidence retained",
+        "budget remained one invocation",
+        "cancelled projection survived restart"
+      ]
+    }
+  },
+  "regressionSuites": [
+    {"command": "go test ./... -count=1", "status": "PASS"},
+    {"command": "go test -tags=mongo_integration ./... -count=1", "status": "PASS"},
+    {"command": "go test -v ./application -run ^TestOperationalCoordinatorExecutesOneInvocationAndNeverChainsAgentProse$ -count=1", "status": "PASS"}
+  ],
+  "invariants": {
+    "finiteDAG": "PASS",
+    "renamedMessageLoopRejected": "PASS",
+    "roleCycleRejected": "PASS",
+    "circularHandoffRejected": "PASS",
+    "validationThrashingRejected": "PASS",
+    "postCompletionWorkRejected": "PASS",
+    "budgetResetRejected": "PASS",
+    "stableFQNAndWorkspaceContinuity": "PASS",
+    "humanWaitResponseAcrossRestart": "PASS",
+    "deterministicReleaseAndConflictRecovery": "PASS",
+    "noDirectModelChaining": "PASS",
+    "noDuplicateWork": "PASS"
+  },
+  "scope": {
+    "localSingleTeamOperatingPath": "ACCEPTED",
+    "phase7Deferrals": ["cross-team federation", "aliases", "trusted signed ingress"],
+    "v3DataMigration": "NOT_RUN",
+    "productionOrHistoricalDatabaseAccess": "NOT_RUN",
+    "retiredFeatures": 0,
+    "unclassifiedFeatures": 0
+  }
+}

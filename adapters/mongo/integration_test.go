@@ -819,6 +819,27 @@ func TestKindFilteredIntentFeedExcludesUnrelatedBacklog(t *testing.T) {
 	}
 }
 
+func TestIntentFeedPollNormalizesExpiredMongoDeadline(t *testing.T) {
+	store := openTestStore(t)
+	openCtx, openCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	feed, err := store.OpenIntentFeedForKind(openCtx, "expired-poll-test", "WORK_INVOCATION_AUTHORIZED")
+	openCancel()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		closeCtx, closeCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer closeCancel()
+		_ = feed.Close(closeCtx)
+	}()
+	pollCtx, pollCancel := context.WithTimeout(context.Background(), time.Millisecond)
+	_, err = feed.Poll(pollCtx)
+	pollCancel()
+	if !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, ErrIntentNotFound) {
+		t.Fatalf("expired idle poll = %v", err)
+	}
+}
+
 func TestClaimLifecycleIsOneWinnerAndEpochFenced(t *testing.T) {
 	store := openTestStore(t)
 	decision := completeDecision(t, 1)

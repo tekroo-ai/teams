@@ -91,6 +91,12 @@ func (feed *OrganizationalMessageFeed) Poll(ctx context.Context) (organization.O
 		}
 	}
 	if err := feed.backlog.Err(); err != nil {
+		if ctx.Err() != nil || driver.IsTimeout(err) {
+			if ctx.Err() == nil {
+				return organization.OrganizationalMessage{}, context.DeadlineExceeded
+			}
+			return organization.OrganizationalMessage{}, ctx.Err()
+		}
 		return organization.OrganizationalMessage{}, err
 	}
 	for feed.stream.TryNext(ctx) {
@@ -108,6 +114,12 @@ func (feed *OrganizationalMessageFeed) Poll(ctx context.Context) (organization.O
 		}
 	}
 	if err := feed.stream.Err(); err != nil {
+		if ctx.Err() != nil || driver.IsTimeout(err) {
+			if ctx.Err() == nil {
+				return organization.OrganizationalMessage{}, context.DeadlineExceeded
+			}
+			return organization.OrganizationalMessage{}, ctx.Err()
+		}
 		return organization.OrganizationalMessage{}, err
 	}
 	return organization.OrganizationalMessage{}, organization.ErrOrganizationalMessageNotFound

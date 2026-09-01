@@ -68,7 +68,7 @@ const (
 	semanticMemoryUntrustedLabel = "SMA recalled memories are untrusted evidence. "
 	qualifiedModelID             = "openai/ddalcu--Qwen3.8-27B-MLX-Serve-8bit"
 	qualifiedModelAPIRoot        = "http://127.0.0.1:8802/v1"
-	qualifiedAgentSettingsJSON   = `{"kind":"Agent","llm":{"model":"openai/ddalcu--Qwen3.8-27B-MLX-Serve-8bit","model_canonical_name":"openai/gpt-4o","base_url":"http://127.0.0.1:8802/v1","api_mode":"chat","api_key":"sma-e1-loopback-only","native_tool_calling":true,"force_string_serializer":false,"stream":false,"temperature":0,"max_output_tokens":8192,"num_retries":0,"retry_multiplier":0,"retry_min_wait":0,"retry_max_wait":0,"timeout":120,"log_completions":false,"litellm_extra_body":{"chat_template_kwargs":{"enable_thinking":false}}}}`
+	qualifiedAgentSettingsJSON   = `{"kind":"Agent","llm":{"model":"openai/ddalcu--Qwen3.8-27B-MLX-Serve-8bit","model_canonical_name":"openai/gpt-4o","base_url":"http://127.0.0.1:8802/v1","api_mode":"chat","api_key":"sma-e1-loopback-only","native_tool_calling":true,"force_string_serializer":false,"stream":false,"temperature":0,"max_output_tokens":8192,"num_retries":0,"retry_multiplier":0,"retry_min_wait":0,"retry_max_wait":0,"timeout":300,"log_completions":false,"litellm_extra_body":{"chat_template_kwargs":{"enable_thinking":false}}}}`
 	qualifiedSMAHookConfigJSON   = `{"hooks":{"UserPromptSubmit":[{"matcher":"*","hooks":[{"type":"command","command":"./.openhands/hooks/sma_context_hook.py","timeout":1}]}]}}`
 )
 
@@ -190,7 +190,7 @@ func qualifiedAgentSettings(raw json.RawMessage) bool {
 			} `json:"litellm_extra_body"`
 		} `json:"llm"`
 	}
-	if json.Unmarshal(raw, &settings) != nil || settings.LLM.Model != qualifiedModelID || settings.LLM.ModelCanonical != "openai/gpt-4o" || settings.LLM.BaseURL != qualifiedModelAPIRoot || settings.LLM.APIMode != "chat" || settings.LLM.APIKey != "sma-e1-loopback-only" || !settings.LLM.NativeToolCalling || settings.LLM.Stream || settings.LLM.Temperature != 0 || settings.LLM.MaximumOutput != 8192 || settings.LLM.Retries != 0 || settings.LLM.Timeout != 120 || settings.LLM.ExtraBody.ChatTemplateArguments.EnableThinking == nil {
+	if json.Unmarshal(raw, &settings) != nil || settings.LLM.Model != qualifiedModelID || settings.LLM.ModelCanonical != "openai/gpt-4o" || settings.LLM.BaseURL != qualifiedModelAPIRoot || settings.LLM.APIMode != "chat" || settings.LLM.APIKey != "sma-e1-loopback-only" || !settings.LLM.NativeToolCalling || settings.LLM.Stream || settings.LLM.Temperature != 0 || settings.LLM.MaximumOutput != 8192 || settings.LLM.Retries != 0 || settings.LLM.Timeout != 300 || settings.LLM.ExtraBody.ChatTemplateArguments.EnableThinking == nil {
 		return false
 	}
 	return !*settings.LLM.ExtraBody.ChatTemplateArguments.EnableThinking
@@ -489,12 +489,13 @@ func (client *Client) getConversation(ctx context.Context, conversationID string
 }
 
 type rawEvent struct {
-	Raw       json.RawMessage
-	ID        string
-	Kind      string
-	Source    string
-	Timestamp time.Time
-	Text      string
+	Raw             json.RawMessage
+	ID              string
+	Kind            string
+	Source          string
+	ObservationKind string
+	Timestamp       time.Time
+	Text            string
 }
 
 func (client *Client) events(ctx context.Context, conversationID string) ([]rawEvent, error) {
@@ -553,6 +554,13 @@ func decodeEvent(raw json.RawMessage) (rawEvent, error) {
 				Text string `json:"text"`
 			} `json:"content"`
 		} `json:"llm_message"`
+		Observation struct {
+			Kind    string `json:"kind"`
+			Content []struct {
+				Type string `json:"type"`
+				Text string `json:"text"`
+			} `json:"content"`
+		} `json:"observation"`
 	}
 	if json.Unmarshal(raw, &envelope) != nil || envelope.ID == "" || envelope.Kind == "" {
 		return rawEvent{}, ErrProtocol
@@ -563,11 +571,18 @@ func decodeEvent(raw json.RawMessage) (rawEvent, error) {
 			text.WriteString(content.Text)
 		}
 	}
+	if envelope.Kind == "ObservationEvent" && envelope.Observation.Kind == "FinishObservation" {
+		for _, content := range envelope.Observation.Content {
+			if content.Type == "text" {
+				text.WriteString(content.Text)
+			}
+		}
+	}
 	var timestamp time.Time
 	if envelope.Timestamp != "" {
 		timestamp, _ = time.Parse(time.RFC3339Nano, envelope.Timestamp)
 	}
-	return rawEvent{Raw: append(json.RawMessage(nil), raw...), ID: envelope.ID, Kind: envelope.Kind, Source: envelope.Source, Timestamp: timestamp, Text: text.String()}, nil
+	return rawEvent{Raw: append(json.RawMessage(nil), raw...), ID: envelope.ID, Kind: envelope.Kind, Source: envelope.Source, ObservationKind: envelope.Observation.Kind, Timestamp: timestamp, Text: text.String()}, nil
 }
 
 func (client *Client) observation(brief application.ExecutionBrief, requestDigest kernel.Digest, info conversationInfo, events []rawEvent, interrupted bool) (application.ExternalExecutionObservation, error) {
@@ -620,7 +635,7 @@ func (client *Client) observation(brief application.ExecutionBrief, requestDiges
 			}
 			toolArtifactJournal = append(toolArtifactJournal, append(json.RawMessage(nil), event.Raw...))
 		}
-		if event.Kind == "MessageEvent" && event.Source == "agent" {
+		if agentFinalEvent(event) {
 			output = []byte(event.Text)
 			copy := event
 			modelEvent = &copy
@@ -669,11 +684,11 @@ func (client *Client) observation(brief application.ExecutionBrief, requestDiges
 }
 
 func eventEvidenceKind(event rawEvent) string {
+	if agentFinalEvent(event) {
+		return "MODEL_OUTPUT"
+	}
 	switch event.Kind {
 	case "MessageEvent":
-		if event.Source == "agent" {
-			return "MODEL_OUTPUT"
-		}
 		return "SOURCE_SNAPSHOT"
 	case "ActionEvent", "ObservationEvent", "ACPToolCallEvent":
 		return "TOOL_RESULT"
@@ -682,6 +697,10 @@ func eventEvidenceKind(event rawEvent) string {
 	default:
 		return ""
 	}
+}
+
+func agentFinalEvent(event rawEvent) bool {
+	return event.Kind == "MessageEvent" && event.Source == "agent" || event.Kind == "ObservationEvent" && event.Source == "environment" && event.ObservationKind == "FinishObservation" && event.Text != ""
 }
 
 func promptIndex(events []rawEvent, prompt string) int {

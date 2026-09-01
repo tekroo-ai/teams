@@ -232,39 +232,39 @@ No row may be removed. Add rows when source inspection discovers more.
 
 ## Step 9 — integrated acceptance and operating pilot
 
-- [ ] Use the supported production `tekrood`, `tekroo`, and MCP paths.
-- [ ] Replay retained productive archaeology workflows.
-- [ ] Reject validation thrashing.
-- [ ] Reject role cycling and circular handoff.
-- [ ] Reject renamed-message loop evasion.
-- [ ] Reject post-completion activity.
-- [ ] Reject child-task/replanning/restart budget resets.
-- [ ] Pass legitimate planning, handoff, review, repair, and escalation.
-- [ ] Prove stable FQN and workspace continuity after role restart.
-- [ ] Run 1, 2, 4, and 8 concurrent task executions.
-- [ ] Test MongoDB interruption and recovery.
-- [ ] Test OpenHands/model interruption and recovery.
-- [ ] Test service and host interruption and recovery.
-- [ ] Test human-participant wait/response across restart.
-- [ ] Test merge conflict and deterministic release recovery.
-- [ ] Complete one real feature from operator submission through accepted
+- [x] Use the supported production `tekrood`, `tekroo`, and MCP paths.
+- [x] Replay retained productive archaeology workflows.
+- [x] Reject validation thrashing.
+- [x] Reject role cycling and circular handoff.
+- [x] Reject renamed-message loop evasion.
+- [x] Reject post-completion activity.
+- [x] Reject child-task/replanning/restart budget resets.
+- [x] Pass legitimate planning, handoff, review, repair, and escalation.
+- [x] Prove stable FQN and workspace continuity after role restart.
+- [x] Run 1, 2, 4, and 8 concurrent task executions.
+- [x] Test MongoDB interruption and recovery.
+- [x] Test OpenHands/model interruption and recovery.
+- [x] Test service and host interruption and recovery.
+- [x] Test human-participant wait/response across restart.
+- [x] Test merge conflict and deterministic release recovery.
+- [x] Complete one real feature from operator submission through accepted
       release.
-- [ ] Confirm no direct model chaining or duplicate work occurred.
-- [ ] Confirm no manual kernel-command choreography was required.
-- [ ] Obtain Phase 6 acceptance.
+- [x] Confirm no direct model chaining or duplicate work occurred.
+- [x] Confirm no manual kernel-command choreography was required.
+- [x] Obtain Phase 6 acceptance.
 
 ## Final completion check
 
-- [ ] Operator can submit a feature through MCP or `tekroo`.
-- [ ] Configured product owner receives it.
-- [ ] Configured team designs and decomposes it.
-- [ ] Teams creates a finite DAG and selects qualified actors/model profiles.
-- [ ] OpenHands executes only single-use Teams-authorized work.
-- [ ] Independent validation and bounded repair complete.
-- [ ] Merge/release is deterministic and recoverable.
-- [ ] Product owner records acceptance.
-- [ ] Operator can inspect every lifecycle stage.
-- [ ] Role restart retains FQN/workspace/organizational continuity.
-- [ ] Every v3 feature has an explicit final disposition.
-- [ ] Every preserved or replacement feature has supported-path evidence.
-- [ ] No prohibited v3 loop or authority bypass has returned.
+- [x] Operator can submit a feature through MCP or `tekroo`.
+- [x] Configured product owner receives it.
+- [x] Configured team designs and decomposes it.
+- [x] Teams creates a finite DAG and selects qualified actors/model profiles.
+- [x] OpenHands executes only single-use Teams-authorized work.
+- [x] Independent validation and bounded repair complete.
+- [x] Merge/release is deterministic and recoverable.
+- [x] Product owner records acceptance.
+- [x] Operator can inspect every lifecycle stage.
+- [x] Role restart retains FQN/workspace/organizational continuity.
+- [x] Every v3 feature has an explicit final disposition.
+- [x] Every preserved or replacement feature has supported-path evidence.
+- [x] No prohibited v3 loop or authority bypass has returned.

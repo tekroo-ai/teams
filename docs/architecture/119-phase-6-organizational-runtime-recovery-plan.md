@@ -2,7 +2,9 @@
 
 ## Status and authority
 
-**Status:** accepted
+**Status:** complete and accepted — Step 9 evidence is recorded in
+`docs/architecture/121-phase-6-integrated-acceptance.md` and
+`OUTPUT/phase-6/step-9/integrated-acceptance.json`.
 
 **Authority:** requested by the principal after the Tekroo v3/v4 feature
 comparison and accepted with authorization to execute continuously through

@@ -319,6 +319,12 @@ func (feed *IntentFeed) Next(ctx context.Context) (ClaimedIntent, error) {
 		return document.claimedIntent()
 	}
 	if err := feed.backlog.Err(); err != nil {
+		if ctx.Err() != nil || driver.IsTimeout(err) {
+			if ctx.Err() == nil {
+				return ClaimedIntent{}, context.DeadlineExceeded
+			}
+			return ClaimedIntent{}, ctx.Err()
+		}
 		return ClaimedIntent{}, err
 	}
 	for feed.stream.Next(ctx) {
@@ -339,6 +345,12 @@ func (feed *IntentFeed) Next(ctx context.Context) (ClaimedIntent, error) {
 		return change.FullDocument.claimedIntent()
 	}
 	if err := feed.stream.Err(); err != nil {
+		if ctx.Err() != nil || driver.IsTimeout(err) {
+			if ctx.Err() == nil {
+				return ClaimedIntent{}, context.DeadlineExceeded
+			}
+			return ClaimedIntent{}, ctx.Err()
+		}
 		if !feed.resynchronized && isResumeFailure(err) {
 			if resyncErr := feed.resynchronize(ctx); resyncErr != nil {
 				return ClaimedIntent{}, resyncErr
@@ -375,6 +387,12 @@ func (feed *IntentFeed) Poll(ctx context.Context) (ClaimedIntent, error) {
 		return document.claimedIntent()
 	}
 	if err := feed.backlog.Err(); err != nil {
+		if ctx.Err() != nil || driver.IsTimeout(err) {
+			if ctx.Err() == nil {
+				return ClaimedIntent{}, context.DeadlineExceeded
+			}
+			return ClaimedIntent{}, ctx.Err()
+		}
 		return ClaimedIntent{}, err
 	}
 	for feed.stream.TryNext(ctx) {
@@ -395,6 +413,12 @@ func (feed *IntentFeed) Poll(ctx context.Context) (ClaimedIntent, error) {
 		return change.FullDocument.claimedIntent()
 	}
 	if err := feed.stream.Err(); err != nil {
+		if ctx.Err() != nil || driver.IsTimeout(err) {
+			if ctx.Err() == nil {
+				return ClaimedIntent{}, context.DeadlineExceeded
+			}
+			return ClaimedIntent{}, ctx.Err()
+		}
 		if !feed.resynchronized && isResumeFailure(err) {
 			if resyncErr := feed.resynchronize(ctx); resyncErr != nil {
 				return ClaimedIntent{}, resyncErr

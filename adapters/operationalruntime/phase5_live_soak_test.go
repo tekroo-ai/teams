@@ -1,4 +1,4 @@
-//go:build phase5_soak && mongo_integration
+//go:build (phase5_soak || phase6_pilot) && mongo_integration
 
 package operationalruntime
 
@@ -60,9 +60,9 @@ func TestPhase5LiveSoakRunsConcurrentLocalWorkAndRestartsCleanly(t *testing.T) {
 	second.acceptanceCriteria, second.baselineSHA = []string{"go test ./... passes without changing tests"}, secondBaseline
 
 	configPath := writePhase5LiveSoakConfig(t, mongoURI, phase5OpenHandsURL, []ProductionWorkspace{
-		{WorkspaceID: first.workspaceID, WorktreeID: first.worktreeID, WorkingDirectory: firstWorkspace},
-		{WorkspaceID: second.workspaceID, WorktreeID: second.worktreeID, WorkingDirectory: secondWorkspace},
-	}, first)
+		{WorkspaceID: first.workspaceID, WorktreeID: first.worktreeID, WorkingDirectory: firstWorkspace, Branch: "main", BaselineSHA: firstBaseline, WritablePaths: []string{"."}},
+		{WorkspaceID: second.workspaceID, WorktreeID: second.worktreeID, WorkingDirectory: secondWorkspace, Branch: "main", BaselineSHA: secondBaseline, WritablePaths: []string{"."}},
+	})
 	tekrood, tekroo := buildProductSurfaceBinaries(t)
 	service, stdout, stderr := startPhase5Tekrood(t, tekrood, configPath)
 	serviceStopped := false
@@ -176,7 +176,7 @@ func TestPhase5LiveSoakRecoversFromDependencyOutageAndCancelsAfterSuspend(t *tes
 	fixture.acceptanceCriteria, fixture.baselineSHA = []string{"operator cancellation interrupts the authorized invocation"}, baseline
 	requirePhase5ConversationAbsent(t, fixture.invocationID)
 
-	configPath := writePhase5LiveSoakConfig(t, mongoURI, gate.URL(), []ProductionWorkspace{{WorkspaceID: fixture.workspaceID, WorktreeID: fixture.worktreeID, WorkingDirectory: workspace}}, fixture)
+	configPath := writePhase5LiveSoakConfig(t, mongoURI, gate.URL(), []ProductionWorkspace{{WorkspaceID: fixture.workspaceID, WorktreeID: fixture.worktreeID, WorkingDirectory: workspace, Branch: "main", BaselineSHA: baseline, WritablePaths: []string{"."}}})
 	tekrood, tekroo := buildProductSurfaceBinaries(t)
 	service, stdout, stderr := startPhase5Tekrood(t, tekrood, configPath)
 	serviceStopped := false
@@ -189,11 +189,26 @@ func TestPhase5LiveSoakRecoversFromDependencyOutageAndCancelsAfterSuspend(t *tes
 	}()
 	waitForProductHealth(t, tekroo, configPath, stderr)
 
-	commandDirectory := filepath.Join(t.TempDir(), "commands")
-	if err := os.Mkdir(commandDirectory, 0o700); err != nil {
+	config, err := LoadProductionConfig(configPath)
+	if err != nil {
 		t.Fatal(err)
 	}
-	submit := phase5ProductSubmitter(t, tekroo, configPath, commandDirectory)
+	commandService, err := NewProductionService(contextWithTimeout(t), config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = commandService.Close(contextWithTimeout(t)) }()
+	submit := func(t *testing.T, command kernel.KernelCommand) kernel.CommandReceipt {
+		t.Helper()
+		receipt, submitErr := commandService.Submit(contextWithTimeout(t), command)
+		if submitErr != nil {
+			t.Fatalf("%s: %v", command.CommandType, submitErr)
+		}
+		if receipt.OutcomeCode != kernel.OutcomeApplied || len(receipt.EventIDs) != 1 {
+			t.Fatalf("%s receipt = %#v", command.CommandType, receipt)
+		}
+		return receipt
+	}
 	fixture.createAuthoritativeTaskWith(t, submit)
 	story := waitForProductStory(t, tekroo, configPath, fixture.storyID, func(view mongo.StoryProjection) bool {
 		return view.AggregateRevision == 1 && len(view.TaskIDs) == 1
@@ -209,9 +224,13 @@ func TestPhase5LiveSoakRecoversFromDependencyOutageAndCancelsAfterSuspend(t *tes
 	waitForPhase5GateRejection(t, gate)
 	gate.SetAvailable(true)
 	waitForPhase5Conversation(t, fixture.invocationID)
-	active := waitForLiveInvocation(t, tekroo, configPath, fixture.invocationID, func(value InvocationStatus) bool {
+	waitForLiveInvocation(t, tekroo, configPath, fixture.invocationID, func(value InvocationStatus) bool {
 		return value.State == kernel.InvocationStarted && value.ConversationID != nil
 	})
+	// Hold the OpenHands boundary unavailable while the daemon is suspended and
+	// the operator records cancellation. This keeps the external conversation
+	// from racing a terminal observation into Teams before cancellation wins.
+	gate.SetAvailable(false)
 
 	if err := service.Process.Signal(syscall.SIGSTOP); err != nil {
 		t.Fatalf("suspend tekrood: %v", err)
@@ -221,22 +240,25 @@ func TestPhase5LiveSoakRecoversFromDependencyOutageAndCancelsAfterSuspend(t *tes
 		t.Fatalf("resume tekrood: %v", err)
 	}
 	waitForProductHealth(t, tekroo, configPath, stderr)
+	currentRaw := productCLI(t, tekroo, configPath, "invocation", string(fixture.invocationID))
+	var current InvocationStatus
+	if json.Unmarshal(currentRaw, &current) != nil || current.State != kernel.InvocationStarted {
+		t.Fatalf("invocation changed before cancellation: %#v raw=%s", current, currentRaw)
+	}
 
-	cancelPayload := map[string]any{
-		"invocation_id": fixture.invocationID, "expected_invocation_revision": active.Revision,
-		"reason": "Phase 5 operator cancellation after process resume", "evidence_ids": []kernel.UUIDv7{fixture.evidenceID},
-		"authority": fixture.human, "requested_at": time.Now().UTC(),
-	}
-	cancelCommand := fixture.command(t, "tekroo.command.work-invocation.request-cancellation", kernel.OperationalSchemaVersion, kernel.AggregateWorkInvocation, fixture.invocationID, fixture.human, active.Revision, cancelPayload,
-		[]kernel.DagParent{{ParentEventID: active.LastEventID, EdgeKind: kernel.EdgeCausal}}, []kernel.EvidenceRef{{EvidenceID: fixture.evidenceID, SHA256: digestByte('e')}}, nil)
-	cancelCommand.ExpectedLifecycleEpoch = nil
-	cancelPath := filepath.Join(commandDirectory, string(cancelCommand.CommandID)+".json")
-	writeJSON(t, cancelPath, cancelCommand, 0o600)
+	cancelPath := filepath.Join(t.TempDir(), "cancellation.json")
+	writeJSON(t, cancelPath, CancellationRequest{
+		ExpectedRevision: current.Revision,
+		Reason:           "Phase 5 operator cancellation after process resume",
+		EvidenceRefs:     []kernel.EvidenceRef{{EvidenceID: fixture.evidenceID, SHA256: digestByte('e')}},
+		IdempotencyKey:   "phase5-recovery-cancellation",
+	}, 0o600)
 	raw := productCLI(t, tekroo, configPath, "cancel", string(fixture.invocationID), cancelPath)
-	var cancelReceipt kernel.CommandReceipt
-	if json.Unmarshal(raw, &cancelReceipt) != nil || cancelReceipt.OutcomeCode != kernel.OutcomeApplied {
-		t.Fatalf("cancellation receipt = %#v raw=%s", cancelReceipt, raw)
+	var cancellationStatus InvocationStatus
+	if json.Unmarshal(raw, &cancellationStatus) != nil || cancellationStatus.CancellationRequestedAt == nil {
+		t.Fatalf("cancellation status = %#v raw=%s", cancellationStatus, raw)
 	}
+	gate.SetAvailable(true)
 	cancelled := waitForLiveInvocation(t, tekroo, configPath, fixture.invocationID, func(value InvocationStatus) bool { return value.State == kernel.InvocationCancelled })
 	if cancelled.TerminalOutcome == nil || *cancelled.TerminalOutcome != kernel.InvocationCancelled || cancelled.CancellationRequestedAt == nil || len(cancelled.TerminalEvidenceIDs) == 0 {
 		t.Fatalf("cancelled invocation = %#v", cancelled)
@@ -462,7 +484,7 @@ func createPhase5SoakRepository(t *testing.T, root, name, function, brokenReturn
 	return workspace, string(bytes.TrimSpace(raw))
 }
 
-func writePhase5LiveSoakConfig(t *testing.T, mongoURI, openHandsURL string, workspaces []ProductionWorkspace, fixture *integratedFixture) string {
+func writePhase5LiveSoakConfig(t *testing.T, mongoURI, openHandsURL string, workspaces []ProductionWorkspace) string {
 	t.Helper()
 	path, config := writeProductionFixture(t)
 	directory := filepath.Dir(path)
@@ -483,8 +505,9 @@ func writePhase5LiveSoakConfig(t *testing.T, mongoURI, openHandsURL string, work
 	config.OpenHands.PollInterval = "250ms"
 	config.Operator.Address = freeProductSurfaceAddress(t)
 	config.Operator.BearerTokenFile = phase5SessionKeyFile
+	config.Operator.Principal = kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "principal"}
 	config.Workspaces = workspaces
-	config.Profiles = []ProductionProfile{{ModelProfileDigest: fixture.modelDigest, RuntimeIdentityDigest: fixture.runtimeDigest, ToolPolicyDigest: fixture.toolDigest, EffectPolicyDigest: fixture.effectDigest, MaximumIterations: 12}}
+	config.Profiles[0].MaximumIterations = 12
 	config.Execution.ConsumerID = "teams-phase5-live-soak"
 	config.Execution.OperationTimeout = "20m"
 	config.Worker.LeaseDuration = "60s"

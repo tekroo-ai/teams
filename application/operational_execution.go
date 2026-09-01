@@ -339,19 +339,19 @@ func BuildExecutionBrief(current OperationalExecutionContext, maximumBytes int) 
 		brief.ResultProtocol = &ExecutionResultProtocol{
 			SchemaVersion: "1.0.0", Marker: ValidationResultMarker,
 			Outcomes:    []string{"PASS", "FAIL", "BLOCKED", "INCONCLUSIVE"},
-			Instruction: "End the final response with the marker on its own line followed by exactly one JSON object containing schema_version, outcome, and non-empty reasons. Teams will reject missing or malformed results.",
+			Instruction: "The OpenHands finish tool message is the result consumed by Teams. Set finish.message to the marker on its own line followed by exactly one JSON object containing schema_version, outcome, and non-empty reasons. Do not summarize or paraphrase the result in finish.message. Teams will reject missing or malformed results.",
 		}
 	} else if invocation.Purpose == kernel.PurposePromotion {
 		brief.ResultProtocol = &ExecutionResultProtocol{
 			SchemaVersion: "1.0.0", Marker: ValidationResultMarker,
 			Outcomes:    []string{"PASS", "FAIL", "BLOCKED", "INCONCLUSIVE"},
-			Instruction: "Act as the product owner. End the final response with the marker on its own line followed by exactly one JSON object containing schema_version, outcome, and non-empty reasons. PASS means every story acceptance criterion is supported by the supplied completion evidence; Teams remains the authority that records acceptance and release state.",
+			Instruction: "Act as the product owner. The OpenHands finish tool message is the result consumed by Teams. Set finish.message to the marker on its own line followed by exactly one JSON object containing schema_version, outcome, and non-empty reasons. Do not summarize or paraphrase the result in finish.message. PASS means every story acceptance criterion is supported by the supplied completion evidence; Teams remains the authority that records acceptance and release state.",
 		}
 	} else if invocation.Purpose == kernel.PurposeHandoff || invocation.Purpose == kernel.PurposeReplan {
 		brief.ResultProtocol = &ExecutionResultProtocol{
 			SchemaVersion: "1.0.0", Marker: OrganizationalResultMarker,
 			Outcomes:    []string{"STRUCTURED_HANDOFF"},
-			Instruction: "End the final response with the marker on its own line followed by exactly one JSON object conforming to the result schema in the task description. Teams will reject missing, malformed, or extra fields.",
+			Instruction: "The OpenHands finish tool message is the result consumed by Teams. Set finish.message to the marker on its own line followed by exactly one JSON object conforming to the result schema in the task description. Do not summarize or paraphrase the result in finish.message. Teams will reject missing, malformed, or extra fields.",
 		}
 	}
 	brief.SemanticContext = buildSemanticContextRequest(current, evidence)

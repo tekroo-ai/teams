@@ -191,6 +191,41 @@
       ],
       "deferralTarget": "Phase 7 federation, after the local single-team Phase 6 operating pilot",
       "deferralDependency": "A principal-approved federation trust and routing threat model plus a versioned signed-ingress successor contract"
+    },
+    "step9": {
+      "status": "COMPLETE_ACCEPTED",
+      "featureIds": [
+        "F001", "F002", "F003", "F004", "F005", "F006", "F007", "F008", "F009", "F010",
+        "F011", "F012", "F013", "F014", "F015", "F016", "F017", "F018", "F019", "F020",
+        "F021", "F022", "F023", "F024", "F025", "F026", "F027", "F028", "F029", "F030",
+        "F031", "F032", "F033", "F034", "F035", "F036", "F037", "F038", "F039", "F040",
+        "F041", "F042", "F043", "F044", "F045", "F046", "F047", "F048", "F049", "F050"
+      ],
+      "productionEvidence": [
+        "V4:cmd/tekrood/main.go",
+        "V4:cmd/tekroo/main.go",
+        "V4:adapters/mcp/handler.go",
+        "V4:adapters/operationalruntime/production.go",
+        "V4:adapters/operationalruntime/feature_stage_runtime.go",
+        "V4:adapters/operationalruntime/task_completion.go",
+        "V4:adapters/openhands/client.go",
+        "V4:adapters/mongo/outbox.go",
+        "V4:adapters/mongo/message_feed.go"
+      ],
+      "testEvidence": [
+        "V4:adapters/operationalruntime/phase6_live_pilot_test.go",
+        "V4:adapters/operationalruntime/phase6_concurrency_pilot_test.go",
+        "V4:adapters/operationalruntime/phase5_live_soak_test.go",
+        "V4:adapters/operationalruntime/task_admission_integration_test.go",
+        "V4:organization/message_test.go",
+        "V4:organization/host_test.go",
+        "V4:application/operational_execution_coordinator_test.go",
+        "V4:application/release_coordinator_test.go"
+      ],
+      "acceptanceRecord": "V4:docs/architecture/121-phase-6-integrated-acceptance.md",
+      "machineReceipt": "V4:OUTPUT/phase-6/step-9/integrated-acceptance.json",
+      "localSingleTeamPath": "ACCEPTED",
+      "deferredFeatureIds": ["F041", "F042", "F043"]
     }
   },
   "features": [
