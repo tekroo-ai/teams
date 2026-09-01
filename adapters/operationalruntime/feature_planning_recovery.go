@@ -82,7 +82,7 @@ func (service *ProductionService) RetryCancelledFeaturePlanning(ctx context.Cont
 	if err != nil || !sameEvidenceSet(registered, request.EvidenceRefs) {
 		return InvocationStatus{}, errors.Join(organization.ErrInvalidFeature, err)
 	}
-	successorProfile, profileBound, err := planningRecoveryProfile(profileSnapshot.Profile, terminal.WorkProfile, recoveryCondition, deadline, evidenceIDs)
+	successorProfile, profileBound, err := planningRecoveryProfile(profileSnapshot.Profile, terminal.WorkProfile, service.planning, recoveryCondition, deadline, evidenceIDs)
 	if err != nil {
 		return InvocationStatus{}, err
 	}
@@ -191,14 +191,14 @@ func recoverablePlanningTerminal(invocation kernel.WorkInvocation) bool {
 	}
 }
 
-func planningRecoveryProfile(current kernel.WorkRiskProfile, prior kernel.WorkProfileBinding, condition kernel.Digest, deadline time.Time, evidenceIDs []kernel.UUIDv7) (kernel.WorkRiskProfile, bool, error) {
-	if !current.Valid() || !prior.Valid() || !condition.Valid() || deadline.IsZero() {
+func planningRecoveryProfile(current kernel.WorkRiskProfile, prior kernel.WorkProfileBinding, planning ProductionPlanning, condition kernel.Digest, deadline time.Time, evidenceIDs []kernel.UUIDv7) (kernel.WorkRiskProfile, bool, error) {
+	if !current.Valid() || !prior.Valid() || planning.PolicyRevision == 0 || !planning.ClassificationPolicyDigest.Valid() || !planning.PromotionPolicyDigest.Valid() || !planning.VerificationTopologyDigest.Valid() || !condition.Valid() || deadline.IsZero() {
 		return kernel.WorkRiskProfile{}, false, organization.ErrInvalidFeature
 	}
 	targetID := deterministicOperationalUUID("planning-recovery-profile", string(prior.ProfileID), string(condition))
 	targetRevision := prior.ProfileRevision + 1
 	if current.Binding() != prior {
-		if current.ProfileID != targetID || current.ProfileRevision != targetRevision || current.SupersedesProfileID == nil || *current.SupersedesProfileID != prior.ProfileID || !current.Budgets.DeadlineAt.Equal(deadline) || !containsEveryUUID(current.ClassificationEvidenceIDs, evidenceIDs) {
+		if current.ProfileID != targetID || current.ProfileRevision != targetRevision || current.SupersedesProfileID == nil || *current.SupersedesProfileID != prior.ProfileID || current.ClassificationPolicyRevision != planning.PolicyRevision || current.ClassificationPolicyDigest != planning.ClassificationPolicyDigest || current.PromotionPolicyRevision != planning.PolicyRevision || current.PromotionPolicyDigest != planning.PromotionPolicyDigest || current.VerificationTopologyDigest != planning.VerificationTopologyDigest || !current.Budgets.DeadlineAt.Equal(deadline) || !containsEveryUUID(current.ClassificationEvidenceIDs, evidenceIDs) {
 			return kernel.WorkRiskProfile{}, false, organization.ErrInvalidFeature
 		}
 		claimedDigest := current.ProfileDigest
@@ -214,6 +214,11 @@ func planningRecoveryProfile(current kernel.WorkRiskProfile, prior kernel.WorkPr
 	next.ProfileID = targetID
 	next.ProfileRevision = targetRevision
 	next.Budgets.DeadlineAt = deadline
+	next.ClassificationPolicyRevision = planning.PolicyRevision
+	next.ClassificationPolicyDigest = planning.ClassificationPolicyDigest
+	next.PromotionPolicyRevision = planning.PolicyRevision
+	next.PromotionPolicyDigest = planning.PromotionPolicyDigest
+	next.VerificationTopologyDigest = planning.VerificationTopologyDigest
 	priorID := prior.ProfileID
 	next.SupersedesProfileID = &priorID
 	next.ClassificationEvidenceIDs = append(next.ClassificationEvidenceIDs, evidenceIDs...)
@@ -240,6 +245,10 @@ func (service *ProductionService) amendPlanningRecoveryBudget(ctx context.Contex
 	deadline := request.DeadlineAt.UTC()
 	targetRevision := terminal.AdmissionPolicyRevision + 1
 	targetDigest := digestBytes([]byte("planning-recovery-budget\x00" + string(terminal.AdmissionPolicyDigest) + "\x00" + string(condition) + "\x00" + deadline.Format(time.RFC3339Nano)))
+	if targetRevision <= service.planning.PolicyRevision {
+		targetRevision = service.planning.PolicyRevision
+		targetDigest = service.planning.BudgetPolicyDigest
+	}
 	if account.PolicyRevision == targetRevision && account.PolicyDigest == targetDigest && account.DeadlineAt.Equal(deadline) {
 		return account, nil
 	}
@@ -290,7 +299,7 @@ func (service *ProductionService) rebindPlanningRecoveryAssignment(ctx context.C
 	if !found || !assignment.Valid() || !profileFound || !profileSnapshot.Valid() || profileSnapshot.Profile.Binding() != task.profile.Binding() || assignment.TaskID != task.plan.ID || assignment.SelectedActorFQN != owner.ActorFQN || assignment.ModelProfileDigest != profile.ModelProfileDigest || assignment.RuntimeIdentityDigest != profile.RuntimeIdentityDigest {
 		return organization.ErrInvalidFeature
 	}
-	if assignment.WorkProfile == task.profile.Binding() && assignment.SelectedExecution() == owner.Execution {
+	if assignment.WorkProfile == task.profile.Binding() && assignment.SelectedExecution() == owner.Execution && assignment.SelectionPolicyRevision == service.planning.PolicyRevision && assignment.SelectionPolicyDigest == service.planning.SelectionPolicyDigest {
 		return nil
 	}
 	evidence, err := evidenceRefsForIDs(snapshot, assignment.EvidenceIDs)
@@ -303,8 +312,8 @@ func (service *ProductionService) rebindPlanningRecoveryAssignment(ctx context.C
 		"selected_decision_route": assignment.SelectedDecisionRoute, "selected_actor_fqn": owner.ActorFQN,
 		"selected_execution_id": owner.Execution.ExecutionID, "selected_fencing_epoch": owner.Execution.FencingEpoch,
 		"model_profile_digest": assignment.ModelProfileDigest, "runtime_identity_digest": assignment.RuntimeIdentityDigest,
-		"qualification": assignment.Qualification, "selection_policy_revision": assignment.SelectionPolicyRevision,
-		"selection_policy_digest": assignment.SelectionPolicyDigest, "hard_constraint_results": assignment.HardConstraintResults,
+		"qualification": assignment.Qualification, "selection_policy_revision": service.planning.PolicyRevision,
+		"selection_policy_digest": service.planning.SelectionPolicyDigest, "hard_constraint_results": assignment.HardConstraintResults,
 		"selection_reasons": assignment.SelectionReasons, "evidence_ids": assignment.EvidenceIDs,
 	}
 	key := "planning-recovery-assignment-" + string(owner.Execution.ExecutionID) + "-" + string(task.profile.ProfileID)

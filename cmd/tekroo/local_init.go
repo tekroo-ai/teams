@@ -257,12 +257,12 @@ func initializeLocalDeployment(ctx context.Context, options localInitOptions) (r
 		AuthorizationPolicyFile: policyPath, ProvenanceFile: filepath.Join(configRoot, "provenance.json"), EvidenceRoot: evidenceRoot,
 		ServiceAuthority: kernel.PrincipalRef{Kind: kernel.PrincipalService, ID: "teams-operational-runtime"}, ExpiryAuthority: kernel.PrincipalRef{Kind: kernel.PrincipalPolicy, ID: "teams-admission-policy"},
 		Workspaces: workspaces, Profiles: profiles,
-		Execution:    operationalruntime.ProductionExecution{ConsumerID: "tekrood-local-production", OperationTimeout: "20m", MaximumBriefBytes: 1 << 20, PolicyRevision: 1},
-		Evidence:     operationalruntime.ProductionEvidence{PolicyRevision: 1, ProducingVersion: "teams-v4-phase8", RetentionPolicy: "local-production"},
+		Execution:    operationalruntime.ProductionExecution{ConsumerID: "tekrood-local-production", OperationTimeout: "20m", MaximumBriefBytes: 1 << 20, PolicyRevision: 2},
+		Evidence:     operationalruntime.ProductionEvidence{PolicyRevision: 2, ProducingVersion: "teams-v4-phase8", RetentionPolicy: "local-production"},
 		Worker:       operationalruntime.ProductionWorker{LeaseDuration: "90s", ReconciliationInterval: "250ms", MaximumReconciliations: 160, MaximumConcurrentInvocations: 8, LeaseOperationTimeout: "5s"},
 		Projection:   operationalruntime.ProductionProjection{Interval: "100ms", OperationTimeout: "5s"},
 		Organization: operationalruntime.ProductionOrganization{ManifestFile: teamPath, ManifestDigest: manifestDigest, Publishers: []operationalruntime.ProductionPublisher{{KeyID: localBootstrapPublisher, PublicKeyFile: filepath.Join(deploymentTeamRoot, "publisher.pub")}, {KeyID: localGroundingPublisher, PublicKeyFile: filepath.Join(deploymentTeamRoot, "role-grounding-publisher.pub")}}, ReconciliationInterval: "1s", MaximumRestarts: 3, MaximumDeliveryAttempts: 3},
-		Planning:     operationalruntime.ProductionPlanning{PolicyRevision: 1, ClassificationPolicyDigest: labelDigest("classification-policy-v1"), PromotionPolicyDigest: labelDigest("promotion-policy-v1"), VerificationTopologyDigest: labelDigest("verification-topology-v1"), SelectionPolicyDigest: labelDigest("selection-policy-v1"), BudgetPolicyDigest: labelDigest("budget-policy-v1"), RequiredGateIDs: []string{"go-test"}, Deadline: "2h"},
+		Planning:     operationalruntime.ProductionPlanning{PolicyRevision: 2, ClassificationPolicyDigest: labelDigest("classification-policy-v2"), PromotionPolicyDigest: labelDigest("promotion-policy-v2"), VerificationTopologyDigest: labelDigest("verification-topology-v2"), SelectionPolicyDigest: labelDigest("selection-policy-v2"), BudgetPolicyDigest: labelDigest("budget-policy-v2"), RequiredGateIDs: []string{"go-test"}, Deadline: "2h"},
 		Git:          &operationalruntime.ProductionGitConfig{Binary: "git", AllowedRoot: filepath.Dir(options.RepositoryRoot), OperationTimeout: "2m"},
 	}
 	provenance, err := localProductionProvenance(options, config, policy, manifest, baseline, tree)
@@ -349,7 +349,7 @@ func localProductionPolicy(manifest organization.TeamManifest) kernel.Authorizat
 	for index := range grants {
 		grants[index].GrantDigest = labelDigest(fmt.Sprintf("grant:%d:%s:%s", index, grants[index].Grantee.Kind, grants[index].Grantee.ID))
 	}
-	return kernel.AuthorizationPolicy{PolicyDigest: labelDigest("teams-local-production-policy-v1"), Revision: 1, Grants: grants}
+	return kernel.AuthorizationPolicy{PolicyDigest: labelDigest("teams-local-production-policy-v2"), Revision: 2, Grants: grants}
 }
 
 func localProductionProvenance(options localInitOptions, config operationalruntime.ProductionConfig, policy kernel.AuthorizationPolicy, manifest organization.TeamManifest, commit, tree string) (kernel.ProvenanceBasis, error) {

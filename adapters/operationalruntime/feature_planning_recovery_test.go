@@ -56,15 +56,16 @@ func TestPlanningRecoveryProfileSupersedesDeadlineAndIsIdempotent(t *testing.T) 
 	deadline := tracked.profile.Budgets.DeadlineAt.Add(time.Hour)
 	evidenceID := kernel.UUIDv7("00000000-0000-7000-8000-000000000304")
 	condition := repeatedDigest('c')
+	planning := ProductionPlanning{PolicyRevision: 2, ClassificationPolicyDigest: repeatedDigest('d'), PromotionPolicyDigest: repeatedDigest('e'), VerificationTopologyDigest: repeatedDigest('f')}
 
-	successor, alreadyBound, err := planningRecoveryProfile(tracked.profile, prior, condition, deadline, []kernel.UUIDv7{evidenceID})
+	successor, alreadyBound, err := planningRecoveryProfile(tracked.profile, prior, planning, condition, deadline, []kernel.UUIDv7{evidenceID})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if alreadyBound || successor.ProfileRevision != prior.ProfileRevision+1 || successor.ProfileID == prior.ProfileID || successor.SupersedesProfileID == nil || *successor.SupersedesProfileID != prior.ProfileID || !successor.Budgets.DeadlineAt.Equal(deadline) || !containsEveryUUID(successor.ClassificationEvidenceIDs, []kernel.UUIDv7{evidenceID}) {
 		t.Fatalf("successor = %#v alreadyBound=%t", successor, alreadyBound)
 	}
-	reloaded, alreadyBound, err := planningRecoveryProfile(successor, prior, condition, deadline, []kernel.UUIDv7{evidenceID})
+	reloaded, alreadyBound, err := planningRecoveryProfile(successor, prior, planning, condition, deadline, []kernel.UUIDv7{evidenceID})
 	if err != nil || !alreadyBound || reloaded.ProfileDigest != successor.ProfileDigest {
 		t.Fatalf("idempotent successor = %#v alreadyBound=%t err=%v", reloaded, alreadyBound, err)
 	}
