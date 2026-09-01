@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -301,7 +302,7 @@ func (client *Client) Start(ctx context.Context, brief application.ExecutionBrie
 			return application.ExternalExecutionObservation{}, ErrProtocol
 		}
 	}
-	if status != http.StatusOK || !conversationMatches(info, conversationID, prepared.workspace.WorkingDirectory, requestDigest) {
+	if status != http.StatusOK || !conversationMatches(info, conversationID, prepared.workspace.WorkingDirectory, requestDigest) || !conversationAgentMatches(info, prepared.profile.AgentSettings) {
 		return application.ExternalExecutionObservation{}, ErrProtocol
 	}
 	events, err := client.events(ctx, conversationID)
@@ -361,9 +362,14 @@ func (client *Client) createOrForkConversation(ctx context.Context, brief applic
 	if status != http.StatusOK || prior.ID != priorID || prior.Workspace.Kind != "LocalWorkspace" || prior.Workspace.WorkingDir != prepared.workspace.WorkingDirectory || prior.Tags["tekrooinvocation"] != priorID || !kernel.Digest(prior.Tags["tekroorequest"]).Valid() || executionStillActive(prior.ExecutionStatus) {
 		return 0, nil, false, ErrProtocol
 	}
+	var agentSettings any
+	if json.Unmarshal(prepared.profile.AgentSettings, &agentSettings) != nil {
+		return 0, nil, false, ErrProtocol
+	}
 	payload := map[string]any{
-		"id":            brief.InvocationID,
-		"reset_metrics": true,
+		"id":             brief.InvocationID,
+		"reset_metrics":  true,
+		"agent_settings": agentSettings,
 		"tags": map[string]string{
 			"tekrooinvocation": string(brief.InvocationID),
 			"tekroorequest":    string(prepared.requestDigest),
@@ -386,7 +392,7 @@ func (client *Client) ReconcileStart(ctx context.Context, brief application.Exec
 	if status == http.StatusNotFound {
 		return absentObservation(brief, requestDigest), nil
 	}
-	if status != http.StatusOK || !conversationMatches(info, conversationID, prepared.workspace.WorkingDirectory, requestDigest) {
+	if status != http.StatusOK || !conversationMatches(info, conversationID, prepared.workspace.WorkingDirectory, requestDigest) || !conversationAgentMatches(info, prepared.profile.AgentSettings) {
 		return application.ExternalExecutionObservation{}, ErrProtocol
 	}
 	events, err := client.events(ctx, conversationID)
@@ -405,7 +411,7 @@ func (client *Client) Inspect(ctx context.Context, brief application.ExecutionBr
 		return application.ExternalExecutionObservation{}, ErrProtocol
 	}
 	info, status, err := client.getConversation(ctx, conversationID)
-	if err != nil || status != http.StatusOK || !conversationMatches(info, conversationID, prepared.workspace.WorkingDirectory, requestDigest) {
+	if err != nil || status != http.StatusOK || !conversationMatches(info, conversationID, prepared.workspace.WorkingDirectory, requestDigest) || !conversationAgentMatches(info, prepared.profile.AgentSettings) {
 		return application.ExternalExecutionObservation{}, ErrProtocol
 	}
 	events, err := client.events(ctx, conversationID)
@@ -920,7 +926,35 @@ type conversationInfo struct {
 		Kind       string `json:"kind"`
 		WorkingDir string `json:"working_dir"`
 	} `json:"workspace"`
-	Tags map[string]string `json:"tags"`
+	Agent conversationAgentSettings `json:"agent"`
+	Tags  map[string]string         `json:"tags"`
+}
+
+type conversationAgentSettings struct {
+	Kind string `json:"kind"`
+	LLM  struct {
+		Model                 string   `json:"model"`
+		ModelCanonicalName    string   `json:"model_canonical_name"`
+		BaseURL               string   `json:"base_url"`
+		APIMode               string   `json:"api_mode"`
+		NativeToolCalling     *bool    `json:"native_tool_calling"`
+		ForceStringSerializer *bool    `json:"force_string_serializer"`
+		Stream                *bool    `json:"stream"`
+		Temperature           *float64 `json:"temperature"`
+		MaxOutputTokens       *int     `json:"max_output_tokens"`
+		NumRetries            *int     `json:"num_retries"`
+		Timeout               *float64 `json:"timeout"`
+		LiteLLMExtraBody      struct {
+			ChatTemplateKwargs struct {
+				EnableThinking *bool `json:"enable_thinking"`
+			} `json:"chat_template_kwargs"`
+		} `json:"litellm_extra_body"`
+	} `json:"llm"`
+}
+
+func conversationAgentMatches(info conversationInfo, expectedRaw json.RawMessage) bool {
+	var expected conversationAgentSettings
+	return json.Unmarshal(expectedRaw, &expected) == nil && reflect.DeepEqual(info.Agent, expected)
 }
 
 func (client *Client) getConversation(ctx context.Context, conversationID string) (conversationInfo, int, error) {

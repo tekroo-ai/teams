@@ -74,6 +74,21 @@ func TestOpenHandsIterationLimitPreservesExplicitBoundsAndEncodesUnbounded(t *te
 	}
 }
 
+func TestConversationAgentMatchRejectsInheritedStaleTimeout(t *testing.T) {
+	var info conversationInfo
+	if err := json.Unmarshal(mustJSON(map[string]any{"agent": testConversationAgent()}), &info); err != nil {
+		t.Fatal(err)
+	}
+	if !conversationAgentMatches(info, qualifiedSMAAgentSettings) {
+		t.Fatal("qualified agent settings did not match")
+	}
+	stale := float64(300)
+	info.Agent.LLM.Timeout = &stale
+	if conversationAgentMatches(info, qualifiedSMAAgentSettings) {
+		t.Fatal("stale inherited timeout matched the qualified profile")
+	}
+}
+
 func TestClientAcceptsFinishObservationAsFinalOutput(t *testing.T) {
 	brief, digest := openHandsTestBrief(t)
 	workspace := filepath.Join(t.TempDir(), "workspace")
@@ -567,7 +582,7 @@ func (state *progressGuardServerState) serveHTTP(writer http.ResponseWriter, req
 		} else if state.interruptCalls > 0 {
 			status = "paused"
 		}
-		writeJSON(writer, map[string]any{"id": conversationID, "execution_status": status, "created_at": "2026-08-31T12:00:00Z", "workspace": map[string]any{"kind": "LocalWorkspace", "working_dir": state.workspace}, "tags": map[string]string{"tekrooinvocation": conversationID, "tekroorequest": testRequestDigest(state.prompt)}})
+		writeJSON(writer, map[string]any{"id": conversationID, "execution_status": status, "created_at": "2026-08-31T12:00:00Z", "workspace": map[string]any{"kind": "LocalWorkspace", "working_dir": state.workspace}, "agent": testConversationAgent(), "tags": map[string]string{"tekrooinvocation": conversationID, "tekroorequest": testRequestDigest(state.prompt)}})
 	case request.Method == http.MethodGet && request.URL.Path == "/api/conversations/"+conversationID+"/events/search":
 		writeJSON(writer, map[string]any{"items": state.events, "next_page_id": nil})
 	case request.Method == http.MethodPost && request.URL.Path == "/api/conversations/"+conversationID+"/interrupt":
@@ -649,17 +664,20 @@ func (state *retryForkServerState) serveHTTP(writer http.ResponseWriter, request
 		if state.submitted {
 			status = "finished"
 		}
-		writeJSON(writer, map[string]any{"id": state.currentID, "execution_status": status, "created_at": "2026-08-31T12:00:00Z", "forked_from_conversation_id": state.priorID, "workspace": map[string]any{"kind": "LocalWorkspace", "working_dir": state.workspace}, "tags": map[string]string{"tekrooinvocation": state.currentID, "tekroorequest": state.requestDigest}})
+		writeJSON(writer, map[string]any{"id": state.currentID, "execution_status": status, "created_at": "2026-08-31T12:00:00Z", "forked_from_conversation_id": state.priorID, "workspace": map[string]any{"kind": "LocalWorkspace", "working_dir": state.workspace}, "agent": testConversationAgent(), "tags": map[string]string{"tekrooinvocation": state.currentID, "tekroorequest": state.requestDigest}})
 	case request.Method == http.MethodGet && request.URL.Path == "/api/conversations/"+state.priorID:
 		writeJSON(writer, map[string]any{"id": state.priorID, "execution_status": "paused", "created_at": "2026-08-31T11:00:00Z", "workspace": map[string]any{"kind": "LocalWorkspace", "working_dir": state.workspace}, "tags": map[string]string{"tekrooinvocation": state.priorID, "tekroorequest": strings.Repeat("a", 64)}})
 	case request.Method == http.MethodPost && request.URL.Path == "/api/conversations/"+state.priorID+"/fork":
 		state.forkCalls++
 		var payload struct {
-			ID           string            `json:"id"`
-			ResetMetrics bool              `json:"reset_metrics"`
-			Tags         map[string]string `json:"tags"`
+			ID            string            `json:"id"`
+			ResetMetrics  bool              `json:"reset_metrics"`
+			AgentSettings map[string]any    `json:"agent_settings"`
+			Tags          map[string]string `json:"tags"`
 		}
-		if json.NewDecoder(request.Body).Decode(&payload) != nil || payload.ID != state.currentID || !payload.ResetMetrics || payload.Tags["tekrooinvocation"] != state.currentID || payload.Tags["tekroorequest"] != state.requestDigest {
+		decodeErr := json.NewDecoder(request.Body).Decode(&payload)
+		llm, _ := payload.AgentSettings["llm"].(map[string]any)
+		if decodeErr != nil || payload.ID != state.currentID || !payload.ResetMetrics || payload.Tags["tekrooinvocation"] != state.currentID || payload.Tags["tekroorequest"] != state.requestDigest || llm["timeout"] != float64(1200) {
 			state.t.Errorf("fork payload = %#v", payload)
 		}
 		state.forked = true
@@ -708,7 +726,7 @@ func (state *openHandsServerState) serveHTTP(writer http.ResponseWriter, request
 		if state.submitted {
 			status = "finished"
 		}
-		writeJSON(writer, map[string]any{"id": conversationID, "execution_status": status, "created_at": "2026-08-31T12:00:00Z", "updated_at": "2026-08-31T12:00:01Z", "workspace": map[string]any{"kind": "LocalWorkspace", "working_dir": state.workspace}, "tags": map[string]string{"tekrooinvocation": conversationID, "tekroorequest": testRequestDigest(state.prompt)}})
+		writeJSON(writer, map[string]any{"id": conversationID, "execution_status": status, "created_at": "2026-08-31T12:00:00Z", "updated_at": "2026-08-31T12:00:01Z", "workspace": map[string]any{"kind": "LocalWorkspace", "working_dir": state.workspace}, "agent": testConversationAgent(), "tags": map[string]string{"tekrooinvocation": conversationID, "tekroorequest": testRequestDigest(state.prompt)}})
 	case request.Method == http.MethodPost && request.URL.Path == "/api/conversations/"+conversationID+"/events":
 		state.submitCalls++
 		var payload struct {
@@ -750,6 +768,14 @@ func finishEvent(id, text string) map[string]any {
 
 func event(id, kind, source, text string) map[string]any {
 	return map[string]any{"id": id, "kind": kind, "source": source, "timestamp": "2026-08-31T12:00:01Z", "llm_message": map[string]any{"content": []map[string]any{{"type": "text", "text": text}}}}
+}
+
+func testConversationAgent() any {
+	var agent any
+	if err := json.Unmarshal(qualifiedSMAAgentSettings, &agent); err != nil {
+		panic(err)
+	}
+	return agent
 }
 
 func writeJSON(writer http.ResponseWriter, value any) {
