@@ -182,6 +182,7 @@ type ExecutionBrief struct {
 	RemainingPurposeBudget uint64                      `json:"remaining_purpose_budget"`
 	DeadlineAt             time.Time                   `json:"deadline_at"`
 	CoordinationRule       string                      `json:"coordination_rule"`
+	ExecutionGuidance      []string                    `json:"execution_guidance"`
 	ResultProtocol         *ExecutionResultProtocol    `json:"result_protocol,omitempty"`
 	SemanticContext        SemanticContextRequest      `json:"semantic_context"`
 }
@@ -217,6 +218,15 @@ var semanticContextForbiddenEffects = []string{
 	"ROUTING",
 	"STORY_STATE",
 	"TASK_STATE",
+}
+
+var boundedExecutionGuidance = []string{
+	"Read and follow AGENTS.md before taking repository actions.",
+	"Use rg or rg --files for repository discovery.",
+	"Never repeat an identical read-only command unless repository state changed; when a search identifies a relevant file, inspect that file next.",
+	"Map and extend existing interfaces before adding a parallel abstraction.",
+	"Implement in cohesive increments and run focused tests after each increment.",
+	"Stay inside the authorized workspace and task scope.",
 }
 
 // SemanticContextRequest is read-only metadata supplied to the qualified
@@ -333,7 +343,8 @@ func BuildExecutionBrief(current OperationalExecutionContext, maximumBytes int) 
 		RuntimeIdentityDigest: invocation.RuntimeIdentityDigest, Scope: current.Scope.Clone(),
 		Evidence: evidence, RemainingGlobalBudget: invocation.RemainingGlobalBudget,
 		RemainingPurposeBudget: invocation.RemainingPurposeBudget, DeadlineAt: invocation.DeadlineAt,
-		CoordinationRule: evidenceOnlyCoordinationRule,
+		CoordinationRule:  evidenceOnlyCoordinationRule,
+		ExecutionGuidance: append([]string(nil), boundedExecutionGuidance...),
 	}
 	if invocation.Purpose == kernel.PurposeValidation || invocation.Purpose == kernel.PurposeReview {
 		brief.ResultProtocol = &ExecutionResultProtocol{

@@ -36,6 +36,12 @@ func TestOperationalCoordinatorExecutesOneInvocationAndNeverChainsAgentProse(t *
 	if runtime.lastBrief.CoordinationRule != evidenceOnlyCoordinationRule || runtime.lastBrief.Task.Description != "Implement the bounded feature." {
 		t.Fatalf("brief = %#v", runtime.lastBrief)
 	}
+	guidance := strings.Join(runtime.lastBrief.ExecutionGuidance, "\n")
+	for _, required := range []string{"AGENTS.md", "rg or rg --files", "Never repeat an identical read-only command", "focused tests"} {
+		if !strings.Contains(guidance, required) {
+			t.Fatalf("execution guidance omitted %q: %v", required, runtime.lastBrief.ExecutionGuidance)
+		}
+	}
 	semantic := runtime.lastBrief.SemanticContext
 	if !semantic.Valid() || semantic.Label != SemanticContextLabel || !semantic.NonAuthoritative || !semantic.NoTeamsAuthorityFallback || semantic.InvocationID != runtime.context.Invocation.ID || semantic.TaskID != runtime.context.Invocation.TaskID || semantic.StoryID != runtime.context.Specification.StoryID || semantic.OperationalScopeEventID != runtime.context.Scope.BoundEventID || semantic.AssignmentID != runtime.context.Assignment.AssignmentID || semantic.WorkspaceID != runtime.context.Scope.WorkspaceID || semantic.WorktreeID != runtime.context.Scope.WorktreeID || semantic.TaskCreatedSourceDigest != runtime.context.Specification.SourceDigest {
 		t.Fatalf("semantic context = %#v", semantic)
