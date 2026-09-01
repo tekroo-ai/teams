@@ -137,14 +137,19 @@ func (service *ProductionService) ensureFeaturePlanningTask(ctx context.Context,
 		parents = append(parents, kernel.DagParent{ParentEventID: priorHead, EdgeKind: kernel.EdgeCausal})
 	}
 	task := organization.PlannedTask{ID: taskID, StoryID: planningStoryID, Title: title, Description: description, AcceptanceCriteria: criteria, DependsOn: dependsOn, Owner: owner.ActorFQN, ModelProfile: owner.ModelProfile, DecisionRoute: profileConfig.Qualification.DecisionRoute, Purpose: purpose, Complexity: 4, Risk: organization.RiskModerate, CriticalPath: true, AttemptLimit: 3, ReviewRoundLimit: 1}
-	payload, _ := json.Marshal(map[string]any{"story_id": planningStoryID, "title": task.Title, "description": task.Description, "acceptance_criteria": task.AcceptanceCriteria, "depends_on": task.DependsOn})
-	created, err := service.submitPlannedCommand(ctx, feature, "tekroo.command.task.create", kernel.AggregateTask, task.ID, "planning-task-"+string(stage), payload, parents)
-	if err != nil {
-		return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, err
-	}
 	state, head, taskFound, err := service.Store.ReadAggregateHead(ctx, kernel.AggregateRef{Kind: kernel.AggregateTask, ID: task.ID})
-	if err != nil || !taskFound {
+	if err != nil {
 		return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, errors.Join(organization.ErrInvalidFeature, err)
+	}
+	if !taskFound {
+		payload, _ := json.Marshal(map[string]any{"story_id": planningStoryID, "title": task.Title, "description": task.Description, "acceptance_criteria": task.AcceptanceCriteria, "depends_on": task.DependsOn})
+		if _, err := service.submitPlannedCommand(ctx, feature, "tekroo.command.task.create", kernel.AggregateTask, task.ID, "planning-task-"+string(stage), payload, parents); err != nil {
+			return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, err
+		}
+		state, head, taskFound, err = service.Store.ReadAggregateHead(ctx, kernel.AggregateRef{Kind: kernel.AggregateTask, ID: task.ID})
+		if err != nil || !taskFound {
+			return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, errors.Join(organization.ErrInvalidFeature, err)
+		}
 	}
 	snapshot, err := service.Store.LoadDecision(ctx, kernel.KernelCommand{Target: kernel.AggregateRef{Kind: kernel.AggregateTask, ID: task.ID}})
 	if err != nil {
@@ -166,7 +171,7 @@ func (service *ProductionService) ensureFeaturePlanningTask(ctx context.Context,
 		return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, err
 	}
 	profile := service.workProfile(feature, task, evidenceID, deadline)
-	tracked := &trackedTask{plan: task, revision: 1, last: created.EventIDs[0], profile: profile, owner: owner}
+	tracked := &trackedTask{plan: task, revision: state.Revision, last: head, profile: profile, owner: owner}
 	if err := service.applyTaskCommand(ctx, feature, tracked, "tekroo.command.task.bind-work-profile", kernel.SchemaVersion, service.policyAuthority, profile, evidence, nil, "profile"); err != nil {
 		return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, err
 	}

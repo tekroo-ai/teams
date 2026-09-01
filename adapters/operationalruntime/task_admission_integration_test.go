@@ -202,6 +202,20 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 	if !created {
 		t.Fatal("automated feature was not created")
 	}
+	planningStory, err := service.ensureFeaturePlanningStory(contextWithTimeout(t), automated)
+	if err != nil {
+		t.Fatal(err)
+	}
+	refinementTaskID := deterministicOperationalUUID("feature-planning-task", string(automated.ID), string(stageRefinement))
+	if _, err := service.submitPlannedCommand(contextWithTimeout(t), automated, "tekroo.command.task.create", kernel.AggregateTask, refinementTaskID, "planning-task-"+string(stageRefinement), mustJSON(map[string]any{
+		"story_id":            deterministicOperationalUUID("feature-planning-story", string(automated.ID)),
+		"title":               "Refine feature request",
+		"description":         "A prior binary created this durable task with an older planning prompt.",
+		"acceptance_criteria": []string{"requirements are testable and ambiguities are explicit"},
+		"depends_on":          []kernel.UUIDv7{},
+	}), []kernel.DagParent{{ParentEventID: planningStory.EventIDs[0], EdgeKind: kernel.EdgeCausal}}); err != nil {
+		t.Fatal(err)
+	}
 	for _, expected := range []struct {
 		stage featurePlanningStage
 		next  organization.FeatureStatus
@@ -378,7 +392,7 @@ func exerciseHumanParticipation(t *testing.T, service *ProductionService, runtim
 
 func submitAutomatedFeature(t *testing.T, service *ProductionService) (organization.FeatureRequest, bool) {
 	t.Helper()
-	returnValue, created, err := service.SubmitFeature(contextWithTimeout(t), kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "principal"}, organization.FeatureRequestInput{IdempotencyKey: "phase6-automated-feature", Team: "example", Title: "Automate a bounded change", Description: "Implement one small repository change and verify it independently.", AcceptanceCriteria: []string{"the requested behavior works"}, Priority: organization.PriorityHigh, Constraints: []string{"preserve current interfaces"}, Repository: "tekroo-ai/teams", WorkspaceID: "engineering", MaximumStories: 4, MaximumTasks: 8, MaximumHops: 8})
+	returnValue, created, err := service.Features.Submit(contextWithTimeout(t), kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "principal"}, organization.FeatureRequestInput{IdempotencyKey: "phase6-automated-feature", Team: "example", Title: "Automate a bounded change", Description: "Implement one small repository change and verify it independently.", AcceptanceCriteria: []string{"the requested behavior works"}, Priority: organization.PriorityHigh, Constraints: []string{"preserve current interfaces"}, Repository: "tekroo-ai/teams", WorkspaceID: "engineering", MaximumStories: 4, MaximumTasks: 8, MaximumHops: 8})
 	if err != nil {
 		t.Fatal(err)
 	}
