@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/tekroo-ai/teams/adapters/executionruntime"
+	"github.com/tekroo-ai/teams/adapters/gitprovider"
 	"github.com/tekroo-ai/teams/adapters/mongo"
 	"github.com/tekroo-ai/teams/adapters/openhands"
 	"github.com/tekroo-ai/teams/adapters/protocol"
@@ -60,6 +61,13 @@ type ProductionConfig struct {
 	Projection              ProductionProjection      `json:"projection"`
 	Organization            ProductionOrganization    `json:"organization"`
 	Planning                ProductionPlanning        `json:"planning"`
+	Git                     *ProductionGitConfig      `json:"git,omitempty"`
+}
+
+type ProductionGitConfig struct {
+	Binary           string `json:"binary"`
+	AllowedRoot      string `json:"allowed_root"`
+	OperationTimeout string `json:"operation_timeout"`
 }
 
 type ProductionMongoConfig struct {
@@ -186,6 +194,7 @@ type resolvedProductionConfig struct {
 	team                  organization.LoadedTeam
 	roleReconciliation    time.Duration
 	planningDeadline      time.Duration
+	gitOperationTimeout   time.Duration
 	planning              ProductionPlanning
 	profilesByModel       map[kernel.Digest]ProductionProfile
 	workspacesByID        map[string]ProductionWorkspace
@@ -227,6 +236,9 @@ func LoadProductionConfig(path string) (ProductionConfig, error) {
 	}
 	for index := range config.Workspaces {
 		config.Workspaces[index].WorkingDirectory = absoluteFrom(base, config.Workspaces[index].WorkingDirectory)
+	}
+	if config.Git != nil {
+		config.Git.AllowedRoot = absoluteFrom(base, config.Git.AllowedRoot)
 	}
 	if _, err := resolveProductionConfig(config); err != nil {
 		return ProductionConfig{}, err
@@ -322,6 +334,16 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 	if err != nil || config.Planning.PolicyRevision == 0 || !config.Planning.ClassificationPolicyDigest.Valid() || !config.Planning.PromotionPolicyDigest.Valid() || !config.Planning.VerificationTopologyDigest.Valid() || !config.Planning.SelectionPolicyDigest.Valid() || !config.Planning.BudgetPolicyDigest.Valid() || len(config.Planning.RequiredGateIDs) == 0 || len(config.Planning.RequiredGateIDs) > 32 {
 		return resolvedProductionConfig{}, invalidConfig("planning policy is invalid")
 	}
+	gitOperationTimeout := time.Duration(0)
+	if config.Git != nil {
+		gitOperationTimeout, err = positiveDuration("git.operation_timeout", config.Git.OperationTimeout)
+		if err != nil || !filepath.IsAbs(config.Git.AllowedRoot) {
+			return resolvedProductionConfig{}, invalidConfig("Git release-provider configuration is invalid")
+		}
+		if _, providerErr := gitprovider.New(gitprovider.Config{GitBinary: config.Git.Binary, AllowedRoot: config.Git.AllowedRoot, OperationTimeout: gitOperationTimeout}); providerErr != nil {
+			return resolvedProductionConfig{}, invalidConfig("Git release-provider root or binary is invalid")
+		}
+	}
 	if config.OpenHands.MaximumPages == 0 || config.OpenHands.MaximumPages > 1000 || config.OpenHands.MaximumEvidenceBytes <= 0 || config.OpenHands.MaximumEvidenceBytes > 16<<20 || config.Execution.ConsumerID == "" || len(config.Execution.ConsumerID) > 256 || config.Execution.MaximumBriefBytes <= 0 || config.Execution.MaximumBriefBytes > 1<<20 || config.Execution.PolicyRevision == 0 || config.Evidence.PolicyRevision == 0 || config.Evidence.ProducingVersion == "" || config.Evidence.RetentionPolicy == "" || config.Worker.MaximumReconciliations == 0 || config.Worker.MaximumConcurrentInvocations == 0 || config.Worker.MaximumConcurrentInvocations > 64 || reconciliation >= leaseDuration {
 		return resolvedProductionConfig{}, invalidConfig("execution, evidence, OpenHands, or worker limits are invalid")
 	}
@@ -377,7 +399,7 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 	if err := readStrictJSONFile(config.ProvenanceFile, &provenance); err != nil || !provenance.Valid() || provenance.PolicyDigest != policy.PolicyDigest || provenance.PolicyRevision != policy.Revision {
 		return resolvedProductionConfig{}, invalidConfig("provenance file is invalid or does not bind the authorization policy")
 	}
-	return resolvedProductionConfig{ProductionConfig: config, mongoURI: mongoURI, sessionAPIKey: sessionKey, operatorBearerToken: operatorToken, humanCredentials: humanCredentials, authorizationPolicy: policy, provenance: provenance, requestTimeout: requestTimeout, pollInterval: pollInterval, operationTimeout: operationTimeout, leaseDuration: leaseDuration, reconciliation: reconciliation, leaseOperationTimeout: leaseOperationTimeout, projectionInterval: projectionInterval, projectionTimeout: projectionTimeout, operatorTimeout: operatorTimeout, team: team, roleReconciliation: roleReconciliation, planningDeadline: planningDeadline}, nil
+	return resolvedProductionConfig{ProductionConfig: config, mongoURI: mongoURI, sessionAPIKey: sessionKey, operatorBearerToken: operatorToken, humanCredentials: humanCredentials, authorizationPolicy: policy, provenance: provenance, requestTimeout: requestTimeout, pollInterval: pollInterval, operationTimeout: operationTimeout, leaseDuration: leaseDuration, reconciliation: reconciliation, leaseOperationTimeout: leaseOperationTimeout, projectionInterval: projectionInterval, projectionTimeout: projectionTimeout, operatorTimeout: operatorTimeout, team: team, roleReconciliation: roleReconciliation, planningDeadline: planningDeadline, gitOperationTimeout: gitOperationTimeout}, nil
 }
 
 // ProductionService owns the Mongo store, assembled runtime, and lifecycle
@@ -391,6 +413,7 @@ type ProductionService struct {
 	MessageBus  *organization.MessageBus
 	RoleInbox   *organization.RoleInbox
 	Features    *organization.FeatureCoordinator
+	Releases    *application.ReleaseCoordinator
 
 	projectionInterval     time.Duration
 	projectionTimeout      time.Duration
@@ -508,6 +531,19 @@ func NewProductionService(ctx context.Context, config ProductionConfig) (*Produc
 		return fail(err)
 	}
 	service.Features = features
+	if config.Git != nil {
+		provider, providerErr := gitprovider.New(gitprovider.Config{GitBinary: config.Git.Binary, AllowedRoot: config.Git.AllowedRoot, OperationTimeout: resolved.gitOperationTimeout})
+		if providerErr != nil {
+			_ = service.Close(ctx)
+			return nil, providerErr
+		}
+		releases, releaseErr := application.NewReleaseCoordinator(runtime, provider, application.ReleaseCoordinatorPolicy{OperationTimeout: resolved.gitOperationTimeout})
+		if releaseErr != nil {
+			_ = service.Close(ctx)
+			return nil, releaseErr
+		}
+		service.Releases = releases
+	}
 	return service, nil
 }
 

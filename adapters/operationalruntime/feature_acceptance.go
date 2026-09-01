@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"sort"
 
+	"github.com/tekroo-ai/teams/application"
 	"github.com/tekroo-ai/teams/kernel"
 	"github.com/tekroo-ai/teams/organization"
 )
@@ -14,15 +16,23 @@ import (
 // completion and acceptance. The exact human who submitted the feature remains
 // the release/acceptance authority; model output is evidence, never authority.
 func (service *ProductionService) AcceptFeature(ctx context.Context, featureID kernel.UUIDv7, expectedRevision uint64, principal kernel.PrincipalRef, noReleaseReason string) (organization.FeatureRequest, error) {
-	if service == nil || service.Features == nil || principal.Kind != kernel.PrincipalHuman || !principal.Valid() || noReleaseReason == "" || len(noReleaseReason) > 4096 {
+	return service.AcceptFeatureWithRelease(ctx, featureID, principal, organization.FeatureAcceptanceInput{ExpectedRevision: expectedRevision, Mode: organization.FeatureAcceptanceNoRelease, NoReleaseReason: noReleaseReason})
+}
+
+func (service *ProductionService) AcceptFeatureWithRelease(ctx context.Context, featureID kernel.UUIDv7, principal kernel.PrincipalRef, input organization.FeatureAcceptanceInput) (organization.FeatureRequest, error) {
+	if service == nil || service.Features == nil || principal.Kind != kernel.PrincipalHuman || !principal.Valid() {
 		return organization.FeatureRequest{}, organization.ErrInvalidFeature
 	}
 	feature, found, err := service.ReadFeature(ctx, featureID)
 	if err != nil || !found {
 		return organization.FeatureRequest{}, errors.Join(organization.ErrFeatureNotFound, err)
 	}
-	if feature.Revision != expectedRevision || feature.Status != organization.FeatureAwaitingAcceptance || feature.Acceptance == nil || feature.Plan == nil || feature.SubmittedBy != principal {
+	if feature.Revision != input.ExpectedRevision || feature.Status != organization.FeatureAwaitingAcceptance || feature.Acceptance == nil || feature.Plan == nil || feature.SubmittedBy != principal || input.Validate(feature.Plan.Stories) != nil {
 		return organization.FeatureRequest{}, organization.ErrFeatureRevisionConflict
+	}
+	codeReleases := make(map[kernel.UUIDv7]organization.StoryCodeRelease, len(input.CodeReleases))
+	for _, release := range input.CodeReleases {
+		codeReleases[release.StoryID] = release
 	}
 	acceptanceTask, invocation, validators, snapshot, err := service.featureAcceptanceEvidence(ctx, feature)
 	if err != nil {
@@ -30,9 +40,14 @@ func (service *ProductionService) AcceptFeature(ctx context.Context, featureID k
 	}
 	releasePlanIDs := make([]kernel.UUIDv7, 0, len(feature.Plan.Stories))
 	for _, story := range feature.Plan.Stories {
-		releasePlanID, acceptErr := service.completeAndAcceptFeatureStory(ctx, feature, story, acceptanceTask, invocation, validators, snapshot, principal, noReleaseReason)
+		var codeRelease *organization.StoryCodeRelease
+		if input.Mode == organization.FeatureAcceptanceCode {
+			value := codeReleases[story.ID]
+			codeRelease = &value
+		}
+		releasePlanID, acceptErr := service.completeAndAcceptFeatureStory(ctx, feature, story, acceptanceTask, invocation, validators, snapshot, principal, input.NoReleaseReason, codeRelease)
 		if acceptErr != nil {
-			return organization.FeatureRequest{}, acceptErr
+			return organization.FeatureRequest{}, fmt.Errorf("accept story %s: %w", story.ID, acceptErr)
 		}
 		releasePlanIDs = append(releasePlanIDs, releasePlanID)
 	}
@@ -81,7 +96,7 @@ func (service *ProductionService) featureAcceptanceEvidence(ctx context.Context,
 	return acceptanceTask, invocation, validators, snapshot, nil
 }
 
-func (service *ProductionService) completeAndAcceptFeatureStory(ctx context.Context, feature organization.FeatureRequest, story organization.PlannedStory, acceptanceTask organization.PlannedTask, acceptance kernel.WorkInvocation, validators []kernel.WorkInvocation, snapshot kernel.Snapshot, principal kernel.PrincipalRef, noReleaseReason string) (kernel.UUIDv7, error) {
+func (service *ProductionService) completeAndAcceptFeatureStory(ctx context.Context, feature organization.FeatureRequest, story organization.PlannedStory, acceptanceTask organization.PlannedTask, acceptance kernel.WorkInvocation, validators []kernel.WorkInvocation, snapshot kernel.Snapshot, principal kernel.PrincipalRef, noReleaseReason string, codeRelease *organization.StoryCodeRelease) (kernel.UUIDv7, error) {
 	storyRef := kernel.AggregateRef{Kind: kernel.AggregateStory, ID: story.ID}
 	state, _, found, err := service.Store.ReadAggregateHead(ctx, storyRef)
 	if err != nil || !found || state.Phase != kernel.PhaseActive || acceptance.OutputDigest == nil {
@@ -160,6 +175,9 @@ func (service *ProductionService) completeAndAcceptFeatureStory(ctx context.Cont
 	if err != nil {
 		return "", err
 	}
+	if codeRelease != nil {
+		return service.executeFeatureCodeRelease(ctx, feature, story, state.Revision, principal, *acceptance.OutputDigest, approved.EventIDs[0], evidence, *codeRelease)
+	}
 	releasePlanID := deterministicOperationalUUID("release-plan", string(feature.ID), string(story.ID), string(*acceptance.OutputDigest))
 	planDigest := digestBytes([]byte(string(feature.ID) + "\x00" + string(story.ID) + "\x00NO_RELEASE_REQUIRED\x00" + string(*acceptance.OutputDigest)))
 	releasePayload := mustJSON(map[string]any{"release_plan_id": releasePlanID, "story_id": story.ID, "story_lifecycle_epoch": feature.LifecycleEpoch, "expected_story_revision": state.Revision + 2, "author": principal, "author_approval_event_id": approved.EventIDs[0], "author_approval_revision": state.Revision + 2, "release_policy_revision": service.planning.PolicyRevision, "plan_digest": planDigest, "evidence_ids": evidenceIDs(evidence), "release_mode": kernel.ReleaseModeNotRequired, "no_release_reason": noReleaseReason})
@@ -175,4 +193,89 @@ func (service *ProductionService) completeAndAcceptFeatureStory(ctx context.Cont
 	acceptancePayload := mustJSON(map[string]any{"acceptance_policy_revision": service.planning.PolicyRevision, "evidence_ids": evidenceIDs(evidence), "lifecycle_epoch": feature.LifecycleEpoch, "release_finalized_event_id": releaseFinalized.EventIDs[0], "release_mode": kernel.ReleaseModeNotRequired, "release_plan_id": releasePlanID, "release_plan_revision": uint64(2)})
 	_, err = service.submitDeterministicCommand(ctx, feature, "tekroo.command.story.request-acceptance", kernel.SchemaVersion, kernel.AggregateStory, story.ID, principal, state.Revision+2, acceptancePayload, []kernel.DagParent{{ParentEventID: releaseFinalized.EventIDs[0], EdgeKind: kernel.EdgeResponse}}, evidence, "story-accept-"+string(story.ID), kernel.AggregatePrecondition{Aggregate: kernel.AggregateRef{Kind: kernel.AggregateReleasePlan, ID: releasePlanID}, Expected: kernel.NewExpectedRevision(2)})
 	return releasePlanID, err
+}
+
+func (service *ProductionService) executeFeatureCodeRelease(ctx context.Context, feature organization.FeatureRequest, story organization.PlannedStory, storyRevision uint64, principal kernel.PrincipalRef, artifactDigest kernel.Digest, approvalEventID kernel.UUIDv7, evidence []kernel.EvidenceRef, specification organization.StoryCodeRelease) (kernel.UUIDv7, error) {
+	if service.Releases == nil || specification.StoryID != story.ID {
+		return "", fmt.Errorf("code release is not configured or story identity mismatched: %w", organization.ErrInvalidFeature)
+	}
+	releasePlanID := deterministicOperationalUUID("release-plan", string(feature.ID), string(story.ID), string(artifactDigest))
+	mergeID := deterministicOperationalUUID("release-merge", string(releasePlanID), specification.ChangeRef, specification.HeadCommit)
+	planBytes, err := json.Marshal(specification)
+	if err != nil {
+		return "", err
+	}
+	planDigest := digestBytes(planBytes)
+	requiredProfiles := []string{"contract-structure", "core-hermetic", "mongo-integration", "synthesized-merge"}
+	createPayload := mustJSON(map[string]any{
+		"release_plan_id": releasePlanID, "story_id": story.ID, "story_lifecycle_epoch": feature.LifecycleEpoch, "expected_story_revision": storyRevision + 2,
+		"author": principal, "author_approval_event_id": approvalEventID, "author_approval_revision": storyRevision + 2,
+		"release_policy_revision": service.planning.PolicyRevision, "plan_digest": planDigest, "evidence_ids": evidenceIDs(evidence), "release_mode": kernel.ReleaseModeCode,
+		"repository_url": specification.RepositoryURL, "base_ref": specification.BaseRef, "base_commit": specification.BaseCommit,
+		"ordered_merges": []map[string]any{{"merge_id": mergeID, "change_ref": specification.ChangeRef, "head_commit": specification.HeadCommit, "role": "story"}},
+		"merge_strategy": "FF_ONLY_ORDERED", "git_version": specification.GitVersion, "conflict_policy": "FAIL_NO_IMPROVISATION",
+		"contract_manifest": kernel.ContractIdentity, "manifest_sha256": ManifestSHA256, "required_profiles": requiredProfiles,
+		"expected_qualified_tree": specification.ExpectedQualifiedTree, "execution_round_limit": uint64(1),
+	})
+	opened, err := service.submitDeterministicCommand(ctx, feature, "tekroo.command.release-plan.create", kernel.SchemaVersion, kernel.AggregateReleasePlan, releasePlanID, service.policyAuthority, 0, createPayload, []kernel.DagParent{{ParentEventID: approvalEventID, EdgeKind: kernel.EdgeResponse}}, evidence, "release-open-"+string(story.ID), kernel.AggregatePrecondition{Aggregate: kernel.AggregateRef{Kind: kernel.AggregateStory, ID: story.ID}, Expected: kernel.NewExpectedRevision(storyRevision + 2)})
+	if err != nil {
+		return "", err
+	}
+	qualificationID := deterministicOperationalUUID("release-qualification", string(releasePlanID), string(planDigest))
+	qualificationPayload := mustJSON(map[string]any{
+		"release_plan_id": releasePlanID, "expected_release_revision": uint64(1), "plan_digest": planDigest, "qualification_id": qualificationID,
+		"contract_manifest": kernel.ContractIdentity, "manifest_sha256": ManifestSHA256, "required_profiles": requiredProfiles,
+		"gate_definition_digest": specification.GateDefinitionDigest, "toolchain_digest": specification.ToolchainDigest, "dependency_lock_digest": specification.DependencyLockDigest,
+		"qualified_base_commit": specification.BaseCommit, "ordered_head_commits": []string{specification.HeadCommit}, "qualified_tree_digest": specification.ExpectedQualifiedTree,
+		"artifact_digests": []kernel.Digest{specification.QualificationArtifactHash}, "evidence_ids": evidenceIDs(evidence),
+	})
+	_, err = service.submitDeterministicCommand(ctx, feature, "tekroo.command.release-plan.record-qualification", kernel.SchemaVersion, kernel.AggregateReleasePlan, releasePlanID, service.policyAuthority, 1, qualificationPayload, []kernel.DagParent{{ParentEventID: opened.EventIDs[0], EdgeKind: kernel.EdgeResponse}}, evidence, "release-qualify-"+string(story.ID))
+	if err != nil {
+		return "", err
+	}
+	plan, err := service.readReleasePlan(ctx, releasePlanID)
+	if err != nil || plan.State != kernel.ReleaseQualified {
+		return "", fmt.Errorf("read qualified release plan state=%s: %w", plan.State, errors.Join(organization.ErrInvalidFeature, err))
+	}
+	attemptID := deterministicOperationalUUID("release-attempt", string(releasePlanID), string(mergeID), "1")
+	providerKey := "teams:" + string(releasePlanID) + ":" + string(mergeID) + ":1"
+	result, err := service.Releases.ExecuteNext(ctx, application.ReleaseExecutionPlan{
+		Plan: plan, AttemptID: attemptID, ProviderKey: providerKey,
+		Request: application.ReleaseCommandTemplate{CommandID: deterministicOperationalUUID("release-request", string(attemptID)), Authority: service.policyAuthority, ExpectedPolicyRevision: service.provenance.PolicyRevision, IdempotencyKey: "release-request-" + string(attemptID), CorrelationID: releasePlanID, EvidenceRefs: evidence}, RequestProvenance: service.provenance,
+		Result: application.ReleaseCommandTemplate{CommandID: deterministicOperationalUUID("release-result", string(attemptID)), Authority: service.serviceAuthority, ExpectedPolicyRevision: service.provenance.PolicyRevision, IdempotencyKey: "release-result-" + string(attemptID), CorrelationID: releasePlanID, EvidenceRefs: evidence}, ResultProvenance: service.provenance,
+		ObservedAt: service.clock.Now().UTC(),
+	})
+	if err != nil || result.ResultReceipt == nil || result.ResultReceipt.OutcomeCode != kernel.OutcomeApplied || (result.Observation.Outcome != kernel.ReleaseOutcomeMerged && result.Observation.Outcome != kernel.ReleaseOutcomeAlreadyMerged) {
+		return "", fmt.Errorf("execute release outcome=%s receipt=%v: %w", result.Observation.Outcome, result.ResultReceipt, errors.Join(organization.ErrInvalidFeature, err))
+	}
+	plan, err = service.readReleasePlan(ctx, releasePlanID)
+	if err != nil || plan.State != kernel.ReleaseQualified || plan.NextMergeIndex != uint64(len(plan.OrderedMerges)) || plan.Qualification == nil || plan.ProviderTreeDigest != specification.ExpectedQualifiedTree {
+		return "", fmt.Errorf("verify release state=%s provider_tree=%s expected_tree=%s: %w", plan.State, plan.ProviderTreeDigest, specification.ExpectedQualifiedTree, errors.Join(organization.ErrInvalidFeature, err))
+	}
+	resultEventIDs := make([]kernel.UUIDv7, 0, len(plan.Results))
+	for _, releaseResult := range plan.Results {
+		resultEventIDs = append(resultEventIDs, releaseResult.ResultEventID)
+	}
+	sort.Slice(resultEventIDs, func(left, right int) bool { return resultEventIDs[left] < resultEventIDs[right] })
+	finalPayload := mustJSON(map[string]any{"release_plan_id": releasePlanID, "expected_release_revision": plan.Revision, "plan_digest": plan.PlanDigest, "release_mode": kernel.ReleaseModeCode, "terminal_status": kernel.ReleaseReadyForAcceptance, "qualification_event_id": plan.Qualification.EventID, "result_event_ids": resultEventIDs, "qualified_tree_digest": plan.Qualification.QualifiedTreeDigest, "provider_tree_digest": plan.ProviderTreeDigest, "reasons": []string{"all planned merges and the provider tree are verified"}, "evidence_ids": evidenceIDs(evidence)})
+	finalized, err := service.submitDeterministicCommand(ctx, feature, "tekroo.command.release-plan.finalize", kernel.SchemaVersion, kernel.AggregateReleasePlan, releasePlanID, service.policyAuthority, plan.Revision, finalPayload, []kernel.DagParent{{ParentEventID: resultEventIDs[len(resultEventIDs)-1], EdgeKind: kernel.EdgeResponse}}, evidence, "release-finalize-"+string(story.ID))
+	if err != nil {
+		return "", err
+	}
+	acceptancePayload := mustJSON(map[string]any{"acceptance_policy_revision": service.planning.PolicyRevision, "evidence_ids": evidenceIDs(evidence), "lifecycle_epoch": feature.LifecycleEpoch, "release_finalized_event_id": finalized.EventIDs[0], "release_mode": kernel.ReleaseModeCode, "release_plan_id": releasePlanID, "release_plan_revision": plan.Revision + 1, "qualified_tree_digest": plan.Qualification.QualifiedTreeDigest})
+	_, err = service.submitDeterministicCommand(ctx, feature, "tekroo.command.story.request-acceptance", kernel.SchemaVersion, kernel.AggregateStory, story.ID, principal, storyRevision+2, acceptancePayload, []kernel.DagParent{{ParentEventID: finalized.EventIDs[0], EdgeKind: kernel.EdgeResponse}}, evidence, "story-accept-"+string(story.ID), kernel.AggregatePrecondition{Aggregate: kernel.AggregateRef{Kind: kernel.AggregateReleasePlan, ID: releasePlanID}, Expected: kernel.NewExpectedRevision(plan.Revision + 1)})
+	return releasePlanID, err
+}
+
+func (service *ProductionService) readReleasePlan(ctx context.Context, releasePlanID kernel.UUIDv7) (kernel.ReleasePlanSnapshot, error) {
+	ref := kernel.AggregateRef{Kind: kernel.AggregateReleasePlan, ID: releasePlanID}
+	snapshot, err := service.Store.LoadDecision(ctx, kernel.KernelCommand{Target: ref})
+	if err != nil {
+		return kernel.ReleasePlanSnapshot{}, err
+	}
+	plan, found := snapshot.ReleasePlans[ref]
+	if !found || !plan.Valid() {
+		return kernel.ReleasePlanSnapshot{}, organization.ErrInvalidFeature
+	}
+	return plan, nil
 }

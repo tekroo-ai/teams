@@ -96,6 +96,9 @@ func (*fakeOrganization) ApplyFeaturePlan(context.Context, kernel.UUIDv7, uint64
 func (*fakeOrganization) AcceptFeature(context.Context, kernel.UUIDv7, uint64, kernel.PrincipalRef, string) (organization.FeatureRequest, error) {
 	return organization.FeatureRequest{}, nil
 }
+func (*fakeOrganization) AcceptFeatureWithRelease(context.Context, kernel.UUIDv7, kernel.PrincipalRef, organization.FeatureAcceptanceInput) (organization.FeatureRequest, error) {
+	return organization.FeatureRequest{}, nil
+}
 func (*fakeOrganization) RegisterHumanParticipant(context.Context, kernel.PrincipalRef, organization.HumanParticipantRegistration) (kernel.HumanParticipantSnapshot, error) {
 	return kernel.HumanParticipantSnapshot{}, nil
 }

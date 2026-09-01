@@ -41,6 +41,7 @@ type Service interface {
 	ReadFeature(context.Context, kernel.UUIDv7) (organization.FeatureRequest, bool, error)
 	ApplyFeaturePlan(context.Context, kernel.UUIDv7, uint64, organization.FeaturePlan) (organization.FeatureRequest, error)
 	AcceptFeature(context.Context, kernel.UUIDv7, uint64, kernel.PrincipalRef, string) (organization.FeatureRequest, error)
+	AcceptFeatureWithRelease(context.Context, kernel.UUIDv7, kernel.PrincipalRef, organization.FeatureAcceptanceInput) (organization.FeatureRequest, error)
 	RegisterHumanParticipant(context.Context, kernel.PrincipalRef, organization.HumanParticipantRegistration) (kernel.HumanParticipantSnapshot, error)
 	AskHuman(context.Context, kernel.PrincipalRef, organization.HumanQuestionRequest) (organization.HumanNotification, error)
 }
@@ -129,6 +130,8 @@ func (handler *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Requ
 		handler.applyFeaturePlan(writer, request, strings.TrimSuffix(strings.TrimPrefix(request.URL.Path, "/v1/features/"), "/plan"))
 	case request.Method == http.MethodPost && strings.HasPrefix(request.URL.Path, "/v1/features/") && strings.HasSuffix(request.URL.Path, "/accept"):
 		handler.acceptFeature(writer, request, strings.TrimSuffix(strings.TrimPrefix(request.URL.Path, "/v1/features/"), "/accept"))
+	case request.Method == http.MethodPost && strings.HasPrefix(request.URL.Path, "/v1/features/") && strings.HasSuffix(request.URL.Path, "/release"):
+		handler.releaseFeature(writer, request, strings.TrimSuffix(strings.TrimPrefix(request.URL.Path, "/v1/features/"), "/release"))
 	case request.Method == http.MethodGet && strings.HasPrefix(request.URL.Path, "/v1/features/"):
 		handler.readFeature(writer, request, strings.TrimPrefix(request.URL.Path, "/v1/features/"))
 	case request.Method == http.MethodGet && strings.HasPrefix(request.URL.Path, "/v1/roles/") && strings.HasSuffix(request.URL.Path, "/inbox"):
@@ -251,6 +254,25 @@ func (handler *Handler) acceptFeature(writer http.ResponseWriter, request *http.
 	feature, err := handler.service.AcceptFeature(request.Context(), id, input.ExpectedRevision, handler.principal, input.NoReleaseReason)
 	if err != nil {
 		writeError(writer, http.StatusConflict, "FEATURE_ACCEPTANCE_REJECTED")
+		return
+	}
+	writeJSON(writer, http.StatusOK, feature)
+}
+
+func (handler *Handler) releaseFeature(writer http.ResponseWriter, request *http.Request, value string) {
+	id := kernel.UUIDv7(value)
+	if !id.Valid() || strings.Contains(value, "/") {
+		writeError(writer, http.StatusBadRequest, "INVALID_FEATURE_ID")
+		return
+	}
+	var input organization.FeatureAcceptanceInput
+	if err := decodeBody(writer, request, handler.maxBody, &input); err != nil || input.Mode != organization.FeatureAcceptanceCode {
+		writeError(writer, http.StatusBadRequest, "INVALID_FEATURE_RELEASE")
+		return
+	}
+	feature, err := handler.service.AcceptFeatureWithRelease(request.Context(), id, handler.principal, input)
+	if err != nil {
+		writeError(writer, http.StatusConflict, "FEATURE_RELEASE_REJECTED")
 		return
 	}
 	writeJSON(writer, http.StatusOK, feature)

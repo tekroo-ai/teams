@@ -37,7 +37,9 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 	policy.Grants[4].Scope.CommandTypes = append(policy.Grants[4].Scope.CommandTypes, "tekroo.command.task.request-completion", "tekroo.command.completion-review.record-result")
 	policy.Grants[4].Scope.TargetKinds = append(policy.Grants[4].Scope.TargetKinds, kernel.AggregateCompletionReview)
 	policy.Grants[2].Scope.CommandTypes = append(policy.Grants[2].Scope.CommandTypes, "tekroo.command.completion-review.record-result")
-	policy.Grants[2].Scope.TargetKinds = append(policy.Grants[2].Scope.TargetKinds, kernel.AggregateCompletionReview)
+	policy.Grants[2].Scope.TargetKinds = append(policy.Grants[2].Scope.TargetKinds, kernel.AggregateCompletionReview, kernel.AggregateReleasePlan)
+	policy.Grants[1].Scope.CommandTypes = append(policy.Grants[1].Scope.CommandTypes, "tekroo.command.release-plan.record-qualification", "tekroo.command.release-plan.request-execution")
+	policy.Grants[2].Scope.CommandTypes = append(policy.Grants[2].Scope.CommandTypes, "tekroo.command.release-plan.record-result")
 	roleCommands := []string{"tekroo.command.task.acquire-ownership", "tekroo.command.task.activate", "tekroo.command.task.request-completion"}
 	for index, actor := range []kernel.ActorFQN{"example::product-owner-1", "example::project-manager-1", "example::architect-1", "example::tester-1"} {
 		commands := append([]string(nil), roleCommands...)
@@ -153,6 +155,10 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 		t.Fatal(err)
 	}
 	service.Features = features
+	service.Releases, err = application.NewReleaseCoordinator(runtime, integratedReleaseProvider{}, application.ReleaseCoordinatorPolicy{OperationTimeout: time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
 	exerciseHumanParticipation(t, service, runtime, store, provenance, now)
 	feature := organization.FeatureRequest{
 		SchemaVersion: organization.FeatureSchemaVersion, ID: kernel.UUIDv7("00000000-0000-7000-8000-000000006010"), Revision: 3, Status: organization.FeatureSpecified,
@@ -269,7 +275,8 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 	if err != nil || !found || automated.Status != organization.FeatureAwaitingAcceptance || automated.Acceptance == nil || automated.Acceptance.RecommendedBy != automated.ProductOwnerActor || automated.Acceptance.AcceptedBy != nil {
 		t.Fatalf("automated acceptance recommendation = %#v found=%t err=%v", automated, found, err)
 	}
-	automated, err = service.AcceptFeature(contextWithTimeout(t), automated.ID, automated.Revision, automated.SubmittedBy, "this integration feature produces retained evidence but no repository release")
+	release := organization.StoryCodeRelease{StoryID: automated.Plan.Stories[0].ID, RepositoryURL: "file:///tmp/phase6-release.git", BaseRef: "main", BaseCommit: strings.Repeat("1", 40), ExpectedQualifiedTree: strings.Repeat("3", 40), ChangeRef: "refs/heads/phase6-release", HeadCommit: strings.Repeat("2", 40), GitVersion: "git version 2.51.0", GateDefinitionDigest: digestByte('a'), ToolchainDigest: digestByte('b'), DependencyLockDigest: digestByte('c'), QualificationArtifactHash: digestByte('d')}
+	automated, err = service.AcceptFeatureWithRelease(contextWithTimeout(t), automated.ID, automated.SubmittedBy, organization.FeatureAcceptanceInput{ExpectedRevision: automated.Revision, Mode: organization.FeatureAcceptanceCode, CodeReleases: []organization.StoryCodeRelease{release}})
 	if err != nil || automated.Status != organization.FeatureAccepted || automated.Acceptance == nil || automated.Acceptance.AcceptedBy == nil || len(automated.Acceptance.ReleasePlanIDs) != len(automated.Plan.Stories) {
 		t.Fatalf("automated feature acceptance = %#v err=%v", automated, err)
 	}
@@ -281,7 +288,7 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 		t.Fatal(err)
 	}
 	automatedStory, found, err := store.ReadStoryProjection(contextWithTimeout(t), automated.Plan.Stories[0].ID)
-	if err != nil || !found || automatedStory.Phase != string(kernel.PhaseAccepted) || automatedStory.Release.State != string(kernel.ReleaseNotRequired) || automatedStory.Acceptance.State != "ACCEPTED" {
+	if err != nil || !found || automatedStory.Phase != string(kernel.PhaseAccepted) || automatedStory.Release.State != string(kernel.ReleaseReadyForAcceptance) || automatedStory.Acceptance.State != "ACCEPTED" {
 		t.Fatalf("automated accepted story = %#v found=%t err=%v", automatedStory, found, err)
 	}
 	projection, found, err := store.ReadTaskProjection(contextWithTimeout(t), plan.Tasks[0].ID)
@@ -292,6 +299,16 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 	if err != nil || !found || !dependent.Valid() || dependent.Phase != string(kernel.PhaseCompleted) || dependent.LatestInvocation == nil || dependent.LatestInvocation.State != kernel.InvocationSucceeded {
 		t.Fatalf("dependent projection=%+v found=%t err=%v", dependent, found, err)
 	}
+}
+
+type integratedReleaseProvider struct{}
+
+func (integratedReleaseProvider) Merge(_ context.Context, request kernel.ReleaseMergeRequest) (kernel.ReleaseProviderObservation, error) {
+	return kernel.ReleaseProviderObservation{ReleasePlanID: request.ReleasePlanID, MergeID: request.MergeID, AttemptID: request.AttemptID, State: kernel.ReleaseProviderMerged, Outcome: kernel.ReleaseOutcomeMerged, BaseCommit: request.BaseCommit, HeadCommit: request.HeadCommit, TreeDigest: strings.Repeat("3", 40), Reasons: []string{"exact qualified head was fast-forwarded"}}, nil
+}
+
+func (integratedReleaseProvider) Reconcile(_ context.Context, request kernel.ReleaseMergeRequest) (kernel.ReleaseProviderObservation, error) {
+	return integratedReleaseProvider{}.Merge(context.Background(), request)
 }
 
 func exerciseHumanParticipation(t *testing.T, service *ProductionService, runtime *Runtime, store *mongo.Store, provenance kernel.ProvenanceBasis, now time.Time) {

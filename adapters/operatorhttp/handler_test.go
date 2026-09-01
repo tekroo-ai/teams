@@ -179,6 +179,10 @@ func (service *operatorService) AcceptFeature(context.Context, kernel.UUIDv7, ui
 	return organization.FeatureRequest{ID: "00000000-0000-7000-8000-000000000005"}, nil
 }
 
+func (service *operatorService) AcceptFeatureWithRelease(context.Context, kernel.UUIDv7, kernel.PrincipalRef, organization.FeatureAcceptanceInput) (organization.FeatureRequest, error) {
+	return organization.FeatureRequest{ID: "00000000-0000-7000-8000-000000000005"}, nil
+}
+
 func (service *operatorService) RegisterHumanParticipant(context.Context, kernel.PrincipalRef, organization.HumanParticipantRegistration) (kernel.HumanParticipantSnapshot, error) {
 	return kernel.HumanParticipantSnapshot{}, nil
 }

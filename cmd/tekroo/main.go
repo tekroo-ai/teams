@@ -89,6 +89,8 @@ func run(arguments []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		method, path, body, err = loadFeaturePlan(operands, stdin, config.Operator.MaximumBodyBytes)
 	case "feature-accept":
 		method, path, body, err = featureAccept(operands)
+	case "feature-release":
+		method, path, body, err = loadFeatureRelease(operands, stdin, config.Operator.MaximumBodyBytes)
 	case "human-register":
 		method, path = http.MethodPost, "/v1/humans"
 		body, err = loadHumanRegistration(operands, stdin, config.Operator.MaximumBodyBytes)
@@ -248,6 +250,21 @@ func loadFeaturePlan(operands []string, stdin io.Reader, maximum int64) (string,
 	return http.MethodPost, "/v1/features/" + operands[0] + "/plan", raw, nil
 }
 
+func loadFeatureRelease(operands []string, stdin io.Reader, maximum int64) (string, string, []byte, error) {
+	if len(operands) != 2 || !kernel.UUIDv7(operands[0]).Valid() {
+		return "", "", nil, usageError()
+	}
+	raw, err := loadDocument(operands[1:], stdin, maximum)
+	if err != nil {
+		return "", "", nil, err
+	}
+	var input organization.FeatureAcceptanceInput
+	if err := strictDocument(raw, &input); err != nil || input.Mode != organization.FeatureAcceptanceCode || input.ExpectedRevision == 0 {
+		return "", "", nil, errors.New("feature release document is invalid")
+	}
+	return http.MethodPost, "/v1/features/" + operands[0] + "/release", raw, nil
+}
+
 func strictDocument(raw []byte, target any) error {
 	decoder := json.NewDecoder(bytes.NewReader(raw))
 	decoder.DisallowUnknownFields()
@@ -385,5 +402,5 @@ func loadCommand(operands []string, stdin io.Reader, maximum int64) ([]byte, ker
 }
 
 func usageError() error {
-	return errors.New("usage: tekroo -config CONFIG health|status|pause|resume|stop|feature FILE|-|feature-status ID|feature-plan ID FILE|-|feature-accept ID REVISION NO_RELEASE_REASON|human-register FILE|-|human-ask FILE|-|roles|role ACTOR start|stop|restart|pause|resume|inbox ACTOR|message FILE|-|message-status ID|message-trace THREAD_ID|deadletters [ACTOR]|task ID|story ID|invocation ID|submit FILE|-|cancel INVOCATION_ID FILE|-")
+	return errors.New("usage: tekroo -config CONFIG health|status|pause|resume|stop|feature FILE|-|feature-status ID|feature-plan ID FILE|-|feature-accept ID REVISION NO_RELEASE_REASON|feature-release ID FILE|-|human-register FILE|-|human-ask FILE|-|roles|role ACTOR start|stop|restart|pause|resume|inbox ACTOR|message FILE|-|message-status ID|message-trace THREAD_ID|deadletters [ACTOR]|task ID|story ID|invocation ID|submit FILE|-|cancel INVOCATION_ID FILE|-")
 }
