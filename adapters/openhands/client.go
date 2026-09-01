@@ -433,6 +433,50 @@ func (client *Client) Inspect(ctx context.Context, brief application.ExecutionBr
 	return client.observation(brief, requestDigest, info, events, false)
 }
 
+// ReconcileSuperseded closes an invocation whose canonical brief changed while
+// it was in flight. The original prompt is located by its durable request
+// digest, so a daemon upgrade never has to recreate or trust changed prompt
+// text. No new model call is made.
+func (client *Client) ReconcileSuperseded(ctx context.Context, brief application.ExecutionBrief, conversationID string, originalRequestDigest, replacementRequestDigest kernel.Digest) (application.ExternalExecutionObservation, error) {
+	prepared, err := client.prepare(ctx, brief, replacementRequestDigest)
+	if err != nil || conversationID != string(brief.InvocationID) || !originalRequestDigest.Valid() || originalRequestDigest == replacementRequestDigest {
+		return application.ExternalExecutionObservation{}, ErrProtocol
+	}
+	info, status, err := client.getConversation(ctx, conversationID)
+	if err != nil || status != http.StatusOK || !conversationMatches(info, conversationID, prepared.workspace.WorkingDirectory, originalRequestDigest) {
+		return application.ExternalExecutionObservation{}, ErrProtocol
+	}
+	events, err := client.events(ctx, conversationID)
+	if err != nil {
+		return application.ExternalExecutionObservation{}, err
+	}
+	index := promptDigestIndex(events, originalRequestDigest)
+	if index < 0 {
+		return application.ExternalExecutionObservation{}, ErrProtocol
+	}
+	interrupted := false
+	if executionStillActive(info.ExecutionStatus) {
+		status, _, err = client.request(ctx, http.MethodPost, "/api/conversations/"+url.PathEscape(conversationID)+"/interrupt", nil)
+		if err != nil || status != http.StatusOK && status != http.StatusNoContent && status != http.StatusConflict {
+			return application.ExternalExecutionObservation{}, ErrProtocol
+		}
+		interrupted = true
+		info, status, err = client.getConversation(ctx, conversationID)
+		if err != nil || status != http.StatusOK {
+			return application.ExternalExecutionObservation{}, ErrProtocol
+		}
+		events, err = client.events(ctx, conversationID)
+		if err != nil {
+			return application.ExternalExecutionObservation{}, err
+		}
+		index = promptDigestIndex(events, originalRequestDigest)
+		if index < 0 {
+			return application.ExternalExecutionObservation{}, ErrProtocol
+		}
+	}
+	return client.observationAt(brief, originalRequestDigest, info, events, index, interrupted)
+}
+
 func shellDisciplineViolation(events []rawEvent, promptIndex int) (string, bool) {
 	for index, event := range events {
 		if index <= promptIndex || event.Kind != "ActionEvent" || event.Source != "agent" || event.ToolName != "terminal" {
@@ -848,6 +892,10 @@ func (client *Client) observation(brief application.ExecutionBrief, requestDiges
 	if index < 0 {
 		return application.ExternalExecutionObservation{}, ErrProtocol
 	}
+	return client.observationAt(brief, requestDigest, info, events, index, interrupted)
+}
+
+func (client *Client) observationAt(brief application.ExecutionBrief, requestDigest kernel.Digest, info conversationInfo, events []rawEvent, index int, interrupted bool) (application.ExternalExecutionObservation, error) {
 	state := application.ExternalRunning
 	retryable := false
 	switch info.ExecutionStatus {
@@ -964,6 +1012,19 @@ func agentFinalEvent(event rawEvent) bool {
 func promptIndex(events []rawEvent, prompt string) int {
 	for index, event := range events {
 		if event.Kind == "MessageEvent" && event.Source == "user" && event.Text == prompt {
+			return index
+		}
+	}
+	return -1
+}
+
+func promptDigestIndex(events []rawEvent, digest kernel.Digest) int {
+	for index, event := range events {
+		if event.Kind != "MessageEvent" || event.Source != "user" {
+			continue
+		}
+		sum := sha256.Sum256([]byte(event.Text))
+		if kernel.Digest(hex.EncodeToString(sum[:])) == digest {
 			return index
 		}
 	}

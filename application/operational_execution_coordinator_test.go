@@ -144,6 +144,25 @@ func TestOperationalCoordinatorRestartFromClaimedReconcilesBeforeStart(t *testin
 	}
 }
 
+func TestOperationalCoordinatorClosesAndRetriesBriefSupersededDuringRestart(t *testing.T) {
+	runtime := newOperationalRuntime(t)
+	runtime.applyClaim(t)
+	runtime.applyStarted(t)
+	runtime.roleInstructions = "Use the upgraded execution guidance."
+	coordinator := newTestOperationalCoordinator(t, runtime)
+
+	result, err := coordinator.Process(context.Background(), runtime.intent)
+	if err != nil || result.State != kernel.InvocationFailed || runtime.supersedeCalls != 1 || runtime.inspectCalls != 0 || runtime.cancelCalls != 0 {
+		t.Fatalf("result=%#v err=%v supersede=%d inspect=%d cancel=%d", result, err, runtime.supersedeCalls, runtime.inspectCalls, runtime.cancelCalls)
+	}
+	if runtime.context.Invocation.Retryable == nil || !*runtime.context.Invocation.Retryable {
+		t.Fatalf("retryable = %v", runtime.context.Invocation.Retryable)
+	}
+	if !strings.Contains(string(runtime.lastTerminalOutput), "EXECUTION_BRIEF_SUPERSEDED") {
+		t.Fatalf("terminal output = %s", runtime.lastTerminalOutput)
+	}
+}
+
 func TestOperationalCoordinatorFailsClosedBeforeProviderOnStaleFence(t *testing.T) {
 	runtime := newOperationalRuntime(t)
 	runtime.context.CurrentExecution.FencingEpoch++
@@ -240,24 +259,27 @@ func TestOperationalCoordinatorRecoversTerminalEvidenceWriteAfterStartedCheckpoi
 }
 
 type operationalRuntime struct {
-	t              *testing.T
-	context        OperationalExecutionContext
-	intent         kernel.OutboxIntent
-	clock          *operationalClock
-	commandTypes   []string
-	startState     ExternalExecutionState
-	reconcileState ExternalExecutionState
-	inspectState   ExternalExecutionState
-	cancelState    ExternalExecutionState
-	startErr       error
-	startOutput    []byte
-	evidenceErr    error
-	startCalls     int
-	reconcileCalls int
-	inspectCalls   int
-	cancelCalls    int
-	evidenceCalls  int
-	lastBrief      ExecutionBrief
+	t                  *testing.T
+	context            OperationalExecutionContext
+	intent             kernel.OutboxIntent
+	clock              *operationalClock
+	commandTypes       []string
+	startState         ExternalExecutionState
+	reconcileState     ExternalExecutionState
+	inspectState       ExternalExecutionState
+	cancelState        ExternalExecutionState
+	startErr           error
+	startOutput        []byte
+	evidenceErr        error
+	startCalls         int
+	reconcileCalls     int
+	inspectCalls       int
+	cancelCalls        int
+	supersedeCalls     int
+	evidenceCalls      int
+	lastBrief          ExecutionBrief
+	roleInstructions   string
+	lastTerminalOutput []byte
 }
 
 func newOperationalRuntime(t *testing.T) *operationalRuntime {
@@ -368,7 +390,11 @@ func (runtime *operationalRuntime) ResolveRoleGrounding(_ context.Context, actor
 	if actor != runtime.context.Invocation.ActorFQN {
 		return RoleExecutionGrounding{}, ErrInvalidOperationalExecution
 	}
-	return testRoleGrounding(actor), nil
+	grounding := testRoleGrounding(actor)
+	if runtime.roleInstructions != "" {
+		grounding.Instructions = runtime.roleInstructions
+	}
+	return grounding, nil
 }
 
 func (runtime *operationalRuntime) LoadOperationalExecution(_ context.Context, invocationID kernel.UUIDv7) (OperationalExecutionContext, error) {
@@ -432,6 +458,11 @@ func (runtime *operationalRuntime) Inspect(_ context.Context, brief ExecutionBri
 	return runtime.observation(brief, digest, runtime.inspectState), nil
 }
 
+func (runtime *operationalRuntime) ReconcileSuperseded(_ context.Context, brief ExecutionBrief, _ string, digest, _ kernel.Digest) (ExternalExecutionObservation, error) {
+	runtime.supersedeCalls++
+	return runtime.observation(brief, digest, ExternalCancelled), nil
+}
+
 func (runtime *operationalRuntime) Cancel(_ context.Context, brief ExecutionBrief, _ string, digest kernel.Digest) (ExternalExecutionObservation, error) {
 	runtime.cancelCalls++
 	return runtime.observation(brief, digest, runtime.cancelState), nil
@@ -459,6 +490,9 @@ func (runtime *operationalRuntime) RecordExecutionEvidence(_ context.Context, _ 
 	}
 	result := make([]kernel.EvidenceRef, len(items))
 	for index, item := range items {
+		if strings.Contains(string(item.Content), "EXECUTION_BRIEF_SUPERSEDED") {
+			runtime.lastTerminalOutput = append([]byte(nil), item.Content...)
+		}
 		hash := sha256.Sum256(item.Content)
 		result[index] = kernel.EvidenceRef{EvidenceID: item.EvidenceID, SHA256: kernel.Digest(hex.EncodeToString(hash[:]))}
 	}

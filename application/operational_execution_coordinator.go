@@ -156,13 +156,27 @@ func (coordinator *OperationalExecutionCoordinator) Process(ctx context.Context,
 				return result, ErrExternalOutcomeUnknown
 			}
 		case kernel.InvocationStarted:
-			brief, requestDigest, briefErr := coordinator.buildBrief(ctx, current)
-			if briefErr != nil || invocation.ConversationID == nil || invocation.RequestDigest == nil || *invocation.RequestDigest != requestDigest {
+			brief, currentRequestDigest, briefErr := coordinator.buildBrief(ctx, current)
+			if briefErr != nil || invocation.ConversationID == nil || invocation.RequestDigest == nil {
 				return result, ErrInvalidOperationalExecution
 			}
+			requestDigest := *invocation.RequestDigest
 			var observation ExternalExecutionObservation
 			deadlineExceeded := !coordinator.clock.Now().Before(invocation.DeadlineAt)
-			if invocation.CancellationRequestedAt != nil || deadlineExceeded {
+			if requestDigest != currentRequestDigest {
+				observation, err = coordinator.callBoundary(ctx, func(effectCtx context.Context) (ExternalExecutionObservation, error) {
+					return coordinator.boundary.ReconcileSuperseded(effectCtx, brief, *invocation.ConversationID, requestDigest, currentRequestDigest)
+				})
+				if err == nil && observation.State != ExternalSucceeded && invocation.CancellationRequestedAt == nil && !deadlineExceeded {
+					observation.State = ExternalFailed
+					observation.Retryable = true
+					observation.Output, _ = json.Marshal(struct {
+						Reason                   string        `json:"reason"`
+						OriginalRequestDigest    kernel.Digest `json:"original_request_digest"`
+						ReplacementRequestDigest kernel.Digest `json:"replacement_request_digest"`
+					}{"EXECUTION_BRIEF_SUPERSEDED", requestDigest, currentRequestDigest})
+				}
+			} else if invocation.CancellationRequestedAt != nil || deadlineExceeded {
 				observation, err = coordinator.callBoundary(ctx, func(effectCtx context.Context) (ExternalExecutionObservation, error) {
 					return coordinator.boundary.Cancel(effectCtx, brief, *invocation.ConversationID, requestDigest)
 				})

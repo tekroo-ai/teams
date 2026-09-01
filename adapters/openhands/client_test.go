@@ -399,6 +399,27 @@ func TestViolatesShellDisciplineDistinguishesQuotedLiteralsFromOperators(t *test
 	}
 }
 
+func TestClientReconcilesSupersededBriefWithoutNewModelCall(t *testing.T) {
+	original, originalDigest := openHandsTestBrief(t)
+	originalPrompt := string(mustJSON(original))
+	current := original
+	current.ExecutionGuidance = []string{"Use the upgraded execution policy."}
+	currentDigest := kernel.Digest(testRequestDigest(string(mustJSON(current))))
+	workspace := filepath.Join(t.TempDir(), "workspace")
+	state := &progressGuardServerState{
+		prompt: originalPrompt, workspace: workspace,
+		events: []map[string]any{event("evt-user", "MessageEvent", "user", originalPrompt)},
+	}
+	server := httptest.NewServer(http.HandlerFunc(state.serveHTTP))
+	defer server.Close()
+	client := newOpenHandsTestClient(t, server.URL, workspace, current)
+
+	observation, err := client.ReconcileSuperseded(context.Background(), current, string(current.InvocationID), originalDigest, currentDigest)
+	if err != nil || observation.State != application.ExternalCancelled || observation.RequestDigest != originalDigest || state.interruptCalls != 1 {
+		t.Fatalf("observation=%#v err=%v interrupts=%d", observation, err, state.interruptCalls)
+	}
+}
+
 type progressGuardServerState struct {
 	prompt         string
 	workspace      string

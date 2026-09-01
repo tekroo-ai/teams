@@ -516,6 +516,7 @@ type OpenHandsExecutionBoundary interface {
 	Start(context.Context, ExecutionBrief, kernel.Digest) (ExternalExecutionObservation, error)
 	ReconcileStart(context.Context, ExecutionBrief, kernel.Digest) (ExternalExecutionObservation, error)
 	Inspect(context.Context, ExecutionBrief, string, kernel.Digest) (ExternalExecutionObservation, error)
+	ReconcileSuperseded(context.Context, ExecutionBrief, string, kernel.Digest, kernel.Digest) (ExternalExecutionObservation, error)
 	Cancel(context.Context, ExecutionBrief, string, kernel.Digest) (ExternalExecutionObservation, error)
 }
 
