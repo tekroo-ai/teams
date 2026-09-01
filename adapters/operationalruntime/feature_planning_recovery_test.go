@@ -92,6 +92,54 @@ func TestFeatureBudgetPolicyAcceptsOnlyExpiredPredecessorForRecovery(t *testing.
 	}
 }
 
+func TestRecoverablePlanningTerminalAcceptsOnlyExplicitlyRecoverableTerminals(t *testing.T) {
+	now := time.Date(2026, 9, 1, 16, 0, 0, 0, time.UTC)
+	retryable := true
+	notRetryable := false
+	tests := []struct {
+		name       string
+		invocation kernel.WorkInvocation
+		want       bool
+	}{
+		{name: "requested cancellation", invocation: recoveryTerminalFixture(kernel.InvocationCancelled, nil, &now), want: true},
+		{name: "unrequested cancellation", invocation: recoveryTerminalFixture(kernel.InvocationCancelled, nil, nil)},
+		{name: "timed out", invocation: recoveryTerminalFixture(kernel.InvocationTimedOut, nil, nil), want: true},
+		{name: "retryable failure", invocation: recoveryTerminalFixture(kernel.InvocationFailed, &retryable, nil), want: true},
+		{name: "non-retryable failure", invocation: recoveryTerminalFixture(kernel.InvocationFailed, &notRetryable, nil)},
+		{name: "failure without classification", invocation: recoveryTerminalFixture(kernel.InvocationFailed, nil, nil)},
+		{name: "retryable start failure", invocation: recoveryTerminalFixture(kernel.InvocationStartFailed, &retryable, nil), want: true},
+		{name: "successful invocation", invocation: recoveryTerminalFixture(kernel.InvocationSucceeded, nil, nil)},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := recoverablePlanningTerminal(test.invocation); got != test.want {
+				t.Fatalf("recoverablePlanningTerminal() = %t, want %t", got, test.want)
+			}
+		})
+	}
+}
+
+func recoveryTerminalFixture(state kernel.WorkInvocationState, retryable *bool, cancelledAt *time.Time) kernel.WorkInvocation {
+	invocation := kernel.WorkInvocation{
+		ID: "00000000-0000-7000-8000-000000000321", Revision: 4, State: state,
+		AuthorizationEventID: "00000000-0000-7000-8000-000000000322", ParentEventID: "00000000-0000-7000-8000-000000000323",
+		TaskID: "00000000-0000-7000-8000-000000000324", BudgetAccountID: "00000000-0000-7000-8000-000000000325",
+		LifecycleEpoch: 1, ScopeRevision: 1, TaskRevision: 1,
+		WorkProfile:           kernel.WorkProfileBinding{ProfileID: "00000000-0000-7000-8000-000000000326", ProfileRevision: 1, ProfileDigest: repeatedDigest('1'), LifecycleEpoch: 1, ScopeRevision: 1},
+		QualifiedAssignmentID: "00000000-0000-7000-8000-000000000327", Purpose: kernel.PurposeReplan,
+		AttemptFamily: "replan", AttemptOrdinal: 10, ConditionDigest: repeatedDigest('2'), OutputPredicateDigest: repeatedDigest('3'),
+		AllowedTerminalOutcomes: []kernel.WorkInvocationState{kernel.InvocationSucceeded, kernel.InvocationFailed, kernel.InvocationTimedOut, kernel.InvocationCancelled, kernel.InvocationStartFailed},
+		ToolPolicyDigest:        repeatedDigest('4'), EffectPolicyDigest: repeatedDigest('5'), ActorFQN: "teams::architect-1",
+		Execution:          kernel.ExecutionTuple{ExecutionID: "00000000-0000-7000-8000-000000000328", FencingEpoch: 1},
+		ModelProfileDigest: repeatedDigest('6'), RuntimeIdentityDigest: repeatedDigest('7'), WorkspaceID: "architect-1",
+		DeadlineAt: time.Date(2026, 9, 1, 17, 0, 0, 0, time.UTC), IdempotencyKey: "recoverable-terminal-fixture",
+		AdmissionPolicyRevision: 1, AdmissionPolicyDigest: repeatedDigest('8'), GlobalDebitOrdinal: 1, PurposeDebitOrdinal: 1,
+		Retryable: retryable, CancellationRequestedAt: cancelledAt,
+		LastEventID: "00000000-0000-7000-8000-000000000329",
+	}
+	return invocation
+}
+
 func TestExplicitPlanningRecoveryPreservesLineageWithoutReusingCondition(t *testing.T) {
 	tracked, profile, workspace, _ := taskExecutionRefreshFixture(t)
 	now := time.Date(2026, 9, 1, 16, 0, 0, 0, time.UTC)

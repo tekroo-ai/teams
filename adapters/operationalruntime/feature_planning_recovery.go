@@ -13,8 +13,8 @@ import (
 )
 
 // PlanningRecoveryRequest is an explicit operator decision to continue one
-// cancelled or timed-out feature-planning invocation under a new condition,
-// execution, and finite deadline.
+// cancelled, timed-out, or retryable failed feature-planning invocation under
+// a new condition, execution, and finite deadline.
 type PlanningRecoveryRequest struct {
 	ExpectedRevision uint64               `json:"expected_revision"`
 	Reason           string               `json:"reason"`
@@ -186,6 +186,8 @@ func recoverablePlanningTerminal(invocation kernel.WorkInvocation) bool {
 		return invocation.CancellationRequestedAt != nil
 	case kernel.InvocationTimedOut:
 		return true
+	case kernel.InvocationFailed, kernel.InvocationStartFailed:
+		return invocation.Retryable != nil && *invocation.Retryable
 	default:
 		return false
 	}
