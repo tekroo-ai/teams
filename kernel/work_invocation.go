@@ -661,7 +661,9 @@ func validChangedConditionContinuation(value invocationAuthorizationPayload, pro
 	if !found || !prior.Valid() || prior.TaskID != value.TaskID || prior.Purpose != value.Purpose || value.AttemptOrdinal != prior.AttemptOrdinal+1 || value.RetryOrdinal != prior.RetryOrdinal+1 || value.ConditionDigest == prior.ConditionDigest || *profile.SupersedesProfileID != prior.WorkProfile.ProfileID || profile.ProfileRevision != prior.WorkProfile.ProfileRevision+1 || value.WorkProfile != profile.Binding() || !value.DeadlineAt.After(prior.DeadlineAt) || !profile.Budgets.DeadlineAt.Equal(value.DeadlineAt) || account.PolicyRevision <= prior.AdmissionPolicyRevision || len(prior.TerminalEvidenceIDs) == 0 {
 		return false
 	}
-	recoverable := prior.State == InvocationTimedOut || prior.State == InvocationCancelled && prior.CancellationRequestedAt != nil
+	recoverable := prior.State == InvocationTimedOut ||
+		prior.State == InvocationCancelled && prior.CancellationRequestedAt != nil ||
+		(prior.State == InvocationFailed || prior.State == InvocationStartFailed) && prior.Retryable != nil && *prior.Retryable
 	if !recoverable {
 		return false
 	}

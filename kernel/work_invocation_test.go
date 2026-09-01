@@ -133,9 +133,27 @@ func TestChangedConditionAllowsOnlyEvidenceBoundOperatorRecovery(t *testing.T) {
 	if !decision.Accepted || decision.Invocation.RetryOfInvocationID == nil || *decision.Invocation.RetryOfInvocationID != prior.ID {
 		t.Fatalf("operator recovery = %#v", decision)
 	}
+	retryable := true
+	prior.State = InvocationFailed
+	prior.CancellationRequestedAt = nil
+	prior.Retryable = &retryable
+	invocations[prior.Ref()] = prior
+	decision = PlanWorkInvocationAuthorization(payload, fixture.task, fixture.account, fixture.binding, fixture.scope, fixture.profile, fixture.assignment, fixture.execution, invocations, fixture.now, fixture.eventID)
+	if !decision.Accepted {
+		t.Fatalf("retryable failed operator recovery = %#v", decision)
+	}
+	notRetryable := false
+	prior.Retryable = &notRetryable
+	invocations[prior.Ref()] = prior
+	rejected := PlanWorkInvocationAuthorization(payload, fixture.task, fixture.account, fixture.binding, fixture.scope, fixture.profile, fixture.assignment, fixture.execution, invocations, fixture.now, fixture.eventID)
+	if rejected.Accepted || rejected.Reason != "INVALID_RETRY" {
+		t.Fatalf("non-retryable failed recovery = %#v", rejected)
+	}
+	prior.Retryable = &retryable
+	invocations[prior.Ref()] = prior
 
 	fixture.profile.Profile.ClassificationEvidenceIDs = []UUIDv7{"00000000-0000-7000-8000-000000000953"}
-	rejected := PlanWorkInvocationAuthorization(payload, fixture.task, fixture.account, fixture.binding, fixture.scope, fixture.profile, fixture.assignment, fixture.execution, invocations, fixture.now, fixture.eventID)
+	rejected = PlanWorkInvocationAuthorization(payload, fixture.task, fixture.account, fixture.binding, fixture.scope, fixture.profile, fixture.assignment, fixture.execution, invocations, fixture.now, fixture.eventID)
 	if rejected.Accepted || rejected.Reason != "INVALID_RETRY" {
 		t.Fatalf("recovery without terminal evidence = %#v", rejected)
 	}
