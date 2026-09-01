@@ -149,6 +149,23 @@ func TestHandlerRetriesCancelledPlanningOnlyWithExplicitOperatorRequest(t *testi
 	}
 }
 
+func TestHandlerRetriesFailedTaskOnlyWithExplicitOperatorRequest(t *testing.T) {
+	service := &operatorService{state: operationalruntime.ControlRunning}
+	handler := newTestHandler(t, service, func() {})
+	body := `{"expected_revision":4,"reason":"resume after observed no-progress stop","evidence_refs":[{"evidence_id":"00000000-0000-7000-8000-000000000091","sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}],"deadline_at":"2026-09-01T16:00:00Z","idempotency_key":"task-recovery-1"}`
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, authorizedRequest(http.MethodPost, "/v1/invocations/00000000-0000-7000-8000-000000000003/retry-task", strings.NewReader(body)))
+	if response.Code != http.StatusOK || service.taskRecoveryCalls != 1 || service.taskRecovery.Reason != "resume after observed no-progress stop" {
+		t.Fatalf("status=%d calls=%d request=%#v body=%s", response.Code, service.taskRecoveryCalls, service.taskRecovery, response.Body.String())
+	}
+
+	response = httptest.NewRecorder()
+	handler.ServeHTTP(response, authorizedRequest(http.MethodPost, "/v1/invocations/00000000-0000-7000-8000-000000000003/retry-task", strings.NewReader(`{"expected_revision":4}`)))
+	if response.Code != http.StatusBadRequest || service.taskRecoveryCalls != 1 {
+		t.Fatalf("invalid status=%d calls=%d", response.Code, service.taskRecoveryCalls)
+	}
+}
+
 func newTestHandler(t *testing.T, service Service, stop func()) *Handler {
 	t.Helper()
 	handler, err := NewHandler(Config{Service: service, BearerToken: testToken, OperatorPrincipal: kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "operator"}, OperationTimeout: time.Second, MaximumBodyBytes: 4096, RequestStop: stop})
@@ -177,6 +194,8 @@ type operatorService struct {
 	featureErr            error
 	planningRecoveryCalls int
 	planningRecovery      operationalruntime.PlanningRecoveryRequest
+	taskRecoveryCalls     int
+	taskRecovery          operationalruntime.TaskRecoveryRequest
 }
 
 func (service *operatorService) Status() operationalruntime.ControlStatus {
@@ -325,6 +344,12 @@ func (service *operatorService) RequestInvocationCancellation(context.Context, k
 func (service *operatorService) RetryCancelledFeaturePlanning(_ context.Context, _ kernel.PrincipalRef, _ kernel.UUIDv7, request operationalruntime.PlanningRecoveryRequest) (operationalruntime.InvocationStatus, error) {
 	service.planningRecoveryCalls++
 	service.planningRecovery = request
+	return operationalruntime.InvocationStatus{}, nil
+}
+
+func (service *operatorService) RetryFailedTask(_ context.Context, _ kernel.PrincipalRef, _ kernel.UUIDv7, request operationalruntime.TaskRecoveryRequest) (operationalruntime.InvocationStatus, error) {
+	service.taskRecoveryCalls++
+	service.taskRecovery = request
 	return operationalruntime.InvocationStatus{}, nil
 }
 

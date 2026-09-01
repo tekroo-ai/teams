@@ -54,6 +54,7 @@ type Service interface {
 	HumanNotifications(context.Context, kernel.PrincipalRef, bool) ([]organization.HumanNotification, error)
 	RequestInvocationCancellation(context.Context, kernel.PrincipalRef, kernel.UUIDv7, operationalruntime.CancellationRequest) (operationalruntime.InvocationStatus, error)
 	RetryCancelledFeaturePlanning(context.Context, kernel.PrincipalRef, kernel.UUIDv7, operationalruntime.PlanningRecoveryRequest) (operationalruntime.InvocationStatus, error)
+	RetryFailedTask(context.Context, kernel.PrincipalRef, kernel.UUIDv7, operationalruntime.TaskRecoveryRequest) (operationalruntime.InvocationStatus, error)
 	FederationSnapshot() operationalruntime.FederationSnapshot
 	ResolveFederationAlias(context.Context, string) (organization.AliasBinding, organization.FederationRoute, error)
 	SendFederatedMessage(context.Context, string, organization.OrganizationalMessage) (organization.FederationDeliveryReceipt, error)
@@ -135,6 +136,8 @@ func (handler *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Requ
 		handler.cancelInvocation(writer, request, strings.TrimSuffix(strings.TrimPrefix(request.URL.Path, "/v1/invocations/"), "/cancel"))
 	case request.Method == http.MethodPost && strings.HasPrefix(request.URL.Path, "/v1/invocations/") && strings.HasSuffix(request.URL.Path, "/retry-planning"):
 		handler.retryPlanningInvocation(writer, request, strings.TrimSuffix(strings.TrimPrefix(request.URL.Path, "/v1/invocations/"), "/retry-planning"))
+	case request.Method == http.MethodPost && strings.HasPrefix(request.URL.Path, "/v1/invocations/") && strings.HasSuffix(request.URL.Path, "/retry-task"):
+		handler.retryTaskInvocation(writer, request, strings.TrimSuffix(strings.TrimPrefix(request.URL.Path, "/v1/invocations/"), "/retry-task"))
 	case request.Method == http.MethodGet && request.URL.Path == "/v1/roles":
 		handler.roles(writer, request)
 	case request.Method == http.MethodGet && request.URL.Path == "/v1/libraries":
@@ -258,6 +261,22 @@ func (handler *Handler) retryPlanningInvocation(writer http.ResponseWriter, requ
 	if err != nil {
 		log.Printf("planning recovery rejected invocation=%s: %v", id, err)
 		writeError(writer, http.StatusConflict, "PLANNING_RECOVERY_REJECTED")
+		return
+	}
+	writeJSON(writer, http.StatusOK, status)
+}
+
+func (handler *Handler) retryTaskInvocation(writer http.ResponseWriter, request *http.Request, value string) {
+	id := kernel.UUIDv7(value)
+	var input operationalruntime.TaskRecoveryRequest
+	if !id.Valid() || strings.Contains(value, "/") || decodeBody(writer, request, handler.maxBody, &input) != nil || !input.Valid() {
+		writeError(writer, http.StatusBadRequest, "INVALID_TASK_RECOVERY_REQUEST")
+		return
+	}
+	status, err := handler.service.RetryFailedTask(request.Context(), handler.principal, id, input)
+	if err != nil {
+		log.Printf("task recovery rejected invocation=%s: %v", id, err)
+		writeError(writer, http.StatusConflict, "TASK_RECOVERY_REJECTED")
 		return
 	}
 	writeJSON(writer, http.StatusOK, status)
