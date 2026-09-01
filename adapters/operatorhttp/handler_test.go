@@ -263,5 +263,9 @@ func (service *operatorService) HumanNotifications(context.Context, kernel.Princ
 	return []organization.HumanNotification{}, nil
 }
 
+func (service *operatorService) RequestInvocationCancellation(context.Context, kernel.PrincipalRef, kernel.UUIDv7, operationalruntime.CancellationRequest) (operationalruntime.InvocationStatus, error) {
+	return operationalruntime.InvocationStatus{}, nil
+}
+
 var _ Service = (*operatorService)(nil)
 var _ OrganizationalService = (*operatorService)(nil)

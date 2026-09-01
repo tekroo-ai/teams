@@ -129,8 +129,7 @@ func run(arguments []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		method, path = http.MethodPost, "/v1/commands"
 		body, _, err = loadCommand(operands, stdin, config.Operator.MaximumBodyBytes)
 	case "cancel":
-		method, path = http.MethodPost, "/v1/commands"
-		body, err = loadCancellation(operands, stdin, config.Operator.MaximumBodyBytes)
+		method, path, body, err = loadCancellation(operands, stdin, config.Operator.MaximumBodyBytes)
 	default:
 		err = usageError()
 	}
@@ -422,18 +421,19 @@ func identityRead(prefix string, operands []string) (string, string, error) {
 	return http.MethodGet, prefix + operands[0], nil
 }
 
-func loadCancellation(operands []string, stdin io.Reader, maximum int64) ([]byte, error) {
+func loadCancellation(operands []string, stdin io.Reader, maximum int64) (string, string, []byte, error) {
 	if len(operands) != 2 || !kernel.UUIDv7(operands[0]).Valid() {
-		return nil, usageError()
+		return "", "", nil, usageError()
 	}
-	raw, command, err := loadCommand(operands[1:], stdin, maximum)
+	raw, err := loadDocument(operands[1:], stdin, maximum)
 	if err != nil {
-		return nil, err
+		return "", "", nil, err
 	}
-	if command.CommandType != "tekroo.command.work-invocation.request-cancellation" || command.Target.Kind != kernel.AggregateWorkInvocation || command.Target.ID != kernel.UUIDv7(operands[0]) {
-		return nil, errors.New("cancellation command does not match the exact invocation")
+	var input operationalruntime.CancellationRequest
+	if err := strictDocument(raw, &input); err != nil || !input.Valid() {
+		return "", "", nil, errors.New("cancellation request is invalid")
 	}
-	return raw, nil
+	return http.MethodPost, "/v1/invocations/" + operands[0] + "/cancel", raw, nil
 }
 
 func loadCommand(operands []string, stdin io.Reader, maximum int64) ([]byte, kernel.KernelCommand, error) {

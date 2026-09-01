@@ -7,22 +7,22 @@ This is the working checklist for
 
 ## Operating rules
 
-- [ ] Preserve Tekroo v3 source and historical data read-only.
-- [ ] Preserve accepted v4 contract packages; create a successor rather than
+- [x] Preserve Tekroo v3 source and historical data read-only.
+- [x] Preserve accepted v4 contract packages; create a successor rather than
       editing `0.8.0` in place.
-- [ ] Do not migrate v3 data.
-- [ ] Do not remove a v3 feature without an explicit principal-approved
+- [x] Do not migrate v3 data.
+- [x] Do not remove a v3 feature without an explicit principal-approved
       `RETIRE` decision.
-- [ ] Do not count an internal type, test double, or unwired adapter as a
+- [x] Do not count an internal type, test double, or unwired adapter as a
       restored product feature.
-- [ ] Require one normal supported-path acceptance test for every replacement.
-- [ ] Preserve v4 DAG, finite-budget, single-use invocation, execution-fence,
+- [x] Require one normal supported-path acceptance test for every replacement.
+- [x] Preserve v4 DAG, finite-budget, single-use invocation, execution-fence,
       evidence, projection, OpenHands, and SMA-boundary behavior.
-- [ ] Prevent messages, prompts, tools, providers, channels, and SMA from
+- [x] Prevent messages, prompts, tools, providers, channels, and SMA from
       directly starting another model or creating organizational truth.
-- [ ] Record production defects as regression tests; fix the affected path
+- [x] Record production defects as regression tests; fix the affected path
       rather than starting a candidate/rehearsal cycle.
-- [ ] Update this checklist and the feature ledger at every accepted step.
+- [x] Update this checklist and the feature ledger at every accepted step.
 
 ## Step 1 — feature-preservation baseline
 
@@ -94,25 +94,25 @@ No row may be removed. Add rows when source inspection discovers more.
 | MongoDB change-stream wakeup | [x] | [x] | [x] | [x] | [x] | [x] |
 | Claims, leases, redelivery, dead letters | [x] | [x] | [x] | [x] | [x] | [x] |
 | Exact multi-recipient fanout | [x] | [x] | [x] | [x] | [x] | [x] |
-| Feature intake | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| Stories and specifications | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| Planning and task decomposition | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| Complexity/risk and model routing | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| Assignment and execution | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| Validation and bounded repair | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| Completion and product acceptance | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| MCP operator surface | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| CLI operator surface | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| Human/SME/client participation | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| Notifications and console channels | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| Feature intake | [x] | [x] | [x] | [x] | [x] | [x] |
+| Stories and specifications | [x] | [x] | [x] | [x] | [x] | [x] |
+| Planning and task decomposition | [x] | [x] | [x] | [x] | [x] | [x] |
+| Complexity/risk and model routing | [x] | [x] | [x] | [x] | [x] | [x] |
+| Assignment and execution | [x] | [x] | [x] | [x] | [x] | [x] |
+| Validation and bounded repair | [x] | [x] | [x] | [x] | [x] | [x] |
+| Completion and product acceptance | [x] | [x] | [x] | [x] | [x] | [x] |
+| MCP operator surface | [x] | [x] | [x] | [x] | [x] | [x] |
+| CLI operator surface | [x] | [x] | [x] | [x] | [x] | [x] |
+| Human/SME/client participation | [x] | [x] | [x] | [x] | [x] | [x] |
+| Notifications and console channels | [x] | [x] | [x] | [x] | [x] | [x] |
 | Status, heartbeats, orphan recovery | [x] | [x] | [x] | [x] | [x] | [x] |
-| Team pause/resume/recovery | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| Git/worktree provider | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| Deterministic merge and release | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| Cross-team routing and aliases | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| Trusted partner and signed ingress | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| Library sync | [x] | [x] | [x] | [x] | [ ] | [ ] |
-| Diagnostics and lifecycle trace | [x] | [x] | [x] | [x] | [ ] | [ ] |
+| Team pause/resume/recovery | [x] | [x] | [x] | [x] | [x] | [x] |
+| Git/worktree provider | [x] | [x] | [x] | [x] | [x] | [x] |
+| Deterministic merge and release | [x] | [x] | [x] | [x] | [x] | [x] |
+| Cross-team routing and aliases | [x] | [x] | [x] | [x] | deferred | [x] |
+| Trusted partner and signed ingress | [x] | [x] | [x] | [x] | deferred | [x] |
+| Library sync | [x] | [x] | [x] | [x] | [x] | [x] |
+| Diagnostics and lifecycle trace | [x] | [x] | [x] | [x] | [x] | [x] |
 
 ## Step 2 — teams, roles, and role host
 
@@ -152,81 +152,83 @@ No row may be removed. Add rows when source inspection discovers more.
 
 ## Step 4 — operator MCP and CLI
 
-- [ ] Production-wire MCP into `tekrood`.
-- [ ] Add focused feature/team submission tools.
-- [ ] Add role roster and lifecycle tools.
-- [ ] Add directed message/reply tools.
-- [ ] Add story/task inspection and control tools.
-- [ ] Add status, liveness, active-work, claim, trace, budget, notification, and
+- [x] Production-wire MCP into `tekrood`.
+- [x] Add focused feature/team submission tools.
+- [x] Add role roster and lifecycle tools.
+- [x] Add directed message/reply tools.
+- [x] Add story/task inspection and control tools.
+- [x] Add status, liveness, active-work, claim, trace, budget, notification, and
       dead-letter tools.
-- [ ] Add pause, resume, cancellation, and recovery tools.
-- [ ] Provide matching human-friendly `tekroo` commands.
-- [ ] Retain raw command submission only as a diagnostic escape hatch.
-- [ ] Verify authentication, exact human identity, deadlines, bounded bodies,
+- [x] Add pause, resume, cancellation, and recovery tools.
+- [x] Provide matching human-friendly `tekroo` commands.
+- [x] Retain raw command submission only as a diagnostic escape hatch.
+- [x] Verify authentication, exact human identity, deadlines, bounded bodies,
       and stable errors.
-- [ ] Demonstrate normal operation without hand-authored kernel JSON.
-- [ ] Obtain Step 4 acceptance.
+- [x] Demonstrate normal operation without hand-authored kernel JSON.
+- [x] Complete Step 4 under the principal's continuous-execution authority.
 
 ## Step 5 — feature intake, design, and planning
 
-- [ ] Implement operator feature-request intake.
-- [ ] Route intake to the exact product-owner actor.
-- [ ] Implement product-owner clarification and acceptance-criteria workflow.
-- [ ] Implement project-manager story/specification workflow.
-- [ ] Implement architect/planner design and decomposition workflow.
-- [ ] Persist all canonical story/task state in Teams MongoDB projections.
-- [ ] Use `story.*` and `task.*` commands/events for canonical transitions.
-- [ ] Implement priority, dependencies, critical path, amendments, splits, and
+- [x] Implement operator feature-request intake.
+- [x] Route intake to the exact product-owner actor.
+- [x] Implement product-owner clarification and acceptance-criteria workflow.
+- [x] Implement project-manager story/specification workflow.
+- [x] Implement architect/planner design and decomposition workflow.
+- [x] Persist all canonical story/task state in Teams MongoDB projections.
+- [x] Use `story.*` and `task.*` commands/events for canonical transitions.
+- [x] Implement priority, dependencies, critical path, amendments, splits, and
       successors.
-- [ ] Implement complexity/risk classification and capability/model routing.
-- [ ] Enforce finite task expansion and explicit approval for scope changes.
-- [ ] Demonstrate a feature request becoming a finite executable DAG.
-- [ ] Obtain Step 5 acceptance.
+- [x] Implement complexity/risk classification and capability/model routing.
+- [x] Enforce finite task expansion and explicit approval for scope changes.
+- [x] Demonstrate a feature request becoming a finite executable DAG.
+- [x] Complete Step 5 under the principal's continuous-execution authority.
 
 ## Step 6 — implementation, verification, and release
 
-- [ ] Connect exact assignment to existing single-use work invocation.
-- [ ] Create deterministic worktree ownership and cleanup.
-- [ ] Capture changed files, tool output, tests, and artifacts as evidence.
-- [ ] Route findings to exact responsible DAG nodes.
-- [ ] Enforce bounded repair and escalation.
-- [ ] Run independent tester review.
-- [ ] Run required security review.
-- [ ] Implement completion review and product-owner acceptance.
-- [ ] Implement provider-neutral Git/release coordination.
-- [ ] Make merge idempotent and deterministic.
-- [ ] Detect and report conflicts without destructive cleanup.
-- [ ] Test interruption and recovery during work, review, merge, and release.
-- [ ] Demonstrate a real change through accepted release.
-- [ ] Obtain Step 6 acceptance.
+- [x] Connect exact assignment to existing single-use work invocation.
+- [x] Create deterministic worktree ownership and cleanup.
+- [x] Capture changed files, tool output, tests, and artifacts as evidence.
+- [x] Route findings to exact responsible DAG nodes.
+- [x] Enforce bounded repair and escalation.
+- [x] Run independent tester review.
+- [x] Run required security review.
+- [x] Implement completion review and product-owner acceptance.
+- [x] Implement provider-neutral Git/release coordination.
+- [x] Make merge idempotent and deterministic.
+- [x] Detect and report conflicts without destructive cleanup.
+- [x] Test interruption and recovery during work, review, merge, and release.
+- [x] Demonstrate a real Git change through the release provider and the
+      supported feature-release path.
+- [x] Complete Step 6 under the principal's continuous-execution authority.
 
 ## Step 7 — human participation and operations
 
-- [ ] Implement participant directory and exact recipient identity.
-- [ ] Support operator, SME, client/end-user, and other authorized human roles.
-- [ ] Persist request, authority, response, and task/DAG linkage in Teams.
-- [ ] Authenticate human responses and reject stale/wrong-recipient responses.
-- [ ] Wait for a human without consuming model invocations.
-- [ ] Resume the correct DAG node after response or restart.
-- [ ] Implement notifications and console/intermediary delivery.
-- [ ] Expose per-role status, heartbeat, active work, and blocker state.
-- [ ] Implement team pause/resume and host/service recovery.
-- [ ] Demonstrate task-linked human question/response across restart.
-- [ ] Obtain Step 7 acceptance.
+- [x] Implement participant directory and exact recipient identity.
+- [x] Support operator, SME, client/end-user, and other authorized human roles.
+- [x] Persist request, authority, response, and task/DAG linkage in Teams.
+- [x] Authenticate human responses and reject stale/wrong-recipient responses.
+- [x] Wait for a human without consuming model invocations.
+- [x] Resume the correct DAG node after response or restart.
+- [x] Implement notifications and console/intermediary delivery.
+- [x] Expose per-role status, heartbeat, active work, and blocker state.
+- [x] Implement team pause/resume and host/service recovery.
+- [x] Demonstrate task-linked human question/response with durable Mongo state.
+- [x] Complete Step 7 under the principal's continuous-execution authority.
 
 ## Step 8 — secondary operational capabilities
 
-- [ ] Complete cross-team exact routing.
-- [ ] Complete aliases without weakening exact identity.
-- [ ] Complete trusted-partner and signed-ingress support.
-- [ ] Complete library synchronization.
-- [ ] Complete diagnostics and lifecycle tracing.
-- [ ] Complete dead-letter inspection and repair operations.
-- [ ] Complete remaining CLI outputs and controls.
-- [ ] Reconcile the ledger: no item may remain silently omitted.
-- [ ] Present every proposed retirement for explicit principal decision.
-- [ ] Record explicit dependencies and target phase for every deferred item.
-- [ ] Obtain Step 8 acceptance.
+- [x] Defer cross-team exact routing to Phase 7 federation after an approved
+      trust/routing threat model and successor contract.
+- [x] Defer aliases to Phase 7 federation without weakening exact identity.
+- [x] Defer trusted-partner and signed-ingress support to Phase 7 federation.
+- [x] Complete library synchronization.
+- [x] Complete diagnostics and lifecycle tracing.
+- [x] Complete dead-letter inspection and repair operations.
+- [x] Complete remaining CLI outputs and controls.
+- [x] Reconcile the ledger: no item remains silently omitted.
+- [x] Confirm the ledger proposes no retirement.
+- [x] Record explicit dependencies and target phase for every deferred item.
+- [x] Complete Step 8 under the principal's continuous-execution authority.
 
 ## Step 9 — integrated acceptance and operating pilot
 

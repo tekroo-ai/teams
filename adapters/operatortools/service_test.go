@@ -127,3 +127,6 @@ func (fake *fakeOrganization) Diagnostics(context.Context) (operationalruntime.D
 func (*fakeOrganization) RepairDeadLetter(context.Context, kernel.UUIDv7, organization.OrganizationalMessage) error {
 	return nil
 }
+func (*fakeOrganization) RequestInvocationCancellation(context.Context, kernel.PrincipalRef, kernel.UUIDv7, operationalruntime.CancellationRequest) (operationalruntime.InvocationStatus, error) {
+	return operationalruntime.InvocationStatus{}, nil
+}

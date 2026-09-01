@@ -51,6 +51,7 @@ type Organization interface {
 	SyncRoleLibraries() ([]organization.RoleLibraryEntry, error)
 	Diagnostics(context.Context) (operationalruntime.Diagnostics, error)
 	RepairDeadLetter(context.Context, kernel.UUIDv7, organization.OrganizationalMessage) error
+	RequestInvocationCancellation(context.Context, kernel.PrincipalRef, kernel.UUIDv7, operationalruntime.CancellationRequest) (operationalruntime.InvocationStatus, error)
 }
 
 // Service translates focused operator operations into domain calls while the
@@ -155,6 +156,15 @@ func (service *Service) CallTool(ctx context.Context, identity protocol.Authenti
 			return nil, err
 		}
 		return map[string]any{"failed_message_id": input.FailedID, "successor_message_id": input.Successor.ID}, nil
+	case mcp.InvocationCancelName:
+		var input struct {
+			InvocationID kernel.UUIDv7                          `json:"invocation_id"`
+			Request      operationalruntime.CancellationRequest `json:"request"`
+		}
+		if err := decodeStrict(arguments, &input); err != nil || !input.InvocationID.Valid() || !input.Request.Valid() {
+			return nil, ErrInvalidArguments
+		}
+		return service.organization.RequestInvocationCancellation(ctx, identity.Principal, input.InvocationID, input.Request)
 	case mcp.FeatureSubmitToolName:
 		var input organization.FeatureRequestInput
 		if err := decodeStrict(arguments, &input); err != nil || input.Validate() != nil {

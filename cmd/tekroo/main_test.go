@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/tekroo-ai/teams/adapters/operationalruntime"
 	"github.com/tekroo-ai/teams/kernel"
 )
 
@@ -80,16 +81,10 @@ func TestOperatorClientRejectsOversizedRequestAndResponse(t *testing.T) {
 	}
 }
 
-func TestLoadCancellationRequiresExactInvocationCommand(t *testing.T) {
+func TestLoadCancellationBuildsFocusedExactInvocationRequest(t *testing.T) {
 	t.Parallel()
-	command := kernel.KernelCommand{
-		CommandType: "tekroo.command.work-invocation.request-cancellation",
-		Target: kernel.AggregateRef{
-			Kind: kernel.AggregateWorkInvocation,
-			ID:   testInvocationID,
-		},
-	}
-	raw, err := json.Marshal(command)
+	request := operationalruntime.CancellationRequest{ExpectedRevision: 2, Reason: "operator requested stop", EvidenceRefs: []kernel.EvidenceRef{{EvidenceID: "018f0000-0000-7000-8000-000000000003", SHA256: kernel.Digest(strings.Repeat("a", 64))}}, IdempotencyKey: "cancel-1"}
+	raw, err := json.Marshal(request)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,15 +92,15 @@ func TestLoadCancellationRequiresExactInvocationCommand(t *testing.T) {
 	if err := os.WriteFile(path, raw, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	loaded, err := loadCancellation([]string{string(testInvocationID), path}, bytes.NewReader(nil), 4096)
+	method, target, loaded, err := loadCancellation([]string{string(testInvocationID), path}, bytes.NewReader(nil), 4096)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Equal(loaded, raw) {
-		t.Fatal("cancellation command bytes changed")
+	if method != http.MethodPost || target != "/v1/invocations/"+string(testInvocationID)+"/cancel" || !bytes.Equal(loaded, raw) {
+		t.Fatalf("cancellation request method=%s target=%s", method, target)
 	}
-	if _, err := loadCancellation([]string{"018f0000-0000-7000-8000-000000000002", path}, bytes.NewReader(nil), 4096); err == nil {
-		t.Fatal("mismatched invocation accepted")
+	if _, _, _, err := loadCancellation([]string{"not-an-invocation", path}, bytes.NewReader(nil), 4096); err == nil {
+		t.Fatal("invalid invocation accepted")
 	}
 }
 

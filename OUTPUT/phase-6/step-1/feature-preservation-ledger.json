@@ -41,6 +41,8 @@
   "contractImpact": {
     "successorRequired": true,
     "proposedIdentity": "tekroo.kernel.contracts/0.9.0",
+    "implementedIdentity": "tekroo.kernel.contracts/0.9.0",
+    "implementationStatus": "COMPLETE",
     "preserveUnchanged": [
       "story and task lifecycle",
       "DAG and parent-edge invariants",
@@ -105,7 +107,90 @@
         "V4:adapters/mongo/message_store_integration_test.go",
         "V4:organization/host_test.go"
       ],
-      "contractBinding": "Included in the single consolidated 0.9.0 successor package before Phase 6 completion"
+      "contractBinding": "Implemented in the single consolidated tekroo.kernel.contracts/0.9.0 package"
+    },
+    "step4": {
+      "status": "COMPLETE",
+      "featureIds": ["F032", "F033"],
+      "productionEvidence": [
+        "V4:adapters/mcp/handler.go",
+        "V4:adapters/operatortools/service.go",
+        "V4:adapters/operatorhttp/handler.go",
+        "V4:cmd/tekroo/main.go",
+        "V4:cmd/tekrood/main.go"
+      ],
+      "testEvidence": [
+        "V4:adapters/mcp/handler_test.go",
+        "V4:adapters/operatortools/service_test.go",
+        "V4:adapters/operatorhttp/handler_test.go",
+        "V4:cmd/tekroo/main_test.go"
+      ]
+    },
+    "step5": {
+      "status": "COMPLETE",
+      "featureIds": ["F024", "F025", "F026", "F027", "F028", "F029"],
+      "productionEvidence": [
+        "V4:organization/feature.go",
+        "V4:organization/planning.go",
+        "V4:adapters/operationalruntime/feature_operations.go",
+        "V4:adapters/operationalruntime/feature_planning.go",
+        "V4:adapters/mongo/feature_store.go"
+      ],
+      "testEvidence": [
+        "V4:organization/feature_test.go",
+        "V4:organization/planning_test.go",
+        "V4:adapters/operationalruntime/task_admission_integration_test.go"
+      ]
+    },
+    "step6": {
+      "status": "COMPLETE",
+      "featureIds": ["F030", "F031", "F039", "F040", "F047", "F048"],
+      "productionEvidence": [
+        "V4:adapters/operationalruntime/feature_work_recovery.go",
+        "V4:adapters/operationalruntime/task_completion.go",
+        "V4:adapters/operationalruntime/feature_acceptance.go",
+        "V4:adapters/operationalruntime/feature_release.go",
+        "V4:adapters/gitprovider/provider.go",
+        "V4:application/release_coordinator.go"
+      ],
+      "testEvidence": [
+        "V4:adapters/operationalruntime/task_admission_integration_test.go",
+        "V4:adapters/gitprovider/provider_test.go",
+        "V4:application/release_coordinator_test.go"
+      ]
+    },
+    "step7": {
+      "status": "COMPLETE",
+      "featureIds": ["F034", "F035", "F036", "F037", "F038"],
+      "productionEvidence": [
+        "V4:organization/human.go",
+        "V4:adapters/operationalruntime/human_operations.go",
+        "V4:adapters/mongo/human_notifications.go",
+        "V4:adapters/operatorhttp/handler.go",
+        "V4:adapters/mcp/handler.go"
+      ],
+      "testEvidence": [
+        "V4:adapters/operationalruntime/task_admission_integration_test.go",
+        "V4:organization/human_test.go"
+      ]
+    },
+    "step8": {
+      "status": "COMPLETE_WITH_EXPLICIT_DEFERRALS",
+      "implementedFeatureIds": ["F044", "F045", "F046"],
+      "deferredFeatureIds": ["F041", "F042", "F043"],
+      "productionEvidence": [
+        "V4:organization/library.go",
+        "V4:adapters/operationalruntime/diagnostics.go",
+        "V4:adapters/mongo/operational_diagnostics.go",
+        "V4:organization/message.go",
+        "V4:cmd/tekroo/main.go"
+      ],
+      "testEvidence": [
+        "V4:organization/library_test.go",
+        "V4:organization/message_test.go"
+      ],
+      "deferralTarget": "Phase 7 federation, after the local single-team Phase 6 operating pilot",
+      "deferralDependency": "A principal-approved federation trust and routing threat model plus a versioned signed-ingress successor contract"
     }
   },
   "features": [
@@ -680,6 +765,8 @@
       "disposition": "DEFER",
       "target": "explicit alias resolution to exact current FQN",
       "step": 8,
+      "deferredTo": "Phase 7 federation",
+      "dependency": "principal-approved federation trust and routing threat model plus successor contract",
       "acceptance": "alias never becomes durable actor identity and resolution is visible in provenance",
       "defectsToAvoid": ["ambiguous recipient"]
     },
@@ -694,6 +781,8 @@
       "disposition": "DEFER",
       "target": "signed provider-neutral ingress after local team path",
       "step": 8,
+      "deferredTo": "Phase 7 federation",
+      "dependency": "principal-approved federation trust and routing threat model plus successor contract",
       "acceptance": "unknown, stale, replayed, or invalid signatures fail closed before message acceptance",
       "defectsToAvoid": ["federated message causing local process launch"]
     },
@@ -708,6 +797,8 @@
       "disposition": "DEFER",
       "target": "explicit authenticated cross-team route after local team path",
       "step": 8,
+      "deferredTo": "Phase 7 federation",
+      "dependency": "principal-approved federation trust and routing threat model plus successor contract",
       "acceptance": "cross-team request resolves exact source and destination authority without widening local permissions",
       "defectsToAvoid": ["wildcard trust"]
     },
@@ -717,8 +808,8 @@
       "name": "role-library synchronization and validation",
       "v3Evidence": ["V3:mcp/internal/library", "V3:mcp/cmd/tekroo/librarycmd.go"],
       "archaeologyEvidence": ["ARCHAEOLOGY:reports/salvage-matrix.md#internal-library"],
-      "v4State": "ABSENT",
-      "v4Evidence": [],
+      "v4State": "IMPLEMENTED_WIRED",
+      "v4Evidence": ["V4:organization/library.go", "V4:adapters/operationalruntime/production.go", "V4:adapters/mcp/handler.go", "V4:adapters/operatorhttp/handler.go", "V4:cmd/tekroo/main.go"],
       "disposition": "REIMPLEMENT",
       "target": "content-addressed local bundle registry and explicit sync",
       "step": 8,
@@ -731,8 +822,8 @@
       "name": "status diagnostics lifecycle trace and dead-letter operations",
       "v3Evidence": ["V3:mcp/cmd/tekroo/debugcmd.go", "V3:mcp/cmd/tekroo/deadlettercmd.go", "V3:mcp/internal/operatormon"],
       "archaeologyEvidence": ["ARCHAEOLOGY:adjudication/supporting-surface-decisions.json"],
-      "v4State": "PARTIAL",
-      "v4Evidence": ["V4:adapters/operatorhttp/handler.go", "V4:cmd/tekroo/main.go", "V4:adapters/mongo/event_export.go"],
+      "v4State": "IMPLEMENTED_WIRED",
+      "v4Evidence": ["V4:adapters/operationalruntime/diagnostics.go", "V4:adapters/mongo/operational_diagnostics.go", "V4:organization/message.go", "V4:adapters/operatorhttp/handler.go", "V4:adapters/mcp/handler.go", "V4:cmd/tekroo/main.go", "V4:adapters/mongo/event_export.go"],
       "disposition": "REIMPLEMENT",
       "target": "read-only operational views plus explicit repair commands",
       "step": 8,

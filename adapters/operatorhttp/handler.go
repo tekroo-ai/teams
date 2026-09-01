@@ -51,6 +51,7 @@ type Service interface {
 	RespondToHumanQuestion(context.Context, kernel.PrincipalRef, organization.HumanResponseInput) (organization.HumanNotification, error)
 	ReadHumanInteraction(context.Context, kernel.UUIDv7) (kernel.HumanInteractionSnapshot, error)
 	HumanNotifications(context.Context, kernel.PrincipalRef, bool) ([]organization.HumanNotification, error)
+	RequestInvocationCancellation(context.Context, kernel.PrincipalRef, kernel.UUIDv7, operationalruntime.CancellationRequest) (operationalruntime.InvocationStatus, error)
 }
 
 type OrganizationalService interface {
@@ -125,6 +126,8 @@ func (handler *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Requ
 		handler.story(writer, request, strings.TrimPrefix(request.URL.Path, "/v1/stories/"))
 	case request.Method == http.MethodGet && strings.HasPrefix(request.URL.Path, "/v1/invocations/"):
 		handler.invocation(writer, request, strings.TrimPrefix(request.URL.Path, "/v1/invocations/"))
+	case request.Method == http.MethodPost && strings.HasPrefix(request.URL.Path, "/v1/invocations/") && strings.HasSuffix(request.URL.Path, "/cancel"):
+		handler.cancelInvocation(writer, request, strings.TrimSuffix(strings.TrimPrefix(request.URL.Path, "/v1/invocations/"), "/cancel"))
 	case request.Method == http.MethodGet && request.URL.Path == "/v1/roles":
 		handler.roles(writer, request)
 	case request.Method == http.MethodGet && request.URL.Path == "/v1/libraries":
@@ -184,6 +187,21 @@ func (handler *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Requ
 	default:
 		writeError(writer, http.StatusNotFound, "NOT_FOUND")
 	}
+}
+
+func (handler *Handler) cancelInvocation(writer http.ResponseWriter, request *http.Request, value string) {
+	id := kernel.UUIDv7(value)
+	var input operationalruntime.CancellationRequest
+	if !id.Valid() || strings.Contains(value, "/") || decodeBody(writer, request, handler.maxBody, &input) != nil || !input.Valid() {
+		writeError(writer, http.StatusBadRequest, "INVALID_CANCELLATION_REQUEST")
+		return
+	}
+	status, err := handler.service.RequestInvocationCancellation(request.Context(), handler.principal, id, input)
+	if err != nil {
+		writeError(writer, http.StatusConflict, "CANCELLATION_REJECTED")
+		return
+	}
+	writeJSON(writer, http.StatusOK, status)
 }
 
 func (handler *Handler) humanNotifications(writer http.ResponseWriter, request *http.Request) {
