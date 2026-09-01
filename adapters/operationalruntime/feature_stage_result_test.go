@@ -57,6 +57,10 @@ func TestPreAssignmentPlanningResultsPreserveOperatorSuppliedActorFQN(t *testing
 	if _, err := parseRefinementStageResult(invented, allowed...); err == nil {
 		t.Fatal("model-invented FQN was accepted")
 	}
+	syntaxReference := []byte(application.OrganizationalResultMarker + "\n{\"schema_version\":\"1.0.0\",\"result_type\":\"FEATURE_REFINEMENT\",\"acceptance_criteria\":[\"names containing the FQN separator :: are rejected\",\"teams::coder-1 remains authoritative\"],\"clarification_questions\":[],\"priority\":\"HIGH\"}")
+	if _, err := parseRefinementStageResult(syntaxReference, allowed...); err != nil {
+		t.Fatalf("FQN syntax reference was rejected as an actor identity: %v", err)
+	}
 }
 
 func TestFeaturePlanningDescriptionCarriesAuthoritativeFeatureState(t *testing.T) {

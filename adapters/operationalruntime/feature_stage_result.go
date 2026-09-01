@@ -130,7 +130,10 @@ func containsPreAssignmentOperationalIdentityExcept(allowedActorFQNs []kernel.Ac
 			}
 			actor, err := kernel.ParseActorFQN(token)
 			if err != nil {
-				return true
+				// Syntax references such as the bare FQN separator "::" are
+				// requirements, not operational identities. Only a token that
+				// parses as an actor FQN can introduce an actor assignment.
+				continue
 			}
 			if _, authorized := allowed[actor]; !authorized {
 				return true
