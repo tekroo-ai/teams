@@ -250,6 +250,14 @@ func (s *Store) ensureIndexes(ctx context.Context) error {
 			{Keys: bson.D{{Key: "submitted_by_kind", Value: 1}, {Key: "submitted_by_id", Value: 1}, {Key: "idempotency_key", Value: 1}}, Options: options.Index().SetName("feature_submitter_idempotency_unique").SetUnique(true)},
 			{Keys: bson.D{{Key: "status", Value: 1}, {Key: "updated_at", Value: 1}}, Options: options.Index().SetName("feature_status_updated")},
 		},
+		"federation_receipts": {
+			{Keys: bson.D{{Key: "delivery_id", Value: 1}}, Options: options.Index().SetName("federation_delivery_unique").SetUnique(true)},
+			{Keys: bson.D{{Key: "route_id", Value: 1}, {Key: "route_revision", Value: 1}, {Key: "accepted_at", Value: 1}}, Options: options.Index().SetName("federation_route_accepted")},
+		},
+		"federation_outbound": {
+			{Keys: bson.D{{Key: "replay_id", Value: 1}}, Options: options.Index().SetName("federation_outbound_replay_unique").SetUnique(true)},
+			{Keys: bson.D{{Key: "route_id", Value: 1}, {Key: "route_revision", Value: 1}, {Key: "recorded_at", Value: 1}}, Options: options.Index().SetName("federation_outbound_route_recorded")},
+		},
 	}
 	for collection, indexes := range definitions {
 		if _, err := s.db.Collection(collection).Indexes().CreateMany(ctx, indexes); err != nil {

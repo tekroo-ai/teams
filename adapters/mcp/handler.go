@@ -45,6 +45,9 @@ const (
 	DiagnosticsToolName    = "tekroo.diagnostics.get"
 	DeadLetterRepairName   = "tekroo.deadletter.repair"
 	InvocationCancelName   = "tekroo.invocation.cancel"
+	FederationInspectName  = "tekroo.federation.inspect"
+	FederationResolveName  = "tekroo.federation.alias.resolve"
+	FederationSendName     = "tekroo.federation.message.send"
 	DefaultMaxBodyBytes    = int64(1 << 20)
 	codeHeaderMismatch     = -32020
 	codeUnsupportedVersion = -32022
@@ -400,6 +403,9 @@ func organizationalTools() []any {
 		map[string]any{"name": DiagnosticsToolName, "title": "Inspect operational diagnostics", "description": "Read active tasks, message claims, dead letters, projection faults, role state, and library identities without mutation.", "inputSchema": object(nil, map[string]any{})},
 		map[string]any{"name": DeadLetterRepairName, "title": "Repair dead letter", "description": "Append an explicitly authorized DAG successor without reopening the failed delivery or resetting its finite budget.", "inputSchema": object([]string{"failed_message_id", "successor"}, map[string]any{"failed_message_id": uuid, "successor": map[string]any{"type": "object"}})},
 		map[string]any{"name": InvocationCancelName, "title": "Cancel invocation", "description": "Request durable cancellation of one exact active invocation with bound evidence.", "inputSchema": object([]string{"invocation_id", "request"}, map[string]any{"invocation_id": uuid, "request": map[string]any{"type": "object"}})},
+		map[string]any{"name": FederationInspectName, "title": "Inspect federation", "description": "Inspect exact configured aliases, routes, and public trust grants.", "inputSchema": object(nil, map[string]any{})},
+		map[string]any{"name": FederationResolveName, "title": "Resolve federation alias", "description": "Resolve one revisioned convenience alias to its exact actor, deployment, and route.", "inputSchema": object([]string{"alias"}, map[string]any{"alias": map[string]any{"type": "string", "minLength": 1, "maxLength": 64}})},
+		map[string]any{"name": FederationSendName, "title": "Send federated message", "description": "Sign and send one exact organizational message through one configured alias and route.", "inputSchema": object([]string{"alias", "message"}, map[string]any{"alias": map[string]any{"type": "string", "minLength": 1, "maxLength": 64}, "message": map[string]any{"type": "object"}})},
 		map[string]any{"name": RolesListToolName, "title": "List configured team roles", "description": "Inspect exact role identities and lifecycle state.", "inputSchema": object(nil, map[string]any{})},
 		map[string]any{
 			"name": RoleControlToolName, "title": "Control one role",

@@ -14,7 +14,7 @@ import (
 	"github.com/tekroo-ai/teams/kernel"
 )
 
-const contractRoot = "CONTRACTS/tekroo.kernel.contracts/0.9.0"
+const contractRoot = "CONTRACTS/tekroo.kernel.contracts/0.10.0"
 
 type fixtureDocument struct {
 	Fixtures []fixture `json:"fixtures"`

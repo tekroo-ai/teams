@@ -52,19 +52,33 @@ type Organization interface {
 	Diagnostics(context.Context) (operationalruntime.Diagnostics, error)
 	RepairDeadLetter(context.Context, kernel.UUIDv7, organization.OrganizationalMessage) error
 	RequestInvocationCancellation(context.Context, kernel.PrincipalRef, kernel.UUIDv7, operationalruntime.CancellationRequest) (operationalruntime.InvocationStatus, error)
+	FederationSnapshot() operationalruntime.FederationSnapshot
+	ResolveFederationAlias(context.Context, string) (organization.AliasBinding, organization.FederationRoute, error)
+	SendFederatedMessage(context.Context, string, organization.OrganizationalMessage) (organization.FederationDeliveryReceipt, error)
 }
 
 // Service translates focused operator operations into domain calls while the
 // MCP package remains a transport-only adapter.
 type Service struct {
 	organization Organization
+	operator     kernel.PrincipalRef
 }
 
 func New(organization Organization) (*Service, error) {
 	if organization == nil {
 		return nil, ErrInvalidConfiguration
 	}
-	return &Service{organization: organization}, nil
+	service := &Service{organization: organization}
+	if provider, ok := organization.(interface {
+		OperatorIdentity() protocol.AuthenticatedContext
+	}); ok {
+		identity := provider.OperatorIdentity()
+		if !identity.Valid() || identity.Principal.Kind != kernel.PrincipalHuman {
+			return nil, ErrInvalidConfiguration
+		}
+		service.operator = identity.Principal
+	}
+	return service, nil
 }
 
 func (service *Service) CallTool(ctx context.Context, identity protocol.AuthenticatedContext, name string, arguments json.RawMessage) (any, error) {
@@ -72,6 +86,9 @@ func (service *Service) CallTool(ctx context.Context, identity protocol.Authenti
 		return nil, ErrInvalidConfiguration
 	}
 	if !identity.Valid() || identity.Principal.Kind != kernel.PrincipalHuman || identity.ActorFQN != nil || identity.Execution != nil {
+		return nil, ErrInvalidArguments
+	}
+	if name == mcp.FederationSendName && service.operator.Valid() && identity.Principal != service.operator {
 		return nil, ErrInvalidArguments
 	}
 	switch name {
@@ -165,6 +182,33 @@ func (service *Service) CallTool(ctx context.Context, identity protocol.Authenti
 			return nil, ErrInvalidArguments
 		}
 		return service.organization.RequestInvocationCancellation(ctx, identity.Principal, input.InvocationID, input.Request)
+	case mcp.FederationInspectName:
+		var input struct{}
+		if err := decodeStrict(arguments, &input); err != nil {
+			return nil, ErrInvalidArguments
+		}
+		return service.organization.FederationSnapshot(), nil
+	case mcp.FederationResolveName:
+		var input struct {
+			Alias string `json:"alias"`
+		}
+		if err := decodeStrict(arguments, &input); err != nil || input.Alias == "" {
+			return nil, ErrInvalidArguments
+		}
+		alias, route, err := service.organization.ResolveFederationAlias(ctx, input.Alias)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{"alias": alias, "route": route}, nil
+	case mcp.FederationSendName:
+		var input struct {
+			Alias   string                             `json:"alias"`
+			Message organization.OrganizationalMessage `json:"message"`
+		}
+		if err := decodeStrict(arguments, &input); err != nil || input.Alias == "" {
+			return nil, ErrInvalidArguments
+		}
+		return service.organization.SendFederatedMessage(ctx, input.Alias, input.Message)
 	case mcp.FeatureSubmitToolName:
 		var input organization.FeatureRequestInput
 		if err := decodeStrict(arguments, &input); err != nil || input.Validate() != nil {

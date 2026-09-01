@@ -37,8 +37,35 @@ func TestRoleControlUsesExactActorAndRejectsUnknownOperation(t *testing.T) {
 	}
 }
 
+func TestFederationInspectionUsesFocusedOperatorSurface(t *testing.T) {
+	service, err := operatortools.New(&fakeOrganization{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	identity := protocol.AuthenticatedContext{Principal: kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "operator"}}
+	value, err := service.CallTool(context.Background(), identity, mcp.FederationInspectName, json.RawMessage(`{}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshot, ok := value.(operationalruntime.FederationSnapshot)
+	if !ok || snapshot.Configured {
+		t.Fatalf("snapshot=%#v", value)
+	}
+	if _, err := service.CallTool(context.Background(), identity, mcp.FederationResolveName, json.RawMessage(`{"alias":"missing"}`)); !errors.Is(err, organization.ErrFederationUnauthorized) {
+		t.Fatalf("resolve err=%v", err)
+	}
+	nonOperator := protocol.AuthenticatedContext{Principal: kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "sme"}}
+	if _, err := service.CallTool(context.Background(), nonOperator, mcp.FederationSendName, json.RawMessage(`{"alias":"remote","message":{}}`)); !errors.Is(err, operatortools.ErrInvalidArguments) {
+		t.Fatalf("non-operator federation send err=%v", err)
+	}
+}
+
 type fakeOrganization struct {
 	restarted kernel.ActorFQN
+}
+
+func (*fakeOrganization) OperatorIdentity() protocol.AuthenticatedContext {
+	return protocol.AuthenticatedContext{Principal: kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "operator"}}
 }
 
 func (*fakeOrganization) Status() operationalruntime.ControlStatus {
@@ -129,4 +156,13 @@ func (*fakeOrganization) RepairDeadLetter(context.Context, kernel.UUIDv7, organi
 }
 func (*fakeOrganization) RequestInvocationCancellation(context.Context, kernel.PrincipalRef, kernel.UUIDv7, operationalruntime.CancellationRequest) (operationalruntime.InvocationStatus, error) {
 	return operationalruntime.InvocationStatus{}, nil
+}
+func (*fakeOrganization) FederationSnapshot() operationalruntime.FederationSnapshot {
+	return operationalruntime.FederationSnapshot{}
+}
+func (*fakeOrganization) ResolveFederationAlias(context.Context, string) (organization.AliasBinding, organization.FederationRoute, error) {
+	return organization.AliasBinding{}, organization.FederationRoute{}, organization.ErrFederationUnauthorized
+}
+func (*fakeOrganization) SendFederatedMessage(context.Context, string, organization.OrganizationalMessage) (organization.FederationDeliveryReceipt, error) {
+	return organization.FederationDeliveryReceipt{}, organization.ErrFederationUnauthorized
 }

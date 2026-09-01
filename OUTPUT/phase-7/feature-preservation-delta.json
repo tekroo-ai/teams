@@ -1,0 +1,73 @@
+{
+  "schemaVersion": "1.0.0",
+  "phase": "Phase 7",
+  "predecessor": "OUTPUT/phase-6/step-1/feature-preservation-ledger.json",
+  "predecessorMutation": "NONE",
+  "entries": [
+    {
+      "id": "F041",
+      "name": "aliases without identity weakening",
+      "priorState": "ABSENT_DEFERRED_TO_PHASE_7",
+      "state": "IMPLEMENTED_WIRED",
+      "implementation": [
+        "organization/federation.go",
+        "adapters/operationalruntime/production.go",
+        "adapters/operatorhttp/handler.go",
+        "adapters/operatortools/service.go",
+        "cmd/tekroo/main.go"
+      ],
+      "tests": [
+        "organization.TestFederationExactSignedIngressAndReplay",
+        "organization.TestFederationCoordinatorResolvesAuthorizesRecordsThenSends",
+        "organization.TestFederationRejectsWildcardsAndInsecureRemoteEndpoint",
+        "cmd/tekroo.TestLoadFederatedMessageWrapsAliasWithoutWeakeningIdentity"
+      ],
+      "acceptance": "alias resolves before signing to one exact actor, deployment, route, and revision; alias is provenance and never durable recipient identity"
+    },
+    {
+      "id": "F042",
+      "name": "trusted partners and signed cross-host ingress",
+      "priorState": "ABSENT_DEFERRED_TO_PHASE_7",
+      "state": "IMPLEMENTED_WIRED",
+      "implementation": [
+        "organization/federation.go",
+        "adapters/federationhttp/handler.go",
+        "adapters/federationhttp/client.go",
+        "adapters/mongo/federation_store.go",
+        "cmd/tekrood/main.go"
+      ],
+      "tests": [
+        "organization.TestFederationRejectsTamperAuthorityClockReplayAndLoop",
+        "adapters/federationhttp.TestHandlerAndClientAcceptExactlyOnce",
+        "adapters/federationhttp.TestTwoDeploymentExactFederatedSend",
+        "adapters/mongo.TestFederationReceiptAndMessageAppendAreExactlyOnce"
+      ],
+      "acceptance": "unknown, revoked, premature, expired, future, replay-conflicting, digest-mismatched, route-mismatched, or signature-invalid input fails before message append"
+    },
+    {
+      "id": "F043",
+      "name": "cross-team exact routing",
+      "priorState": "ABSENT_DEFERRED_TO_PHASE_7",
+      "state": "IMPLEMENTED_WIRED",
+      "implementation": [
+        "organization/federation_outbound.go",
+        "adapters/mongo/federation_store.go",
+        "adapters/federationhttp/client.go",
+        "adapters/operationalruntime/production.go"
+      ],
+      "tests": [
+        "organization.TestFederationCoordinatorResolvesAuthorizesRecordsThenSends",
+        "adapters/federationhttp.TestTwoDeploymentExactFederatedSend",
+        "adapters/mongo.TestFederationOutboundRecordPreservesThreadForReply",
+        "adapters/operationalruntime.TestProductionServiceStartsAndStopsAcceptedRuntimeFromFileConfiguration"
+      ],
+      "acceptance": "exact source and destination authority is route-scoped; outbound and inbound preserve causal DAG, budget, lifecycle, scope, and progress lineage without local permission widening"
+    }
+  ],
+  "counts": {
+    "priorDeferred": 3,
+    "implementedWired": 3,
+    "implicitRetirements": 0,
+    "unclassified": 0
+  }
+}

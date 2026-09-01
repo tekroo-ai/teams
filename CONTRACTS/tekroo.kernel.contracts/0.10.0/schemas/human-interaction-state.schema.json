@@ -1,0 +1,157 @@
+{
+  "$id": "https://contracts.tekroo.ai/tekroo.kernel.contracts/0.10.0/schemas/human-interaction-state.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "accepted_human_ids": {
+      "items": {
+        "maxLength": 4096,
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxItems": 64,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "canonical_question_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "confidentiality": {
+      "enum": [
+        "PUBLIC",
+        "INTERNAL",
+        "CONFIDENTIAL",
+        "RESTRICTED"
+      ],
+      "type": "string"
+    },
+    "deadline_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "declared_effect": {
+      "enum": [
+        "ADVISORY_ONLY",
+        "AUTHORITY_IF_AUTHORIZED",
+        "EVIDENCE_ONLY"
+      ],
+      "type": "string"
+    },
+    "id": {
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "type": "string"
+    },
+    "kind": {
+      "const": "human-interaction"
+    },
+    "phase": {
+      "enum": [
+        "CLOSED",
+        "COLLECTING",
+        "EXPIRED",
+        "OPEN",
+        "SATISFIED"
+      ],
+      "type": "string"
+    },
+    "question_revision": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "response_policy": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "EXACT_ONE"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "ANY_ONE"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "ALL"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "QUORUM"
+            },
+            "quorum": {
+              "maximum": 64,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "kind",
+            "quorum"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "response_specification_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "revision": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "selected_human_ids": {
+      "items": {
+        "maxLength": 4096,
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxItems": 64,
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    }
+  },
+  "required": [
+    "id",
+    "kind",
+    "revision",
+    "phase",
+    "question_revision",
+    "canonical_question_digest",
+    "response_specification_digest",
+    "selected_human_ids",
+    "accepted_human_ids",
+    "response_policy",
+    "declared_effect",
+    "confidentiality",
+    "deadline_at"
+  ],
+  "title": "Finite directed human question, delivery, response, and closure state",
+  "type": "object"
+}

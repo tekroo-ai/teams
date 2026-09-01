@@ -67,7 +67,7 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 	}
 	defer closeRuntimeStore(t, store)
 
-	catalogue, err := contract.Load(os.DirFS(filepath.Join("..", "..")), "CONTRACTS/tekroo.kernel.contracts/0.9.0")
+	catalogue, err := contract.Load(os.DirFS(filepath.Join("..", "..")), "CONTRACTS/tekroo.kernel.contracts/0.10.0")
 	if err != nil {
 		t.Fatal(err)
 	}

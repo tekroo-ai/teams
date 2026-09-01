@@ -1,0 +1,96 @@
+{
+  "contractIdentity": "tekroo.kernel.contracts/0.10.0",
+  "fixtures": [
+    {
+      "assertion": "an alias resolves to one exact actor, deployment, route, and revision before signing",
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "P7-FED-001",
+      "kind": "ALIAS"
+    },
+    {
+      "assertion": "wildcard, ambiguous, stale, or remotely supplied alias routing is rejected",
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "P7-FED-002",
+      "kind": "ALIAS"
+    },
+    {
+      "assertion": "an exact authorized Ed25519 envelope appends one organizational message",
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "P7-FED-003",
+      "kind": "SIGNED_INGRESS"
+    },
+    {
+      "assertion": "unknown, revoked, premature, expired, or signature-invalid keys fail before append",
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "P7-FED-004",
+      "kind": "SIGNED_INGRESS"
+    },
+    {
+      "assertion": "signature validity cannot widen exact source, destination, type, or purpose authority",
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "P7-FED-005",
+      "kind": "ROUTE_AUTHORITY"
+    },
+    {
+      "assertion": "duplicate delivery returns the retained receipt and never appends a second message",
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "P7-FED-006",
+      "kind": "REPLAY"
+    },
+    {
+      "assertion": "replay ID reuse with different bytes fails closed",
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "P7-FED-007",
+      "kind": "REPLAY"
+    },
+    {
+      "assertion": "future, stale, or expired envelopes fail closed",
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "P7-FED-008",
+      "kind": "CLOCK"
+    },
+    {
+      "assertion": "payload mutation or nonmatching message digest fails closed",
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "P7-FED-009",
+      "kind": "DIGEST"
+    },
+    {
+      "assertion": "a deployment may occur only once in a finite route trace",
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "P7-FED-010",
+      "kind": "ROUTE_TRACE"
+    },
+    {
+      "assertion": "production routes require HTTPS and cannot expose operator or MCP tools",
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "P7-FED-011",
+      "kind": "TRANSPORT"
+    },
+    {
+      "assertion": "federated receipt cannot launch a role, invoke a model, reset a budget, or mutate SMA",
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "P7-FED-012",
+      "kind": "AUTHORITY"
+    },
+    {
+      "assertion": "DAG, budget, lifecycle, scope, causation, and progress lineage survive transport unchanged",
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "P7-FED-013",
+      "kind": "LINEAGE"
+    },
+    {
+      "assertion": "uncertain outbound delivery reconciles by exact delivery identity before retry",
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "P7-FED-014",
+      "kind": "OUTBOUND"
+    },
+    {
+      "assertion": "operator HTTP, MCP, and CLI inspect and send without direct database access",
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "P7-FED-015",
+      "kind": "OPERATOR"
+    }
+  ],
+  "schemaVersion": "1.0.0"
+}

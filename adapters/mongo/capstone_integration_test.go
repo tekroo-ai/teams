@@ -379,7 +379,7 @@ func loadCapstoneCatalogue(t *testing.T) kernel.CatalogueSnapshot {
 		t.Fatal("locate capstone test")
 	}
 	root := filepath.Clean(filepath.Join(filepath.Dir(file), "../.."))
-	catalogue, err := contract.Load(os.DirFS(root), "CONTRACTS/tekroo.kernel.contracts/0.9.0")
+	catalogue, err := contract.Load(os.DirFS(root), "CONTRACTS/tekroo.kernel.contracts/0.10.0")
 	if err != nil {
 		t.Fatal(err)
 	}

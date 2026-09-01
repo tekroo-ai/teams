@@ -28,7 +28,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
-const testManifestSHA = kernel.Digest("dade26b7f02164b7d366735a15bd0e4253ac6796c6120bed0c5f02fda1bbeb9c")
+const testManifestSHA = kernel.Digest("2752b876d5a71bb1367a088b9f8cc0ad5df6343b0833906c49aae5a404b8db98")
 
 var (
 	testMongoURI string
@@ -62,7 +62,7 @@ func TestStartupRejectsUnsupportedTopology(t *testing.T) {
 }
 
 func TestStartupPinsMetadataAndRequiredIndexes(t *testing.T) {
-	manifest, err := os.ReadFile("../../CONTRACTS/tekroo.kernel.contracts/0.9.0/manifest.json")
+	manifest, err := os.ReadFile("../../CONTRACTS/tekroo.kernel.contracts/0.10.0/manifest.json")
 	if err != nil {
 		t.Fatal(err)
 	}

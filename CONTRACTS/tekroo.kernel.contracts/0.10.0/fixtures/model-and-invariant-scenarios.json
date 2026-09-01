@@ -1,0 +1,5755 @@
+{
+  "contractIdentity": "tekroo.kernel.contracts/0.10.0",
+  "fixtures": [
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "COMPATIBILITY-1.0-MISSING-CONTEXT",
+      "given": {
+        "sourceVersion": "1.0.0"
+      },
+      "kind": "COMPATIBILITY_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-012"
+      ],
+      "then": {
+        "expected": {
+          "outcome": "MIGRATION_REQUIRED"
+        }
+      },
+      "when": {
+        "exactContextAvailable": false
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "DAG-REJECT-CYCLE",
+      "given": {
+        "nodes": [
+          "a",
+          "b"
+        ]
+      },
+      "kind": "DAG_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-005"
+      ],
+      "then": {
+        "expected": {
+          "reason": "CYCLE",
+          "valid": false
+        }
+      },
+      "when": {
+        "edges": [
+          {
+            "child": "b",
+            "parent": "a"
+          },
+          {
+            "child": "a",
+            "parent": "b"
+          }
+        ]
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "DAG-VALID-BRANCH-JOIN",
+      "given": {
+        "nodes": [
+          "root",
+          "left",
+          "right",
+          "join"
+        ]
+      },
+      "kind": "DAG_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-005"
+      ],
+      "then": {
+        "expected": {
+          "reason": null,
+          "valid": true
+        }
+      },
+      "when": {
+        "edges": [
+          {
+            "child": "left",
+            "parent": "root"
+          },
+          {
+            "child": "right",
+            "parent": "root"
+          },
+          {
+            "child": "join",
+            "parent": "left"
+          },
+          {
+            "child": "join",
+            "parent": "right"
+          }
+        ]
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "ESCALATION-ADJUDICATOR-DEADLINE",
+      "given": {
+        "adjudicator": {
+          "id": "principal-adjudicator",
+          "kind": "HUMAN"
+        },
+        "deadlineAt": "2026-08-12T00:00:00Z",
+        "resolutionRoundLimit": 1,
+        "state": "OPEN",
+        "subjectLifecycleEpoch": 1,
+        "timeoutPolicy": {
+          "id": "escalation-timeout-policy",
+          "kind": "POLICY"
+        }
+      },
+      "kind": "ESCALATION_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-005",
+        "P2-KCF-007"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "ADJUDICATOR_DEADLINE_EXCEEDED",
+          "state": "OPEN"
+        }
+      },
+      "when": {
+        "action": "RESOLVE",
+        "authority": {
+          "id": "principal-adjudicator",
+          "kind": "HUMAN"
+        },
+        "decidedAt": "2026-08-12T00:00:01Z",
+        "outcome": "RESOLVED",
+        "round": 1,
+        "sourceRole": "ADJUDICATOR",
+        "subjectLifecycleEpoch": 1
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "ESCALATION-EXACT-ADJUDICATOR",
+      "given": {
+        "adjudicator": {
+          "id": "principal-adjudicator",
+          "kind": "HUMAN"
+        },
+        "deadlineAt": "2026-08-12T00:00:00Z",
+        "resolutionRoundLimit": 1,
+        "state": "OPEN",
+        "subjectLifecycleEpoch": 1,
+        "timeoutPolicy": {
+          "id": "escalation-timeout-policy",
+          "kind": "POLICY"
+        }
+      },
+      "kind": "ESCALATION_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-005",
+        "P2-KCF-007"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "reason": "ACCEPTED",
+          "state": "TERMINAL"
+        }
+      },
+      "when": {
+        "action": "RESOLVE",
+        "authority": {
+          "id": "principal-adjudicator",
+          "kind": "HUMAN"
+        },
+        "decidedAt": "2026-08-11T12:00:00Z",
+        "outcome": "RESOLVED",
+        "round": 1,
+        "sourceRole": "ADJUDICATOR",
+        "subjectLifecycleEpoch": 1
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "ESCALATION-NO-REROUTE",
+      "given": {
+        "adjudicator": {
+          "id": "principal-adjudicator",
+          "kind": "HUMAN"
+        },
+        "deadlineAt": "2026-08-12T00:00:00Z",
+        "resolutionRoundLimit": 1,
+        "state": "OPEN",
+        "subjectLifecycleEpoch": 1,
+        "timeoutPolicy": {
+          "id": "escalation-timeout-policy",
+          "kind": "POLICY"
+        }
+      },
+      "kind": "ESCALATION_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-005",
+        "P2-KCF-007"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "REROUTE_PROHIBITED",
+          "state": "OPEN"
+        }
+      },
+      "when": {
+        "action": "REROUTE"
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "ESCALATION-POLICY-TIMEOUT",
+      "given": {
+        "adjudicator": {
+          "id": "principal-adjudicator",
+          "kind": "HUMAN"
+        },
+        "deadlineAt": "2026-08-12T00:00:00Z",
+        "resolutionRoundLimit": 1,
+        "state": "OPEN",
+        "subjectLifecycleEpoch": 1,
+        "timeoutPolicy": {
+          "id": "escalation-timeout-policy",
+          "kind": "POLICY"
+        }
+      },
+      "kind": "ESCALATION_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-005",
+        "P2-KCF-007"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "reason": "ACCEPTED",
+          "state": "TERMINAL"
+        }
+      },
+      "when": {
+        "action": "RESOLVE",
+        "authority": {
+          "id": "escalation-timeout-policy",
+          "kind": "POLICY"
+        },
+        "decidedAt": "2026-08-12T00:00:01Z",
+        "outcome": "HUMAN_REQUIRED",
+        "round": 1,
+        "sourceRole": "POLICY_TIMEOUT",
+        "subjectLifecycleEpoch": 1
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "ESCALATION-ROUND-EXHAUSTED",
+      "given": {
+        "adjudicator": {
+          "id": "principal-adjudicator",
+          "kind": "HUMAN"
+        },
+        "deadlineAt": "2026-08-12T00:00:00Z",
+        "resolutionRoundLimit": 1,
+        "state": "OPEN",
+        "subjectLifecycleEpoch": 1,
+        "timeoutPolicy": {
+          "id": "escalation-timeout-policy",
+          "kind": "POLICY"
+        }
+      },
+      "kind": "ESCALATION_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-005",
+        "P2-KCF-007"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "RESOLUTION_BUDGET_EXHAUSTED",
+          "state": "OPEN"
+        }
+      },
+      "when": {
+        "action": "RESOLVE",
+        "authority": {
+          "id": "principal-adjudicator",
+          "kind": "HUMAN"
+        },
+        "decidedAt": "2026-08-11T12:00:00Z",
+        "outcome": "RESOLVED",
+        "round": 2,
+        "sourceRole": "ADJUDICATOR",
+        "subjectLifecycleEpoch": 1
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "ESCALATION-ROUTE-ONCE",
+      "given": {
+        "adjudicator": {
+          "id": "principal-adjudicator",
+          "kind": "HUMAN"
+        },
+        "deadlineAt": "2026-08-12T00:00:00Z",
+        "resolutionRoundLimit": 1,
+        "state": "OPEN",
+        "subjectLifecycleEpoch": 1,
+        "timeoutPolicy": {
+          "id": "escalation-timeout-policy",
+          "kind": "POLICY"
+        }
+      },
+      "kind": "ESCALATION_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-005",
+        "P2-KCF-007"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "ESCALATION_ALREADY_OPEN",
+          "state": "OPEN"
+        }
+      },
+      "when": {
+        "action": "OPEN"
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "ESCALATION-STALE-LIFECYCLE",
+      "given": {
+        "adjudicator": {
+          "id": "principal-adjudicator",
+          "kind": "HUMAN"
+        },
+        "deadlineAt": "2026-08-12T00:00:00Z",
+        "resolutionRoundLimit": 1,
+        "state": "OPEN",
+        "subjectLifecycleEpoch": 1,
+        "timeoutPolicy": {
+          "id": "escalation-timeout-policy",
+          "kind": "POLICY"
+        }
+      },
+      "kind": "ESCALATION_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-005",
+        "P2-KCF-007"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "LIFECYCLE_EPOCH_MISMATCH",
+          "state": "OPEN"
+        }
+      },
+      "when": {
+        "action": "RESOLVE",
+        "authority": {
+          "id": "principal-adjudicator",
+          "kind": "HUMAN"
+        },
+        "decidedAt": "2026-08-11T12:00:00Z",
+        "outcome": "RESOLVED",
+        "round": 1,
+        "sourceRole": "ADJUDICATOR",
+        "subjectLifecycleEpoch": 2
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "ESCALATION-TERMINAL",
+      "given": {
+        "adjudicator": {
+          "id": "principal-adjudicator",
+          "kind": "HUMAN"
+        },
+        "deadlineAt": "2026-08-12T00:00:00Z",
+        "resolutionRoundLimit": 1,
+        "state": "TERMINAL",
+        "subjectLifecycleEpoch": 1,
+        "timeoutPolicy": {
+          "id": "escalation-timeout-policy",
+          "kind": "POLICY"
+        }
+      },
+      "kind": "ESCALATION_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-005",
+        "P2-KCF-007"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "ESCALATION_TERMINAL",
+          "state": "TERMINAL"
+        }
+      },
+      "when": {
+        "action": "RESOLVE",
+        "authority": {
+          "id": "principal-adjudicator",
+          "kind": "HUMAN"
+        },
+        "decidedAt": "2026-08-11T12:00:00Z",
+        "outcome": "RESOLVED",
+        "round": 1,
+        "sourceRole": "ADJUDICATOR",
+        "subjectLifecycleEpoch": 1
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "ESCALATION-TIMEOUT-BEFORE-DEADLINE",
+      "given": {
+        "adjudicator": {
+          "id": "principal-adjudicator",
+          "kind": "HUMAN"
+        },
+        "deadlineAt": "2026-08-12T00:00:00Z",
+        "resolutionRoundLimit": 1,
+        "state": "OPEN",
+        "subjectLifecycleEpoch": 1,
+        "timeoutPolicy": {
+          "id": "escalation-timeout-policy",
+          "kind": "POLICY"
+        }
+      },
+      "kind": "ESCALATION_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-005",
+        "P2-KCF-007"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "DEADLINE_NOT_REACHED",
+          "state": "OPEN"
+        }
+      },
+      "when": {
+        "action": "RESOLVE",
+        "authority": {
+          "id": "escalation-timeout-policy",
+          "kind": "POLICY"
+        },
+        "decidedAt": "2026-08-11T12:00:00Z",
+        "outcome": "BLOCKED",
+        "round": 1,
+        "sourceRole": "POLICY_TIMEOUT",
+        "subjectLifecycleEpoch": 1
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "ESCALATION-TIMEOUT-OUTCOME",
+      "given": {
+        "adjudicator": {
+          "id": "principal-adjudicator",
+          "kind": "HUMAN"
+        },
+        "deadlineAt": "2026-08-12T00:00:00Z",
+        "resolutionRoundLimit": 1,
+        "state": "OPEN",
+        "subjectLifecycleEpoch": 1,
+        "timeoutPolicy": {
+          "id": "escalation-timeout-policy",
+          "kind": "POLICY"
+        }
+      },
+      "kind": "ESCALATION_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-005",
+        "P2-KCF-007"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "INVALID_TIMEOUT_OUTCOME",
+          "state": "OPEN"
+        }
+      },
+      "when": {
+        "action": "RESOLVE",
+        "authority": {
+          "id": "escalation-timeout-policy",
+          "kind": "POLICY"
+        },
+        "decidedAt": "2026-08-12T00:00:01Z",
+        "outcome": "RESOLVED",
+        "round": 1,
+        "sourceRole": "POLICY_TIMEOUT",
+        "subjectLifecycleEpoch": 1
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "ESCALATION-WRONG-ADJUDICATOR",
+      "given": {
+        "adjudicator": {
+          "id": "principal-adjudicator",
+          "kind": "HUMAN"
+        },
+        "deadlineAt": "2026-08-12T00:00:00Z",
+        "resolutionRoundLimit": 1,
+        "state": "OPEN",
+        "subjectLifecycleEpoch": 1,
+        "timeoutPolicy": {
+          "id": "escalation-timeout-policy",
+          "kind": "POLICY"
+        }
+      },
+      "kind": "ESCALATION_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-005",
+        "P2-KCF-007"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "ADJUDICATOR_MISMATCH",
+          "state": "OPEN"
+        }
+      },
+      "when": {
+        "action": "RESOLVE",
+        "authority": {
+          "id": "wrong-adjudicator",
+          "kind": "HUMAN"
+        },
+        "decidedAt": "2026-08-11T12:00:00Z",
+        "outcome": "RESOLVED",
+        "round": 1,
+        "sourceRole": "ADJUDICATOR",
+        "subjectLifecycleEpoch": 1
+      }
+    },
+    {
+      "classification": "COUNTEREXAMPLE",
+      "fixtureId": "HC-ADMISSION-CLOSED-DURING-QUIESCENCE",
+      "given": {
+        "admissionOpen": false,
+        "powerEpoch": 8,
+        "state": "QUIESCING"
+      },
+      "kind": "TEAM_CONTINUITY_MODEL",
+      "sourceDecisionIds": [
+        "HC-DEC-002"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "ADMISSION_CLOSED"
+        }
+      },
+      "when": {
+        "action": "DISPATCH",
+        "powerEpoch": 8
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "HC-BEGIN-RECONCILIATION",
+      "given": {
+        "admissionOpen": false,
+        "powerEpoch": 8,
+        "state": "SUSPENDED",
+        "unresolvedExecutionIds": [
+          "00000000-0000-7000-8000-000000000905"
+        ]
+      },
+      "kind": "TEAM_CONTINUITY_MODEL",
+      "sourceDecisionIds": [
+        "HC-DEC-004"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "admissionOpen": false,
+          "reason": "ACCEPTED",
+          "state": "RECONCILING",
+          "unresolvedExecutionIds": [
+            "00000000-0000-7000-8000-000000000905"
+          ]
+        }
+      },
+      "when": {
+        "action": "BEGIN_RECONCILIATION",
+        "powerEpoch": 8
+      }
+    },
+    {
+      "classification": "COUNTEREXAMPLE",
+      "fixtureId": "HC-CONTINUOUS-POSTURE-REQUIRES-HEALTH",
+      "given": {
+        "admissionOpen": true,
+        "operatingPosture": "CONTINUOUS",
+        "powerEpoch": 7,
+        "state": "ACTIVE"
+      },
+      "kind": "TEAM_CONTINUITY_MODEL",
+      "sourceDecisionIds": [
+        "HC-DEC-001"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "HOST_CONTINUITY_LOST"
+        }
+      },
+      "when": {
+        "action": "OBSERVE_CONTINUOUS",
+        "servicesHealthy": false
+      }
+    },
+    {
+      "classification": "COUNTEREXAMPLE",
+      "fixtureId": "HC-NO-DIRECT-SUSPENDED-TO-ACTIVE",
+      "given": {
+        "admissionOpen": false,
+        "powerEpoch": 8,
+        "state": "SUSPENDED",
+        "unresolvedExecutionIds": []
+      },
+      "kind": "TEAM_CONTINUITY_MODEL",
+      "sourceDecisionIds": [
+        "HC-DEC-004",
+        "HC-DEC-005"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "RECONCILIATION_REQUIRED",
+          "state": "SUSPENDED"
+        }
+      },
+      "when": {
+        "action": "RESUME",
+        "changeStreamReconciled": true,
+        "outboxReconciled": true,
+        "powerEpoch": 8,
+        "reconciledExecutionIds": [],
+        "servicesHealthy": true
+      }
+    },
+    {
+      "classification": "COUNTEREXAMPLE",
+      "fixtureId": "HC-OLD-EPOCH-RESULT-QUARANTINED",
+      "given": {
+        "admissionOpen": false,
+        "powerEpoch": 8,
+        "state": "RECONCILING"
+      },
+      "kind": "TEAM_CONTINUITY_MODEL",
+      "sourceDecisionIds": [
+        "HC-DEC-002",
+        "HC-DEC-003"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "LATE_RESULT_QUARANTINED"
+        }
+      },
+      "when": {
+        "action": "ACCEPT_RESULT",
+        "powerEpoch": 7
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "HC-PLANNED-QUIESCENCE",
+      "given": {
+        "admissionOpen": true,
+        "powerEpoch": 7,
+        "state": "ACTIVE"
+      },
+      "kind": "TEAM_CONTINUITY_MODEL",
+      "sourceDecisionIds": [
+        "HC-DEC-002"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "admissionOpen": false,
+          "powerEpoch": 8,
+          "reason": "ACCEPTED",
+          "state": "QUIESCING"
+        }
+      },
+      "when": {
+        "action": "REQUEST_QUIESCENCE",
+        "nextPowerEpoch": 8
+      }
+    },
+    {
+      "classification": "COUNTEREXAMPLE",
+      "fixtureId": "HC-QUIESCENCE-EPOCH-MUST-INCREMENT",
+      "given": {
+        "admissionOpen": true,
+        "powerEpoch": 7,
+        "state": "ACTIVE"
+      },
+      "kind": "TEAM_CONTINUITY_MODEL",
+      "sourceDecisionIds": [
+        "HC-DEC-002"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "admissionOpen": true,
+          "powerEpoch": 7,
+          "reason": "POWER_EPOCH_MISMATCH",
+          "state": "ACTIVE"
+        }
+      },
+      "when": {
+        "action": "REQUEST_QUIESCENCE",
+        "nextPowerEpoch": 7
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "HC-RESUME-AFTER-EXACT-RECONCILIATION",
+      "given": {
+        "admissionOpen": false,
+        "powerEpoch": 8,
+        "state": "RECONCILING",
+        "unresolvedExecutionIds": [
+          "00000000-0000-7000-8000-000000000904",
+          "00000000-0000-7000-8000-000000000905"
+        ]
+      },
+      "kind": "TEAM_CONTINUITY_MODEL",
+      "sourceDecisionIds": [
+        "HC-DEC-004",
+        "HC-DEC-005"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "admissionOpen": true,
+          "powerEpoch": 8,
+          "reason": "ACCEPTED",
+          "state": "ACTIVE",
+          "unresolvedExecutionIds": []
+        }
+      },
+      "when": {
+        "action": "RESUME",
+        "changeStreamReconciled": true,
+        "outboxReconciled": true,
+        "powerEpoch": 8,
+        "reconciledExecutionIds": [
+          "00000000-0000-7000-8000-000000000904",
+          "00000000-0000-7000-8000-000000000905"
+        ],
+        "servicesHealthy": true
+      }
+    },
+    {
+      "classification": "COUNTEREXAMPLE",
+      "fixtureId": "HC-RESUME-REQUIRES-EXACT-RECONCILIATION",
+      "given": {
+        "admissionOpen": false,
+        "powerEpoch": 8,
+        "state": "RECONCILING",
+        "unresolvedExecutionIds": [
+          "00000000-0000-7000-8000-000000000904",
+          "00000000-0000-7000-8000-000000000905"
+        ]
+      },
+      "kind": "TEAM_CONTINUITY_MODEL",
+      "sourceDecisionIds": [
+        "HC-DEC-004",
+        "HC-DEC-005"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "UNRESOLVED_EXECUTIONS",
+          "state": "RECONCILING"
+        }
+      },
+      "when": {
+        "action": "RESUME",
+        "changeStreamReconciled": true,
+        "outboxReconciled": true,
+        "powerEpoch": 8,
+        "reconciledExecutionIds": [
+          "00000000-0000-7000-8000-000000000904"
+        ],
+        "servicesHealthy": true
+      }
+    },
+    {
+      "classification": "COUNTEREXAMPLE",
+      "fixtureId": "HC-SUSPEND-REQUIRES-COMPLETE-INVENTORY",
+      "given": {
+        "admissionOpen": false,
+        "powerEpoch": 8,
+        "state": "QUIESCING"
+      },
+      "kind": "TEAM_CONTINUITY_MODEL",
+      "sourceDecisionIds": [
+        "HC-DEC-002",
+        "HC-DEC-003"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "EXECUTION_INVENTORY_INCOMPLETE",
+          "state": "QUIESCING"
+        }
+      },
+      "when": {
+        "action": "RECORD_SUSPENDED",
+        "allExecutionsRecorded": false,
+        "unresolvedExecutionIds": [
+          "00000000-0000-7000-8000-000000000905"
+        ]
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "HC-SUSPEND-WITH-RECORDED-UNKNOWN",
+      "given": {
+        "admissionOpen": false,
+        "powerEpoch": 8,
+        "state": "QUIESCING"
+      },
+      "kind": "TEAM_CONTINUITY_MODEL",
+      "sourceDecisionIds": [
+        "HC-DEC-002",
+        "HC-DEC-003"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "admissionOpen": false,
+          "reason": "ACCEPTED",
+          "state": "SUSPENDED",
+          "unresolvedExecutionIds": [
+            "00000000-0000-7000-8000-000000000905"
+          ]
+        }
+      },
+      "when": {
+        "action": "RECORD_SUSPENDED",
+        "allExecutionsRecorded": true,
+        "unresolvedExecutionIds": [
+          "00000000-0000-7000-8000-000000000905"
+        ]
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "HC-UNEXPECTED-OUTAGE-FENCES",
+      "given": {
+        "admissionOpen": true,
+        "powerEpoch": 7,
+        "state": "ACTIVE",
+        "unresolvedExecutionIds": []
+      },
+      "kind": "TEAM_CONTINUITY_MODEL",
+      "sourceDecisionIds": [
+        "HC-DEC-004"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "admissionOpen": false,
+          "powerEpoch": 8,
+          "reason": "ACCEPTED",
+          "state": "RECONCILING",
+          "unresolvedExecutionIds": [
+            "00000000-0000-7000-8000-000000000904"
+          ]
+        }
+      },
+      "when": {
+        "action": "RECORD_UNEXPECTED_OUTAGE",
+        "knownInFlightExecutionIds": [
+          "00000000-0000-7000-8000-000000000904"
+        ],
+        "nextPowerEpoch": 8
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "HI-ADVISORY-RESPONSE-CANNOT-AUTHORIZE",
+      "given": {
+        "declaredEffect": "ADVISORY_ONLY",
+        "scopedCommandAuthority": true
+      },
+      "kind": "HUMAN_INTERACTION_MODEL",
+      "sourceDecisionIds": [
+        "HP-DEC-001",
+        "HP-DEC-005"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "reason": "RECORDED_AS_ADVISORY",
+          "resolvedEffect": "ADVISORY_ONLY"
+        }
+      },
+      "when": {
+        "action": "EVALUATE_EFFECT"
+      }
+    },
+    {
+      "classification": "COUNTEREXAMPLE",
+      "fixtureId": "HI-ALL-REQUIRES-EVERY-DISTINCT-HUMAN",
+      "given": {
+        "acceptedHumanIds": [
+          "human:alice"
+        ],
+        "responsePolicy": {
+          "kind": "ALL"
+        },
+        "selectedHumanIds": [
+          "human:alice",
+          "human:bob"
+        ]
+      },
+      "kind": "HUMAN_INTERACTION_MODEL",
+      "sourceDecisionIds": [
+        "HP-DEC-003",
+        "HP-DEC-005"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "RESPONSE_POLICY_UNSATISFIED"
+        }
+      },
+      "when": {
+        "action": "EVALUATE_RESPONSE_POLICY"
+      }
+    },
+    {
+      "classification": "COUNTEREXAMPLE",
+      "fixtureId": "HI-AUTHORIZED-EFFECT-REQUIRES-SCOPE",
+      "given": {
+        "declaredEffect": "AUTHORITY_IF_AUTHORIZED",
+        "scopedCommandAuthority": false
+      },
+      "kind": "HUMAN_INTERACTION_MODEL",
+      "sourceDecisionIds": [
+        "HP-DEC-001",
+        "HP-DEC-005"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "SCOPED_AUTHORITY_REQUIRED",
+          "resolvedEffect": "EVIDENCE_ONLY"
+        }
+      },
+      "when": {
+        "action": "EVALUATE_EFFECT"
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "HI-DELIVERY-IS-NOT-RESPONSE",
+      "given": {
+        "acceptedHumanIds": [],
+        "responsePolicy": {
+          "kind": "EXACT_ONE"
+        },
+        "selectedHumanIds": [
+          "human:alice"
+        ]
+      },
+      "kind": "HUMAN_INTERACTION_MODEL",
+      "sourceDecisionIds": [
+        "HP-DEC-004"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "reason": "DELIVERY_RECORDED",
+          "responsePolicySatisfied": false
+        }
+      },
+      "when": {
+        "action": "RECORD_DELIVERY",
+        "recipientId": "human:alice"
+      }
+    },
+    {
+      "classification": "COUNTEREXAMPLE",
+      "fixtureId": "HI-FAILED-COMMIT-PRESERVES-RETRY",
+      "given": {
+        "commitSucceeded": false,
+        "credentialVerified": true
+      },
+      "kind": "HUMAN_INTERACTION_MODEL",
+      "sourceDecisionIds": [
+        "HP-DEC-002",
+        "HP-DEC-005"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "capabilityConsumed": false,
+          "reason": "COMMIT_FAILED"
+        }
+      },
+      "when": {
+        "action": "ACCEPT_RESPONSE_CAPABILITY"
+      }
+    },
+    {
+      "classification": "COUNTEREXAMPLE",
+      "fixtureId": "HI-HUMAN-ORIGIN-CANNOT-BORROW-ACTOR",
+      "given": {
+        "originActorFqn": "teams::operator-1",
+        "originExecutionId": "00000000-0000-7000-8000-000000000905",
+        "originKind": "HUMAN"
+      },
+      "kind": "HUMAN_INTERACTION_MODEL",
+      "sourceDecisionIds": [
+        "HP-DEC-003"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "HUMAN_ACTOR_ATTRIBUTION"
+        }
+      },
+      "when": {
+        "action": "OPEN"
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "HI-HUMAN-ORIGIN-HAS-NO-ACTOR-EXECUTION",
+      "given": {
+        "originActorFqn": null,
+        "originExecutionId": null,
+        "originKind": "HUMAN"
+      },
+      "kind": "HUMAN_INTERACTION_MODEL",
+      "sourceDecisionIds": [
+        "HP-DEC-003"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "reason": "ACCEPTED"
+        }
+      },
+      "when": {
+        "action": "OPEN"
+      }
+    },
+    {
+      "classification": "COUNTEREXAMPLE",
+      "fixtureId": "HI-HUMAN-RESPONSE-CANNOT-CARRY-ACTOR",
+      "given": {
+        "authenticationValid": true,
+        "duplicate": false,
+        "participantActive": true,
+        "questionRevision": 1,
+        "responseSpecificationMatches": true,
+        "selectedHumanIds": [
+          "human:alice"
+        ]
+      },
+      "kind": "HUMAN_INTERACTION_MODEL",
+      "sourceDecisionIds": [
+        "HP-DEC-005"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "HUMAN_ACTOR_ATTRIBUTION"
+        }
+      },
+      "when": {
+        "action": "RESPOND",
+        "actorFqn": "teams::operator-1",
+        "questionRevision": 1,
+        "respondentId": "human:alice",
+        "sourceKind": "HUMAN"
+      }
+    },
+    {
+      "classification": "COUNTEREXAMPLE",
+      "fixtureId": "HI-MATERIAL-RENDERING-CHANGE-REJECTED",
+      "given": {
+        "materialEquivalenceProven": false,
+        "renderedDiffers": true
+      },
+      "kind": "HUMAN_INTERACTION_MODEL",
+      "sourceDecisionIds": [
+        "HP-DEC-004"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "PRESENTATION_EQUIVALENCE_REQUIRED"
+        }
+      },
+      "when": {
+        "action": "RECORD_DELIVERY",
+        "recipientId": "human:alice"
+      }
+    },
+    {
+      "classification": "COUNTEREXAMPLE",
+      "fixtureId": "HI-OPERATOR-RELAY-NOT-HUMAN-RESPONSE",
+      "given": {
+        "authenticationValid": true,
+        "duplicate": false,
+        "participantActive": true,
+        "questionRevision": 1,
+        "responseSpecificationMatches": true,
+        "selectedHumanIds": [
+          "human:alice"
+        ]
+      },
+      "kind": "HUMAN_INTERACTION_MODEL",
+      "sourceDecisionIds": [
+        "HP-DEC-004",
+        "HP-DEC-005",
+        "HP-DEC-006"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "HUMAN_AUTHORITY_REQUIRED"
+        }
+      },
+      "when": {
+        "action": "RESPOND",
+        "questionRevision": 1,
+        "respondentId": "human:alice",
+        "sourceKind": "ACTOR"
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "HI-QUORUM-SATISFIED-BY-DISTINCT-HUMANS",
+      "given": {
+        "acceptedHumanIds": [
+          "human:alice",
+          "human:bob"
+        ],
+        "responsePolicy": {
+          "kind": "QUORUM",
+          "quorum": 2
+        },
+        "selectedHumanIds": [
+          "human:alice",
+          "human:bob",
+          "human:carol"
+        ]
+      },
+      "kind": "HUMAN_INTERACTION_MODEL",
+      "sourceDecisionIds": [
+        "HP-DEC-003",
+        "HP-DEC-005"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "reason": "RESPONSE_POLICY_SATISFIED"
+        }
+      },
+      "when": {
+        "action": "EVALUATE_RESPONSE_POLICY"
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "HI-RESPONSE-CAPABILITY-CONSUMED-AFTER-COMMIT",
+      "given": {
+        "commitSucceeded": true,
+        "credentialVerified": true
+      },
+      "kind": "HUMAN_INTERACTION_MODEL",
+      "sourceDecisionIds": [
+        "HP-DEC-002",
+        "HP-DEC-005"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "capabilityConsumed": true,
+          "reason": "ACCEPTED"
+        }
+      },
+      "when": {
+        "action": "ACCEPT_RESPONSE_CAPABILITY"
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "HI-SELECTED-HUMAN-RESPONSE",
+      "given": {
+        "authenticationValid": true,
+        "duplicate": false,
+        "participantActive": true,
+        "questionRevision": 1,
+        "responseSpecificationMatches": true,
+        "selectedHumanIds": [
+          "human:alice"
+        ]
+      },
+      "kind": "HUMAN_INTERACTION_MODEL",
+      "sourceDecisionIds": [
+        "HP-DEC-003",
+        "HP-DEC-005"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "reason": "ACCEPTED"
+        }
+      },
+      "when": {
+        "action": "RESPOND",
+        "questionRevision": 1,
+        "respondentId": "human:alice",
+        "sourceKind": "HUMAN"
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "HI-SILENCE-IS-NOT-CONSENT",
+      "given": {
+        "acceptedHumanIds": [],
+        "deadlineExpired": true
+      },
+      "kind": "HUMAN_INTERACTION_MODEL",
+      "sourceDecisionIds": [
+        "HP-DEC-006"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "reason": "EXPIRED_WITHOUT_CONSENT",
+          "state": "EXPIRED"
+        }
+      },
+      "when": {
+        "action": "EXPIRE",
+        "silenceIsConsent": false
+      }
+    },
+    {
+      "classification": "COUNTEREXAMPLE",
+      "fixtureId": "HI-STALE-QUESTION-REJECTED",
+      "given": {
+        "authenticationValid": true,
+        "duplicate": false,
+        "participantActive": true,
+        "questionRevision": 2,
+        "responseSpecificationMatches": true,
+        "selectedHumanIds": [
+          "human:alice"
+        ]
+      },
+      "kind": "HUMAN_INTERACTION_MODEL",
+      "sourceDecisionIds": [
+        "HP-DEC-003",
+        "HP-DEC-005"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "QUESTION_REVISION_MISMATCH"
+        }
+      },
+      "when": {
+        "action": "RESPOND",
+        "questionRevision": 1,
+        "respondentId": "human:alice",
+        "sourceKind": "HUMAN"
+      }
+    },
+    {
+      "classification": "COUNTEREXAMPLE",
+      "fixtureId": "HI-UNSELECTED-HUMAN-REJECTED",
+      "given": {
+        "authenticationValid": true,
+        "duplicate": false,
+        "participantActive": true,
+        "questionRevision": 1,
+        "responseSpecificationMatches": true,
+        "selectedHumanIds": [
+          "human:alice"
+        ]
+      },
+      "kind": "HUMAN_INTERACTION_MODEL",
+      "sourceDecisionIds": [
+        "HP-DEC-003",
+        "HP-DEC-005"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "RECIPIENT_MISMATCH"
+        }
+      },
+      "when": {
+        "action": "RESPOND",
+        "questionRevision": 1,
+        "respondentId": "human:bob",
+        "sourceKind": "HUMAN"
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "HP-AUTHENTICATION-BINDING-EXACT",
+      "given": {
+        "assuranceSufficient": true,
+        "bindingActive": true,
+        "subjectMatches": true
+      },
+      "kind": "HUMAN_PARTICIPANT_MODEL",
+      "sourceDecisionIds": [
+        "HP-DEC-002"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "reason": "ACCEPTED"
+        }
+      },
+      "when": {
+        "action": "AUTHENTICATE"
+      }
+    },
+    {
+      "classification": "COUNTEREXAMPLE",
+      "fixtureId": "HP-CHANNEL-IDENTITY-NOT-HUMAN",
+      "given": {
+        "assuranceSufficient": true,
+        "bindingActive": true,
+        "subjectMatches": false
+      },
+      "kind": "HUMAN_PARTICIPANT_MODEL",
+      "sourceDecisionIds": [
+        "HP-DEC-002"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "AUTHENTICATION_SUBJECT_MISMATCH"
+        }
+      },
+      "when": {
+        "action": "AUTHENTICATE"
+      }
+    },
+    {
+      "classification": "COUNTEREXAMPLE",
+      "fixtureId": "HP-CONFIDENTIALITY-CEILING-REJECTS",
+      "given": {
+        "requestedConfidentiality": "RESTRICTED",
+        "routeCeiling": "CONFIDENTIAL"
+      },
+      "kind": "HUMAN_PARTICIPANT_MODEL",
+      "sourceDecisionIds": [
+        "HP-DEC-002",
+        "HP-DEC-006"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "CONFIDENTIALITY_CEILING_EXCEEDED"
+        }
+      },
+      "when": {
+        "action": "SELECT_DELIVERY_ROUTE"
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "HP-DELIVERY-BINDING-REFERENCES-ACTIVE-AUTH",
+      "given": {
+        "activeAuthenticationBindingIds": [
+          "00000000-0000-7000-8000-000000000911"
+        ],
+        "deliveryAuthenticationBindingIds": [
+          "00000000-0000-7000-8000-000000000911"
+        ]
+      },
+      "kind": "HUMAN_PARTICIPANT_MODEL",
+      "sourceDecisionIds": [
+        "HP-DEC-002"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "reason": "ACCEPTED"
+        }
+      },
+      "when": {
+        "action": "VALIDATE_PROFILE_BINDINGS"
+      }
+    },
+    {
+      "classification": "COUNTEREXAMPLE",
+      "fixtureId": "HP-DELIVERY-BINDING-UNKNOWN-AUTH-REJECTED",
+      "given": {
+        "activeAuthenticationBindingIds": [
+          "00000000-0000-7000-8000-000000000911"
+        ],
+        "deliveryAuthenticationBindingIds": [
+          "00000000-0000-7000-8000-000000000908"
+        ]
+      },
+      "kind": "HUMAN_PARTICIPANT_MODEL",
+      "sourceDecisionIds": [
+        "HP-DEC-002"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "AUTHENTICATION_BINDING_REFERENCE_INVALID"
+        }
+      },
+      "when": {
+        "action": "VALIDATE_PROFILE_BINDINGS"
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "HP-DISTINCT-HUMANS-SAME-ROLE",
+      "given": {
+        "participantIds": [
+          "human:alice",
+          "human:bob"
+        ],
+        "roleIds": [
+          "payments-sme",
+          "payments-sme"
+        ]
+      },
+      "kind": "HUMAN_PARTICIPANT_MODEL",
+      "sourceDecisionIds": [
+        "HP-DEC-001"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "reason": "ACCEPTED",
+          "recipientIds": [
+            "human:alice",
+            "human:bob"
+          ]
+        }
+      },
+      "when": {
+        "action": "RESOLVE_RECIPIENTS"
+      }
+    },
+    {
+      "classification": "COUNTEREXAMPLE",
+      "fixtureId": "HP-EXPIRED-ROLE-REJECTED",
+      "given": {
+        "active": true,
+        "commandAuthorized": true,
+        "roleCurrent": false,
+        "scopeMatches": true
+      },
+      "kind": "HUMAN_PARTICIPANT_MODEL",
+      "sourceDecisionIds": [
+        "HP-DEC-001"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "ROLE_BINDING_EXPIRED"
+        }
+      },
+      "when": {
+        "action": "AUTHORIZE"
+      }
+    },
+    {
+      "classification": "COUNTEREXAMPLE",
+      "fixtureId": "HP-REVOKED-HUMAN-REJECTED",
+      "given": {
+        "active": false,
+        "commandAuthorized": true,
+        "scopeMatches": true
+      },
+      "kind": "HUMAN_PARTICIPANT_MODEL",
+      "sourceDecisionIds": [
+        "HP-DEC-001",
+        "HP-DEC-002"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "PARTICIPANT_REVOKED"
+        }
+      },
+      "when": {
+        "action": "AUTHORIZE"
+      }
+    },
+    {
+      "classification": "COUNTEREXAMPLE",
+      "fixtureId": "HP-ROLE-LABEL-NO-INTRINSIC-AUTHORITY",
+      "given": {
+        "active": true,
+        "commandAuthorized": false,
+        "scopeMatches": true
+      },
+      "kind": "HUMAN_PARTICIPANT_MODEL",
+      "sourceDecisionIds": [
+        "HP-DEC-001"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "SCOPED_AUTHORITY_REQUIRED"
+        }
+      },
+      "when": {
+        "action": "AUTHORIZE"
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "HP-SCOPED-HUMAN-AUTHORITY",
+      "given": {
+        "active": true,
+        "commandAuthorized": true,
+        "scopeMatches": true
+      },
+      "kind": "HUMAN_PARTICIPANT_MODEL",
+      "sourceDecisionIds": [
+        "HP-DEC-001"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "reason": "ACCEPTED"
+        }
+      },
+      "when": {
+        "action": "AUTHORIZE"
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "IDEMPOTENCY-DUPLICATE-AND-CONFLICT",
+      "given": {},
+      "kind": "IDEMPOTENCY_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-007"
+      ],
+      "then": {
+        "expected": {
+          "durableDecisionCount": 1,
+          "receipts": [
+            {
+              "eventCount": 1,
+              "fingerprint": "5d731c4556822547ffc0009f11868f67036020cd2e6c958bec656871037160b4",
+              "outcome": "APPLIED"
+            },
+            {
+              "eventCount": 1,
+              "fingerprint": "5d731c4556822547ffc0009f11868f67036020cd2e6c958bec656871037160b4",
+              "outcome": "APPLIED"
+            },
+            {
+              "eventCount": 0,
+              "outcome": "REJECTED_CONFLICT",
+              "reason": "IDEMPOTENCY_KEY_REUSE"
+            }
+          ]
+        }
+      },
+      "when": {
+        "commands": [
+          {
+            "scope": {
+              "commandType": "tekroo.command.task.activate",
+              "contract": "tekroo.kernel.contracts/0.10.0",
+              "key": "activate-1",
+              "principal": "teams::coder-1",
+              "target": "task-1"
+            },
+            "semanticRequest": {
+              "expectedRevision": 2,
+              "owner": "teams::coder-1"
+            }
+          },
+          {
+            "scope": {
+              "commandType": "tekroo.command.task.activate",
+              "contract": "tekroo.kernel.contracts/0.10.0",
+              "key": "activate-1",
+              "principal": "teams::coder-1",
+              "target": "task-1"
+            },
+            "semanticRequest": {
+              "expectedRevision": 2,
+              "owner": "teams::coder-1"
+            }
+          },
+          {
+            "scope": {
+              "commandType": "tekroo.command.task.activate",
+              "contract": "tekroo.kernel.contracts/0.10.0",
+              "key": "activate-1",
+              "principal": "teams::coder-1",
+              "target": "task-1"
+            },
+            "semanticRequest": {
+              "expectedRevision": 3,
+              "owner": "teams::coder-1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "IDENTITY-CONCRETE-FQN",
+      "given": {},
+      "kind": "IDENTITY_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-002"
+      ],
+      "then": {
+        "expected": {
+          "valid": true
+        }
+      },
+      "when": {
+        "value": "teams::senior-coder-1"
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "IDENTITY-REJECT-LEADING-ZERO",
+      "given": {},
+      "kind": "IDENTITY_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-002"
+      ],
+      "then": {
+        "expected": {
+          "valid": false
+        }
+      },
+      "when": {
+        "value": "teams::coder-01"
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "IDENTITY-REJECT-WILDCARD",
+      "given": {},
+      "kind": "IDENTITY_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-002"
+      ],
+      "then": {
+        "expected": {
+          "valid": false
+        }
+      },
+      "when": {
+        "value": "teams::coder-*"
+      }
+    },
+    {
+      "classification": "COUNTEREXAMPLE",
+      "fixtureId": "MC-ASSIGNMENT-DOWNGRADE-REJECTED",
+      "given": {
+        "hardConstraintsPass": true,
+        "qualificationStatus": "PASS",
+        "requiredRoute": "COMPLEX_REASONING",
+        "revoked": false,
+        "selectedRoute": "BOUNDED_EXECUTION"
+      },
+      "kind": "MODEL_CAPABILITY_POLICY_MODEL",
+      "sourceDecisionIds": [
+        "MC-DEC-002",
+        "MC-DEC-003",
+        "MC-DEC-004",
+        "MC-DEC-005",
+        "MC-DEC-007",
+        "MC-DEC-008"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "CAPABILITY_MISMATCH"
+        }
+      },
+      "when": {
+        "action": "AUTHORIZE_ASSIGNMENT"
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "MC-ASSIGNMENT-EXACT-QUALIFICATION",
+      "given": {
+        "hardConstraintsPass": true,
+        "qualificationStatus": "PASS",
+        "requiredRoute": "COMPLEX_REASONING",
+        "revoked": false,
+        "selectedRoute": "COMPLEX_REASONING"
+      },
+      "kind": "MODEL_CAPABILITY_POLICY_MODEL",
+      "sourceDecisionIds": [
+        "MC-DEC-002",
+        "MC-DEC-003",
+        "MC-DEC-004",
+        "MC-DEC-005",
+        "MC-DEC-007",
+        "MC-DEC-008"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "reason": "ACCEPTED"
+        }
+      },
+      "when": {
+        "action": "AUTHORIZE_ASSIGNMENT"
+      }
+    },
+    {
+      "classification": "COUNTEREXAMPLE",
+      "fixtureId": "MC-ASSIGNMENT-REVOKED-REJECTED",
+      "given": {
+        "hardConstraintsPass": true,
+        "qualificationStatus": "PASS",
+        "requiredRoute": "BOUNDED_EXECUTION",
+        "revoked": true,
+        "selectedRoute": "BOUNDED_EXECUTION"
+      },
+      "kind": "MODEL_CAPABILITY_POLICY_MODEL",
+      "sourceDecisionIds": [
+        "MC-DEC-002",
+        "MC-DEC-003",
+        "MC-DEC-004",
+        "MC-DEC-005",
+        "MC-DEC-007",
+        "MC-DEC-008"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "QUALIFICATION_REVOKED"
+        }
+      },
+      "when": {
+        "action": "AUTHORIZE_ASSIGNMENT"
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "MC-ROUTINE-REVISION-PRESERVES-PROFILE",
+      "given": {
+        "aggregateRevision": 19,
+        "profileScopeRevision": 2,
+        "scopeRevision": 2
+      },
+      "kind": "MODEL_CAPABILITY_POLICY_MODEL",
+      "sourceDecisionIds": [
+        "MC-DEC-002",
+        "MC-DEC-003",
+        "MC-DEC-004",
+        "MC-DEC-005",
+        "MC-DEC-007",
+        "MC-DEC-008"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "reason": "ACCEPTED"
+        }
+      },
+      "when": {
+        "action": "BIND_PROFILE"
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "MC-SCOPE-BINDING-EXACT",
+      "given": {
+        "profileScopeRevision": 2,
+        "scopeRevision": 2
+      },
+      "kind": "MODEL_CAPABILITY_POLICY_MODEL",
+      "sourceDecisionIds": [
+        "MC-DEC-002",
+        "MC-DEC-003",
+        "MC-DEC-004",
+        "MC-DEC-005",
+        "MC-DEC-007",
+        "MC-DEC-008"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "reason": "ACCEPTED"
+        }
+      },
+      "when": {
+        "action": "BIND_PROFILE"
+      }
+    },
+    {
+      "classification": "COUNTEREXAMPLE",
+      "fixtureId": "MC-SCOPE-BINDING-STALE",
+      "given": {
+        "profileScopeRevision": 1,
+        "scopeRevision": 2
+      },
+      "kind": "MODEL_CAPABILITY_POLICY_MODEL",
+      "sourceDecisionIds": [
+        "MC-DEC-002",
+        "MC-DEC-003",
+        "MC-DEC-004",
+        "MC-DEC-005",
+        "MC-DEC-007",
+        "MC-DEC-008"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "STALE_WORK_PROFILE"
+        }
+      },
+      "when": {
+        "action": "BIND_PROFILE"
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "MC-VARIANT-MATERIAL-DISAGREEMENT-ESCALATES",
+      "given": {
+        "classification": "MATERIAL_DISAGREEMENT",
+        "submittedCandidateIds": [
+          "00000000-0000-7000-8000-000000000808",
+          "00000000-0000-7000-8000-000000000809"
+        ]
+      },
+      "kind": "MODEL_CAPABILITY_POLICY_MODEL",
+      "sourceDecisionIds": [
+        "MC-DEC-002",
+        "MC-DEC-003",
+        "MC-DEC-004",
+        "MC-DEC-005",
+        "MC-DEC-007",
+        "MC-DEC-008"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "reason": "ESCALATION_REQUIRED"
+        }
+      },
+      "when": {
+        "action": "ESCALATE"
+      }
+    },
+    {
+      "classification": "COUNTEREXAMPLE",
+      "fixtureId": "MC-VARIANT-MATERIAL-DISAGREEMENT-NO-SELECTION",
+      "given": {
+        "classification": "MATERIAL_DISAGREEMENT",
+        "submittedCandidateIds": [
+          "00000000-0000-7000-8000-000000000808",
+          "00000000-0000-7000-8000-000000000809"
+        ]
+      },
+      "kind": "MODEL_CAPABILITY_POLICY_MODEL",
+      "sourceDecisionIds": [
+        "MC-DEC-002",
+        "MC-DEC-003",
+        "MC-DEC-004",
+        "MC-DEC-005",
+        "MC-DEC-007",
+        "MC-DEC-008"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "MATERIAL_DISAGREEMENT"
+        }
+      },
+      "when": {
+        "action": "SELECT",
+        "selectedCandidateId": "00000000-0000-7000-8000-000000000808"
+      }
+    },
+    {
+      "classification": "COUNTEREXAMPLE",
+      "fixtureId": "MC-VARIANT-UNSUBMITTED-CANDIDATE-REJECTED",
+      "given": {
+        "classification": "MATERIAL_AGREEMENT",
+        "submittedCandidateIds": [
+          "00000000-0000-7000-8000-000000000808",
+          "00000000-0000-7000-8000-000000000809"
+        ]
+      },
+      "kind": "MODEL_CAPABILITY_POLICY_MODEL",
+      "sourceDecisionIds": [
+        "MC-DEC-002",
+        "MC-DEC-003",
+        "MC-DEC-004",
+        "MC-DEC-005",
+        "MC-DEC-007",
+        "MC-DEC-008"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "CANDIDATE_NOT_SUBMITTED"
+        }
+      },
+      "when": {
+        "action": "SELECT",
+        "selectedCandidateId": "00000000-0000-7000-8000-000000000804"
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "MC-VERIFICATION-TOPOLOGY-EXACT",
+      "given": {
+        "provenDimensions": [
+          "ACTOR",
+          "EXECUTION",
+          "METHOD"
+        ],
+        "requiredDimensions": [
+          "ACTOR",
+          "EXECUTION",
+          "METHOD"
+        ]
+      },
+      "kind": "MODEL_CAPABILITY_POLICY_MODEL",
+      "sourceDecisionIds": [
+        "MC-DEC-002",
+        "MC-DEC-003",
+        "MC-DEC-004",
+        "MC-DEC-005",
+        "MC-DEC-007",
+        "MC-DEC-008"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "reason": "ACCEPTED"
+        }
+      },
+      "when": {
+        "action": "FINALIZE_REVIEW"
+      }
+    },
+    {
+      "classification": "COUNTEREXAMPLE",
+      "fixtureId": "MC-VERIFICATION-TOPOLOGY-MISSING",
+      "given": {
+        "provenDimensions": [
+          "ACTOR",
+          "METHOD"
+        ],
+        "requiredDimensions": [
+          "ACTOR",
+          "EXECUTION",
+          "METHOD"
+        ]
+      },
+      "kind": "MODEL_CAPABILITY_POLICY_MODEL",
+      "sourceDecisionIds": [
+        "MC-DEC-002",
+        "MC-DEC-003",
+        "MC-DEC-004",
+        "MC-DEC-005",
+        "MC-DEC-007",
+        "MC-DEC-008"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "INDEPENDENCE_NOT_PROVEN"
+        }
+      },
+      "when": {
+        "action": "FINALIZE_REVIEW"
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "MODEL-BLOCK-ORTHOGONAL",
+      "given": {
+        "condition": "RUNNABLE",
+        "lifecycleEpoch": 1,
+        "phase": "ACTIVE"
+      },
+      "kind": "STATE_MODEL",
+      "model": "task",
+      "sourceDecisionIds": [
+        "P2-KCF-006"
+      ],
+      "then": {
+        "expected": {
+          "condition": "RUNNABLE",
+          "lifecycleEpoch": 1,
+          "phase": "ACTIVE",
+          "rejected": null
+        }
+      },
+      "when": {
+        "actions": [
+          "block",
+          "unblock"
+        ]
+      }
+    },
+    {
+      "classification": "REGRESSION_RECEIPT",
+      "fixtureId": "MODEL-COMPLETION-NO-REQUESTED-PHASE",
+      "given": {
+        "condition": "RUNNABLE",
+        "lifecycleEpoch": 1,
+        "phase": "ACTIVE"
+      },
+      "kind": "STATE_MODEL",
+      "model": "task",
+      "sourceDecisionIds": [
+        "P2-KCF-006",
+        "P2-KCF-008"
+      ],
+      "then": {
+        "expected": {
+          "condition": "RUNNABLE",
+          "lifecycleEpoch": 1,
+          "phase": "COMPLETED",
+          "rejected": null
+        }
+      },
+      "when": {
+        "actions": [
+          "complete"
+        ]
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "MODEL-ILLEGAL-COMPLETION",
+      "given": {
+        "condition": "RUNNABLE",
+        "lifecycleEpoch": 1,
+        "phase": "READY"
+      },
+      "kind": "STATE_MODEL",
+      "model": "task",
+      "sourceDecisionIds": [
+        "P2-KCF-006",
+        "P2-KCF-008"
+      ],
+      "then": {
+        "expected": {
+          "condition": "RUNNABLE",
+          "lifecycleEpoch": 1,
+          "phase": "READY",
+          "rejected": "REJECTED_POLICY"
+        }
+      },
+      "when": {
+        "actions": [
+          "complete"
+        ]
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "MODEL-REOPEN-INCREMENTS-EPOCH",
+      "given": {
+        "condition": "RUNNABLE",
+        "lifecycleEpoch": 1,
+        "phase": "COMPLETED"
+      },
+      "kind": "STATE_MODEL",
+      "model": "story",
+      "sourceDecisionIds": [
+        "P2-KCF-008"
+      ],
+      "then": {
+        "expected": {
+          "condition": "RUNNABLE",
+          "lifecycleEpoch": 2,
+          "phase": "ACTIVE",
+          "rejected": null
+        }
+      },
+      "when": {
+        "actions": [
+          "reopen"
+        ]
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "MODEL-STORY-FORWARD",
+      "given": {
+        "condition": "RUNNABLE",
+        "lifecycleEpoch": 1,
+        "phase": "DRAFT"
+      },
+      "kind": "STATE_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-006",
+        "P2-KCF-008"
+      ],
+      "then": {
+        "expected": {
+          "condition": "RUNNABLE",
+          "lifecycleEpoch": 1,
+          "phase": "ACCEPTED",
+          "rejected": null
+        }
+      },
+      "when": {
+        "actions": [
+          "authorize",
+          "begin_planning",
+          "activate",
+          "complete",
+          "accept"
+        ]
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "MODEL-TASK-FORWARD",
+      "given": {
+        "condition": "RUNNABLE",
+        "lifecycleEpoch": 1,
+        "phase": "PLANNED"
+      },
+      "kind": "STATE_MODEL",
+      "model": "task",
+      "sourceDecisionIds": [
+        "P2-KCF-006",
+        "P2-KCF-008"
+      ],
+      "then": {
+        "expected": {
+          "condition": "RUNNABLE",
+          "lifecycleEpoch": 1,
+          "phase": "COMPLETED",
+          "rejected": null
+        }
+      },
+      "when": {
+        "actions": [
+          "mark_ready",
+          "activate",
+          "complete"
+        ]
+      }
+    },
+    {
+      "classification": "COUNTEREXAMPLE",
+      "fixtureId": "OP-ACTOR-CANNOT-IMPERSONATE-HUMAN",
+      "given": {
+        "claimedKind": "HUMAN",
+        "explicitlyAuthorized": true,
+        "sourceKind": "ACTOR"
+      },
+      "kind": "OPERATOR_SEPARATION_MODEL",
+      "sourceDecisionIds": [
+        "OP-DEC-001",
+        "OP-DEC-003"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "HUMAN_IMPERSONATION"
+        }
+      },
+      "when": {
+        "action": "PRESENT_AUTHORITY"
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "OP-ACTOR-EXPLICIT-AUTHORITY",
+      "given": {
+        "claimedKind": "ACTOR",
+        "commandAuthorityKinds": [
+          "ACTOR"
+        ],
+        "currentExecution": true,
+        "explicitlyAuthorized": true,
+        "sourceKind": "ACTOR"
+      },
+      "kind": "OPERATOR_SEPARATION_MODEL",
+      "sourceDecisionIds": [
+        "OP-DEC-003",
+        "OP-DEC-004"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "reason": "ACCEPTED"
+        }
+      },
+      "when": {
+        "action": "PRESENT_AUTHORITY"
+      }
+    },
+    {
+      "classification": "COUNTEREXAMPLE",
+      "fixtureId": "OP-CONTROL-SURFACE-IS-NOT-PRINCIPAL",
+      "given": {
+        "claimedKind": "ACTOR",
+        "explicitlyAuthorized": true,
+        "sourceKind": "CONTROL_SURFACE"
+      },
+      "kind": "OPERATOR_SEPARATION_MODEL",
+      "sourceDecisionIds": [
+        "OP-DEC-001"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "ADAPTER_NOT_PRINCIPAL"
+        }
+      },
+      "when": {
+        "action": "PRESENT_AUTHORITY"
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "OP-HUMAN-ATTRIBUTION-PRESERVED",
+      "given": {
+        "claimedKind": "HUMAN",
+        "explicitlyAuthorized": true,
+        "sourceKind": "HUMAN"
+      },
+      "kind": "OPERATOR_SEPARATION_MODEL",
+      "sourceDecisionIds": [
+        "OP-DEC-001",
+        "OP-DEC-003"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "reason": "ACCEPTED"
+        }
+      },
+      "when": {
+        "action": "PRESENT_AUTHORITY"
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "OP-HUMAN-REQUIRED-EXACT-HUMAN",
+      "given": {
+        "targetKind": "HUMAN"
+      },
+      "kind": "OPERATOR_SEPARATION_MODEL",
+      "sourceDecisionIds": [
+        "OP-DEC-005"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "reason": "ACCEPTED"
+        }
+      },
+      "when": {
+        "action": "ROUTE_HUMAN_REQUIRED"
+      }
+    },
+    {
+      "classification": "COUNTEREXAMPLE",
+      "fixtureId": "OP-HUMAN-REQUIRED-NOT-OPERATOR-ACTOR",
+      "given": {
+        "targetKind": "ACTOR"
+      },
+      "kind": "OPERATOR_SEPARATION_MODEL",
+      "sourceDecisionIds": [
+        "OP-DEC-005"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "HUMAN_PRINCIPAL_REQUIRED"
+        }
+      },
+      "when": {
+        "action": "ROUTE_HUMAN_REQUIRED"
+      }
+    },
+    {
+      "classification": "COUNTEREXAMPLE",
+      "fixtureId": "OP-ROLE-NAME-NO-AUTHORITY",
+      "given": {
+        "claimedKind": "ACTOR",
+        "commandAuthorityKinds": [
+          "ACTOR"
+        ],
+        "currentExecution": true,
+        "explicitlyAuthorized": false,
+        "sourceKind": "ACTOR"
+      },
+      "kind": "OPERATOR_SEPARATION_MODEL",
+      "sourceDecisionIds": [
+        "OP-DEC-003"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "AUTHORITY_REQUIRED"
+        }
+      },
+      "when": {
+        "action": "PRESENT_AUTHORITY"
+      }
+    },
+    {
+      "classification": "COUNTEREXAMPLE",
+      "fixtureId": "OP-STALE-EXECUTION-FENCED",
+      "given": {
+        "claimedKind": "ACTOR",
+        "commandAuthorityKinds": [
+          "ACTOR"
+        ],
+        "currentExecution": false,
+        "explicitlyAuthorized": true,
+        "sourceKind": "ACTOR"
+      },
+      "kind": "OPERATOR_SEPARATION_MODEL",
+      "sourceDecisionIds": [
+        "OP-DEC-002"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "STALE_EXECUTION"
+        }
+      },
+      "when": {
+        "action": "PRESENT_AUTHORITY"
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "PRECONDITION-EXACT-ALL",
+      "given": {
+        "revisions": {
+          "story:00000000-0000-7000-8000-000000000701": 3,
+          "task:00000000-0000-7000-8000-000000000702": 5
+        }
+      },
+      "kind": "PRECONDITION_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-007"
+      ],
+      "then": {
+        "expected": {
+          "valid": true
+        }
+      },
+      "when": {
+        "preconditions": [
+          {
+            "aggregate": "story:00000000-0000-7000-8000-000000000701",
+            "expectedRevision": 3
+          },
+          {
+            "aggregate": "task:00000000-0000-7000-8000-000000000702",
+            "expectedRevision": 5
+          }
+        ]
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "PRECONDITION-STALE-NONE",
+      "given": {
+        "revisions": {
+          "story:00000000-0000-7000-8000-000000000701": 4,
+          "task:00000000-0000-7000-8000-000000000702": 5
+        }
+      },
+      "kind": "PRECONDITION_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-007"
+      ],
+      "then": {
+        "expected": {
+          "valid": false
+        }
+      },
+      "when": {
+        "preconditions": [
+          {
+            "aggregate": "story:00000000-0000-7000-8000-000000000701",
+            "expectedRevision": 3
+          },
+          {
+            "aggregate": "task:00000000-0000-7000-8000-000000000702",
+            "expectedRevision": 5
+          }
+        ]
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "RELEASE-ALREADY-MERGED",
+      "given": {
+        "activeAttemptId": "00000000-0000-7000-8000-000000000755",
+        "activeMergeId": "00000000-0000-7000-8000-000000000752",
+        "activeRound": 1,
+        "baseCommit": "1111111111111111111111111111111111111111",
+        "executionRoundLimit": 2,
+        "headCommits": [
+          "2222222222222222222222222222222222222222",
+          "5555555555555555555555555555555555555555"
+        ],
+        "latestResultEventId": null,
+        "mergeOrder": [
+          "00000000-0000-7000-8000-000000000752",
+          "00000000-0000-7000-8000-000000000753"
+        ],
+        "nextMergeIndex": 0,
+        "nextRound": 1,
+        "planDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "providerTreeDigest": null,
+        "qualifiedTreeDigest": "3333333333333333333333333333333333333333",
+        "releaseMode": "CODE",
+        "state": "EXECUTING",
+        "unresolvedAttemptId": null
+      },
+      "kind": "RELEASE_MODEL",
+      "sourceDecisionIds": [
+        "P1B-V3-INTERNAL-RELEASE",
+        "P2-KCF-012",
+        "NEG-012"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "reason": "ACCEPTED",
+          "state": "QUALIFIED"
+        }
+      },
+      "when": {
+        "action": "RECORD_RESULT",
+        "attemptId": "00000000-0000-7000-8000-000000000755",
+        "outcome": "ALREADY_MERGED",
+        "resultEventId": "00000000-0000-7000-8000-000000000757"
+      }
+    },
+    {
+      "classification": "COUNTEREXAMPLE",
+      "fixtureId": "RELEASE-AUTHOR-APPROVAL-MISMATCH",
+      "given": {
+        "author": {
+          "id": "principal-author",
+          "kind": "HUMAN"
+        },
+        "authorApprovalEventId": "00000000-0000-7000-8000-000000000749",
+        "releaseMode": "CODE",
+        "state": "ABSENT"
+      },
+      "kind": "RELEASE_MODEL",
+      "sourceDecisionIds": [
+        "P1B-V3-INTERNAL-RELEASE",
+        "P2-KCF-012",
+        "NEG-012"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "AUTHOR_APPROVAL_MISMATCH",
+          "state": "ABSENT"
+        }
+      },
+      "when": {
+        "action": "CREATE",
+        "author": {
+          "id": "principal-author",
+          "kind": "HUMAN"
+        },
+        "authorApprovalEventId": "00000000-0000-7000-8000-000000000748"
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "RELEASE-BOUNDED-RETRY",
+      "given": {
+        "activeRound": 0,
+        "baseCommit": "1111111111111111111111111111111111111111",
+        "executionRoundLimit": 2,
+        "headCommits": [
+          "2222222222222222222222222222222222222222",
+          "5555555555555555555555555555555555555555"
+        ],
+        "latestResultEventId": null,
+        "mergeOrder": [
+          "00000000-0000-7000-8000-000000000752",
+          "00000000-0000-7000-8000-000000000753"
+        ],
+        "nextMergeIndex": 0,
+        "nextRound": 2,
+        "planDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "providerTreeDigest": null,
+        "qualifiedTreeDigest": "3333333333333333333333333333333333333333",
+        "releaseMode": "CODE",
+        "state": "QUALIFIED",
+        "unresolvedAttemptId": null
+      },
+      "kind": "RELEASE_MODEL",
+      "sourceDecisionIds": [
+        "P1B-V3-INTERNAL-RELEASE",
+        "P2-KCF-012",
+        "NEG-012"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "reason": "ACCEPTED",
+          "state": "EXECUTING"
+        }
+      },
+      "when": {
+        "action": "REQUEST_EXECUTION",
+        "attemptId": "00000000-0000-7000-8000-000000000761",
+        "mergeId": "00000000-0000-7000-8000-000000000752",
+        "round": 2
+      }
+    },
+    {
+      "classification": "COUNTEREXAMPLE",
+      "fixtureId": "RELEASE-CHANGED-BASE",
+      "given": {
+        "activeRound": 0,
+        "baseCommit": "1111111111111111111111111111111111111111",
+        "executionRoundLimit": 2,
+        "headCommits": [
+          "2222222222222222222222222222222222222222",
+          "5555555555555555555555555555555555555555"
+        ],
+        "latestResultEventId": null,
+        "mergeOrder": [
+          "00000000-0000-7000-8000-000000000752",
+          "00000000-0000-7000-8000-000000000753"
+        ],
+        "nextMergeIndex": 0,
+        "nextRound": 1,
+        "planDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "providerTreeDigest": null,
+        "qualifiedTreeDigest": null,
+        "releaseMode": "CODE",
+        "state": "PLANNED",
+        "unresolvedAttemptId": null
+      },
+      "kind": "RELEASE_MODEL",
+      "sourceDecisionIds": [
+        "P1B-V3-INTERNAL-RELEASE",
+        "P2-KCF-012",
+        "NEG-012"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "QUALIFICATION_INPUT_MISMATCH",
+          "state": "PLANNED"
+        }
+      },
+      "when": {
+        "action": "QUALIFY",
+        "baseCommit": "6666666666666666666666666666666666666666",
+        "headCommits": [
+          "2222222222222222222222222222222222222222",
+          "5555555555555555555555555555555555555555"
+        ],
+        "planDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "qualifiedTreeDigest": "3333333333333333333333333333333333333333"
+      }
+    },
+    {
+      "classification": "COUNTEREXAMPLE",
+      "fixtureId": "RELEASE-CHANGED-HEAD",
+      "given": {
+        "activeRound": 0,
+        "baseCommit": "1111111111111111111111111111111111111111",
+        "executionRoundLimit": 2,
+        "headCommits": [
+          "2222222222222222222222222222222222222222",
+          "5555555555555555555555555555555555555555"
+        ],
+        "latestResultEventId": null,
+        "mergeOrder": [
+          "00000000-0000-7000-8000-000000000752",
+          "00000000-0000-7000-8000-000000000753"
+        ],
+        "nextMergeIndex": 0,
+        "nextRound": 1,
+        "planDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "providerTreeDigest": null,
+        "qualifiedTreeDigest": null,
+        "releaseMode": "CODE",
+        "state": "PLANNED",
+        "unresolvedAttemptId": null
+      },
+      "kind": "RELEASE_MODEL",
+      "sourceDecisionIds": [
+        "P1B-V3-INTERNAL-RELEASE",
+        "P2-KCF-012",
+        "NEG-012"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "QUALIFICATION_INPUT_MISMATCH",
+          "state": "PLANNED"
+        }
+      },
+      "when": {
+        "action": "QUALIFY",
+        "baseCommit": "1111111111111111111111111111111111111111",
+        "headCommits": [
+          "2222222222222222222222222222222222222222",
+          "7777777777777777777777777777777777777777"
+        ],
+        "planDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "qualifiedTreeDigest": "3333333333333333333333333333333333333333"
+      }
+    },
+    {
+      "classification": "COUNTEREXAMPLE",
+      "fixtureId": "RELEASE-CHANGED-PLAN",
+      "given": {
+        "activeRound": 0,
+        "baseCommit": "1111111111111111111111111111111111111111",
+        "executionRoundLimit": 2,
+        "headCommits": [
+          "2222222222222222222222222222222222222222",
+          "5555555555555555555555555555555555555555"
+        ],
+        "latestResultEventId": null,
+        "mergeOrder": [
+          "00000000-0000-7000-8000-000000000752",
+          "00000000-0000-7000-8000-000000000753"
+        ],
+        "nextMergeIndex": 0,
+        "nextRound": 1,
+        "planDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "providerTreeDigest": null,
+        "qualifiedTreeDigest": null,
+        "releaseMode": "CODE",
+        "state": "PLANNED",
+        "unresolvedAttemptId": null
+      },
+      "kind": "RELEASE_MODEL",
+      "sourceDecisionIds": [
+        "P1B-V3-INTERNAL-RELEASE",
+        "P2-KCF-012",
+        "NEG-012"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "PLAN_DIGEST_MISMATCH",
+          "state": "PLANNED"
+        }
+      },
+      "when": {
+        "action": "QUALIFY",
+        "baseCommit": "1111111111111111111111111111111111111111",
+        "headCommits": [
+          "2222222222222222222222222222222222222222",
+          "5555555555555555555555555555555555555555"
+        ],
+        "planDigest": "9999999999999999999999999999999999999999999999999999999999999999",
+        "qualifiedTreeDigest": "3333333333333333333333333333333333333333"
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "RELEASE-CLEAN-MERGE",
+      "given": {
+        "activeAttemptId": "00000000-0000-7000-8000-000000000755",
+        "activeMergeId": "00000000-0000-7000-8000-000000000752",
+        "activeRound": 1,
+        "baseCommit": "1111111111111111111111111111111111111111",
+        "executionRoundLimit": 2,
+        "headCommits": [
+          "2222222222222222222222222222222222222222",
+          "5555555555555555555555555555555555555555"
+        ],
+        "latestResultEventId": null,
+        "mergeOrder": [
+          "00000000-0000-7000-8000-000000000752",
+          "00000000-0000-7000-8000-000000000753"
+        ],
+        "nextMergeIndex": 0,
+        "nextRound": 1,
+        "planDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "providerTreeDigest": null,
+        "qualifiedTreeDigest": "3333333333333333333333333333333333333333",
+        "releaseMode": "CODE",
+        "state": "EXECUTING",
+        "unresolvedAttemptId": null
+      },
+      "kind": "RELEASE_MODEL",
+      "sourceDecisionIds": [
+        "P1B-V3-INTERNAL-RELEASE",
+        "P2-KCF-012",
+        "NEG-012"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "reason": "ACCEPTED",
+          "state": "QUALIFIED"
+        }
+      },
+      "when": {
+        "action": "RECORD_RESULT",
+        "attemptId": "00000000-0000-7000-8000-000000000755",
+        "outcome": "MERGED",
+        "resultEventId": "00000000-0000-7000-8000-000000000757"
+      }
+    },
+    {
+      "classification": "COUNTEREXAMPLE",
+      "fixtureId": "RELEASE-CONCURRENT-WORKER",
+      "given": {
+        "activeAttemptId": "00000000-0000-7000-8000-000000000755",
+        "activeMergeId": "00000000-0000-7000-8000-000000000752",
+        "activeRound": 1,
+        "baseCommit": "1111111111111111111111111111111111111111",
+        "executionRoundLimit": 2,
+        "headCommits": [
+          "2222222222222222222222222222222222222222",
+          "5555555555555555555555555555555555555555"
+        ],
+        "latestResultEventId": null,
+        "mergeOrder": [
+          "00000000-0000-7000-8000-000000000752",
+          "00000000-0000-7000-8000-000000000753"
+        ],
+        "nextMergeIndex": 0,
+        "nextRound": 1,
+        "planDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "providerTreeDigest": null,
+        "qualifiedTreeDigest": "3333333333333333333333333333333333333333",
+        "releaseMode": "CODE",
+        "state": "EXECUTING",
+        "unresolvedAttemptId": null
+      },
+      "kind": "RELEASE_MODEL",
+      "sourceDecisionIds": [
+        "P1B-V3-INTERNAL-RELEASE",
+        "P2-KCF-012",
+        "NEG-012"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "EXECUTION_IN_PROGRESS",
+          "state": "EXECUTING"
+        }
+      },
+      "when": {
+        "action": "REQUEST_EXECUTION",
+        "attemptId": "00000000-0000-7000-8000-000000000761",
+        "mergeId": "00000000-0000-7000-8000-000000000752",
+        "round": 1
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "RELEASE-EXACT-AUTHOR-APPROVAL",
+      "given": {
+        "author": {
+          "id": "principal-author",
+          "kind": "HUMAN"
+        },
+        "authorApprovalEventId": "00000000-0000-7000-8000-000000000749",
+        "releaseMode": "CODE",
+        "state": "ABSENT"
+      },
+      "kind": "RELEASE_MODEL",
+      "sourceDecisionIds": [
+        "P1B-V3-INTERNAL-RELEASE",
+        "P2-KCF-012",
+        "NEG-012"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "reason": "ACCEPTED",
+          "state": "PLANNED"
+        }
+      },
+      "when": {
+        "action": "CREATE",
+        "author": {
+          "id": "principal-author",
+          "kind": "HUMAN"
+        },
+        "authorApprovalEventId": "00000000-0000-7000-8000-000000000749"
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "RELEASE-EXACT-QUALIFICATION",
+      "given": {
+        "activeRound": 0,
+        "baseCommit": "1111111111111111111111111111111111111111",
+        "executionRoundLimit": 2,
+        "headCommits": [
+          "2222222222222222222222222222222222222222",
+          "5555555555555555555555555555555555555555"
+        ],
+        "latestResultEventId": null,
+        "mergeOrder": [
+          "00000000-0000-7000-8000-000000000752",
+          "00000000-0000-7000-8000-000000000753"
+        ],
+        "nextMergeIndex": 0,
+        "nextRound": 1,
+        "planDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "providerTreeDigest": null,
+        "qualifiedTreeDigest": null,
+        "releaseMode": "CODE",
+        "state": "PLANNED",
+        "unresolvedAttemptId": null
+      },
+      "kind": "RELEASE_MODEL",
+      "sourceDecisionIds": [
+        "P1B-V3-INTERNAL-RELEASE",
+        "P2-KCF-012",
+        "NEG-012"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "reason": "ACCEPTED",
+          "state": "QUALIFIED"
+        }
+      },
+      "when": {
+        "action": "QUALIFY",
+        "baseCommit": "1111111111111111111111111111111111111111",
+        "headCommits": [
+          "2222222222222222222222222222222222222222",
+          "5555555555555555555555555555555555555555"
+        ],
+        "planDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "qualifiedTreeDigest": "3333333333333333333333333333333333333333"
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "RELEASE-EXACT-RECONCILIATION",
+      "given": {
+        "activeAttemptId": "00000000-0000-7000-8000-000000000755",
+        "activeMergeId": "00000000-0000-7000-8000-000000000752",
+        "activeRound": 1,
+        "baseCommit": "1111111111111111111111111111111111111111",
+        "executionRoundLimit": 2,
+        "headCommits": [
+          "2222222222222222222222222222222222222222",
+          "5555555555555555555555555555555555555555"
+        ],
+        "latestResultEventId": "00000000-0000-7000-8000-000000000757",
+        "mergeOrder": [
+          "00000000-0000-7000-8000-000000000752",
+          "00000000-0000-7000-8000-000000000753"
+        ],
+        "nextMergeIndex": 0,
+        "nextRound": 1,
+        "planDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "providerTreeDigest": null,
+        "qualifiedTreeDigest": "3333333333333333333333333333333333333333",
+        "releaseMode": "CODE",
+        "state": "RECONCILING",
+        "unresolvedAttemptId": "00000000-0000-7000-8000-000000000755"
+      },
+      "kind": "RELEASE_MODEL",
+      "sourceDecisionIds": [
+        "P1B-V3-INTERNAL-RELEASE",
+        "P2-KCF-012",
+        "NEG-012"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "reason": "ACCEPTED",
+          "state": "QUALIFIED"
+        }
+      },
+      "when": {
+        "action": "RECONCILE",
+        "attemptId": "00000000-0000-7000-8000-000000000755",
+        "outcome": "MERGED",
+        "providerTreeDigest": "3333333333333333333333333333333333333333",
+        "supersedesResultEventId": "00000000-0000-7000-8000-000000000757"
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "RELEASE-EXECUTE-BEFORE-QUALIFICATION",
+      "given": {
+        "activeRound": 0,
+        "baseCommit": "1111111111111111111111111111111111111111",
+        "executionRoundLimit": 2,
+        "headCommits": [
+          "2222222222222222222222222222222222222222",
+          "5555555555555555555555555555555555555555"
+        ],
+        "latestResultEventId": null,
+        "mergeOrder": [
+          "00000000-0000-7000-8000-000000000752",
+          "00000000-0000-7000-8000-000000000753"
+        ],
+        "nextMergeIndex": 0,
+        "nextRound": 1,
+        "planDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "providerTreeDigest": null,
+        "qualifiedTreeDigest": null,
+        "releaseMode": "CODE",
+        "state": "PLANNED",
+        "unresolvedAttemptId": null
+      },
+      "kind": "RELEASE_MODEL",
+      "sourceDecisionIds": [
+        "P1B-V3-INTERNAL-RELEASE",
+        "P2-KCF-012",
+        "NEG-012"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "QUALIFICATION_REQUIRED",
+          "state": "PLANNED"
+        }
+      },
+      "when": {
+        "action": "REQUEST_EXECUTION",
+        "attemptId": "00000000-0000-7000-8000-000000000755",
+        "mergeId": "00000000-0000-7000-8000-000000000752",
+        "round": 1
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "RELEASE-FIRST-ORDERED-REQUEST",
+      "given": {
+        "activeRound": 0,
+        "baseCommit": "1111111111111111111111111111111111111111",
+        "executionRoundLimit": 2,
+        "headCommits": [
+          "2222222222222222222222222222222222222222",
+          "5555555555555555555555555555555555555555"
+        ],
+        "latestResultEventId": null,
+        "mergeOrder": [
+          "00000000-0000-7000-8000-000000000752",
+          "00000000-0000-7000-8000-000000000753"
+        ],
+        "nextMergeIndex": 0,
+        "nextRound": 1,
+        "planDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "providerTreeDigest": null,
+        "qualifiedTreeDigest": "3333333333333333333333333333333333333333",
+        "releaseMode": "CODE",
+        "state": "QUALIFIED",
+        "unresolvedAttemptId": null
+      },
+      "kind": "RELEASE_MODEL",
+      "sourceDecisionIds": [
+        "P1B-V3-INTERNAL-RELEASE",
+        "P2-KCF-012",
+        "NEG-012"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "reason": "ACCEPTED",
+          "state": "EXECUTING"
+        }
+      },
+      "when": {
+        "action": "REQUEST_EXECUTION",
+        "attemptId": "00000000-0000-7000-8000-000000000755",
+        "mergeId": "00000000-0000-7000-8000-000000000752",
+        "round": 1
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "RELEASE-GENUINE-FAILURE-EXHAUSTED",
+      "given": {
+        "activeAttemptId": "00000000-0000-7000-8000-000000000755",
+        "activeMergeId": "00000000-0000-7000-8000-000000000752",
+        "activeRound": 2,
+        "baseCommit": "1111111111111111111111111111111111111111",
+        "executionRoundLimit": 2,
+        "headCommits": [
+          "2222222222222222222222222222222222222222",
+          "5555555555555555555555555555555555555555"
+        ],
+        "latestResultEventId": null,
+        "mergeOrder": [
+          "00000000-0000-7000-8000-000000000752",
+          "00000000-0000-7000-8000-000000000753"
+        ],
+        "nextMergeIndex": 0,
+        "nextRound": 2,
+        "planDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "providerTreeDigest": null,
+        "qualifiedTreeDigest": "3333333333333333333333333333333333333333",
+        "releaseMode": "CODE",
+        "state": "EXECUTING",
+        "unresolvedAttemptId": null
+      },
+      "kind": "RELEASE_MODEL",
+      "sourceDecisionIds": [
+        "P1B-V3-INTERNAL-RELEASE",
+        "P2-KCF-012",
+        "NEG-012"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "reason": "ACCEPTED",
+          "state": "FAILED"
+        }
+      },
+      "when": {
+        "action": "RECORD_RESULT",
+        "attemptId": "00000000-0000-7000-8000-000000000755",
+        "outcome": "FAILED",
+        "resultEventId": "00000000-0000-7000-8000-000000000757"
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "RELEASE-GENUINE-FAILURE-RETRYABLE",
+      "given": {
+        "activeAttemptId": "00000000-0000-7000-8000-000000000755",
+        "activeMergeId": "00000000-0000-7000-8000-000000000752",
+        "activeRound": 1,
+        "baseCommit": "1111111111111111111111111111111111111111",
+        "executionRoundLimit": 2,
+        "headCommits": [
+          "2222222222222222222222222222222222222222",
+          "5555555555555555555555555555555555555555"
+        ],
+        "latestResultEventId": null,
+        "mergeOrder": [
+          "00000000-0000-7000-8000-000000000752",
+          "00000000-0000-7000-8000-000000000753"
+        ],
+        "nextMergeIndex": 0,
+        "nextRound": 1,
+        "planDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "providerTreeDigest": null,
+        "qualifiedTreeDigest": "3333333333333333333333333333333333333333",
+        "releaseMode": "CODE",
+        "state": "EXECUTING",
+        "unresolvedAttemptId": null
+      },
+      "kind": "RELEASE_MODEL",
+      "sourceDecisionIds": [
+        "P1B-V3-INTERNAL-RELEASE",
+        "P2-KCF-012",
+        "NEG-012"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "reason": "ACCEPTED",
+          "state": "QUALIFIED"
+        }
+      },
+      "when": {
+        "action": "RECORD_RESULT",
+        "attemptId": "00000000-0000-7000-8000-000000000755",
+        "outcome": "FAILED",
+        "resultEventId": "00000000-0000-7000-8000-000000000757"
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "RELEASE-IDEMPOTENCY-DUPLICATE-AND-CONFLICT",
+      "given": {},
+      "kind": "IDEMPOTENCY_MODEL",
+      "sourceDecisionIds": [
+        "P1B-V3-INTERNAL-RELEASE",
+        "NEG-012"
+      ],
+      "then": {
+        "expected": {
+          "durableDecisionCount": 1,
+          "receipts": [
+            {
+              "eventCount": 1,
+              "fingerprint": "be2789e543e64998adf537c69dba0460d360566d6d2c53137ed2d2e4e0e4d9e3",
+              "outcome": "APPLIED"
+            },
+            {
+              "eventCount": 1,
+              "fingerprint": "be2789e543e64998adf537c69dba0460d360566d6d2c53137ed2d2e4e0e4d9e3",
+              "outcome": "APPLIED"
+            },
+            {
+              "eventCount": 0,
+              "outcome": "REJECTED_CONFLICT",
+              "reason": "IDEMPOTENCY_KEY_REUSE"
+            }
+          ]
+        }
+      },
+      "when": {
+        "commands": [
+          {
+            "scope": {
+              "commandType": "tekroo.command.release-plan.request-execution",
+              "contract": "tekroo.kernel.contracts/0.10.0",
+              "key": "release-751-merge-752-round-1",
+              "principal": "release-policy",
+              "target": "00000000-0000-7000-8000-000000000751"
+            },
+            "semanticRequest": {
+              "attemptId": "00000000-0000-7000-8000-000000000755",
+              "expectedRevision": 2,
+              "mergeId": "00000000-0000-7000-8000-000000000752",
+              "planDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "round": 1
+            }
+          },
+          {
+            "scope": {
+              "commandType": "tekroo.command.release-plan.request-execution",
+              "contract": "tekroo.kernel.contracts/0.10.0",
+              "key": "release-751-merge-752-round-1",
+              "principal": "release-policy",
+              "target": "00000000-0000-7000-8000-000000000751"
+            },
+            "semanticRequest": {
+              "attemptId": "00000000-0000-7000-8000-000000000755",
+              "expectedRevision": 2,
+              "mergeId": "00000000-0000-7000-8000-000000000752",
+              "planDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "round": 1
+            }
+          },
+          {
+            "scope": {
+              "commandType": "tekroo.command.release-plan.request-execution",
+              "contract": "tekroo.kernel.contracts/0.10.0",
+              "key": "release-751-merge-752-round-1",
+              "principal": "release-policy",
+              "target": "00000000-0000-7000-8000-000000000751"
+            },
+            "semanticRequest": {
+              "attemptId": "00000000-0000-7000-8000-000000000761",
+              "expectedRevision": 2,
+              "mergeId": "00000000-0000-7000-8000-000000000752",
+              "planDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "round": 1
+            }
+          }
+        ]
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "RELEASE-NO-CODE-FINALIZE",
+      "given": {
+        "activeRound": 0,
+        "baseCommit": "1111111111111111111111111111111111111111",
+        "executionRoundLimit": 2,
+        "headCommits": [
+          "2222222222222222222222222222222222222222",
+          "5555555555555555555555555555555555555555"
+        ],
+        "latestResultEventId": null,
+        "mergeOrder": [],
+        "nextMergeIndex": 0,
+        "nextRound": 1,
+        "planDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "providerTreeDigest": null,
+        "qualifiedTreeDigest": null,
+        "releaseMode": "NO_RELEASE_REQUIRED",
+        "state": "PLANNED",
+        "unresolvedAttemptId": null
+      },
+      "kind": "RELEASE_MODEL",
+      "sourceDecisionIds": [
+        "P1B-V3-INTERNAL-RELEASE",
+        "P2-KCF-012",
+        "NEG-012"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "reason": "ACCEPTED",
+          "state": "NO_RELEASE_REQUIRED"
+        }
+      },
+      "when": {
+        "action": "FINALIZE",
+        "terminalStatus": "NO_RELEASE_REQUIRED"
+      }
+    },
+    {
+      "classification": "COUNTEREXAMPLE",
+      "fixtureId": "RELEASE-NO-RETRY-WHILE-UNKNOWN",
+      "given": {
+        "activeAttemptId": "00000000-0000-7000-8000-000000000755",
+        "activeMergeId": "00000000-0000-7000-8000-000000000752",
+        "activeRound": 1,
+        "baseCommit": "1111111111111111111111111111111111111111",
+        "executionRoundLimit": 2,
+        "headCommits": [
+          "2222222222222222222222222222222222222222",
+          "5555555555555555555555555555555555555555"
+        ],
+        "latestResultEventId": "00000000-0000-7000-8000-000000000757",
+        "mergeOrder": [
+          "00000000-0000-7000-8000-000000000752",
+          "00000000-0000-7000-8000-000000000753"
+        ],
+        "nextMergeIndex": 0,
+        "nextRound": 1,
+        "planDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "providerTreeDigest": null,
+        "qualifiedTreeDigest": "3333333333333333333333333333333333333333",
+        "releaseMode": "CODE",
+        "state": "RECONCILING",
+        "unresolvedAttemptId": "00000000-0000-7000-8000-000000000755"
+      },
+      "kind": "RELEASE_MODEL",
+      "sourceDecisionIds": [
+        "P1B-V3-INTERNAL-RELEASE",
+        "P2-KCF-012",
+        "NEG-012"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "RECONCILIATION_REQUIRED",
+          "state": "RECONCILING"
+        }
+      },
+      "when": {
+        "action": "REQUEST_EXECUTION",
+        "attemptId": "00000000-0000-7000-8000-000000000761",
+        "mergeId": "00000000-0000-7000-8000-000000000752",
+        "round": 2
+      }
+    },
+    {
+      "classification": "COUNTEREXAMPLE",
+      "fixtureId": "RELEASE-PARTIAL-FINALIZE",
+      "given": {
+        "activeRound": 0,
+        "baseCommit": "1111111111111111111111111111111111111111",
+        "executionRoundLimit": 2,
+        "headCommits": [
+          "2222222222222222222222222222222222222222",
+          "5555555555555555555555555555555555555555"
+        ],
+        "latestResultEventId": null,
+        "mergeOrder": [
+          "00000000-0000-7000-8000-000000000752",
+          "00000000-0000-7000-8000-000000000753"
+        ],
+        "nextMergeIndex": 1,
+        "nextRound": 1,
+        "planDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "providerTreeDigest": "3333333333333333333333333333333333333333",
+        "qualifiedTreeDigest": "3333333333333333333333333333333333333333",
+        "releaseMode": "CODE",
+        "state": "QUALIFIED",
+        "unresolvedAttemptId": null
+      },
+      "kind": "RELEASE_MODEL",
+      "sourceDecisionIds": [
+        "P1B-V3-INTERNAL-RELEASE",
+        "P2-KCF-012",
+        "NEG-012"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "RELEASE_INCOMPLETE",
+          "state": "QUALIFIED"
+        }
+      },
+      "when": {
+        "action": "FINALIZE",
+        "providerTreeDigest": "3333333333333333333333333333333333333333",
+        "terminalStatus": "READY_FOR_ACCEPTANCE"
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "RELEASE-PROVIDER-UNAVAILABLE",
+      "given": {
+        "activeAttemptId": "00000000-0000-7000-8000-000000000755",
+        "activeMergeId": "00000000-0000-7000-8000-000000000752",
+        "activeRound": 1,
+        "baseCommit": "1111111111111111111111111111111111111111",
+        "executionRoundLimit": 2,
+        "headCommits": [
+          "2222222222222222222222222222222222222222",
+          "5555555555555555555555555555555555555555"
+        ],
+        "latestResultEventId": "00000000-0000-7000-8000-000000000757",
+        "mergeOrder": [
+          "00000000-0000-7000-8000-000000000752",
+          "00000000-0000-7000-8000-000000000753"
+        ],
+        "nextMergeIndex": 0,
+        "nextRound": 1,
+        "planDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "providerTreeDigest": null,
+        "qualifiedTreeDigest": "3333333333333333333333333333333333333333",
+        "releaseMode": "CODE",
+        "state": "RECONCILING",
+        "unresolvedAttemptId": "00000000-0000-7000-8000-000000000755"
+      },
+      "kind": "RELEASE_MODEL",
+      "sourceDecisionIds": [
+        "P1B-V3-INTERNAL-RELEASE",
+        "P2-KCF-012",
+        "NEG-012"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "reason": "ACCEPTED",
+          "state": "RECONCILING"
+        }
+      },
+      "when": {
+        "action": "RECONCILE",
+        "attemptId": "00000000-0000-7000-8000-000000000755",
+        "outcome": "UNKNOWN",
+        "supersedesResultEventId": "00000000-0000-7000-8000-000000000757"
+      }
+    },
+    {
+      "classification": "COUNTEREXAMPLE",
+      "fixtureId": "RELEASE-RETRY-BUDGET-EXHAUSTED",
+      "given": {
+        "activeRound": 0,
+        "baseCommit": "1111111111111111111111111111111111111111",
+        "executionRoundLimit": 2,
+        "headCommits": [
+          "2222222222222222222222222222222222222222",
+          "5555555555555555555555555555555555555555"
+        ],
+        "latestResultEventId": null,
+        "mergeOrder": [
+          "00000000-0000-7000-8000-000000000752",
+          "00000000-0000-7000-8000-000000000753"
+        ],
+        "nextMergeIndex": 0,
+        "nextRound": 3,
+        "planDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "providerTreeDigest": null,
+        "qualifiedTreeDigest": "3333333333333333333333333333333333333333",
+        "releaseMode": "CODE",
+        "state": "QUALIFIED",
+        "unresolvedAttemptId": null
+      },
+      "kind": "RELEASE_MODEL",
+      "sourceDecisionIds": [
+        "P1B-V3-INTERNAL-RELEASE",
+        "P2-KCF-012",
+        "NEG-012"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "RETRY_BUDGET_EXHAUSTED",
+          "state": "QUALIFIED"
+        }
+      },
+      "when": {
+        "action": "REQUEST_EXECUTION",
+        "attemptId": "00000000-0000-7000-8000-000000000762",
+        "mergeId": "00000000-0000-7000-8000-000000000752",
+        "round": 3
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "RELEASE-TERMINAL-IMMUTABLE",
+      "given": {
+        "activeRound": 0,
+        "baseCommit": "1111111111111111111111111111111111111111",
+        "executionRoundLimit": 2,
+        "headCommits": [
+          "2222222222222222222222222222222222222222",
+          "5555555555555555555555555555555555555555"
+        ],
+        "latestResultEventId": null,
+        "mergeOrder": [
+          "00000000-0000-7000-8000-000000000752",
+          "00000000-0000-7000-8000-000000000753"
+        ],
+        "nextMergeIndex": 2,
+        "nextRound": 1,
+        "planDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "providerTreeDigest": "3333333333333333333333333333333333333333",
+        "qualifiedTreeDigest": "3333333333333333333333333333333333333333",
+        "releaseMode": "CODE",
+        "state": "READY_FOR_ACCEPTANCE",
+        "unresolvedAttemptId": null
+      },
+      "kind": "RELEASE_MODEL",
+      "sourceDecisionIds": [
+        "P1B-V3-INTERNAL-RELEASE",
+        "P2-KCF-012",
+        "NEG-012"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "RELEASE_TERMINAL",
+          "state": "READY_FOR_ACCEPTANCE"
+        }
+      },
+      "when": {
+        "action": "REQUEST_EXECUTION",
+        "attemptId": "00000000-0000-7000-8000-000000000755",
+        "mergeId": "00000000-0000-7000-8000-000000000752"
+      }
+    },
+    {
+      "classification": "COUNTEREXAMPLE",
+      "fixtureId": "RELEASE-TREE-MISMATCH",
+      "given": {
+        "activeRound": 0,
+        "baseCommit": "1111111111111111111111111111111111111111",
+        "executionRoundLimit": 2,
+        "headCommits": [
+          "2222222222222222222222222222222222222222",
+          "5555555555555555555555555555555555555555"
+        ],
+        "latestResultEventId": null,
+        "mergeOrder": [
+          "00000000-0000-7000-8000-000000000752",
+          "00000000-0000-7000-8000-000000000753"
+        ],
+        "nextMergeIndex": 2,
+        "nextRound": 1,
+        "planDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "providerTreeDigest": "3333333333333333333333333333333333333333",
+        "qualifiedTreeDigest": "3333333333333333333333333333333333333333",
+        "releaseMode": "CODE",
+        "state": "QUALIFIED",
+        "unresolvedAttemptId": null
+      },
+      "kind": "RELEASE_MODEL",
+      "sourceDecisionIds": [
+        "P1B-V3-INTERNAL-RELEASE",
+        "P2-KCF-012",
+        "NEG-012"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "TREE_MISMATCH",
+          "state": "QUALIFIED"
+        }
+      },
+      "when": {
+        "action": "FINALIZE",
+        "providerTreeDigest": "4444444444444444444444444444444444444444",
+        "terminalStatus": "READY_FOR_ACCEPTANCE"
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "RELEASE-UNKNOWN-RESULT",
+      "given": {
+        "activeAttemptId": "00000000-0000-7000-8000-000000000755",
+        "activeMergeId": "00000000-0000-7000-8000-000000000752",
+        "activeRound": 1,
+        "baseCommit": "1111111111111111111111111111111111111111",
+        "executionRoundLimit": 2,
+        "headCommits": [
+          "2222222222222222222222222222222222222222",
+          "5555555555555555555555555555555555555555"
+        ],
+        "latestResultEventId": null,
+        "mergeOrder": [
+          "00000000-0000-7000-8000-000000000752",
+          "00000000-0000-7000-8000-000000000753"
+        ],
+        "nextMergeIndex": 0,
+        "nextRound": 1,
+        "planDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "providerTreeDigest": null,
+        "qualifiedTreeDigest": "3333333333333333333333333333333333333333",
+        "releaseMode": "CODE",
+        "state": "EXECUTING",
+        "unresolvedAttemptId": null
+      },
+      "kind": "RELEASE_MODEL",
+      "sourceDecisionIds": [
+        "P1B-V3-INTERNAL-RELEASE",
+        "P2-KCF-012",
+        "NEG-012"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "reason": "ACCEPTED",
+          "state": "RECONCILING"
+        }
+      },
+      "when": {
+        "action": "RECORD_RESULT",
+        "attemptId": "00000000-0000-7000-8000-000000000755",
+        "outcome": "UNKNOWN",
+        "resultEventId": "00000000-0000-7000-8000-000000000757"
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "RELEASE-VERIFIED-FINALIZE",
+      "given": {
+        "activeRound": 0,
+        "baseCommit": "1111111111111111111111111111111111111111",
+        "executionRoundLimit": 2,
+        "headCommits": [
+          "2222222222222222222222222222222222222222",
+          "5555555555555555555555555555555555555555"
+        ],
+        "latestResultEventId": null,
+        "mergeOrder": [
+          "00000000-0000-7000-8000-000000000752",
+          "00000000-0000-7000-8000-000000000753"
+        ],
+        "nextMergeIndex": 2,
+        "nextRound": 1,
+        "planDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "providerTreeDigest": "3333333333333333333333333333333333333333",
+        "qualifiedTreeDigest": "3333333333333333333333333333333333333333",
+        "releaseMode": "CODE",
+        "state": "QUALIFIED",
+        "unresolvedAttemptId": null
+      },
+      "kind": "RELEASE_MODEL",
+      "sourceDecisionIds": [
+        "P1B-V3-INTERNAL-RELEASE",
+        "P2-KCF-012",
+        "NEG-012"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "reason": "ACCEPTED",
+          "state": "READY_FOR_ACCEPTANCE"
+        }
+      },
+      "when": {
+        "action": "FINALIZE",
+        "providerTreeDigest": "3333333333333333333333333333333333333333",
+        "terminalStatus": "READY_FOR_ACCEPTANCE"
+      }
+    },
+    {
+      "classification": "COUNTEREXAMPLE",
+      "fixtureId": "RELEASE-WRONG-ORDER",
+      "given": {
+        "activeRound": 0,
+        "baseCommit": "1111111111111111111111111111111111111111",
+        "executionRoundLimit": 2,
+        "headCommits": [
+          "2222222222222222222222222222222222222222",
+          "5555555555555555555555555555555555555555"
+        ],
+        "latestResultEventId": null,
+        "mergeOrder": [
+          "00000000-0000-7000-8000-000000000752",
+          "00000000-0000-7000-8000-000000000753"
+        ],
+        "nextMergeIndex": 0,
+        "nextRound": 1,
+        "planDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "providerTreeDigest": null,
+        "qualifiedTreeDigest": "3333333333333333333333333333333333333333",
+        "releaseMode": "CODE",
+        "state": "QUALIFIED",
+        "unresolvedAttemptId": null
+      },
+      "kind": "RELEASE_MODEL",
+      "sourceDecisionIds": [
+        "P1B-V3-INTERNAL-RELEASE",
+        "P2-KCF-012",
+        "NEG-012"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "MERGE_ORDER_CONFLICT",
+          "state": "QUALIFIED"
+        }
+      },
+      "when": {
+        "action": "REQUEST_EXECUTION",
+        "attemptId": "00000000-0000-7000-8000-000000000755",
+        "mergeId": "00000000-0000-7000-8000-000000000753",
+        "round": 1
+      }
+    },
+    {
+      "classification": "COUNTEREXAMPLE",
+      "fixtureId": "RELEASE-WRONG-SUPERSESSION",
+      "given": {
+        "activeAttemptId": "00000000-0000-7000-8000-000000000755",
+        "activeMergeId": "00000000-0000-7000-8000-000000000752",
+        "activeRound": 1,
+        "baseCommit": "1111111111111111111111111111111111111111",
+        "executionRoundLimit": 2,
+        "headCommits": [
+          "2222222222222222222222222222222222222222",
+          "5555555555555555555555555555555555555555"
+        ],
+        "latestResultEventId": "00000000-0000-7000-8000-000000000757",
+        "mergeOrder": [
+          "00000000-0000-7000-8000-000000000752",
+          "00000000-0000-7000-8000-000000000753"
+        ],
+        "nextMergeIndex": 0,
+        "nextRound": 1,
+        "planDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "providerTreeDigest": null,
+        "qualifiedTreeDigest": "3333333333333333333333333333333333333333",
+        "releaseMode": "CODE",
+        "state": "RECONCILING",
+        "unresolvedAttemptId": "00000000-0000-7000-8000-000000000755"
+      },
+      "kind": "RELEASE_MODEL",
+      "sourceDecisionIds": [
+        "P1B-V3-INTERNAL-RELEASE",
+        "P2-KCF-012",
+        "NEG-012"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "RESULT_SUPERSESSION_MISMATCH",
+          "state": "RECONCILING"
+        }
+      },
+      "when": {
+        "action": "RECONCILE",
+        "attemptId": "00000000-0000-7000-8000-000000000755",
+        "outcome": "MERGED",
+        "providerTreeDigest": "3333333333333333333333333333333333333333",
+        "supersedesResultEventId": "00000000-0000-7000-8000-000000000762"
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "REVIEW-BOUNDED-ADJUDICATOR",
+      "given": {
+        "adjudication": {
+          "adjudicator": {
+            "id": "validation-adjudicator",
+            "kind": "POLICY"
+          },
+          "deadline_at": "2026-08-13T00:00:00Z",
+          "round_limit": 1
+        },
+        "branch": {
+          "acceptance_criteria": [
+            "all required tests pass"
+          ],
+          "branch_id": "tests",
+          "deadline_at": "2026-08-12T00:00:00Z",
+          "input_evidence_ids": [
+            "00000000-0000-7000-8000-000000000207"
+          ],
+          "resolution_owner_fqn": "teams::coder-1",
+          "round_limit": 2,
+          "validator": {
+            "id": "validator-tests",
+            "kind": "SERVICE"
+          }
+        }
+      },
+      "kind": "BOUNDED_REVIEW_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-008"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "reason": "ACCEPTED"
+        }
+      },
+      "when": {
+        "authority": {
+          "id": "validation-adjudicator",
+          "kind": "POLICY"
+        },
+        "changedConditionEvidenceIds": [
+          "00000000-0000-7000-8000-000000000207"
+        ],
+        "decidedAt": "2026-08-12T12:00:00Z",
+        "result": "FAIL",
+        "round": 1,
+        "sourceRole": "ADJUDICATOR",
+        "supersedesResultEventIds": [
+          "00000000-0000-7000-8000-000000000601"
+        ]
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "REVIEW-BOUNDED-CHANGED-CONDITION",
+      "given": {
+        "adjudication": {
+          "adjudicator": {
+            "id": "validation-adjudicator",
+            "kind": "POLICY"
+          },
+          "deadline_at": "2026-08-13T00:00:00Z",
+          "round_limit": 1
+        },
+        "branch": {
+          "acceptance_criteria": [
+            "all required tests pass"
+          ],
+          "branch_id": "tests",
+          "deadline_at": "2026-08-12T00:00:00Z",
+          "input_evidence_ids": [
+            "00000000-0000-7000-8000-000000000207"
+          ],
+          "resolution_owner_fqn": "teams::coder-1",
+          "round_limit": 2,
+          "validator": {
+            "id": "validator-tests",
+            "kind": "SERVICE"
+          }
+        }
+      },
+      "kind": "BOUNDED_REVIEW_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-008"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "CHANGED_CONDITION_REQUIRED"
+        }
+      },
+      "when": {
+        "authority": {
+          "id": "validator-tests",
+          "kind": "SERVICE"
+        },
+        "changedConditionEvidenceIds": [],
+        "decidedAt": "2026-08-11T12:00:00Z",
+        "result": "PASS",
+        "round": 2,
+        "sourceRole": "VALIDATOR",
+        "supersedesResultEventIds": [
+          "00000000-0000-7000-8000-000000000601"
+        ]
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "REVIEW-BOUNDED-DEADLINE",
+      "given": {
+        "adjudication": {
+          "adjudicator": {
+            "id": "validation-adjudicator",
+            "kind": "POLICY"
+          },
+          "deadline_at": "2026-08-13T00:00:00Z",
+          "round_limit": 1
+        },
+        "branch": {
+          "acceptance_criteria": [
+            "all required tests pass"
+          ],
+          "branch_id": "tests",
+          "deadline_at": "2026-08-12T00:00:00Z",
+          "input_evidence_ids": [
+            "00000000-0000-7000-8000-000000000207"
+          ],
+          "resolution_owner_fqn": "teams::coder-1",
+          "round_limit": 2,
+          "validator": {
+            "id": "validator-tests",
+            "kind": "SERVICE"
+          }
+        }
+      },
+      "kind": "BOUNDED_REVIEW_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-008"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "BRANCH_DEADLINE_EXCEEDED"
+        }
+      },
+      "when": {
+        "authority": {
+          "id": "validator-tests",
+          "kind": "SERVICE"
+        },
+        "changedConditionEvidenceIds": [],
+        "decidedAt": "2026-08-12T00:00:01Z",
+        "result": "PASS",
+        "round": 1,
+        "sourceRole": "VALIDATOR",
+        "supersedesResultEventIds": []
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "REVIEW-BOUNDED-POLICY-TIMEOUT",
+      "given": {
+        "adjudication": {
+          "adjudicator": {
+            "id": "validation-adjudicator",
+            "kind": "POLICY"
+          },
+          "deadline_at": "2026-08-13T00:00:00Z",
+          "round_limit": 1
+        },
+        "branch": {
+          "acceptance_criteria": [
+            "all required tests pass"
+          ],
+          "branch_id": "tests",
+          "deadline_at": "2026-08-12T00:00:00Z",
+          "input_evidence_ids": [
+            "00000000-0000-7000-8000-000000000207"
+          ],
+          "resolution_owner_fqn": "teams::coder-1",
+          "round_limit": 2,
+          "validator": {
+            "id": "validator-tests",
+            "kind": "SERVICE"
+          }
+        }
+      },
+      "kind": "BOUNDED_REVIEW_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-008"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "reason": "ACCEPTED"
+        }
+      },
+      "when": {
+        "authority": {
+          "id": "validation-policy",
+          "kind": "POLICY"
+        },
+        "changedConditionEvidenceIds": [],
+        "decidedAt": "2026-08-12T00:00:01Z",
+        "result": "BLOCKED",
+        "round": 1,
+        "sourceRole": "POLICY_TIMEOUT",
+        "supersedesResultEventIds": []
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "REVIEW-BOUNDED-POST-FINALIZATION",
+      "given": {
+        "adjudication": {
+          "adjudicator": {
+            "id": "validation-adjudicator",
+            "kind": "POLICY"
+          },
+          "deadline_at": "2026-08-13T00:00:00Z",
+          "round_limit": 1
+        },
+        "branch": {
+          "acceptance_criteria": [
+            "all required tests pass"
+          ],
+          "branch_id": "tests",
+          "deadline_at": "2026-08-12T00:00:00Z",
+          "input_evidence_ids": [
+            "00000000-0000-7000-8000-000000000207"
+          ],
+          "resolution_owner_fqn": "teams::coder-1",
+          "round_limit": 2,
+          "validator": {
+            "id": "validator-tests",
+            "kind": "SERVICE"
+          }
+        },
+        "finalized": true
+      },
+      "kind": "BOUNDED_REVIEW_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-008"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "REVIEW_ALREADY_FINALIZED"
+        }
+      },
+      "when": {
+        "authority": {
+          "id": "validator-tests",
+          "kind": "SERVICE"
+        },
+        "changedConditionEvidenceIds": [],
+        "decidedAt": "2026-08-11T12:00:00Z",
+        "result": "PASS",
+        "round": 1,
+        "sourceRole": "VALIDATOR",
+        "supersedesResultEventIds": []
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "REVIEW-BOUNDED-ROUND-LIMIT",
+      "given": {
+        "adjudication": {
+          "adjudicator": {
+            "id": "validation-adjudicator",
+            "kind": "POLICY"
+          },
+          "deadline_at": "2026-08-13T00:00:00Z",
+          "round_limit": 1
+        },
+        "branch": {
+          "acceptance_criteria": [
+            "all required tests pass"
+          ],
+          "branch_id": "tests",
+          "deadline_at": "2026-08-12T00:00:00Z",
+          "input_evidence_ids": [
+            "00000000-0000-7000-8000-000000000207"
+          ],
+          "resolution_owner_fqn": "teams::coder-1",
+          "round_limit": 2,
+          "validator": {
+            "id": "validator-tests",
+            "kind": "SERVICE"
+          }
+        }
+      },
+      "kind": "BOUNDED_REVIEW_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-008"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "BRANCH_ROUND_EXHAUSTED"
+        }
+      },
+      "when": {
+        "authority": {
+          "id": "validator-tests",
+          "kind": "SERVICE"
+        },
+        "changedConditionEvidenceIds": [],
+        "decidedAt": "2026-08-11T12:00:00Z",
+        "result": "PASS",
+        "round": 3,
+        "sourceRole": "VALIDATOR",
+        "supersedesResultEventIds": []
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "REVIEW-BOUNDED-VALIDATOR-PASS",
+      "given": {
+        "adjudication": {
+          "adjudicator": {
+            "id": "validation-adjudicator",
+            "kind": "POLICY"
+          },
+          "deadline_at": "2026-08-13T00:00:00Z",
+          "round_limit": 1
+        },
+        "branch": {
+          "acceptance_criteria": [
+            "all required tests pass"
+          ],
+          "branch_id": "tests",
+          "deadline_at": "2026-08-12T00:00:00Z",
+          "input_evidence_ids": [
+            "00000000-0000-7000-8000-000000000207"
+          ],
+          "resolution_owner_fqn": "teams::coder-1",
+          "round_limit": 2,
+          "validator": {
+            "id": "validator-tests",
+            "kind": "SERVICE"
+          }
+        }
+      },
+      "kind": "BOUNDED_REVIEW_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-008"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "reason": "ACCEPTED"
+        }
+      },
+      "when": {
+        "authority": {
+          "id": "validator-tests",
+          "kind": "SERVICE"
+        },
+        "changedConditionEvidenceIds": [],
+        "decidedAt": "2026-08-11T12:00:00Z",
+        "result": "PASS",
+        "round": 1,
+        "sourceRole": "VALIDATOR",
+        "supersedesResultEventIds": []
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "REVIEW-BOUNDED-WRONG-VALIDATOR",
+      "given": {
+        "adjudication": {
+          "adjudicator": {
+            "id": "validation-adjudicator",
+            "kind": "POLICY"
+          },
+          "deadline_at": "2026-08-13T00:00:00Z",
+          "round_limit": 1
+        },
+        "branch": {
+          "acceptance_criteria": [
+            "all required tests pass"
+          ],
+          "branch_id": "tests",
+          "deadline_at": "2026-08-12T00:00:00Z",
+          "input_evidence_ids": [
+            "00000000-0000-7000-8000-000000000207"
+          ],
+          "resolution_owner_fqn": "teams::coder-1",
+          "round_limit": 2,
+          "validator": {
+            "id": "validator-tests",
+            "kind": "SERVICE"
+          }
+        }
+      },
+      "kind": "BOUNDED_REVIEW_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-008"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "VALIDATOR_MISMATCH"
+        }
+      },
+      "when": {
+        "authority": {
+          "id": "different-validator",
+          "kind": "SERVICE"
+        },
+        "changedConditionEvidenceIds": [],
+        "decidedAt": "2026-08-11T12:00:00Z",
+        "result": "PASS",
+        "round": 1,
+        "sourceRole": "VALIDATOR",
+        "supersedesResultEventIds": []
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "REVIEW-JOIN-DUPLICATE-CONFLICT",
+      "given": {
+        "joinRule": "ALL_PASS",
+        "partialResultPolicy": "WAIT_ALL",
+        "requiredBranchIds": [
+          "review",
+          "tests"
+        ]
+      },
+      "kind": "REVIEW_JOIN_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-008"
+      ],
+      "then": {
+        "expected": {
+          "complete": false,
+          "status": "CONFLICT"
+        }
+      },
+      "when": {
+        "results": [
+          {
+            "branchId": "tests",
+            "result": "PASS"
+          },
+          {
+            "branchId": "tests",
+            "result": "FAIL"
+          }
+        ]
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "REVIEW-JOIN-ORDER-INDEPENDENT",
+      "given": {
+        "joinRule": "ALL_PASS",
+        "partialResultPolicy": "WAIT_ALL",
+        "requiredBranchIds": [
+          "review",
+          "tests"
+        ]
+      },
+      "kind": "REVIEW_JOIN_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-008"
+      ],
+      "then": {
+        "expected": {
+          "complete": true,
+          "status": "PASS"
+        }
+      },
+      "when": {
+        "results": [
+          {
+            "branchId": "tests",
+            "result": "PASS"
+          },
+          {
+            "branchId": "review",
+            "result": "PASS"
+          }
+        ]
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "SUCCESSOR-SET-CANONICAL",
+      "given": {},
+      "kind": "SUCCESSOR_SET_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-008"
+      ],
+      "then": {
+        "expected": {
+          "valid": true
+        }
+      },
+      "when": {
+        "successorIds": [
+          "00000000-0000-7000-8000-000000000801",
+          "00000000-0000-7000-8000-000000000802"
+        ]
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "SUCCESSOR-SET-REJECT-UNORDERED",
+      "given": {},
+      "kind": "SUCCESSOR_SET_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-008"
+      ],
+      "then": {
+        "expected": {
+          "valid": false
+        }
+      },
+      "when": {
+        "successorIds": [
+          "00000000-0000-7000-8000-000000000802",
+          "00000000-0000-7000-8000-000000000801"
+        ]
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "P4-MISSING-BUDGET-FAILS-CLOSED",
+      "given": {
+        "budget": null,
+        "consumed": false,
+        "exact": {
+          "actorFqn": "teams::coder-1",
+          "executionId": "00000000-0000-7000-8000-000000000908",
+          "fencingEpoch": 1,
+          "lifecycleEpoch": 1,
+          "modelDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+          "runtimeDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+          "scopeRevision": 1,
+          "taskRevision": 4
+        },
+        "lastConditionDigest": null,
+        "priorTerminal": null,
+        "state": "ABSENT"
+      },
+      "kind": "INVOCATION_ADMISSION_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-039"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "MISSING_BUDGET"
+        }
+      },
+      "when": {
+        "action": "AUTHORIZE",
+        "actorFqn": "teams::coder-1",
+        "conditionDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "executionId": "00000000-0000-7000-8000-000000000908",
+        "fencingEpoch": 1,
+        "lifecycleEpoch": 1,
+        "modelDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+        "now": "2026-08-31T12:00:00Z",
+        "origin": "TEAMS_KERNEL",
+        "purpose": "IMPLEMENTATION",
+        "retryOf": null,
+        "retryOrdinal": 0,
+        "runtimeDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+        "scopeRevision": 1,
+        "taskRevision": 4
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "P4-DIRECT-AGENT-WAKEUP-REJECTED",
+      "given": {
+        "budget": {
+          "accountId": "00000000-0000-7000-8000-000000000901",
+          "deadlineAt": "2026-09-30T00:00:00Z",
+          "limit": 8,
+          "purposeLimit": 4,
+          "purposeUsed": 1,
+          "used": 2
+        },
+        "consumed": false,
+        "exact": {
+          "actorFqn": "teams::coder-1",
+          "executionId": "00000000-0000-7000-8000-000000000908",
+          "fencingEpoch": 1,
+          "lifecycleEpoch": 1,
+          "modelDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+          "runtimeDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+          "scopeRevision": 1,
+          "taskRevision": 4
+        },
+        "lastConditionDigest": null,
+        "priorTerminal": null,
+        "state": "ABSENT"
+      },
+      "kind": "INVOCATION_ADMISSION_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-040"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "DIRECT_WAKEUP_PROHIBITED"
+        }
+      },
+      "when": {
+        "action": "AUTHORIZE",
+        "actorFqn": "teams::coder-1",
+        "conditionDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "executionId": "00000000-0000-7000-8000-000000000908",
+        "fencingEpoch": 1,
+        "lifecycleEpoch": 1,
+        "modelDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+        "now": "2026-08-31T12:00:00Z",
+        "origin": "AGENT_MESSAGE",
+        "purpose": "IMPLEMENTATION",
+        "retryOf": null,
+        "retryOrdinal": 0,
+        "runtimeDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+        "scopeRevision": 1,
+        "taskRevision": 4
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "P4-COOPTED-MESSAGE-WAKEUP-REJECTED",
+      "given": {
+        "budget": {
+          "accountId": "00000000-0000-7000-8000-000000000901",
+          "deadlineAt": "2026-09-30T00:00:00Z",
+          "limit": 8,
+          "purposeLimit": 4,
+          "purposeUsed": 1,
+          "used": 2
+        },
+        "consumed": false,
+        "exact": {
+          "actorFqn": "teams::coder-1",
+          "executionId": "00000000-0000-7000-8000-000000000908",
+          "fencingEpoch": 1,
+          "lifecycleEpoch": 1,
+          "modelDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+          "runtimeDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+          "scopeRevision": 1,
+          "taskRevision": 4
+        },
+        "lastConditionDigest": null,
+        "priorTerminal": null,
+        "state": "ABSENT"
+      },
+      "kind": "INVOCATION_ADMISSION_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-041"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "DIRECT_WAKEUP_PROHIBITED"
+        }
+      },
+      "when": {
+        "action": "AUTHORIZE",
+        "actorFqn": "teams::coder-1",
+        "conditionDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "executionId": "00000000-0000-7000-8000-000000000908",
+        "fencingEpoch": 1,
+        "lifecycleEpoch": 1,
+        "messageType": "tekroo.event.task.dispatched",
+        "modelDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+        "now": "2026-08-31T12:00:00Z",
+        "origin": "AGENT_MESSAGE",
+        "purpose": "IMPLEMENTATION",
+        "retryOf": null,
+        "retryOrdinal": 0,
+        "runtimeDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+        "scopeRevision": 1,
+        "taskRevision": 4
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "P4-TASK-DISPATCH-NOT-EXECUTABLE",
+      "given": {
+        "budget": {
+          "accountId": "00000000-0000-7000-8000-000000000901",
+          "deadlineAt": "2026-09-30T00:00:00Z",
+          "limit": 8,
+          "purposeLimit": 4,
+          "purposeUsed": 1,
+          "used": 2
+        },
+        "consumed": false,
+        "exact": {
+          "actorFqn": "teams::coder-1",
+          "executionId": "00000000-0000-7000-8000-000000000908",
+          "fencingEpoch": 1,
+          "lifecycleEpoch": 1,
+          "modelDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+          "runtimeDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+          "scopeRevision": 1,
+          "taskRevision": 4
+        },
+        "lastConditionDigest": null,
+        "priorTerminal": null,
+        "state": "ABSENT"
+      },
+      "kind": "INVOCATION_ADMISSION_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-042"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "DIRECT_WAKEUP_PROHIBITED"
+        }
+      },
+      "when": {
+        "action": "AUTHORIZE",
+        "actorFqn": "teams::coder-1",
+        "conditionDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "executionId": "00000000-0000-7000-8000-000000000908",
+        "fencingEpoch": 1,
+        "lifecycleEpoch": 1,
+        "messageType": "tekroo.event.task.dispatched",
+        "modelDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+        "now": "2026-08-31T12:00:00Z",
+        "origin": "TEAMS_TASK_DISPATCH",
+        "purpose": "IMPLEMENTATION",
+        "retryOf": null,
+        "retryOrdinal": 0,
+        "runtimeDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+        "scopeRevision": 1,
+        "taskRevision": 4
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "P4-STALE-TASK-REVISION-REJECTED",
+      "given": {
+        "budget": {
+          "accountId": "00000000-0000-7000-8000-000000000901",
+          "deadlineAt": "2026-09-30T00:00:00Z",
+          "limit": 8,
+          "purposeLimit": 4,
+          "purposeUsed": 1,
+          "used": 2
+        },
+        "consumed": false,
+        "exact": {
+          "actorFqn": "teams::coder-1",
+          "executionId": "00000000-0000-7000-8000-000000000908",
+          "fencingEpoch": 1,
+          "lifecycleEpoch": 1,
+          "modelDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+          "runtimeDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+          "scopeRevision": 1,
+          "taskRevision": 4
+        },
+        "lastConditionDigest": null,
+        "priorTerminal": null,
+        "state": "ABSENT"
+      },
+      "kind": "INVOCATION_ADMISSION_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-043"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "STALE_TASK_REVISION"
+        }
+      },
+      "when": {
+        "action": "AUTHORIZE",
+        "actorFqn": "teams::coder-1",
+        "conditionDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "executionId": "00000000-0000-7000-8000-000000000908",
+        "fencingEpoch": 1,
+        "lifecycleEpoch": 1,
+        "modelDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+        "now": "2026-08-31T12:00:00Z",
+        "origin": "TEAMS_KERNEL",
+        "purpose": "IMPLEMENTATION",
+        "retryOf": null,
+        "retryOrdinal": 0,
+        "runtimeDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+        "scopeRevision": 1,
+        "taskRevision": 3
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "P4-STALE-LIFECYCLE-REJECTED",
+      "given": {
+        "budget": {
+          "accountId": "00000000-0000-7000-8000-000000000901",
+          "deadlineAt": "2026-09-30T00:00:00Z",
+          "limit": 8,
+          "purposeLimit": 4,
+          "purposeUsed": 1,
+          "used": 2
+        },
+        "consumed": false,
+        "exact": {
+          "actorFqn": "teams::coder-1",
+          "executionId": "00000000-0000-7000-8000-000000000908",
+          "fencingEpoch": 1,
+          "lifecycleEpoch": 1,
+          "modelDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+          "runtimeDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+          "scopeRevision": 1,
+          "taskRevision": 4
+        },
+        "lastConditionDigest": null,
+        "priorTerminal": null,
+        "state": "ABSENT"
+      },
+      "kind": "INVOCATION_ADMISSION_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-044"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "STALE_LIFECYCLE"
+        }
+      },
+      "when": {
+        "action": "AUTHORIZE",
+        "actorFqn": "teams::coder-1",
+        "conditionDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "executionId": "00000000-0000-7000-8000-000000000908",
+        "fencingEpoch": 1,
+        "lifecycleEpoch": 2,
+        "modelDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+        "now": "2026-08-31T12:00:00Z",
+        "origin": "TEAMS_KERNEL",
+        "purpose": "IMPLEMENTATION",
+        "retryOf": null,
+        "retryOrdinal": 0,
+        "runtimeDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+        "scopeRevision": 1,
+        "taskRevision": 4
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "P4-STALE-FENCE-REJECTED",
+      "given": {
+        "budget": {
+          "accountId": "00000000-0000-7000-8000-000000000901",
+          "deadlineAt": "2026-09-30T00:00:00Z",
+          "limit": 8,
+          "purposeLimit": 4,
+          "purposeUsed": 1,
+          "used": 2
+        },
+        "consumed": false,
+        "exact": {
+          "actorFqn": "teams::coder-1",
+          "executionId": "00000000-0000-7000-8000-000000000908",
+          "fencingEpoch": 1,
+          "lifecycleEpoch": 1,
+          "modelDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+          "runtimeDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+          "scopeRevision": 1,
+          "taskRevision": 4
+        },
+        "lastConditionDigest": null,
+        "priorTerminal": null,
+        "state": "ABSENT"
+      },
+      "kind": "INVOCATION_ADMISSION_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-045"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "RUNTIME_IDENTITY_MISMATCH"
+        }
+      },
+      "when": {
+        "action": "AUTHORIZE",
+        "actorFqn": "teams::coder-1",
+        "conditionDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "executionId": "00000000-0000-7000-8000-000000000908",
+        "fencingEpoch": 2,
+        "lifecycleEpoch": 1,
+        "modelDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+        "now": "2026-08-31T12:00:00Z",
+        "origin": "TEAMS_KERNEL",
+        "purpose": "IMPLEMENTATION",
+        "retryOf": null,
+        "retryOrdinal": 0,
+        "runtimeDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+        "scopeRevision": 1,
+        "taskRevision": 4
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "P4-WRONG-ACTOR-REJECTED",
+      "given": {
+        "budget": {
+          "accountId": "00000000-0000-7000-8000-000000000901",
+          "deadlineAt": "2026-09-30T00:00:00Z",
+          "limit": 8,
+          "purposeLimit": 4,
+          "purposeUsed": 1,
+          "used": 2
+        },
+        "consumed": false,
+        "exact": {
+          "actorFqn": "teams::coder-1",
+          "executionId": "00000000-0000-7000-8000-000000000908",
+          "fencingEpoch": 1,
+          "lifecycleEpoch": 1,
+          "modelDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+          "runtimeDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+          "scopeRevision": 1,
+          "taskRevision": 4
+        },
+        "lastConditionDigest": null,
+        "priorTerminal": null,
+        "state": "ABSENT"
+      },
+      "kind": "INVOCATION_ADMISSION_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-046"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "RUNTIME_IDENTITY_MISMATCH"
+        }
+      },
+      "when": {
+        "action": "AUTHORIZE",
+        "actorFqn": "teams::coder-2",
+        "conditionDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "executionId": "00000000-0000-7000-8000-000000000908",
+        "fencingEpoch": 1,
+        "lifecycleEpoch": 1,
+        "modelDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+        "now": "2026-08-31T12:00:00Z",
+        "origin": "TEAMS_KERNEL",
+        "purpose": "IMPLEMENTATION",
+        "retryOf": null,
+        "retryOrdinal": 0,
+        "runtimeDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+        "scopeRevision": 1,
+        "taskRevision": 4
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "P4-WRONG-MODEL-REJECTED",
+      "given": {
+        "budget": {
+          "accountId": "00000000-0000-7000-8000-000000000901",
+          "deadlineAt": "2026-09-30T00:00:00Z",
+          "limit": 8,
+          "purposeLimit": 4,
+          "purposeUsed": 1,
+          "used": 2
+        },
+        "consumed": false,
+        "exact": {
+          "actorFqn": "teams::coder-1",
+          "executionId": "00000000-0000-7000-8000-000000000908",
+          "fencingEpoch": 1,
+          "lifecycleEpoch": 1,
+          "modelDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+          "runtimeDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+          "scopeRevision": 1,
+          "taskRevision": 4
+        },
+        "lastConditionDigest": null,
+        "priorTerminal": null,
+        "state": "ABSENT"
+      },
+      "kind": "INVOCATION_ADMISSION_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-047"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "RUNTIME_IDENTITY_MISMATCH"
+        }
+      },
+      "when": {
+        "action": "AUTHORIZE",
+        "actorFqn": "teams::coder-1",
+        "conditionDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "executionId": "00000000-0000-7000-8000-000000000908",
+        "fencingEpoch": 1,
+        "lifecycleEpoch": 1,
+        "modelDigest": "9999999999999999999999999999999999999999999999999999999999999999",
+        "now": "2026-08-31T12:00:00Z",
+        "origin": "TEAMS_KERNEL",
+        "purpose": "IMPLEMENTATION",
+        "retryOf": null,
+        "retryOrdinal": 0,
+        "runtimeDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+        "scopeRevision": 1,
+        "taskRevision": 4
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "P4-WRONG-RUNTIME-REJECTED",
+      "given": {
+        "budget": {
+          "accountId": "00000000-0000-7000-8000-000000000901",
+          "deadlineAt": "2026-09-30T00:00:00Z",
+          "limit": 8,
+          "purposeLimit": 4,
+          "purposeUsed": 1,
+          "used": 2
+        },
+        "consumed": false,
+        "exact": {
+          "actorFqn": "teams::coder-1",
+          "executionId": "00000000-0000-7000-8000-000000000908",
+          "fencingEpoch": 1,
+          "lifecycleEpoch": 1,
+          "modelDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+          "runtimeDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+          "scopeRevision": 1,
+          "taskRevision": 4
+        },
+        "lastConditionDigest": null,
+        "priorTerminal": null,
+        "state": "ABSENT"
+      },
+      "kind": "INVOCATION_ADMISSION_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-048"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "RUNTIME_IDENTITY_MISMATCH"
+        }
+      },
+      "when": {
+        "action": "AUTHORIZE",
+        "actorFqn": "teams::coder-1",
+        "conditionDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "executionId": "00000000-0000-7000-8000-000000000908",
+        "fencingEpoch": 1,
+        "lifecycleEpoch": 1,
+        "modelDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+        "now": "2026-08-31T12:00:00Z",
+        "origin": "TEAMS_KERNEL",
+        "purpose": "IMPLEMENTATION",
+        "retryOf": null,
+        "retryOrdinal": 0,
+        "runtimeDigest": "9999999999999999999999999999999999999999999999999999999999999999",
+        "scopeRevision": 1,
+        "taskRevision": 4
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "P4-FIRST-INVOCATION-ACCEPTED",
+      "given": {
+        "budget": {
+          "accountId": "00000000-0000-7000-8000-000000000901",
+          "deadlineAt": "2026-09-30T00:00:00Z",
+          "limit": 8,
+          "purposeLimit": 4,
+          "purposeUsed": 1,
+          "used": 2
+        },
+        "consumed": false,
+        "exact": {
+          "actorFqn": "teams::coder-1",
+          "executionId": "00000000-0000-7000-8000-000000000908",
+          "fencingEpoch": 1,
+          "lifecycleEpoch": 1,
+          "modelDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+          "runtimeDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+          "scopeRevision": 1,
+          "taskRevision": 4
+        },
+        "lastConditionDigest": null,
+        "priorTerminal": null,
+        "state": "ABSENT"
+      },
+      "kind": "INVOCATION_ADMISSION_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-049"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "globalUsed": 3,
+          "maximumAdditionalInvocations": 5,
+          "purposeUsed": 2,
+          "reason": "ACCEPTED"
+        }
+      },
+      "when": {
+        "action": "AUTHORIZE",
+        "actorFqn": "teams::coder-1",
+        "conditionDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "executionId": "00000000-0000-7000-8000-000000000908",
+        "fencingEpoch": 1,
+        "lifecycleEpoch": 1,
+        "modelDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+        "now": "2026-08-31T12:00:00Z",
+        "origin": "TEAMS_KERNEL",
+        "purpose": "IMPLEMENTATION",
+        "retryOf": null,
+        "retryOrdinal": 0,
+        "runtimeDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+        "scopeRevision": 1,
+        "taskRevision": 4
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "P4-UNCHANGED-CONDITION-REDISPATCH-REJECTED",
+      "given": {
+        "budget": {
+          "accountId": "00000000-0000-7000-8000-000000000901",
+          "deadlineAt": "2026-09-30T00:00:00Z",
+          "limit": 8,
+          "purposeLimit": 4,
+          "purposeUsed": 1,
+          "used": 2
+        },
+        "consumed": false,
+        "exact": {
+          "actorFqn": "teams::coder-1",
+          "executionId": "00000000-0000-7000-8000-000000000908",
+          "fencingEpoch": 1,
+          "lifecycleEpoch": 1,
+          "modelDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+          "runtimeDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+          "scopeRevision": 1,
+          "taskRevision": 4
+        },
+        "lastConditionDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "priorTerminal": null,
+        "state": "ABSENT"
+      },
+      "kind": "INVOCATION_ADMISSION_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-050"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "UNCHANGED_CONDITION"
+        }
+      },
+      "when": {
+        "action": "AUTHORIZE",
+        "actorFqn": "teams::coder-1",
+        "conditionDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "executionId": "00000000-0000-7000-8000-000000000908",
+        "fencingEpoch": 1,
+        "lifecycleEpoch": 1,
+        "modelDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+        "now": "2026-08-31T12:00:00Z",
+        "origin": "TEAMS_KERNEL",
+        "purpose": "IMPLEMENTATION",
+        "retryOf": null,
+        "retryOrdinal": 0,
+        "runtimeDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+        "scopeRevision": 1,
+        "taskRevision": 4
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "P4-CHANGED-EVIDENCE-CONTINUATION-ACCEPTED",
+      "given": {
+        "budget": {
+          "accountId": "00000000-0000-7000-8000-000000000901",
+          "deadlineAt": "2026-09-30T00:00:00Z",
+          "limit": 8,
+          "purposeLimit": 4,
+          "purposeUsed": 1,
+          "used": 2
+        },
+        "consumed": false,
+        "exact": {
+          "actorFqn": "teams::coder-1",
+          "executionId": "00000000-0000-7000-8000-000000000908",
+          "fencingEpoch": 1,
+          "lifecycleEpoch": 1,
+          "modelDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+          "runtimeDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+          "scopeRevision": 1,
+          "taskRevision": 4
+        },
+        "lastConditionDigest": "8888888888888888888888888888888888888888888888888888888888888888",
+        "priorTerminal": null,
+        "state": "ABSENT"
+      },
+      "kind": "INVOCATION_ADMISSION_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-039"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "globalUsed": 3,
+          "maximumAdditionalInvocations": 5,
+          "purposeUsed": 2,
+          "reason": "ACCEPTED"
+        }
+      },
+      "when": {
+        "action": "AUTHORIZE",
+        "actorFqn": "teams::coder-1",
+        "conditionDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "executionId": "00000000-0000-7000-8000-000000000908",
+        "fencingEpoch": 1,
+        "lifecycleEpoch": 1,
+        "modelDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+        "now": "2026-08-31T12:00:00Z",
+        "origin": "TEAMS_KERNEL",
+        "purpose": "IMPLEMENTATION",
+        "retryOf": null,
+        "retryOrdinal": 0,
+        "runtimeDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+        "scopeRevision": 1,
+        "taskRevision": 4
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "P4-RETRYABLE-TERMINAL-CONTINUATION-ACCEPTED",
+      "given": {
+        "budget": {
+          "accountId": "00000000-0000-7000-8000-000000000901",
+          "deadlineAt": "2026-09-30T00:00:00Z",
+          "limit": 8,
+          "purposeLimit": 4,
+          "purposeUsed": 1,
+          "used": 2
+        },
+        "consumed": false,
+        "exact": {
+          "actorFqn": "teams::coder-1",
+          "executionId": "00000000-0000-7000-8000-000000000908",
+          "fencingEpoch": 1,
+          "lifecycleEpoch": 1,
+          "modelDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+          "runtimeDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+          "scopeRevision": 1,
+          "taskRevision": 4
+        },
+        "lastConditionDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "priorTerminal": {
+          "invocationId": "prior",
+          "retryOrdinal": 0,
+          "retryable": true
+        },
+        "state": "ABSENT"
+      },
+      "kind": "INVOCATION_ADMISSION_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-040"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "globalUsed": 3,
+          "maximumAdditionalInvocations": 5,
+          "purposeUsed": 2,
+          "reason": "ACCEPTED"
+        }
+      },
+      "when": {
+        "action": "AUTHORIZE",
+        "actorFqn": "teams::coder-1",
+        "conditionDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "executionId": "00000000-0000-7000-8000-000000000908",
+        "fencingEpoch": 1,
+        "lifecycleEpoch": 1,
+        "modelDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+        "now": "2026-08-31T12:00:00Z",
+        "origin": "TEAMS_KERNEL",
+        "purpose": "IMPLEMENTATION",
+        "retryOf": "prior",
+        "retryOrdinal": 1,
+        "runtimeDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+        "scopeRevision": 1,
+        "taskRevision": 4
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "P4-NONRETRYABLE-CONTINUATION-REJECTED",
+      "given": {
+        "budget": {
+          "accountId": "00000000-0000-7000-8000-000000000901",
+          "deadlineAt": "2026-09-30T00:00:00Z",
+          "limit": 8,
+          "purposeLimit": 4,
+          "purposeUsed": 1,
+          "used": 2
+        },
+        "consumed": false,
+        "exact": {
+          "actorFqn": "teams::coder-1",
+          "executionId": "00000000-0000-7000-8000-000000000908",
+          "fencingEpoch": 1,
+          "lifecycleEpoch": 1,
+          "modelDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+          "runtimeDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+          "scopeRevision": 1,
+          "taskRevision": 4
+        },
+        "lastConditionDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "priorTerminal": {
+          "invocationId": "prior",
+          "retryOrdinal": 0,
+          "retryable": false
+        },
+        "state": "ABSENT"
+      },
+      "kind": "INVOCATION_ADMISSION_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-041"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "UNCHANGED_CONDITION"
+        }
+      },
+      "when": {
+        "action": "AUTHORIZE",
+        "actorFqn": "teams::coder-1",
+        "conditionDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "executionId": "00000000-0000-7000-8000-000000000908",
+        "fencingEpoch": 1,
+        "lifecycleEpoch": 1,
+        "modelDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+        "now": "2026-08-31T12:00:00Z",
+        "origin": "TEAMS_KERNEL",
+        "purpose": "IMPLEMENTATION",
+        "retryOf": "prior",
+        "retryOrdinal": 1,
+        "runtimeDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+        "scopeRevision": 1,
+        "taskRevision": 4
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "P4-PERMIT-FIRST-CLAIM-ACCEPTED",
+      "given": {
+        "budget": {
+          "accountId": "00000000-0000-7000-8000-000000000901",
+          "deadlineAt": "2026-09-30T00:00:00Z",
+          "limit": 8,
+          "purposeLimit": 4,
+          "purposeUsed": 1,
+          "used": 2
+        },
+        "consumed": false,
+        "exact": {
+          "actorFqn": "teams::coder-1",
+          "executionId": "00000000-0000-7000-8000-000000000908",
+          "fencingEpoch": 1,
+          "lifecycleEpoch": 1,
+          "modelDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+          "runtimeDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+          "scopeRevision": 1,
+          "taskRevision": 4
+        },
+        "lastConditionDigest": null,
+        "priorTerminal": null,
+        "state": "AUTHORIZED"
+      },
+      "kind": "INVOCATION_ADMISSION_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-042"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "reason": "ACCEPTED",
+          "state": "CLAIMED"
+        }
+      },
+      "when": {
+        "action": "CLAIM",
+        "beforeDeadline": true,
+        "consumed": false,
+        "identityMatches": true
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "P4-PERMIT-REUSE-REJECTED",
+      "given": {
+        "budget": {
+          "accountId": "00000000-0000-7000-8000-000000000901",
+          "deadlineAt": "2026-09-30T00:00:00Z",
+          "limit": 8,
+          "purposeLimit": 4,
+          "purposeUsed": 1,
+          "used": 2
+        },
+        "consumed": true,
+        "exact": {
+          "actorFqn": "teams::coder-1",
+          "executionId": "00000000-0000-7000-8000-000000000908",
+          "fencingEpoch": 1,
+          "lifecycleEpoch": 1,
+          "modelDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+          "runtimeDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+          "scopeRevision": 1,
+          "taskRevision": 4
+        },
+        "lastConditionDigest": null,
+        "priorTerminal": null,
+        "state": "CLAIMED"
+      },
+      "kind": "INVOCATION_ADMISSION_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-043"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "PERMIT_ALREADY_CONSUMED",
+          "state": "CLAIMED"
+        }
+      },
+      "when": {
+        "action": "CLAIM",
+        "beforeDeadline": true,
+        "consumed": true,
+        "identityMatches": true
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "P4-CANCELLATION-REQUEST-NOT-TERMINAL",
+      "given": {
+        "budget": {
+          "accountId": "00000000-0000-7000-8000-000000000901",
+          "deadlineAt": "2026-09-30T00:00:00Z",
+          "limit": 8,
+          "purposeLimit": 4,
+          "purposeUsed": 1,
+          "used": 2
+        },
+        "consumed": false,
+        "exact": {
+          "actorFqn": "teams::coder-1",
+          "executionId": "00000000-0000-7000-8000-000000000908",
+          "fencingEpoch": 1,
+          "lifecycleEpoch": 1,
+          "modelDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+          "runtimeDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+          "scopeRevision": 1,
+          "taskRevision": 4
+        },
+        "lastConditionDigest": null,
+        "priorTerminal": null,
+        "state": "STARTED"
+      },
+      "kind": "INVOCATION_ADMISSION_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-044"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "cancellationRequested": true,
+          "reason": "CANCELLATION_REQUESTED",
+          "state": "STARTED"
+        }
+      },
+      "when": {
+        "action": "REQUEST_CANCELLATION"
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "P4-CANCELLED-REQUIRES-TERMINAL-EVIDENCE",
+      "given": {
+        "budget": {
+          "accountId": "00000000-0000-7000-8000-000000000901",
+          "deadlineAt": "2026-09-30T00:00:00Z",
+          "limit": 8,
+          "purposeLimit": 4,
+          "purposeUsed": 1,
+          "used": 2
+        },
+        "consumed": false,
+        "exact": {
+          "actorFqn": "teams::coder-1",
+          "executionId": "00000000-0000-7000-8000-000000000908",
+          "fencingEpoch": 1,
+          "lifecycleEpoch": 1,
+          "modelDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+          "runtimeDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+          "scopeRevision": 1,
+          "taskRevision": 4
+        },
+        "lastConditionDigest": null,
+        "priorTerminal": null,
+        "state": "STARTED"
+      },
+      "kind": "INVOCATION_ADMISSION_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-045"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "TERMINAL_EVIDENCE_REQUIRED",
+          "state": "STARTED"
+        }
+      },
+      "when": {
+        "action": "RECORD_TERMINAL",
+        "outcome": "CANCELLED",
+        "terminalEvidence": false
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "P4-ROOT-BOUND-COMPUTED",
+      "given": {
+        "limit": 8,
+        "rootAccountId": "00000000-0000-7000-8000-000000000901",
+        "used": 3
+      },
+      "kind": "WORK_BUDGET_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-046"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "maximumAdditionalInvocations": 5,
+          "reason": "ACCEPTED"
+        }
+      },
+      "when": {
+        "action": "COMPUTE_BOUND"
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "P4-CHILD-BUDGET-RESET-REJECTED",
+      "given": {
+        "limit": 8,
+        "rootAccountId": "00000000-0000-7000-8000-000000000901",
+        "used": 3
+      },
+      "kind": "WORK_BUDGET_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-047"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "maximumAdditionalInvocations": 5,
+          "reason": "BUDGET_RESET_PROHIBITED"
+        }
+      },
+      "when": {
+        "accountId": "new-account",
+        "action": "INHERIT",
+        "mechanism": "CHILD_TASK",
+        "requestedLimit": 8
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "P4-HANDOFF-BUDGET-RESET-REJECTED",
+      "given": {
+        "limit": 8,
+        "rootAccountId": "00000000-0000-7000-8000-000000000901",
+        "used": 3
+      },
+      "kind": "WORK_BUDGET_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-048"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "maximumAdditionalInvocations": 5,
+          "reason": "BUDGET_RESET_PROHIBITED"
+        }
+      },
+      "when": {
+        "accountId": "new-account",
+        "action": "INHERIT",
+        "mechanism": "HANDOFF",
+        "requestedLimit": 8
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "P4-REPLAN-BUDGET-RESET-REJECTED",
+      "given": {
+        "limit": 8,
+        "rootAccountId": "00000000-0000-7000-8000-000000000901",
+        "used": 3
+      },
+      "kind": "WORK_BUDGET_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-049"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "maximumAdditionalInvocations": 5,
+          "reason": "BUDGET_RESET_PROHIBITED"
+        }
+      },
+      "when": {
+        "accountId": "new-account",
+        "action": "INHERIT",
+        "mechanism": "REPLAN",
+        "requestedLimit": 8
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "P4-PROMOTION-BUDGET-RESET-REJECTED",
+      "given": {
+        "limit": 8,
+        "rootAccountId": "00000000-0000-7000-8000-000000000901",
+        "used": 3
+      },
+      "kind": "WORK_BUDGET_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-050"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "maximumAdditionalInvocations": 5,
+          "reason": "BUDGET_RESET_PROHIBITED"
+        }
+      },
+      "when": {
+        "accountId": "new-account",
+        "action": "INHERIT",
+        "mechanism": "PROMOTION",
+        "requestedLimit": 8
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "P4-REVIEW-BUDGET-RESET-REJECTED",
+      "given": {
+        "limit": 8,
+        "rootAccountId": "00000000-0000-7000-8000-000000000901",
+        "used": 3
+      },
+      "kind": "WORK_BUDGET_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-039"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "maximumAdditionalInvocations": 5,
+          "reason": "BUDGET_RESET_PROHIBITED"
+        }
+      },
+      "when": {
+        "accountId": "new-account",
+        "action": "INHERIT",
+        "mechanism": "REVIEW",
+        "requestedLimit": 8
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "P4-REPAIR-BUDGET-RESET-REJECTED",
+      "given": {
+        "limit": 8,
+        "rootAccountId": "00000000-0000-7000-8000-000000000901",
+        "used": 3
+      },
+      "kind": "WORK_BUDGET_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-040"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "maximumAdditionalInvocations": 5,
+          "reason": "BUDGET_RESET_PROHIBITED"
+        }
+      },
+      "when": {
+        "accountId": "new-account",
+        "action": "INHERIT",
+        "mechanism": "REPAIR",
+        "requestedLimit": 8
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "P4-ACTOR-REPLACEMENT-BUDGET-RESET-REJECTED",
+      "given": {
+        "limit": 8,
+        "rootAccountId": "00000000-0000-7000-8000-000000000901",
+        "used": 3
+      },
+      "kind": "WORK_BUDGET_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-041"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "maximumAdditionalInvocations": 5,
+          "reason": "BUDGET_RESET_PROHIBITED"
+        }
+      },
+      "when": {
+        "accountId": "new-account",
+        "action": "INHERIT",
+        "mechanism": "ACTOR_REPLACEMENT",
+        "requestedLimit": 8
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "P4-MODEL-REPLACEMENT-BUDGET-RESET-REJECTED",
+      "given": {
+        "limit": 8,
+        "rootAccountId": "00000000-0000-7000-8000-000000000901",
+        "used": 3
+      },
+      "kind": "WORK_BUDGET_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-042"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "maximumAdditionalInvocations": 5,
+          "reason": "BUDGET_RESET_PROHIBITED"
+        }
+      },
+      "when": {
+        "accountId": "new-account",
+        "action": "INHERIT",
+        "mechanism": "MODEL_REPLACEMENT",
+        "requestedLimit": 8
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "P4-RESTART-BUDGET-RESET-REJECTED",
+      "given": {
+        "limit": 8,
+        "rootAccountId": "00000000-0000-7000-8000-000000000901",
+        "used": 3
+      },
+      "kind": "WORK_BUDGET_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-043"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "maximumAdditionalInvocations": 5,
+          "reason": "CAPACITY_MINT_PROHIBITED"
+        }
+      },
+      "when": {
+        "accountId": "00000000-0000-7000-8000-000000000901",
+        "action": "INHERIT",
+        "mechanism": "RESTART",
+        "requestedLimit": 11
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "P4-EXPLICIT-BUDGET-AMENDMENT-ACCEPTED",
+      "given": {
+        "limit": 8,
+        "revision": 1,
+        "rootAccountId": "00000000-0000-7000-8000-000000000901",
+        "used": 3
+      },
+      "kind": "WORK_BUDGET_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-044"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "maximumAdditionalInvocations": 6,
+          "reason": "ACCEPTED",
+          "revision": 2
+        }
+      },
+      "when": {
+        "action": "AMEND",
+        "authorized": true,
+        "expectedRevision": 1,
+        "newLimit": 9
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "P4-PROJECTION-DUPLICATE-IDEMPOTENT",
+      "given": {
+        "lastDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+        "lastEventId": "e3",
+        "revision": 3
+      },
+      "kind": "PROJECTION_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-045"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "reason": "DUPLICATE",
+          "revision": 3
+        }
+      },
+      "when": {
+        "action": "APPLY",
+        "event": {
+          "digest": "3333333333333333333333333333333333333333333333333333333333333333",
+          "eventId": "e3",
+          "revision": 3
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "P4-PROJECTION-GAP-FAILS-CLOSED",
+      "given": {
+        "lastDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+        "lastEventId": "e3",
+        "revision": 3
+      },
+      "kind": "PROJECTION_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-046"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "REVISION_GAP",
+          "revision": 3
+        }
+      },
+      "when": {
+        "action": "APPLY",
+        "event": {
+          "digest": "5555555555555555555555555555555555555555555555555555555555555555",
+          "eventId": "e5",
+          "revision": 5
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "P4-PROJECTION-CONFLICT-FAILS-CLOSED",
+      "given": {
+        "lastDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+        "lastEventId": "e3",
+        "revision": 3
+      },
+      "kind": "PROJECTION_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-047"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "REVISION_CONFLICT",
+          "revision": 3
+        }
+      },
+      "when": {
+        "action": "APPLY",
+        "event": {
+          "digest": "4444444444444444444444444444444444444444444444444444444444444444",
+          "eventId": "other",
+          "revision": 3
+        }
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "P4-PROJECTION-REBUILD-EQUIVALENT",
+      "given": {
+        "incremental": {
+          "id": "00000000-0000-7000-8000-000000000903",
+          "phase": "ACTIVE",
+          "revision": 4
+        }
+      },
+      "kind": "PROJECTION_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-048"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "reason": "EXACT_REBUILD_MATCH"
+        }
+      },
+      "when": {
+        "action": "COMPARE_REBUILD",
+        "rebuilt": {
+          "id": "00000000-0000-7000-8000-000000000903",
+          "phase": "ACTIVE",
+          "revision": 4
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "P4-PROJECTION-REBUILD-MISMATCH",
+      "given": {
+        "incremental": {
+          "id": "00000000-0000-7000-8000-000000000903",
+          "phase": "ACTIVE",
+          "revision": 4
+        }
+      },
+      "kind": "PROJECTION_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-049"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "REBUILD_MISMATCH"
+        }
+      },
+      "when": {
+        "action": "COMPARE_REBUILD",
+        "rebuilt": {
+          "id": "00000000-0000-7000-8000-000000000903",
+          "phase": "COMPLETED",
+          "revision": 4
+        }
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "P4-SMA-AUTHORITATIVE-TASK-WRITE-REJECTED",
+      "given": {},
+      "kind": "AUTHORITY_BOUNDARY_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-050"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "TEAMS_AUTHORITY_REQUIRED"
+        }
+      },
+      "when": {
+        "effect": "TASK_STATE",
+        "source": "SMA"
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "P4-SMA-ROUTING-WRITE-REJECTED",
+      "given": {},
+      "kind": "AUTHORITY_BOUNDARY_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-039"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "TEAMS_AUTHORITY_REQUIRED"
+        }
+      },
+      "when": {
+        "effect": "ROUTING_STATE",
+        "source": "SMA"
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "P4-OPENHANDS-LEASE-WRITE-REJECTED",
+      "given": {},
+      "kind": "AUTHORITY_BOUNDARY_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-040"
+      ],
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "TEAMS_AUTHORITY_REQUIRED"
+        }
+      },
+      "when": {
+        "effect": "OWNERSHIP_LEASE",
+        "source": "OPENHANDS"
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "P4-SMA-SEMANTIC-MEMORY-WRITE-ACCEPTED",
+      "given": {},
+      "kind": "AUTHORITY_BOUNDARY_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-041"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "reason": "SMA_MEMORY_DOMAIN"
+        }
+      },
+      "when": {
+        "effect": "SEMANTIC_MEMORY",
+        "source": "SMA"
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "P4-TEAMS-OPERATIONAL-WRITE-ACCEPTED",
+      "given": {},
+      "kind": "AUTHORITY_BOUNDARY_MODEL",
+      "sourceDecisionIds": [
+        "P2-KCF-042"
+      ],
+      "then": {
+        "expected": {
+          "accepted": true,
+          "reason": "ACCEPTED"
+        }
+      },
+      "when": {
+        "effect": "TASK_STATE",
+        "source": "TEAMS_KERNEL"
+      }
+    }
+  ],
+  "schemaVersion": "1.7.0"
+}

@@ -53,6 +53,20 @@ func TestHandlerControlsRuntimeAndRequestsStop(t *testing.T) {
 	}
 }
 
+func TestHandlerExposesFederationOnlyThroughAuthenticatedOperatorSurface(t *testing.T) {
+	handler := newTestHandler(t, &operatorService{state: operationalruntime.ControlRunning}, func() {})
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, authorizedRequest(http.MethodGet, "/v1/federation", nil))
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"configured":false`) {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	response = httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/v1/federation", nil))
+	if response.Code != http.StatusUnauthorized {
+		t.Fatalf("unauthorized status=%d", response.Code)
+	}
+}
+
 func TestHandlerSubmitsStrictCommandAndReadsProjections(t *testing.T) {
 	service := &operatorService{state: operationalruntime.ControlRunning}
 	handler := newTestHandler(t, service, func() {})
@@ -78,7 +92,7 @@ func TestHandlerSubmitsStrictCommandAndReadsProjections(t *testing.T) {
 func TestHandlerDecodesCanonicalContractCommandShape(t *testing.T) {
 	service := &operatorService{state: operationalruntime.ControlRunning}
 	handler := newTestHandler(t, service, func() {})
-	body := `{"contract_manifest":"tekroo.kernel.contracts/0.9.0","command_id":"00000000-0000-7000-8000-000000000001","command_type":"tekroo.command.story.create","command_version":"1.6.0","target":{"kind":"story","id":"00000000-0000-7000-8000-000000000002"},"authority":{"kind":"HUMAN","id":"operator"},"actor_fqn":null,"execution":null,"expected_revision":{"must_not_exist":true,"revision":0},"preconditions":[],"expected_lifecycle_epoch":null,"expected_policy_revision":1,"expected_catalogue_revision":8,"idempotency_key":"canonical-shape","correlation_id":"00000000-0000-7000-8000-000000000003","causation":[],"issued_at":null,"payload":{},"evidence_refs":[]}`
+	body := `{"contract_manifest":"tekroo.kernel.contracts/0.10.0","command_id":"00000000-0000-7000-8000-000000000001","command_type":"tekroo.command.story.create","command_version":"1.6.0","target":{"kind":"story","id":"00000000-0000-7000-8000-000000000002"},"authority":{"kind":"HUMAN","id":"operator"},"actor_fqn":null,"execution":null,"expected_revision":{"must_not_exist":true,"revision":0},"preconditions":[],"expected_lifecycle_epoch":null,"expected_policy_revision":1,"expected_catalogue_revision":8,"idempotency_key":"canonical-shape","correlation_id":"00000000-0000-7000-8000-000000000003","causation":[],"issued_at":null,"payload":{},"evidence_refs":[]}`
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, authorizedRequest(http.MethodPost, "/v1/commands", strings.NewReader(body)))
 	if response.Code != http.StatusOK || service.lastCommand.CommandType != "tekroo.command.story.create" || service.lastCommand.Target.Kind != kernel.AggregateStory {
@@ -275,6 +289,18 @@ func (service *operatorService) HumanNotifications(context.Context, kernel.Princ
 
 func (service *operatorService) RequestInvocationCancellation(context.Context, kernel.PrincipalRef, kernel.UUIDv7, operationalruntime.CancellationRequest) (operationalruntime.InvocationStatus, error) {
 	return operationalruntime.InvocationStatus{}, nil
+}
+
+func (service *operatorService) FederationSnapshot() operationalruntime.FederationSnapshot {
+	return operationalruntime.FederationSnapshot{}
+}
+
+func (service *operatorService) ResolveFederationAlias(context.Context, string) (organization.AliasBinding, organization.FederationRoute, error) {
+	return organization.AliasBinding{}, organization.FederationRoute{}, organization.ErrFederationUnauthorized
+}
+
+func (service *operatorService) SendFederatedMessage(context.Context, string, organization.OrganizationalMessage) (organization.FederationDeliveryReceipt, error) {
+	return organization.FederationDeliveryReceipt{}, organization.ErrFederationUnauthorized
 }
 
 var _ Service = (*operatorService)(nil)

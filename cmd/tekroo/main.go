@@ -86,6 +86,17 @@ func run(arguments []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		method, path, err = noOperand(http.MethodPost, "/v1/libraries/sync", operands)
 	case "diagnostics":
 		method, path, err = noOperand(http.MethodGet, "/v1/diagnostics", operands)
+	case "federation":
+		method, path, err = noOperand(http.MethodGet, "/v1/federation", operands)
+	case "federation-alias":
+		if len(operands) != 1 || operands[0] == "" || strings.Contains(operands[0], "/") {
+			err = usageError()
+		} else {
+			method, path = http.MethodGet, "/v1/federation/aliases/"+url.PathEscape(operands[0])
+		}
+	case "federation-send":
+		method, path = http.MethodPost, "/v1/federation/messages"
+		body, err = loadFederatedMessage(operands, stdin, config.Operator.MaximumBodyBytes)
 	case "feature":
 		method, path = http.MethodPost, "/v1/features"
 		body, err = loadFeature(operands, stdin, config.Operator.MaximumBodyBytes)
@@ -223,6 +234,21 @@ func loadMessage(operands []string, stdin io.Reader, maximum int64) ([]byte, err
 		return nil, errors.New("message document contains trailing JSON content")
 	}
 	return raw, nil
+}
+
+func loadFederatedMessage(operands []string, stdin io.Reader, maximum int64) ([]byte, error) {
+	if len(operands) != 2 || operands[0] == "" || strings.ContainsAny(operands[0], "/*?") {
+		return nil, usageError()
+	}
+	raw, err := loadDocument(operands[1:], stdin, maximum)
+	if err != nil {
+		return nil, err
+	}
+	var message organization.OrganizationalMessage
+	if err := strictDocument(raw, &message); err != nil || message.SchemaVersion != organization.OrganizationalMessageSchemaVersion || !message.ID.Valid() || !message.Sender.Valid() || !message.SenderExecution.Valid() {
+		return nil, errors.New("federated message document is invalid")
+	}
+	return json.Marshal(map[string]any{"alias": operands[0], "message": message})
 }
 
 func loadFeature(operands []string, stdin io.Reader, maximum int64) ([]byte, error) {
@@ -454,5 +480,5 @@ func loadCommand(operands []string, stdin io.Reader, maximum int64) ([]byte, ker
 }
 
 func usageError() error {
-	return errors.New("usage: tekroo -config CONFIG health|status|diagnostics|pause|resume|stop|feature FILE|-|feature-status ID|feature-plan ID FILE|-|feature-accept ID REVISION NO_RELEASE_REASON|feature-release ID FILE|-|human-register FILE|-|human-ask FILE|-|human-notifications [open|all]|human-respond FILE|-|human-interaction ID|roles|libraries|library-sync|role ACTOR start|stop|restart|pause|resume|inbox ACTOR|message FILE|-|message-status ID|message-trace THREAD_ID|deadletters [ACTOR]|deadletter-repair ID FILE|-|task ID|story ID|invocation ID|submit FILE|-|cancel INVOCATION_ID FILE|-")
+	return errors.New("usage: tekroo -config CONFIG health|status|diagnostics|federation|federation-alias NAME|federation-send ALIAS FILE|-|pause|resume|stop|feature FILE|-|feature-status ID|feature-plan ID FILE|-|feature-accept ID REVISION NO_RELEASE_REASON|feature-release ID FILE|-|human-register FILE|-|human-ask FILE|-|human-notifications [open|all]|human-respond FILE|-|human-interaction ID|roles|libraries|library-sync|role ACTOR start|stop|restart|pause|resume|inbox ACTOR|message FILE|-|message-status ID|message-trace THREAD_ID|deadletters [ACTOR]|deadletter-repair ID FILE|-|task ID|story ID|invocation ID|submit FILE|-|cancel INVOCATION_ID FILE|-")
 }

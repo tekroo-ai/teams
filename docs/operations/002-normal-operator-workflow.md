@@ -1,6 +1,6 @@
 # Normal local operator workflow
 
-This is the supported Phase 5 path. Run `tekrood` as the persistent service and
+This is the supported Phase 7 path. Run `tekrood` as the persistent service and
 submit every organizational change with `tekroo`. Do not write Teams MongoDB
 documents directly.
 
@@ -16,6 +16,9 @@ tekroo task TASK_ID
 tekroo story STORY_ID
 tekroo invocation INVOCATION_ID
 tekroo cancel INVOCATION_ID COMMAND.json
+tekroo federation
+tekroo federation-alias ALIAS
+tekroo federation-send ALIAS MESSAGE.json
 tekroo stop
 ```
 
@@ -31,11 +34,28 @@ The client validates and submits this envelope; it does not infer or elevate
 authority.
 
 The exact accepted payload templates are the `NORMATIVE_EXAMPLE` entries in
-[`catalogue-coverage.json`](../../CONTRACTS/tekroo.kernel.contracts/0.8.0/fixtures/catalogue-coverage.json).
+[`catalogue-coverage.json`](../../CONTRACTS/tekroo.kernel.contracts/0.10.0/fixtures/catalogue-coverage.json).
 Select the entry whose `when.commandType` matches the command below and place
 its `when.payload` in the command envelope. This keeps the starter material
-identical to contract `0.8.0` instead of maintaining a second copy of each
+identical to contract `0.10.0` instead of maintaining a second copy of each
 schema.
+
+## Federated exact routing
+
+Federation is disabled when the optional `federation` daemon configuration is
+absent. When enabled, aliases, routes, signing identity, and peer trust grants
+come only from the validated configuration file. `tekroo federation` inspects
+that exact configuration, and `tekroo federation-alias NAME` shows the exact
+actor, deployment, and route revision selected by a convenience alias.
+
+`tekroo federation-send NAME MESSAGE.json` accepts an organizational message
+whose recipient is either empty or already equals the alias's exact actor. The
+daemon resolves the alias, validates the live sender execution, records the
+outbound DAG step before network I/O, signs the immutable envelope, and sends it
+through the configured route. The remote ingress is a dedicated listener; it
+does not expose operator or MCP tools. Plain HTTP routes are accepted only when
+explicitly marked test-only and bound to loopback. Production routes require
+HTTPS.
 
 ## Ordered workflow
 

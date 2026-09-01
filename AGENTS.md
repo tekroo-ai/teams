@@ -3,15 +3,14 @@
 ## Governing authority
 
 The latest accepted package is
-`CONTRACTS/tekroo.kernel.contracts/0.8.0/`; its source-lineage decisions are
-binding successor requirements and govern the qualified provider-neutral local
-deterministic implementation. Packages `0.1.0` through `0.7.0` remain preserved
-for historical replay and compatibility analysis. Concrete human channels,
-provider adapters, host-power mechanisms, production deployment, SMA-Q1, and
-WP6 retain separate authorization and qualification gates. Do not edit an
-accepted or released package in place. If code and its governing contract
-disagree, stop and report the disagreement; do not weaken fixtures to make code
-pass.
+`CONTRACTS/tekroo.kernel.contracts/0.9.0/`. Authorized Phase 7 implementation
+uses the immutable successor candidate
+`CONTRACTS/tekroo.kernel.contracts/0.10.0/`; its source-lineage decisions are
+binding successor requirements. Packages `0.1.0` through `0.9.0` remain
+preserved for historical replay and compatibility analysis. Public-network or
+production deployment retains separate authorization. Do not edit an accepted
+or released package in place. If code and its governing contract disagree,
+stop and report the disagreement; do not weaken fixtures to make code pass.
 
 ## Scope boundaries
 

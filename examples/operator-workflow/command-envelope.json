@@ -1,5 +1,5 @@
 {
-  "contract_manifest": "tekroo.kernel.contracts/0.9.0",
+  "contract_manifest": "tekroo.kernel.contracts/0.10.0",
   "command_id": "REPLACE_WITH_UUIDV7",
   "command_type": "REPLACE_WITH_EXACT_CATALOGUE_COMMAND_TYPE",
   "command_version": "1.6.0",

@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/tekroo-ai/teams/adapters/federationhttp"
 	"github.com/tekroo-ai/teams/adapters/httpapi"
 	"github.com/tekroo-ai/teams/adapters/mcp"
 	"github.com/tekroo-ai/teams/adapters/operationalruntime"
@@ -60,6 +61,25 @@ func run(arguments []string, stdout, stderr io.Writer) error {
 	startupCancel()
 	if err != nil {
 		return err
+	}
+	var federationListener net.Listener
+	var federationServer *http.Server
+	var federationResult chan error
+	federationAddress, federationMaximumBody, federationIngress := service.FederationListener()
+	if federationIngress != nil {
+		federationContext, federationCancel := context.WithTimeout(context.Background(), startupTimeout)
+		federationListener, err = (&net.ListenConfig{}).Listen(federationContext, "tcp", federationAddress)
+		federationCancel()
+		if err != nil {
+			return fmt.Errorf("reserve federation endpoint: %w", err)
+		}
+		defer federationListener.Close()
+		federationHandler, handlerErr := federationhttp.NewHandler(federationIngress, func() time.Time { return time.Now().UTC() }, federationMaximumBody)
+		if handlerErr != nil {
+			return handlerErr
+		}
+		federationServer = &http.Server{Addr: federationAddress, Handler: federationHandler, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 15 * time.Second, IdleTimeout: time.Minute}
+		federationResult = make(chan error, 1)
 	}
 	closed := false
 	defer func() {
@@ -122,7 +142,10 @@ func run(arguments []string, stdout, stderr io.Writer) error {
 	server := &http.Server{Addr: config.Operator.Address, Handler: router, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 15 * time.Second, IdleTimeout: time.Minute}
 	serverResult := make(chan error, 1)
 	go func() { serverResult <- server.Serve(listener) }()
-	writeLog(stdout, serviceLog{Event: "tekrood_started", At: time.Now().UTC(), Contract: kernel.ContractIdentity, Database: config.Mongo.Database, OpenHands: config.OpenHands.BaseURL, Operator: config.Operator.Address, Workspaces: len(config.Workspaces), Profiles: len(config.Profiles)})
+	if federationServer != nil {
+		go func() { federationResult <- federationServer.Serve(federationListener) }()
+	}
+	writeLog(stdout, serviceLog{Event: "tekrood_started", At: time.Now().UTC(), Contract: kernel.ContractIdentity, Database: config.Mongo.Database, OpenHands: config.OpenHands.BaseURL, Operator: config.Operator.Address, Federation: federationAddress, Workspaces: len(config.Workspaces), Profiles: len(config.Profiles)})
 
 	shutdownSignal, stopSignals := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stopSignals()
@@ -135,18 +158,27 @@ func run(arguments []string, stdout, stderr io.Writer) error {
 			runtimeErr = serveErr
 			writeLog(stderr, serviceLog{Event: "tekrood_failed", At: time.Now().UTC(), Error: serveErr.Error()})
 		}
+	case serveErr := <-federationResult:
+		if federationResult != nil && !errors.Is(serveErr, http.ErrServerClosed) {
+			runtimeErr = serveErr
+			writeLog(stderr, serviceLog{Event: "tekrood_failed", At: time.Now().UTC(), Error: serveErr.Error()})
+		}
 	case <-stopRequested:
 	case <-shutdownSignal.Done():
 	}
 
 	serverContext, serverCancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	serverErr := server.Shutdown(serverContext)
+	var federationServerErr error
+	if federationServer != nil {
+		federationServerErr = federationServer.Shutdown(serverContext)
+	}
 	serverCancel()
 	stopContext, stopCancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	err = service.Stop(stopContext)
 	stopCancel()
-	if err != nil || serverErr != nil {
-		return errors.Join(runtimeErr, serverErr, err)
+	if err != nil || serverErr != nil || federationServerErr != nil {
+		return errors.Join(runtimeErr, serverErr, federationServerErr, err)
 	}
 	closeContext, closeCancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	err = service.Close(closeContext)
@@ -166,6 +198,7 @@ type serviceLog struct {
 	Database   string    `json:"database,omitempty"`
 	OpenHands  string    `json:"openhands,omitempty"`
 	Operator   string    `json:"operator,omitempty"`
+	Federation string    `json:"federation,omitempty"`
 	Workspaces int       `json:"workspaces,omitempty"`
 	Profiles   int       `json:"profiles,omitempty"`
 	Error      string    `json:"error,omitempty"`

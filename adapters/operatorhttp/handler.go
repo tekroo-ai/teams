@@ -52,6 +52,9 @@ type Service interface {
 	ReadHumanInteraction(context.Context, kernel.UUIDv7) (kernel.HumanInteractionSnapshot, error)
 	HumanNotifications(context.Context, kernel.PrincipalRef, bool) ([]organization.HumanNotification, error)
 	RequestInvocationCancellation(context.Context, kernel.PrincipalRef, kernel.UUIDv7, operationalruntime.CancellationRequest) (operationalruntime.InvocationStatus, error)
+	FederationSnapshot() operationalruntime.FederationSnapshot
+	ResolveFederationAlias(context.Context, string) (organization.AliasBinding, organization.FederationRoute, error)
+	SendFederatedMessage(context.Context, string, organization.OrganizationalMessage) (organization.FederationDeliveryReceipt, error)
 }
 
 type OrganizationalService interface {
@@ -150,6 +153,12 @@ func (handler *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Requ
 			return
 		}
 		writeJSON(writer, http.StatusOK, diagnostics)
+	case request.Method == http.MethodGet && request.URL.Path == "/v1/federation":
+		writeJSON(writer, http.StatusOK, handler.service.FederationSnapshot())
+	case request.Method == http.MethodGet && strings.HasPrefix(request.URL.Path, "/v1/federation/aliases/"):
+		handler.resolveFederationAlias(writer, request, strings.TrimPrefix(request.URL.Path, "/v1/federation/aliases/"))
+	case request.Method == http.MethodPost && request.URL.Path == "/v1/federation/messages":
+		handler.sendFederatedMessage(writer, request)
 	case request.Method == http.MethodPost && strings.HasPrefix(request.URL.Path, "/v1/dead-letters/") && strings.HasSuffix(request.URL.Path, "/repair"):
 		handler.repairDeadLetter(writer, request, strings.TrimSuffix(strings.TrimPrefix(request.URL.Path, "/v1/dead-letters/"), "/repair"))
 	case request.Method == http.MethodPost && request.URL.Path == "/v1/features":
@@ -187,6 +196,36 @@ func (handler *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Requ
 	default:
 		writeError(writer, http.StatusNotFound, "NOT_FOUND")
 	}
+}
+
+func (handler *Handler) resolveFederationAlias(writer http.ResponseWriter, request *http.Request, name string) {
+	if name == "" || strings.Contains(name, "/") {
+		writeError(writer, http.StatusBadRequest, "INVALID_FEDERATION_ALIAS")
+		return
+	}
+	alias, route, err := handler.service.ResolveFederationAlias(request.Context(), name)
+	if err != nil {
+		writeError(writer, http.StatusNotFound, "FEDERATION_ALIAS_NOT_FOUND")
+		return
+	}
+	writeJSON(writer, http.StatusOK, map[string]any{"alias": alias, "route": route})
+}
+
+func (handler *Handler) sendFederatedMessage(writer http.ResponseWriter, request *http.Request) {
+	var input struct {
+		Alias   string                             `json:"alias"`
+		Message organization.OrganizationalMessage `json:"message"`
+	}
+	if decodeBody(writer, request, handler.maxBody, &input) != nil || input.Alias == "" {
+		writeError(writer, http.StatusBadRequest, "INVALID_FEDERATED_MESSAGE")
+		return
+	}
+	receipt, err := handler.service.SendFederatedMessage(request.Context(), input.Alias, input.Message)
+	if err != nil {
+		writeError(writer, http.StatusConflict, "FEDERATED_MESSAGE_REJECTED")
+		return
+	}
+	writeJSON(writer, http.StatusCreated, receipt)
 }
 
 func (handler *Handler) cancelInvocation(writer http.ResponseWriter, request *http.Request, value string) {

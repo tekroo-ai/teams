@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/tekroo-ai/teams/adapters/executionruntime"
+	"github.com/tekroo-ai/teams/adapters/federationhttp"
 	"github.com/tekroo-ai/teams/adapters/gitprovider"
 	"github.com/tekroo-ai/teams/adapters/mongo"
 	"github.com/tekroo-ai/teams/adapters/openhands"
@@ -30,8 +31,8 @@ import (
 )
 
 const (
-	ContractPackagePath = "CONTRACTS/tekroo.kernel.contracts/0.9.0"
-	ManifestSHA256      = kernel.Digest("dade26b7f02164b7d366735a15bd0e4253ac6796c6120bed0c5f02fda1bbeb9c")
+	ContractPackagePath = "CONTRACTS/tekroo.kernel.contracts/0.10.0"
+	ManifestSHA256      = kernel.Digest("2752b876d5a71bb1367a088b9f8cc0ad5df6343b0833906c49aae5a404b8db98")
 	maximumConfigBytes  = 1 << 20
 )
 
@@ -62,6 +63,20 @@ type ProductionConfig struct {
 	Organization            ProductionOrganization    `json:"organization"`
 	Planning                ProductionPlanning        `json:"planning"`
 	Git                     *ProductionGitConfig      `json:"git,omitempty"`
+	Federation              *ProductionFederation     `json:"federation,omitempty"`
+}
+
+type ProductionFederation struct {
+	Address           string                              `json:"address"`
+	MaximumBodyBytes  int64                               `json:"maximum_body_bytes"`
+	RequestTimeout    string                              `json:"request_timeout"`
+	AllowedFutureSkew string                              `json:"allowed_future_skew"`
+	EnvelopeTTL       string                              `json:"envelope_ttl"`
+	PrivateKeyFile    string                              `json:"private_key_file"`
+	SigningIdentity   organization.FederationTrustGrant   `json:"signing_identity"`
+	Aliases           []organization.AliasBinding         `json:"aliases"`
+	Routes            []organization.FederationRoute      `json:"routes"`
+	TrustGrants       []organization.FederationTrustGrant `json:"trust_grants"`
 }
 
 type ProductionGitConfig struct {
@@ -200,6 +215,11 @@ type resolvedProductionConfig struct {
 	team                  organization.LoadedTeam
 	libraryTeams          []organization.LoadedTeam
 	trustedRolePublishers map[string]ed25519.PublicKey
+	federationRegistry    *organization.StaticFederationRegistry
+	federationPrivateKey  ed25519.PrivateKey
+	federationTimeout     time.Duration
+	federationFutureSkew  time.Duration
+	federationTTL         time.Duration
 	roleReconciliation    time.Duration
 	planningDeadline      time.Duration
 	gitOperationTimeout   time.Duration
@@ -251,6 +271,9 @@ func LoadProductionConfig(path string) (ProductionConfig, error) {
 	if config.Git != nil {
 		config.Git.AllowedRoot = absoluteFrom(base, config.Git.AllowedRoot)
 	}
+	if config.Federation != nil {
+		config.Federation.PrivateKeyFile = absoluteFrom(base, config.Federation.PrivateKeyFile)
+	}
 	if _, err := resolveProductionConfig(config); err != nil {
 		return ProductionConfig{}, err
 	}
@@ -262,7 +285,7 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 		return resolvedProductionConfig{}, invalidConfig("required identity, storage, workspace, or profile binding is missing")
 	}
 	if info, err := os.Stat(filepath.Join(config.ContractRoot, ContractPackagePath, "manifest.json")); err != nil || !info.Mode().IsRegular() {
-		return resolvedProductionConfig{}, invalidConfig("contract root does not contain contract 0.9.0")
+		return resolvedProductionConfig{}, invalidConfig("contract root does not contain contract 0.10.0")
 	}
 	if !loopbackHTTPURL(config.OpenHands.BaseURL) {
 		return resolvedProductionConfig{}, invalidConfig("OpenHands base URL must be an explicit loopback HTTP endpoint with no path")
@@ -355,6 +378,46 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 			return resolvedProductionConfig{}, invalidConfig("Git release-provider root or binary is invalid")
 		}
 	}
+	var federationRegistry *organization.StaticFederationRegistry
+	var federationPrivateKey ed25519.PrivateKey
+	var federationTimeout, federationFutureSkew, federationTTL time.Duration
+	if config.Federation != nil {
+		federationTimeout, err = positiveDuration("federation.request_timeout", config.Federation.RequestTimeout)
+		if err != nil {
+			return resolvedProductionConfig{}, err
+		}
+		federationFutureSkew, err = positiveDuration("federation.allowed_future_skew", config.Federation.AllowedFutureSkew)
+		if err != nil || federationFutureSkew > time.Minute {
+			return resolvedProductionConfig{}, invalidConfig("federation future-skew policy is invalid")
+		}
+		federationTTL, err = positiveDuration("federation.envelope_ttl", config.Federation.EnvelopeTTL)
+		if err != nil || federationTTL > organization.MaximumFederationTTL || !loopbackAddress(config.Federation.Address) || config.Federation.Address == config.Operator.Address || config.Federation.MaximumBodyBytes <= 0 || config.Federation.MaximumBodyBytes > federationhttp.DefaultMaximumBodyBytes || config.Federation.SigningIdentity.Validate() != nil || config.Federation.SigningIdentity.DeploymentIdentity != config.DeploymentIdentity || config.Federation.SigningIdentity.Status != organization.FederationActive {
+			return resolvedProductionConfig{}, invalidConfig("federation identity, listener, or limits are invalid")
+		}
+		privateRaw, readErr := os.ReadFile(config.Federation.PrivateKeyFile)
+		if readErr != nil {
+			return resolvedProductionConfig{}, invalidConfig("federation private key file is missing")
+		}
+		decoded, decodeErr := base64.StdEncoding.Strict().DecodeString(strings.TrimSpace(string(privateRaw)))
+		if decodeErr != nil || len(decoded) != ed25519.PrivateKeySize {
+			return resolvedProductionConfig{}, invalidConfig("federation private key is invalid")
+		}
+		federationPrivateKey = ed25519.PrivateKey(decoded)
+		signingPublicKey, publicKeyErr := config.Federation.SigningIdentity.PublicEd25519Key()
+		if publicKeyErr != nil || !federationPrivateKey.Public().(ed25519.PublicKey).Equal(signingPublicKey) {
+			return resolvedProductionConfig{}, invalidConfig("federation private key does not match signing identity")
+		}
+		grants := append([]organization.FederationTrustGrant{config.Federation.SigningIdentity}, config.Federation.TrustGrants...)
+		federationRegistry, err = organization.NewStaticFederationRegistry(config.Federation.Aliases, config.Federation.Routes, grants)
+		if err != nil {
+			return resolvedProductionConfig{}, invalidConfig("federation aliases, routes, or trust grants are invalid")
+		}
+		for _, route := range config.Federation.Routes {
+			if route.SourceDeployment != config.DeploymentIdentity && route.DestinationDeployment != config.DeploymentIdentity {
+				return resolvedProductionConfig{}, invalidConfig("federation route does not involve this deployment")
+			}
+		}
+	}
 	if config.OpenHands.MaximumPages == 0 || config.OpenHands.MaximumPages > 1000 || config.OpenHands.MaximumEvidenceBytes <= 0 || config.OpenHands.MaximumEvidenceBytes > 16<<20 || config.Execution.ConsumerID == "" || len(config.Execution.ConsumerID) > 256 || config.Execution.MaximumBriefBytes <= 0 || config.Execution.MaximumBriefBytes > 1<<20 || config.Execution.PolicyRevision == 0 || config.Evidence.PolicyRevision == 0 || config.Evidence.ProducingVersion == "" || config.Evidence.RetentionPolicy == "" || config.Worker.MaximumReconciliations == 0 || config.Worker.MaximumConcurrentInvocations == 0 || config.Worker.MaximumConcurrentInvocations > 64 || reconciliation >= leaseDuration {
 		return resolvedProductionConfig{}, invalidConfig("execution, evidence, OpenHands, or worker limits are invalid")
 	}
@@ -402,6 +465,19 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 	if err != nil {
 		return resolvedProductionConfig{}, invalidConfig("team manifest or role bundle is invalid")
 	}
+	if config.Federation != nil {
+		for _, route := range config.Federation.Routes {
+			if route.SourceDeployment == config.DeploymentIdentity && !loadedTeamHasActor(team, route.SourceActor) || route.DestinationDeployment == config.DeploymentIdentity && !loadedTeamHasActor(team, route.DestinationActor) {
+				return resolvedProductionConfig{}, invalidConfig("federation route local actor is not in the exact team roster")
+			}
+		}
+		for _, alias := range config.Federation.Aliases {
+			route, found, routeErr := federationRegistry.LoadRoute(context.Background(), alias.RouteID, alias.RouteRevision)
+			if routeErr != nil || !found || route.SourceDeployment != config.DeploymentIdentity {
+				return resolvedProductionConfig{}, invalidConfig("federation alias is not an outbound route for this deployment")
+			}
+		}
+	}
 	libraryTeams := make([]organization.LoadedTeam, 0, len(config.Organization.LibraryManifests))
 	for _, source := range config.Organization.LibraryManifests {
 		loaded, loadErr := organization.LoadTeamManifest(source.ManifestFile, source.ManifestDigest, trustedKeys)
@@ -418,22 +494,37 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 	if err := readStrictJSONFile(config.ProvenanceFile, &provenance); err != nil || !provenance.Valid() || provenance.PolicyDigest != policy.PolicyDigest || provenance.PolicyRevision != policy.Revision {
 		return resolvedProductionConfig{}, invalidConfig("provenance file is invalid or does not bind the authorization policy")
 	}
-	return resolvedProductionConfig{ProductionConfig: config, mongoURI: mongoURI, sessionAPIKey: sessionKey, operatorBearerToken: operatorToken, humanCredentials: humanCredentials, authorizationPolicy: policy, provenance: provenance, requestTimeout: requestTimeout, pollInterval: pollInterval, operationTimeout: operationTimeout, leaseDuration: leaseDuration, reconciliation: reconciliation, leaseOperationTimeout: leaseOperationTimeout, projectionInterval: projectionInterval, projectionTimeout: projectionTimeout, operatorTimeout: operatorTimeout, team: team, libraryTeams: libraryTeams, trustedRolePublishers: trustedKeys, roleReconciliation: roleReconciliation, planningDeadline: planningDeadline, gitOperationTimeout: gitOperationTimeout}, nil
+	return resolvedProductionConfig{ProductionConfig: config, mongoURI: mongoURI, sessionAPIKey: sessionKey, operatorBearerToken: operatorToken, humanCredentials: humanCredentials, authorizationPolicy: policy, provenance: provenance, requestTimeout: requestTimeout, pollInterval: pollInterval, operationTimeout: operationTimeout, leaseDuration: leaseDuration, reconciliation: reconciliation, leaseOperationTimeout: leaseOperationTimeout, projectionInterval: projectionInterval, projectionTimeout: projectionTimeout, operatorTimeout: operatorTimeout, team: team, libraryTeams: libraryTeams, trustedRolePublishers: trustedKeys, roleReconciliation: roleReconciliation, planningDeadline: planningDeadline, gitOperationTimeout: gitOperationTimeout, federationRegistry: federationRegistry, federationPrivateKey: federationPrivateKey, federationTimeout: federationTimeout, federationFutureSkew: federationFutureSkew, federationTTL: federationTTL}, nil
+}
+
+func loadedTeamHasActor(team organization.LoadedTeam, actor kernel.ActorFQN) bool {
+	for _, loaded := range team.Roles {
+		for instance := uint32(1); instance <= loaded.Binding.MaximumInstances; instance++ {
+			expected, err := kernel.ParseActorFQN(fmt.Sprintf("%s::%s-%d", team.Manifest.Team, loaded.Binding.Role, instance))
+			if err == nil && expected == actor {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // ProductionService owns the Mongo store, assembled runtime, and lifecycle
 // controller created from one validated production configuration.
 type ProductionService struct {
-	Store       *mongo.Store
-	Runtime     *Runtime
-	Controller  *Controller
-	RoleHost    *organization.Host
-	RoleRuntime *organization.InProcessRuntime
-	MessageBus  *organization.MessageBus
-	RoleInbox   *organization.RoleInbox
-	RoleLibrary *organization.RoleLibrary
-	Features    *organization.FeatureCoordinator
-	Releases    *application.ReleaseCoordinator
+	Store              *mongo.Store
+	Runtime            *Runtime
+	Controller         *Controller
+	RoleHost           *organization.Host
+	RoleRuntime        *organization.InProcessRuntime
+	MessageBus         *organization.MessageBus
+	RoleInbox          *organization.RoleInbox
+	RoleLibrary        *organization.RoleLibrary
+	FederationRegistry *organization.StaticFederationRegistry
+	FederationIngress  *organization.FederationIngress
+	Federation         *organization.FederationCoordinator
+	Features           *organization.FeatureCoordinator
+	Releases           *application.ReleaseCoordinator
 
 	projectionInterval     time.Duration
 	projectionTimeout      time.Duration
@@ -465,6 +556,8 @@ type ProductionService struct {
 	ids                    kernel.IDSource
 	librarySources         []ProductionTeamSource
 	trustedRolePublishers  map[string]ed25519.PublicKey
+	federationAddress      string
+	federationMaximumBody  int64
 }
 
 func NewProductionService(ctx context.Context, config ProductionConfig) (*ProductionService, error) {
@@ -559,6 +652,25 @@ func NewProductionService(ctx context.Context, config ProductionConfig) (*Produc
 		trustedPublishers[key] = append(ed25519.PublicKey(nil), value...)
 	}
 	service := &ProductionService{Store: store, Runtime: runtime, Controller: controller, RoleHost: roleHost, RoleRuntime: roleRuntime, MessageBus: messageBus, RoleInbox: roleInbox, RoleLibrary: roleLibrary, projectionInterval: resolved.projectionInterval, projectionTimeout: resolved.projectionTimeout, recoveryInterval: resolved.reconciliation, recoveryTimeout: resolved.leaseOperationTimeout, recoveryAttempts: config.Worker.MaximumReconciliations, failures: make(chan error, 4), provenance: resolved.provenance, operatorToken: resolved.operatorBearerToken, operatorIdentity: protocol.AuthenticatedContext{Principal: config.Operator.Principal}, humanCredentials: append([]HumanTransportCredential(nil), resolved.humanCredentials...), operatorTimeout: resolved.operatorTimeout, operatorMaxBody: config.Operator.MaximumBodyBytes, roleReconciliation: resolved.roleReconciliation, roleMaximumRestarts: config.Organization.MaximumRestarts, messageMaximumAttempts: config.Organization.MaximumDeliveryAttempts, clock: clock, ids: ids, planningDeadline: resolved.planningDeadline, planning: config.Planning, profilesByModel: profilesByModel, workspacesByID: workspacesByID, serviceAuthority: config.ServiceAuthority, policyAuthority: config.ExpiryAuthority, librarySources: librarySources, trustedRolePublishers: trustedPublishers}
+	if config.Federation != nil {
+		federationIngress, ingressErr := organization.NewFederationIngress(resolved.federationRegistry, store, config.DeploymentIdentity, resolved.federationFutureSkew)
+		if ingressErr != nil {
+			return fail(ingressErr)
+		}
+		federationClient, clientErr := federationhttp.NewClient(&http.Client{Timeout: resolved.federationTimeout}, config.Federation.MaximumBodyBytes)
+		if clientErr != nil {
+			return fail(clientErr)
+		}
+		federationCoordinator, coordinatorErr := organization.NewFederationCoordinator(resolved.federationRegistry, store, store, federationClient, clock, ids, config.DeploymentIdentity, config.Federation.SigningIdentity, resolved.federationPrivateKey, resolved.federationTTL)
+		if coordinatorErr != nil {
+			return fail(coordinatorErr)
+		}
+		service.FederationRegistry = resolved.federationRegistry
+		service.FederationIngress = federationIngress
+		service.Federation = federationCoordinator
+		service.federationAddress = config.Federation.Address
+		service.federationMaximumBody = config.Federation.MaximumBodyBytes
+	}
 	features, err := organization.NewFeatureCoordinator(store, roleHost, service, clock, ids)
 	if err != nil {
 		return fail(err)
@@ -744,6 +856,41 @@ func (service *ProductionService) SendMessageFanout(ctx context.Context, message
 		return application.ErrInvalidConfiguration
 	}
 	return service.MessageBus.SendFanout(ctx, messages)
+}
+
+type FederationSnapshot struct {
+	Configured bool                                `json:"configured"`
+	Aliases    []organization.AliasBinding         `json:"aliases"`
+	Routes     []organization.FederationRoute      `json:"routes"`
+	Trust      []organization.FederationTrustGrant `json:"trust_grants"`
+}
+
+func (service *ProductionService) FederationSnapshot() FederationSnapshot {
+	if service == nil || service.FederationRegistry == nil {
+		return FederationSnapshot{}
+	}
+	return FederationSnapshot{Configured: true, Aliases: service.FederationRegistry.Aliases(), Routes: service.FederationRegistry.Routes(), Trust: service.FederationRegistry.TrustGrants()}
+}
+
+func (service *ProductionService) ResolveFederationAlias(ctx context.Context, name string) (organization.AliasBinding, organization.FederationRoute, error) {
+	if service == nil || service.Federation == nil {
+		return organization.AliasBinding{}, organization.FederationRoute{}, application.ErrInvalidConfiguration
+	}
+	return service.Federation.ResolveAlias(ctx, name)
+}
+
+func (service *ProductionService) SendFederatedMessage(ctx context.Context, alias string, message organization.OrganizationalMessage) (organization.FederationDeliveryReceipt, error) {
+	if service == nil || service.Federation == nil {
+		return organization.FederationDeliveryReceipt{}, application.ErrInvalidConfiguration
+	}
+	return service.Federation.SendByAlias(ctx, alias, message)
+}
+
+func (service *ProductionService) FederationListener() (string, int64, *organization.FederationIngress) {
+	if service == nil {
+		return "", 0, nil
+	}
+	return service.federationAddress, service.federationMaximumBody, service.FederationIngress
 }
 
 func (service *ProductionService) RoleInboxSnapshot(actor kernel.ActorFQN) []organization.OrganizationalMessage {

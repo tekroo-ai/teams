@@ -121,6 +121,33 @@ func TestLoadProductionConfigRejectsDuplicateWorkspace(t *testing.T) {
 	}
 }
 
+func TestLoadProductionConfigAcceptsExactLoopbackFederation(t *testing.T) {
+	path, config := writeProductionFixture(t)
+	directory := filepath.Dir(path)
+	publicKey, privateKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeText(t, filepath.Join(directory, "federation.key"), base64.StdEncoding.EncodeToString(privateKey)+"\n", 0o600)
+	now := time.Now().UTC()
+	source := config.DeploymentIdentity
+	destination := repeatedDigest('d')
+	route := organization.FederationRoute{SchemaVersion: organization.FederationSchemaVersion, RouteID: "00000000-0000-7000-8000-000000000410", Revision: 1, SourceDeployment: source, DestinationDeployment: destination, SourceActor: "fixture::coder-1", DestinationActor: "remote::architect-1", MessageTypes: []string{"tekroo.message.feature.request"}, Purposes: []organization.MessagePurpose{organization.PurposeRequest}, KeyID: "local-federation-key", Endpoint: "http://127.0.0.1:18992/v1/federation/ingress", Status: organization.FederationActive, AllowInsecureLoopbackForTest: true}
+	signing := organization.FederationTrustGrant{SchemaVersion: organization.FederationSchemaVersion, PeerID: "fixture", DeploymentIdentity: source, KeyID: route.KeyID, KeyEpoch: 1, PublicKey: base64.StdEncoding.EncodeToString(publicKey), NotBefore: now.Add(-time.Hour), NotAfter: now.Add(time.Hour), Status: organization.FederationActive}
+	alias := organization.AliasBinding{SchemaVersion: organization.FederationSchemaVersion, Name: "remote-architect", Revision: 1, RouteID: route.RouteID, RouteRevision: route.Revision, DeploymentIdentity: destination, ActorFQN: route.DestinationActor}
+	config.Federation = &ProductionFederation{Address: "127.0.0.1:18991", MaximumBodyBytes: 1 << 20, RequestTimeout: "5s", AllowedFutureSkew: "10s", EnvelopeTTL: "1m", PrivateKeyFile: "federation.key", SigningIdentity: signing, Aliases: []organization.AliasBinding{alias}, Routes: []organization.FederationRoute{route}}
+	writeJSON(t, path, config, 0o600)
+	loaded, err := LoadProductionConfig(path)
+	if err != nil || loaded.Federation == nil || !filepath.IsAbs(loaded.Federation.PrivateKeyFile) {
+		t.Fatalf("loaded=%#v err=%v", loaded.Federation, err)
+	}
+	config.Federation.Routes[0].Endpoint = "http://remote.example/v1/federation/ingress"
+	writeJSON(t, path, config, 0o600)
+	if _, err := LoadProductionConfig(path); !errors.Is(err, ErrInvalidProductionConfiguration) {
+		t.Fatalf("insecure remote endpoint err=%v", err)
+	}
+}
+
 func writeProductionFixture(t *testing.T) (string, ProductionConfig) {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", ".."))

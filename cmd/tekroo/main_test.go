@@ -15,6 +15,7 @@ import (
 
 	"github.com/tekroo-ai/teams/adapters/operationalruntime"
 	"github.com/tekroo-ai/teams/kernel"
+	"github.com/tekroo-ai/teams/organization"
 )
 
 const (
@@ -132,5 +133,25 @@ func TestInvocationReadUsesExactPath(t *testing.T) {
 	method, path, err := identityRead("/v1/invocations/", []string{string(testInvocationID)})
 	if err != nil || method != http.MethodGet || path != "/v1/invocations/"+string(testInvocationID) {
 		t.Fatalf("unexpected result: %q %q %v", method, path, err)
+	}
+}
+
+func TestLoadFederatedMessageWrapsAliasWithoutWeakeningIdentity(t *testing.T) {
+	now := time.Date(2026, 9, 1, 20, 0, 0, 0, time.UTC)
+	message := organization.OrganizationalMessage{SchemaVersion: organization.OrganizationalMessageSchemaVersion, ID: "00000000-0000-7000-8000-000000000620", Type: "tekroo.message.feature.request", Purpose: organization.PurposeRequest, Sender: "source::product-owner-1", SenderExecution: kernel.ExecutionTuple{ExecutionID: "00000000-0000-7000-8000-000000000611", FencingEpoch: 1}, CorrelationID: "00000000-0000-7000-8000-000000000612", Work: organization.MessageWorkLink{DAGNodeID: "00000000-0000-7000-8000-000000000613"}, Flow: organization.MessageFlow{ThreadID: "00000000-0000-7000-8000-000000000612", StepID: "00000000-0000-7000-8000-000000000613", Hop: 1, MaximumHops: 8, BudgetAccountID: "00000000-0000-7000-8000-000000000614", LifecycleEpoch: 1, ScopeRevision: 1, ProgressDigest: kernel.Digest(strings.Repeat("c", 64))}, Body: json.RawMessage(`{"request":"design"}`), CreatedAt: now, ExpiresAt: now.Add(time.Hour)}
+	raw, _ := json.Marshal(message)
+	wrapped, err := loadFederatedMessage([]string{"remote-architect", "-"}, bytes.NewReader(raw), 4096)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var value struct {
+		Alias   string                             `json:"alias"`
+		Message organization.OrganizationalMessage `json:"message"`
+	}
+	if err := json.Unmarshal(wrapped, &value); err != nil || value.Alias != "remote-architect" || value.Message.Recipient != "" {
+		t.Fatalf("wrapped=%s err=%v", wrapped, err)
+	}
+	if _, err := loadFederatedMessage([]string{"remote-*", "-"}, bytes.NewReader(raw), 4096); err == nil {
+		t.Fatal("wildcard alias accepted")
 	}
 }
