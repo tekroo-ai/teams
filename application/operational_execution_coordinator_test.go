@@ -79,6 +79,36 @@ func TestRetryExecutionBriefDirectsAgentToContinueFromRetainedState(t *testing.T
 	}
 }
 
+func TestReadOnlyRoleGuidanceNeverOrdersEditsAndAppliesToHandoffRetry(t *testing.T) {
+	runtime := newOperationalRuntime(t)
+	actor := kernel.ActorFQN("teams::architect-1")
+	runtime.context.Invocation.ActorFQN = actor
+	runtime.context.Invocation.Purpose = kernel.PurposeHandoff
+	retryOf := testUUID(779)
+	runtime.context.Invocation.RetryOfInvocationID = &retryOf
+	runtime.context.Invocation.RetryOrdinal = 1
+	grounding := RoleExecutionGrounding{
+		ActorFQN: actor, RoleFQRN: kernel.RoleFQRN("architect"), BundleVersion: "1.1.0", BundleDigest: testDigest('b'),
+		Capabilities: []string{"architecture"}, Permissions: []string{"repository.read"},
+		Instructions: "Inspect the repository and return an evidence-grounded DAG without editing files.",
+	}
+	brief, _, err := BuildExecutionBrief(runtime.context, grounding, 1<<20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	guidance := strings.Join(brief.ExecutionGuidance, "\n")
+	for _, required := range []string{"no repository.edit permission", "Do not edit repository files", "finish the assigned plan", "bounded retry", "prior OpenHands conversation", "three additional read-only", "Produce the assigned plan"} {
+		if !strings.Contains(guidance, required) {
+			t.Fatalf("read-only guidance omitted %q: %v", required, brief.ExecutionGuidance)
+		}
+	}
+	for _, forbidden := range []string{"Make a concrete code or test edit", "Implement in cohesive increments", "Make the smallest justified code or test edit"} {
+		if strings.Contains(guidance, forbidden) {
+			t.Fatalf("read-only guidance contains %q: %v", forbidden, brief.ExecutionGuidance)
+		}
+	}
+}
+
 func TestOperationalCoordinatorReconcilesAmbiguousStartWithoutDuplicateSubmission(t *testing.T) {
 	runtime := newOperationalRuntime(t)
 	runtime.startErr = errors.New("response lost after provider acceptance")
@@ -329,7 +359,7 @@ func testRoleGrounding(actor kernel.ActorFQN) RoleExecutionGrounding {
 	fqrn, _ := kernel.RoleFQRNFromActor(actor)
 	return RoleExecutionGrounding{
 		ActorFQN: actor, RoleFQRN: fqrn, BundleVersion: "1.0.0", BundleDigest: testDigest('b'),
-		Capabilities: []string{"implement"}, Permissions: []string{"repository.read", "repository.write"},
+		Capabilities: []string{"implement"}, Permissions: []string{"repository.edit", "repository.read"},
 		Instructions: "Implement the assigned task and return evidence.",
 	}
 }

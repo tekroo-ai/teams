@@ -258,23 +258,45 @@ var semanticContextForbiddenEffects = []string{
 	"TASK_STATE",
 }
 
-var boundedExecutionGuidance = []string{
+var sharedExecutionGuidance = []string{
 	"Before acting, inspect role_grounding: actor_fqn identifies this running instance, role_fqrn identifies its signed role bundle, and the bundle instructions, capabilities, and permissions define the role you must perform.",
 	"Read and follow AGENTS.md before taking repository actions.",
 	"Use rg or rg --files for repository discovery.",
 	"Never repeat an identical read-only command unless repository state changed; when a search identifies a relevant file, inspect that file next.",
 	"Treat semantically equivalent searches as repeats; after locating a candidate file, inspect it instead of varying the same query.",
 	"Do not inspect or modify accepted CONTRACTS packages during ordinary implementation tasks; their immutability is already established by AGENTS.md.",
-	"Make a concrete code or test edit within twelve repository-discovery commands; if the task remains ambiguous, report an explicit blocker instead of continuing to search.",
-	"Map and extend existing interfaces before adding a parallel abstraction.",
-	"Implement in cohesive increments and run focused tests after each increment.",
 	"Stay inside the authorized workspace and task scope.",
 }
 
-var retryExecutionGuidance = []string{
+var editableExecutionGuidance = []string{
+	"Make a concrete code or test edit within twelve repository-discovery commands; if the task remains ambiguous, report an explicit blocker instead of continuing to search.",
+	"Map and extend existing interfaces before adding a parallel abstraction.",
+	"Implement in cohesive increments and run focused tests after each increment.",
+}
+
+var readOnlyExecutionGuidance = []string{
+	"This role has no repository.edit permission. Do not edit repository files or create implementation artifacts.",
+	"Within twelve repository-discovery commands, finish the assigned plan, review, or report from observed repository evidence; if the evidence remains insufficient, report an explicit blocker instead of continuing to search.",
+	"Inspect current interfaces and relevant tests only as needed to perform the assigned role, then return the required result through the finish tool.",
+}
+
+var sharedRetryExecutionGuidance = []string{
 	"This is a bounded retry. Reuse the current workspace and retained task evidence; do not restart repository discovery from the beginning.",
 	"The prior OpenHands conversation is retained in this retry. Do not reread AGENTS.md or repeat ls, rg, find, sed, cat, or file-view actions already present in that history.",
+	"At most three additional read-only repository actions are allowed across the entire retry lineage; if the next role-appropriate action is still not justified, report an explicit blocker.",
+}
+
+var editableRetryExecutionGuidance = []string{
 	"Make the smallest justified code or test edit immediately from the retained findings. At most three additional read-only repository actions are allowed across the entire retry lineage; if an edit is still not justified, report an explicit blocker.",
+}
+
+var readOnlyRetryExecutionGuidance = []string{
+	"Produce the assigned plan, review, or report immediately from the retained findings. Do not perform implementation edits.",
+}
+
+func hasExecutionPermission(permissions []string, required string) bool {
+	_, found := slices.BinarySearch(permissions, required)
+	return found
 }
 
 // SemanticContextRequest is read-only metadata supplied to the qualified
@@ -403,11 +425,22 @@ func BuildExecutionBrief(current OperationalExecutionContext, grounding RoleExec
 		RuntimeIdentityDigest: invocation.RuntimeIdentityDigest, Scope: current.Scope.Clone(),
 		Evidence: evidence, RemainingGlobalBudget: invocation.RemainingGlobalBudget,
 		RemainingPurposeBudget: invocation.RemainingPurposeBudget, DeadlineAt: invocation.DeadlineAt,
-		CoordinationRule:  evidenceOnlyCoordinationRule,
-		ExecutionGuidance: append([]string(nil), boundedExecutionGuidance...),
+		CoordinationRule: evidenceOnlyCoordinationRule,
 	}
-	if invocation.RetryOrdinal > 0 && (invocation.Purpose == kernel.PurposeImplementation || invocation.Purpose == kernel.PurposeRepair) {
-		brief.ExecutionGuidance = append(brief.ExecutionGuidance, retryExecutionGuidance...)
+	brief.ExecutionGuidance = append([]string(nil), sharedExecutionGuidance...)
+	editable := hasExecutionPermission(grounding.Permissions, "repository.edit")
+	if editable {
+		brief.ExecutionGuidance = append(brief.ExecutionGuidance, editableExecutionGuidance...)
+	} else {
+		brief.ExecutionGuidance = append(brief.ExecutionGuidance, readOnlyExecutionGuidance...)
+	}
+	if invocation.RetryOrdinal > 0 {
+		brief.ExecutionGuidance = append(brief.ExecutionGuidance, sharedRetryExecutionGuidance...)
+		if editable {
+			brief.ExecutionGuidance = append(brief.ExecutionGuidance, editableRetryExecutionGuidance...)
+		} else {
+			brief.ExecutionGuidance = append(brief.ExecutionGuidance, readOnlyRetryExecutionGuidance...)
+		}
 	}
 	if invocation.Purpose == kernel.PurposeValidation || invocation.Purpose == kernel.PurposeReview {
 		brief.ResultProtocol = &ExecutionResultProtocol{
