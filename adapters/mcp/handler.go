@@ -42,6 +42,8 @@ const (
 	InvocationGetToolName  = "tekroo.invocation.get"
 	LibrariesListToolName  = "tekroo.libraries.list"
 	LibrariesSyncToolName  = "tekroo.libraries.sync"
+	DiagnosticsToolName    = "tekroo.diagnostics.get"
+	DeadLetterRepairName   = "tekroo.deadletter.repair"
 	DefaultMaxBodyBytes    = int64(1 << 20)
 	codeHeaderMismatch     = -32020
 	codeUnsupportedVersion = -32022
@@ -394,6 +396,8 @@ func organizationalTools() []any {
 		map[string]any{"name": InvocationGetToolName, "title": "Inspect invocation", "description": "Read one single-use work invocation and terminal evidence state.", "inputSchema": object([]string{"invocation_id"}, map[string]any{"invocation_id": uuid})},
 		map[string]any{"name": LibrariesListToolName, "title": "List role libraries", "description": "Inspect exact versions and content identities of configured role libraries.", "inputSchema": object(nil, map[string]any{})},
 		map[string]any{"name": LibrariesSyncToolName, "title": "Synchronize role libraries", "description": "Revalidate and synchronize only the exact signed library sources bound by tekrood configuration.", "inputSchema": object(nil, map[string]any{})},
+		map[string]any{"name": DiagnosticsToolName, "title": "Inspect operational diagnostics", "description": "Read active tasks, message claims, dead letters, projection faults, role state, and library identities without mutation.", "inputSchema": object(nil, map[string]any{})},
+		map[string]any{"name": DeadLetterRepairName, "title": "Repair dead letter", "description": "Append an explicitly authorized DAG successor without reopening the failed delivery or resetting its finite budget.", "inputSchema": object([]string{"failed_message_id", "successor"}, map[string]any{"failed_message_id": uuid, "successor": map[string]any{"type": "object"}})},
 		map[string]any{"name": RolesListToolName, "title": "List configured team roles", "description": "Inspect exact role identities and lifecycle state.", "inputSchema": object(nil, map[string]any{})},
 		map[string]any{
 			"name": RoleControlToolName, "title": "Control one role",

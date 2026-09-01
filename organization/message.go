@@ -313,3 +313,26 @@ func (bus *MessageBus) DeadLetters(ctx context.Context, recipient kernel.ActorFQ
 	}
 	return reader.ListDeadLetters(ctx, recipient, limit)
 }
+
+// RepairDeadLetter creates a new DAG successor. It never reopens the failed
+// delivery or resets its attempts, budget account, lifecycle, or scope.
+func (bus *MessageBus) RepairDeadLetter(ctx context.Context, failedID kernel.UUIDv7, successor OrganizationalMessage) error {
+	if bus == nil || !failedID.Valid() || successor.Validate() != nil {
+		return ErrInvalidOrganizationalMessage
+	}
+	failed, found, err := bus.Read(ctx, failedID)
+	if err != nil {
+		return err
+	}
+	if !found {
+		return ErrOrganizationalMessageNotFound
+	}
+	prior := failed.Message
+	if failed.State != MessageDeadLetter || successor.CausationID == nil || *successor.CausationID != failedID || successor.Sender != prior.Recipient || successor.CorrelationID != prior.CorrelationID || successor.Flow.ThreadID != prior.Flow.ThreadID || successor.Flow.ParentStepID == nil || *successor.Flow.ParentStepID != prior.Flow.StepID || successor.Flow.Hop != prior.Flow.Hop+1 || successor.Flow.MaximumHops != prior.Flow.MaximumHops || successor.Flow.BudgetAccountID != prior.Flow.BudgetAccountID || successor.Flow.LifecycleEpoch != prior.Flow.LifecycleEpoch || successor.Flow.ScopeRevision != prior.Flow.ScopeRevision || successor.Work.FeatureID == nil != (prior.Work.FeatureID == nil) || successor.Work.StoryID == nil != (prior.Work.StoryID == nil) || successor.Work.TaskID == nil != (prior.Work.TaskID == nil) {
+		return ErrOrganizationalMessageConflict
+	}
+	if successor.Work.FeatureID != nil && *successor.Work.FeatureID != *prior.Work.FeatureID || successor.Work.StoryID != nil && *successor.Work.StoryID != *prior.Work.StoryID || successor.Work.TaskID != nil && *successor.Work.TaskID != *prior.Work.TaskID {
+		return ErrOrganizationalMessageConflict
+	}
+	return bus.Send(ctx, successor)
+}

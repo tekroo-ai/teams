@@ -46,6 +46,11 @@ type Service interface {
 	AskHuman(context.Context, kernel.PrincipalRef, organization.HumanQuestionRequest) (organization.HumanNotification, error)
 	RoleLibraries() []organization.RoleLibraryEntry
 	SyncRoleLibraries() ([]organization.RoleLibraryEntry, error)
+	Diagnostics(context.Context) (operationalruntime.Diagnostics, error)
+	RepairDeadLetter(context.Context, kernel.UUIDv7, organization.OrganizationalMessage) error
+	RespondToHumanQuestion(context.Context, kernel.PrincipalRef, organization.HumanResponseInput) (organization.HumanNotification, error)
+	ReadHumanInteraction(context.Context, kernel.UUIDv7) (kernel.HumanInteractionSnapshot, error)
+	HumanNotifications(context.Context, kernel.PrincipalRef, bool) ([]organization.HumanNotification, error)
 }
 
 type OrganizationalService interface {
@@ -135,12 +140,27 @@ func (handler *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Requ
 			return
 		}
 		writeJSON(writer, http.StatusOK, libraries)
+	case request.Method == http.MethodGet && request.URL.Path == "/v1/diagnostics":
+		diagnostics, err := handler.service.Diagnostics(request.Context())
+		if err != nil {
+			writeError(writer, http.StatusInternalServerError, "DIAGNOSTICS_READ_FAILED")
+			return
+		}
+		writeJSON(writer, http.StatusOK, diagnostics)
+	case request.Method == http.MethodPost && strings.HasPrefix(request.URL.Path, "/v1/dead-letters/") && strings.HasSuffix(request.URL.Path, "/repair"):
+		handler.repairDeadLetter(writer, request, strings.TrimSuffix(strings.TrimPrefix(request.URL.Path, "/v1/dead-letters/"), "/repair"))
 	case request.Method == http.MethodPost && request.URL.Path == "/v1/features":
 		handler.submitFeature(writer, request)
 	case request.Method == http.MethodPost && request.URL.Path == "/v1/humans":
 		handler.registerHuman(writer, request)
 	case request.Method == http.MethodPost && request.URL.Path == "/v1/human-questions":
 		handler.askHuman(writer, request)
+	case request.Method == http.MethodGet && request.URL.Path == "/v1/human-notifications":
+		handler.humanNotifications(writer, request)
+	case request.Method == http.MethodPost && request.URL.Path == "/v1/human-responses":
+		handler.respondHuman(writer, request)
+	case request.Method == http.MethodGet && strings.HasPrefix(request.URL.Path, "/v1/human-interactions/"):
+		handler.humanInteraction(writer, request, strings.TrimPrefix(request.URL.Path, "/v1/human-interactions/"))
 	case request.Method == http.MethodPost && strings.HasPrefix(request.URL.Path, "/v1/features/") && strings.HasSuffix(request.URL.Path, "/plan"):
 		handler.applyFeaturePlan(writer, request, strings.TrimSuffix(strings.TrimPrefix(request.URL.Path, "/v1/features/"), "/plan"))
 	case request.Method == http.MethodPost && strings.HasPrefix(request.URL.Path, "/v1/features/") && strings.HasSuffix(request.URL.Path, "/accept"):
@@ -164,6 +184,71 @@ func (handler *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Requ
 	default:
 		writeError(writer, http.StatusNotFound, "NOT_FOUND")
 	}
+}
+
+func (handler *Handler) humanNotifications(writer http.ResponseWriter, request *http.Request) {
+	openOnly := true
+	if value := request.URL.Query().Get("open_only"); value != "" {
+		if value != "true" && value != "false" {
+			writeError(writer, http.StatusBadRequest, "INVALID_NOTIFICATION_FILTER")
+			return
+		}
+		openOnly = value == "true"
+	}
+	values, err := handler.service.HumanNotifications(request.Context(), handler.principal, openOnly)
+	if err != nil {
+		writeError(writer, http.StatusInternalServerError, "NOTIFICATION_READ_FAILED")
+		return
+	}
+	writeJSON(writer, http.StatusOK, values)
+}
+
+func (handler *Handler) respondHuman(writer http.ResponseWriter, request *http.Request) {
+	var input organization.HumanResponseInput
+	if decodeBody(writer, request, handler.maxBody, &input) != nil || !input.Valid() {
+		writeError(writer, http.StatusBadRequest, "INVALID_HUMAN_RESPONSE")
+		return
+	}
+	value, err := handler.service.RespondToHumanQuestion(request.Context(), handler.principal, input)
+	if err != nil {
+		writeError(writer, http.StatusConflict, "HUMAN_RESPONSE_REJECTED")
+		return
+	}
+	writeJSON(writer, http.StatusOK, value)
+}
+
+func (handler *Handler) humanInteraction(writer http.ResponseWriter, request *http.Request, value string) {
+	id := kernel.UUIDv7(value)
+	if !id.Valid() || strings.Contains(value, "/") {
+		writeError(writer, http.StatusBadRequest, "INVALID_HUMAN_INTERACTION_ID")
+		return
+	}
+	interaction, err := handler.service.ReadHumanInteraction(request.Context(), id)
+	if err != nil {
+		writeError(writer, http.StatusNotFound, "HUMAN_INTERACTION_NOT_FOUND")
+		return
+	}
+	if interaction.OriginPrincipal != handler.principal {
+		if _, selected := interaction.Selected(handler.principal); !selected {
+			writeError(writer, http.StatusNotFound, "HUMAN_INTERACTION_NOT_FOUND")
+			return
+		}
+	}
+	writeJSON(writer, http.StatusOK, interaction)
+}
+
+func (handler *Handler) repairDeadLetter(writer http.ResponseWriter, request *http.Request, value string) {
+	id := kernel.UUIDv7(value)
+	var successor organization.OrganizationalMessage
+	if !id.Valid() || strings.Contains(value, "/") || decodeBody(writer, request, handler.maxBody, &successor) != nil || successor.Validate() != nil {
+		writeError(writer, http.StatusBadRequest, "INVALID_DEAD_LETTER_REPAIR")
+		return
+	}
+	if err := handler.service.RepairDeadLetter(request.Context(), id, successor); err != nil {
+		writeError(writer, http.StatusConflict, "DEAD_LETTER_REPAIR_REJECTED")
+		return
+	}
+	writeJSON(writer, http.StatusCreated, map[string]any{"failed_message_id": id, "successor_message_id": successor.ID})
 }
 
 func (handler *Handler) registerHuman(writer http.ResponseWriter, request *http.Request) {

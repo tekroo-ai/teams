@@ -247,6 +247,53 @@ func TestPendingMessageReaddressIsExactAuditedAndDoesNotResetBudget(t *testing.T
 	}
 }
 
+func TestDeadLetterRepairAppendsSuccessorWithoutReopeningOrResettingBudget(t *testing.T) {
+	roles := NewMemoryRoleStore()
+	for _, state := range []RoleInstanceState{
+		testRoleState("teams::architect-1", testExecution(2, 1)),
+		testRoleState("teams::coder-1", testExecution(5, 1)),
+		testRoleState("teams::tester-1", testExecution(6, 1)),
+	} {
+		if err := roles.CompareAndSwapRole(context.Background(), 0, state); err != nil {
+			t.Fatal(err)
+		}
+	}
+	store := NewMemoryOrganizationalMessageStore()
+	bus, _ := NewMessageBus(store, roles)
+	failed := testMessage(0)
+	if err := bus.Send(context.Background(), failed); err != nil {
+		t.Fatal(err)
+	}
+	now := failed.CreatedAt.Add(time.Second)
+	if _, err := store.AcquireMessage(context.Background(), failed.Recipient, testExecution(5, 1), now, time.Second, 1); err != nil {
+		t.Fatal(err)
+	}
+	if _, dead, err := store.SweepMessages(context.Background(), now.Add(2*time.Second), 1); err != nil || dead != 1 {
+		t.Fatalf("dead-letter sweep dead=%d err=%v", dead, err)
+	}
+	successor := nextTestMessage(failed, 1)
+	successor.SenderExecution = testExecution(5, 1)
+	if err := bus.RepairDeadLetter(context.Background(), failed.ID, successor); err != nil {
+		t.Fatal(err)
+	}
+	prior, found, err := bus.Read(context.Background(), failed.ID)
+	if err != nil || !found || prior.State != MessageDeadLetter || prior.Attempts != 1 {
+		t.Fatalf("failed delivery mutated: %+v found=%v err=%v", prior, found, err)
+	}
+	trace, err := bus.Trace(context.Background(), failed.Flow.ThreadID)
+	if err != nil || len(trace) != 2 || trace[1].State != MessagePending || trace[1].Message.Flow.BudgetAccountID != failed.Flow.BudgetAccountID {
+		t.Fatalf("repair trace=%+v err=%v", trace, err)
+	}
+	reset := successor
+	reset.ID = testUUID(14)
+	reset.Flow.StepID = testUUID(15)
+	reset.Work.DAGNodeID = reset.Flow.StepID
+	reset.Flow.BudgetAccountID = testUUID(13)
+	if err := bus.RepairDeadLetter(context.Background(), failed.ID, reset); !errors.Is(err, ErrOrganizationalMessageConflict) {
+		t.Fatalf("budget reset repair error=%v", err)
+	}
+}
+
 func testMessage(offset int) OrganizationalMessage {
 	created := time.Date(2026, 8, 31, 12, 0, 0, 0, time.UTC)
 	story := testUUID(6)

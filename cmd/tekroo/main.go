@@ -84,6 +84,8 @@ func run(arguments []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		method, path, err = noOperand(http.MethodGet, "/v1/libraries", operands)
 	case "library-sync":
 		method, path, err = noOperand(http.MethodPost, "/v1/libraries/sync", operands)
+	case "diagnostics":
+		method, path, err = noOperand(http.MethodGet, "/v1/diagnostics", operands)
 	case "feature":
 		method, path = http.MethodPost, "/v1/features"
 		body, err = loadFeature(operands, stdin, config.Operator.MaximumBodyBytes)
@@ -101,6 +103,13 @@ func run(arguments []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	case "human-ask":
 		method, path = http.MethodPost, "/v1/human-questions"
 		body, err = loadHumanQuestion(operands, stdin, config.Operator.MaximumBodyBytes)
+	case "human-notifications":
+		method, path, err = humanNotificationsRead(operands)
+	case "human-respond":
+		method, path = http.MethodPost, "/v1/human-responses"
+		body, err = loadHumanResponse(operands, stdin, config.Operator.MaximumBodyBytes)
+	case "human-interaction":
+		method, path, err = identityRead("/v1/human-interactions/", operands)
 	case "role":
 		method, path, err = roleOperation(operands)
 	case "inbox":
@@ -114,6 +123,8 @@ func run(arguments []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		method, path, err = identityRead("/v1/message-threads/", operands)
 	case "deadletters":
 		method, path, err = deadLetterRead(operands)
+	case "deadletter-repair":
+		method, path, body, err = loadDeadLetterRepair(operands, stdin, config.Operator.MaximumBodyBytes)
 	case "submit":
 		method, path = http.MethodPost, "/v1/commands"
 		body, _, err = loadCommand(operands, stdin, config.Operator.MaximumBodyBytes)
@@ -183,6 +194,21 @@ func deadLetterRead(operands []string) (string, string, error) {
 	return http.MethodGet, "/v1/dead-letters?recipient=" + url.QueryEscape(operands[0]), nil
 }
 
+func loadDeadLetterRepair(operands []string, stdin io.Reader, maximum int64) (string, string, []byte, error) {
+	if len(operands) != 2 || !kernel.UUIDv7(operands[0]).Valid() {
+		return "", "", nil, usageError()
+	}
+	raw, err := loadDocument(operands[1:], stdin, maximum)
+	if err != nil {
+		return "", "", nil, err
+	}
+	var successor organization.OrganizationalMessage
+	if err := strictDocument(raw, &successor); err != nil || successor.Validate() != nil {
+		return "", "", nil, errors.New("dead-letter successor document is invalid")
+	}
+	return http.MethodPost, "/v1/dead-letters/" + operands[0] + "/repair", raw, nil
+}
+
 func loadMessage(operands []string, stdin io.Reader, maximum int64) ([]byte, error) {
 	raw, err := loadDocument(operands, stdin, maximum)
 	if err != nil {
@@ -234,6 +260,28 @@ func loadHumanQuestion(operands []string, stdin io.Reader, maximum int64) ([]byt
 		return nil, errors.New("human question document is invalid")
 	}
 	return raw, nil
+}
+
+func loadHumanResponse(operands []string, stdin io.Reader, maximum int64) ([]byte, error) {
+	raw, err := loadDocument(operands, stdin, maximum)
+	if err != nil {
+		return nil, err
+	}
+	var input organization.HumanResponseInput
+	if err := strictDocument(raw, &input); err != nil || !input.Valid() {
+		return nil, errors.New("human response document is invalid")
+	}
+	return raw, nil
+}
+
+func humanNotificationsRead(operands []string) (string, string, error) {
+	if len(operands) == 0 || len(operands) == 1 && operands[0] == "open" {
+		return http.MethodGet, "/v1/human-notifications?open_only=true", nil
+	}
+	if len(operands) == 1 && operands[0] == "all" {
+		return http.MethodGet, "/v1/human-notifications?open_only=false", nil
+	}
+	return "", "", usageError()
 }
 
 func loadFeaturePlan(operands []string, stdin io.Reader, maximum int64) (string, string, []byte, error) {
@@ -406,5 +454,5 @@ func loadCommand(operands []string, stdin io.Reader, maximum int64) ([]byte, ker
 }
 
 func usageError() error {
-	return errors.New("usage: tekroo -config CONFIG health|status|pause|resume|stop|feature FILE|-|feature-status ID|feature-plan ID FILE|-|feature-accept ID REVISION NO_RELEASE_REASON|feature-release ID FILE|-|human-register FILE|-|human-ask FILE|-|roles|libraries|library-sync|role ACTOR start|stop|restart|pause|resume|inbox ACTOR|message FILE|-|message-status ID|message-trace THREAD_ID|deadletters [ACTOR]|task ID|story ID|invocation ID|submit FILE|-|cancel INVOCATION_ID FILE|-")
+	return errors.New("usage: tekroo -config CONFIG health|status|diagnostics|pause|resume|stop|feature FILE|-|feature-status ID|feature-plan ID FILE|-|feature-accept ID REVISION NO_RELEASE_REASON|feature-release ID FILE|-|human-register FILE|-|human-ask FILE|-|human-notifications [open|all]|human-respond FILE|-|human-interaction ID|roles|libraries|library-sync|role ACTOR start|stop|restart|pause|resume|inbox ACTOR|message FILE|-|message-status ID|message-trace THREAD_ID|deadletters [ACTOR]|deadletter-repair ID FILE|-|task ID|story ID|invocation ID|submit FILE|-|cancel INVOCATION_ID FILE|-")
 }

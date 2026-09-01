@@ -49,6 +49,8 @@ type Organization interface {
 	HumanNotifications(context.Context, kernel.PrincipalRef, bool) ([]organization.HumanNotification, error)
 	RoleLibraries() []organization.RoleLibraryEntry
 	SyncRoleLibraries() ([]organization.RoleLibraryEntry, error)
+	Diagnostics(context.Context) (operationalruntime.Diagnostics, error)
+	RepairDeadLetter(context.Context, kernel.UUIDv7, organization.OrganizationalMessage) error
 }
 
 // Service translates focused operator operations into domain calls while the
@@ -135,6 +137,24 @@ func (service *Service) CallTool(ctx context.Context, identity protocol.Authenti
 			return nil, ErrInvalidArguments
 		}
 		return service.organization.SyncRoleLibraries()
+	case mcp.DiagnosticsToolName:
+		var input struct{}
+		if err := decodeStrict(arguments, &input); err != nil {
+			return nil, ErrInvalidArguments
+		}
+		return service.organization.Diagnostics(ctx)
+	case mcp.DeadLetterRepairName:
+		var input struct {
+			FailedID  kernel.UUIDv7                      `json:"failed_message_id"`
+			Successor organization.OrganizationalMessage `json:"successor"`
+		}
+		if err := decodeStrict(arguments, &input); err != nil || !input.FailedID.Valid() || input.Successor.Validate() != nil {
+			return nil, ErrInvalidArguments
+		}
+		if err := service.organization.RepairDeadLetter(ctx, input.FailedID, input.Successor); err != nil {
+			return nil, err
+		}
+		return map[string]any{"failed_message_id": input.FailedID, "successor_message_id": input.Successor.ID}, nil
 	case mcp.FeatureSubmitToolName:
 		var input organization.FeatureRequestInput
 		if err := decodeStrict(arguments, &input); err != nil || input.Validate() != nil {

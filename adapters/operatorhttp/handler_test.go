@@ -243,5 +243,25 @@ func (service *operatorService) SyncRoleLibraries() ([]organization.RoleLibraryE
 	return service.RoleLibraries(), nil
 }
 
+func (service *operatorService) Diagnostics(context.Context) (operationalruntime.Diagnostics, error) {
+	return operationalruntime.Diagnostics{Control: service.Status()}, nil
+}
+
+func (service *operatorService) RepairDeadLetter(context.Context, kernel.UUIDv7, organization.OrganizationalMessage) error {
+	return nil
+}
+
+func (service *operatorService) RespondToHumanQuestion(context.Context, kernel.PrincipalRef, organization.HumanResponseInput) (organization.HumanNotification, error) {
+	return organization.HumanNotification{}, nil
+}
+
+func (service *operatorService) ReadHumanInteraction(context.Context, kernel.UUIDv7) (kernel.HumanInteractionSnapshot, error) {
+	return kernel.HumanInteractionSnapshot{}, nil
+}
+
+func (service *operatorService) HumanNotifications(context.Context, kernel.PrincipalRef, bool) ([]organization.HumanNotification, error) {
+	return []organization.HumanNotification{}, nil
+}
+
 var _ Service = (*operatorService)(nil)
 var _ OrganizationalService = (*operatorService)(nil)

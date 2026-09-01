@@ -121,3 +121,9 @@ func (*fakeOrganization) RoleLibraries() []organization.RoleLibraryEntry {
 func (fake *fakeOrganization) SyncRoleLibraries() ([]organization.RoleLibraryEntry, error) {
 	return fake.RoleLibraries(), nil
 }
+func (fake *fakeOrganization) Diagnostics(context.Context) (operationalruntime.Diagnostics, error) {
+	return operationalruntime.Diagnostics{Control: fake.Status()}, nil
+}
+func (*fakeOrganization) RepairDeadLetter(context.Context, kernel.UUIDv7, organization.OrganizationalMessage) error {
+	return nil
+}
