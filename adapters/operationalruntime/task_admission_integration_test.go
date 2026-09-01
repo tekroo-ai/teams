@@ -19,6 +19,7 @@ import (
 	"github.com/tekroo-ai/teams/adapters/fake"
 	"github.com/tekroo-ai/teams/adapters/mongo"
 	"github.com/tekroo-ai/teams/adapters/openhands"
+	"github.com/tekroo-ai/teams/adapters/protocol"
 	"github.com/tekroo-ai/teams/application"
 	"github.com/tekroo-ai/teams/contract"
 	"github.com/tekroo-ai/teams/kernel"
@@ -47,6 +48,13 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 		}
 		policy.Grants = append(policy.Grants, kernel.AuthorityGrant{GrantDigest: digestByte(byte('2' + index)), Grantee: kernel.PrincipalRef{Kind: kernel.PrincipalActor, ID: string(actor)}, Scope: kernel.AuthorityScope{CommandTypes: commands, TargetKinds: targets, CanReadTarget: true}})
 	}
+	policy.Grants = append(policy.Grants,
+		kernel.AuthorityGrant{GrantDigest: digestByte('6'), Grantee: kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "principal"}, Scope: kernel.AuthorityScope{CommandTypes: []string{"tekroo.command.human-participant.bind-profile", "tekroo.command.human-interaction.open"}, TargetKinds: []kernel.AggregateKind{kernel.AggregateHumanParticipant, kernel.AggregateHumanInteraction}, CanReadTarget: true}},
+		kernel.AuthorityGrant{GrantDigest: digestByte('7'), Grantee: kernel.PrincipalRef{Kind: kernel.PrincipalService, ID: "teams-operational-runtime"}, Scope: kernel.AuthorityScope{CommandTypes: []string{"tekroo.command.human-interaction.record-delivery"}, TargetKinds: []kernel.AggregateKind{kernel.AggregateHumanInteraction}, CanReadTarget: true}},
+		kernel.AuthorityGrant{GrantDigest: digestByte('8'), Grantee: kernel.PrincipalRef{Kind: kernel.PrincipalPolicy, ID: "teams-admission-policy"}, Scope: kernel.AuthorityScope{CommandTypes: []string{"tekroo.command.human-interaction.close", "tekroo.command.work.block", "tekroo.command.work.unblock"}, TargetKinds: []kernel.AggregateKind{kernel.AggregateHumanInteraction, kernel.AggregateTask}, CanReadTarget: true}},
+		kernel.AuthorityGrant{GrantDigest: digestByte('9'), Grantee: kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "human:alice"}, Scope: kernel.AuthorityScope{CommandTypes: []string{"tekroo.command.human-interaction.respond"}, TargetKinds: []kernel.AggregateKind{kernel.AggregateHumanInteraction}, CanReadTarget: true}},
+		kernel.AuthorityGrant{GrantDigest: digestByte('f'), Grantee: kernel.PrincipalRef{Kind: kernel.PrincipalActor, ID: "example::human-wait-1"}, Scope: kernel.AuthorityScope{CommandTypes: roleCommands, TargetKinds: []kernel.AggregateKind{kernel.AggregateTask}, CanReadTarget: true}},
+	)
 	store, err := mongo.Open(contextWithTimeout(t), mongo.Config{
 		URI: uri, Database: "tekroo_phase6_task_admission", ContractIdentity: kernel.ContractIdentity,
 		ManifestSHA256: phase4ManifestSHA, MigrationLevel: 1, Policy: policy,
@@ -138,12 +146,14 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 		},
 		serviceAuthority: kernel.PrincipalRef{Kind: kernel.PrincipalService, ID: "teams-operational-runtime"},
 		policyAuthority:  kernel.PrincipalRef{Kind: kernel.PrincipalPolicy, ID: "teams-admission-policy"},
+		operatorIdentity: protocol.AuthenticatedContext{Principal: kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "principal"}},
 	}
 	features, err := organization.NewFeatureCoordinator(store, roleHost, service, clock, ids)
 	if err != nil {
 		t.Fatal(err)
 	}
 	service.Features = features
+	exerciseHumanParticipation(t, service, runtime, store, provenance, now)
 	feature := organization.FeatureRequest{
 		SchemaVersion: organization.FeatureSchemaVersion, ID: kernel.UUIDv7("00000000-0000-7000-8000-000000006010"), Revision: 3, Status: organization.FeatureSpecified,
 		Input:       organization.FeatureRequestInput{Team: "example", Title: "Admission integration", Description: "Create one executable root task.", AcceptanceCriteria: []string{"task is executable"}, Priority: organization.PriorityHigh, Repository: "tekroo-ai/teams", WorkspaceID: "engineering", IdempotencyKey: "phase6-admission", MaximumStories: 4, MaximumTasks: 8, MaximumHops: 8},
@@ -281,6 +291,54 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 	dependent, found, err := store.ReadTaskProjection(contextWithTimeout(t), plan.Tasks[1].ID)
 	if err != nil || !found || !dependent.Valid() || dependent.Phase != string(kernel.PhaseCompleted) || dependent.LatestInvocation == nil || dependent.LatestInvocation.State != kernel.InvocationSucceeded {
 		t.Fatalf("dependent projection=%+v found=%t err=%v", dependent, found, err)
+	}
+}
+
+func exerciseHumanParticipation(t *testing.T, service *ProductionService, runtime *Runtime, store *mongo.Store, provenance kernel.ProvenanceBasis, now time.Time) {
+	t.Helper()
+	fixture := newIntegratedFixture(t, now, 9000, "example::human-wait-1", "human-wait-1", "worktree-human-wait-1")
+	fixture.createAuthoritativeTaskWith(t, runtimeCommandSubmitter(runtime, provenance))
+	participant := kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "human:alice"}
+	profile, err := service.RegisterHumanParticipant(contextWithTimeout(t), service.operatorIdentity.Principal, organization.HumanParticipantRegistration{
+		Participant: participant, DisplayLabel: "Alice SME", RoleClass: "SME", RoleID: "domain-sme", ScopeKind: "WORK", ScopeID: string(fixture.taskID), Channel: "WEB_PORTAL", Confidentiality: kernel.ConfidentialityInternal, IdempotencyKey: "human-alice-registration",
+	})
+	if err != nil || profile.Participant != participant || !profile.Active {
+		t.Fatalf("human profile=%+v err=%v", profile, err)
+	}
+	notification, err := service.AskHuman(contextWithTimeout(t), service.operatorIdentity.Principal, organization.HumanQuestionRequest{
+		IdempotencyKey: "human-alice-question", SubjectTaskID: fixture.taskID, Recipient: participant,
+		Question: "Which public interface must remain stable?", ResponseSpecification: "Identify the existing public interface by name.",
+		Purpose: "REQUIREMENTS_CLARIFICATION", DeclaredEffect: "ADVISORY_ONLY", Confidentiality: kernel.ConfidentialityInternal, DeadlineAt: now.Add(time.Hour),
+	})
+	if err != nil || notification.State != kernel.HumanInteractionCollecting {
+		t.Fatalf("human question=%+v err=%v", notification, err)
+	}
+	taskState, _, found, err := store.ReadAggregateHead(contextWithTimeout(t), kernel.AggregateRef{Kind: kernel.AggregateTask, ID: fixture.taskID})
+	if err != nil || !found || taskState.Condition != kernel.ConditionBlocked {
+		t.Fatalf("blocked task=%+v found=%t err=%v", taskState, found, err)
+	}
+	decision, err := store.LoadDecision(contextWithTimeout(t), kernel.KernelCommand{Target: kernel.AggregateRef{Kind: kernel.AggregateTask, ID: fixture.taskID}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, invoked := latestTaskInvocation(decision.WorkInvocations, fixture.taskID); invoked {
+		t.Fatal("human wait created a model invocation")
+	}
+	notification, err = service.RespondToHumanQuestion(contextWithTimeout(t), participant, organization.HumanResponseInput{InteractionID: notification.InteractionID, ExpectedRevision: 2, Response: "Preserve the existing public interface.", ResponseClassification: "ANSWER"})
+	if err != nil || notification.State != kernel.HumanInteractionClosed || notification.ResponseEventID == nil {
+		t.Fatalf("human response=%+v err=%v", notification, err)
+	}
+	taskState, _, found, err = store.ReadAggregateHead(contextWithTimeout(t), kernel.AggregateRef{Kind: kernel.AggregateTask, ID: fixture.taskID})
+	if err != nil || !found || taskState.Condition != kernel.ConditionRunnable {
+		t.Fatalf("unblocked task=%+v found=%t err=%v", taskState, found, err)
+	}
+	interaction, err := service.ReadHumanInteraction(contextWithTimeout(t), notification.InteractionID)
+	if err != nil || interaction.Phase != kernel.HumanInteractionClosed || len(interaction.Responses) != 1 {
+		t.Fatalf("human interaction=%+v err=%v", interaction, err)
+	}
+	notifications, err := service.HumanNotifications(contextWithTimeout(t), participant, false)
+	if err != nil || len(notifications) != 1 || notifications[0].InteractionID != notification.InteractionID {
+		t.Fatalf("human notifications=%+v err=%v", notifications, err)
 	}
 }
 

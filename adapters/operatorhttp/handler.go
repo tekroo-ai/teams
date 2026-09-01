@@ -41,6 +41,8 @@ type Service interface {
 	ReadFeature(context.Context, kernel.UUIDv7) (organization.FeatureRequest, bool, error)
 	ApplyFeaturePlan(context.Context, kernel.UUIDv7, uint64, organization.FeaturePlan) (organization.FeatureRequest, error)
 	AcceptFeature(context.Context, kernel.UUIDv7, uint64, kernel.PrincipalRef, string) (organization.FeatureRequest, error)
+	RegisterHumanParticipant(context.Context, kernel.PrincipalRef, organization.HumanParticipantRegistration) (kernel.HumanParticipantSnapshot, error)
+	AskHuman(context.Context, kernel.PrincipalRef, organization.HumanQuestionRequest) (organization.HumanNotification, error)
 }
 
 type OrganizationalService interface {
@@ -119,6 +121,10 @@ func (handler *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Requ
 		handler.roles(writer, request)
 	case request.Method == http.MethodPost && request.URL.Path == "/v1/features":
 		handler.submitFeature(writer, request)
+	case request.Method == http.MethodPost && request.URL.Path == "/v1/humans":
+		handler.registerHuman(writer, request)
+	case request.Method == http.MethodPost && request.URL.Path == "/v1/human-questions":
+		handler.askHuman(writer, request)
 	case request.Method == http.MethodPost && strings.HasPrefix(request.URL.Path, "/v1/features/") && strings.HasSuffix(request.URL.Path, "/plan"):
 		handler.applyFeaturePlan(writer, request, strings.TrimSuffix(strings.TrimPrefix(request.URL.Path, "/v1/features/"), "/plan"))
 	case request.Method == http.MethodPost && strings.HasPrefix(request.URL.Path, "/v1/features/") && strings.HasSuffix(request.URL.Path, "/accept"):
@@ -140,6 +146,34 @@ func (handler *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Requ
 	default:
 		writeError(writer, http.StatusNotFound, "NOT_FOUND")
 	}
+}
+
+func (handler *Handler) registerHuman(writer http.ResponseWriter, request *http.Request) {
+	var input organization.HumanParticipantRegistration
+	if err := decodeBody(writer, request, handler.maxBody, &input); err != nil || !input.Valid() {
+		writeError(writer, http.StatusBadRequest, "INVALID_HUMAN_REGISTRATION")
+		return
+	}
+	participant, err := handler.service.RegisterHumanParticipant(request.Context(), handler.principal, input)
+	if err != nil {
+		writeError(writer, http.StatusConflict, "HUMAN_REGISTRATION_REJECTED")
+		return
+	}
+	writeJSON(writer, http.StatusCreated, participant)
+}
+
+func (handler *Handler) askHuman(writer http.ResponseWriter, request *http.Request) {
+	var input organization.HumanQuestionRequest
+	if err := decodeBody(writer, request, handler.maxBody, &input); err != nil {
+		writeError(writer, http.StatusBadRequest, "INVALID_HUMAN_QUESTION")
+		return
+	}
+	notification, err := handler.service.AskHuman(request.Context(), handler.principal, input)
+	if err != nil {
+		writeError(writer, http.StatusConflict, "HUMAN_QUESTION_REJECTED")
+		return
+	}
+	writeJSON(writer, http.StatusCreated, notification)
 }
 
 func (handler *Handler) submitFeature(writer http.ResponseWriter, request *http.Request) {

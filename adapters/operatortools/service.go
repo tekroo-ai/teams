@@ -41,6 +41,11 @@ type Organization interface {
 	ReadFeature(context.Context, kernel.UUIDv7) (organization.FeatureRequest, bool, error)
 	ApplyFeaturePlan(context.Context, kernel.UUIDv7, uint64, organization.FeaturePlan) (organization.FeatureRequest, error)
 	AcceptFeature(context.Context, kernel.UUIDv7, uint64, kernel.PrincipalRef, string) (organization.FeatureRequest, error)
+	RegisterHumanParticipant(context.Context, kernel.PrincipalRef, organization.HumanParticipantRegistration) (kernel.HumanParticipantSnapshot, error)
+	AskHuman(context.Context, kernel.PrincipalRef, organization.HumanQuestionRequest) (organization.HumanNotification, error)
+	RespondToHumanQuestion(context.Context, kernel.PrincipalRef, organization.HumanResponseInput) (organization.HumanNotification, error)
+	ReadHumanInteraction(context.Context, kernel.UUIDv7) (kernel.HumanInteractionSnapshot, error)
+	HumanNotifications(context.Context, kernel.PrincipalRef, bool) ([]organization.HumanNotification, error)
 }
 
 // Service translates focused operator operations into domain calls while the
@@ -160,6 +165,49 @@ func (service *Service) CallTool(ctx context.Context, identity protocol.Authenti
 			return nil, ErrInvalidArguments
 		}
 		return service.organization.AcceptFeature(ctx, input.ID, input.ExpectedRevision, identity.Principal, input.NoReleaseReason)
+	case mcp.HumanRegisterToolName:
+		var input organization.HumanParticipantRegistration
+		if err := decodeStrict(arguments, &input); err != nil || !input.Valid() {
+			return nil, ErrInvalidArguments
+		}
+		return service.organization.RegisterHumanParticipant(ctx, identity.Principal, input)
+	case mcp.HumanAskToolName:
+		var input organization.HumanQuestionRequest
+		if err := decodeStrict(arguments, &input); err != nil {
+			return nil, ErrInvalidArguments
+		}
+		return service.organization.AskHuman(ctx, identity.Principal, input)
+	case mcp.HumanNotificationsName:
+		var input struct {
+			OpenOnly bool `json:"open_only,omitempty"`
+		}
+		if err := decodeStrict(arguments, &input); err != nil {
+			return nil, ErrInvalidArguments
+		}
+		return service.organization.HumanNotifications(ctx, identity.Principal, input.OpenOnly)
+	case mcp.HumanRespondToolName:
+		var input organization.HumanResponseInput
+		if err := decodeStrict(arguments, &input); err != nil || !input.Valid() {
+			return nil, ErrInvalidArguments
+		}
+		return service.organization.RespondToHumanQuestion(ctx, identity.Principal, input)
+	case mcp.HumanInteractionName:
+		var input struct {
+			ID kernel.UUIDv7 `json:"interaction_id"`
+		}
+		if err := decodeStrict(arguments, &input); err != nil || !input.ID.Valid() {
+			return nil, ErrInvalidArguments
+		}
+		interaction, err := service.organization.ReadHumanInteraction(ctx, input.ID)
+		if err != nil {
+			return nil, err
+		}
+		if interaction.OriginPrincipal != identity.Principal {
+			if _, selected := interaction.Selected(identity.Principal); !selected {
+				return nil, ErrNotFound
+			}
+		}
+		return interaction, nil
 	case mcp.RolesListToolName:
 		var input struct{}
 		if err := decodeStrict(arguments, &input); err != nil {

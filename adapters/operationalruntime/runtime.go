@@ -42,6 +42,7 @@ type Config struct {
 // current Teams authority, kernel command handling, OpenHands execution,
 // immutable evidence, and durable reconciliation.
 type Runtime struct {
+	catalogue   kernel.CatalogueSnapshot
 	handler     *application.Handler
 	coordinator *application.OperationalExecutionCoordinator
 	worker      *executionruntime.Worker
@@ -100,7 +101,7 @@ func New(ctx context.Context, config Config) (*Runtime, error) {
 		_ = feed.Close(context.WithoutCancel(ctx))
 		return nil, err
 	}
-	return &Runtime{handler: handler, coordinator: coordinator, worker: worker, feed: feed, evidence: blobs}, nil
+	return &Runtime{catalogue: config.Catalogue, handler: handler, coordinator: coordinator, worker: worker, feed: feed, evidence: blobs}, nil
 }
 
 func (runtime *Runtime) ReadExecutionOutput(ctx context.Context, digest kernel.Digest) ([]byte, error) {

@@ -91,7 +91,13 @@ func run(arguments []string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	authenticator, err := httpapi.NewStaticBearerAuthenticator(token, service.OperatorIdentity())
+	credentials := service.HumanTransportCredentials()
+	bearerBindings := make([]httpapi.BearerBinding, 0, len(credentials)+1)
+	bearerBindings = append(bearerBindings, httpapi.BearerBinding{Token: token, Identity: service.OperatorIdentity()})
+	for _, credential := range credentials {
+		bearerBindings = append(bearerBindings, httpapi.BearerBinding{Token: credential.Token, Identity: protocol.AuthenticatedContext{Principal: credential.Principal}})
+	}
+	authenticator, err := httpapi.NewMultiStaticBearerAuthenticator(bearerBindings)
 	if err != nil {
 		return err
 	}

@@ -30,6 +30,11 @@ const (
 	FeatureGetToolName     = "tekroo.feature.get"
 	FeaturePlanToolName    = "tekroo.feature.plan.apply"
 	FeatureAcceptToolName  = "tekroo.feature.accept"
+	HumanRegisterToolName  = "tekroo.human.participant.register"
+	HumanAskToolName       = "tekroo.human.question.ask"
+	HumanNotificationsName = "tekroo.human.notifications.list"
+	HumanRespondToolName   = "tekroo.human.response.record"
+	HumanInteractionName   = "tekroo.human.interaction.get"
 	StatusToolName         = "tekroo.status.get"
 	TaskGetToolName        = "tekroo.task.get"
 	StoryGetToolName       = "tekroo.story.get"
@@ -374,6 +379,11 @@ func organizationalTools() []any {
 		map[string]any{"name": FeatureGetToolName, "title": "Inspect feature request", "description": "Read the canonical feature workflow and finite plan.", "inputSchema": object([]string{"feature_id"}, map[string]any{"feature_id": uuid})},
 		map[string]any{"name": FeaturePlanToolName, "title": "Apply reviewed feature plan", "description": "Materialize a finite reviewed story/task DAG.", "inputSchema": map[string]any{"$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object"}},
 		map[string]any{"name": FeatureAcceptToolName, "title": "Accept completed feature without a code release", "description": "Apply the submitting human's acceptance to a completed, independently reviewed feature and record an explicit reason that no repository release is required.", "inputSchema": object([]string{"feature_id", "expected_revision", "no_release_reason"}, map[string]any{"feature_id": uuid, "expected_revision": map[string]any{"type": "integer", "minimum": 1}, "no_release_reason": map[string]any{"type": "string", "minLength": 1, "maxLength": 4096}})},
+		map[string]any{"name": HumanRegisterToolName, "title": "Register human participant", "description": "Bind an exact authenticated human participant to a scoped role and delivery channel.", "inputSchema": map[string]any{"$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object"}},
+		map[string]any{"name": HumanAskToolName, "title": "Ask a human participant", "description": "Deliver one bounded question to an exact participant and block the subject task until its authenticated response.", "inputSchema": map[string]any{"$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object"}},
+		map[string]any{"name": HumanNotificationsName, "title": "List my human notifications", "description": "List durable questions addressed to the authenticated human participant.", "inputSchema": object(nil, map[string]any{"open_only": map[string]any{"type": "boolean"}})},
+		map[string]any{"name": HumanRespondToolName, "title": "Respond to human question", "description": "Record the authenticated participant's response and resume the exact blocked task.", "inputSchema": map[string]any{"$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object"}},
+		map[string]any{"name": HumanInteractionName, "title": "Inspect human interaction", "description": "Read one canonical human-interaction aggregate.", "inputSchema": object([]string{"interaction_id"}, map[string]any{"interaction_id": uuid})},
 		map[string]any{"name": StatusToolName, "title": "Inspect team runtime", "description": "Read current tekrood control and liveness state.", "inputSchema": object(nil, map[string]any{})},
 		map[string]any{"name": TaskGetToolName, "title": "Inspect task", "description": "Read one canonical task projection, assignment, scope, budget, and latest invocation.", "inputSchema": object([]string{"task_id"}, map[string]any{"task_id": uuid})},
 		map[string]any{"name": StoryGetToolName, "title": "Inspect story", "description": "Read one canonical story projection and its task DAG.", "inputSchema": object([]string{"story_id"}, map[string]any{"story_id": uuid})},

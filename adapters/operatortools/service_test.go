@@ -96,3 +96,18 @@ func (*fakeOrganization) ApplyFeaturePlan(context.Context, kernel.UUIDv7, uint64
 func (*fakeOrganization) AcceptFeature(context.Context, kernel.UUIDv7, uint64, kernel.PrincipalRef, string) (organization.FeatureRequest, error) {
 	return organization.FeatureRequest{}, nil
 }
+func (*fakeOrganization) RegisterHumanParticipant(context.Context, kernel.PrincipalRef, organization.HumanParticipantRegistration) (kernel.HumanParticipantSnapshot, error) {
+	return kernel.HumanParticipantSnapshot{}, nil
+}
+func (*fakeOrganization) AskHuman(context.Context, kernel.PrincipalRef, organization.HumanQuestionRequest) (organization.HumanNotification, error) {
+	return organization.HumanNotification{}, nil
+}
+func (*fakeOrganization) RespondToHumanQuestion(context.Context, kernel.PrincipalRef, organization.HumanResponseInput) (organization.HumanNotification, error) {
+	return organization.HumanNotification{}, nil
+}
+func (*fakeOrganization) ReadHumanInteraction(context.Context, kernel.UUIDv7) (kernel.HumanInteractionSnapshot, error) {
+	return kernel.HumanInteractionSnapshot{}, nil
+}
+func (*fakeOrganization) HumanNotifications(context.Context, kernel.PrincipalRef, bool) ([]organization.HumanNotification, error) {
+	return nil, nil
+}

@@ -79,11 +79,22 @@ type ProductionOpenHandsConfig struct {
 }
 
 type ProductionOperatorConfig struct {
-	Address          string              `json:"address"`
-	BearerTokenFile  string              `json:"bearer_token_file"`
-	Principal        kernel.PrincipalRef `json:"principal"`
-	OperationTimeout string              `json:"operation_timeout"`
-	MaximumBodyBytes int64               `json:"maximum_body_bytes"`
+	Address          string                      `json:"address"`
+	BearerTokenFile  string                      `json:"bearer_token_file"`
+	Principal        kernel.PrincipalRef         `json:"principal"`
+	HumanCredentials []ProductionHumanCredential `json:"human_credentials,omitempty"`
+	OperationTimeout string                      `json:"operation_timeout"`
+	MaximumBodyBytes int64                       `json:"maximum_body_bytes"`
+}
+
+type ProductionHumanCredential struct {
+	Principal       kernel.PrincipalRef `json:"principal"`
+	BearerTokenFile string              `json:"bearer_token_file"`
+}
+
+type HumanTransportCredential struct {
+	Principal kernel.PrincipalRef
+	Token     string
 }
 
 type ProductionWorkspace struct {
@@ -160,6 +171,7 @@ type resolvedProductionConfig struct {
 	mongoURI              string
 	sessionAPIKey         string
 	operatorBearerToken   string
+	humanCredentials      []HumanTransportCredential
 	authorizationPolicy   kernel.AuthorizationPolicy
 	provenance            kernel.ProvenanceBasis
 	requestTimeout        time.Duration
@@ -203,6 +215,9 @@ func LoadProductionConfig(path string) (ProductionConfig, error) {
 	config.Mongo.URIFile = absoluteFrom(base, config.Mongo.URIFile)
 	config.OpenHands.SessionAPIKeyFile = absoluteFrom(base, config.OpenHands.SessionAPIKeyFile)
 	config.Operator.BearerTokenFile = absoluteFrom(base, config.Operator.BearerTokenFile)
+	for index := range config.Operator.HumanCredentials {
+		config.Operator.HumanCredentials[index].BearerTokenFile = absoluteFrom(base, config.Operator.HumanCredentials[index].BearerTokenFile)
+	}
 	config.AuthorizationPolicyFile = absoluteFrom(base, config.AuthorizationPolicyFile)
 	config.ProvenanceFile = absoluteFrom(base, config.ProvenanceFile)
 	config.EvidenceRoot = absoluteFrom(base, config.EvidenceRoot)
@@ -243,6 +258,25 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 	operatorToken, err := readSecret(config.Operator.BearerTokenFile)
 	if err != nil || len(operatorToken) < 32 {
 		return resolvedProductionConfig{}, invalidConfig("operator bearer token file must contain at least 32 characters")
+	}
+	humanCredentials := make([]HumanTransportCredential, len(config.Operator.HumanCredentials))
+	seenHumans := make(map[string]struct{}, len(humanCredentials))
+	seenTokens := map[kernel.Digest]struct{}{digestBytes([]byte(operatorToken)): {}}
+	for index, credential := range config.Operator.HumanCredentials {
+		token, tokenErr := readSecret(credential.BearerTokenFile)
+		tokenDigest := digestBytes([]byte(token))
+		if tokenErr != nil || len(token) < 32 || credential.Principal.Kind != kernel.PrincipalHuman || !credential.Principal.Valid() || credential.Principal == config.Operator.Principal {
+			return resolvedProductionConfig{}, invalidConfig("human transport credential is invalid")
+		}
+		if _, duplicate := seenHumans[credential.Principal.ID]; duplicate {
+			return resolvedProductionConfig{}, invalidConfig("human transport principal is duplicated")
+		}
+		if _, duplicate := seenTokens[tokenDigest]; duplicate {
+			return resolvedProductionConfig{}, invalidConfig("human transport credential is duplicated")
+		}
+		seenHumans[credential.Principal.ID] = struct{}{}
+		seenTokens[tokenDigest] = struct{}{}
+		humanCredentials[index] = HumanTransportCredential{Principal: credential.Principal, Token: token}
 	}
 	requestTimeout, err := positiveDuration("openhands.request_timeout", config.OpenHands.RequestTimeout)
 	if err != nil {
@@ -343,7 +377,7 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 	if err := readStrictJSONFile(config.ProvenanceFile, &provenance); err != nil || !provenance.Valid() || provenance.PolicyDigest != policy.PolicyDigest || provenance.PolicyRevision != policy.Revision {
 		return resolvedProductionConfig{}, invalidConfig("provenance file is invalid or does not bind the authorization policy")
 	}
-	return resolvedProductionConfig{ProductionConfig: config, mongoURI: mongoURI, sessionAPIKey: sessionKey, operatorBearerToken: operatorToken, authorizationPolicy: policy, provenance: provenance, requestTimeout: requestTimeout, pollInterval: pollInterval, operationTimeout: operationTimeout, leaseDuration: leaseDuration, reconciliation: reconciliation, leaseOperationTimeout: leaseOperationTimeout, projectionInterval: projectionInterval, projectionTimeout: projectionTimeout, operatorTimeout: operatorTimeout, team: team, roleReconciliation: roleReconciliation, planningDeadline: planningDeadline}, nil
+	return resolvedProductionConfig{ProductionConfig: config, mongoURI: mongoURI, sessionAPIKey: sessionKey, operatorBearerToken: operatorToken, humanCredentials: humanCredentials, authorizationPolicy: policy, provenance: provenance, requestTimeout: requestTimeout, pollInterval: pollInterval, operationTimeout: operationTimeout, leaseDuration: leaseDuration, reconciliation: reconciliation, leaseOperationTimeout: leaseOperationTimeout, projectionInterval: projectionInterval, projectionTimeout: projectionTimeout, operatorTimeout: operatorTimeout, team: team, roleReconciliation: roleReconciliation, planningDeadline: planningDeadline}, nil
 }
 
 // ProductionService owns the Mongo store, assembled runtime, and lifecycle
@@ -372,6 +406,7 @@ type ProductionService struct {
 	provenance             kernel.ProvenanceBasis
 	operatorToken          string
 	operatorIdentity       protocol.AuthenticatedContext
+	humanCredentials       []HumanTransportCredential
 	operatorTimeout        time.Duration
 	operatorMaxBody        int64
 	roleReconciliation     time.Duration
@@ -467,7 +502,7 @@ func NewProductionService(ctx context.Context, config ProductionConfig) (*Produc
 	for _, workspace := range config.Workspaces {
 		workspacesByID[workspace.WorkspaceID] = workspace
 	}
-	service := &ProductionService{Store: store, Runtime: runtime, Controller: controller, RoleHost: roleHost, RoleRuntime: roleRuntime, MessageBus: messageBus, RoleInbox: roleInbox, projectionInterval: resolved.projectionInterval, projectionTimeout: resolved.projectionTimeout, recoveryInterval: resolved.reconciliation, recoveryTimeout: resolved.leaseOperationTimeout, recoveryAttempts: config.Worker.MaximumReconciliations, failures: make(chan error, 4), provenance: resolved.provenance, operatorToken: resolved.operatorBearerToken, operatorIdentity: protocol.AuthenticatedContext{Principal: config.Operator.Principal}, operatorTimeout: resolved.operatorTimeout, operatorMaxBody: config.Operator.MaximumBodyBytes, roleReconciliation: resolved.roleReconciliation, roleMaximumRestarts: config.Organization.MaximumRestarts, messageMaximumAttempts: config.Organization.MaximumDeliveryAttempts, clock: clock, ids: ids, planningDeadline: resolved.planningDeadline, planning: config.Planning, profilesByModel: profilesByModel, workspacesByID: workspacesByID, serviceAuthority: config.ServiceAuthority, policyAuthority: config.ExpiryAuthority}
+	service := &ProductionService{Store: store, Runtime: runtime, Controller: controller, RoleHost: roleHost, RoleRuntime: roleRuntime, MessageBus: messageBus, RoleInbox: roleInbox, projectionInterval: resolved.projectionInterval, projectionTimeout: resolved.projectionTimeout, recoveryInterval: resolved.reconciliation, recoveryTimeout: resolved.leaseOperationTimeout, recoveryAttempts: config.Worker.MaximumReconciliations, failures: make(chan error, 4), provenance: resolved.provenance, operatorToken: resolved.operatorBearerToken, operatorIdentity: protocol.AuthenticatedContext{Principal: config.Operator.Principal}, humanCredentials: append([]HumanTransportCredential(nil), resolved.humanCredentials...), operatorTimeout: resolved.operatorTimeout, operatorMaxBody: config.Operator.MaximumBodyBytes, roleReconciliation: resolved.roleReconciliation, roleMaximumRestarts: config.Organization.MaximumRestarts, messageMaximumAttempts: config.Organization.MaximumDeliveryAttempts, clock: clock, ids: ids, planningDeadline: resolved.planningDeadline, planning: config.Planning, profilesByModel: profilesByModel, workspacesByID: workspacesByID, serviceAuthority: config.ServiceAuthority, policyAuthority: config.ExpiryAuthority}
 	features, err := organization.NewFeatureCoordinator(store, roleHost, service, clock, ids)
 	if err != nil {
 		return fail(err)
@@ -577,6 +612,13 @@ func (service *ProductionService) OperatorIdentity() protocol.AuthenticatedConte
 		return protocol.AuthenticatedContext{}
 	}
 	return service.operatorIdentity
+}
+
+func (service *ProductionService) HumanTransportCredentials() []HumanTransportCredential {
+	if service == nil {
+		return nil
+	}
+	return append([]HumanTransportCredential(nil), service.humanCredentials...)
 }
 
 func (service *ProductionService) RoleRoster(ctx context.Context) ([]organization.RoleInstanceState, error) {

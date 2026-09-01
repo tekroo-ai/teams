@@ -89,6 +89,12 @@ func run(arguments []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		method, path, body, err = loadFeaturePlan(operands, stdin, config.Operator.MaximumBodyBytes)
 	case "feature-accept":
 		method, path, body, err = featureAccept(operands)
+	case "human-register":
+		method, path = http.MethodPost, "/v1/humans"
+		body, err = loadHumanRegistration(operands, stdin, config.Operator.MaximumBodyBytes)
+	case "human-ask":
+		method, path = http.MethodPost, "/v1/human-questions"
+		body, err = loadHumanQuestion(operands, stdin, config.Operator.MaximumBodyBytes)
 	case "role":
 		method, path, err = roleOperation(operands)
 	case "inbox":
@@ -196,6 +202,30 @@ func loadFeature(operands []string, stdin io.Reader, maximum int64) ([]byte, err
 	var input organization.FeatureRequestInput
 	if err := strictDocument(raw, &input); err != nil || input.Validate() != nil {
 		return nil, errors.New("feature request document is invalid")
+	}
+	return raw, nil
+}
+
+func loadHumanRegistration(operands []string, stdin io.Reader, maximum int64) ([]byte, error) {
+	raw, err := loadDocument(operands, stdin, maximum)
+	if err != nil {
+		return nil, err
+	}
+	var input organization.HumanParticipantRegistration
+	if err := strictDocument(raw, &input); err != nil || !input.Valid() {
+		return nil, errors.New("human registration document is invalid")
+	}
+	return raw, nil
+}
+
+func loadHumanQuestion(operands []string, stdin io.Reader, maximum int64) ([]byte, error) {
+	raw, err := loadDocument(operands, stdin, maximum)
+	if err != nil {
+		return nil, err
+	}
+	var input organization.HumanQuestionRequest
+	if err := strictDocument(raw, &input); err != nil {
+		return nil, errors.New("human question document is invalid")
 	}
 	return raw, nil
 }
@@ -355,5 +385,5 @@ func loadCommand(operands []string, stdin io.Reader, maximum int64) ([]byte, ker
 }
 
 func usageError() error {
-	return errors.New("usage: tekroo -config CONFIG health|status|pause|resume|stop|feature FILE|-|feature-status ID|feature-plan ID FILE|-|feature-accept ID REVISION NO_RELEASE_REASON|roles|role ACTOR start|stop|restart|pause|resume|inbox ACTOR|message FILE|-|message-status ID|message-trace THREAD_ID|deadletters [ACTOR]|task ID|story ID|invocation ID|submit FILE|-|cancel INVOCATION_ID FILE|-")
+	return errors.New("usage: tekroo -config CONFIG health|status|pause|resume|stop|feature FILE|-|feature-status ID|feature-plan ID FILE|-|feature-accept ID REVISION NO_RELEASE_REASON|human-register FILE|-|human-ask FILE|-|roles|role ACTOR start|stop|restart|pause|resume|inbox ACTOR|message FILE|-|message-status ID|message-trace THREAD_ID|deadletters [ACTOR]|task ID|story ID|invocation ID|submit FILE|-|cancel INVOCATION_ID FILE|-")
 }

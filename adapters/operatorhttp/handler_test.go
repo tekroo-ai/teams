@@ -179,6 +179,14 @@ func (service *operatorService) AcceptFeature(context.Context, kernel.UUIDv7, ui
 	return organization.FeatureRequest{ID: "00000000-0000-7000-8000-000000000005"}, nil
 }
 
+func (service *operatorService) RegisterHumanParticipant(context.Context, kernel.PrincipalRef, organization.HumanParticipantRegistration) (kernel.HumanParticipantSnapshot, error) {
+	return kernel.HumanParticipantSnapshot{}, nil
+}
+
+func (service *operatorService) AskHuman(context.Context, kernel.PrincipalRef, organization.HumanQuestionRequest) (organization.HumanNotification, error) {
+	return organization.HumanNotification{}, nil
+}
+
 func (service *operatorService) RoleRoster(context.Context) ([]organization.RoleInstanceState, error) {
 	return []organization.RoleInstanceState{}, nil
 }
