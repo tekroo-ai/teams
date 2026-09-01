@@ -413,8 +413,8 @@ func (client *Client) Inspect(ctx context.Context, brief application.ExecutionBr
 		return application.ExternalExecutionObservation{}, ErrProtocol
 	}
 	currentPromptIndex := promptIndex(events, prepared.prompt)
-	if command, violated := shellDisciplineViolation(events, currentPromptIndex); violated {
-		return client.failForExecutionPolicyViolation(ctx, brief, requestDigest, info, events, "SHELL_DISCIPLINE_VIOLATION", command)
+	if violation, violated := shellDisciplineViolation(events, currentPromptIndex); violated {
+		return client.correctShellDisciplineViolation(ctx, brief, requestDigest, info, events, currentPromptIndex, violation)
 	}
 	if progressGuardApplies(brief) {
 		discoveryActions, mutationObserved := repositoryProgress(events, currentPromptIndex)
@@ -477,17 +477,39 @@ func (client *Client) ReconcileSuperseded(ctx context.Context, brief application
 	return client.observationAt(brief, originalRequestDigest, info, events, index, interrupted)
 }
 
-func shellDisciplineViolation(events []rawEvent, promptIndex int) (string, bool) {
+const shellDisciplineCorrectionPrefix = "TEKROO_SHELL_DISCIPLINE_CORRECTION:"
+
+func shellDisciplineViolation(events []rawEvent, promptIndex int) (rawEvent, bool) {
 	for index, event := range events {
 		if index <= promptIndex || event.Kind != "ActionEvent" || event.Source != "agent" || event.ToolName != "terminal" {
 			continue
 		}
 		command := strings.TrimSpace(event.ActionCommand)
-		if violatesShellDiscipline(command) {
-			return command, true
+		if violatesShellDiscipline(command) && !shellDisciplineViolationCorrected(events, index, event.ID) {
+			return event, true
 		}
 	}
-	return "", false
+	return rawEvent{}, false
+}
+
+func shellDisciplineViolationCorrected(events []rawEvent, violationIndex int, violationID string) bool {
+	marker := shellDisciplineCorrectionPrefix + violationID
+	for index := violationIndex + 1; index < len(events); index++ {
+		if events[index].Kind == "MessageEvent" && events[index].Source == "user" && strings.Contains(events[index].Text, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+func shellDisciplineCorrectionCount(events []rawEvent, promptIndex int) int {
+	count := 0
+	for index, event := range events {
+		if index > promptIndex && event.Kind == "MessageEvent" && event.Source == "user" && strings.Contains(event.Text, shellDisciplineCorrectionPrefix) {
+			count++
+		}
+	}
+	return count
 }
 
 func violatesShellDiscipline(command string) bool {
@@ -555,6 +577,43 @@ func (client *Client) failForExecutionPolicyViolation(ctx context.Context, brief
 	observation.Retryable = true
 	observation.Output = output
 	return observation, nil
+}
+
+func (client *Client) correctShellDisciplineViolation(ctx context.Context, brief application.ExecutionBrief, requestDigest kernel.Digest, info conversationInfo, events []rawEvent, promptIndex int, violation rawEvent) (application.ExternalExecutionObservation, error) {
+	if shellDisciplineCorrectionCount(events, promptIndex) > 0 {
+		return client.failForExecutionPolicyViolation(ctx, brief, requestDigest, info, events, "REPEATED_SHELL_DISCIPLINE_VIOLATION", strings.TrimSpace(violation.ActionCommand))
+	}
+	conversationID := string(brief.InvocationID)
+	if executionStillActive(info.ExecutionStatus) {
+		status, _, err := client.request(ctx, http.MethodPost, "/api/conversations/"+url.PathEscape(conversationID)+"/interrupt", nil)
+		if err != nil || status != http.StatusOK && status != http.StatusNoContent && status != http.StatusConflict {
+			return application.ExternalExecutionObservation{}, ErrProtocol
+		}
+	}
+	if refreshed, refreshedStatus, err := client.getConversation(ctx, conversationID); err == nil && refreshedStatus == http.StatusOK {
+		info = refreshed
+	}
+	if refreshed, err := client.events(ctx, conversationID); err == nil {
+		events = refreshed
+	}
+	if shellDisciplineViolationCorrected(events, promptIndex, violation.ID) {
+		return client.observation(brief, requestDigest, info, events, false)
+	}
+	correction := shellDisciplineCorrectionPrefix + violation.ID + "\nThe previous terminal action was rejected because it combined shell commands. Continue this same task, but issue exactly one command in each terminal action. Do not use cd, pipes, semicolons, &&, command substitution, environment-variable expansion, or embedded newlines. Split discovery and file inspection into separate actions."
+	status, _, err := client.request(ctx, http.MethodPost, "/api/conversations/"+url.PathEscape(conversationID)+"/events", map[string]any{
+		"role": "user", "run": true,
+		"content": []map[string]any{{"type": "text", "text": correction}},
+	})
+	if err != nil || status != http.StatusOK {
+		return application.ExternalExecutionObservation{}, ErrProtocol
+	}
+	if refreshed, refreshedStatus, refreshErr := client.getConversation(ctx, conversationID); refreshErr == nil && refreshedStatus == http.StatusOK {
+		info = refreshed
+	}
+	if refreshed, refreshErr := client.events(ctx, conversationID); refreshErr == nil {
+		events = refreshed
+	}
+	return client.observation(brief, requestDigest, info, events, false)
 }
 
 func progressGuardApplies(brief application.ExecutionBrief) bool {

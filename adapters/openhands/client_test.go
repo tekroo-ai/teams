@@ -345,34 +345,31 @@ func TestClientProgressGuardRequiresSuccessfulMutationObservation(t *testing.T) 
 	}
 }
 
-func TestClientInterruptsCompoundShellAction(t *testing.T) {
+func TestClientCorrectsOneCompoundShellActionInsideTheInvocation(t *testing.T) {
 	brief, digest := openHandsTestBrief(t)
 	workspace := filepath.Join(t.TempDir(), "workspace")
-	tests := []struct {
-		name          string
-		terminal      bool
-		wantInterrupt int
-	}{
-		{name: "active", wantInterrupt: 1},
-		{name: "already terminal", terminal: true},
+	events := []map[string]any{
+		event("evt-user", "MessageEvent", "user", string(mustJSON(brief))),
+		actionEvent("compound-action", "terminal", "rg -n name . | head"),
+		observationEvent("compound-observation", "terminal", false, 0),
 	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			events := []map[string]any{
-				event("evt-user", "MessageEvent", "user", string(mustJSON(brief))),
-				actionEvent("compound-action", "terminal", "cd /tmp && rg -n name . | head"),
-				observationEvent("compound-observation", "terminal", false, 0),
-			}
-			state := &progressGuardServerState{prompt: string(mustJSON(brief)), workspace: workspace, events: events, terminal: test.terminal}
-			server := httptest.NewServer(http.HandlerFunc(state.serveHTTP))
-			defer server.Close()
-			client := newOpenHandsTestClient(t, server.URL, workspace, brief)
+	state := &progressGuardServerState{prompt: string(mustJSON(brief)), workspace: workspace, events: events}
+	server := httptest.NewServer(http.HandlerFunc(state.serveHTTP))
+	defer server.Close()
+	client := newOpenHandsTestClient(t, server.URL, workspace, brief)
 
-			observation, err := client.Inspect(context.Background(), brief, string(brief.InvocationID), digest)
-			if err != nil || observation.State != application.ExternalFailed || !observation.Retryable || state.interruptCalls != test.wantInterrupt || !strings.Contains(string(observation.Output), "SHELL_DISCIPLINE_VIOLATION") {
-				t.Fatalf("observation=%#v err=%v interrupts=%d", observation, err, state.interruptCalls)
-			}
-		})
+	observation, err := client.Inspect(context.Background(), brief, string(brief.InvocationID), digest)
+	if err != nil || observation.State != application.ExternalRunning || state.interruptCalls != 1 || state.correctionCalls != 1 {
+		t.Fatalf("observation=%#v err=%v interrupts=%d corrections=%d", observation, err, state.interruptCalls, state.correctionCalls)
+	}
+	if !strings.Contains(state.correctionText, shellDisciplineCorrectionPrefix+"compound-action") || !strings.Contains(state.correctionText, "exactly one command") {
+		t.Fatalf("correction text = %q", state.correctionText)
+	}
+
+	state.events = append(state.events, actionEvent("second-compound-action", "terminal", "rg --files && pwd"))
+	observation, err = client.Inspect(context.Background(), brief, string(brief.InvocationID), digest)
+	if err != nil || observation.State != application.ExternalFailed || !observation.Retryable || state.correctionCalls != 1 || !strings.Contains(string(observation.Output), "REPEATED_SHELL_DISCIPLINE_VIOLATION") {
+		t.Fatalf("repeated observation=%#v err=%v corrections=%d", observation, err, state.correctionCalls)
 	}
 }
 
@@ -421,11 +418,13 @@ func TestClientReconcilesSupersededBriefWithoutNewModelCall(t *testing.T) {
 }
 
 type progressGuardServerState struct {
-	prompt         string
-	workspace      string
-	events         []map[string]any
-	interruptCalls int
-	terminal       bool
+	prompt          string
+	workspace       string
+	events          []map[string]any
+	interruptCalls  int
+	correctionCalls int
+	correctionText  string
+	terminal        bool
 }
 
 func (state *progressGuardServerState) serveHTTP(writer http.ResponseWriter, request *http.Request) {
@@ -444,6 +443,20 @@ func (state *progressGuardServerState) serveHTTP(writer http.ResponseWriter, req
 	case request.Method == http.MethodPost && request.URL.Path == "/api/conversations/"+conversationID+"/interrupt":
 		state.interruptCalls++
 		writer.WriteHeader(http.StatusNoContent)
+	case request.Method == http.MethodPost && request.URL.Path == "/api/conversations/"+conversationID+"/events":
+		var payload struct {
+			Content []struct {
+				Text string `json:"text"`
+			} `json:"content"`
+		}
+		if json.NewDecoder(request.Body).Decode(&payload) != nil || len(payload.Content) != 1 {
+			writer.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		state.correctionCalls++
+		state.correctionText = payload.Content[0].Text
+		state.events = append(state.events, event("policy-correction", "MessageEvent", "user", state.correctionText))
+		writer.WriteHeader(http.StatusOK)
 	default:
 		writer.WriteHeader(http.StatusNotFound)
 	}
