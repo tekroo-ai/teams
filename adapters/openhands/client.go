@@ -416,6 +416,9 @@ func (client *Client) Inspect(ctx context.Context, brief application.ExecutionBr
 	if violation, violated := shellDisciplineViolation(events, currentPromptIndex); violated {
 		return client.correctShellDisciplineViolation(ctx, brief, requestDigest, info, events, currentPromptIndex, violation)
 	}
+	if violation, violated := repositorySearchLoopViolation(events, currentPromptIndex); violated {
+		return client.correctRepositorySearchLoop(ctx, brief, requestDigest, info, events, currentPromptIndex, violation)
+	}
 	if progressGuardApplies(brief) {
 		discoveryActions, mutationObserved := repositoryProgress(events, currentPromptIndex)
 		discoveryLimit := maximumRepositoryDiscoveryActions
@@ -478,6 +481,7 @@ func (client *Client) ReconcileSuperseded(ctx context.Context, brief application
 }
 
 const shellDisciplineCorrectionPrefix = "TEKROO_SHELL_DISCIPLINE_CORRECTION:"
+const repositoryProgressCorrectionPrefix = "TEKROO_REPOSITORY_PROGRESS_CORRECTION:"
 
 func shellDisciplineViolation(events []rawEvent, promptIndex int) (rawEvent, bool) {
 	for index, event := range events {
@@ -548,6 +552,78 @@ func violatesShellDiscipline(command string) bool {
 	return false
 }
 
+func repositorySearchLoopViolation(events []rawEvent, promptIndex int) (rawEvent, bool) {
+	lastSuccessfulSearch := ""
+	pendingSearch := ""
+	for index, event := range events {
+		if index <= promptIndex {
+			continue
+		}
+		if event.Kind == "ActionEvent" && event.Source == "agent" {
+			signature, search := repositorySearchSignature(event.ActionCommand)
+			if search {
+				if signature == lastSuccessfulSearch && !repositoryProgressViolationCorrected(events, index, event.ID) {
+					return event, true
+				}
+				pendingSearch = signature
+				continue
+			}
+			if repositoryDiscoveryAction(event) {
+				lastSuccessfulSearch = ""
+				pendingSearch = ""
+			}
+			continue
+		}
+		if pendingSearch != "" && event.Kind == "ObservationEvent" && event.ToolName == "terminal" {
+			if !event.ObservationError && !event.ObservationTimeout && (event.ObservationExitCode == nil || *event.ObservationExitCode == 0) && strings.TrimSpace(event.Text) != "" {
+				lastSuccessfulSearch = pendingSearch
+			}
+			pendingSearch = ""
+		}
+	}
+	return rawEvent{}, false
+}
+
+func repositorySearchSignature(command string) (string, bool) {
+	fields := strings.Fields(strings.TrimSpace(command))
+	if len(fields) == 0 || filepath.Base(fields[0]) != "rg" {
+		return "", false
+	}
+	for _, field := range fields[1:] {
+		if field == "--files" {
+			return "rg:--files", true
+		}
+		if strings.HasPrefix(field, "-") {
+			continue
+		}
+		pattern := strings.Trim(field, "\"'")
+		if pattern != "" {
+			return "rg:" + pattern, true
+		}
+	}
+	return "rg", true
+}
+
+func repositoryProgressViolationCorrected(events []rawEvent, violationIndex int, violationID string) bool {
+	marker := repositoryProgressCorrectionPrefix + violationID
+	for index := violationIndex + 1; index < len(events); index++ {
+		if events[index].Kind == "MessageEvent" && events[index].Source == "user" && strings.Contains(events[index].Text, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+func repositoryProgressCorrectionCount(events []rawEvent, promptIndex int) int {
+	count := 0
+	for index, event := range events {
+		if index > promptIndex && event.Kind == "MessageEvent" && event.Source == "user" && strings.Contains(event.Text, repositoryProgressCorrectionPrefix) {
+			count++
+		}
+	}
+	return count
+}
+
 func (client *Client) failForExecutionPolicyViolation(ctx context.Context, brief application.ExecutionBrief, requestDigest kernel.Digest, info conversationInfo, events []rawEvent, reason, command string) (application.ExternalExecutionObservation, error) {
 	conversationID := string(brief.InvocationID)
 	if executionStillActive(info.ExecutionStatus) {
@@ -600,6 +676,43 @@ func (client *Client) correctShellDisciplineViolation(ctx context.Context, brief
 		return client.observation(brief, requestDigest, info, events, false)
 	}
 	correction := shellDisciplineCorrectionPrefix + violation.ID + "\nThe previous terminal action was rejected because it combined shell commands. Continue this same task, but issue exactly one command in each terminal action. Do not use cd, pipes, semicolons, &&, command substitution, environment-variable expansion, or embedded newlines. Split discovery and file inspection into separate actions."
+	status, _, err := client.request(ctx, http.MethodPost, "/api/conversations/"+url.PathEscape(conversationID)+"/events", map[string]any{
+		"role": "user", "run": true,
+		"content": []map[string]any{{"type": "text", "text": correction}},
+	})
+	if err != nil || status != http.StatusOK {
+		return application.ExternalExecutionObservation{}, ErrProtocol
+	}
+	if refreshed, refreshedStatus, refreshErr := client.getConversation(ctx, conversationID); refreshErr == nil && refreshedStatus == http.StatusOK {
+		info = refreshed
+	}
+	if refreshed, refreshErr := client.events(ctx, conversationID); refreshErr == nil {
+		events = refreshed
+	}
+	return client.observation(brief, requestDigest, info, events, false)
+}
+
+func (client *Client) correctRepositorySearchLoop(ctx context.Context, brief application.ExecutionBrief, requestDigest kernel.Digest, info conversationInfo, events []rawEvent, promptIndex int, violation rawEvent) (application.ExternalExecutionObservation, error) {
+	if repositoryProgressCorrectionCount(events, promptIndex) > 0 {
+		return client.failForExecutionPolicyViolation(ctx, brief, requestDigest, info, events, "REPEATED_REPOSITORY_SEARCH", strings.TrimSpace(violation.ActionCommand))
+	}
+	conversationID := string(brief.InvocationID)
+	if executionStillActive(info.ExecutionStatus) {
+		status, _, err := client.request(ctx, http.MethodPost, "/api/conversations/"+url.PathEscape(conversationID)+"/interrupt", nil)
+		if err != nil || status != http.StatusOK && status != http.StatusNoContent && status != http.StatusConflict {
+			return application.ExternalExecutionObservation{}, ErrProtocol
+		}
+	}
+	if refreshed, refreshedStatus, err := client.getConversation(ctx, conversationID); err == nil && refreshedStatus == http.StatusOK {
+		info = refreshed
+	}
+	if refreshed, err := client.events(ctx, conversationID); err == nil {
+		events = refreshed
+	}
+	if repositoryProgressViolationCorrected(events, promptIndex, violation.ID) {
+		return client.observation(brief, requestDigest, info, events, false)
+	}
+	correction := repositoryProgressCorrectionPrefix + violation.ID + "\nThe previous repository search repeated a question that had already returned results. Continue this same task by inspecting one of the files already located and then produce the assigned result. Do not run another repository search in this retry."
 	status, _, err := client.request(ctx, http.MethodPost, "/api/conversations/"+url.PathEscape(conversationID)+"/events", map[string]any{
 		"role": "user", "run": true,
 		"content": []map[string]any{{"type": "text", "text": correction}},
@@ -877,7 +990,7 @@ func decodeEvent(raw json.RawMessage) (rawEvent, error) {
 			text.WriteString(content.Text)
 		}
 	}
-	if envelope.Kind == "ObservationEvent" && envelope.Observation.Kind == "FinishObservation" {
+	if envelope.Kind == "ObservationEvent" {
 		for _, content := range envelope.Observation.Content {
 			if content.Type == "text" {
 				text.WriteString(content.Text)

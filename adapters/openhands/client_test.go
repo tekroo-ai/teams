@@ -373,6 +373,50 @@ func TestClientCorrectsOneCompoundShellActionInsideTheInvocation(t *testing.T) {
 	}
 }
 
+func TestClientCorrectsRepeatedSuccessfulRepositorySearchInsideTheInvocation(t *testing.T) {
+	brief, digest := openHandsTestBrief(t)
+	workspace := filepath.Join(t.TempDir(), "workspace")
+	events := []map[string]any{
+		event("evt-user", "MessageEvent", "user", string(mustJSON(brief))),
+		actionEvent("first-search", "terminal", `rg -n "type.*interface" organization/host.go`),
+		observationEventWithText("first-search-observation", "terminal", false, 0, "organization/host.go:24:type RoleStore interface"),
+		actionEvent("repeated-search", "terminal", `rg -n "type.*interface" organization/*.go`),
+	}
+	state := &progressGuardServerState{prompt: string(mustJSON(brief)), workspace: workspace, events: events}
+	server := httptest.NewServer(http.HandlerFunc(state.serveHTTP))
+	defer server.Close()
+	client := newOpenHandsTestClient(t, server.URL, workspace, brief)
+
+	observation, err := client.Inspect(context.Background(), brief, string(brief.InvocationID), digest)
+	if err != nil || observation.State != application.ExternalRunning || state.interruptCalls != 1 || state.correctionCalls != 1 {
+		t.Fatalf("observation=%#v err=%v interrupts=%d corrections=%d", observation, err, state.interruptCalls, state.correctionCalls)
+	}
+	if !strings.Contains(state.correctionText, repositoryProgressCorrectionPrefix+"repeated-search") || !strings.Contains(state.correctionText, "inspecting one of the files") {
+		t.Fatalf("correction text = %q", state.correctionText)
+	}
+
+	state.events = append(state.events, actionEvent("third-search", "terminal", `rg -n "type.*interface" adapters/*.go`))
+	observation, err = client.Inspect(context.Background(), brief, string(brief.InvocationID), digest)
+	if err != nil || observation.State != application.ExternalFailed || !observation.Retryable || state.correctionCalls != 1 || !strings.Contains(string(observation.Output), "REPEATED_REPOSITORY_SEARCH") {
+		t.Fatalf("repeated observation=%#v err=%v corrections=%d", observation, err, state.correctionCalls)
+	}
+}
+
+func TestRepositorySearchLoopRequiresSuccessfulResultAndNoInterveningInspection(t *testing.T) {
+	events := []rawEvent{
+		{Kind: "MessageEvent", Source: "user"},
+		{ID: "empty-search", Kind: "ActionEvent", Source: "agent", ToolName: "terminal", ActionCommand: `rg -n "Actor" missing/`},
+		{Kind: "ObservationEvent", ToolName: "terminal", ObservationExitCode: intPointer(1)},
+		{ID: "different-search", Kind: "ActionEvent", Source: "agent", ToolName: "terminal", ActionCommand: `rg -n "Actor" organization/`},
+		{Kind: "ObservationEvent", ToolName: "terminal", Text: "organization/host.go:Actor", ObservationExitCode: intPointer(0)},
+		{ID: "inspection", Kind: "ActionEvent", Source: "agent", ToolName: "file_editor", ActionCommand: "view"},
+		{ID: "allowed-repeat", Kind: "ActionEvent", Source: "agent", ToolName: "terminal", ActionCommand: `rg -n "Actor" adapters/`},
+	}
+	if violation, found := repositorySearchLoopViolation(events, 0); found {
+		t.Fatalf("unexpected violation: %+v", violation)
+	}
+}
+
 func TestViolatesShellDisciplineDistinguishesQuotedLiteralsFromOperators(t *testing.T) {
 	tests := []struct {
 		command string
@@ -469,6 +513,12 @@ func actionEvent(id, tool, command string) map[string]any {
 func observationEvent(id, tool string, isError bool, exitCode int) map[string]any {
 	return map[string]any{"id": id, "kind": "ObservationEvent", "source": "environment", "timestamp": "2026-08-31T12:00:02Z", "tool_name": tool, "observation": map[string]any{"kind": "TestObservation", "is_error": isError, "exit_code": exitCode}}
 }
+
+func observationEventWithText(id, tool string, isError bool, exitCode int, text string) map[string]any {
+	return map[string]any{"id": id, "kind": "ObservationEvent", "source": "environment", "timestamp": "2026-08-31T12:00:02Z", "tool_name": tool, "observation": map[string]any{"kind": "TestObservation", "is_error": isError, "exit_code": exitCode, "content": []map[string]any{{"type": "text", "text": text}}}}
+}
+
+func intPointer(value int) *int { return &value }
 
 type openHandsServerState struct {
 	t              *testing.T

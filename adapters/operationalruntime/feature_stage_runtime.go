@@ -278,7 +278,7 @@ func technicalPlanningFailure(output []byte) bool {
 		return false
 	}
 	switch value.Reason {
-	case "EXECUTION_BRIEF_SUPERSEDED", "SHELL_DISCIPLINE_VIOLATION", "REPEATED_SHELL_DISCIPLINE_VIOLATION":
+	case "EXECUTION_BRIEF_SUPERSEDED", "SHELL_DISCIPLINE_VIOLATION", "REPEATED_SHELL_DISCIPLINE_VIOLATION", "REPEATED_REPOSITORY_SEARCH":
 		return true
 	default:
 		return false

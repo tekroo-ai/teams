@@ -178,7 +178,7 @@ func TestRetryableFeaturePlanningInvocation(t *testing.T) {
 }
 
 func TestTechnicalPlanningFailureClassification(t *testing.T) {
-	for _, reason := range []string{"EXECUTION_BRIEF_SUPERSEDED", "SHELL_DISCIPLINE_VIOLATION", "REPEATED_SHELL_DISCIPLINE_VIOLATION"} {
+	for _, reason := range []string{"EXECUTION_BRIEF_SUPERSEDED", "SHELL_DISCIPLINE_VIOLATION", "REPEATED_SHELL_DISCIPLINE_VIOLATION", "REPEATED_REPOSITORY_SEARCH"} {
 		if !technicalPlanningFailure([]byte(`{"reason":"` + reason + `"}`)) {
 			t.Fatalf("technical reason %q was not recognized", reason)
 		}
