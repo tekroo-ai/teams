@@ -260,6 +260,32 @@ func TestClientInterruptsImplementationAfterTwelveReadOnlyRepositoryActions(t *t
 	}
 }
 
+func TestClientInterruptsReadOnlyPlannerAfterTwelveRepositoryActions(t *testing.T) {
+	brief, _ := openHandsTestBrief(t)
+	brief.Purpose = kernel.PurposeReplan
+	brief.RoleGrounding.Permissions = []string{"repository.read"}
+	encoded := mustJSON(brief)
+	hash := sha256.Sum256(encoded)
+	digest := kernel.Digest(hex.EncodeToString(hash[:]))
+	workspace := filepath.Join(t.TempDir(), "workspace")
+	events := []map[string]any{event("evt-user", "MessageEvent", "user", string(encoded))}
+	for index := 0; index < maximumRepositoryDiscoveryActions; index++ {
+		events = append(events,
+			actionEvent(fmt.Sprintf("action-%02d", index), "terminal", "ls adapters"),
+			observationEvent(fmt.Sprintf("observation-%02d", index), "terminal", false, 0),
+		)
+	}
+	state := &progressGuardServerState{prompt: string(encoded), workspace: workspace, events: events}
+	server := httptest.NewServer(http.HandlerFunc(state.serveHTTP))
+	defer server.Close()
+	client := newOpenHandsTestClient(t, server.URL, workspace, brief)
+
+	observation, err := client.Inspect(context.Background(), brief, string(brief.InvocationID), digest)
+	if err != nil || observation.State != application.ExternalFailed || !observation.Retryable || state.interruptCalls != 1 || !strings.Contains(string(observation.Output), "REPOSITORY_DISCOVERY_LIMIT_EXCEEDED") {
+		t.Fatalf("observation=%#v err=%v interrupts=%d", observation, err, state.interruptCalls)
+	}
+}
+
 func TestClientRetryProgressGuardCountsRetainedDiscoveryHistory(t *testing.T) {
 	brief, _ := openHandsTestBrief(t)
 	priorID := kernel.UUIDv7("00000000-0000-7000-8000-000000000200")

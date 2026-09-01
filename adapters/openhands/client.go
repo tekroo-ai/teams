@@ -760,7 +760,15 @@ func (client *Client) correctRepositorySearchLoop(ctx context.Context, brief app
 }
 
 func progressGuardApplies(brief application.ExecutionBrief) bool {
-	return brief.Purpose == kernel.PurposeImplementation || brief.Purpose == kernel.PurposeRepair
+	if brief.Purpose == kernel.PurposeImplementation || brief.Purpose == kernel.PurposeRepair {
+		return true
+	}
+	for _, permission := range brief.RoleGrounding.Permissions {
+		if permission == "repository.edit" {
+			return false
+		}
+	}
+	return true
 }
 
 func executionStillActive(status string) bool {
