@@ -490,7 +490,7 @@ func (client *Client) prepare(ctx context.Context, brief application.ExecutionBr
 	}
 	digest := sha256.Sum256(encoded)
 	invalidRetry := brief.RetryOfInvocationID == nil && brief.RetryOrdinal != 0 || brief.RetryOfInvocationID != nil && (!brief.RetryOfInvocationID.Valid() || *brief.RetryOfInvocationID == brief.InvocationID || brief.RetryOrdinal == 0)
-	if kernel.Digest(hex.EncodeToString(digest[:])) != requestDigest || brief.ContractManifest != kernel.ContractIdentity || brief.CoordinationRule == "" || invalidRetry {
+	if kernel.Digest(hex.EncodeToString(digest[:])) != requestDigest || brief.ContractManifest != kernel.ContractIdentity || brief.CoordinationRule == "" || !brief.RoleGrounding.Valid(brief.ActorFQN) || invalidRetry {
 		return preparedExecution{}, ErrProtocol
 	}
 	workspace, err := client.workspaces.ResolveWorkspace(ctx, brief.Scope)

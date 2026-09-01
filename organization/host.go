@@ -62,7 +62,7 @@ type RoleInstanceState struct {
 }
 
 func (state RoleInstanceState) Valid() bool {
-	if !state.ActorFQN.Valid() || !namePattern.MatchString(state.Team) || !namePattern.MatchString(state.Role) || state.Instance == 0 || state.Revision == 0 || !state.BundleDigest.Valid() || !state.ModelProfile.Valid() || state.WorkspaceID == "" || len(state.WorkspaceID) > 1024 || !state.Status.Valid() || !state.ManifestDigest.Valid() || !versionPattern.MatchString(state.ManifestVersion) || !versionPattern.MatchString(state.BundleVersion) {
+	if !state.ActorFQN.Valid() || !namePattern.MatchString(state.Team) || !validRoleName(state.Role) || state.Instance == 0 || state.Revision == 0 || !state.BundleDigest.Valid() || !state.ModelProfile.Valid() || state.WorkspaceID == "" || len(state.WorkspaceID) > 1024 || !state.Status.Valid() || !state.ManifestDigest.Valid() || !versionPattern.MatchString(state.ManifestVersion) || !versionPattern.MatchString(state.BundleVersion) {
 		return false
 	}
 	expected, err := kernel.ParseActorFQN(fmt.Sprintf("%s::%s-%d", state.Team, state.Role, state.Instance))

@@ -29,6 +29,7 @@ type Config struct {
 	HTTPClient               *http.Client
 	WorkspaceBindings        []openhands.WorkspaceBinding
 	ExecutionProfiles        []openhands.ExecutionProfile
+	RoleGrounding            application.RoleGroundingResolver
 	OpenHandsPollInterval    time.Duration
 	OpenHandsMaximumPages    uint32
 	OpenHandsMaximumEvidence int
@@ -56,7 +57,7 @@ func New(ctx context.Context, config Config) (*Runtime, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if config.Store == nil || config.Catalogue == nil || config.Clock == nil || config.IDs == nil || config.ExecutionPolicy.ConsumerID == "" || config.ExecutionPolicy.ConsumerID != config.WorkerPolicy.ConsumerID {
+	if config.Store == nil || config.Catalogue == nil || config.Clock == nil || config.IDs == nil || config.RoleGrounding == nil || config.ExecutionPolicy.ConsumerID == "" || config.ExecutionPolicy.ConsumerID != config.WorkerPolicy.ConsumerID {
 		return nil, application.ErrInvalidConfiguration
 	}
 	handler, err := application.NewHandler(config.Store, kernel.Evaluator{Catalogue: config.Catalogue}, config.Clock, config.IDs)
@@ -88,7 +89,7 @@ func New(ctx context.Context, config Config) (*Runtime, error) {
 	if err != nil {
 		return nil, err
 	}
-	coordinator, err := application.NewOperationalExecutionCoordinator(config.Store, handler, client, recorder, config.Clock, config.ExecutionPolicy)
+	coordinator, err := application.NewOperationalExecutionCoordinator(config.Store, handler, client, recorder, config.RoleGrounding, config.Clock, config.ExecutionPolicy)
 	if err != nil {
 		return nil, err
 	}

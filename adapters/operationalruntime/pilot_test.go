@@ -89,7 +89,7 @@ func TestControlledLocalOperatingPilot(t *testing.T) {
 			{WorkspaceID: primary.workspaceID, WorktreeID: primary.worktreeID, WorkingDirectory: primaryWorkspace},
 			{WorkspaceID: cancelProbe.workspaceID, WorktreeID: cancelProbe.worktreeID, WorkingDirectory: cancelWorkspace},
 		},
-		ExecutionProfiles: []openhands.ExecutionProfile{profile}, OpenHandsPollInterval: 100 * time.Millisecond,
+		ExecutionProfiles: []openhands.ExecutionProfile{profile}, RoleGrounding: testRoleGroundingResolver{}, OpenHandsPollInterval: 100 * time.Millisecond,
 		OpenHandsMaximumPages: 64, OpenHandsMaximumEvidence: 16 << 20, EvidenceRoot: evidenceRoot,
 		ExecutionPolicy: application.OperationalExecutionPolicy{
 			OperationTimeout: 130 * time.Second, MaximumBriefBytes: 1 << 20, ConsumerID: consumer,
@@ -242,7 +242,7 @@ func TestControlledLocalOperatingPilotContinuation(t *testing.T) {
 			{WorkspaceID: primary.workspaceID, WorktreeID: primary.worktreeID, WorkingDirectory: primaryWorkspace},
 			{WorkspaceID: cancelProbe.workspaceID, WorktreeID: cancelProbe.worktreeID, WorkingDirectory: cancelWorkspace},
 		},
-		ExecutionProfiles: []openhands.ExecutionProfile{profile}, OpenHandsPollInterval: 100 * time.Millisecond,
+		ExecutionProfiles: []openhands.ExecutionProfile{profile}, RoleGrounding: testRoleGroundingResolver{}, OpenHandsPollInterval: 100 * time.Millisecond,
 		OpenHandsMaximumPages: 64, OpenHandsMaximumEvidence: 16 << 20, EvidenceRoot: evidenceRoot,
 		ExecutionPolicy: application.OperationalExecutionPolicy{
 			OperationTimeout: 130 * time.Second, MaximumBriefBytes: 1 << 20, ConsumerID: consumer,

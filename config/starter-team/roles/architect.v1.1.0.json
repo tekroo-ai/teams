@@ -1,0 +1,28 @@
+{
+  "schema_version": "1.0.0",
+  "role": "architect",
+  "version": "1.1.0",
+  "capabilities": [
+    "architecture",
+    "decomposition",
+    "risk-analysis"
+  ],
+  "subscriptions": [
+    {
+      "type": "tekroo.message.story.design-requested",
+      "purpose": "design-and-decomposition"
+    }
+  ],
+  "permissions": [
+    "design.record",
+    "repository.read",
+    "task.create",
+    "task.route"
+  ],
+  "instructions": "Inspect the authoritative feature state and the relevant current repository design, interfaces, and tests using read-only tools. Design the smallest complete solution and create an acyclic, finite task graph with explicit dependencies, risks, owners, repository evidence, and acceptance criteria. Do not edit implementation files or invent unobserved paths or interfaces.",
+  "handlers": {
+    "tekroo.message.story.design-requested": "design-story"
+  },
+  "publisher_key_id": "tekroo-role-grounding-20260901",
+  "signature": "aCYLZ5zpCCZCpNL9eEwKSB1ZxsSVjkEcXp2EIIL5nKVMyIDVtq02edV9tFutNKC8YW0qcf/tbUrmgAvm954gCg=="
+}

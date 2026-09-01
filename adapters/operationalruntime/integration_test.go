@@ -94,7 +94,7 @@ func TestAssembledRuntimeExecutesIndependentAuthorizedTasksConcurrentlyAndBuilds
 			{WorkspaceID: fixture.workspaceID, WorktreeID: fixture.worktreeID, WorkingDirectory: workspace},
 			{WorkspaceID: secondFixture.workspaceID, WorktreeID: secondFixture.worktreeID, WorkingDirectory: secondWorkspace},
 		},
-		ExecutionProfiles: []openhands.ExecutionProfile{profile}, OpenHandsPollInterval: time.Millisecond,
+		ExecutionProfiles: []openhands.ExecutionProfile{profile}, RoleGrounding: testRoleGroundingResolver{}, OpenHandsPollInterval: time.Millisecond,
 		OpenHandsMaximumPages: 8, OpenHandsMaximumEvidence: 1 << 20, EvidenceRoot: filepath.Join(t.TempDir(), "evidence"),
 		ExecutionPolicy: application.OperationalExecutionPolicy{
 			OperationTimeout: 2 * time.Second, MaximumBriefBytes: 1 << 20, ConsumerID: consumer,

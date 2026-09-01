@@ -36,8 +36,11 @@ func TestOperationalCoordinatorExecutesOneInvocationAndNeverChainsAgentProse(t *
 	if runtime.lastBrief.CoordinationRule != evidenceOnlyCoordinationRule || runtime.lastBrief.Task.Description != "Implement the bounded feature." {
 		t.Fatalf("brief = %#v", runtime.lastBrief)
 	}
+	if !runtime.lastBrief.RoleGrounding.Valid(runtime.context.Invocation.ActorFQN) || runtime.lastBrief.RoleGrounding.Instructions != "Implement the assigned task and return evidence." {
+		t.Fatalf("role grounding = %#v", runtime.lastBrief.RoleGrounding)
+	}
 	guidance := strings.Join(runtime.lastBrief.ExecutionGuidance, "\n")
-	for _, required := range []string{"AGENTS.md", "rg or rg --files", "Never repeat an identical read-only command", "semantically equivalent searches", "accepted CONTRACTS packages", "within twelve repository-discovery commands", "focused tests"} {
+	for _, required := range []string{"role_grounding", "role_fqrn", "AGENTS.md", "rg or rg --files", "Never repeat an identical read-only command", "semantically equivalent searches", "accepted CONTRACTS packages", "within twelve repository-discovery commands", "focused tests"} {
 		if !strings.Contains(guidance, required) {
 			t.Fatalf("execution guidance omitted %q: %v", required, runtime.lastBrief.ExecutionGuidance)
 		}
@@ -61,7 +64,7 @@ func TestRetryExecutionBriefDirectsAgentToContinueFromRetainedState(t *testing.T
 	retryOf := testUUID(778)
 	runtime.context.Invocation.RetryOfInvocationID = &retryOf
 	runtime.context.Invocation.RetryOrdinal = 1
-	brief, _, err := BuildExecutionBrief(runtime.context, 1<<20)
+	brief, _, err := BuildExecutionBrief(runtime.context, testRoleGrounding(runtime.context.Invocation.ActorFQN), 1<<20)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -311,7 +314,7 @@ func newOperationalRuntime(t *testing.T) *operationalRuntime {
 func newTestOperationalCoordinator(t *testing.T, runtime *operationalRuntime) *OperationalExecutionCoordinator {
 	t.Helper()
 	basis := validTestProvenance()
-	coordinator, err := NewOperationalExecutionCoordinator(runtime, runtime, runtime, runtime, runtime.clock, OperationalExecutionPolicy{
+	coordinator, err := NewOperationalExecutionCoordinator(runtime, runtime, runtime, runtime, runtime, runtime.clock, OperationalExecutionPolicy{
 		OperationTimeout: time.Second, MaximumBriefBytes: 1 << 20, ConsumerID: "teams-openhands-runtime",
 		PolicyRevision: 1, ServiceAuthority: kernel.PrincipalRef{Kind: kernel.PrincipalService, ID: "teams-openhands-runtime"},
 		ExpiryAuthority: kernel.PrincipalRef{Kind: kernel.PrincipalPolicy, ID: "teams-invocation-expiry"}, Provenance: basis,
@@ -320,6 +323,22 @@ func newTestOperationalCoordinator(t *testing.T, runtime *operationalRuntime) *O
 		t.Fatal(err)
 	}
 	return coordinator
+}
+
+func testRoleGrounding(actor kernel.ActorFQN) RoleExecutionGrounding {
+	fqrn, _ := kernel.RoleFQRNFromActor(actor)
+	return RoleExecutionGrounding{
+		ActorFQN: actor, RoleFQRN: fqrn, BundleVersion: "1.0.0", BundleDigest: testDigest('b'),
+		Capabilities: []string{"implement"}, Permissions: []string{"repository.read", "repository.write"},
+		Instructions: "Implement the assigned task and return evidence.",
+	}
+}
+
+func (runtime *operationalRuntime) ResolveRoleGrounding(_ context.Context, actor kernel.ActorFQN) (RoleExecutionGrounding, error) {
+	if actor != runtime.context.Invocation.ActorFQN {
+		return RoleExecutionGrounding{}, ErrInvalidOperationalExecution
+	}
+	return testRoleGrounding(actor), nil
 }
 
 func (runtime *operationalRuntime) LoadOperationalExecution(_ context.Context, invocationID kernel.UUIDv7) (OperationalExecutionContext, error) {
@@ -434,7 +453,7 @@ func (runtime *operationalRuntime) applyClaim(t *testing.T) {
 
 func (runtime *operationalRuntime) applyStarted(t *testing.T) {
 	t.Helper()
-	brief, digest, err := BuildExecutionBrief(runtime.context, 1<<20)
+	brief, digest, err := BuildExecutionBrief(runtime.context, testRoleGrounding(runtime.context.Invocation.ActorFQN), 1<<20)
 	if err != nil {
 		t.Fatal(err)
 	}

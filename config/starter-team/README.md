@@ -7,6 +7,8 @@ location, replace its example profile/workspace bindings with real accepted
 identities, compute its SHA-256, and bind that digest plus `publisher.pub` in
 `tekrood` configuration.
 
-The bootstrap private signing key was destroyed after these immutable bundles
-were produced. Use `role-bundle-tool` with a deployment-owned Ed25519 key to
-publish amended bundles; do not edit a signed bundle in place.
+The bootstrap private signing key was destroyed after those immutable bundles
+were produced. Architect bundle `1.1.0` is an immutable successor that adds the
+read-only repository access needed for grounded design work; it is signed by
+`role-grounding-publisher.pub`. Use `role-bundle-tool` with a deployment-owned
+Ed25519 key to publish later amendments; do not edit a signed bundle in place.

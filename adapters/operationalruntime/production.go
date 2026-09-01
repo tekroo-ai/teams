@@ -604,10 +604,14 @@ func NewProductionService(ctx context.Context, config ProductionConfig) (*Produc
 		profiles = append(profiles, profile)
 		profilesByModel[item.ModelProfileDigest] = item
 	}
+	roleGrounding, err := newBoundRoleGroundingResolver(resolved.team)
+	if err != nil {
+		return fail(err)
+	}
 	runtime, err := New(ctx, Config{
 		Store: store, Catalogue: catalogue, Clock: clock, IDs: ids,
 		OpenHandsBaseURL: config.OpenHands.BaseURL, OpenHandsSessionAPIKey: resolved.sessionAPIKey,
-		HTTPClient: &http.Client{Timeout: resolved.requestTimeout}, WorkspaceBindings: workspaces, ExecutionProfiles: profiles,
+		HTTPClient: &http.Client{Timeout: resolved.requestTimeout}, WorkspaceBindings: workspaces, ExecutionProfiles: profiles, RoleGrounding: roleGrounding,
 		OpenHandsPollInterval: resolved.pollInterval, OpenHandsMaximumPages: config.OpenHands.MaximumPages,
 		OpenHandsMaximumEvidence: config.OpenHands.MaximumEvidenceBytes, EvidenceRoot: config.EvidenceRoot,
 		ExecutionPolicy: application.OperationalExecutionPolicy{OperationTimeout: resolved.operationTimeout, MaximumBriefBytes: config.Execution.MaximumBriefBytes, ConsumerID: config.Execution.ConsumerID, PolicyRevision: config.Execution.PolicyRevision, ServiceAuthority: config.ServiceAuthority, ExpiryAuthority: config.ExpiryAuthority, Provenance: resolved.provenance},

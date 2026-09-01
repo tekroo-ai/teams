@@ -41,15 +41,24 @@ type OperationalExecutionCoordinator struct {
 	commands ExecutionCommandService
 	boundary OpenHandsExecutionBoundary
 	evidence ExecutionEvidenceRecorder
+	roles    RoleGroundingResolver
 	clock    kernel.Clock
 	policy   OperationalExecutionPolicy
 }
 
-func NewOperationalExecutionCoordinator(reader OperationalExecutionReader, commands ExecutionCommandService, boundary OpenHandsExecutionBoundary, evidence ExecutionEvidenceRecorder, clock kernel.Clock, policy OperationalExecutionPolicy) (*OperationalExecutionCoordinator, error) {
-	if reader == nil || commands == nil || boundary == nil || evidence == nil || clock == nil || !policy.valid() {
+func NewOperationalExecutionCoordinator(reader OperationalExecutionReader, commands ExecutionCommandService, boundary OpenHandsExecutionBoundary, evidence ExecutionEvidenceRecorder, roles RoleGroundingResolver, clock kernel.Clock, policy OperationalExecutionPolicy) (*OperationalExecutionCoordinator, error) {
+	if reader == nil || commands == nil || boundary == nil || evidence == nil || roles == nil || clock == nil || !policy.valid() {
 		return nil, ErrInvalidConfiguration
 	}
-	return &OperationalExecutionCoordinator{reader: reader, commands: commands, boundary: boundary, evidence: evidence, clock: clock, policy: policy}, nil
+	return &OperationalExecutionCoordinator{reader: reader, commands: commands, boundary: boundary, evidence: evidence, roles: roles, clock: clock, policy: policy}, nil
+}
+
+func (coordinator *OperationalExecutionCoordinator) buildBrief(ctx context.Context, current OperationalExecutionContext) (ExecutionBrief, kernel.Digest, error) {
+	grounding, err := coordinator.roles.ResolveRoleGrounding(ctx, current.Invocation.ActorFQN)
+	if err != nil {
+		return ExecutionBrief{}, "", err
+	}
+	return BuildExecutionBrief(current, grounding, coordinator.policy.MaximumBriefBytes)
 }
 
 // Process consumes exactly one invocation authorization intent. Repeated calls
@@ -110,7 +119,7 @@ func (coordinator *OperationalExecutionCoordinator) Process(ctx context.Context,
 			if err := current.Validate(coordinator.clock.Now()); err != nil {
 				return coordinator.recordKnownStartFailure(ctx, current, err)
 			}
-			brief, requestDigest, briefErr := BuildExecutionBrief(current, coordinator.policy.MaximumBriefBytes)
+			brief, requestDigest, briefErr := coordinator.buildBrief(ctx, current)
 			if briefErr != nil {
 				return coordinator.recordKnownStartFailure(ctx, current, briefErr)
 			}
@@ -147,7 +156,7 @@ func (coordinator *OperationalExecutionCoordinator) Process(ctx context.Context,
 				return result, ErrExternalOutcomeUnknown
 			}
 		case kernel.InvocationStarted:
-			brief, requestDigest, briefErr := BuildExecutionBrief(current, coordinator.policy.MaximumBriefBytes)
+			brief, requestDigest, briefErr := coordinator.buildBrief(ctx, current)
 			if briefErr != nil || invocation.ConversationID == nil || invocation.RequestDigest == nil || *invocation.RequestDigest != requestDigest {
 				return result, ErrInvalidOperationalExecution
 			}
@@ -258,7 +267,7 @@ func (coordinator *OperationalExecutionCoordinator) recordStarted(ctx context.Co
 
 func (coordinator *OperationalExecutionCoordinator) recordKnownStartFailure(ctx context.Context, current OperationalExecutionContext, cause error) (OperationalExecutionResult, error) {
 	invocation := current.Invocation
-	brief, requestDigest, _ := BuildExecutionBrief(current, coordinator.policy.MaximumBriefBytes)
+	brief, requestDigest, _ := coordinator.buildBrief(ctx, current)
 	if !requestDigest.Valid() {
 		encoded, _ := json.Marshal(struct {
 			InvocationID kernel.UUIDv7 `json:"invocation_id"`

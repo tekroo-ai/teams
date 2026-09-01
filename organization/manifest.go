@@ -33,6 +33,14 @@ var (
 	versionPattern         = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
 )
 
+func validRoleName(value string) bool {
+	if !namePattern.MatchString(value) {
+		return false
+	}
+	_, err := kernel.ParseRoleFQRN(value)
+	return err == nil
+}
+
 type LaunchMode string
 
 const (
@@ -94,7 +102,7 @@ func (bundle RoleBundle) ContentDigest() (kernel.Digest, error) {
 }
 
 func (bundle RoleBundle) Validate() error {
-	if bundle.SchemaVersion != RoleBundleSchemaVersion || !namePattern.MatchString(bundle.Role) || !versionPattern.MatchString(bundle.Version) || bundle.PublisherKeyID == "" || len(bundle.PublisherKeyID) > 256 || len(bundle.Instructions) == 0 || len(bundle.Instructions) > 1<<20 || len(bundle.Signature) == 0 {
+	if bundle.SchemaVersion != RoleBundleSchemaVersion || !validRoleName(bundle.Role) || !versionPattern.MatchString(bundle.Version) || bundle.PublisherKeyID == "" || len(bundle.PublisherKeyID) > 256 || len(bundle.Instructions) == 0 || len(bundle.Instructions) > 1<<20 || len(bundle.Signature) == 0 {
 		return ErrInvalidRoleBundle
 	}
 	if !sortedUniqueNonempty(bundle.Capabilities, 128, 256) || !sortedUniqueNonempty(bundle.Permissions, 128, 256) {
@@ -144,7 +152,7 @@ func (manifest TeamManifest) Validate() error {
 	}
 	previous := ""
 	for _, role := range manifest.Roles {
-		if !namePattern.MatchString(role.Role) || role.Role <= previous || role.BundlePath == "" || filepath.IsAbs(role.BundlePath) || filepath.Clean(role.BundlePath) != role.BundlePath || strings.HasPrefix(role.BundlePath, "../") || !role.BundleDigest.Valid() || role.PublisherKeyID == "" || len(role.PublisherKeyID) > 256 || role.InitialInstances == 0 || role.MaximumInstances < role.InitialInstances || role.MaximumInstances > 64 || !role.LaunchMode.Valid() || !role.ModelProfileDigest.Valid() || len(role.WorkspaceIDs) != int(role.MaximumInstances) || !sortedUniqueNonempty(role.WorkspaceIDs, 64, 1024) {
+		if !validRoleName(role.Role) || role.Role <= previous || role.BundlePath == "" || filepath.IsAbs(role.BundlePath) || filepath.Clean(role.BundlePath) != role.BundlePath || strings.HasPrefix(role.BundlePath, "../") || !role.BundleDigest.Valid() || role.PublisherKeyID == "" || len(role.PublisherKeyID) > 256 || role.InitialInstances == 0 || role.MaximumInstances < role.InitialInstances || role.MaximumInstances > 64 || !role.LaunchMode.Valid() || !role.ModelProfileDigest.Valid() || len(role.WorkspaceIDs) != int(role.MaximumInstances) || !sortedUniqueNonempty(role.WorkspaceIDs, 64, 1024) {
 			return ErrInvalidTeamManifest
 		}
 		for index := uint32(1); index <= role.MaximumInstances; index++ {

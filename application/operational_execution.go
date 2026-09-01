@@ -6,7 +6,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"slices"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/tekroo-ai/teams/kernel"
@@ -174,6 +176,7 @@ type ExecutionBrief struct {
 	AssignmentID           kernel.UUIDv7               `json:"assignment_id"`
 	DecisionRoute          kernel.DecisionRoute        `json:"decision_route"`
 	ActorFQN               kernel.ActorFQN             `json:"actor_fqn"`
+	RoleGrounding          RoleExecutionGrounding      `json:"role_grounding"`
 	Execution              kernel.ExecutionTuple       `json:"execution"`
 	ModelProfileDigest     kernel.Digest               `json:"model_profile_digest"`
 	RuntimeIdentityDigest  kernel.Digest               `json:"runtime_identity_digest"`
@@ -186,6 +189,40 @@ type ExecutionBrief struct {
 	ExecutionGuidance      []string                    `json:"execution_guidance"`
 	ResultProtocol         *ExecutionResultProtocol    `json:"result_protocol,omitempty"`
 	SemanticContext        SemanticContextRequest      `json:"semantic_context"`
+}
+
+// RoleExecutionGrounding binds one exact running actor FQN to the authenticated
+// role bundle indexed by its FQRN. The bundle digest binds the human-readable
+// duties and permissions to the signed bundle loaded at service startup.
+type RoleExecutionGrounding struct {
+	ActorFQN      kernel.ActorFQN `json:"actor_fqn"`
+	RoleFQRN      kernel.RoleFQRN `json:"role_fqrn"`
+	BundleVersion string          `json:"bundle_version"`
+	BundleDigest  kernel.Digest   `json:"bundle_digest"`
+	Capabilities  []string        `json:"capabilities"`
+	Permissions   []string        `json:"permissions"`
+	Instructions  string          `json:"instructions"`
+}
+
+func (grounding RoleExecutionGrounding) Valid(actor kernel.ActorFQN) bool {
+	fqrn, err := kernel.RoleFQRNFromActor(actor)
+	if err != nil || grounding.ActorFQN != actor || grounding.RoleFQRN != fqrn || grounding.BundleVersion == "" || !grounding.BundleDigest.Valid() || strings.TrimSpace(grounding.Instructions) == "" || len(grounding.Instructions) > 1<<20 || len(grounding.Capabilities) == 0 || len(grounding.Permissions) == 0 || !slices.IsSorted(grounding.Capabilities) || !slices.IsSorted(grounding.Permissions) {
+		return false
+	}
+	for _, values := range [][]string{grounding.Capabilities, grounding.Permissions} {
+		previous := ""
+		for _, value := range values {
+			if value == "" || value <= previous {
+				return false
+			}
+			previous = value
+		}
+	}
+	return true
+}
+
+type RoleGroundingResolver interface {
+	ResolveRoleGrounding(context.Context, kernel.ActorFQN) (RoleExecutionGrounding, error)
 }
 
 type ExecutionResultProtocol struct {
@@ -222,6 +259,7 @@ var semanticContextForbiddenEffects = []string{
 }
 
 var boundedExecutionGuidance = []string{
+	"Before acting, inspect role_grounding: actor_fqn identifies this running instance, role_fqrn identifies its signed role bundle, and the bundle instructions, capabilities, and permissions define the role you must perform.",
 	"Read and follow AGENTS.md before taking repository actions.",
 	"Use rg or rg --files for repository discovery.",
 	"Never repeat an identical read-only command unless repository state changed; when a search identifies a relevant file, inspect that file next.",
@@ -339,11 +377,14 @@ func cloneUUID(value *kernel.UUIDv7) *kernel.UUIDv7 {
 	return &copy
 }
 
-func BuildExecutionBrief(current OperationalExecutionContext, maximumBytes int) (ExecutionBrief, kernel.Digest, error) {
+func BuildExecutionBrief(current OperationalExecutionContext, grounding RoleExecutionGrounding, maximumBytes int) (ExecutionBrief, kernel.Digest, error) {
 	if maximumBytes <= 0 || maximumBytes > 1<<20 {
 		return ExecutionBrief{}, "", ErrInvalidOperationalExecution
 	}
 	invocation := current.Invocation
+	if !grounding.Valid(invocation.ActorFQN) {
+		return ExecutionBrief{}, "", ErrInvalidOperationalExecution
+	}
 	evidence := append([]kernel.EvidenceRef(nil), current.Evidence...)
 	sort.Slice(evidence, func(left, right int) bool { return evidence[left].EvidenceID < evidence[right].EvidenceID })
 	brief := ExecutionBrief{
@@ -357,7 +398,8 @@ func BuildExecutionBrief(current OperationalExecutionContext, maximumBytes int) 
 		ToolPolicyDigest: invocation.ToolPolicyDigest, EffectPolicyDigest: invocation.EffectPolicyDigest,
 		WorkProfile: current.Profile.Profile.Clone(), AssignmentID: invocation.QualifiedAssignmentID,
 		DecisionRoute: current.Assignment.SelectedDecisionRoute, ActorFQN: invocation.ActorFQN,
-		Execution: invocation.Execution, ModelProfileDigest: invocation.ModelProfileDigest,
+		RoleGrounding: grounding,
+		Execution:     invocation.Execution, ModelProfileDigest: invocation.ModelProfileDigest,
 		RuntimeIdentityDigest: invocation.RuntimeIdentityDigest, Scope: current.Scope.Clone(),
 		Evidence: evidence, RemainingGlobalBudget: invocation.RemainingGlobalBudget,
 		RemainingPurposeBudget: invocation.RemainingPurposeBudget, DeadlineAt: invocation.DeadlineAt,

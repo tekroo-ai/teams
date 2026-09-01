@@ -113,7 +113,15 @@ func TestStarterTeamContainsEightVerifiedRoleBundles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	team, err := LoadTeamManifest(manifestPath, kernel.Digest("a6c918f9a454509e1f72be950497a05cd87db5d69b3232ff64a0e9c8b9d0dbdd"), map[string]ed25519.PublicKey{"tekroo-phase6-bootstrap": publicKey})
+	groundingRaw, err := os.ReadFile(filepath.Join(filepath.Dir(manifestPath), "role-grounding-publisher.pub"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	groundingKey, err := base64.StdEncoding.Strict().DecodeString(strings.TrimSpace(string(groundingRaw)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	team, err := LoadTeamManifest(manifestPath, kernel.Digest("fc23fd21129c69ebf4b22176b12191170b4b88702366bd5172b37e2098dbc98b"), map[string]ed25519.PublicKey{"tekroo-phase6-bootstrap": publicKey, "tekroo-role-grounding-20260901": groundingKey})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,6 +133,18 @@ func TestStarterTeamContainsEightVerifiedRoleBundles(t *testing.T) {
 		if role.Bundle.Role != want[index] {
 			t.Fatalf("role %d=%q want=%q", index, role.Bundle.Role, want[index])
 		}
+	}
+	if team.Roles[0].Bundle.Version != "1.1.0" || !strings.Contains(strings.Join(team.Roles[0].Bundle.Permissions, "\n"), "repository.read") {
+		t.Fatalf("architect bundle is not repository-grounded: %#v", team.Roles[0].Bundle)
+	}
+}
+
+func TestRoleFQRNIsTheManifestRoleKey(t *testing.T) {
+	if !validRoleName("coder-1") {
+		t.Fatal("lexically valid FQRN role key was rejected")
+	}
+	if validRoleName("teams::coder-1") {
+		t.Fatal("actor FQN was accepted as a role FQRN")
 	}
 }
 

@@ -174,6 +174,33 @@ func TestClientRejectsAuthoritativeOrIncompleteSemanticContextBeforeHTTP(t *test
 	}
 }
 
+func TestClientRejectsMissingOrMismatchedRoleGroundingBeforeHTTP(t *testing.T) {
+	base, _ := openHandsTestBrief(t)
+	mutations := map[string]func(*application.ExecutionBrief){
+		"wrong actor": func(brief *application.ExecutionBrief) { brief.RoleGrounding.ActorFQN = "teams::coder-2" },
+		"wrong fqrn":  func(brief *application.ExecutionBrief) { brief.RoleGrounding.RoleFQRN = "tester" },
+		"no bundle":   func(brief *application.ExecutionBrief) { brief.RoleGrounding.BundleDigest = "" },
+		"no duties":   func(brief *application.ExecutionBrief) { brief.RoleGrounding.Instructions = "" },
+	}
+	for name, mutate := range mutations {
+		t.Run(name, func(t *testing.T) {
+			brief := base
+			mutate(&brief)
+			encoded := mustJSON(brief)
+			hash := sha256.Sum256(encoded)
+			requests := 0
+			server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { requests++ }))
+			defer server.Close()
+			workspace := filepath.Join(t.TempDir(), "workspace")
+			client := newOpenHandsTestClient(t, server.URL, workspace, brief)
+			_, err := client.Start(context.Background(), brief, kernel.Digest(hex.EncodeToString(hash[:])))
+			if !errorsIs(err, ErrProtocol) || requests != 0 {
+				t.Fatalf("err=%v requests=%d", err, requests)
+			}
+		})
+	}
+}
+
 func TestClientInterruptsImplementationAfterTwelveReadOnlyRepositoryActions(t *testing.T) {
 	brief, digest := openHandsTestBrief(t)
 	workspace := filepath.Join(t.TempDir(), "workspace")
@@ -526,6 +553,7 @@ func newOpenHandsTestClient(t *testing.T, baseURL, workspace string, brief appli
 func openHandsTestBrief(t *testing.T) (application.ExecutionBrief, kernel.Digest) {
 	t.Helper()
 	actor := kernel.ActorFQN("teams::coder-1")
+	fqrn, _ := kernel.RoleFQRNFromActor(actor)
 	brief := application.ExecutionBrief{
 		ContractManifest: kernel.ContractIdentity, InvocationID: "00000000-0000-7000-8000-000000000201",
 		AuthorizationEventID: "00000000-0000-7000-8000-000000000202", ParentEventID: "00000000-0000-7000-8000-000000000203",
@@ -534,6 +562,7 @@ func openHandsTestBrief(t *testing.T) (application.ExecutionBrief, kernel.Digest
 		AttemptFamily: "implementation", AttemptOrdinal: 1, ConditionDigest: digest('b'), OutputPredicateDigest: digest('c'),
 		ToolPolicyDigest: digest('d'), EffectPolicyDigest: digest('e'), AssignmentID: "00000000-0000-7000-8000-000000000207",
 		DecisionRoute: kernel.RouteBoundedExecution, ActorFQN: actor,
+		RoleGrounding:      application.RoleExecutionGrounding{ActorFQN: actor, RoleFQRN: fqrn, BundleVersion: "1.0.0", BundleDigest: digest('9'), Capabilities: []string{"implement"}, Permissions: []string{"repository.read", "repository.write"}, Instructions: "Implement the assigned task."},
 		Execution:          kernel.ExecutionTuple{ExecutionID: "00000000-0000-7000-8000-000000000208", FencingEpoch: 1},
 		ModelProfileDigest: digest('f'), RuntimeIdentityDigest: digest('1'),
 		WorkProfile: kernel.WorkRiskProfile{ProfileID: "00000000-0000-7000-8000-000000000210", ProfileRevision: 1, ProfileDigest: digest('2'), LifecycleEpoch: 1, ScopeRevision: 1},

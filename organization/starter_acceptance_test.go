@@ -28,7 +28,15 @@ func TestStarterTeamRoleHostReplacementAcceptance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	team, err := LoadTeamManifest(manifestPath, kernel.Digest("a6c918f9a454509e1f72be950497a05cd87db5d69b3232ff64a0e9c8b9d0dbdd"), map[string]ed25519.PublicKey{"tekroo-phase6-bootstrap": publicKey})
+	groundingRaw, err := os.ReadFile(filepath.Join(filepath.Dir(manifestPath), "role-grounding-publisher.pub"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	groundingKey, err := base64.StdEncoding.Strict().DecodeString(strings.TrimSpace(string(groundingRaw)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	team, err := LoadTeamManifest(manifestPath, kernel.Digest("fc23fd21129c69ebf4b22176b12191170b4b88702366bd5172b37e2098dbc98b"), map[string]ed25519.PublicKey{"tekroo-phase6-bootstrap": publicKey, "tekroo-role-grounding-20260901": groundingKey})
 	if err != nil {
 		t.Fatal(err)
 	}

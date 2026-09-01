@@ -3,6 +3,7 @@ package kernel
 import (
 	"errors"
 	"regexp"
+	"strings"
 )
 
 const (
@@ -14,6 +15,7 @@ const (
 
 var (
 	actorFQNPattern = regexp.MustCompile(`^(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])::(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])-[1-9][0-9]{0,19}$`)
+	roleFQRNPattern = regexp.MustCompile(`^(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])$`)
 	uuidV7Pattern   = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
 	digestPattern   = regexp.MustCompile(`^[0-9a-f]{64}$`)
 )
@@ -28,6 +30,38 @@ func ParseActorFQN(value string) (ActorFQN, error) {
 }
 
 func (f ActorFQN) Valid() bool { return actorFQNPattern.MatchString(string(f)) }
+
+// RoleFQRN identifies a role definition (role). ActorFQN identifies one
+// running instance of that role definition (team::role-N).
+type RoleFQRN string
+
+func ParseRoleFQRN(value string) (RoleFQRN, error) {
+	if !validRoleFQRN(value) {
+		return "", errors.New("invalid role FQRN")
+	}
+	return RoleFQRN(value), nil
+}
+
+func (f RoleFQRN) Valid() bool { return validRoleFQRN(string(f)) }
+
+func validRoleFQRN(value string) bool {
+	return roleFQRNPattern.MatchString(value)
+}
+
+func RoleFQRNFromActor(actor ActorFQN) (RoleFQRN, error) {
+	if !actor.Valid() {
+		return "", errors.New("invalid actor FQN")
+	}
+	_, roleAndInstance, found := strings.Cut(string(actor), "::")
+	if !found {
+		return "", errors.New("invalid actor FQN")
+	}
+	separator := strings.LastIndexByte(roleAndInstance, '-')
+	if separator < 0 {
+		return "", errors.New("invalid actor FQN")
+	}
+	return ParseRoleFQRN(roleAndInstance[:separator])
+}
 
 type UUIDv7 string
 

@@ -5,9 +5,9 @@
   "roles": [
     {
       "role": "architect",
-      "bundle_path": "roles/architect.json",
-      "bundle_digest": "6f8cd95ba54322a30970de933a9fd1c1519dcba4ff8e214fa69719c0cee3b64d",
-      "publisher_key_id": "tekroo-phase6-bootstrap",
+      "bundle_path": "roles/architect.v1.1.0.json",
+      "bundle_digest": "ca2225cce471bb3b11732b9737474eb825e02df64a4e86111f2d51436f1ae405",
+      "publisher_key_id": "tekroo-role-grounding-20260901",
       "initial_instances": 1,
       "maximum_instances": 1,
       "launch_mode": "ON_DEMAND",

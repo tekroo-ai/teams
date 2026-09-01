@@ -26,13 +26,14 @@ import (
 )
 
 const (
-	localModelIdentity       = "ddalcu--Qwen3.8-27B-MLX-Serve-8bit"
-	localModelEndpoint       = "http://127.0.0.1:8802/v1"
-	acceptedQualification    = "66e4aeabf7be5a7bdf1220293d08a2ec4e737088caf45193d8002a2b0b53975e"
-	acceptedCorpus           = "b183c6e04f0b4af0977611da63fea332ce2e30bb890e2ea0d8ab6c1f639f00a1"
-	localDeploymentTeam      = "teams"
-	localDeploymentVersion   = "1.0.0"
-	localDeploymentPublisher = "tekroo-phase6-bootstrap"
+	localModelIdentity      = "ddalcu--Qwen3.8-27B-MLX-Serve-8bit"
+	localModelEndpoint      = "http://127.0.0.1:8802/v1"
+	acceptedQualification   = "66e4aeabf7be5a7bdf1220293d08a2ec4e737088caf45193d8002a2b0b53975e"
+	acceptedCorpus          = "b183c6e04f0b4af0977611da63fea332ce2e30bb890e2ea0d8ab6c1f639f00a1"
+	localDeploymentTeam     = "teams"
+	localDeploymentVersion  = "1.0.0"
+	localBootstrapPublisher = "tekroo-phase6-bootstrap"
+	localGroundingPublisher = "tekroo-role-grounding-20260901"
 )
 
 type localInitOptions struct {
@@ -131,6 +132,9 @@ func initializeLocalDeployment(ctx context.Context, options localInitOptions) (r
 		return result, errors.New("starter team manifest is invalid")
 	}
 	if err := requireRegularFile(filepath.Join(starterRoot, "publisher.pub"), false); err != nil {
+		return result, err
+	}
+	if err := requireRegularFile(filepath.Join(starterRoot, "role-grounding-publisher.pub"), false); err != nil {
 		return result, err
 	}
 	if err := requireRegularFile(options.OpenHandsKeyFile, true); err != nil {
@@ -257,7 +261,7 @@ func initializeLocalDeployment(ctx context.Context, options localInitOptions) (r
 		Evidence:     operationalruntime.ProductionEvidence{PolicyRevision: 1, ProducingVersion: "teams-v4-phase8", RetentionPolicy: "local-production"},
 		Worker:       operationalruntime.ProductionWorker{LeaseDuration: "90s", ReconciliationInterval: "250ms", MaximumReconciliations: 160, MaximumConcurrentInvocations: 8, LeaseOperationTimeout: "5s"},
 		Projection:   operationalruntime.ProductionProjection{Interval: "100ms", OperationTimeout: "5s"},
-		Organization: operationalruntime.ProductionOrganization{ManifestFile: teamPath, ManifestDigest: manifestDigest, Publishers: []operationalruntime.ProductionPublisher{{KeyID: localDeploymentPublisher, PublicKeyFile: filepath.Join(deploymentTeamRoot, "publisher.pub")}}, ReconciliationInterval: "1s", MaximumRestarts: 3, MaximumDeliveryAttempts: 3},
+		Organization: operationalruntime.ProductionOrganization{ManifestFile: teamPath, ManifestDigest: manifestDigest, Publishers: []operationalruntime.ProductionPublisher{{KeyID: localBootstrapPublisher, PublicKeyFile: filepath.Join(deploymentTeamRoot, "publisher.pub")}, {KeyID: localGroundingPublisher, PublicKeyFile: filepath.Join(deploymentTeamRoot, "role-grounding-publisher.pub")}}, ReconciliationInterval: "1s", MaximumRestarts: 3, MaximumDeliveryAttempts: 3},
 		Planning:     operationalruntime.ProductionPlanning{PolicyRevision: 1, ClassificationPolicyDigest: labelDigest("classification-policy-v1"), PromotionPolicyDigest: labelDigest("promotion-policy-v1"), VerificationTopologyDigest: labelDigest("verification-topology-v1"), SelectionPolicyDigest: labelDigest("selection-policy-v1"), BudgetPolicyDigest: labelDigest("budget-policy-v1"), RequiredGateIDs: []string{"go-test"}, Deadline: "2h"},
 		Git:          &operationalruntime.ProductionGitConfig{Binary: "git", AllowedRoot: filepath.Dir(options.RepositoryRoot), OperationTimeout: "2m"},
 	}

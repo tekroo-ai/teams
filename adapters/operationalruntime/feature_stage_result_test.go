@@ -98,7 +98,7 @@ func TestFeaturePlanningDescriptionCarriesAuthoritativeFeatureState(t *testing.T
 			}
 		}
 		if stage == stageArchitecture {
-			for _, required := range []string{"role class", "exactly one of coder, senior-coder, tester, or security", "JSON integer from 1 through 10", "arrays containing only zero-based integer task indexes", "IMPLEMENTATION and INVESTIGATION tasks must always use", "bounded local coding model", "three or more architectural layers", "two through six causal IMPLEMENTATION tasks", "complexity no greater than 6", "single causal order", "read AGENTS.md", "use rg for discovery", "finish.message is the only result Teams receives", "Do not put a summary or paraphrase in finish.message", "reasoning-only task", "Do not choose or mention an actor instance, branch"} {
+			for _, required := range []string{"role class", "exactly one of coder, senior-coder, tester, or security", "JSON integer from 1 through 10", "arrays containing only zero-based integer task indexes", "IMPLEMENTATION and INVESTIGATION tasks must always use", "bounded local coding model", "three or more architectural layers", "two through six causal IMPLEMENTATION tasks", "complexity no greater than 6", "single causal order", "read AGENTS.md", "use rg for discovery", "read-only repository tools", "relevant current architecture", "repository-relative file paths", "Do not edit files", "finish.message is the only result Teams receives", "Do not put a summary or paraphrase in finish.message", "Do not choose or mention an actor instance, branch"} {
 				if !strings.Contains(description, required) {
 					t.Fatalf("architecture schema instruction omitted %q", required)
 				}
