@@ -542,17 +542,19 @@ func shellDisciplineViolation(events []rawEvent, promptIndex int) (rawEvent, boo
 			continue
 		}
 		command := strings.TrimSpace(event.ActionCommand)
-		if violatesShellDiscipline(command) && !shellDisciplineViolationCorrected(events, index, event.ID) {
+		if violatesShellDiscipline(command) && !shellDisciplineViolationCorrected(events, index) {
 			return event, true
 		}
 	}
 	return rawEvent{}, false
 }
 
-func shellDisciplineViolationCorrected(events []rawEvent, violationIndex int, violationID string) bool {
-	marker := shellDisciplineCorrectionPrefix + violationID
+func shellDisciplineViolationCorrected(events []rawEvent, violationIndex int) bool {
 	for index := violationIndex + 1; index < len(events); index++ {
-		if events[index].Kind == "MessageEvent" && events[index].Source == "user" && strings.Contains(events[index].Text, marker) {
+		// A model may emit multiple terminal actions in one response. One
+		// correction after that response covers every violation already emitted;
+		// a later violation remains uncorrected and is therefore terminal.
+		if events[index].Kind == "MessageEvent" && events[index].Source == "user" && strings.Contains(events[index].Text, shellDisciplineCorrectionPrefix) {
 			return true
 		}
 	}
@@ -755,7 +757,7 @@ func (client *Client) correctShellDisciplineViolation(ctx context.Context, brief
 	if refreshed, err := client.events(ctx, conversationID); err == nil {
 		events = refreshed
 	}
-	if shellDisciplineViolationCorrected(events, promptIndex, violation.ID) {
+	if shellDisciplineViolationCorrected(events, promptIndex) {
 		return client.observation(brief, requestDigest, info, events, false)
 	}
 	correction := shellDisciplineCorrectionPrefix + violation.ID + "\nThe previous terminal action was rejected because it combined shell commands. Continue this same task, but issue exactly one command in each terminal action. Do not use cd, pipes, semicolons, &&, command substitution, environment-variable expansion, or embedded newlines. Split discovery and file inspection into separate actions."

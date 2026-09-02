@@ -743,6 +743,35 @@ func TestClientCorrectsOneCompoundShellActionInsideTheInvocation(t *testing.T) {
 	}
 }
 
+func TestClientOneCorrectionCoversConcurrentCompoundShellActions(t *testing.T) {
+	brief, digest := openHandsTestBrief(t)
+	workspace := filepath.Join(t.TempDir(), "workspace")
+	events := []map[string]any{
+		event("evt-user", "MessageEvent", "user", string(mustJSON(brief))),
+		actionEvent("first-compound-action", "terminal", "rg -n name . | head"),
+		actionEvent("second-compound-action", "terminal", "rg -n alias . | head"),
+	}
+	state := &progressGuardServerState{prompt: string(mustJSON(brief)), workspace: workspace, events: events}
+	server := httptest.NewServer(http.HandlerFunc(state.serveHTTP))
+	defer server.Close()
+	client := newOpenHandsTestClient(t, server.URL, workspace, brief)
+
+	observation, err := client.Inspect(context.Background(), brief, string(brief.InvocationID), digest)
+	if err != nil || observation.State != application.ExternalRunning || state.interruptCalls != 1 || state.correctionCalls != 1 {
+		t.Fatalf("first observation=%#v err=%v interrupts=%d corrections=%d", observation, err, state.interruptCalls, state.correctionCalls)
+	}
+	observation, err = client.Inspect(context.Background(), brief, string(brief.InvocationID), digest)
+	if err != nil || observation.State != application.ExternalRunning || state.interruptCalls != 1 || state.correctionCalls != 1 {
+		t.Fatalf("second observation=%#v err=%v interrupts=%d corrections=%d", observation, err, state.interruptCalls, state.correctionCalls)
+	}
+
+	state.events = append(state.events, actionEvent("post-correction-compound-action", "terminal", "rg --files && pwd"))
+	observation, err = client.Inspect(context.Background(), brief, string(brief.InvocationID), digest)
+	if err != nil || observation.State != application.ExternalFailed || !observation.Retryable || state.correctionCalls != 1 || !strings.Contains(string(observation.Output), "REPEATED_SHELL_DISCIPLINE_VIOLATION") {
+		t.Fatalf("post-correction observation=%#v err=%v corrections=%d", observation, err, state.correctionCalls)
+	}
+}
+
 func TestClientCorrectsRepeatedSuccessfulRepositorySearchInsideTheInvocation(t *testing.T) {
 	brief, digest := openHandsTestBrief(t)
 	workspace := filepath.Join(t.TempDir(), "workspace")
