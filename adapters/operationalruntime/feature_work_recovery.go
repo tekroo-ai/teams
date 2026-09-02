@@ -40,8 +40,10 @@ func (service *ProductionService) reconcileFeaturePlan(ctx context.Context, feat
 	states := make(map[kernel.UUIDv7]kernel.AggregateState, len(plan.Tasks))
 	heads := make(map[kernel.UUIDv7]kernel.UUIDv7, len(plan.Tasks))
 	invocations := make(map[kernel.UUIDv7]kernel.WorkInvocation, len(plan.Tasks))
+	tasksByID := make(map[kernel.UUIDv7]organization.PlannedTask, len(plan.Tasks))
 	var snapshot kernel.Snapshot
 	for _, item := range plan.Tasks {
+		tasksByID[item.ID] = item
 		state, head, found, err := service.Store.ReadAggregateHead(ctx, kernel.AggregateRef{Kind: kernel.AggregateTask, ID: item.ID})
 		if err != nil {
 			return fmt.Errorf("read task %s head: %w", item.ID, err)
@@ -134,8 +136,14 @@ func (service *ProductionService) reconcileFeaturePlan(ctx context.Context, feat
 			}
 			dependency := states[dependencyID]
 			if dependency.Phase != kernel.PhaseCompleted {
-				ready = false
-				break
+				dependencyTask, planned := tasksByID[dependencyID]
+				invocation, succeeded := invocations[dependencyID]
+				if !planned || !implementationChainDependencyReady(item, dependencyTask, invocation, succeeded) {
+					ready = false
+					break
+				}
+				dependencyEvents = append(dependencyEvents, invocation.LastEventID)
+				continue
 			}
 			dependencyEvents = append(dependencyEvents, heads[dependencyID])
 		}
@@ -175,6 +183,22 @@ func (service *ProductionService) reconcileFeaturePlan(ctx context.Context, feat
 		budget.Revision++
 	}
 	return nil
+}
+
+// implementationChainDependencyReady permits a later implementation stage to
+// continue in the same actor workspace after the preceding implementation
+// invocation succeeds, while independent validation remains pending. Without
+// this rule, a plan with one validator covering a sequential implementation
+// chain deadlocks: each stage waits for completion, but completion waits for
+// the validator, which cannot run until every stage has produced its result.
+// All other dependency kinds retain the stricter completed-phase requirement.
+func implementationChainDependencyReady(task organization.PlannedTask, dependency organization.PlannedTask, invocation kernel.WorkInvocation, found bool) bool {
+	return task.Purpose == kernel.PurposeImplementation &&
+		dependency.Purpose == kernel.PurposeImplementation &&
+		task.Owner == dependency.Owner &&
+		found &&
+		invocation.State == kernel.InvocationSucceeded &&
+		invocation.OutputDigest != nil
 }
 
 func (service *ProductionService) recordFeatureAcceptanceRecommendation(ctx context.Context, feature organization.FeatureRequest, plan organization.FeaturePlan, invocations map[kernel.UUIDv7]kernel.WorkInvocation) error {
