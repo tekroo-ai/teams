@@ -88,19 +88,19 @@ func (service *ProductionService) RetryFailedTask(ctx context.Context, principal
 		}
 	}
 
-	owner, active, err := service.RoleHost.Status(ctx, planned.Owner)
+	owner, found, err := service.RoleHost.Status(ctx, planned.Owner)
 	if err != nil {
 		return InvocationStatus{}, err
 	}
-	if active {
-		if owner.Status != organization.RoleIdle {
-			return InvocationStatus{}, organization.ErrRoleNotRunning
-		}
-		if owner.Execution == terminal.Execution {
-			owner, err = service.RestartRole(ctx, planned.Owner)
-		}
-	} else {
+	transition, err := planRecoveryRoleTransition(owner, found, terminal.Execution)
+	if err != nil {
+		return InvocationStatus{}, err
+	}
+	switch transition {
+	case recoveryRoleStart:
 		owner, err = service.StartRole(ctx, planned.Owner)
+	case recoveryRoleRestart:
+		owner, err = service.RestartRole(ctx, planned.Owner)
 	}
 	if err != nil || owner.Status != organization.RoleIdle || owner.Execution == terminal.Execution {
 		return InvocationStatus{}, errors.Join(organization.ErrRoleNotRunning, err)
@@ -142,6 +142,34 @@ func (service *ProductionService) RetryFailedTask(ctx context.Context, principal
 		return InvocationStatus{}, errors.Join(application.ErrInvalidOperationalExecution, err)
 	}
 	return status, nil
+}
+
+type recoveryRoleTransition uint8
+
+const (
+	recoveryRoleReuse recoveryRoleTransition = iota
+	recoveryRoleStart
+	recoveryRoleRestart
+)
+
+// planRecoveryRoleTransition distinguishes a durable role record from a
+// running role. Host.Status reports whether a record exists, so STOPPED must
+// start a new execution rather than being rejected as an active non-idle role.
+func planRecoveryRoleTransition(owner organization.RoleInstanceState, found bool, terminal kernel.ExecutionTuple) (recoveryRoleTransition, error) {
+	if !found || owner.Status == organization.RoleStopped {
+		return recoveryRoleStart, nil
+	}
+	switch owner.Status {
+	case organization.RoleIdle:
+		if owner.Execution == terminal {
+			return recoveryRoleRestart, nil
+		}
+		return recoveryRoleReuse, nil
+	case organization.RoleFailed:
+		return recoveryRoleRestart, nil
+	default:
+		return recoveryRoleReuse, organization.ErrRoleNotRunning
+	}
 }
 
 func (service *ProductionService) plannedFeatureTask(ctx context.Context, taskID kernel.UUIDv7) (organization.FeatureRequest, organization.PlannedTask, bool, error) {
