@@ -113,10 +113,16 @@ func (service *ProductionService) reconcileFeaturePlan(ctx context.Context, feat
 			}
 			if found && (latest.State == kernel.InvocationFailed || latest.State == kernel.InvocationTimedOut || latest.State == kernel.InvocationStartFailed) && latest.Retryable != nil && *latest.Retryable && latest.AttemptOrdinal < uint64(item.AttemptLimit) {
 				profileConfig, configured := service.profilesByModel[item.ModelProfile]
+				if !configured {
+					return organization.ErrInvalidFeature
+				}
 				owner, active, ownerErr := service.RoleHost.Status(ctx, item.Owner)
+				if ownerErr == nil && (!active || owner.Status != organization.RoleIdle) {
+					owner, ownerErr = service.RoleHost.EnsureStarted(ctx, item.Owner)
+				}
 				workspace, workspaceFound := service.workspacesByID[owner.WorkspaceID]
 				profileSnapshot, profileFound := snapshot.WorkProfiles[kernel.AggregateRef{Kind: kernel.AggregateTask, ID: item.ID}]
-				if !configured || ownerErr != nil || !active || owner.Status != organization.RoleIdle || !workspaceFound || !profileFound || !profileSnapshot.Valid() {
+				if ownerErr != nil || owner.Status != organization.RoleIdle || !workspaceFound || !profileFound || !profileSnapshot.Valid() {
 					return errors.Join(organization.ErrRoleNotRunning, ownerErr)
 				}
 				tracked := &trackedTask{plan: item, revision: state.Revision, last: heads[item.ID], profile: profileSnapshot.Profile, owner: owner}
