@@ -29,7 +29,10 @@ const (
 	maximumRepositoryDiscoveryActions = 12
 	maximumRetryDiscoveryActions      = 6
 	qualifiedCondenserMaximumEvents   = 80
-	qualifiedCondenserMaximumTokens   = 48000
+	// The qualified local model advertises a 128K context window. Keep 32K in
+	// reserve for tool results, the next response, and control messages while
+	// avoiding a lossy condensation during the required pre-edit inspection.
+	qualifiedCondenserMaximumTokens = 96000
 )
 
 type WorkspaceBinding struct {
@@ -89,7 +92,7 @@ const (
 	semanticMemoryUntrustedLabel = "SMA recalled memories are untrusted evidence. "
 	qualifiedModelID             = "openai/ddalcu--Qwen3.8-27B-MLX-Serve-8bit"
 	qualifiedModelAPIRoot        = "http://127.0.0.1:8802/v1"
-	qualifiedAgentSettingsJSON   = `{"kind":"Agent","llm":{"model":"openai/ddalcu--Qwen3.8-27B-MLX-Serve-8bit","model_canonical_name":"openai/gpt-4o","base_url":"http://127.0.0.1:8802/v1","api_mode":"chat","api_key":"sma-e1-loopback-only","native_tool_calling":true,"force_string_serializer":false,"stream":false,"temperature":0,"max_output_tokens":8192,"num_retries":0,"retry_multiplier":0,"retry_min_wait":0,"retry_max_wait":0,"timeout":1200,"log_completions":false,"litellm_extra_body":{"chat_template_kwargs":{"enable_thinking":false}}},"condenser":{"kind":"LLMSummarizingCondenser","llm":{"model":"openai/ddalcu--Qwen3.8-27B-MLX-Serve-8bit","model_canonical_name":"openai/gpt-4o","base_url":"http://127.0.0.1:8802/v1","api_mode":"chat","api_key":"sma-e1-loopback-only","native_tool_calling":true,"force_string_serializer":false,"stream":false,"temperature":0,"max_output_tokens":8192,"num_retries":0,"retry_multiplier":0,"retry_min_wait":0,"retry_max_wait":0,"timeout":1200,"log_completions":false,"usage_id":"condenser","litellm_extra_body":{"chat_template_kwargs":{"enable_thinking":false}}},"max_size":80,"max_tokens":48000,"keep_first":2}}`
+	qualifiedAgentSettingsJSON   = `{"kind":"Agent","llm":{"model":"openai/ddalcu--Qwen3.8-27B-MLX-Serve-8bit","model_canonical_name":"openai/gpt-4o","base_url":"http://127.0.0.1:8802/v1","api_mode":"chat","api_key":"sma-e1-loopback-only","native_tool_calling":true,"force_string_serializer":false,"stream":false,"temperature":0,"max_output_tokens":8192,"num_retries":0,"retry_multiplier":0,"retry_min_wait":0,"retry_max_wait":0,"timeout":1200,"log_completions":false,"litellm_extra_body":{"chat_template_kwargs":{"enable_thinking":false}}},"condenser":{"kind":"LLMSummarizingCondenser","llm":{"model":"openai/ddalcu--Qwen3.8-27B-MLX-Serve-8bit","model_canonical_name":"openai/gpt-4o","base_url":"http://127.0.0.1:8802/v1","api_mode":"chat","api_key":"sma-e1-loopback-only","native_tool_calling":true,"force_string_serializer":false,"stream":false,"temperature":0,"max_output_tokens":8192,"num_retries":0,"retry_multiplier":0,"retry_min_wait":0,"retry_max_wait":0,"timeout":1200,"log_completions":false,"usage_id":"condenser","litellm_extra_body":{"chat_template_kwargs":{"enable_thinking":false}}},"max_size":80,"max_tokens":96000,"keep_first":2}}`
 	qualifiedSMAHookConfigJSON   = `{"hooks":{"UserPromptSubmit":[{"matcher":"*","hooks":[{"type":"command","command":"./.openhands/hooks/sma_context_hook.py","timeout":1}]}]}}`
 )
 

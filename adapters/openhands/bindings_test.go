@@ -128,7 +128,11 @@ func TestQualifiedAgentSettingsUseOperationalRequestTimeout(t *testing.T) {
 	if qualifiedAgentSettings(shortTimeout) {
 		t.Fatal("five-minute LLM timeout accepted")
 	}
-	lateCondensation := json.RawMessage(strings.Replace(string(qualifiedSMAAgentSettings), `"max_tokens":48000`, `"max_tokens":100000`, 1))
+	prematureCondensation := json.RawMessage(strings.Replace(string(qualifiedSMAAgentSettings), `"max_tokens":96000`, `"max_tokens":48000`, 1))
+	if qualifiedAgentSettings(prematureCondensation) {
+		t.Fatal("premature condenser token limit accepted")
+	}
+	lateCondensation := json.RawMessage(strings.Replace(string(qualifiedSMAAgentSettings), `"max_tokens":96000`, `"max_tokens":120000`, 1))
 	if qualifiedAgentSettings(lateCondensation) {
 		t.Fatal("memory-unsafe condenser token limit accepted")
 	}
