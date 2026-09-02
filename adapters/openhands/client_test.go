@@ -566,8 +566,24 @@ func TestClientExplicitRecoveryProfileEnforcesBoundedReadAllowance(t *testing.T)
 		observationEvent("post-correction-read-observation", "terminal", false, 0),
 	)
 	observation, err = client.Inspect(context.Background(), brief, string(brief.InvocationID), digest)
-	if err != nil || observation.State != application.ExternalFailed || !observation.Retryable || !strings.Contains(string(observation.Output), `"repository_discovery_limit":0`) {
-		t.Fatalf("post-correction read observation=%#v err=%v", observation, err)
+	if err != nil || observation.State != application.ExternalRunning || state.interruptCalls != 1 {
+		t.Fatalf("first targeted post-correction read observation=%#v err=%v", observation, err)
+	}
+	state.events = append(state.events,
+		actionEvent("post-correction-read-2", "file_editor", "view"),
+		observationEvent("post-correction-read-observation-2", "file_editor", false, 0),
+	)
+	observation, err = client.Inspect(context.Background(), brief, string(brief.InvocationID), digest)
+	if err != nil || observation.State != application.ExternalRunning || state.interruptCalls != 1 {
+		t.Fatalf("second targeted post-correction read observation=%#v err=%v", observation, err)
+	}
+	state.events = append(state.events,
+		actionEvent("post-correction-read-3", "file_editor", "view"),
+		observationEvent("post-correction-read-observation-3", "file_editor", false, 0),
+	)
+	observation, err = client.Inspect(context.Background(), brief, string(brief.InvocationID), digest)
+	if err != nil || observation.State != application.ExternalFailed || !observation.Retryable || !strings.Contains(string(observation.Output), `"repository_discovery_limit":2`) {
+		t.Fatalf("excess post-correction read observation=%#v err=%v", observation, err)
 	}
 }
 

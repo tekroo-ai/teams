@@ -28,7 +28,12 @@ var (
 const (
 	maximumRepositoryDiscoveryActions = 12
 	maximumRetryDiscoveryActions      = 6
-	qualifiedCondenserMaximumEvents   = 80
+	// After a recovery has exhausted its normal inspection allowance, permit
+	// two narrowly targeted reads so the model can recover exact edit context.
+	// The allowance is still finite and resets only after a successful edit or
+	// validation command.
+	maximumPostCorrectionReads      = 2
+	qualifiedCondenserMaximumEvents = 80
 	// The qualified local model advertises a 128K context window. Keep 32K in
 	// reserve for tool results, the next response, and control messages while
 	// avoiding a lossy condensation during the required pre-edit inspection.
@@ -456,10 +461,10 @@ func (client *Client) Inspect(ctx context.Context, brief application.ExecutionBr
 			correctionIndex := implementationProgressCorrectionIndex(events, currentPromptIndex)
 			if correctionIndex >= 0 {
 				discoveryActions, progressObserved := recoveryRepositoryProgress(events, correctionIndex)
-				if executionStillActive(info.ExecutionStatus) && ((!progressObserved && discoveryActions > 0) || discoveryActions > maximumRepositoryDiscoveryActions) {
+				if executionStillActive(info.ExecutionStatus) && ((!progressObserved && discoveryActions > maximumPostCorrectionReads) || discoveryActions > maximumRepositoryDiscoveryActions) {
 					limit := maximumRepositoryDiscoveryActions
 					if !progressObserved {
-						limit = 0
+						limit = maximumPostCorrectionReads
 					}
 					return client.stopForNoProgress(ctx, brief, requestDigest, info, events, discoveryActions, limit)
 				}
@@ -860,7 +865,7 @@ func (client *Client) correctImplementationProgress(ctx context.Context, brief a
 	if implementationProgressCorrectionIndex(events, promptIndex(events, string(mustJSON(brief)))) >= 0 {
 		return client.observation(brief, requestDigest, info, events, false)
 	}
-	correction := implementationProgressCorrectionPrefix + string(brief.InvocationID) + "\nYou have enough repository context. Continue this same task by making the smallest required edit in the files named by the task, then run its specified focused tests. Do not perform another repository read before a successful edit or test command."
+	correction := implementationProgressCorrectionPrefix + string(brief.InvocationID) + "\nYou have enough repository context. Continue this same task by making the smallest required edit in the files named by the task, then run its specified focused tests. If exact edit context is still missing, you may perform at most two narrowly targeted reads first; do not resume broad discovery."
 	status, _, err := client.request(ctx, http.MethodPost, "/api/conversations/"+url.PathEscape(conversationID)+"/events", map[string]any{
 		"role": "user", "run": true,
 		"content": []map[string]any{{"type": "text", "text": correction}},
