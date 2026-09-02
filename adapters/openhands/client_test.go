@@ -307,7 +307,7 @@ func TestClientInterruptsImplementationAfterTwelveReadOnlyRepositoryActions(t *t
 	}
 }
 
-func TestClientAllowsTargetedFileInspectionBeyondTwelveTotalActions(t *testing.T) {
+func TestClientBoundsImplementationFileInspectionWithoutProgress(t *testing.T) {
 	brief, digest := openHandsTestBrief(t)
 	workspace := filepath.Join(t.TempDir(), "workspace")
 	events := []map[string]any{
@@ -317,7 +317,7 @@ func TestClientAllowsTargetedFileInspectionBeyondTwelveTotalActions(t *testing.T
 		actionEvent("discovery", "terminal", "rg --files"),
 		observationEvent("discovery-observation", "terminal", false, 0),
 	}
-	for index := 0; index < maximumRepositoryDiscoveryActions; index++ {
+	for index := 0; index < maximumRepositoryDiscoveryActions-2; index++ {
 		events = append(events,
 			actionEvent(fmt.Sprintf("view-%02d", index), "file_editor", "view"),
 			observationEvent(fmt.Sprintf("view-observation-%02d", index), "file_editor", false, 0),
@@ -330,7 +330,42 @@ func TestClientAllowsTargetedFileInspectionBeyondTwelveTotalActions(t *testing.T
 
 	observation, err := client.Inspect(context.Background(), brief, string(brief.InvocationID), digest)
 	if err != nil || observation.State != application.ExternalRunning || state.interruptCalls != 0 {
-		t.Fatalf("targeted inspection observation=%#v err=%v interrupts=%d", observation, err, state.interruptCalls)
+		t.Fatalf("full read allowance observation=%#v err=%v interrupts=%d", observation, err, state.interruptCalls)
+	}
+	events = append(events,
+		actionEvent("view-excess", "file_editor", "view"),
+		observationEvent("view-excess-observation", "file_editor", false, 0),
+	)
+	state.events = events
+	observation, err = client.Inspect(context.Background(), brief, string(brief.InvocationID), digest)
+	if err != nil || observation.State != application.ExternalFailed || !observation.Retryable || state.interruptCalls != 1 || !strings.Contains(string(observation.Output), `"repository_discovery_actions":13`) {
+		t.Fatalf("bounded read observation=%#v err=%v interrupts=%d", observation, err, state.interruptCalls)
+	}
+}
+
+func TestClientAllowsReadOnlyValidatorTargetedFileInspection(t *testing.T) {
+	brief, _ := openHandsTestBrief(t)
+	brief.Purpose = kernel.PurposeValidation
+	brief.RoleGrounding.Permissions = []string{"repository.read"}
+	encoded := mustJSON(brief)
+	hash := sha256.Sum256(encoded)
+	digest := kernel.Digest(hex.EncodeToString(hash[:]))
+	workspace := filepath.Join(t.TempDir(), "workspace")
+	events := []map[string]any{event("evt-user", "MessageEvent", "user", string(encoded))}
+	for index := 0; index < maximumRepositoryDiscoveryActions+1; index++ {
+		events = append(events,
+			actionEvent(fmt.Sprintf("view-%02d", index), "file_editor", "view"),
+			observationEvent(fmt.Sprintf("view-observation-%02d", index), "file_editor", false, 0),
+		)
+	}
+	state := &progressGuardServerState{prompt: string(encoded), workspace: workspace, events: events}
+	server := httptest.NewServer(http.HandlerFunc(state.serveHTTP))
+	defer server.Close()
+	client := newOpenHandsTestClient(t, server.URL, workspace, brief)
+
+	observation, err := client.Inspect(context.Background(), brief, string(brief.InvocationID), digest)
+	if err != nil || observation.State != application.ExternalRunning || state.interruptCalls != 0 {
+		t.Fatalf("validator inspection observation=%#v err=%v interrupts=%d", observation, err, state.interruptCalls)
 	}
 }
 
@@ -587,7 +622,11 @@ func TestClientProgressGuardRequiresSuccessfulMutationObservation(t *testing.T) 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			events := []map[string]any{event("evt-user", "MessageEvent", "user", string(mustJSON(brief)))}
-			for index := 0; index < maximumRepositoryDiscoveryActions; index++ {
+			actionCount := maximumRepositoryDiscoveryActions
+			if test.mutationError {
+				actionCount++
+			}
+			for index := 0; index < actionCount; index++ {
 				events = append(events,
 					actionEvent(fmt.Sprintf("action-%02d", index), "terminal", "sed -n '1,80p' organization/message.go"),
 					observationEvent(fmt.Sprintf("observation-%02d", index), "terminal", false, 0),
@@ -659,7 +698,7 @@ func TestClientProgressGuardStillBoundsDiscoveryAfterSuccessfulValidation(t *tes
 		actionEvent("test-action", "terminal", "go test ./organization"),
 		observationEvent("test-observation", "terminal", false, 0),
 	}
-	for index := 0; index < maximumRepositoryDiscoveryActions; index++ {
+	for index := 0; index < maximumRepositoryDiscoveryActions+1; index++ {
 		events = append(events,
 			actionEvent(fmt.Sprintf("action-%02d", index), "terminal", "sed -n '1,80p' organization/message.go"),
 			observationEvent(fmt.Sprintf("observation-%02d", index), "terminal", false, 0),
@@ -671,7 +710,7 @@ func TestClientProgressGuardStillBoundsDiscoveryAfterSuccessfulValidation(t *tes
 	client := newOpenHandsTestClient(t, server.URL, workspace, brief)
 
 	observation, err := client.Inspect(context.Background(), brief, string(brief.InvocationID), digest)
-	if err != nil || observation.State != application.ExternalFailed || state.interruptCalls != 1 || !strings.Contains(string(observation.Output), `"repository_discovery_actions":12`) {
+	if err != nil || observation.State != application.ExternalFailed || state.interruptCalls != 1 || !strings.Contains(string(observation.Output), `"repository_discovery_actions":13`) {
 		t.Fatalf("post-validation bound observation=%#v err=%v interrupts=%d", observation, err, state.interruptCalls)
 	}
 }

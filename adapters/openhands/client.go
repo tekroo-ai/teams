@@ -454,6 +454,13 @@ func (client *Client) Inspect(ctx context.Context, brief application.ExecutionBr
 		discoveryActions, _ := repositoryProgress(events, currentPromptIndex)
 		discoveryLimit := maximumRepositoryDiscoveryActions
 		limitExceeded := discoveryActions >= discoveryLimit
+		implementationGuard := brief.Purpose == kernel.PurposeImplementation || brief.Purpose == kernel.PurposeRepair
+		if implementationGuard {
+			discoveryActions, _ = recoveryRepositoryProgress(events, currentPromptIndex)
+			// Permit the model to choose a productive next action after the
+			// final allowed read. Stop only when it performs another read.
+			limitExceeded = discoveryActions > discoveryLimit
+		}
 		if brief.RetryOrdinal > 0 && explicitRecoveryProfile(brief) {
 			discoveryActions, _ = recoveryRepositoryProgress(events, currentPromptIndex)
 			discoveryLimit = maximumRepositoryDiscoveryActions
@@ -463,6 +470,9 @@ func (client *Client) Inspect(ctx context.Context, brief application.ExecutionBr
 			limitExceeded = discoveryActions > discoveryLimit
 		} else if brief.RetryOrdinal > 0 && currentPromptIndex > 0 {
 			priorDiscoveryActions, priorProgressObserved := repositoryProgress(events[:currentPromptIndex], -1)
+			if implementationGuard {
+				priorDiscoveryActions, priorProgressObserved = recoveryRepositoryProgress(events[:currentPromptIndex], -1)
+			}
 			if !priorProgressObserved {
 				if priorDiscoveryActions > maximumRepositoryDiscoveryActions {
 					priorDiscoveryActions = maximumRepositoryDiscoveryActions
