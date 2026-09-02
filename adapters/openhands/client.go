@@ -456,7 +456,7 @@ func (client *Client) Inspect(ctx context.Context, brief application.ExecutionBr
 		limitExceeded := discoveryActions >= discoveryLimit
 		if brief.RetryOrdinal > 0 && explicitRecoveryProfile(brief) {
 			discoveryActions, _ = recoveryRepositoryProgress(events, currentPromptIndex)
-			discoveryLimit = maximumRetryDiscoveryActions
+			discoveryLimit = maximumRepositoryDiscoveryActions
 			// The model must be allowed to choose its next action after using
 			// the final permitted read. Interrupt only after it actually issues
 			// another read; a mutation resets the recovery allowance below.
@@ -815,8 +815,9 @@ func progressGuardApplies(brief application.ExecutionBrief) bool {
 }
 
 // An evidence-bound operator recovery supersedes the prior work profile and
-// grants a fresh bounded execution window. Automatic retries retain their
-// predecessor's discovery count so repeated read-only loops still terminate.
+// starts in a clean conversation, so it receives the normal bounded execution
+// window. Automatic retries retain predecessor history and receive only the
+// smaller additional allowance.
 func explicitRecoveryProfile(brief application.ExecutionBrief) bool {
 	return brief.RetryOrdinal > 0 && brief.WorkProfile.SupersedesProfileID != nil
 }
@@ -1150,10 +1151,10 @@ func repositoryProgress(events []rawEvent, promptIndex int) (int, bool) {
 	return discoveryActions, progressObserved
 }
 
-// recoveryRepositoryProgress enforces the smaller inspection allowance stated
-// in an explicit recovery brief. Direct file views count here because the
-// predecessor conversation is retained; a successful repository mutation
-// starts a new implementation increment and resets the allowance.
+// recoveryRepositoryProgress counts successful source reads in a clean,
+// evidence-bound recovery conversation. Direct file views count, while a
+// successful repository mutation starts a new implementation increment and
+// resets the allowance.
 func recoveryRepositoryProgress(events []rawEvent, promptIndex int) (int, bool) {
 	readOnlyActions := 0
 	progressObserved := false

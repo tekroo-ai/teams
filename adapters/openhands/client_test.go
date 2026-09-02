@@ -469,7 +469,7 @@ func TestClientExplicitRecoveryProfileEnforcesBoundedReadAllowance(t *testing.T)
 			observationEvent(fmt.Sprintf("metadata-observation-%02d", index), "terminal", false, 0),
 		)
 	}
-	for index := 0; index < maximumRetryDiscoveryActions; index++ {
+	for index := 0; index < maximumRepositoryDiscoveryActions; index++ {
 		events = append(events,
 			actionEvent(fmt.Sprintf("recovery-view-%02d", index), "file_editor", "view"),
 			observationEvent(fmt.Sprintf("recovery-view-observation-%02d", index), "file_editor", false, 0),
@@ -494,7 +494,7 @@ func TestClientExplicitRecoveryProfileEnforcesBoundedReadAllowance(t *testing.T)
 	)
 	state.events = events
 	observation, err = client.Inspect(context.Background(), brief, string(brief.InvocationID), digest)
-	if err != nil || observation.State != application.ExternalFailed || state.interruptCalls != 1 || !strings.Contains(string(observation.Output), fmt.Sprintf(`"repository_discovery_actions":%d`, maximumRetryDiscoveryActions+1)) || !strings.Contains(string(observation.Output), fmt.Sprintf(`"repository_discovery_limit":%d`, maximumRetryDiscoveryActions)) {
+	if err != nil || observation.State != application.ExternalFailed || state.interruptCalls != 1 || !strings.Contains(string(observation.Output), fmt.Sprintf(`"repository_discovery_actions":%d`, maximumRepositoryDiscoveryActions+1)) || !strings.Contains(string(observation.Output), fmt.Sprintf(`"repository_discovery_limit":%d`, maximumRepositoryDiscoveryActions)) {
 		t.Fatalf("bounded recovery observation=%#v err=%v interrupts=%d", observation, err, state.interruptCalls)
 	}
 }
@@ -539,7 +539,7 @@ func TestClientExplicitRecoveryReadAllowanceResetsAfterSuccessfulMutation(t *tes
 		actionEvent("edit", "file_editor", "str_replace"),
 		observationEvent("edit-observation", "file_editor", false, 0),
 	}
-	for index := 0; index < maximumRetryDiscoveryActions-1; index++ {
+	for index := 0; index < maximumRepositoryDiscoveryActions-1; index++ {
 		events = append(events,
 			actionEvent(fmt.Sprintf("view-after-edit-%02d", index), "file_editor", "view"),
 			observationEvent(fmt.Sprintf("view-after-edit-observation-%02d", index), "file_editor", false, 0),
