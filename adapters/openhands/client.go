@@ -446,9 +446,14 @@ func (client *Client) Inspect(ctx context.Context, brief application.ExecutionBr
 	if progressGuardApplies(brief) {
 		discoveryActions, _ := repositoryProgress(events, currentPromptIndex)
 		discoveryLimit := maximumRepositoryDiscoveryActions
+		limitExceeded := discoveryActions >= discoveryLimit
 		if brief.RetryOrdinal > 0 && currentPromptIndex > 0 && explicitRecoveryProfile(brief) {
 			discoveryActions, _ = recoveryRepositoryProgress(events, currentPromptIndex)
 			discoveryLimit = maximumRetryDiscoveryActions
+			// The model must be allowed to choose its next action after using
+			// the final permitted read. Interrupt only after it actually issues
+			// another read; a mutation resets the recovery allowance below.
+			limitExceeded = discoveryActions > discoveryLimit
 		} else if brief.RetryOrdinal > 0 && currentPromptIndex > 0 {
 			priorDiscoveryActions, priorProgressObserved := repositoryProgress(events[:currentPromptIndex], -1)
 			if !priorProgressObserved {
@@ -458,8 +463,9 @@ func (client *Client) Inspect(ctx context.Context, brief application.ExecutionBr
 				discoveryActions += priorDiscoveryActions
 				discoveryLimit += maximumRetryDiscoveryActions
 			}
+			limitExceeded = discoveryActions >= discoveryLimit
 		}
-		if discoveryActions >= discoveryLimit && executionStillActive(info.ExecutionStatus) {
+		if limitExceeded && executionStillActive(info.ExecutionStatus) {
 			return client.stopForNoProgress(ctx, brief, requestDigest, info, events, discoveryActions, discoveryLimit)
 		}
 	}

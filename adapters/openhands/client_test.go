@@ -434,7 +434,7 @@ func TestClientExplicitRecoveryProfileEnforcesThreeReadAllowance(t *testing.T) {
 		observationEvent("prior-observation", "terminal", false, 0),
 	)
 	events = append(events, event("recovery-user", "MessageEvent", "user", string(encoded)))
-	for index := 0; index < maximumRetryDiscoveryActions-1; index++ {
+	for index := 0; index < maximumRetryDiscoveryActions; index++ {
 		events = append(events,
 			actionEvent(fmt.Sprintf("recovery-view-%02d", index), "file_editor", "view"),
 			observationEvent(fmt.Sprintf("recovery-view-observation-%02d", index), "file_editor", false, 0),
@@ -447,15 +447,15 @@ func TestClientExplicitRecoveryProfileEnforcesThreeReadAllowance(t *testing.T) {
 
 	observation, err := client.Inspect(context.Background(), brief, string(brief.InvocationID), digest)
 	if err != nil || observation.State != application.ExternalRunning || state.interruptCalls != 0 {
-		t.Fatalf("bounded recovery observation=%#v err=%v interrupts=%d", observation, err, state.interruptCalls)
+		t.Fatalf("full recovery allowance observation=%#v err=%v interrupts=%d", observation, err, state.interruptCalls)
 	}
 	events = append(events,
-		actionEvent("recovery-action-final", "terminal", "git status --short"),
-		observationEvent("recovery-observation-final", "terminal", false, 0),
+		actionEvent("recovery-action-excess", "terminal", "git status --short"),
+		observationEvent("recovery-observation-excess", "terminal", false, 0),
 	)
 	state.events = events
 	observation, err = client.Inspect(context.Background(), brief, string(brief.InvocationID), digest)
-	if err != nil || observation.State != application.ExternalFailed || state.interruptCalls != 1 || !strings.Contains(string(observation.Output), `"repository_discovery_actions":3`) || !strings.Contains(string(observation.Output), `"repository_discovery_limit":3`) {
+	if err != nil || observation.State != application.ExternalFailed || state.interruptCalls != 1 || !strings.Contains(string(observation.Output), `"repository_discovery_actions":4`) || !strings.Contains(string(observation.Output), `"repository_discovery_limit":3`) {
 		t.Fatalf("bounded recovery observation=%#v err=%v interrupts=%d", observation, err, state.interruptCalls)
 	}
 }
