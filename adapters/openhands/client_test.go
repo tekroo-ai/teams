@@ -461,6 +461,12 @@ func TestClientExplicitRecoveryProfileEnforcesThreeReadAllowance(t *testing.T) {
 	digest := kernel.Digest(hex.EncodeToString(hash[:]))
 	workspace := filepath.Join(t.TempDir(), "workspace")
 	events := []map[string]any{event("recovery-user", "MessageEvent", "user", string(encoded))}
+	for index, command := range []string{"git status", "git log --oneline -10", "git show --stat HEAD", "git diff --check"} {
+		events = append(events,
+			actionEvent(fmt.Sprintf("metadata-%02d", index), "terminal", command),
+			observationEvent(fmt.Sprintf("metadata-observation-%02d", index), "terminal", false, 0),
+		)
+	}
 	for index := 0; index < maximumRetryDiscoveryActions; index++ {
 		events = append(events,
 			actionEvent(fmt.Sprintf("recovery-view-%02d", index), "file_editor", "view"),
@@ -477,7 +483,7 @@ func TestClientExplicitRecoveryProfileEnforcesThreeReadAllowance(t *testing.T) {
 		t.Fatalf("full recovery allowance observation=%#v err=%v interrupts=%d", observation, err, state.interruptCalls)
 	}
 	events = append(events,
-		actionEvent("recovery-action-excess", "terminal", "git status --short"),
+		actionEvent("recovery-action-excess", "terminal", "git --no-pager diff"),
 		observationEvent("recovery-observation-excess", "terminal", false, 0),
 	)
 	state.events = events

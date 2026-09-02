@@ -1182,10 +1182,53 @@ func recoveryRepositoryProgress(events []rawEvent, promptIndex int) (int, bool) 
 }
 
 func repositoryReadOnlyAction(event rawEvent) bool {
-	if mutationAction(event) || workProgressAction(event) {
+	if mutationAction(event) || workProgressAction(event) || repositoryMetadataValidationAction(event) {
 		return false
 	}
 	return repositorySearchProgressAction(event)
+}
+
+// repositoryMetadataValidationAction recognizes Git commands that verify a
+// checkpoint without reading source content. They do not consume the bounded
+// source-inspection allowance; plain diffs and file-content commands still do.
+func repositoryMetadataValidationAction(event rawEvent) bool {
+	if event.ToolName != "terminal" {
+		return false
+	}
+	fields := strings.Fields(strings.ToLower(strings.TrimSpace(event.ActionCommand)))
+	if len(fields) < 2 || filepath.Base(fields[0]) != "git" {
+		return false
+	}
+	index := 1
+	for index < len(fields) && strings.HasPrefix(fields[index], "-") {
+		index++
+	}
+	if index >= len(fields) {
+		return false
+	}
+	subcommand := fields[index]
+	arguments := fields[index+1:]
+	switch subcommand {
+	case "status", "log", "rev-parse", "branch":
+		return true
+	case "show":
+		return containsAnyField(arguments, "--stat", "--summary", "--name-only", "--name-status")
+	case "diff":
+		return containsAnyField(arguments, "--check", "--stat", "--summary", "--name-only", "--name-status")
+	default:
+		return false
+	}
+}
+
+func containsAnyField(fields []string, candidates ...string) bool {
+	for _, field := range fields {
+		for _, candidate := range candidates {
+			if field == candidate {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func workProgressAction(event rawEvent) bool {
