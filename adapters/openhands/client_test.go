@@ -275,6 +275,33 @@ func TestClientInterruptsImplementationAfterTwelveReadOnlyRepositoryActions(t *t
 	}
 }
 
+func TestClientAllowsTargetedFileInspectionBeyondTwelveTotalActions(t *testing.T) {
+	brief, digest := openHandsTestBrief(t)
+	workspace := filepath.Join(t.TempDir(), "workspace")
+	events := []map[string]any{
+		event("evt-user", "MessageEvent", "user", string(mustJSON(brief))),
+		actionEvent("instructions", "terminal", "cat AGENTS.md"),
+		observationEvent("instructions-observation", "terminal", false, 0),
+		actionEvent("discovery", "terminal", "rg --files"),
+		observationEvent("discovery-observation", "terminal", false, 0),
+	}
+	for index := 0; index < maximumRepositoryDiscoveryActions; index++ {
+		events = append(events,
+			actionEvent(fmt.Sprintf("view-%02d", index), "file_editor", "view"),
+			observationEvent(fmt.Sprintf("view-observation-%02d", index), "file_editor", false, 0),
+		)
+	}
+	state := &progressGuardServerState{prompt: string(mustJSON(brief)), workspace: workspace, events: events}
+	server := httptest.NewServer(http.HandlerFunc(state.serveHTTP))
+	defer server.Close()
+	client := newOpenHandsTestClient(t, server.URL, workspace, brief)
+
+	observation, err := client.Inspect(context.Background(), brief, string(brief.InvocationID), digest)
+	if err != nil || observation.State != application.ExternalRunning || state.interruptCalls != 0 {
+		t.Fatalf("targeted inspection observation=%#v err=%v interrupts=%d", observation, err, state.interruptCalls)
+	}
+}
+
 func TestClientInterruptsReadOnlyPlannerAfterTwelveRepositoryActions(t *testing.T) {
 	brief, _ := openHandsTestBrief(t)
 	brief.Purpose = kernel.PurposeReplan

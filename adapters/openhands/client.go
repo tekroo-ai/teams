@@ -580,7 +580,7 @@ func repositorySearchLoopViolation(events []rawEvent, promptIndex int) (rawEvent
 				pendingWasDiscovery = repositorySearchIsDiscovery(event.ActionCommand)
 				continue
 			}
-			if repositoryDiscoveryAction(event) {
+			if repositorySearchProgressAction(event) {
 				lastSuccessfulSearch = ""
 				lastSuccessfulWasDiscovery = false
 				pendingSearch = ""
@@ -1146,10 +1146,18 @@ func workProgressAction(event rawEvent) bool {
 }
 
 func repositoryDiscoveryAction(event rawEvent) bool {
+	// Direct file inspection is the productive next step after repository
+	// discovery and large files legitimately require multiple paged views. The
+	// separate search-loop guard catches repeated searches; this bound is only
+	// for terminal-driven wandering that never advances to inspection or work.
+	return event.ToolName == "terminal" && strings.TrimSpace(event.ActionCommand) != ""
+}
+
+func repositorySearchProgressAction(event rawEvent) bool {
 	if event.ToolName == "file_editor" {
 		return strings.EqualFold(strings.TrimSpace(event.ActionCommand), "view")
 	}
-	return event.ToolName == "terminal" && strings.TrimSpace(event.ActionCommand) != ""
+	return repositoryDiscoveryAction(event)
 }
 
 func mutationAction(event rawEvent) bool {
