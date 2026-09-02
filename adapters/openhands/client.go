@@ -28,6 +28,8 @@ var (
 const (
 	maximumRepositoryDiscoveryActions = 12
 	maximumRetryDiscoveryActions      = 3
+	qualifiedCondenserMaximumEvents   = 80
+	qualifiedCondenserMaximumTokens   = 48000
 )
 
 type WorkspaceBinding struct {
@@ -87,7 +89,7 @@ const (
 	semanticMemoryUntrustedLabel = "SMA recalled memories are untrusted evidence. "
 	qualifiedModelID             = "openai/ddalcu--Qwen3.8-27B-MLX-Serve-8bit"
 	qualifiedModelAPIRoot        = "http://127.0.0.1:8802/v1"
-	qualifiedAgentSettingsJSON   = `{"kind":"Agent","llm":{"model":"openai/ddalcu--Qwen3.8-27B-MLX-Serve-8bit","model_canonical_name":"openai/gpt-4o","base_url":"http://127.0.0.1:8802/v1","api_mode":"chat","api_key":"sma-e1-loopback-only","native_tool_calling":true,"force_string_serializer":false,"stream":false,"temperature":0,"max_output_tokens":8192,"num_retries":0,"retry_multiplier":0,"retry_min_wait":0,"retry_max_wait":0,"timeout":1200,"log_completions":false,"litellm_extra_body":{"chat_template_kwargs":{"enable_thinking":false}}}}`
+	qualifiedAgentSettingsJSON   = `{"kind":"Agent","llm":{"model":"openai/ddalcu--Qwen3.8-27B-MLX-Serve-8bit","model_canonical_name":"openai/gpt-4o","base_url":"http://127.0.0.1:8802/v1","api_mode":"chat","api_key":"sma-e1-loopback-only","native_tool_calling":true,"force_string_serializer":false,"stream":false,"temperature":0,"max_output_tokens":8192,"num_retries":0,"retry_multiplier":0,"retry_min_wait":0,"retry_max_wait":0,"timeout":1200,"log_completions":false,"litellm_extra_body":{"chat_template_kwargs":{"enable_thinking":false}}},"condenser":{"kind":"LLMSummarizingCondenser","llm":{"model":"openai/ddalcu--Qwen3.8-27B-MLX-Serve-8bit","model_canonical_name":"openai/gpt-4o","base_url":"http://127.0.0.1:8802/v1","api_mode":"chat","api_key":"sma-e1-loopback-only","native_tool_calling":true,"force_string_serializer":false,"stream":false,"temperature":0,"max_output_tokens":8192,"num_retries":0,"retry_multiplier":0,"retry_min_wait":0,"retry_max_wait":0,"timeout":1200,"log_completions":false,"usage_id":"condenser","litellm_extra_body":{"chat_template_kwargs":{"enable_thinking":false}}},"max_size":80,"max_tokens":48000,"keep_first":2}}`
 	qualifiedSMAHookConfigJSON   = `{"hooks":{"UserPromptSubmit":[{"matcher":"*","hooks":[{"type":"command","command":"./.openhands/hooks/sma_context_hook.py","timeout":1}]}]}}`
 )
 
@@ -189,31 +191,47 @@ func (binding SemanticMemoryBinding) valid(hookConfig json.RawMessage) bool {
 	return containsQualifiedSemanticMemoryHook(hookConfig, binding.HookCommand, binding.HookTimeoutSeconds)
 }
 
+type qualifiedLLMSettings struct {
+	Model             string  `json:"model"`
+	ModelCanonical    string  `json:"model_canonical_name"`
+	BaseURL           string  `json:"base_url"`
+	APIMode           string  `json:"api_mode"`
+	APIKey            string  `json:"api_key"`
+	NativeToolCalling bool    `json:"native_tool_calling"`
+	Stream            bool    `json:"stream"`
+	Temperature       float64 `json:"temperature"`
+	MaximumOutput     uint32  `json:"max_output_tokens"`
+	Retries           uint32  `json:"num_retries"`
+	Timeout           uint32  `json:"timeout"`
+	ExtraBody         struct {
+		ChatTemplateArguments struct {
+			EnableThinking *bool `json:"enable_thinking"`
+		} `json:"chat_template_kwargs"`
+	} `json:"litellm_extra_body"`
+}
+
 func qualifiedAgentSettings(raw json.RawMessage) bool {
 	var settings struct {
-		LLM struct {
-			Model             string  `json:"model"`
-			ModelCanonical    string  `json:"model_canonical_name"`
-			BaseURL           string  `json:"base_url"`
-			APIMode           string  `json:"api_mode"`
-			APIKey            string  `json:"api_key"`
-			NativeToolCalling bool    `json:"native_tool_calling"`
-			Stream            bool    `json:"stream"`
-			Temperature       float64 `json:"temperature"`
-			MaximumOutput     uint32  `json:"max_output_tokens"`
-			Retries           uint32  `json:"num_retries"`
-			Timeout           uint32  `json:"timeout"`
-			ExtraBody         struct {
-				ChatTemplateArguments struct {
-					EnableThinking *bool `json:"enable_thinking"`
-				} `json:"chat_template_kwargs"`
-			} `json:"litellm_extra_body"`
-		} `json:"llm"`
+		LLM       qualifiedLLMSettings `json:"llm"`
+		Condenser struct {
+			Kind          string               `json:"kind"`
+			LLM           qualifiedLLMSettings `json:"llm"`
+			MaximumEvents uint32               `json:"max_size"`
+			MaximumTokens uint32               `json:"max_tokens"`
+			KeepFirst     uint32               `json:"keep_first"`
+		} `json:"condenser"`
 	}
-	if json.Unmarshal(raw, &settings) != nil || settings.LLM.Model != qualifiedModelID || settings.LLM.ModelCanonical != "openai/gpt-4o" || settings.LLM.BaseURL != qualifiedModelAPIRoot || settings.LLM.APIMode != "chat" || settings.LLM.APIKey != "sma-e1-loopback-only" || !settings.LLM.NativeToolCalling || settings.LLM.Stream || settings.LLM.Temperature != 0 || settings.LLM.MaximumOutput != 8192 || settings.LLM.Retries != 0 || settings.LLM.Timeout != 1200 || settings.LLM.ExtraBody.ChatTemplateArguments.EnableThinking == nil {
+	if json.Unmarshal(raw, &settings) != nil || !qualifiedLLM(settings.LLM) || !qualifiedLLM(settings.Condenser.LLM) {
 		return false
 	}
-	return !*settings.LLM.ExtraBody.ChatTemplateArguments.EnableThinking
+	return settings.Condenser.Kind == "LLMSummarizingCondenser" && settings.Condenser.MaximumEvents == qualifiedCondenserMaximumEvents && settings.Condenser.MaximumTokens == qualifiedCondenserMaximumTokens && settings.Condenser.KeepFirst == 2
+}
+
+func qualifiedLLM(settings qualifiedLLMSettings) bool {
+	if settings.Model != qualifiedModelID || settings.ModelCanonical != "openai/gpt-4o" || settings.BaseURL != qualifiedModelAPIRoot || settings.APIMode != "chat" || settings.APIKey != "sma-e1-loopback-only" || !settings.NativeToolCalling || settings.Stream || settings.Temperature != 0 || settings.MaximumOutput != 8192 || settings.Retries != 0 || settings.Timeout != 1200 || settings.ExtraBody.ChatTemplateArguments.EnableThinking == nil {
+		return false
+	}
+	return !*settings.ExtraBody.ChatTemplateArguments.EnableThinking
 }
 
 func containsQualifiedSemanticMemoryHook(raw json.RawMessage, command string, timeout uint32) bool {

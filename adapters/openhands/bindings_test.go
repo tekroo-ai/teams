@@ -128,6 +128,22 @@ func TestQualifiedAgentSettingsUseOperationalRequestTimeout(t *testing.T) {
 	if qualifiedAgentSettings(shortTimeout) {
 		t.Fatal("five-minute LLM timeout accepted")
 	}
+	lateCondensation := json.RawMessage(strings.Replace(string(qualifiedSMAAgentSettings), `"max_tokens":48000`, `"max_tokens":100000`, 1))
+	if qualifiedAgentSettings(lateCondensation) {
+		t.Fatal("memory-unsafe condenser token limit accepted")
+	}
+	var settings map[string]any
+	if json.Unmarshal(qualifiedSMAAgentSettings, &settings) != nil {
+		t.Fatal("decode accepted settings")
+	}
+	delete(settings, "condenser")
+	missingCondenser, err := json.Marshal(settings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if qualifiedAgentSettings(missingCondenser) {
+		t.Fatal("profile without a token-bounded condenser accepted")
+	}
 }
 
 func TestAcceptedSemanticMemoryBindingMatchesRetainedStep15Evidence(t *testing.T) {
