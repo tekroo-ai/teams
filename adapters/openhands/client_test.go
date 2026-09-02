@@ -386,6 +386,57 @@ func TestClientRetryProgressGuardCapsPreEnforcementHistory(t *testing.T) {
 	}
 }
 
+func TestClientExplicitRecoveryProfileGetsFreshDiscoveryBudget(t *testing.T) {
+	brief, _ := openHandsTestBrief(t)
+	priorID := kernel.UUIDv7("00000000-0000-7000-8000-000000000200")
+	priorProfileID := brief.WorkProfile.ProfileID
+	brief.RetryOfInvocationID = &priorID
+	brief.RetryOrdinal = 2
+	brief.AttemptOrdinal = 3
+	brief.WorkProfile.ProfileID = "00000000-0000-7000-8000-000000000211"
+	brief.WorkProfile.ProfileRevision = 2
+	brief.WorkProfile.SupersedesProfileID = &priorProfileID
+	brief.SemanticContext.WorkProfile = brief.WorkProfile.Binding()
+	encoded := mustJSON(brief)
+	hash := sha256.Sum256(encoded)
+	digest := kernel.Digest(hex.EncodeToString(hash[:]))
+	workspace := filepath.Join(t.TempDir(), "workspace")
+	events := []map[string]any{event("prior-user", "MessageEvent", "user", "prior attempt")}
+	for index := 0; index < maximumRepositoryDiscoveryActions; index++ {
+		events = append(events,
+			actionEvent(fmt.Sprintf("prior-action-%02d", index), "terminal", "rg -n Actor organization/*.go"),
+			observationEvent(fmt.Sprintf("prior-observation-%02d", index), "terminal", false, 0),
+		)
+	}
+	events = append(events, event("recovery-user", "MessageEvent", "user", string(encoded)))
+	for index := 0; index < maximumRetryDiscoveryActions; index++ {
+		events = append(events,
+			actionEvent(fmt.Sprintf("recovery-action-%02d", index), "terminal", "sed -n '1,80p' organization/host.go"),
+			observationEvent(fmt.Sprintf("recovery-observation-%02d", index), "terminal", false, 0),
+		)
+	}
+	state := &progressGuardServerState{prompt: string(encoded), workspace: workspace, events: events}
+	server := httptest.NewServer(http.HandlerFunc(state.serveHTTP))
+	defer server.Close()
+	client := newOpenHandsTestClient(t, server.URL, workspace, brief)
+
+	observation, err := client.Inspect(context.Background(), brief, string(brief.InvocationID), digest)
+	if err != nil || observation.State != application.ExternalRunning || state.interruptCalls != 0 {
+		t.Fatalf("fresh recovery budget observation=%#v err=%v interrupts=%d", observation, err, state.interruptCalls)
+	}
+	for index := maximumRetryDiscoveryActions; index < maximumRepositoryDiscoveryActions; index++ {
+		events = append(events,
+			actionEvent(fmt.Sprintf("recovery-action-%02d", index), "terminal", "sed -n '1,80p' organization/host.go"),
+			observationEvent(fmt.Sprintf("recovery-observation-%02d", index), "terminal", false, 0),
+		)
+	}
+	state.events = events
+	observation, err = client.Inspect(context.Background(), brief, string(brief.InvocationID), digest)
+	if err != nil || observation.State != application.ExternalFailed || state.interruptCalls != 1 || !strings.Contains(string(observation.Output), `"repository_discovery_actions":12`) || !strings.Contains(string(observation.Output), `"repository_discovery_limit":12`) {
+		t.Fatalf("bounded recovery observation=%#v err=%v interrupts=%d", observation, err, state.interruptCalls)
+	}
+}
+
 func TestClientProgressGuardRequiresSuccessfulMutationObservation(t *testing.T) {
 	brief, digest := openHandsTestBrief(t)
 	workspace := filepath.Join(t.TempDir(), "workspace")

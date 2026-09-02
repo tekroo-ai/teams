@@ -428,7 +428,7 @@ func (client *Client) Inspect(ctx context.Context, brief application.ExecutionBr
 	if progressGuardApplies(brief) {
 		discoveryActions, mutationObserved := repositoryProgress(events, currentPromptIndex)
 		discoveryLimit := maximumRepositoryDiscoveryActions
-		if brief.RetryOrdinal > 0 && currentPromptIndex > 0 {
+		if brief.RetryOrdinal > 0 && currentPromptIndex > 0 && !explicitRecoveryProfile(brief) {
 			priorDiscoveryActions, priorMutationObserved := repositoryProgress(events[:currentPromptIndex], -1)
 			if !priorMutationObserved {
 				if priorDiscoveryActions > maximumRepositoryDiscoveryActions {
@@ -778,6 +778,13 @@ func progressGuardApplies(brief application.ExecutionBrief) bool {
 		}
 	}
 	return true
+}
+
+// An evidence-bound operator recovery supersedes the prior work profile and
+// grants a fresh bounded execution window. Automatic retries retain their
+// predecessor's discovery count so repeated read-only loops still terminate.
+func explicitRecoveryProfile(brief application.ExecutionBrief) bool {
+	return brief.RetryOrdinal > 0 && brief.WorkProfile.SupersedesProfileID != nil
 }
 
 func executionStillActive(status string) bool {
