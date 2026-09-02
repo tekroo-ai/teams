@@ -1182,10 +1182,22 @@ func recoveryRepositoryProgress(events []rawEvent, promptIndex int) (int, bool) 
 }
 
 func repositoryReadOnlyAction(event rawEvent) bool {
-	if mutationAction(event) || workProgressAction(event) || repositoryMetadataValidationAction(event) {
+	if mutationAction(event) || workProgressAction(event) || repositoryMetadataValidationAction(event) || terminalControlAction(event) {
 		return false
 	}
 	return repositorySearchProgressAction(event)
+}
+
+func terminalControlAction(event rawEvent) bool {
+	if event.ToolName != "terminal" {
+		return false
+	}
+	switch strings.ToLower(strings.TrimSpace(event.ActionCommand)) {
+	case "c-c", "ctrl-c", "^c", "c-d", "ctrl-d", "^d":
+		return true
+	default:
+		return false
+	}
 }
 
 // repositoryMetadataValidationAction recognizes Git commands that verify a

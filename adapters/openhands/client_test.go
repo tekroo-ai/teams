@@ -475,6 +475,10 @@ func TestClientExplicitRecoveryProfileEnforcesBoundedReadAllowance(t *testing.T)
 			observationEvent(fmt.Sprintf("recovery-view-observation-%02d", index), "file_editor", false, 0),
 		)
 	}
+	events = append(events,
+		actionEvent("terminal-control", "terminal", "C-c"),
+		observationEvent("terminal-control-observation", "terminal", true, 1),
+	)
 	state := &progressGuardServerState{prompt: string(encoded), workspace: workspace, events: events}
 	server := httptest.NewServer(http.HandlerFunc(state.serveHTTP))
 	defer server.Close()
