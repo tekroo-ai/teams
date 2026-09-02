@@ -208,6 +208,38 @@ func planningRecoveryProfile(current kernel.WorkRiskProfile, prior kernel.WorkPr
 		if current.ProfileID == completionID && current.ProfileRevision == targetRevision+1 && current.SupersedesProfileID != nil && *current.SupersedesProfileID == targetID && current.ClassificationPolicyRevision == planning.PolicyRevision && current.ClassificationPolicyDigest == planning.ClassificationPolicyDigest && current.PromotionPolicyRevision == planning.PolicyRevision && current.PromotionPolicyDigest == planning.PromotionPolicyDigest && current.VerificationTopologyDigest == planning.VerificationTopologyDigest && current.Budgets.DeadlineAt.Equal(deadline) && containsEveryUUID(current.ClassificationEvidenceIDs, evidenceIDs) && planningRecoveryProfileDigestMatches(current) {
 			return current, true, nil
 		}
+		if compatibleCommittedRecoveryCompletion(current, prior, planning, deadline, evidenceIDs) {
+			return current, true, nil
+		}
+		// Another recovery of the same terminal task may already have committed
+		// the compatible successor profile before a later stage failed. Resume
+		// from that durable checkpoint instead of requiring the caller to retain
+		// the earlier request's condition-specific profile ID.
+		if compatibleCommittedRecoveryProfile(current, prior, planning, deadline, evidenceIDs) {
+			return current, true, nil
+		}
+		if committedRecoveryProfileBase(current, prior, planning, deadline) {
+			completed := current.Clone()
+			completed.ProfileID = deterministicOperationalUUID("planning-recovery-profile-completion", string(current.ProfileID), string(condition))
+			completed.ProfileRevision = current.ProfileRevision + 1
+			currentID := current.ProfileID
+			completed.SupersedesProfileID = &currentID
+			completed.ClassificationEvidenceIDs = append(completed.ClassificationEvidenceIDs, evidenceIDs...)
+			sort.Slice(completed.ClassificationEvidenceIDs, func(left, right int) bool {
+				return completed.ClassificationEvidenceIDs[left] < completed.ClassificationEvidenceIDs[right]
+			})
+			completed.ClassificationEvidenceIDs = uniqueUUIDs(completed.ClassificationEvidenceIDs)
+			completed.ProfileDigest = ""
+			encoded, err := json.Marshal(completed)
+			if err != nil {
+				return kernel.WorkRiskProfile{}, false, err
+			}
+			completed.ProfileDigest = digestBytes(encoded)
+			if !completed.Valid() {
+				return kernel.WorkRiskProfile{}, false, organization.ErrInvalidFeature
+			}
+			return completed, false, nil
+		}
 		if current.ProfileID != targetID || current.ProfileRevision != targetRevision || current.SupersedesProfileID == nil || *current.SupersedesProfileID != prior.ProfileID || current.ClassificationPolicyRevision != planning.PolicyRevision || current.ClassificationPolicyDigest != planning.ClassificationPolicyDigest || current.PromotionPolicyRevision != planning.PolicyRevision || current.PromotionPolicyDigest != planning.PromotionPolicyDigest || current.VerificationTopologyDigest != planning.VerificationTopologyDigest || !current.Budgets.DeadlineAt.Equal(deadline) {
 			return kernel.WorkRiskProfile{}, false, organization.ErrInvalidFeature
 		}
@@ -266,6 +298,27 @@ func planningRecoveryProfile(current kernel.WorkRiskProfile, prior kernel.WorkPr
 	return next, false, nil
 }
 
+func compatibleCommittedRecoveryProfile(current kernel.WorkRiskProfile, prior kernel.WorkProfileBinding, planning ProductionPlanning, deadline time.Time, evidenceIDs []kernel.UUIDv7) bool {
+	return committedRecoveryProfileBase(current, prior, planning, deadline) &&
+		containsEveryUUID(current.ClassificationEvidenceIDs, evidenceIDs) && planningRecoveryProfileDigestMatches(current)
+}
+
+func committedRecoveryProfileBase(current kernel.WorkRiskProfile, prior kernel.WorkProfileBinding, planning ProductionPlanning, deadline time.Time) bool {
+	return current.ProfileRevision == prior.ProfileRevision+1 &&
+		current.SupersedesProfileID != nil && *current.SupersedesProfileID == prior.ProfileID &&
+		current.ClassificationPolicyRevision == planning.PolicyRevision && current.ClassificationPolicyDigest == planning.ClassificationPolicyDigest &&
+		current.PromotionPolicyRevision == planning.PolicyRevision && current.PromotionPolicyDigest == planning.PromotionPolicyDigest &&
+		current.VerificationTopologyDigest == planning.VerificationTopologyDigest && current.Budgets.DeadlineAt.Equal(deadline) && planningRecoveryProfileDigestMatches(current)
+}
+
+func compatibleCommittedRecoveryCompletion(current kernel.WorkRiskProfile, prior kernel.WorkProfileBinding, planning ProductionPlanning, deadline time.Time, evidenceIDs []kernel.UUIDv7) bool {
+	return current.ProfileRevision == prior.ProfileRevision+2 && current.SupersedesProfileID != nil && *current.SupersedesProfileID != prior.ProfileID &&
+		current.ClassificationPolicyRevision == planning.PolicyRevision && current.ClassificationPolicyDigest == planning.ClassificationPolicyDigest &&
+		current.PromotionPolicyRevision == planning.PolicyRevision && current.PromotionPolicyDigest == planning.PromotionPolicyDigest &&
+		current.VerificationTopologyDigest == planning.VerificationTopologyDigest && current.Budgets.DeadlineAt.Equal(deadline) &&
+		containsEveryUUID(current.ClassificationEvidenceIDs, evidenceIDs) && planningRecoveryProfileDigestMatches(current)
+}
+
 func planningRecoveryProfileDigestMatches(profile kernel.WorkRiskProfile) bool {
 	claimed := profile.ProfileDigest
 	profile.ProfileDigest = ""
@@ -284,6 +337,13 @@ func (service *ProductionService) amendPlanningRecoveryBudget(ctx context.Contex
 		return kernel.WorkBudgetAccount{}, organization.ErrInvalidFeature
 	}
 	deadline := request.DeadlineAt.UTC()
+	// The feature budget is shared by its tasks. A prior task recovery may
+	// already provide enough time and capacity for this task's successor. Reuse
+	// that valid account rather than rejecting an equal or later deadline as a
+	// failed attempt to extend it again.
+	if recoveryBudgetAlreadyCovers(account, terminal, deadline) {
+		return account, nil
+	}
 	targetRevision := terminal.AdmissionPolicyRevision + 1
 	targetDigest := digestBytes([]byte("planning-recovery-budget\x00" + string(terminal.AdmissionPolicyDigest) + "\x00" + string(condition) + "\x00" + deadline.Format(time.RFC3339Nano)))
 	if targetRevision <= service.planning.PolicyRevision {
@@ -293,7 +353,7 @@ func (service *ProductionService) amendPlanningRecoveryBudget(ctx context.Contex
 	if account.PolicyRevision == targetRevision && account.PolicyDigest == targetDigest && account.DeadlineAt.Equal(deadline) {
 		return account, nil
 	}
-	if account.PolicyRevision != terminal.AdmissionPolicyRevision || account.PolicyDigest != terminal.AdmissionPolicyDigest || !deadline.After(account.DeadlineAt) {
+	if account.PolicyRevision != terminal.AdmissionPolicyRevision || account.PolicyDigest != terminal.AdmissionPolicyDigest || deadline.Before(account.DeadlineAt) {
 		return kernel.WorkBudgetAccount{}, organization.ErrInvalidFeature
 	}
 	evidenceIDs := make([]kernel.UUIDv7, len(evidence))
@@ -324,6 +384,10 @@ func (service *ProductionService) amendPlanningRecoveryBudget(ctx context.Contex
 		return kernel.WorkBudgetAccount{}, organization.ErrInvalidFeature
 	}
 	return updated, nil
+}
+
+func recoveryBudgetAlreadyCovers(account kernel.WorkBudgetAccount, terminal kernel.WorkInvocation, deadline time.Time) bool {
+	return !deadline.After(account.DeadlineAt) && account.PolicyRevision > terminal.AdmissionPolicyRevision
 }
 
 func (service *ProductionService) rebindPlanningRecoveryAssignment(ctx context.Context, feature organization.FeatureRequest, task *trackedTask, profile ProductionProfile, owner organization.RoleInstanceState) error {

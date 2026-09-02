@@ -71,6 +71,62 @@ func TestPlanningRecoveryProfileSupersedesDeadlineAndIsIdempotent(t *testing.T) 
 	}
 }
 
+func TestPlanningRecoveryProfileReusesCompatibleCommittedSuccessor(t *testing.T) {
+	tracked, _, _, _ := taskExecutionRefreshFixture(t)
+	prior := tracked.profile.Binding()
+	deadline := tracked.profile.Budgets.DeadlineAt.Add(time.Hour)
+	evidenceID := kernel.UUIDv7("00000000-0000-7000-8000-000000000304")
+	planning := ProductionPlanning{PolicyRevision: 2, ClassificationPolicyDigest: repeatedDigest('d'), PromotionPolicyDigest: repeatedDigest('e'), VerificationTopologyDigest: repeatedDigest('f')}
+
+	committed, _, err := planningRecoveryProfile(tracked.profile, prior, planning, repeatedDigest('a'), deadline, []kernel.UUIDv7{evidenceID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	reused, alreadyBound, err := planningRecoveryProfile(committed, prior, planning, repeatedDigest('b'), deadline, []kernel.UUIDv7{evidenceID})
+	if err != nil || !alreadyBound || reused.ProfileDigest != committed.ProfileDigest {
+		t.Fatalf("reused=%#v alreadyBound=%t err=%v", reused, alreadyBound, err)
+	}
+}
+
+func TestPlanningRecoveryProfileCompletesCompatibleSuccessorWithMissingEvidence(t *testing.T) {
+	tracked, _, _, _ := taskExecutionRefreshFixture(t)
+	prior := tracked.profile.Binding()
+	deadline := tracked.profile.Budgets.DeadlineAt.Add(time.Hour)
+	firstEvidence := kernel.UUIDv7("00000000-0000-7000-8000-000000000304")
+	recoveryEvidence := kernel.UUIDv7("00000000-0000-7000-8000-000000000305")
+	planning := ProductionPlanning{PolicyRevision: 2, ClassificationPolicyDigest: repeatedDigest('d'), PromotionPolicyDigest: repeatedDigest('e'), VerificationTopologyDigest: repeatedDigest('f')}
+
+	committed, _, err := planningRecoveryProfile(tracked.profile, prior, planning, repeatedDigest('a'), deadline, []kernel.UUIDv7{firstEvidence})
+	if err != nil {
+		t.Fatal(err)
+	}
+	completed, alreadyBound, err := planningRecoveryProfile(committed, prior, planning, repeatedDigest('b'), deadline, []kernel.UUIDv7{recoveryEvidence})
+	if err != nil || alreadyBound || completed.ProfileRevision != committed.ProfileRevision+1 || completed.SupersedesProfileID == nil || *completed.SupersedesProfileID != committed.ProfileID || !containsEveryUUID(completed.ClassificationEvidenceIDs, []kernel.UUIDv7{firstEvidence, recoveryEvidence}) {
+		t.Fatalf("completed=%#v alreadyBound=%t err=%v", completed, alreadyBound, err)
+	}
+	reloaded, alreadyBound, err := planningRecoveryProfile(completed, prior, planning, repeatedDigest('b'), deadline, []kernel.UUIDv7{recoveryEvidence})
+	if err != nil || !alreadyBound || reloaded.ProfileDigest != completed.ProfileDigest {
+		t.Fatalf("reloaded=%#v alreadyBound=%t err=%v", reloaded, alreadyBound, err)
+	}
+}
+
+func TestRecoveryBudgetReusesSharedAccountThatAlreadyCoversDeadline(t *testing.T) {
+	deadline := time.Date(2026, 9, 2, 10, 30, 0, 0, time.UTC)
+	terminal := kernel.WorkInvocation{AdmissionPolicyRevision: 25, AdmissionPolicyDigest: repeatedDigest('a')}
+	account := kernel.WorkBudgetAccount{PolicyRevision: 25, PolicyDigest: terminal.AdmissionPolicyDigest, DeadlineAt: deadline}
+	if recoveryBudgetAlreadyCovers(account, terminal, deadline) {
+		t.Fatal("terminal admission policy was reused without the revision required for a changed-condition retry")
+	}
+	account.PolicyRevision++
+	account.PolicyDigest = repeatedDigest('b')
+	if !recoveryBudgetAlreadyCovers(account, terminal, deadline.Add(-time.Minute)) {
+		t.Fatal("newer shared budget policy was not reused")
+	}
+	if recoveryBudgetAlreadyCovers(account, terminal, deadline.Add(time.Minute)) {
+		t.Fatal("insufficient shared deadline was reused")
+	}
+}
+
 func TestPlanningRecoveryProfileCompletesDurablePartialBinding(t *testing.T) {
 	tracked, _, _, _ := taskExecutionRefreshFixture(t)
 	prior := tracked.profile.Binding()
