@@ -343,6 +343,35 @@ func TestClientBoundsImplementationFileInspectionWithoutProgress(t *testing.T) {
 	}
 }
 
+func TestClientCountsConcurrentImplementationReadsIndividually(t *testing.T) {
+	brief, digest := openHandsTestBrief(t)
+	workspace := filepath.Join(t.TempDir(), "workspace")
+	events := []map[string]any{event("evt-user", "MessageEvent", "user", string(mustJSON(brief)))}
+	for index := 0; index < maximumRepositoryDiscoveryActions+1; index += 2 {
+		batchSize := 2
+		if remaining := maximumRepositoryDiscoveryActions + 1 - index; remaining < batchSize {
+			batchSize = remaining
+		}
+		for offset := 0; offset < batchSize; offset++ {
+			item := index + offset
+			events = append(events, actionEvent(fmt.Sprintf("action-%02d", item), "file_editor", "view"))
+		}
+		for offset := 0; offset < batchSize; offset++ {
+			item := index + offset
+			events = append(events, observationEvent(fmt.Sprintf("observation-%02d", item), "file_editor", false, 0))
+		}
+	}
+	state := &progressGuardServerState{prompt: string(mustJSON(brief)), workspace: workspace, events: events}
+	server := httptest.NewServer(http.HandlerFunc(state.serveHTTP))
+	defer server.Close()
+	client := newOpenHandsTestClient(t, server.URL, workspace, brief)
+
+	observation, err := client.Inspect(context.Background(), brief, string(brief.InvocationID), digest)
+	if err != nil || observation.State != application.ExternalFailed || !observation.Retryable || state.interruptCalls != 1 || !strings.Contains(string(observation.Output), `"repository_discovery_actions":13`) {
+		t.Fatalf("observation=%#v err=%v interrupts=%d", observation, err, state.interruptCalls)
+	}
+}
+
 func TestClientAllowsReadOnlyValidatorTargetedFileInspection(t *testing.T) {
 	brief, _ := openHandsTestBrief(t)
 	brief.Purpose = kernel.PurposeValidation
@@ -529,8 +558,57 @@ func TestClientExplicitRecoveryProfileEnforcesBoundedReadAllowance(t *testing.T)
 	)
 	state.events = events
 	observation, err = client.Inspect(context.Background(), brief, string(brief.InvocationID), digest)
-	if err != nil || observation.State != application.ExternalFailed || state.interruptCalls != 1 || !strings.Contains(string(observation.Output), fmt.Sprintf(`"repository_discovery_actions":%d`, maximumRepositoryDiscoveryActions+1)) || !strings.Contains(string(observation.Output), fmt.Sprintf(`"repository_discovery_limit":%d`, maximumRepositoryDiscoveryActions)) {
-		t.Fatalf("bounded recovery observation=%#v err=%v interrupts=%d", observation, err, state.interruptCalls)
+	if err != nil || observation.State != application.ExternalRunning || state.interruptCalls != 1 || state.correctionCalls != 1 || !strings.Contains(state.correctionText, implementationProgressCorrectionPrefix) {
+		t.Fatalf("corrected recovery observation=%#v err=%v interrupts=%d corrections=%d", observation, err, state.interruptCalls, state.correctionCalls)
+	}
+	state.events = append(state.events,
+		actionEvent("post-correction-read", "terminal", "sed -n '1,80p' cmd/tekroo/main.go"),
+		observationEvent("post-correction-read-observation", "terminal", false, 0),
+	)
+	observation, err = client.Inspect(context.Background(), brief, string(brief.InvocationID), digest)
+	if err != nil || observation.State != application.ExternalFailed || !observation.Retryable || !strings.Contains(string(observation.Output), `"repository_discovery_limit":0`) {
+		t.Fatalf("post-correction read observation=%#v err=%v", observation, err)
+	}
+}
+
+func TestClientExplicitRecoveryProgressCorrectionAllowsImmediateEdit(t *testing.T) {
+	brief, _ := openHandsTestBrief(t)
+	priorID := kernel.UUIDv7("00000000-0000-7000-8000-000000000200")
+	priorProfileID := brief.WorkProfile.ProfileID
+	brief.RetryOfInvocationID = &priorID
+	brief.RetryOrdinal = 1
+	brief.AttemptOrdinal = 2
+	brief.WorkProfile.ProfileID = "00000000-0000-7000-8000-000000000211"
+	brief.WorkProfile.ProfileRevision = 2
+	brief.WorkProfile.SupersedesProfileID = &priorProfileID
+	brief.SemanticContext.WorkProfile = brief.WorkProfile.Binding()
+	encoded := mustJSON(brief)
+	hash := sha256.Sum256(encoded)
+	digest := kernel.Digest(hex.EncodeToString(hash[:]))
+	workspace := filepath.Join(t.TempDir(), "workspace")
+	events := []map[string]any{event("recovery-user", "MessageEvent", "user", string(encoded))}
+	for index := 0; index < maximumRepositoryDiscoveryActions+1; index++ {
+		events = append(events,
+			actionEvent(fmt.Sprintf("read-%02d", index), "file_editor", "view"),
+			observationEvent(fmt.Sprintf("read-observation-%02d", index), "file_editor", false, 0),
+		)
+	}
+	state := &progressGuardServerState{prompt: string(encoded), workspace: workspace, events: events}
+	server := httptest.NewServer(http.HandlerFunc(state.serveHTTP))
+	defer server.Close()
+	client := newOpenHandsTestClient(t, server.URL, workspace, brief)
+
+	observation, err := client.Inspect(context.Background(), brief, string(brief.InvocationID), digest)
+	if err != nil || observation.State != application.ExternalRunning || state.correctionCalls != 1 {
+		t.Fatalf("correction observation=%#v err=%v corrections=%d", observation, err, state.correctionCalls)
+	}
+	state.events = append(state.events,
+		actionEvent("edit", "file_editor", "str_replace"),
+		observationEvent("edit-observation", "file_editor", false, 0),
+	)
+	observation, err = client.Inspect(context.Background(), brief, string(brief.InvocationID), digest)
+	if err != nil || observation.State != application.ExternalRunning || state.correctionCalls != 1 {
+		t.Fatalf("post-edit observation=%#v err=%v corrections=%d", observation, err, state.correctionCalls)
 	}
 }
 
@@ -893,7 +971,7 @@ func (state *progressGuardServerState) serveHTTP(writer http.ResponseWriter, req
 		status := "running"
 		if state.terminal {
 			status = "paused"
-		} else if state.interruptCalls > 0 {
+		} else if state.interruptCalls > state.correctionCalls {
 			status = "paused"
 		}
 		writeJSON(writer, map[string]any{"id": conversationID, "execution_status": status, "created_at": "2026-08-31T12:00:00Z", "workspace": map[string]any{"kind": "LocalWorkspace", "working_dir": state.workspace}, "agent": testConversationAgent(), "tags": map[string]string{"tekrooinvocation": conversationID, "tekroorequest": testRequestDigest(state.prompt)}})

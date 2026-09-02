@@ -451,10 +451,29 @@ func (client *Client) Inspect(ctx context.Context, brief application.ExecutionBr
 		return client.correctRepositorySearchLoop(ctx, brief, requestDigest, info, events, currentPromptIndex, violation)
 	}
 	if progressGuardApplies(brief) {
+		implementationGuard := brief.Purpose == kernel.PurposeImplementation || brief.Purpose == kernel.PurposeRepair
+		if implementationGuard && explicitRecoveryProfile(brief) {
+			correctionIndex := implementationProgressCorrectionIndex(events, currentPromptIndex)
+			if correctionIndex >= 0 {
+				discoveryActions, progressObserved := recoveryRepositoryProgress(events, correctionIndex)
+				if executionStillActive(info.ExecutionStatus) && ((!progressObserved && discoveryActions > 0) || discoveryActions > maximumRepositoryDiscoveryActions) {
+					limit := maximumRepositoryDiscoveryActions
+					if !progressObserved {
+						limit = 0
+					}
+					return client.stopForNoProgress(ctx, brief, requestDigest, info, events, discoveryActions, limit)
+				}
+				return client.observation(brief, requestDigest, info, events, false)
+			}
+			discoveryActions, _ := recoveryRepositoryProgress(events, currentPromptIndex)
+			if discoveryActions > maximumRepositoryDiscoveryActions && executionStillActive(info.ExecutionStatus) {
+				return client.correctImplementationProgress(ctx, brief, requestDigest, info, events)
+			}
+			return client.observation(brief, requestDigest, info, events, false)
+		}
 		discoveryActions, _ := repositoryProgress(events, currentPromptIndex)
 		discoveryLimit := maximumRepositoryDiscoveryActions
 		limitExceeded := discoveryActions >= discoveryLimit
-		implementationGuard := brief.Purpose == kernel.PurposeImplementation || brief.Purpose == kernel.PurposeRepair
 		if implementationGuard {
 			discoveryActions, _ = recoveryRepositoryProgress(events, currentPromptIndex)
 			// Permit the model to choose a productive next action after the
@@ -535,6 +554,16 @@ func (client *Client) ReconcileSuperseded(ctx context.Context, brief application
 
 const shellDisciplineCorrectionPrefix = "TEKROO_SHELL_DISCIPLINE_CORRECTION:"
 const repositoryProgressCorrectionPrefix = "TEKROO_REPOSITORY_PROGRESS_CORRECTION:"
+const implementationProgressCorrectionPrefix = "TEKROO_IMPLEMENTATION_PROGRESS_CORRECTION:"
+
+func implementationProgressCorrectionIndex(events []rawEvent, promptIndex int) int {
+	for index := len(events) - 1; index > promptIndex; index-- {
+		if events[index].Kind == "MessageEvent" && events[index].Source == "user" && strings.Contains(events[index].Text, implementationProgressCorrectionPrefix) {
+			return index
+		}
+	}
+	return -1
+}
 
 func shellDisciplineViolation(events []rawEvent, promptIndex int) (rawEvent, bool) {
 	for index, event := range events {
@@ -798,6 +827,40 @@ func (client *Client) correctRepositorySearchLoop(ctx context.Context, brief app
 		return client.observation(brief, requestDigest, info, events, false)
 	}
 	correction := repositoryProgressCorrectionPrefix + violation.ID + "\nThe previous action ran another repository search after a successful search had already returned concrete results. Continue this same task by inspecting one of the files already located and then produce the assigned result. Do not run another repository search in this retry."
+	status, _, err := client.request(ctx, http.MethodPost, "/api/conversations/"+url.PathEscape(conversationID)+"/events", map[string]any{
+		"role": "user", "run": true,
+		"content": []map[string]any{{"type": "text", "text": correction}},
+	})
+	if err != nil || status != http.StatusOK {
+		return application.ExternalExecutionObservation{}, ErrProtocol
+	}
+	if refreshed, refreshedStatus, refreshErr := client.getConversation(ctx, conversationID); refreshErr == nil && refreshedStatus == http.StatusOK {
+		info = refreshed
+	}
+	if refreshed, refreshErr := client.events(ctx, conversationID); refreshErr == nil {
+		events = refreshed
+	}
+	return client.observation(brief, requestDigest, info, events, false)
+}
+
+func (client *Client) correctImplementationProgress(ctx context.Context, brief application.ExecutionBrief, requestDigest kernel.Digest, info conversationInfo, events []rawEvent) (application.ExternalExecutionObservation, error) {
+	conversationID := string(brief.InvocationID)
+	if executionStillActive(info.ExecutionStatus) {
+		status, _, err := client.request(ctx, http.MethodPost, "/api/conversations/"+url.PathEscape(conversationID)+"/interrupt", nil)
+		if err != nil || status != http.StatusOK && status != http.StatusNoContent && status != http.StatusConflict {
+			return application.ExternalExecutionObservation{}, ErrProtocol
+		}
+	}
+	if refreshed, refreshedStatus, err := client.getConversation(ctx, conversationID); err == nil && refreshedStatus == http.StatusOK {
+		info = refreshed
+	}
+	if refreshed, err := client.events(ctx, conversationID); err == nil {
+		events = refreshed
+	}
+	if implementationProgressCorrectionIndex(events, promptIndex(events, string(mustJSON(brief)))) >= 0 {
+		return client.observation(brief, requestDigest, info, events, false)
+	}
+	correction := implementationProgressCorrectionPrefix + string(brief.InvocationID) + "\nYou have enough repository context. Continue this same task by making the smallest required edit in the files named by the task, then run its specified focused tests. Do not perform another repository read before a successful edit or test command."
 	status, _, err := client.request(ctx, http.MethodPost, "/api/conversations/"+url.PathEscape(conversationID)+"/events", map[string]any{
 		"role": "user", "run": true,
 		"content": []map[string]any{{"type": "text", "text": correction}},
@@ -1170,36 +1233,39 @@ func repositoryProgress(events []rawEvent, promptIndex int) (int, bool) {
 func recoveryRepositoryProgress(events []rawEvent, promptIndex int) (int, bool) {
 	readOnlyActions := 0
 	progressObserved := false
-	pendingProgressTool := ""
-	pendingReadOnlyTool := ""
+	type pendingAction uint8
+	const (
+		pendingRead pendingAction = iota + 1
+		pendingProgress
+	)
+	pendingByTool := make(map[string][]pendingAction)
 	for index, event := range events {
 		if index <= promptIndex {
 			continue
 		}
 		if event.Kind == "ActionEvent" && event.Source == "agent" {
-			pendingProgressTool = ""
-			pendingReadOnlyTool = ""
 			if workProgressAction(event) {
-				pendingProgressTool = event.ToolName
+				pendingByTool[event.ToolName] = append(pendingByTool[event.ToolName], pendingProgress)
 				continue
 			}
 			if repositoryReadOnlyAction(event) {
-				pendingReadOnlyTool = event.ToolName
+				pendingByTool[event.ToolName] = append(pendingByTool[event.ToolName], pendingRead)
 			}
 			continue
 		}
-		if pendingProgressTool != "" && event.Kind == "ObservationEvent" && event.ToolName == pendingProgressTool {
-			if !event.ObservationError && !event.ObservationTimeout && (event.ObservationExitCode == nil || *event.ObservationExitCode == 0) {
+		if event.Kind != "ObservationEvent" || len(pendingByTool[event.ToolName]) == 0 {
+			continue
+		}
+		pending := pendingByTool[event.ToolName][0]
+		pendingByTool[event.ToolName] = pendingByTool[event.ToolName][1:]
+		if !event.ObservationError && !event.ObservationTimeout && (event.ObservationExitCode == nil || *event.ObservationExitCode == 0) {
+			switch pending {
+			case pendingProgress:
 				readOnlyActions = 0
 				progressObserved = true
-			}
-			pendingProgressTool = ""
-		}
-		if pendingReadOnlyTool != "" && event.Kind == "ObservationEvent" && event.ToolName == pendingReadOnlyTool {
-			if !event.ObservationError && !event.ObservationTimeout && (event.ObservationExitCode == nil || *event.ObservationExitCode == 0) {
+			case pendingRead:
 				readOnlyActions++
 			}
-			pendingReadOnlyTool = ""
 		}
 	}
 	return readOnlyActions, progressObserved
