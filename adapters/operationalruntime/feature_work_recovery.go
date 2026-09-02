@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"time"
 
 	"github.com/tekroo-ai/teams/kernel"
 	"github.com/tekroo-ai/teams/organization"
@@ -65,6 +66,13 @@ func (service *ProductionService) reconcileFeaturePlan(ctx context.Context, feat
 	if !found || !budget.Valid() {
 		return errors.New("feature work budget is missing")
 	}
+	deadlinesExtended, err := service.reconcileFeatureProfileDeadlines(ctx, feature, plan, states, heads, snapshot, budget)
+	if err != nil {
+		return err
+	}
+	if deadlinesExtended {
+		return nil
+	}
 	revalidationAuthorized, err := service.reconcileValidationRounds(ctx, feature, plan, states, heads, invocations, snapshot, budget.Revision)
 	if err != nil {
 		return err
@@ -97,6 +105,12 @@ func (service *ProductionService) reconcileFeaturePlan(ctx context.Context, feat
 				continue
 			}
 			latest, found := invocations[item.ID]
+			if !found {
+				if err := service.resumeInvocationlessActiveTask(ctx, feature, item, state, heads[item.ID], snapshot, budget); err != nil {
+					return err
+				}
+				return nil
+			}
 			if found && (latest.State == kernel.InvocationFailed || latest.State == kernel.InvocationTimedOut || latest.State == kernel.InvocationStartFailed) && latest.Retryable != nil && *latest.Retryable && latest.AttemptOrdinal < uint64(item.AttemptLimit) {
 				profileConfig, configured := service.profilesByModel[item.ModelProfile]
 				owner, active, ownerErr := service.RoleHost.Status(ctx, item.Owner)
@@ -183,6 +197,105 @@ func (service *ProductionService) reconcileFeaturePlan(ctx context.Context, feat
 		budget.Revision++
 	}
 	return nil
+}
+
+func (service *ProductionService) reconcileFeatureProfileDeadlines(ctx context.Context, feature organization.FeatureRequest, plan organization.FeaturePlan, states map[kernel.UUIDv7]kernel.AggregateState, heads map[kernel.UUIDv7]kernel.UUIDv7, snapshot kernel.Snapshot, budget kernel.WorkBudgetAccount) (bool, error) {
+	now := service.clock.Now().UTC()
+	if !budget.DeadlineAt.After(now) {
+		return false, nil
+	}
+	evidenceIDs := featureDeadlineExtensionEvidenceIDs(plan, snapshot, budget.DeadlineAt)
+	changed := false
+	for _, item := range plan.Tasks {
+		state, stateFound := states[item.ID]
+		if !stateFound || state.Phase == kernel.PhaseCompleted {
+			continue
+		}
+		if latest, found := latestTaskInvocation(snapshot.WorkInvocations, item.ID); found && latest.State == kernel.InvocationSucceeded {
+			continue
+		}
+		taskRef := kernel.AggregateRef{Kind: kernel.AggregateTask, ID: item.ID}
+		profileSnapshot, found := snapshot.WorkProfiles[taskRef]
+		if !found || !profileSnapshot.Valid() {
+			return false, organization.ErrInvalidFeature
+		}
+		current := profileSnapshot.Profile
+		if current.Budgets.DeadlineAt.After(now) || !current.Budgets.DeadlineAt.Before(budget.DeadlineAt) {
+			continue
+		}
+		if len(evidenceIDs) == 0 {
+			return false, organization.ErrInvalidFeature
+		}
+		condition := digestBytes([]byte("feature-deadline-profile\x00" + string(feature.ID) + "\x00" + string(item.ID) + "\x00" + string(budget.PolicyDigest) + "\x00" + budget.DeadlineAt.Format(time.RFC3339Nano)))
+		successor, alreadyBound, err := planningRecoveryProfile(current, current.Binding(), service.planning, condition, budget.DeadlineAt, evidenceIDs)
+		if err != nil {
+			return false, err
+		}
+		if alreadyBound {
+			continue
+		}
+		evidence, err := evidenceRefsForIDs(snapshot, successor.ClassificationEvidenceIDs)
+		if err != nil {
+			return false, err
+		}
+		tracked := &trackedTask{plan: item, revision: state.Revision, last: heads[item.ID], profile: successor}
+		key := "feature-deadline-profile-" + string(successor.ProfileID)
+		if err := service.applyTaskCommand(ctx, feature, tracked, "tekroo.command.task.bind-work-profile", kernel.SchemaVersion, service.policyAuthority, successor, evidence, nil, key); err != nil {
+			return false, err
+		}
+		changed = true
+	}
+	return changed, nil
+}
+
+func featureDeadlineExtensionEvidenceIDs(plan organization.FeaturePlan, snapshot kernel.Snapshot, deadline time.Time) []kernel.UUIDv7 {
+	var evidenceIDs []kernel.UUIDv7
+	for _, item := range plan.Tasks {
+		profile, found := snapshot.WorkProfiles[kernel.AggregateRef{Kind: kernel.AggregateTask, ID: item.ID}]
+		if !found || !profile.Valid() || profile.Profile.SupersedesProfileID == nil || !profile.Profile.Budgets.DeadlineAt.Equal(deadline) {
+			continue
+		}
+		evidenceIDs = append(evidenceIDs, profile.Profile.ClassificationEvidenceIDs...)
+	}
+	sort.Slice(evidenceIDs, func(left, right int) bool { return evidenceIDs[left] < evidenceIDs[right] })
+	return uniqueUUIDs(evidenceIDs)
+}
+
+func (service *ProductionService) resumeInvocationlessActiveTask(ctx context.Context, feature organization.FeatureRequest, item organization.PlannedTask, state kernel.AggregateState, head kernel.UUIDv7, snapshot kernel.Snapshot, budget kernel.WorkBudgetAccount) error {
+	taskRef := kernel.AggregateRef{Kind: kernel.AggregateTask, ID: item.ID}
+	profileSnapshot, profileFound := snapshot.WorkProfiles[taskRef]
+	assignment, assignmentFound := snapshot.QualifiedAssignments[taskRef]
+	binding, bindingFound := snapshot.TaskWorkBudgets[taskRef]
+	scope, scopeFound := snapshot.TaskOperationalScopes[taskRef]
+	if state.Phase != kernel.PhaseActive || state.Condition != kernel.ConditionRunnable || !profileFound || !profileSnapshot.Valid() || !assignmentFound || !assignment.Valid() || !bindingFound || !binding.Valid() || binding.BudgetAccountID != feature.BudgetAccountID || !scopeFound || !scope.Valid() || scope.TaskID != item.ID || !budget.Valid() || !budget.DeadlineAt.After(service.clock.Now().UTC()) {
+		return organization.ErrInvalidFeature
+	}
+	owner, active, err := service.RoleHost.Status(ctx, item.Owner)
+	if err != nil {
+		return err
+	}
+	if !active || owner.Status != organization.RoleIdle {
+		owner, err = service.RoleHost.EnsureStarted(ctx, item.Owner)
+	}
+	if err != nil || owner.Status != organization.RoleIdle {
+		return errors.Join(organization.ErrRoleNotRunning, err)
+	}
+	profileConfig, configured := service.profilesByModel[item.ModelProfile]
+	workspace, workspaceFound := service.workspacesByID[owner.WorkspaceID]
+	if !configured || !workspaceFound || owner.ModelProfile != item.ModelProfile {
+		return organization.ErrInvalidFeature
+	}
+	if err := service.registerExecution(ctx, owner, profileConfig); err != nil {
+		return err
+	}
+	tracked := &trackedTask{plan: item, revision: state.Revision, last: head, profile: profileSnapshot.Profile, owner: owner}
+	if err := service.rebindPlanningRecoveryAssignment(ctx, feature, tracked, profileConfig, owner); err != nil {
+		return err
+	}
+	if err := service.refreshTaskExecutionBinding(ctx, feature, tracked, profileConfig, workspace); err != nil {
+		return err
+	}
+	return service.authorizeTaskInvocationWithCondition(ctx, feature, tracked, profileConfig, workspace, budget.Revision, item.Purpose, 1, nil, nil)
 }
 
 // implementationChainDependencyReady permits a later implementation stage to
