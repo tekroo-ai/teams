@@ -134,6 +134,38 @@ func TestClientForksPriorConversationForRetryContinuity(t *testing.T) {
 	}
 }
 
+func TestClientCreatesCleanConversationForExplicitRecovery(t *testing.T) {
+	brief, _ := openHandsTestBrief(t)
+	priorID := kernel.UUIDv7("00000000-0000-7000-8000-000000000200")
+	priorProfileID := brief.WorkProfile.ProfileID
+	brief.RetryOfInvocationID = &priorID
+	brief.RetryOrdinal = 2
+	brief.AttemptOrdinal = 3
+	brief.WorkProfile.ProfileID = "00000000-0000-7000-8000-000000000211"
+	brief.WorkProfile.ProfileRevision = 2
+	brief.WorkProfile.SupersedesProfileID = &priorProfileID
+	brief.SemanticContext.WorkProfile = brief.WorkProfile.Binding()
+	encoded := mustJSON(brief)
+	hash := sha256.Sum256(encoded)
+	digest := kernel.Digest(hex.EncodeToString(hash[:]))
+	workspace := filepath.Join(t.TempDir(), "workspace")
+	state := &retryForkServerState{t: t, prompt: string(encoded), workspace: workspace, priorID: string(priorID), currentID: string(brief.InvocationID), requestDigest: string(digest)}
+	server := httptest.NewServer(http.HandlerFunc(state.serveHTTP))
+	defer server.Close()
+	client := newOpenHandsTestClient(t, server.URL, workspace, brief)
+
+	observation, err := client.Start(context.Background(), brief, digest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if observation.State != application.ExternalSucceeded || string(observation.Output) != "continued" {
+		t.Fatalf("observation = %#v", observation)
+	}
+	if state.createCalls != 1 || state.forkCalls != 0 || state.priorGets != 0 || state.submitCalls != 1 {
+		t.Fatalf("create=%d fork=%d prior_get=%d submit=%d", state.createCalls, state.forkCalls, state.priorGets, state.submitCalls)
+	}
+}
+
 func TestClientReconcileStartReturnsAbsentWithoutSubmittingDuplicate(t *testing.T) {
 	brief, digest := openHandsTestBrief(t)
 	workspace := filepath.Join(t.TempDir(), "workspace")
@@ -428,12 +460,7 @@ func TestClientExplicitRecoveryProfileEnforcesThreeReadAllowance(t *testing.T) {
 	hash := sha256.Sum256(encoded)
 	digest := kernel.Digest(hex.EncodeToString(hash[:]))
 	workspace := filepath.Join(t.TempDir(), "workspace")
-	events := []map[string]any{event("prior-user", "MessageEvent", "user", "prior attempt")}
-	events = append(events,
-		actionEvent("prior-action", "terminal", "rg -n Actor organization/*.go"),
-		observationEvent("prior-observation", "terminal", false, 0),
-	)
-	events = append(events, event("recovery-user", "MessageEvent", "user", string(encoded)))
+	events := []map[string]any{event("recovery-user", "MessageEvent", "user", string(encoded))}
 	for index := 0; index < maximumRetryDiscoveryActions; index++ {
 		events = append(events,
 			actionEvent(fmt.Sprintf("recovery-view-%02d", index), "file_editor", "view"),
@@ -817,9 +844,11 @@ type retryForkServerState struct {
 	currentID     string
 	requestDigest string
 	forked        bool
+	cleanCreated  bool
 	submitted     bool
 	forkCalls     int
 	createCalls   int
+	priorGets     int
 	submitCalls   int
 }
 
@@ -830,7 +859,7 @@ func (state *retryForkServerState) serveHTTP(writer http.ResponseWriter, request
 	}
 	switch {
 	case request.Method == http.MethodGet && request.URL.Path == "/api/conversations/"+state.currentID:
-		if !state.forked {
+		if !state.forked && !state.cleanCreated {
 			writer.WriteHeader(http.StatusNotFound)
 			return
 		}
@@ -838,8 +867,13 @@ func (state *retryForkServerState) serveHTTP(writer http.ResponseWriter, request
 		if state.submitted {
 			status = "finished"
 		}
-		writeJSON(writer, map[string]any{"id": state.currentID, "execution_status": status, "created_at": "2026-08-31T12:00:00Z", "forked_from_conversation_id": state.priorID, "workspace": map[string]any{"kind": "LocalWorkspace", "working_dir": state.workspace}, "agent": testConversationAgent(), "tags": map[string]string{"tekrooinvocation": state.currentID, "tekroorequest": state.requestDigest}})
+		info := map[string]any{"id": state.currentID, "execution_status": status, "created_at": "2026-08-31T12:00:00Z", "workspace": map[string]any{"kind": "LocalWorkspace", "working_dir": state.workspace}, "agent": testConversationAgent(), "tags": map[string]string{"tekrooinvocation": state.currentID, "tekroorequest": state.requestDigest}}
+		if state.forked {
+			info["forked_from_conversation_id"] = state.priorID
+		}
+		writeJSON(writer, info)
 	case request.Method == http.MethodGet && request.URL.Path == "/api/conversations/"+state.priorID:
+		state.priorGets++
 		writeJSON(writer, map[string]any{"id": state.priorID, "execution_status": "paused", "created_at": "2026-08-31T11:00:00Z", "workspace": map[string]any{"kind": "LocalWorkspace", "working_dir": state.workspace}, "tags": map[string]string{"tekrooinvocation": state.priorID, "tekroorequest": strings.Repeat("a", 64)}})
 	case request.Method == http.MethodPost && request.URL.Path == "/api/conversations/"+state.priorID+"/fork":
 		state.forkCalls++
@@ -858,6 +892,7 @@ func (state *retryForkServerState) serveHTTP(writer http.ResponseWriter, request
 		writer.WriteHeader(http.StatusCreated)
 	case request.Method == http.MethodPost && request.URL.Path == "/api/conversations":
 		state.createCalls++
+		state.cleanCreated = true
 		writer.WriteHeader(http.StatusCreated)
 	case request.Method == http.MethodPost && request.URL.Path == "/api/conversations/"+state.currentID+"/events":
 		state.submitCalls++

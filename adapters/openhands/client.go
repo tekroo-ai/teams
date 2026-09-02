@@ -364,7 +364,11 @@ func (client *Client) Start(ctx context.Context, brief application.ExecutionBrie
 }
 
 func (client *Client) createOrForkConversation(ctx context.Context, brief application.ExecutionBrief, prepared preparedExecution) (int, []byte, bool, error) {
-	if brief.RetryOfInvocationID == nil {
+	// An evidence-bound operator recovery already carries its predecessor and
+	// checkpoint lineage in the immutable execution brief. Start it cleanly so
+	// a failed agent loop is not copied into the successor model context.
+	// Automatic retries still fork for ordinary conversational continuity.
+	if brief.RetryOfInvocationID == nil || explicitRecoveryProfile(brief) {
 		status, body, err := client.createConversation(ctx, brief, prepared)
 		return status, body, false, err
 	}
@@ -447,7 +451,7 @@ func (client *Client) Inspect(ctx context.Context, brief application.ExecutionBr
 		discoveryActions, _ := repositoryProgress(events, currentPromptIndex)
 		discoveryLimit := maximumRepositoryDiscoveryActions
 		limitExceeded := discoveryActions >= discoveryLimit
-		if brief.RetryOrdinal > 0 && currentPromptIndex > 0 && explicitRecoveryProfile(brief) {
+		if brief.RetryOrdinal > 0 && explicitRecoveryProfile(brief) {
 			discoveryActions, _ = recoveryRepositoryProgress(events, currentPromptIndex)
 			discoveryLimit = maximumRetryDiscoveryActions
 			// The model must be allowed to choose its next action after using
