@@ -480,14 +480,20 @@ func planTaskExecutionRefresh(task *trackedTask, profile ProductionProfile, work
 	if snapshot.State == nil || snapshot.State.Revision != task.revision || snapshot.State.Ownership.OwnerFQN == nil || *snapshot.State.Ownership.OwnerFQN != task.owner.ActorFQN || !assignmentFound || !assignment.Valid() || !scopeFound || !scope.Valid() || !profileFound || !profileSnapshot.Valid() || !executionFound || currentExecution != task.owner.Execution {
 		return taskExecutionRefreshPlan{}, organization.ErrInvalidFeature
 	}
-	if assignment.TaskID != task.plan.ID || assignment.SelectedActorFQN != task.owner.ActorFQN || assignment.WorkProfile != task.profile.Binding() || assignment.ModelProfileDigest != profile.ModelProfileDigest || assignment.RuntimeIdentityDigest != profile.RuntimeIdentityDigest || assignment.Qualification.QualificationID != profile.Qualification.QualificationID || assignment.Qualification.QualificationDigest != profile.Qualification.QualificationDigest || assignment.Qualification.QualificationCorpusDigest != profile.Qualification.QualificationCorpusDigest || assignment.Qualification.ModelProfileDigest != profile.Qualification.ModelProfileDigest || assignment.Qualification.DecisionRoute != profile.Qualification.DecisionRoute || assignment.Qualification.QualifiedRole != profile.Qualification.QualifiedRole || assignment.Qualification.Status != profile.Qualification.Status || !assignment.Qualification.ObservedAt.Equal(profile.Qualification.ObservedAt) {
+	assignmentProfileCurrent := assignment.WorkProfile == task.profile.Binding()
+	assignmentProfilePredecessor := task.profile.SupersedesProfileID != nil &&
+		assignment.WorkProfile.ProfileID == *task.profile.SupersedesProfileID &&
+		assignment.WorkProfile.ProfileRevision+1 == task.profile.ProfileRevision &&
+		assignment.WorkProfile.LifecycleEpoch == task.profile.LifecycleEpoch &&
+		assignment.WorkProfile.ScopeRevision == task.profile.ScopeRevision
+	if assignment.TaskID != task.plan.ID || assignment.SelectedActorFQN != task.owner.ActorFQN || !assignmentProfileCurrent && !assignmentProfilePredecessor || assignment.ModelProfileDigest != profile.ModelProfileDigest || assignment.RuntimeIdentityDigest != profile.RuntimeIdentityDigest || assignment.Qualification.QualificationID != profile.Qualification.QualificationID || assignment.Qualification.QualificationDigest != profile.Qualification.QualificationDigest || assignment.Qualification.QualificationCorpusDigest != profile.Qualification.QualificationCorpusDigest || assignment.Qualification.ModelProfileDigest != profile.Qualification.ModelProfileDigest || assignment.Qualification.DecisionRoute != profile.Qualification.DecisionRoute || assignment.Qualification.QualifiedRole != profile.Qualification.QualifiedRole || assignment.Qualification.Status != profile.Qualification.Status || !assignment.Qualification.ObservedAt.Equal(profile.Qualification.ObservedAt) {
 		return taskExecutionRefreshPlan{}, organization.ErrInvalidFeature
 	}
 	if scope.TaskID != task.plan.ID || scope.OwnerFQN != task.owner.ActorFQN || scope.WorkspaceID != workspace.WorkspaceID || scope.WorktreeID != workspace.WorktreeID || scope.Branch != workspace.Branch || !slices.Equal(scope.WritablePaths, sortedStrings(workspace.WritablePaths)) {
 		return taskExecutionRefreshPlan{}, organization.ErrInvalidFeature
 	}
 	return taskExecutionRefreshPlan{
-		assignment: assignment.SelectedExecution() != task.owner.Execution,
+		assignment: !assignmentProfileCurrent || assignment.SelectedExecution() != task.owner.Execution,
 		scope:      scope.Execution != task.owner.Execution || scope.BaselineSHA != workspace.BaselineSHA,
 	}, nil
 }
@@ -511,7 +517,7 @@ func (service *ProductionService) refreshTaskExecutionBinding(ctx context.Contex
 		}
 		payload := map[string]any{
 			"assignment_id": assignment.AssignmentID, "task_id": task.plan.ID, "expected_task_revision": task.revision,
-			"work_profile": assignment.WorkProfile, "required_decision_route": assignment.RequiredDecisionRoute,
+			"work_profile": task.profile.Binding(), "required_decision_route": assignment.RequiredDecisionRoute,
 			"selected_decision_route": assignment.SelectedDecisionRoute, "selected_actor_fqn": task.owner.ActorFQN,
 			"selected_execution_id": task.owner.Execution.ExecutionID, "selected_fencing_epoch": task.owner.Execution.FencingEpoch,
 			"model_profile_digest": assignment.ModelProfileDigest, "runtime_identity_digest": assignment.RuntimeIdentityDigest,

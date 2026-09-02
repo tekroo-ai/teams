@@ -1,6 +1,7 @@
 package operationalruntime
 
 import (
+	"encoding/json"
 	"errors"
 	"testing"
 	"time"
@@ -65,6 +66,42 @@ func TestPlanTaskExecutionRefreshRejectsActorOrWorkspaceSubstitution(t *testing.
 	expandedWorkspace.WritablePaths = []string{".", "src"}
 	if _, err := planTaskExecutionRefresh(task, profile, expandedWorkspace, snapshot); !errors.Is(err, organization.ErrInvalidFeature) {
 		t.Fatalf("expanded writable scope error = %v", err)
+	}
+}
+
+func TestPlanTaskExecutionRefreshRebindsDirectSuccessorWorkProfile(t *testing.T) {
+	task, profile, workspace, snapshot := taskExecutionRefreshFixture(t)
+	taskRef := kernel.AggregateRef{Kind: kernel.AggregateTask, ID: task.plan.ID}
+	assignment := snapshot.QualifiedAssignments[taskRef]
+	assignment.SelectedExecutionID = task.owner.Execution.ExecutionID
+	assignment.SelectedFencingEpoch = task.owner.Execution.FencingEpoch
+	snapshot.QualifiedAssignments[taskRef] = assignment
+
+	predecessorID := task.profile.ProfileID
+	task.profile.ProfileID = "00000000-0000-7000-8000-000000000121"
+	task.profile.ProfileRevision++
+	task.profile.SupersedesProfileID = &predecessorID
+	task.profile.ProfileDigest = ""
+	encoded, err := json.Marshal(task.profile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	task.profile.ProfileDigest = digestBytes(encoded)
+	snapshot.WorkProfiles[taskRef] = kernel.WorkProfileSnapshot{BoundEventID: "00000000-0000-7000-8000-000000000122", TaskRevision: snapshot.State.Revision, Profile: task.profile}
+
+	plan, err := planTaskExecutionRefresh(task, profile, workspace, snapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !plan.assignment {
+		t.Fatalf("successor profile refresh plan = %+v, want assignment refresh", plan)
+	}
+
+	unrelated := assignment
+	unrelated.WorkProfile.ProfileID = "00000000-0000-7000-8000-000000000123"
+	snapshot.QualifiedAssignments[taskRef] = unrelated
+	if _, err := planTaskExecutionRefresh(task, profile, workspace, snapshot); !errors.Is(err, organization.ErrInvalidFeature) {
+		t.Fatalf("unrelated profile error = %v", err)
 	}
 }
 
