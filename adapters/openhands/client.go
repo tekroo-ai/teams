@@ -27,7 +27,7 @@ var (
 
 const (
 	maximumRepositoryDiscoveryActions = 12
-	maximumRetryDiscoveryActions      = 3
+	maximumRetryDiscoveryActions      = 6
 	qualifiedCondenserMaximumEvents   = 80
 	qualifiedCondenserMaximumTokens   = 48000
 )

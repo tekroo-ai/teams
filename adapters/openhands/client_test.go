@@ -393,7 +393,8 @@ func TestClientRetryProgressGuardCountsRetainedDiscoveryHistory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if observation.State != application.ExternalFailed || !observation.Retryable || !strings.Contains(string(observation.Output), `"repository_discovery_actions":15`) || !strings.Contains(string(observation.Output), `"repository_discovery_limit":15`) {
+	combinedLimit := maximumRepositoryDiscoveryActions + maximumRetryDiscoveryActions
+	if observation.State != application.ExternalFailed || !observation.Retryable || !strings.Contains(string(observation.Output), fmt.Sprintf(`"repository_discovery_actions":%d`, combinedLimit)) || !strings.Contains(string(observation.Output), fmt.Sprintf(`"repository_discovery_limit":%d`, combinedLimit)) {
 		t.Fatalf("observation = %#v", observation)
 	}
 	if state.interruptCalls != 1 {
@@ -440,12 +441,13 @@ func TestClientRetryProgressGuardCapsPreEnforcementHistory(t *testing.T) {
 	)
 	state.events = events
 	observation, err = client.Inspect(context.Background(), brief, string(brief.InvocationID), digest)
-	if err != nil || observation.State != application.ExternalFailed || state.interruptCalls != 1 || !strings.Contains(string(observation.Output), `"repository_discovery_actions":15`) {
+	combinedLimit := maximumRepositoryDiscoveryActions + maximumRetryDiscoveryActions
+	if err != nil || observation.State != application.ExternalFailed || state.interruptCalls != 1 || !strings.Contains(string(observation.Output), fmt.Sprintf(`"repository_discovery_actions":%d`, combinedLimit)) {
 		t.Fatalf("bounded continuation observation=%#v err=%v interrupts=%d", observation, err, state.interruptCalls)
 	}
 }
 
-func TestClientExplicitRecoveryProfileEnforcesThreeReadAllowance(t *testing.T) {
+func TestClientExplicitRecoveryProfileEnforcesBoundedReadAllowance(t *testing.T) {
 	brief, _ := openHandsTestBrief(t)
 	priorID := kernel.UUIDv7("00000000-0000-7000-8000-000000000200")
 	priorProfileID := brief.WorkProfile.ProfileID
@@ -488,7 +490,7 @@ func TestClientExplicitRecoveryProfileEnforcesThreeReadAllowance(t *testing.T) {
 	)
 	state.events = events
 	observation, err = client.Inspect(context.Background(), brief, string(brief.InvocationID), digest)
-	if err != nil || observation.State != application.ExternalFailed || state.interruptCalls != 1 || !strings.Contains(string(observation.Output), `"repository_discovery_actions":4`) || !strings.Contains(string(observation.Output), `"repository_discovery_limit":3`) {
+	if err != nil || observation.State != application.ExternalFailed || state.interruptCalls != 1 || !strings.Contains(string(observation.Output), fmt.Sprintf(`"repository_discovery_actions":%d`, maximumRetryDiscoveryActions+1)) || !strings.Contains(string(observation.Output), fmt.Sprintf(`"repository_discovery_limit":%d`, maximumRetryDiscoveryActions)) {
 		t.Fatalf("bounded recovery observation=%#v err=%v interrupts=%d", observation, err, state.interruptCalls)
 	}
 }
