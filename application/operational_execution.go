@@ -281,18 +281,35 @@ var readOnlyExecutionGuidance = []string{
 	"Inspect current interfaces and relevant tests only as needed to perform the assigned role, then return the required result through the finish tool.",
 }
 
-var sharedRetryExecutionGuidance = []string{
+var sharedRetainedRetryExecutionGuidance = []string{
 	"This is a bounded retry. Reuse the current workspace and retained task evidence; do not restart repository discovery from the beginning.",
 	"The prior OpenHands conversation is retained in this retry. Do not reread AGENTS.md or repeat ls, rg, find, sed, cat, or file-view actions already present in that history.",
 	"At most three additional read-only repository actions are allowed across the entire retry lineage; if the next role-appropriate action is still not justified, report an explicit blocker.",
 }
 
-var editableRetryExecutionGuidance = []string{
+var editableRetainedRetryExecutionGuidance = []string{
 	"Make the smallest justified code or test edit immediately from the retained findings. At most three additional read-only repository actions are allowed across the entire retry lineage; if an edit is still not justified, report an explicit blocker.",
 }
 
-var readOnlyRetryExecutionGuidance = []string{
+var readOnlyRetainedRetryExecutionGuidance = []string{
 	"Produce the assigned plan, review, or report immediately from the retained findings. Do not perform implementation edits.",
+}
+
+var sharedExplicitRecoveryExecutionGuidance = []string{
+	"This explicit recovery starts a clean OpenHands conversation. Prior conversational history is not available; use the current workspace and task evidence as the durable recovery state.",
+	"Inspect Git status, recent commits, and the focused diff before reading source broadly. The workspace may already contain a completed implementation from the failed invocation.",
+	"Do not restart implementation or force a new edit when the current committed work already satisfies the task. Verify the existing result against the acceptance criteria and finish promptly.",
+}
+
+var editableExplicitRecoveryExecutionGuidance = []string{
+	"If the existing workspace does not satisfy the task, make the smallest justified code or test correction within twelve source-inspection actions, then run focused verification. If it already satisfies the task, run focused verification and finish without changing it.",
+	"Map and extend existing interfaces before adding a parallel abstraction.",
+	"Implement in cohesive increments and run focused tests after each increment.",
+}
+
+var readOnlyExplicitRecoveryExecutionGuidance = []string{
+	"This role has no repository.edit permission. Do not edit repository files or create implementation artifacts.",
+	"Produce the assigned plan, review, or report from the current workspace and task evidence, then return the result through the finish tool.",
 }
 
 func hasExecutionPermission(permissions []string, required string) bool {
@@ -430,17 +447,27 @@ func BuildExecutionBrief(current OperationalExecutionContext, grounding RoleExec
 	}
 	brief.ExecutionGuidance = append([]string(nil), sharedExecutionGuidance...)
 	editable := hasExecutionPermission(grounding.Permissions, "repository.edit")
-	if editable {
-		brief.ExecutionGuidance = append(brief.ExecutionGuidance, editableExecutionGuidance...)
-	} else {
-		brief.ExecutionGuidance = append(brief.ExecutionGuidance, readOnlyExecutionGuidance...)
-	}
-	if invocation.RetryOrdinal > 0 {
-		brief.ExecutionGuidance = append(brief.ExecutionGuidance, sharedRetryExecutionGuidance...)
+	explicitRecovery := invocation.RetryOrdinal > 0 && current.Profile.Profile.SupersedesProfileID != nil
+	if explicitRecovery {
+		brief.ExecutionGuidance = append(brief.ExecutionGuidance, sharedExplicitRecoveryExecutionGuidance...)
 		if editable {
-			brief.ExecutionGuidance = append(brief.ExecutionGuidance, editableRetryExecutionGuidance...)
+			brief.ExecutionGuidance = append(brief.ExecutionGuidance, editableExplicitRecoveryExecutionGuidance...)
 		} else {
-			brief.ExecutionGuidance = append(brief.ExecutionGuidance, readOnlyRetryExecutionGuidance...)
+			brief.ExecutionGuidance = append(brief.ExecutionGuidance, readOnlyExplicitRecoveryExecutionGuidance...)
+		}
+	} else {
+		if editable {
+			brief.ExecutionGuidance = append(brief.ExecutionGuidance, editableExecutionGuidance...)
+		} else {
+			brief.ExecutionGuidance = append(brief.ExecutionGuidance, readOnlyExecutionGuidance...)
+		}
+		if invocation.RetryOrdinal > 0 {
+			brief.ExecutionGuidance = append(brief.ExecutionGuidance, sharedRetainedRetryExecutionGuidance...)
+			if editable {
+				brief.ExecutionGuidance = append(brief.ExecutionGuidance, editableRetainedRetryExecutionGuidance...)
+			} else {
+				brief.ExecutionGuidance = append(brief.ExecutionGuidance, readOnlyRetainedRetryExecutionGuidance...)
+			}
 		}
 	}
 	if invocation.Purpose == kernel.PurposeValidation || invocation.Purpose == kernel.PurposeReview {

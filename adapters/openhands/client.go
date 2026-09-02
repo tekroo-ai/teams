@@ -1153,22 +1153,22 @@ func repositoryProgress(events []rawEvent, promptIndex int) (int, bool) {
 
 // recoveryRepositoryProgress counts successful source reads in a clean,
 // evidence-bound recovery conversation. Direct file views count, while a
-// successful repository mutation starts a new implementation increment and
-// resets the allowance.
+// successful repository mutation or deterministic validation starts a new
+// implementation increment and resets the allowance.
 func recoveryRepositoryProgress(events []rawEvent, promptIndex int) (int, bool) {
 	readOnlyActions := 0
 	progressObserved := false
-	pendingMutationTool := ""
+	pendingProgressTool := ""
 	pendingReadOnlyTool := ""
 	for index, event := range events {
 		if index <= promptIndex {
 			continue
 		}
 		if event.Kind == "ActionEvent" && event.Source == "agent" {
-			pendingMutationTool = ""
+			pendingProgressTool = ""
 			pendingReadOnlyTool = ""
-			if mutationAction(event) {
-				pendingMutationTool = event.ToolName
+			if workProgressAction(event) {
+				pendingProgressTool = event.ToolName
 				continue
 			}
 			if repositoryReadOnlyAction(event) {
@@ -1176,12 +1176,12 @@ func recoveryRepositoryProgress(events []rawEvent, promptIndex int) (int, bool) 
 			}
 			continue
 		}
-		if pendingMutationTool != "" && event.Kind == "ObservationEvent" && event.ToolName == pendingMutationTool {
+		if pendingProgressTool != "" && event.Kind == "ObservationEvent" && event.ToolName == pendingProgressTool {
 			if !event.ObservationError && !event.ObservationTimeout && (event.ObservationExitCode == nil || *event.ObservationExitCode == 0) {
 				readOnlyActions = 0
 				progressObserved = true
 			}
-			pendingMutationTool = ""
+			pendingProgressTool = ""
 		}
 		if pendingReadOnlyTool != "" && event.Kind == "ObservationEvent" && event.ToolName == pendingReadOnlyTool {
 			if !event.ObservationError && !event.ObservationTimeout && (event.ObservationExitCode == nil || *event.ObservationExitCode == 0) {

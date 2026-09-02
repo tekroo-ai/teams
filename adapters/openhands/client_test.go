@@ -516,6 +516,22 @@ func TestRecoveryRepositoryProgressCountsOnlySuccessfulReads(t *testing.T) {
 	}
 }
 
+func TestRecoveryRepositoryProgressResetsAfterSuccessfulValidation(t *testing.T) {
+	exitSuccess := 0
+	events := []rawEvent{
+		{Kind: "ActionEvent", Source: "agent", ToolName: "file_editor", ActionCommand: "view"},
+		{Kind: "ObservationEvent", ToolName: "file_editor", ObservationExitCode: &exitSuccess},
+		{Kind: "ActionEvent", Source: "agent", ToolName: "terminal", ActionCommand: "go test ./adapters/mcp ./adapters/operatortools"},
+		{Kind: "ObservationEvent", ToolName: "terminal", ObservationExitCode: &exitSuccess},
+		{Kind: "ActionEvent", Source: "agent", ToolName: "file_editor", ActionCommand: "view"},
+		{Kind: "ObservationEvent", ToolName: "file_editor", ObservationExitCode: &exitSuccess},
+	}
+	reads, progress := recoveryRepositoryProgress(events, -1)
+	if reads != 1 || !progress {
+		t.Fatalf("reads=%d progress=%t, want one post-validation read and observed progress", reads, progress)
+	}
+}
+
 func TestClientExplicitRecoveryReadAllowanceResetsAfterSuccessfulMutation(t *testing.T) {
 	brief, _ := openHandsTestBrief(t)
 	priorID := kernel.UUIDv7("00000000-0000-7000-8000-000000000200")

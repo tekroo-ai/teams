@@ -79,6 +79,34 @@ func TestRetryExecutionBriefDirectsAgentToContinueFromRetainedState(t *testing.T
 	}
 }
 
+func TestExplicitRecoveryExecutionBriefUsesCleanConversationAndExistingWorkspace(t *testing.T) {
+	runtime := newOperationalRuntime(t)
+	retryOf := testUUID(780)
+	priorProfileID := runtime.context.Profile.Profile.ProfileID
+	runtime.context.Invocation.RetryOfInvocationID = &retryOf
+	runtime.context.Invocation.RetryOrdinal = 2
+	runtime.context.Profile.Profile.ProfileID = testUUID(781)
+	runtime.context.Profile.Profile.ProfileRevision++
+	runtime.context.Profile.Profile.SupersedesProfileID = &priorProfileID
+	runtime.context.Invocation.WorkProfile = runtime.context.Profile.Profile.Binding()
+	runtime.context.Assignment.WorkProfile = runtime.context.Profile.Profile.Binding()
+	brief, _, err := BuildExecutionBrief(runtime.context, testRoleGrounding(runtime.context.Invocation.ActorFQN), 1<<20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	guidance := strings.Join(brief.ExecutionGuidance, "\n")
+	for _, required := range []string{"clean OpenHands conversation", "Prior conversational history is not available", "current workspace", "recent commits", "may already contain a completed implementation", "without changing it"} {
+		if !strings.Contains(guidance, required) {
+			t.Fatalf("explicit recovery guidance omitted %q: %v", required, brief.ExecutionGuidance)
+		}
+	}
+	for _, forbidden := range []string{"prior OpenHands conversation is retained", "three additional read-only", "Make a concrete code or test edit"} {
+		if strings.Contains(guidance, forbidden) {
+			t.Fatalf("explicit recovery guidance contains stale instruction %q: %v", forbidden, brief.ExecutionGuidance)
+		}
+	}
+}
+
 func TestReadOnlyRoleGuidanceNeverOrdersEditsAndAppliesToHandoffRetry(t *testing.T) {
 	runtime := newOperationalRuntime(t)
 	actor := kernel.ActorFQN("teams::architect-1")
