@@ -426,11 +426,11 @@ func (client *Client) Inspect(ctx context.Context, brief application.ExecutionBr
 		return client.correctRepositorySearchLoop(ctx, brief, requestDigest, info, events, currentPromptIndex, violation)
 	}
 	if progressGuardApplies(brief) {
-		discoveryActions, mutationObserved := repositoryProgress(events, currentPromptIndex)
+		discoveryActions, _ := repositoryProgress(events, currentPromptIndex)
 		discoveryLimit := maximumRepositoryDiscoveryActions
 		if brief.RetryOrdinal > 0 && currentPromptIndex > 0 && !explicitRecoveryProfile(brief) {
-			priorDiscoveryActions, priorMutationObserved := repositoryProgress(events[:currentPromptIndex], -1)
-			if !priorMutationObserved {
+			priorDiscoveryActions, priorProgressObserved := repositoryProgress(events[:currentPromptIndex], -1)
+			if !priorProgressObserved {
 				if priorDiscoveryActions > maximumRepositoryDiscoveryActions {
 					priorDiscoveryActions = maximumRepositoryDiscoveryActions
 				}
@@ -438,7 +438,7 @@ func (client *Client) Inspect(ctx context.Context, brief application.ExecutionBr
 				discoveryLimit += maximumRetryDiscoveryActions
 			}
 		}
-		if !mutationObserved && discoveryActions >= discoveryLimit && executionStillActive(info.ExecutionStatus) {
+		if discoveryActions >= discoveryLimit && executionStillActive(info.ExecutionStatus) {
 			return client.stopForNoProgress(ctx, brief, requestDigest, info, events, discoveryActions, discoveryLimit)
 		}
 	}
@@ -1088,15 +1088,16 @@ func decodeEvent(raw json.RawMessage) (rawEvent, error) {
 
 func repositoryProgress(events []rawEvent, promptIndex int) (int, bool) {
 	discoveryActions := 0
-	pendingMutationTool := ""
+	progressObserved := false
+	pendingProgressTool := ""
 	for index, event := range events {
 		if index <= promptIndex {
 			continue
 		}
 		if event.Kind == "ActionEvent" && event.Source == "agent" {
-			pendingMutationTool = ""
-			if mutationAction(event) {
-				pendingMutationTool = event.ToolName
+			pendingProgressTool = ""
+			if workProgressAction(event) {
+				pendingProgressTool = event.ToolName
 				continue
 			}
 			if repositoryDiscoveryAction(event) {
@@ -1104,14 +1105,44 @@ func repositoryProgress(events []rawEvent, promptIndex int) (int, bool) {
 			}
 			continue
 		}
-		if pendingMutationTool != "" && event.Kind == "ObservationEvent" && event.ToolName == pendingMutationTool {
+		if pendingProgressTool != "" && event.Kind == "ObservationEvent" && event.ToolName == pendingProgressTool {
 			if !event.ObservationError && !event.ObservationTimeout && (event.ObservationExitCode == nil || *event.ObservationExitCode == 0) {
-				return discoveryActions, true
+				discoveryActions = 0
+				progressObserved = true
 			}
-			pendingMutationTool = ""
+			pendingProgressTool = ""
 		}
 	}
-	return discoveryActions, false
+	return discoveryActions, progressObserved
+}
+
+func workProgressAction(event rawEvent) bool {
+	if mutationAction(event) {
+		return true
+	}
+	if event.ToolName != "terminal" {
+		return false
+	}
+	fields := strings.Fields(strings.ToLower(strings.TrimSpace(event.ActionCommand)))
+	if len(fields) < 2 {
+		return false
+	}
+	switch filepath.Base(fields[0]) {
+	case "go":
+		switch fields[1] {
+		case "build", "test", "vet":
+			return true
+		}
+	case "git":
+		if fields[1] == "diff" {
+			for _, field := range fields[2:] {
+				if field == "--check" {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 func repositoryDiscoveryAction(event rawEvent) bool {

@@ -481,6 +481,66 @@ func TestClientProgressGuardRequiresSuccessfulMutationObservation(t *testing.T) 
 	}
 }
 
+func TestClientProgressGuardTreatsSuccessfulValidationAsProgress(t *testing.T) {
+	brief, digest := openHandsTestBrief(t)
+	workspace := filepath.Join(t.TempDir(), "workspace")
+	events := []map[string]any{event("evt-user", "MessageEvent", "user", string(mustJSON(brief)))}
+	commands := []string{
+		`grep -n "ValidTeamName\\|ActorTeamOf" organization/*.go`,
+		`grep -n "actor_names" adapters/mongo/store.go`,
+		`sed -n '240,275p' adapters/mongo/store.go`,
+		`ls adapters/mongo/actor_name_store_test.go`,
+		`sed -n '1,260p' adapters/mongo/actor_name_store_test.go`,
+		`go test -tags mongo_integration -run TestActorNameStore ./adapters/mongo/`,
+		`go test -count=1 -tags mongo_integration -run TestActorNameStore ./adapters/mongo/`,
+		`go test -count=1 ./adapters/mongo/`,
+		`go test -count=1 ./organization/`,
+		`git diff --check`,
+		`git status`,
+		`git --no-pager diff adapters/mongo/store.go`,
+	}
+	for index, command := range commands {
+		events = append(events,
+			actionEvent(fmt.Sprintf("action-%02d", index), "terminal", command),
+			observationEvent(fmt.Sprintf("observation-%02d", index), "terminal", false, 0),
+		)
+	}
+	state := &progressGuardServerState{prompt: string(mustJSON(brief)), workspace: workspace, events: events}
+	server := httptest.NewServer(http.HandlerFunc(state.serveHTTP))
+	defer server.Close()
+	client := newOpenHandsTestClient(t, server.URL, workspace, brief)
+
+	observation, err := client.Inspect(context.Background(), brief, string(brief.InvocationID), digest)
+	if err != nil || observation.State != application.ExternalRunning || state.interruptCalls != 0 {
+		t.Fatalf("validation progress observation=%#v err=%v interrupts=%d", observation, err, state.interruptCalls)
+	}
+}
+
+func TestClientProgressGuardStillBoundsDiscoveryAfterSuccessfulValidation(t *testing.T) {
+	brief, digest := openHandsTestBrief(t)
+	workspace := filepath.Join(t.TempDir(), "workspace")
+	events := []map[string]any{
+		event("evt-user", "MessageEvent", "user", string(mustJSON(brief))),
+		actionEvent("test-action", "terminal", "go test ./organization"),
+		observationEvent("test-observation", "terminal", false, 0),
+	}
+	for index := 0; index < maximumRepositoryDiscoveryActions; index++ {
+		events = append(events,
+			actionEvent(fmt.Sprintf("action-%02d", index), "terminal", "sed -n '1,80p' organization/message.go"),
+			observationEvent(fmt.Sprintf("observation-%02d", index), "terminal", false, 0),
+		)
+	}
+	state := &progressGuardServerState{prompt: string(mustJSON(brief)), workspace: workspace, events: events}
+	server := httptest.NewServer(http.HandlerFunc(state.serveHTTP))
+	defer server.Close()
+	client := newOpenHandsTestClient(t, server.URL, workspace, brief)
+
+	observation, err := client.Inspect(context.Background(), brief, string(brief.InvocationID), digest)
+	if err != nil || observation.State != application.ExternalFailed || state.interruptCalls != 1 || !strings.Contains(string(observation.Output), `"repository_discovery_actions":12`) {
+		t.Fatalf("post-validation bound observation=%#v err=%v interrupts=%d", observation, err, state.interruptCalls)
+	}
+}
+
 func TestClientCorrectsOneCompoundShellActionInsideTheInvocation(t *testing.T) {
 	brief, digest := openHandsTestBrief(t)
 	workspace := filepath.Join(t.TempDir(), "workspace")
