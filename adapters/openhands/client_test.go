@@ -499,6 +499,23 @@ func TestClientExplicitRecoveryProfileEnforcesBoundedReadAllowance(t *testing.T)
 	}
 }
 
+func TestRecoveryRepositoryProgressCountsOnlySuccessfulReads(t *testing.T) {
+	exitFailure := 1
+	exitSuccess := 0
+	events := []rawEvent{
+		{Kind: "ActionEvent", Source: "agent", ToolName: "file_editor", ActionCommand: "view"},
+		{Kind: "ObservationEvent", ToolName: "file_editor", ObservationError: true, ObservationExitCode: &exitFailure},
+		{Kind: "ActionEvent", Source: "agent", ToolName: "terminal", ActionCommand: "sed -n '1,80p' adapters/mcp/handler.go"},
+		{Kind: "ObservationEvent", ToolName: "terminal", ObservationTimeout: true},
+		{Kind: "ActionEvent", Source: "agent", ToolName: "terminal", ActionCommand: "sed -n '1,80p' adapters/mcp/handler.go"},
+		{Kind: "ObservationEvent", ToolName: "terminal", ObservationExitCode: &exitSuccess},
+	}
+	reads, progress := recoveryRepositoryProgress(events, -1)
+	if reads != 1 || progress {
+		t.Fatalf("reads=%d progress=%t, want one successful read and no mutation", reads, progress)
+	}
+}
+
 func TestClientExplicitRecoveryReadAllowanceResetsAfterSuccessfulMutation(t *testing.T) {
 	brief, _ := openHandsTestBrief(t)
 	priorID := kernel.UUIDv7("00000000-0000-7000-8000-000000000200")

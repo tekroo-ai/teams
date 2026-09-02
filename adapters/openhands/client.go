@@ -1158,18 +1158,20 @@ func recoveryRepositoryProgress(events []rawEvent, promptIndex int) (int, bool) 
 	readOnlyActions := 0
 	progressObserved := false
 	pendingMutationTool := ""
+	pendingReadOnlyTool := ""
 	for index, event := range events {
 		if index <= promptIndex {
 			continue
 		}
 		if event.Kind == "ActionEvent" && event.Source == "agent" {
 			pendingMutationTool = ""
+			pendingReadOnlyTool = ""
 			if mutationAction(event) {
 				pendingMutationTool = event.ToolName
 				continue
 			}
 			if repositoryReadOnlyAction(event) {
-				readOnlyActions++
+				pendingReadOnlyTool = event.ToolName
 			}
 			continue
 		}
@@ -1179,6 +1181,12 @@ func recoveryRepositoryProgress(events []rawEvent, promptIndex int) (int, bool) 
 				progressObserved = true
 			}
 			pendingMutationTool = ""
+		}
+		if pendingReadOnlyTool != "" && event.Kind == "ObservationEvent" && event.ToolName == pendingReadOnlyTool {
+			if !event.ObservationError && !event.ObservationTimeout && (event.ObservationExitCode == nil || *event.ObservationExitCode == 0) {
+				readOnlyActions++
+			}
+			pendingReadOnlyTool = ""
 		}
 	}
 	return readOnlyActions, progressObserved
