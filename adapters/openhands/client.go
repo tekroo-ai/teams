@@ -446,7 +446,10 @@ func (client *Client) Inspect(ctx context.Context, brief application.ExecutionBr
 	if progressGuardApplies(brief) {
 		discoveryActions, _ := repositoryProgress(events, currentPromptIndex)
 		discoveryLimit := maximumRepositoryDiscoveryActions
-		if brief.RetryOrdinal > 0 && currentPromptIndex > 0 && !explicitRecoveryProfile(brief) {
+		if brief.RetryOrdinal > 0 && currentPromptIndex > 0 && explicitRecoveryProfile(brief) {
+			discoveryActions, _ = recoveryRepositoryProgress(events, currentPromptIndex)
+			discoveryLimit = maximumRetryDiscoveryActions
+		} else if brief.RetryOrdinal > 0 && currentPromptIndex > 0 {
 			priorDiscoveryActions, priorProgressObserved := repositoryProgress(events[:currentPromptIndex], -1)
 			if !priorProgressObserved {
 				if priorDiscoveryActions > maximumRepositoryDiscoveryActions {
@@ -1132,6 +1135,47 @@ func repositoryProgress(events []rawEvent, promptIndex int) (int, bool) {
 		}
 	}
 	return discoveryActions, progressObserved
+}
+
+// recoveryRepositoryProgress enforces the smaller inspection allowance stated
+// in an explicit recovery brief. Direct file views count here because the
+// predecessor conversation is retained; a successful repository mutation
+// starts a new implementation increment and resets the allowance.
+func recoveryRepositoryProgress(events []rawEvent, promptIndex int) (int, bool) {
+	readOnlyActions := 0
+	progressObserved := false
+	pendingMutationTool := ""
+	for index, event := range events {
+		if index <= promptIndex {
+			continue
+		}
+		if event.Kind == "ActionEvent" && event.Source == "agent" {
+			pendingMutationTool = ""
+			if mutationAction(event) {
+				pendingMutationTool = event.ToolName
+				continue
+			}
+			if repositoryReadOnlyAction(event) {
+				readOnlyActions++
+			}
+			continue
+		}
+		if pendingMutationTool != "" && event.Kind == "ObservationEvent" && event.ToolName == pendingMutationTool {
+			if !event.ObservationError && !event.ObservationTimeout && (event.ObservationExitCode == nil || *event.ObservationExitCode == 0) {
+				readOnlyActions = 0
+				progressObserved = true
+			}
+			pendingMutationTool = ""
+		}
+	}
+	return readOnlyActions, progressObserved
+}
+
+func repositoryReadOnlyAction(event rawEvent) bool {
+	if mutationAction(event) || workProgressAction(event) {
+		return false
+	}
+	return repositorySearchProgressAction(event)
 }
 
 func workProgressAction(event rawEvent) bool {
