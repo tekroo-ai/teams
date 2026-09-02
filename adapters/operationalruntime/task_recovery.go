@@ -3,6 +3,7 @@ package operationalruntime
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/tekroo-ai/teams/application"
 	"github.com/tekroo-ai/teams/kernel"
@@ -24,26 +25,26 @@ func (service *ProductionService) RetryFailedTask(ctx context.Context, principal
 	}
 	terminalStatus, found, err := service.ReadInvocation(ctx, invocationID)
 	if err != nil || !found || terminalStatus.Revision != request.ExpectedRevision {
-		return InvocationStatus{}, errors.Join(application.ErrInvalidOperationalExecution, err)
+		return InvocationStatus{}, fmt.Errorf("read terminal invocation: %w", errors.Join(application.ErrInvalidOperationalExecution, err))
 	}
 	terminalContext, err := service.Store.LoadOperationalExecution(ctx, invocationID)
 	if err != nil || terminalContext.Invocation.Revision != terminalStatus.Revision || !recoverablePlanningTerminal(terminalContext.Invocation) {
-		return InvocationStatus{}, errors.Join(application.ErrInvalidOperationalExecution, err)
+		return InvocationStatus{}, fmt.Errorf("load recoverable terminal invocation: %w", errors.Join(application.ErrInvalidOperationalExecution, err))
 	}
 	terminal := terminalContext.Invocation
 
 	feature, planned, found, err := service.plannedFeatureTask(ctx, terminal.TaskID)
 	if err != nil || !found || planned.Purpose != kernel.PurposeImplementation && planned.Purpose != kernel.PurposeRepair {
-		return InvocationStatus{}, errors.Join(organization.ErrInvalidFeature, err)
+		return InvocationStatus{}, fmt.Errorf("locate planned task: %w", errors.Join(organization.ErrInvalidFeature, err))
 	}
 	taskRef := kernel.AggregateRef{Kind: kernel.AggregateTask, ID: planned.ID}
 	state, head, stateFound, err := service.Store.ReadAggregateHead(ctx, taskRef)
 	if err != nil || !stateFound || state.Phase != kernel.PhaseActive || state.Condition != kernel.ConditionRunnable {
-		return InvocationStatus{}, errors.Join(organization.ErrInvalidFeature, err)
+		return InvocationStatus{}, fmt.Errorf("read runnable task head: %w", errors.Join(organization.ErrInvalidFeature, err))
 	}
 	snapshot, err := service.Store.LoadDecision(ctx, kernel.KernelCommand{Target: taskRef})
 	if err != nil {
-		return InvocationStatus{}, err
+		return InvocationStatus{}, fmt.Errorf("load recovery decision state: %w", err)
 	}
 	latest, latestFound := latestTaskInvocation(snapshot.WorkInvocations, planned.ID)
 	profileSnapshot, profileFound := snapshot.WorkProfiles[taskRef]
@@ -53,7 +54,7 @@ func (service *ProductionService) RetryFailedTask(ctx context.Context, principal
 	now := service.clock.Now().UTC()
 	deadline := request.DeadlineAt.UTC()
 	if err != nil || !latestFound || latest.ID != terminal.ID || !profileFound || !profileSnapshot.Valid() || !budgetFound || !budget.Valid() || !deadline.After(now) || !deadline.After(terminal.DeadlineAt) || deadline.Before(profileSnapshot.Profile.Budgets.DeadlineAt) || deadline.After(now.Add(service.planningDeadline)) {
-		return InvocationStatus{}, errors.Join(organization.ErrInvalidFeature, err)
+		return InvocationStatus{}, fmt.Errorf("validate recovery preconditions: %w", errors.Join(organization.ErrInvalidFeature, err))
 	}
 
 	evidenceIDs := make([]kernel.UUIDv7, len(request.EvidenceRefs))
@@ -62,39 +63,39 @@ func (service *ProductionService) RetryFailedTask(ctx context.Context, principal
 	}
 	registered, err := evidenceRefsForIDs(snapshot, evidenceIDs)
 	if err != nil || !sameEvidenceSet(registered, request.EvidenceRefs) {
-		return InvocationStatus{}, errors.Join(organization.ErrInvalidFeature, err)
+		return InvocationStatus{}, fmt.Errorf("validate recovery evidence: %w", errors.Join(organization.ErrInvalidFeature, err))
 	}
 	profileEvidenceIDs := recoveryProfileEvidenceIDs(terminal, evidenceIDs)
 	if _, err := evidenceRefsForIDs(snapshot, profileEvidenceIDs); err != nil {
-		return InvocationStatus{}, err
+		return InvocationStatus{}, fmt.Errorf("validate recovery profile evidence: %w", err)
 	}
 	successorProfile, profileBound, err := planningRecoveryProfile(profileSnapshot.Profile, terminal.WorkProfile, service.planning, recoveryCondition, deadline, profileEvidenceIDs)
 	if err != nil {
-		return InvocationStatus{}, err
+		return InvocationStatus{}, fmt.Errorf("prepare recovery profile: %w", err)
 	}
 	budget, err = service.amendPlanningRecoveryBudget(ctx, principal, feature, terminal, budget, request, recoveryCondition, registered)
 	if err != nil {
-		return InvocationStatus{}, err
+		return InvocationStatus{}, fmt.Errorf("amend recovery budget: %w", err)
 	}
 	tracked := &trackedTask{plan: planned, revision: state.Revision, last: head, profile: successorProfile}
 	if !profileBound {
 		profileEvidence, evidenceErr := evidenceRefsForIDs(snapshot, successorProfile.ClassificationEvidenceIDs)
 		if evidenceErr != nil {
-			return InvocationStatus{}, evidenceErr
+			return InvocationStatus{}, fmt.Errorf("load recovery profile evidence: %w", evidenceErr)
 		}
 		key := "task-recovery-profile-" + string(terminal.ID) + "-" + string(successorProfile.ProfileID) + "-" + request.IdempotencyKey
 		if err := service.applyTaskCommand(ctx, feature, tracked, "tekroo.command.task.bind-work-profile", kernel.SchemaVersion, service.policyAuthority, successorProfile, profileEvidence, nil, key); err != nil {
-			return InvocationStatus{}, err
+			return InvocationStatus{}, fmt.Errorf("bind recovery profile: %w", err)
 		}
 	}
 
 	owner, found, err := service.RoleHost.Status(ctx, planned.Owner)
 	if err != nil {
-		return InvocationStatus{}, err
+		return InvocationStatus{}, fmt.Errorf("read recovery actor: %w", err)
 	}
 	transition, err := planRecoveryRoleTransition(owner, found, terminal.Execution)
 	if err != nil {
-		return InvocationStatus{}, err
+		return InvocationStatus{}, fmt.Errorf("plan recovery actor transition: %w", err)
 	}
 	switch transition {
 	case recoveryRoleStart:
@@ -103,43 +104,43 @@ func (service *ProductionService) RetryFailedTask(ctx context.Context, principal
 		owner, err = service.RestartRole(ctx, planned.Owner)
 	}
 	if err != nil || owner.Status != organization.RoleIdle || owner.Execution == terminal.Execution {
-		return InvocationStatus{}, errors.Join(organization.ErrRoleNotRunning, err)
+		return InvocationStatus{}, fmt.Errorf("start recovery actor: %w", errors.Join(organization.ErrRoleNotRunning, err))
 	}
 	profileConfig, configured := service.profilesByModel[owner.ModelProfile]
 	workspace, workspaceFound := service.workspacesByID[owner.WorkspaceID]
 	if !configured || !workspaceFound {
-		return InvocationStatus{}, organization.ErrInvalidFeature
+		return InvocationStatus{}, fmt.Errorf("resolve recovery profile and workspace: %w", organization.ErrInvalidFeature)
 	}
 	state, head, stateFound, err = service.Store.ReadAggregateHead(ctx, taskRef)
 	if err != nil || !stateFound {
-		return InvocationStatus{}, errors.Join(organization.ErrInvalidFeature, err)
+		return InvocationStatus{}, fmt.Errorf("refresh task head: %w", errors.Join(organization.ErrInvalidFeature, err))
 	}
 	tracked = &trackedTask{plan: planned, revision: state.Revision, last: head, profile: successorProfile, owner: owner}
 	if err := service.rebindPlanningRecoveryAssignment(ctx, feature, tracked, profileConfig, owner); err != nil {
-		return InvocationStatus{}, err
+		return InvocationStatus{}, fmt.Errorf("rebind recovery assignment: %w", err)
 	}
 	if err := service.refreshTaskExecutionBinding(ctx, feature, tracked, profileConfig, workspace); err != nil {
-		return InvocationStatus{}, err
+		return InvocationStatus{}, fmt.Errorf("refresh recovery execution binding: %w", err)
 	}
 	budgetRevision, err := service.extendTaskTechnicalRetryBudget(ctx, feature, tracked, planned.Purpose, terminal.AttemptOrdinal+1)
 	if err != nil || budgetRevision != budget.Revision {
-		return InvocationStatus{}, errors.Join(organization.ErrInvalidFeature, err)
+		return InvocationStatus{}, fmt.Errorf("extend technical retry budget: %w", errors.Join(organization.ErrInvalidFeature, err))
 	}
 	if err := service.authorizeTaskInvocationWithConditionPolicy(ctx, feature, tracked, profileConfig, workspace, budgetRevision, planned.Purpose, terminal.AttemptOrdinal+1, &terminal, []kernel.Digest{recoveryCondition}, true, false); err != nil {
-		return InvocationStatus{}, err
+		return InvocationStatus{}, fmt.Errorf("authorize recovery invocation: %w", err)
 	}
 
 	updated, err := service.Store.LoadDecision(ctx, kernel.KernelCommand{Target: taskRef})
 	if err != nil {
-		return InvocationStatus{}, err
+		return InvocationStatus{}, fmt.Errorf("load authorized recovery invocation: %w", err)
 	}
 	next, nextFound := latestTaskInvocation(updated.WorkInvocations, planned.ID)
 	if !nextFound || next.ID == invocationID || next.AttemptOrdinal != terminal.AttemptOrdinal+1 {
-		return InvocationStatus{}, application.ErrInvalidOperationalExecution
+		return InvocationStatus{}, fmt.Errorf("verify authorized recovery invocation: %w", application.ErrInvalidOperationalExecution)
 	}
 	status, statusFound, err := service.ReadInvocation(ctx, next.ID)
 	if err != nil || !statusFound {
-		return InvocationStatus{}, errors.Join(application.ErrInvalidOperationalExecution, err)
+		return InvocationStatus{}, fmt.Errorf("read authorized recovery invocation: %w", errors.Join(application.ErrInvalidOperationalExecution, err))
 	}
 	return status, nil
 }
