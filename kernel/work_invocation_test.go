@@ -72,7 +72,7 @@ func TestWorkInvocationAdmissionFailsClosedAcrossEveryIdentityAndBudgetBoundary(
 	}
 }
 
-func TestUnchangedConditionRequiresExactRetryableTerminal(t *testing.T) {
+func TestUnchangedConditionCannotConsumeAnotherModelInvocation(t *testing.T) {
 	fixture := phase4Fixture(t)
 	condition := Digest("dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd")
 	prior := fixture.authorizedInvocation(t, UUIDv7("00000000-0000-7000-8000-000000000950"), condition)
@@ -87,8 +87,8 @@ func TestUnchangedConditionRequiresExactRetryableTerminal(t *testing.T) {
 		t.Fatalf("unchanged condition = %#v", withoutRetry)
 	}
 	retry := PlanWorkInvocationAuthorization(fixture.authorizationPayload(t, fixture.invocationID, condition, &prior.ID, 1), fixture.task, fixture.account, fixture.binding, fixture.scope, fixture.profile, fixture.assignment, fixture.execution, invocations, fixture.now, fixture.eventID)
-	if !retry.Accepted {
-		t.Fatalf("retry = %#v", retry)
+	if retry.Accepted || retry.Reason != "UNCHANGED_CONDITION" {
+		t.Fatalf("unchanged retry = %#v", retry)
 	}
 	notRetryable := false
 	prior.Retryable = &notRetryable
@@ -96,6 +96,23 @@ func TestUnchangedConditionRequiresExactRetryableTerminal(t *testing.T) {
 	rejected := PlanWorkInvocationAuthorization(fixture.authorizationPayload(t, fixture.invocationID, condition, &prior.ID, 1), fixture.task, fixture.account, fixture.binding, fixture.scope, fixture.profile, fixture.assignment, fixture.execution, invocations, fixture.now, fixture.eventID)
 	if rejected.Accepted || rejected.Reason != "UNCHANGED_CONDITION" {
 		t.Fatalf("nonretryable = %#v", rejected)
+	}
+}
+
+func TestTaskCannotHaveTwoActiveInvocationsAcrossConditions(t *testing.T) {
+	fixture := phase4Fixture(t)
+	prior := fixture.authorizedInvocation(t, UUIDv7("00000000-0000-7000-8000-000000000955"), Digest("dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"))
+	prior.State = InvocationStarted
+	invocations := map[AggregateRef]WorkInvocation{prior.Ref(): prior}
+	value := fixture.authorizationObject(t, fixture.invocationID, Digest("cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"), &prior.ID, 1)
+	value["attempt_ordinal"] = float64(2)
+	payload, err := json.Marshal(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decision := PlanWorkInvocationAuthorization(payload, fixture.task, fixture.account, fixture.binding, fixture.scope, fixture.profile, fixture.assignment, fixture.execution, invocations, fixture.now, fixture.eventID)
+	if decision.Accepted || decision.Reason != "ACTIVE_INVOCATION_EXISTS" {
+		t.Fatalf("parallel invocation = %#v", decision)
 	}
 }
 
@@ -162,15 +179,15 @@ func TestChangedConditionAllowsOnlyEvidenceBoundOperatorRecovery(t *testing.T) {
 	notRetryable := false
 	prior.Retryable = &notRetryable
 	invocations[prior.Ref()] = prior
-	rejected := PlanWorkInvocationAuthorization(payload, fixture.task, fixture.account, fixture.binding, fixture.scope, fixture.profile, fixture.assignment, fixture.execution, invocations, fixture.now, fixture.eventID)
-	if rejected.Accepted || rejected.Reason != "INVALID_RETRY" {
-		t.Fatalf("non-retryable failed recovery = %#v", rejected)
+	decision = PlanWorkInvocationAuthorization(payload, fixture.task, fixture.account, fixture.binding, fixture.scope, fixture.profile, fixture.assignment, fixture.execution, invocations, fixture.now, fixture.eventID)
+	if !decision.Accepted {
+		t.Fatalf("explicitly remediated non-retryable failed recovery = %#v", decision)
 	}
 	prior.Retryable = &retryable
 	invocations[prior.Ref()] = prior
 
 	fixture.profile.Profile.ClassificationEvidenceIDs = []UUIDv7{"00000000-0000-7000-8000-000000000953"}
-	rejected = PlanWorkInvocationAuthorization(payload, fixture.task, fixture.account, fixture.binding, fixture.scope, fixture.profile, fixture.assignment, fixture.execution, invocations, fixture.now, fixture.eventID)
+	rejected := PlanWorkInvocationAuthorization(payload, fixture.task, fixture.account, fixture.binding, fixture.scope, fixture.profile, fixture.assignment, fixture.execution, invocations, fixture.now, fixture.eventID)
 	if rejected.Accepted || rejected.Reason != "INVALID_RETRY" {
 		t.Fatalf("recovery without terminal evidence = %#v", rejected)
 	}
@@ -199,6 +216,27 @@ func TestWorkInvocationPermitIsSingleUseAndCancellationIsNotTerminal(t *testing.
 	cancelledRequested, valid := ApplyWorkInvocationEvent(started, cancelEvent)
 	if !valid || cancelledRequested.State != InvocationStarted || cancelledRequested.CancellationRequestedAt == nil {
 		t.Fatalf("cancellation request = %#v, %v", cancelledRequested, valid)
+	}
+}
+
+func TestPlanningCandidateCanBeRevalidatedAfterDeterministicOutputRejection(t *testing.T) {
+	priorID := UUIDv7("00000000-0000-7000-8000-000000000970")
+	prior := WorkInvocation{
+		ID: priorID, TaskID: "00000000-0000-7000-8000-000000000971",
+		Purpose: PurposeReplan, AttemptOrdinal: 1, RetryOrdinal: 0,
+		State: InvocationSucceeded, ConditionDigest: Digest("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
+	}
+	value := invocationAuthorizationPayload{
+		Purpose: PurposeReplan, AttemptOrdinal: 2, RetryOrdinal: 1,
+		RetryOfInvocationID: &priorID,
+		ConditionDigest:     Digest("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
+	}
+	if !validCandidateRevalidation(value, prior) {
+		t.Fatal("changed-condition planning revalidation was rejected")
+	}
+	value.Purpose = PurposeImplementation
+	if validCandidateRevalidation(value, prior) {
+		t.Fatal("successful implementation was accepted for candidate revalidation")
 	}
 }
 

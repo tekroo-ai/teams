@@ -109,6 +109,13 @@ type OperationalExecutionReader interface {
 	LoadOperationalExecutionByAuthorizationEvent(context.Context, kernel.UUIDv7) (OperationalExecutionContext, error)
 }
 
+// OperationalDeadlineExtensionReader is an optional runtime capability. It
+// preserves an already-started invocation across recorded host suspension
+// without changing the immutable authorization or its audit timestamps.
+type OperationalDeadlineExtensionReader interface {
+	EffectiveWorkInvocationDeadline(context.Context, kernel.WorkInvocation, time.Time) (time.Time, error)
+}
+
 func (c OperationalExecutionContext) Validate(now time.Time) error {
 	invocation := c.Invocation
 	if !invocation.Valid() || c.Task.Kind != kernel.AggregateTask || c.Task.ID != invocation.TaskID || c.Task.Revision != invocation.TaskRevision || c.Task.LifecycleEpoch != invocation.LifecycleEpoch || c.Task.ScopeRevision != invocation.ScopeRevision || c.Task.Phase != kernel.PhaseActive || c.Task.Condition != kernel.ConditionRunnable || !c.AuthorizationEventSeen || !c.ParentEventSeen {
@@ -263,32 +270,45 @@ var sharedExecutionGuidance = []string{
 	"Read and follow AGENTS.md before taking repository actions.",
 	"Use rg or rg --files for repository discovery.",
 	"The authorized workspace is already the terminal working directory. Issue exactly one shell command per terminal action: do not use cd, &&, semicolons, pipes, command substitution, environment-variable expansion, or multiple commands separated by newlines.",
-	"Never repeat an identical read-only command unless repository state changed; when a search identifies a relevant file, inspect that file next.",
-	"Treat semantically equivalent searches as repeats; after locating a candidate file, inspect it instead of varying the same query.",
-	"Do not inspect or modify accepted CONTRACTS packages during ordinary implementation tasks; their immutability is already established by AGENTS.md.",
+	"Every inspection must resolve a concrete open question in the assigned task. When a search identifies the relevant implementation and tests, inspect those files and stop discovery; do not enumerate unrelated directories to prove absence.",
+	"Read accepted CONTRACTS packages only when they directly resolve an open question in the assigned task. Never modify accepted CONTRACTS packages.",
 	"Stay inside the authorized workspace and task scope.",
 }
 
 var editableExecutionGuidance = []string{
-	"Make a concrete code or test edit within twelve repository-discovery commands; if the task remains ambiguous, report an explicit blocker instead of continuing to search.",
+	"Inspect enough current code and tests to justify the change, then make the smallest cohesive edit. If the task remains ambiguous after the relevant surfaces are exhausted, report the concrete blocker.",
 	"Map and extend existing interfaces before adding a parallel abstraction.",
 	"Implement in cohesive increments and run focused tests after each increment.",
+	"Before reporting success, commit the intended changes and tests on the assigned branch and leave Git status clean. Validators receive only the committed candidate.",
 }
 
 var readOnlyExecutionGuidance = []string{
-	"This role has no repository.edit permission. Do not edit repository files or create implementation artifacts.",
-	"Within twelve repository-discovery commands, finish the assigned plan, review, or report from observed repository evidence; if the evidence remains insufficient, report an explicit blocker instead of continuing to search.",
+	"This task does not authorize repository edits. Do not edit repository files or create implementation artifacts.",
+	"Finish the assigned plan, review, or report from enough observed repository evidence to support it; if the relevant surfaces are exhausted and evidence remains insufficient, report the concrete blocker.",
 	"Inspect current interfaces and relevant tests only as needed to perform the assigned role, then return the required result through the finish tool.",
+	"When the task requires a structured result, validate the complete finish message against result_protocol and every required field in the task's result schema before calling finish.",
+}
+
+var validationExecutionGuidance = []string{
+	"Act as an independent engineering validator, not only as a test runner. Candidate-authored tests, builds, vet, and race checks are necessary evidence but do not by themselves prove that the implementation matches an acceptance criterion.",
+	"For every acceptance criterion, trace the relevant production control or data path and test a concrete plausible near-miss against that path. A cited test supports a criterion only when its assertions distinguish the required behavior from that near-miss.",
+	"Return PASS only when every criterion is supported by the inspected production behavior and distinguishing verification. Return FAIL for an observed contradiction and INCONCLUSIVE when the available evidence cannot distinguish compliance from a plausible near-miss; never convert missing evidence into PASS.",
+}
+
+var reviewExecutionGuidance = []string{
+	"Perform only the review defined by the task acceptance criteria and the signed role's capabilities. Implementation details and test results may be inspected as evidence, but they do not expand the review's authority.",
+	"Report evidence-backed findings within that review boundary. Do not assume ownership of implementation, architecture, general functional validation, product acceptance, or release unless the task and signed role explicitly assign it.",
+	"Return PASS only when every review criterion is supported by relevant inspected or executed evidence. Return FAIL for an observed contradiction and INCONCLUSIVE when the available evidence is insufficient; never convert missing evidence into PASS.",
 }
 
 var sharedRetainedRetryExecutionGuidance = []string{
 	"This is a bounded retry. Reuse the current workspace and retained task evidence; do not restart repository discovery from the beginning.",
 	"The prior OpenHands conversation is retained in this retry. Do not reread AGENTS.md or repeat ls, rg, find, sed, cat, or file-view actions already present in that history.",
-	"At most three additional read-only repository actions are allowed across the entire retry lineage; if the next role-appropriate action is still not justified, report an explicit blocker.",
+	"Continue from the retained checkpoint. Distinct, relevant inspections are allowed; exact repeated actions without an intervening state change are rejected.",
 }
 
 var editableRetainedRetryExecutionGuidance = []string{
-	"Make the smallest justified code or test edit immediately from the retained findings. At most three additional read-only repository actions are allowed across the entire retry lineage; if an edit is still not justified, report an explicit blocker.",
+	"Make the smallest justified code or test edit from the retained findings, using additional distinct inspections only where the checkpoint leaves a concrete gap.",
 }
 
 var readOnlyRetainedRetryExecutionGuidance = []string{
@@ -302,13 +322,14 @@ var sharedExplicitRecoveryExecutionGuidance = []string{
 }
 
 var editableExplicitRecoveryExecutionGuidance = []string{
-	"If the existing workspace does not satisfy the task, make the smallest justified code or test correction within twelve source-inspection actions, then run focused verification. If it already satisfies the task, run focused verification and finish without changing it.",
+	"If the existing workspace does not satisfy the task, make the smallest justified code or test correction, then run focused verification. If it already satisfies the task, run focused verification and finish without changing it.",
 	"Map and extend existing interfaces before adding a parallel abstraction.",
 	"Implement in cohesive increments and run focused tests after each increment.",
 }
 
 var readOnlyExplicitRecoveryExecutionGuidance = []string{
-	"This role has no repository.edit permission. Do not edit repository files or create implementation artifacts.",
+	"This task does not authorize repository edits. Do not edit repository files or create implementation artifacts.",
+	"If the preceding result was rejected by a deterministic result validator, preserve its supported engineering conclusions and regenerate the complete structured result from the authoritative task schema. Before calling finish, verify every required object field is present and every required value is non-empty.",
 	"Produce the assigned plan, review, or report from the current workspace and task evidence, then return the result through the finish tool.",
 }
 
@@ -446,35 +467,44 @@ func BuildExecutionBrief(current OperationalExecutionContext, grounding RoleExec
 		CoordinationRule: evidenceOnlyCoordinationRule,
 	}
 	brief.ExecutionGuidance = append([]string(nil), sharedExecutionGuidance...)
-	editable := hasExecutionPermission(grounding.Permissions, "repository.edit")
+	mutationAuthorized := hasExecutionPermission(grounding.Permissions, "repository.edit") &&
+		(invocation.Purpose == kernel.PurposeImplementation || invocation.Purpose == kernel.PurposeRepair)
 	explicitRecovery := invocation.RetryOrdinal > 0 && current.Profile.Profile.SupersedesProfileID != nil
 	if explicitRecovery {
 		brief.ExecutionGuidance = append(brief.ExecutionGuidance, sharedExplicitRecoveryExecutionGuidance...)
-		if editable {
+		if mutationAuthorized {
 			brief.ExecutionGuidance = append(brief.ExecutionGuidance, editableExplicitRecoveryExecutionGuidance...)
 		} else {
 			brief.ExecutionGuidance = append(brief.ExecutionGuidance, readOnlyExplicitRecoveryExecutionGuidance...)
 		}
 	} else {
-		if editable {
+		if mutationAuthorized {
 			brief.ExecutionGuidance = append(brief.ExecutionGuidance, editableExecutionGuidance...)
 		} else {
 			brief.ExecutionGuidance = append(brief.ExecutionGuidance, readOnlyExecutionGuidance...)
 		}
 		if invocation.RetryOrdinal > 0 {
 			brief.ExecutionGuidance = append(brief.ExecutionGuidance, sharedRetainedRetryExecutionGuidance...)
-			if editable {
+			if mutationAuthorized {
 				brief.ExecutionGuidance = append(brief.ExecutionGuidance, editableRetainedRetryExecutionGuidance...)
 			} else {
 				brief.ExecutionGuidance = append(brief.ExecutionGuidance, readOnlyRetainedRetryExecutionGuidance...)
 			}
 		}
 	}
-	if invocation.Purpose == kernel.PurposeValidation || invocation.Purpose == kernel.PurposeReview {
+	if invocation.Purpose == kernel.PurposeValidation {
+		brief.ExecutionGuidance = append(brief.ExecutionGuidance, validationExecutionGuidance...)
 		brief.ResultProtocol = &ExecutionResultProtocol{
 			SchemaVersion: "1.0.0", Marker: ValidationResultMarker,
 			Outcomes:    []string{"PASS", "FAIL", "BLOCKED", "INCONCLUSIVE"},
-			Instruction: "The OpenHands finish tool message is the result consumed by Teams. Set finish.message to the marker on its own line followed by exactly one JSON object containing schema_version, outcome, and non-empty reasons. Do not summarize or paraphrase the result in finish.message. Teams will reject missing or malformed results.",
+			Instruction: "The OpenHands finish tool message is the result consumed by Teams. Set finish.message to the marker on its own line followed by exactly one JSON object containing schema_version, outcome, and non-empty reasons. For PASS, reasons must cover every acceptance criterion and identify the inspected production control or data path plus verification that distinguishes the required behavior from a plausible near-miss; test names or aggregate test commands alone are insufficient. Do not summarize or paraphrase the result in finish.message. Teams will reject missing or malformed results.",
+		}
+	} else if invocation.Purpose == kernel.PurposeReview {
+		brief.ExecutionGuidance = append(brief.ExecutionGuidance, reviewExecutionGuidance...)
+		brief.ResultProtocol = &ExecutionResultProtocol{
+			SchemaVersion: "1.0.0", Marker: ValidationResultMarker,
+			Outcomes:    []string{"PASS", "FAIL", "BLOCKED", "INCONCLUSIVE"},
+			Instruction: "The OpenHands finish tool message is the result consumed by Teams. Set finish.message to the marker on its own line followed by exactly one JSON object containing schema_version, outcome, and non-empty reasons. For PASS, reasons must cover every assigned review criterion with evidence inside the signed role's review boundary. Do not make a broader implementation, architecture, product-acceptance, release, or workflow determination. Do not summarize or paraphrase the result in finish.message. Teams will reject missing or malformed results.",
 		}
 	} else if invocation.Purpose == kernel.PurposePromotion {
 		brief.ResultProtocol = &ExecutionResultProtocol{

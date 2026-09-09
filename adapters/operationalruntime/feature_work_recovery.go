@@ -41,10 +41,8 @@ func (service *ProductionService) reconcileFeaturePlan(ctx context.Context, feat
 	states := make(map[kernel.UUIDv7]kernel.AggregateState, len(plan.Tasks))
 	heads := make(map[kernel.UUIDv7]kernel.UUIDv7, len(plan.Tasks))
 	invocations := make(map[kernel.UUIDv7]kernel.WorkInvocation, len(plan.Tasks))
-	tasksByID := make(map[kernel.UUIDv7]organization.PlannedTask, len(plan.Tasks))
 	var snapshot kernel.Snapshot
 	for _, item := range plan.Tasks {
-		tasksByID[item.ID] = item
 		state, head, found, err := service.Store.ReadAggregateHead(ctx, kernel.AggregateRef{Kind: kernel.AggregateTask, ID: item.ID})
 		if err != nil {
 			return fmt.Errorf("read task %s head: %w", item.ID, err)
@@ -66,23 +64,23 @@ func (service *ProductionService) reconcileFeaturePlan(ctx context.Context, feat
 	if !found || !budget.Valid() {
 		return errors.New("feature work budget is missing")
 	}
-	deadlinesExtended, err := service.reconcileFeatureProfileDeadlines(ctx, feature, plan, states, heads, snapshot, budget)
+	deadlinesExtended, err := service.reconcileFeatureProfileDeadlines(ctx, feature, plan, states, heads, invocations, snapshot, budget)
 	if err != nil {
-		return err
+		return fmt.Errorf("reconcile profile deadlines: %w", err)
 	}
 	if deadlinesExtended {
 		return nil
 	}
-	revalidationAuthorized, err := service.reconcileValidationRounds(ctx, feature, plan, states, heads, invocations, snapshot, budget.Revision)
+	revalidationAuthorized, err := service.reconcileValidationRounds(ctx, feature, plan, states, heads, invocations, snapshot, budget.Revision, evidence)
 	if err != nil {
-		return err
+		return fmt.Errorf("reconcile validation rounds: %w", err)
 	}
 	if revalidationAuthorized {
 		return nil
 	}
 	completed, err := service.reconcileTaskCompletions(ctx, feature, plan, states, heads, invocations, snapshot)
 	if err != nil {
-		return err
+		return fmt.Errorf("reconcile task completions: %w", err)
 	}
 	if completed {
 		return nil
@@ -97,48 +95,30 @@ func (service *ProductionService) reconcileFeaturePlan(ctx context.Context, feat
 	if allCompleted {
 		return service.recordFeatureAcceptanceRecommendation(ctx, feature, plan, invocations)
 	}
+	if service.newInvocationAdmissionBlocked() {
+		return nil
+	}
 
 	for _, item := range plan.Tasks {
 		state := states[item.ID]
-		if state.Phase == kernel.PhaseActive {
-			if state.Condition != kernel.ConditionRunnable {
-				continue
-			}
-			latest, found := invocations[item.ID]
-			if !found {
-				if err := service.resumeInvocationlessActiveTask(ctx, feature, item, state, heads[item.ID], snapshot, budget); err != nil {
-					return err
-				}
-				return nil
-			}
-			if found && (latest.State == kernel.InvocationFailed || latest.State == kernel.InvocationTimedOut || latest.State == kernel.InvocationStartFailed) && latest.Retryable != nil && *latest.Retryable && latest.AttemptOrdinal < uint64(item.AttemptLimit) {
-				profileConfig, configured := service.profilesByModel[item.ModelProfile]
-				if !configured {
-					return organization.ErrInvalidFeature
-				}
-				owner, active, ownerErr := service.RoleHost.Status(ctx, item.Owner)
-				if ownerErr == nil && (!active || owner.Status != organization.RoleIdle) {
-					owner, ownerErr = service.RoleHost.EnsureStarted(ctx, item.Owner)
-				}
-				workspace, workspaceFound := service.workspacesByID[owner.WorkspaceID]
-				profileSnapshot, profileFound := snapshot.WorkProfiles[kernel.AggregateRef{Kind: kernel.AggregateTask, ID: item.ID}]
-				if ownerErr != nil || owner.Status != organization.RoleIdle || !workspaceFound || !profileFound || !profileSnapshot.Valid() {
-					return errors.Join(organization.ErrRoleNotRunning, ownerErr)
-				}
-				tracked := &trackedTask{plan: item, revision: state.Revision, last: heads[item.ID], profile: profileSnapshot.Profile, owner: owner}
-				if err := service.authorizeTaskInvocationWithCondition(ctx, feature, tracked, profileConfig, workspace, budget.Revision, latest.Purpose, latest.AttemptOrdinal+1, &latest, nil); err != nil {
-					return err
-				}
-				budget.Revision++
-			}
+		if state.Condition != kernel.ConditionRunnable {
 			continue
 		}
-		if state.Phase != kernel.PhasePlanned {
+		if state.Phase == kernel.PhaseActive {
+			if _, found := invocations[item.ID]; found {
+				// A terminal failure does not justify another model call by itself.
+				// Operator recovery or a repaired candidate must provide explicit
+				// changed-condition evidence before another invocation is authorized.
+				continue
+			}
+		}
+		if state.Phase != kernel.PhasePlanned && state.Phase != kernel.PhaseReady && state.Phase != kernel.PhaseActive {
 			continue
 		}
 		dependencyEvents := make([]kernel.UUIDv7, 0, len(item.DependsOn))
-		conditionDigests := make([]kernel.Digest, 0, len(item.Validates))
-		ready := len(item.DependsOn) > 0
+		conditionDigests := make([]kernel.Digest, 0, len(item.DependsOn))
+		ready := true
+		bindDependencyOutputs := item.Purpose == kernel.PurposeValidation || item.Purpose == kernel.PurposeReview
 		validationTargets := make(map[kernel.UUIDv7]struct{}, len(item.Validates))
 		for _, targetID := range item.Validates {
 			validationTargets[targetID] = struct{}{}
@@ -146,7 +126,7 @@ func (service *ProductionService) reconcileFeaturePlan(ctx context.Context, feat
 		for _, dependencyID := range item.DependsOn {
 			if _, validationTarget := validationTargets[dependencyID]; validationTarget {
 				invocation, succeeded := invocations[dependencyID]
-				if !succeeded || invocation.State != kernel.InvocationSucceeded || invocation.OutputDigest == nil {
+				if !plannedDependencyReady(true, states[dependencyID], invocation, succeeded) {
 					ready = false
 					break
 				}
@@ -155,35 +135,49 @@ func (service *ProductionService) reconcileFeaturePlan(ctx context.Context, feat
 				continue
 			}
 			dependency := states[dependencyID]
-			if dependency.Phase != kernel.PhaseCompleted {
-				dependencyTask, planned := tasksByID[dependencyID]
+			if !plannedDependencyReady(false, dependency, kernel.WorkInvocation{}, false) {
+				ready = false
+				break
+			}
+			dependencyEvents = append(dependencyEvents, heads[dependencyID])
+			if bindDependencyOutputs {
 				invocation, succeeded := invocations[dependencyID]
-				if !planned || !implementationChainDependencyReady(item, dependencyTask, invocation, succeeded) {
+				if !succeeded || invocation.State != kernel.InvocationSucceeded || invocation.OutputDigest == nil {
 					ready = false
 					break
 				}
-				dependencyEvents = append(dependencyEvents, invocation.LastEventID)
-				continue
+				conditionDigests = append(conditionDigests, *invocation.OutputDigest)
 			}
-			dependencyEvents = append(dependencyEvents, heads[dependencyID])
 		}
 		if !ready {
 			continue
 		}
 		sort.Slice(dependencyEvents, func(left, right int) bool { return dependencyEvents[left] < dependencyEvents[right] })
 		profileConfig, found := service.profilesByModel[item.ModelProfile]
-		if !found || profileConfig.Qualification.DecisionRoute != item.DecisionRoute {
+		if !found || !profileConfig.qualifiedFor(item.DecisionRoute, workKindForPurpose(item.Purpose, item.Risk), service.clock.Now().UTC()) {
 			return organization.ErrInvalidFeature
 		}
 		owner, active, err := service.RoleHost.Status(ctx, item.Owner)
 		if err != nil {
 			return err
 		}
-		if !active || owner.Status != organization.RoleIdle {
+		if roleNeedsStart(active, owner.Status) {
 			owner, err = service.RoleHost.EnsureStarted(ctx, item.Owner)
 		}
 		if err != nil || owner.ModelProfile != item.ModelProfile {
 			return errors.Join(organization.ErrRoleNotRunning, err)
+		}
+		if owner.Status != organization.RoleIdle {
+			// A long-running actor executes one assigned work item at a time.
+			// Leave later ready DAG nodes pending until its current invocation
+			// returns to idle; starting the role again cannot make it available.
+			continue
+		}
+		if actorHasActiveInvocation(snapshot.WorkInvocations, owner.ActorFQN, owner.Execution) {
+			// Role status describes the long-running role process, not whether one
+			// of its model invocations is still in flight. Admit at most one active
+			// work item per FQN; other role instances remain independently usable.
+			continue
 		}
 		workspace, found := service.workspacesByID[owner.WorkspaceID]
 		if !found {
@@ -197,27 +191,66 @@ func (service *ProductionService) reconcileFeaturePlan(ctx context.Context, feat
 			return organization.ErrInvalidFeature
 		}
 		tracked := &trackedTask{plan: item, revision: state.Revision, last: heads[item.ID], profile: profileSnapshot.Profile, owner: owner}
-		if err := service.activateTask(ctx, feature, tracked, profileConfig, workspace, budget.Revision, dependencyEvents, evidence, evidenceID, conditionDigests); err != nil {
+		taskEvidence := append([]kernel.EvidenceRef(nil), evidence...)
+		if item.Purpose == kernel.PurposeImplementation || item.Purpose == kernel.PurposeRepair {
+			var workspaceEvidence kernel.EvidenceRef
+			workspace, workspaceEvidence, err = service.prepareImplementationWorkspace(ctx, feature, item, owner, plan)
+			if err != nil {
+				return err
+			}
+			taskEvidence = append(taskEvidence, workspaceEvidence)
+		} else if len(item.Validates) > 0 || item.Purpose == kernel.PurposePromotion {
+			workspace, taskEvidence, err = service.prepareCandidateConsumerWorkspace(ctx, feature, item, owner, plan, invocations, evidence)
+			if err != nil {
+				return err
+			}
+		}
+		sort.Slice(taskEvidence, func(left, right int) bool { return taskEvidence[left].EvidenceID < taskEvidence[right].EvidenceID })
+		if err := service.activateTask(ctx, feature, tracked, profileConfig, workspace, budget.Revision, dependencyEvents, taskEvidence, evidenceID, conditionDigests); err != nil {
 			return err
 		}
-		budget.Revision++
+		// Activation mutates task, budget, actor, and invocation state. Reload
+		// those authoritative snapshots before admitting another ready node.
+		return nil
 	}
 	return nil
 }
 
-func (service *ProductionService) reconcileFeatureProfileDeadlines(ctx context.Context, feature organization.FeatureRequest, plan organization.FeaturePlan, states map[kernel.UUIDv7]kernel.AggregateState, heads map[kernel.UUIDv7]kernel.UUIDv7, snapshot kernel.Snapshot, budget kernel.WorkBudgetAccount) (bool, error) {
+func roleNeedsStart(found bool, status organization.RoleStatus) bool {
+	return !found || status == organization.RoleStopped || status == organization.RoleFailed
+}
+
+func actorHasActiveInvocation(invocations map[kernel.AggregateRef]kernel.WorkInvocation, actor kernel.ActorFQN, execution kernel.ExecutionTuple) bool {
+	for _, invocation := range invocations {
+		// A role restart fences its prior execution. Work authorized to that old
+		// execution can no longer run or report a valid result, so it must not
+		// occupy the restarted actor indefinitely.
+		if invocation.ActorFQN == actor && invocation.Execution == execution && !invocation.State.Terminal() {
+			return true
+		}
+	}
+	return false
+}
+
+func (service *ProductionService) reconcileFeatureProfileDeadlines(ctx context.Context, feature organization.FeatureRequest, plan organization.FeaturePlan, states map[kernel.UUIDv7]kernel.AggregateState, heads map[kernel.UUIDv7]kernel.UUIDv7, invocations map[kernel.UUIDv7]kernel.WorkInvocation, snapshot kernel.Snapshot, budget kernel.WorkBudgetAccount) (bool, error) {
 	now := service.clock.Now().UTC()
 	if !budget.DeadlineAt.After(now) {
 		return false, nil
 	}
-	evidenceIDs := featureDeadlineExtensionEvidenceIDs(plan, snapshot, budget.DeadlineAt)
+	evidenceIDs, err := service.featureDeadlineExtensionEvidenceIDs(ctx, plan, snapshot, budget)
+	if err != nil {
+		return false, err
+	}
 	changed := false
 	for _, item := range plan.Tasks {
 		state, stateFound := states[item.ID]
 		if !stateFound || state.Phase == kernel.PhaseCompleted {
 			continue
 		}
-		if latest, found := latestTaskInvocation(snapshot.WorkInvocations, item.ID); found && latest.State == kernel.InvocationSucceeded {
+		// Once a task has an invocation, that invocation's recovery path owns any
+		// deadline extension. Advancing the task profile independently would make
+		// an in-flight or completed result appear stale during reconciliation.
+		if _, found := invocations[item.ID]; found {
 			continue
 		}
 		taskRef := kernel.AggregateRef{Kind: kernel.AggregateTask, ID: item.ID}
@@ -254,7 +287,26 @@ func (service *ProductionService) reconcileFeatureProfileDeadlines(ctx context.C
 	return changed, nil
 }
 
-func featureDeadlineExtensionEvidenceIDs(plan organization.FeaturePlan, snapshot kernel.Snapshot, deadline time.Time) []kernel.UUIDv7 {
+func (service *ProductionService) featureDeadlineExtensionEvidenceIDs(ctx context.Context, plan organization.FeaturePlan, snapshot kernel.Snapshot, budget kernel.WorkBudgetAccount) ([]kernel.UUIDv7, error) {
+	evidenceIDs := profileDeadlineExtensionEvidenceIDs(plan, snapshot, budget.DeadlineAt)
+	if len(evidenceIDs) == 0 {
+		event, found, err := service.Store.ReadEvent(ctx, budget.LastEventID)
+		if err != nil {
+			return nil, err
+		}
+		var payload struct {
+			DeadlineAt  time.Time       `json:"deadline_at"`
+			EvidenceIDs []kernel.UUIDv7 `json:"evidence_ids"`
+		}
+		if found && event.EventType == "tekroo.event.work-budget.amended" && json.Unmarshal(event.Payload, &payload) == nil && payload.DeadlineAt.Equal(budget.DeadlineAt) {
+			evidenceIDs = append(evidenceIDs, payload.EvidenceIDs...)
+		}
+	}
+	sort.Slice(evidenceIDs, func(left, right int) bool { return evidenceIDs[left] < evidenceIDs[right] })
+	return uniqueUUIDs(evidenceIDs), nil
+}
+
+func profileDeadlineExtensionEvidenceIDs(plan organization.FeaturePlan, snapshot kernel.Snapshot, deadline time.Time) []kernel.UUIDv7 {
 	var evidenceIDs []kernel.UUIDv7
 	for _, item := range plan.Tasks {
 		profile, found := snapshot.WorkProfiles[kernel.AggregateRef{Kind: kernel.AggregateTask, ID: item.ID}]
@@ -287,8 +339,8 @@ func (service *ProductionService) resumeInvocationlessActiveTask(ctx context.Con
 		return errors.Join(organization.ErrRoleNotRunning, err)
 	}
 	profileConfig, configured := service.profilesByModel[item.ModelProfile]
-	workspace, workspaceFound := service.workspacesByID[owner.WorkspaceID]
-	if !configured || !workspaceFound || owner.ModelProfile != item.ModelProfile {
+	workspace, workspaceErr := service.workspaceForExistingTask(ctx, item, owner, snapshot)
+	if !configured || !profileConfig.qualifiedFor(item.DecisionRoute, workKindForPurpose(item.Purpose, item.Risk), service.clock.Now().UTC()) || workspaceErr != nil || owner.ModelProfile != item.ModelProfile {
 		return organization.ErrInvalidFeature
 	}
 	if err := service.registerExecution(ctx, owner, profileConfig); err != nil {
@@ -304,20 +356,15 @@ func (service *ProductionService) resumeInvocationlessActiveTask(ctx context.Con
 	return service.authorizeTaskInvocationWithCondition(ctx, feature, tracked, profileConfig, workspace, budget.Revision, item.Purpose, 1, nil, nil)
 }
 
-// implementationChainDependencyReady permits a later implementation stage to
-// continue in the same actor workspace after the preceding implementation
-// invocation succeeds, while independent validation remains pending. Without
-// this rule, a plan with one validator covering a sequential implementation
-// chain deadlocks: each stage waits for completion, but completion waits for
-// the validator, which cannot run until every stage has produced its result.
-// All other dependency kinds retain the stricter completed-phase requirement.
-func implementationChainDependencyReady(task organization.PlannedTask, dependency organization.PlannedTask, invocation kernel.WorkInvocation, found bool) bool {
-	return task.Purpose == kernel.PurposeImplementation &&
-		dependency.Purpose == kernel.PurposeImplementation &&
-		task.Owner == dependency.Owner &&
-		found &&
-		invocation.State == kernel.InvocationSucceeded &&
-		invocation.OutputDigest != nil
+// plannedDependencyReady exposes an unaccepted candidate only to a task that
+// is explicitly assigned to validate that candidate. Every other DAG edge
+// waits for the dependency to complete, which means its required independent
+// validation has passed. This rule is independent of role and work domain.
+func plannedDependencyReady(validationTarget bool, dependency kernel.AggregateState, invocation kernel.WorkInvocation, found bool) bool {
+	if validationTarget {
+		return found && invocation.State == kernel.InvocationSucceeded && invocation.OutputDigest != nil
+	}
+	return dependency.Phase == kernel.PhaseCompleted
 }
 
 func (service *ProductionService) recordFeatureAcceptanceRecommendation(ctx context.Context, feature organization.FeatureRequest, plan organization.FeaturePlan, invocations map[kernel.UUIDv7]kernel.WorkInvocation) error {
@@ -343,8 +390,49 @@ func (service *ProductionService) recordFeatureAcceptanceRecommendation(ctx cont
 		return err
 	}
 	result, err := parseStructuredValidationResult(output)
+	if err == nil {
+		decision, loadErr := service.Store.LoadDecision(ctx, kernel.KernelCommand{Target: kernel.AggregateRef{Kind: kernel.AggregateTask, ID: acceptanceTask.ID}})
+		if loadErr != nil {
+			return loadErr
+		}
+		err = service.validateCandidateResult(ctx, *acceptanceTask, decision, result)
+	}
 	if err != nil || result.Outcome != "PASS" {
 		return errors.Join(organization.ErrInvalidFeature, err)
+	}
+	featureValidatorID, featureValidatorFound, err := service.assembledValidationCandidateTask(ctx, feature, *acceptanceTask, plan)
+	if err != nil {
+		return err
+	}
+	for _, task := range plan.Tasks {
+		if len(task.Validates) == 0 {
+			continue
+		}
+		validator, present := invocations[task.ID]
+		if !present || validator.State != kernel.InvocationSucceeded || validator.OutputDigest == nil {
+			return organization.ErrInvalidFeature
+		}
+		validatorOutput, readErr := service.Runtime.ReadExecutionOutput(ctx, *validator.OutputDigest)
+		validatorResult, parseErr := parseStructuredValidationResult(validatorOutput)
+		candidateMismatch := task.ID == featureValidatorID && validatorResult.CandidateID != result.CandidateID
+		if readErr != nil || parseErr != nil || validatorResult.Outcome != "PASS" || candidateMismatch {
+			return errors.Join(organization.ErrInvalidFeature, readErr, parseErr)
+		}
+	}
+	if !featureValidatorFound {
+		// Legacy plans had no whole-feature validator. Their validators must
+		// still have used the acceptance candidate exactly.
+		for _, task := range plan.Tasks {
+			if len(task.Validates) == 0 {
+				continue
+			}
+			validator := invocations[task.ID]
+			validatorOutput, readErr := service.Runtime.ReadExecutionOutput(ctx, *validator.OutputDigest)
+			validatorResult, parseErr := parseStructuredValidationResult(validatorOutput)
+			if readErr != nil || parseErr != nil || validatorResult.CandidateID != result.CandidateID {
+				return errors.Join(organization.ErrInvalidFeature, readErr, parseErr)
+			}
+		}
 	}
 	stories := make([]kernel.UUIDv7, len(plan.Stories))
 	for index := range plan.Stories {
@@ -359,7 +447,7 @@ func (service *ProductionService) recordFeatureAcceptanceRecommendation(ctx cont
 	return err
 }
 
-func (service *ProductionService) reconcileValidationRounds(ctx context.Context, feature organization.FeatureRequest, plan organization.FeaturePlan, states map[kernel.UUIDv7]kernel.AggregateState, heads map[kernel.UUIDv7]kernel.UUIDv7, invocations map[kernel.UUIDv7]kernel.WorkInvocation, snapshot kernel.Snapshot, budgetRevision uint64) (bool, error) {
+func (service *ProductionService) reconcileValidationRounds(ctx context.Context, feature organization.FeatureRequest, plan organization.FeaturePlan, states map[kernel.UUIDv7]kernel.AggregateState, heads map[kernel.UUIDv7]kernel.UUIDv7, invocations map[kernel.UUIDv7]kernel.WorkInvocation, snapshot kernel.Snapshot, budgetRevision uint64, evidence []kernel.EvidenceRef) (bool, error) {
 	for _, validator := range plan.Tasks {
 		if len(validator.Validates) == 0 || states[validator.ID].Phase != kernel.PhaseActive {
 			continue
@@ -372,12 +460,15 @@ func (service *ProductionService) reconcileValidationRounds(ctx context.Context,
 		for _, targetID := range validator.Validates {
 			validationTargets[targetID] = struct{}{}
 		}
-		conditionDigests := make([]kernel.Digest, 0, len(validator.Validates))
-		repairedCandidate := false
+		conditionDigests := make([]kernel.Digest, 0, len(validator.DependsOn))
 		ready := true
 		for _, dependencyID := range validator.DependsOn {
 			if _, validates := validationTargets[dependencyID]; !validates {
-				continue
+				dependency := states[dependencyID]
+				if !plannedDependencyReady(false, dependency, kernel.WorkInvocation{}, false) {
+					ready = false
+					break
+				}
 			}
 			candidate, present := invocations[dependencyID]
 			if !present || candidate.State != kernel.InvocationSucceeded || candidate.OutputDigest == nil {
@@ -385,9 +476,8 @@ func (service *ProductionService) reconcileValidationRounds(ctx context.Context,
 				break
 			}
 			conditionDigests = append(conditionDigests, *candidate.OutputDigest)
-			repairedCandidate = repairedCandidate || candidate.Purpose == kernel.PurposeRepair
 		}
-		if !ready || !repairedCandidate {
+		if !ready {
 			continue
 		}
 		profileSnapshot, profileFound := snapshot.WorkProfiles[kernel.AggregateRef{Kind: kernel.AggregateTask, ID: validator.ID}]
@@ -399,21 +489,36 @@ func (service *ProductionService) reconcileValidationRounds(ctx context.Context,
 		if digestErr != nil {
 			return false, digestErr
 		}
-		if latest.ConditionDigest == expectedCondition {
+		// An operator-authorized revalidation also binds its recovery condition.
+		// Use the same exact-lineage check as completion reconciliation so that a
+		// valid successor is not mistaken for a still-stale validator and charged
+		// as another attempt.
+		if validatorConditionMatches(snapshot, validator.ID, latest, profileSnapshot.Profile.ProfileDigest, digestBytes(criteria), conditionDigests, expectedCondition) {
 			continue
 		}
 		nextAttempt := latest.AttemptOrdinal + 1
-		if nextAttempt > uint64(validator.AttemptLimit) {
-			return false, organization.ErrInvalidFeature
-		}
+		technicalExtension := nextAttempt > uint64(validator.AttemptLimit)
 		profileConfig, configured := service.profilesByModel[validator.ModelProfile]
-		owner, active, ownerErr := service.RoleHost.Status(ctx, validator.Owner)
-		workspace, workspaceFound := service.workspacesByID[owner.WorkspaceID]
-		if !configured || ownerErr != nil || !active || owner.Status != organization.RoleIdle || !workspaceFound {
+		owner, ownerErr := service.StartRole(ctx, validator.Owner)
+		if !configured || !profileConfig.qualifiedFor(validator.DecisionRoute, workKindForPurpose(validator.Purpose, validator.Risk), service.clock.Now().UTC()) || ownerErr != nil || owner.Status != organization.RoleIdle {
 			return false, errors.Join(organization.ErrRoleNotRunning, ownerErr)
 		}
 		tracked := &trackedTask{plan: validator, revision: states[validator.ID].Revision, last: heads[validator.ID], profile: profileSnapshot.Profile, owner: owner}
-		if err := service.authorizeTaskInvocationWithCondition(ctx, feature, tracked, profileConfig, workspace, budgetRevision, validator.Purpose, nextAttempt, nil, conditionDigests); err != nil {
+		workspace, candidateEvidence, workspaceErr := service.prepareCandidateConsumerWorkspace(ctx, feature, validator, owner, plan, invocations, evidence)
+		if workspaceErr != nil {
+			return false, workspaceErr
+		}
+		if err := service.rebindTaskCandidateWorkspace(ctx, feature, tracked, workspace, candidateEvidence); err != nil {
+			return false, err
+		}
+		invocationBudgetRevision, budgetErr := service.extendTaskTechnicalRetryBudget(ctx, feature, tracked, validator.Purpose, nextAttempt)
+		if budgetErr != nil || invocationBudgetRevision != budgetRevision {
+			return false, errors.Join(organization.ErrInvalidFeature, budgetErr)
+		}
+		// A changed dependency set is a new candidate, not another attempt to
+		// validate the old candidate. Permit its successor ordinal even when the
+		// prior candidate consumed the planned validation-attempt allowance.
+		if err := service.authorizeTaskInvocationWithConditionPolicy(ctx, feature, tracked, profileConfig, workspace, invocationBudgetRevision, validator.Purpose, nextAttempt, &latest, conditionDigests, technicalExtension, false); err != nil {
 			return false, err
 		}
 		return true, nil

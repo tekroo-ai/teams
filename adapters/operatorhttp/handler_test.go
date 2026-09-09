@@ -132,6 +132,23 @@ func TestHandlerReportsDurableFeatureWhenMaterializationIsPending(t *testing.T) 
 	}
 }
 
+func TestHandlerRequestsFeatureReplanWithBoundHumanIdentity(t *testing.T) {
+	service := &operatorService{state: operationalruntime.ControlRunning}
+	handler := newTestHandler(t, service, func() {})
+	body := `{"expected_revision":4,"expected_plan_version":1,"reason":"replace the observed infeasible task graph","evidence_refs":[{"evidence_id":"00000000-0000-7000-8000-000000000090","sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}],"deadline_at":"2026-09-01T20:00:00Z","idempotency_key":"feature-replan-1"}`
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, authorizedRequest(http.MethodPost, "/v1/features/00000000-0000-7000-8000-000000000005/replan", strings.NewReader(body)))
+	if response.Code != http.StatusOK || service.featureReplanCalls != 1 || service.featureReplan.ExpectedPlanVersion != 1 || service.featureReplan.Reason != "replace the observed infeasible task graph" {
+		t.Fatalf("status=%d calls=%d request=%#v body=%s", response.Code, service.featureReplanCalls, service.featureReplan, response.Body.String())
+	}
+
+	response = httptest.NewRecorder()
+	handler.ServeHTTP(response, authorizedRequest(http.MethodPost, "/v1/features/00000000-0000-7000-8000-000000000005/replan", strings.NewReader(`{"expected_revision":4}`)))
+	if response.Code != http.StatusBadRequest || service.featureReplanCalls != 1 {
+		t.Fatalf("invalid status=%d calls=%d", response.Code, service.featureReplanCalls)
+	}
+}
+
 func TestHandlerRetriesCancelledPlanningOnlyWithExplicitOperatorRequest(t *testing.T) {
 	service := &operatorService{state: operationalruntime.ControlRunning}
 	handler := newTestHandler(t, service, func() {})
@@ -196,6 +213,8 @@ type operatorService struct {
 	planningRecovery      operationalruntime.PlanningRecoveryRequest
 	taskRecoveryCalls     int
 	taskRecovery          operationalruntime.TaskRecoveryRequest
+	featureReplanCalls    int
+	featureReplan         operationalruntime.FeatureReplanRequest
 }
 
 func (service *operatorService) Status() operationalruntime.ControlStatus {
@@ -351,6 +370,12 @@ func (service *operatorService) RetryFailedTask(_ context.Context, _ kernel.Prin
 	service.taskRecoveryCalls++
 	service.taskRecovery = request
 	return operationalruntime.InvocationStatus{}, nil
+}
+
+func (service *operatorService) RequestFeatureReplan(_ context.Context, _ kernel.PrincipalRef, _ kernel.UUIDv7, request operationalruntime.FeatureReplanRequest) (organization.FeatureRequest, error) {
+	service.featureReplanCalls++
+	service.featureReplan = request
+	return organization.FeatureRequest{}, nil
 }
 
 func (service *operatorService) FederationSnapshot() operationalruntime.FederationSnapshot {

@@ -206,6 +206,13 @@ func (worker *Worker) Run(ctx context.Context) error {
 		intent, err := worker.source.Next(sourceCtx)
 		sourceCancel()
 		if err != nil {
+			// Shutdown wins over a concurrent empty-poll result. A source may
+			// legitimately report no intent at the same instant the run context is
+			// cancelled; surfacing that sentinel would turn a clean stop into a
+			// false runtime failure.
+			if runCtx.Err() != nil {
+				return runCtx.Err()
+			}
 			if (errors.Is(err, context.DeadlineExceeded) || errors.Is(err, mongo.ErrIntentNotFound)) && runCtx.Err() == nil {
 				continue
 			}

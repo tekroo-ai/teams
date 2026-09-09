@@ -121,7 +121,7 @@ func TestStarterTeamContainsEightVerifiedRoleBundles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	team, err := LoadTeamManifest(manifestPath, kernel.Digest("fc23fd21129c69ebf4b22176b12191170b4b88702366bd5172b37e2098dbc98b"), map[string]ed25519.PublicKey{"tekroo-phase6-bootstrap": publicKey, "tekroo-role-grounding-20260901": groundingKey})
+	team, err := LoadTeamManifest(manifestPath, kernel.Digest("3478f27988da4f7c022df0ca7145af88b8e8cc1eb6fd446402ff69b33519c693"), map[string]ed25519.PublicKey{"tekroo-phase6-bootstrap": publicKey, "tekroo-role-grounding-20260901": groundingKey})
 	if err != nil {
 		t.Fatal(err)
 	}

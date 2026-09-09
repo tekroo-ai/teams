@@ -24,6 +24,10 @@ func (service *ProductionService) SubmitFeature(ctx context.Context, principal k
 	}
 	if feature.Status == organization.FeatureSubmitted {
 		if err := service.materializeFeatureIntake(ctx, feature); err != nil {
+			if errors.Is(err, errNewInvocationAdmissionSuspended) {
+				service.clearRecoveryFault("feature-intake:" + string(feature.ID))
+				return feature, created, nil
+			}
 			service.recordRecoveryFault("feature-intake:"+string(feature.ID), err)
 			return feature, created, fmt.Errorf("%w: %v", ErrFeatureMaterializationPending, err)
 		}

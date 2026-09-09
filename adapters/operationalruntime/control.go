@@ -54,6 +54,17 @@ func NewController(runtime *Runtime, clock interface{ Now() time.Time }) (*Contr
 }
 
 func (controller *Controller) Start(ctx context.Context) error {
+	return controller.start(ctx, false)
+}
+
+// StartPaused initializes the worker and its durable feed without admitting
+// work. It is used when an operator must inspect or checkpoint a deployment
+// before allowing the next pending invocation to begin.
+func (controller *Controller) StartPaused(ctx context.Context) error {
+	return controller.start(ctx, true)
+}
+
+func (controller *Controller) start(ctx context.Context, paused bool) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -65,7 +76,12 @@ func (controller *Controller) Start(ctx context.Context) error {
 	runContext, cancel := context.WithCancel(context.Background())
 	controller.cancel = cancel
 	controller.done = make(chan error, 1)
-	controller.state = ControlRunning
+	if paused {
+		controller.runtime.worker.Pause()
+		controller.state = ControlPaused
+	} else {
+		controller.state = ControlRunning
+	}
 	controller.startedAt = controller.clock.Now()
 	go func() {
 		err := controller.runtime.Run(runContext)

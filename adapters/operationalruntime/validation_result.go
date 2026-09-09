@@ -8,14 +8,17 @@ import (
 	"strings"
 
 	"github.com/tekroo-ai/teams/application"
+	"github.com/tekroo-ai/teams/kernel"
 )
 
 var errInvalidValidationResult = errors.New("invalid structured validation result")
 
 type structuredValidationResult struct {
-	SchemaVersion string   `json:"schema_version"`
-	Outcome       string   `json:"outcome"`
-	Reasons       []string `json:"reasons"`
+	SchemaVersion          string        `json:"schema_version"`
+	Outcome                string        `json:"outcome"`
+	Reasons                []string      `json:"reasons"`
+	CandidateID            kernel.UUIDv7 `json:"candidate_id,omitempty"`
+	CandidateReceiptSHA256 kernel.Digest `json:"candidate_receipt_sha256,omitempty"`
 }
 
 func parseStructuredValidationResult(output []byte) (structuredValidationResult, error) {
@@ -52,6 +55,9 @@ func parseStructuredValidationResult(output []byte) (structuredValidationResult,
 			return structuredValidationResult{}, errInvalidValidationResult
 		}
 		seen[reason] = struct{}{}
+	}
+	if (result.CandidateID == "") != (result.CandidateReceiptSHA256 == "") || result.CandidateID != "" && (!result.CandidateID.Valid() || !result.CandidateReceiptSHA256.Valid()) {
+		return structuredValidationResult{}, errInvalidValidationResult
 	}
 	return result, nil
 }

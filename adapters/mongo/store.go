@@ -43,9 +43,10 @@ type Config struct {
 }
 
 type Store struct {
-	client *driver.Client
-	db     *driver.Database
-	owns   bool
+	client             *driver.Client
+	db                 *driver.Database
+	owns               bool
+	deploymentIdentity kernel.Digest
 
 	faultMu   sync.Mutex
 	fault     string
@@ -122,7 +123,7 @@ func Open(ctx context.Context, config Config) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	store := &Store{client: client, db: client.Database(config.Database), owns: true, backlogLimit: config.BacklogLimit}
+	store := &Store{client: client, db: client.Database(config.Database), owns: true, backlogLimit: config.BacklogLimit, deploymentIdentity: config.DeploymentIdentity}
 	if config.DeploymentIdentity != "" {
 		if err := store.validateDeploymentBeforeInitialization(ctx, config.DeploymentIdentity); err != nil {
 			_ = client.Disconnect(context.Background())
@@ -196,7 +197,14 @@ func (s *Store) initialize(ctx context.Context, config Config) error {
 	case err != nil:
 		return err
 	case !reflect.DeepEqual(existing.Data, policy.Data):
-		return ErrMetadataMismatch
+		var priorPolicy kernel.AuthorizationPolicy
+		if decode(existing.Data, &priorPolicy) != nil || !authorizationPolicySuccessor(normalizePolicy(priorPolicy), normalizePolicy(config.Policy)) {
+			return ErrMetadataMismatch
+		}
+		result, replaceErr := s.db.Collection("metadata").ReplaceOne(ctx, bson.D{{Key: "_id", Value: "authorization"}, {Key: "data", Value: existing.Data}}, policy)
+		if replaceErr != nil || result.ModifiedCount != 1 {
+			return errors.Join(ErrMetadataMismatch, replaceErr)
+		}
 	}
 	deliveryPolicyBytes, err := encode(struct {
 		Revision     uint64 `json:"revision"`
@@ -218,6 +226,49 @@ func (s *Store) initialize(ctx context.Context, config Config) error {
 		return ErrMetadataMismatch
 	}
 	return nil
+}
+
+// authorizationPolicySuccessor permits a configured local policy to advance
+// by exactly one revision without invalidating durable work. Existing grants
+// may only gain command types; principals, targets, ownership constraints,
+// delegations, and every other authority property remain immutable.
+func authorizationPolicySuccessor(prior, next kernel.AuthorizationPolicy) bool {
+	if !prior.PolicyDigest.Valid() || !next.PolicyDigest.Valid() || prior.PolicyDigest == next.PolicyDigest || next.Revision != prior.Revision+1 || !reflect.DeepEqual(prior.Requirements, next.Requirements) || !reflect.DeepEqual(prior.Delegations, next.Delegations) || len(prior.Grants) != len(next.Grants) {
+		return false
+	}
+	nextByDigest := make(map[kernel.Digest]kernel.AuthorityGrant, len(next.Grants))
+	for _, grant := range next.Grants {
+		if _, duplicate := nextByDigest[grant.GrantDigest]; duplicate {
+			return false
+		}
+		nextByDigest[grant.GrantDigest] = grant
+	}
+	for _, oldGrant := range prior.Grants {
+		newGrant, found := nextByDigest[oldGrant.GrantDigest]
+		if !found || oldGrant.Grantee != newGrant.Grantee || !reflect.DeepEqual(oldGrant.ExpiresAt, newGrant.ExpiresAt) || oldGrant.Revoked != newGrant.Revoked || oldGrant.AllowDelegation != newGrant.AllowDelegation || !authorityScopeCommandSuccessor(oldGrant.Scope, newGrant.Scope) {
+			return false
+		}
+	}
+	return true
+}
+
+func authorityScopeCommandSuccessor(prior, next kernel.AuthorityScope) bool {
+	if prior.CanReadTarget != next.CanReadTarget || prior.RequiresOwner != next.RequiresOwner || prior.CanReopenAccepted != next.CanReopenAccepted || !reflect.DeepEqual(prior.TargetKinds, next.TargetKinds) || !reflect.DeepEqual(prior.TargetIDs, next.TargetIDs) {
+		return false
+	}
+	commands := make(map[string]struct{}, len(next.CommandTypes))
+	for _, command := range next.CommandTypes {
+		if command == "" {
+			return false
+		}
+		commands[command] = struct{}{}
+	}
+	for _, command := range prior.CommandTypes {
+		if _, retained := commands[command]; !retained {
+			return false
+		}
+	}
+	return true
 }
 
 func (s *Store) ensureIndexes(ctx context.Context) error {
@@ -252,6 +303,9 @@ func (s *Store) ensureIndexes(ctx context.Context) error {
 		"feature_requests": {
 			{Keys: bson.D{{Key: "submitted_by_kind", Value: 1}, {Key: "submitted_by_id", Value: 1}, {Key: "idempotency_key", Value: 1}}, Options: options.Index().SetName("feature_submitter_idempotency_unique").SetUnique(true)},
 			{Keys: bson.D{{Key: "status", Value: 1}, {Key: "updated_at", Value: 1}}, Options: options.Index().SetName("feature_status_updated")},
+		},
+		"runtime_suspensions": {
+			{Keys: bson.D{{Key: "deployment_identity", Value: 1}, {Key: "suspended_at", Value: 1}, {Key: "_id", Value: 1}}, Options: options.Index().SetName("runtime_suspension_deployment_time")},
 		},
 		"federation_receipts": {
 			{Keys: bson.D{{Key: "delivery_id", Value: 1}}, Options: options.Index().SetName("federation_delivery_unique").SetUnique(true)},
@@ -296,8 +350,23 @@ func (s *Store) loadSnapshot(ctx context.Context, target kernel.AggregateRef, pr
 	}
 
 	snapshot.AcceptedEvents = make(map[kernel.UUIDv7]kernel.AcceptedEvent)
+	snapshot.WorkProfileHistory = make(map[kernel.UUIDv7]kernel.WorkRiskProfile)
 	if err := scan(ctx, s.db.Collection("events"), bson.D{}, func(document eventDocument) error {
 		snapshot.AcceptedEvents[kernel.UUIDv7(document.ID)] = kernel.AcceptedEvent{EventType: document.EventType, Qualification: document.Qualification}
+		if document.EventType == "tekroo.event.task.work-profile-bound" {
+			var event kernel.DomainEvent
+			if err := decode(document.Data, &event); err != nil {
+				return err
+			}
+			profile, err := kernel.WorkRiskProfileFromPayload(event.Payload)
+			if err != nil || event.Aggregate.Kind != kernel.AggregateTask || event.Aggregate.ID != profile.TaskID {
+				return ErrCorruptAggregate
+			}
+			if prior, found := snapshot.WorkProfileHistory[profile.ProfileID]; found && !reflect.DeepEqual(prior, profile) {
+				return ErrCorruptAggregate
+			}
+			snapshot.WorkProfileHistory[profile.ProfileID] = profile
+		}
 		return nil
 	}); err != nil {
 		return kernel.Snapshot{}, err

@@ -427,7 +427,14 @@ func BoundedReviewResultReason(snapshot CompletionReviewSnapshot, result ReviewB
 	if !required || !result.EventID.Valid() || result.DecidedAt.IsZero() || !result.Authority.Valid() || result.Round == 0 || !validReviewResult(result.Result) || !validUUIDSet(result.EvidenceIDs, true) {
 		return "INVALID_REVIEW_RESULT"
 	}
-	if snapshot.TopologyBound && (result.CandidateArtifactDigest != snapshot.CandidateArtifactDigest || !result.IndependenceReceipt.Proves(spec.RequiredIndependenceDimensions, spec.RequiredMethodIDs) || !RequiredSeparationProven(snapshot.Implementer, result.Authority, result.ActorFQN, result.Execution, spec.RequiredIndependenceDimensions, result.IndependenceReceipt)) {
+	// A policy timeout closes an expired branch; it is not an independent
+	// evaluation of the candidate. Requiring an actor/execution separation for
+	// that administrative result would make the contract's POLICY_TIMEOUT path
+	// impossible for the policy principal to use.
+	if snapshot.TopologyBound && result.CandidateArtifactDigest != snapshot.CandidateArtifactDigest {
+		return "INDEPENDENCE_NOT_PROVEN"
+	}
+	if snapshot.TopologyBound && result.SourceRole != "POLICY_TIMEOUT" && (!result.IndependenceReceipt.Proves(spec.RequiredIndependenceDimensions, spec.RequiredMethodIDs) || !RequiredSeparationProven(snapshot.Implementer, result.Authority, result.ActorFQN, result.Execution, spec.RequiredIndependenceDimensions, result.IndependenceReceipt)) {
 		return "INDEPENDENCE_NOT_PROVEN"
 	}
 	switch result.SourceRole {

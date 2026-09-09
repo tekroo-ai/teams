@@ -96,6 +96,45 @@ func TestOrganizationalMessageFeedPollNormalizesExpiredMongoDeadline(t *testing.
 	}
 }
 
+func TestOrganizationalMessageFeedIdlePollDoesNotSpin(t *testing.T) {
+	store := openTestStore(t)
+	openCtx, openCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	feed, err := store.OpenOrganizationalMessageFeed(openCtx, "idle-message-poll", "teams::coder-1")
+	openCancel()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		closeCtx, closeCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer closeCancel()
+		_ = feed.Close(closeCtx)
+	}()
+
+	// The driver's initial empty aggregate batch may be consumed without a
+	// getMore. Once primed, every idle poll must perform Mongo's bounded await
+	// rather than turning the role worker into a tight loop.
+	warmupCtx, warmupCancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
+	_, err = feed.Poll(warmupCtx)
+	warmupCancel()
+	if !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, organization.ErrOrganizationalMessageNotFound) {
+		t.Fatalf("idle message feed warmup = %v", err)
+	}
+
+	for attempt := 0; attempt < 4; attempt++ {
+		pollCtx, pollCancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
+		started := time.Now()
+		_, err = feed.Poll(pollCtx)
+		elapsed := time.Since(started)
+		pollCancel()
+		if !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, organization.ErrOrganizationalMessageNotFound) {
+			t.Fatalf("idle message poll = %v", err)
+		}
+		if elapsed < 50*time.Millisecond {
+			t.Fatalf("idle message poll %d returned after %s; want Mongo bounded await", attempt+1, elapsed)
+		}
+	}
+}
+
 func mongoTestMessage(recipient kernel.ActorFQN) organization.OrganizationalMessage {
 	story := testUUID(9802)
 	task := testUUID(9803)

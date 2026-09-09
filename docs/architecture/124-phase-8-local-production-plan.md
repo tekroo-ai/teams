@@ -26,12 +26,13 @@ already qualified system.
 1. `tekroo init-local` creates a deployment from explicit absolute inputs.
 2. It creates a fresh Teams database identity and never reads v3 data.
 3. It produces deployment-owned secrets, authorization policy, provenance,
-   team manifest, signed role library, role worktrees, SMA hook bindings,
-   production configuration, state/evidence directories, and a LaunchAgent
-   definition.
+   team manifest, signed role library, exact accepted model-profile
+   qualification bindings, role worktrees, SMA hook bindings, production
+   configuration, state/evidence directories, and a LaunchAgent definition.
 4. It fails closed on unsafe paths, non-loopback endpoints, shared Teams/SMA
    database identity, dirty tracked source, pre-existing deployment state,
-   branch collision, missing accepted assets, or invalid generated config.
+   branch collision, missing accepted assets, absent/ineligible/mismatched
+   profile qualification, or invalid generated config.
 5. The existing isolated installer builds only `tekrood` and `tekroo` and the
    lifecycle scripts start, stop, restart, and inspect the configured service.
 6. A fresh local deployment starts against the installed MongoDB, OpenHands,

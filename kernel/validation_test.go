@@ -152,6 +152,49 @@ func TestBoundedValidationEnforcesExactAuthorityDeadlineRoundAndSupersession(t *
 	}
 }
 
+func TestPolicyTimeoutCanCloseTopologyBoundBranchWithoutInventingAgentIdentity(t *testing.T) {
+	deadline := time.Date(2026, time.August, 12, 0, 0, 0, 0, time.UTC)
+	candidate := kernel.Digest("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+	branch := kernel.ReviewBranchSpec{
+		BranchID:                       "tests",
+		Validator:                      kernel.PrincipalRef{Kind: kernel.PrincipalActor, ID: "teams::tester-1"},
+		DeadlineAt:                     deadline,
+		RoundLimit:                     1,
+		RequiredIndependenceDimensions: []kernel.IndependenceDimension{kernel.IndependencePrincipal, kernel.IndependenceActor, kernel.IndependenceExecution},
+		RequiredMethodIDs:              []string{"independent-test"},
+	}
+	snapshot := kernel.CompletionReviewSnapshot{
+		TopologyBound:           true,
+		CandidateArtifactDigest: candidate,
+		RequiredBranchIDs:       []string{"tests"},
+		Branches:                map[string]kernel.ReviewBranchSpec{"tests": branch},
+		PartialResultPolicy:     "WAIT_ALL",
+		Results:                 map[string]string{},
+		ResultRecords:           map[string]kernel.ReviewBranchResult{},
+		KnownResultEvents:       map[kernel.UUIDv7]kernel.ReviewBranchResult{},
+		ReviewRevision:          1,
+	}
+	result := kernel.ReviewBranchResult{
+		BranchID:                "tests",
+		SourceRole:              "POLICY_TIMEOUT",
+		Authority:               kernel.PrincipalRef{Kind: kernel.PrincipalPolicy, ID: "teams-policy"},
+		Round:                   1,
+		Result:                  "BLOCKED",
+		EvidenceIDs:             []kernel.UUIDv7{"00000000-0000-7000-8000-000000000620"},
+		EventID:                 kernel.UUIDv7("00000000-0000-7000-8000-000000000621"),
+		DecidedAt:               deadline.Add(time.Nanosecond),
+		CandidateArtifactDigest: candidate,
+	}
+	closed, ok := kernel.ApplyBoundedReviewBranchResult(snapshot, result)
+	if !ok || !closed.Join.Complete || closed.Join.Status != "BLOCKED" {
+		t.Fatalf("policy timeout = %#v ok=%t", closed, ok)
+	}
+	result.CandidateArtifactDigest = kernel.Digest("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
+	if reason := kernel.BoundedReviewResultReason(snapshot, result); reason != "INDEPENDENCE_NOT_PROVEN" {
+		t.Fatalf("candidate mismatch reason = %q", reason)
+	}
+}
+
 func TestCompletionReviewFinalizationBindsCurrentResultSet(t *testing.T) {
 	subject := kernel.AggregateRef{Kind: kernel.AggregateTask, ID: kernel.UUIDv7("00000000-0000-7000-8000-000000000611")}
 	resultID := kernel.UUIDv7("00000000-0000-7000-8000-000000000612")

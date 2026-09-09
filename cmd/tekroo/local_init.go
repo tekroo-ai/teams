@@ -16,57 +16,89 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 	"time"
 
+	"github.com/tekroo-ai/teams/adapters/openhands"
 	"github.com/tekroo-ai/teams/adapters/operationalruntime"
+	"github.com/tekroo-ai/teams/application"
 	"github.com/tekroo-ai/teams/kernel"
 	"github.com/tekroo-ai/teams/organization"
 )
 
 const (
-	localModelIdentity      = "ddalcu--Qwen3.8-27B-MLX-Serve-8bit"
-	localModelEndpoint      = "http://127.0.0.1:8802/v1"
-	acceptedQualification   = "66e4aeabf7be5a7bdf1220293d08a2ec4e737088caf45193d8002a2b0b53975e"
-	acceptedCorpus          = "b183c6e04f0b4af0977611da63fea332ce2e30bb890e2ea0d8ab6c1f639f00a1"
-	localDeploymentTeam     = "teams"
-	localDeploymentVersion  = "1.0.0"
-	localBootstrapPublisher = "tekroo-phase6-bootstrap"
-	localGroundingPublisher = "tekroo-role-grounding-20260901"
+	localModelIdentity        = "ddalcu--Qwen3.8-27B-MLX-Serve-8bit"
+	localBoundedModelEndpoint = "http://127.0.0.1:8802/v1"
+	localComplexModelEndpoint = "http://127.0.0.1:8800/v1"
+	localOpenHandsEndpoint    = "http://127.0.0.1:8000"
+	localDeploymentTeam       = "teams"
+	localDeploymentVersion    = "1.0.0"
+	localBootstrapPublisher   = "tekroo-phase6-bootstrap"
+	localGroundingPublisher   = "tekroo-role-grounding-20260901"
+	localBoundedOutputTokens  = 8192
+	localComplexOutputTokens  = 32768
+	// Editing profiles receive a smaller per-decision ceiling than read-only
+	// complex reasoning profiles. Run 41 showed Qwen 3.8 repeating a completed
+	// implementation plan until the 32K ceiling without emitting an action.
+	// This bounds one response, not the actor lifetime or tool iterations, and
+	// is selected from repository.edit authority rather than a named role.
+	localComplexEditingOutputTokens = 16384
+	localComplexReasoningEffort     = "medium"
+	localCondenserOutputTokens      = 4096
+	localCondenserMaximumEvents     = 80
+	localEditCondenserMaximumEvents = 240
+	localQualificationSchema        = "tekroo.local-model-profile-qualifications/1.0.0"
 )
 
 type localInitOptions struct {
-	Root             string
-	SourceRoot       string
-	RepositoryRoot   string
-	OpenHandsKeyFile string
-	SMAHookFile      string
-	TekroodPath      string
-	MongoURI         string
-	Database         string
-	SMADatabase      string
-	OperatorAddress  string
-	BranchPrefix     string
+	Root                    string
+	SourceRoot              string
+	RepositoryRoot          string
+	OpenHandsKeyFile        string
+	OpenHandsBaseURL        string
+	SMAHookFile             string
+	TekroodPath             string
+	MongoURI                string
+	Database                string
+	SMADatabase             string
+	OperatorAddress         string
+	BranchPrefix            string
+	QualificationBundleFile string
 }
 
 type localInitResult struct {
-	Root             string   `json:"root"`
-	ConfigPath       string   `json:"config_path"`
-	StateDirectory   string   `json:"state_directory"`
-	LaunchAgentPath  string   `json:"launch_agent_path"`
-	Database         string   `json:"database"`
-	SMADatabase      string   `json:"sma_database"`
-	OperatorAddress  string   `json:"operator_address"`
-	BranchPrefix     string   `json:"branch_prefix"`
-	OpenHands        string   `json:"openhands"`
-	Model            string   `json:"model"`
-	Team             string   `json:"team"`
-	WorkspaceCount   int      `json:"workspace_count"`
-	WorkspaceIDs     []string `json:"workspace_ids"`
-	BaselineCommit   string   `json:"baseline_commit"`
-	ContractIdentity string   `json:"contract_identity"`
-	AutomaticStartup bool     `json:"automatic_startup"`
+	Root                      string        `json:"root"`
+	ConfigPath                string        `json:"config_path"`
+	StateDirectory            string        `json:"state_directory"`
+	LaunchAgentPath           string        `json:"launch_agent_path"`
+	Database                  string        `json:"database"`
+	SMADatabase               string        `json:"sma_database"`
+	OperatorAddress           string        `json:"operator_address"`
+	BranchPrefix              string        `json:"branch_prefix"`
+	OpenHands                 string        `json:"openhands"`
+	Model                     string        `json:"model"`
+	Team                      string        `json:"team"`
+	WorkspaceCount            int           `json:"workspace_count"`
+	WorkspaceIDs              []string      `json:"workspace_ids"`
+	BaselineCommit            string        `json:"baseline_commit"`
+	ContractIdentity          string        `json:"contract_identity"`
+	AutomaticStartup          bool          `json:"automatic_startup"`
+	QualificationBundle       string        `json:"qualification_bundle"`
+	QualificationBundleDigest kernel.Digest `json:"qualification_bundle_digest"`
+}
+
+type localQualificationBundle struct {
+	SchemaVersion  string                             `json:"schema_version"`
+	Qualifications []localProfileQualificationBinding `json:"qualifications"`
+}
+
+type localProfileQualificationBinding struct {
+	RoleFQRN            kernel.RoleFQRN                           `json:"role_fqrn"`
+	ModelProfileDigest  kernel.Digest                             `json:"model_profile_digest"`
+	QualificationCorpus application.QualificationCorpusDefinition `json:"qualification_corpus"`
+	Qualification       kernel.ModelProfileQualification          `json:"qualification"`
 }
 
 func runLocalInit(arguments []string, stdout, stderr io.Writer) error {
@@ -76,6 +108,7 @@ func runLocalInit(arguments []string, stdout, stderr io.Writer) error {
 	sourceRoot := flags.String("source-root", "", "absolute Teams source root containing contract and starter team")
 	repositoryRoot := flags.String("repository", "", "absolute Git repository used by the team")
 	openHandsKey := flags.String("openhands-key", "", "absolute OpenHands session API key file")
+	openHandsURL := flags.String("openhands-url", localOpenHandsEndpoint, "loopback OpenHands agent-server URL")
 	smaHook := flags.String("sma-hook", "", "absolute accepted SMA OpenHands hook")
 	tekrood := flags.String("tekrood", "", "absolute installed tekrood binary")
 	mongoURI := flags.String("mongo-uri", "mongodb://127.0.0.1:27017", "loopback MongoDB URI")
@@ -83,6 +116,7 @@ func runLocalInit(arguments []string, stdout, stderr io.Writer) error {
 	smaDatabase := flags.String("sma-database", "sma", "physically separate SMA database identity")
 	operatorAddress := flags.String("operator-address", "127.0.0.1:8787", "loopback operator listener")
 	branchPrefix := flags.String("branch-prefix", "tekroo/", "Git branch prefix for role worktrees")
+	qualificationBundle := flags.String("qualification-bundle", "", "absolute accepted model-profile qualification bundle")
 	if err := flags.Parse(arguments); err != nil {
 		return err
 	}
@@ -91,10 +125,12 @@ func runLocalInit(arguments []string, stdout, stderr io.Writer) error {
 	}
 	result, err := initializeLocalDeployment(context.Background(), localInitOptions{
 		Root: *root, SourceRoot: *sourceRoot, RepositoryRoot: *repositoryRoot,
-		OpenHandsKeyFile: *openHandsKey, SMAHookFile: *smaHook, TekroodPath: *tekrood,
+		OpenHandsKeyFile: *openHandsKey, OpenHandsBaseURL: *openHandsURL,
+		SMAHookFile: *smaHook, TekroodPath: *tekrood,
 		MongoURI: *mongoURI, Database: *database, SMADatabase: *smaDatabase,
-		OperatorAddress: *operatorAddress,
-		BranchPrefix:    *branchPrefix,
+		OperatorAddress:         *operatorAddress,
+		BranchPrefix:            *branchPrefix,
+		QualificationBundleFile: *qualificationBundle,
 	})
 	if err != nil {
 		return err
@@ -110,6 +146,9 @@ func runLocalInit(arguments []string, stdout, stderr io.Writer) error {
 func initializeLocalDeployment(ctx context.Context, options localInitOptions) (result localInitResult, err error) {
 	if options.BranchPrefix == "" {
 		options.BranchPrefix = "tekroo/"
+	}
+	if options.OpenHandsBaseURL == "" {
+		options.OpenHandsBaseURL = localOpenHandsEndpoint
 	}
 	if err := validateLocalInitOptions(options); err != nil {
 		return result, err
@@ -190,6 +229,22 @@ func initializeLocalDeployment(ctx context.Context, options localInitOptions) (r
 	}
 	manifest.Team = localDeploymentTeam
 	manifest.Version = localDeploymentVersion
+	profiles, err := localProductionProfiles(deploymentTeamRoot, &manifest)
+	if err != nil {
+		return result, err
+	}
+	profiles, qualificationBundle, err := bindLocalProductionQualifications(options.QualificationBundleFile, profiles, time.Now().UTC())
+	if err != nil {
+		return result, err
+	}
+	qualificationBundlePath := filepath.Join(configRoot, "model-profile-qualifications.json")
+	if err = writeJSONFile(qualificationBundlePath, qualificationBundle, 0o600); err != nil {
+		return result, err
+	}
+	qualificationBundleDigest, err := fileDigest(qualificationBundlePath)
+	if err != nil {
+		return result, err
+	}
 	teamPath := filepath.Join(deploymentTeamRoot, "team.json")
 	if err = writeJSONFile(teamPath, manifest, 0o600); err != nil {
 		return result, err
@@ -198,6 +253,9 @@ func initializeLocalDeployment(ctx context.Context, options localInitOptions) (r
 	manifestDigest, err := fileDigest(teamPath)
 	if err != nil {
 		return result, err
+	}
+	if err = ensureGitInfoExclude(ctx, options.RepositoryRoot, "/.openhands/hooks/sma_context_hook.py"); err != nil {
+		return result, fmt.Errorf("exclude injected OpenHands hook: %w", err)
 	}
 	workspaces := make([]operationalruntime.ProductionWorkspace, 0)
 	workspaceIDs := make([]string, 0)
@@ -225,7 +283,6 @@ func initializeLocalDeployment(ctx context.Context, options localInitOptions) (r
 			workspaceIDs = append(workspaceIDs, workspaceID)
 		}
 	}
-	profiles := localProductionProfiles(manifest)
 	policy := localProductionPolicy(manifest)
 	policyPath := filepath.Join(configRoot, "authorization-policy.json")
 	if err = writeJSONFile(policyPath, policy, 0o600); err != nil {
@@ -251,21 +308,22 @@ func initializeLocalDeployment(ctx context.Context, options localInitOptions) (r
 	config := operationalruntime.ProductionConfig{
 		ContractRoot:          options.SourceRoot,
 		Mongo:                 operationalruntime.ProductionMongoConfig{URIFile: mongoPath, Database: options.Database, BacklogLimit: 10000, DeliveryPolicyRevision: 1},
-		OpenHands:             operationalruntime.ProductionOpenHandsConfig{BaseURL: "http://127.0.0.1:8000", SessionAPIKeyFile: options.OpenHandsKeyFile, RequestTimeout: "20m", PollInterval: "250ms", MaximumPages: 64, MaximumEvidenceBytes: 16 << 20},
+		OpenHands:             operationalruntime.ProductionOpenHandsConfig{BaseURL: options.OpenHandsBaseURL, SessionAPIKeyFile: options.OpenHandsKeyFile, RequestTimeout: "20m", PollInterval: "250ms", MaximumPages: 64, MaximumEvidenceBytes: 16 << 20},
 		Operator:              operationalruntime.ProductionOperatorConfig{Address: options.OperatorAddress, BearerTokenFile: operatorTokenPath, Principal: kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "principal"}, OperationTimeout: "30s", MaximumBodyBytes: 1 << 20},
 		TeamsDatabaseIdentity: options.Database, SMADatabaseIdentity: options.SMADatabase, DeploymentIdentity: kernel.Digest(deploymentIdentity),
 		AuthorizationPolicyFile: policyPath, ProvenanceFile: filepath.Join(configRoot, "provenance.json"), EvidenceRoot: evidenceRoot,
 		ServiceAuthority: kernel.PrincipalRef{Kind: kernel.PrincipalService, ID: "teams-operational-runtime"}, ExpiryAuthority: kernel.PrincipalRef{Kind: kernel.PrincipalPolicy, ID: "teams-admission-policy"},
 		Workspaces: workspaces, Profiles: profiles,
-		Execution:    operationalruntime.ProductionExecution{ConsumerID: "tekrood-local-production", OperationTimeout: "20m", MaximumBriefBytes: 1 << 20, PolicyRevision: 2},
-		Evidence:     operationalruntime.ProductionEvidence{PolicyRevision: 2, ProducingVersion: "teams-v4-phase8", RetentionPolicy: "local-production"},
+		Execution:    operationalruntime.ProductionExecution{ConsumerID: "tekrood-local-production", OperationTimeout: "20m", MaximumBriefBytes: 1 << 20, PolicyRevision: 6},
+		Evidence:     operationalruntime.ProductionEvidence{PolicyRevision: 6, ProducingVersion: "teams-v4-phase8", RetentionPolicy: "local-production"},
 		Worker:       operationalruntime.ProductionWorker{LeaseDuration: "90s", ReconciliationInterval: "250ms", MaximumReconciliations: 160, MaximumConcurrentInvocations: 8, LeaseOperationTimeout: "5s"},
 		Projection:   operationalruntime.ProductionProjection{Interval: "100ms", OperationTimeout: "5s"},
+		Continuity:   &operationalruntime.ProductionContinuity{HeartbeatInterval: "2s", SuspensionThreshold: "10s"},
 		Organization: operationalruntime.ProductionOrganization{ManifestFile: teamPath, ManifestDigest: manifestDigest, Publishers: []operationalruntime.ProductionPublisher{{KeyID: localBootstrapPublisher, PublicKeyFile: filepath.Join(deploymentTeamRoot, "publisher.pub")}, {KeyID: localGroundingPublisher, PublicKeyFile: filepath.Join(deploymentTeamRoot, "role-grounding-publisher.pub")}}, ReconciliationInterval: "1s", MaximumRestarts: 3, MaximumDeliveryAttempts: 3},
-		Planning:     operationalruntime.ProductionPlanning{PolicyRevision: 2, ClassificationPolicyDigest: labelDigest("classification-policy-v2"), PromotionPolicyDigest: labelDigest("promotion-policy-v2"), VerificationTopologyDigest: labelDigest("verification-topology-v2"), SelectionPolicyDigest: labelDigest("selection-policy-v2"), BudgetPolicyDigest: labelDigest("budget-policy-v2"), RequiredGateIDs: []string{"go-test"}, Deadline: "2h"},
+		Planning:     operationalruntime.ProductionPlanning{PolicyRevision: 3, ClassificationPolicyDigest: labelDigest("classification-policy-v3"), PromotionPolicyDigest: labelDigest("promotion-policy-v3"), VerificationTopologyDigest: labelDigest("verification-topology-v3"), SelectionPolicyDigest: labelDigest("selection-policy-v3"), BudgetPolicyDigest: labelDigest("budget-policy-v3"), RequiredGateIDs: []string{"go-test"}, CandidateGates: []operationalruntime.ProductionCandidateGate{{GateID: "go-test", Command: []string{"go", "test", "./..."}, Timeout: "20m"}}, Deadline: "8h"},
 		Git:          &operationalruntime.ProductionGitConfig{Binary: "git", AllowedRoot: filepath.Dir(options.RepositoryRoot), OperationTimeout: "2m"},
 	}
-	provenance, err := localProductionProvenance(options, config, policy, manifest, baseline, tree)
+	provenance, err := localProductionProvenance(options, config, policy, manifest, baseline, tree, qualificationBundleDigest)
 	if err != nil {
 		return result, err
 	}
@@ -286,16 +344,17 @@ func initializeLocalDeployment(ctx context.Context, options localInitOptions) (r
 	return localInitResult{
 		Root: options.Root, ConfigPath: configPath, StateDirectory: stateRoot,
 		LaunchAgentPath: launchAgentPath, Database: options.Database, SMADatabase: options.SMADatabase,
-		OperatorAddress: options.OperatorAddress, OpenHands: "http://127.0.0.1:8000",
+		OperatorAddress: options.OperatorAddress, OpenHands: options.OpenHandsBaseURL,
 		BranchPrefix: options.BranchPrefix,
 		Model:        localModelIdentity, Team: localDeploymentTeam, WorkspaceCount: len(workspaces),
 		WorkspaceIDs: workspaceIDs, BaselineCommit: baseline, ContractIdentity: kernel.ContractIdentity,
-		AutomaticStartup: false,
+		AutomaticStartup:    false,
+		QualificationBundle: qualificationBundlePath, QualificationBundleDigest: qualificationBundleDigest,
 	}, nil
 }
 
 func validateLocalInitOptions(options localInitOptions) error {
-	for name, value := range map[string]string{"root": options.Root, "source root": options.SourceRoot, "repository": options.RepositoryRoot, "OpenHands key": options.OpenHandsKeyFile, "SMA hook": options.SMAHookFile, "tekrood": options.TekroodPath} {
+	for name, value := range map[string]string{"root": options.Root, "source root": options.SourceRoot, "repository": options.RepositoryRoot, "OpenHands key": options.OpenHandsKeyFile, "SMA hook": options.SMAHookFile, "tekrood": options.TekroodPath, "qualification bundle": options.QualificationBundleFile} {
 		if value == "" || !filepath.IsAbs(value) || filepath.Clean(value) != value {
 			return fmt.Errorf("%s must be a clean absolute path", name)
 		}
@@ -310,6 +369,10 @@ func validateLocalInitOptions(options localInitOptions) error {
 	if err != nil || parsed.Scheme != "mongodb" || parsed.Hostname() == "" || !isLoopbackHost(parsed.Hostname()) || parsed.User != nil {
 		return errors.New("MongoDB URI must be an unauthenticated loopback mongodb endpoint")
 	}
+	openHandsURL, err := url.Parse(options.OpenHandsBaseURL)
+	if err != nil || openHandsURL.Scheme != "http" || openHandsURL.Hostname() == "" || openHandsURL.Port() == "" || !isLoopbackHost(openHandsURL.Hostname()) || openHandsURL.User != nil || openHandsURL.Path != "" || openHandsURL.RawQuery != "" || openHandsURL.Fragment != "" {
+		return errors.New("OpenHands URL must be an unauthenticated loopback HTTP endpoint with no path")
+	}
 	host, port, err := net.SplitHostPort(options.OperatorAddress)
 	if err != nil || port == "" || !isLoopbackHost(host) {
 		return errors.New("operator address must be an explicit loopback host and port")
@@ -320,25 +383,110 @@ func validateLocalInitOptions(options localInitOptions) error {
 	return nil
 }
 
-func localProductionProfiles(manifest organization.TeamManifest) []operationalruntime.ProductionProfile {
+func bindLocalProductionQualifications(path string, profiles []operationalruntime.ProductionProfile, at time.Time) ([]operationalruntime.ProductionProfile, localQualificationBundle, error) {
+	if err := requireRegularFile(path, true); err != nil {
+		return nil, localQualificationBundle{}, fmt.Errorf("qualification bundle: %w", err)
+	}
+	var bundle localQualificationBundle
+	if err := readStrictJSON(path, &bundle); err != nil {
+		return nil, localQualificationBundle{}, fmt.Errorf("qualification bundle is invalid: %w", err)
+	}
+	if bundle.SchemaVersion != localQualificationSchema || len(bundle.Qualifications) == 0 || len(bundle.Qualifications) > len(profiles) {
+		return nil, localQualificationBundle{}, errors.New("qualification bundle has invalid schema or coverage")
+	}
+	bound := append([]operationalruntime.ProductionProfile(nil), profiles...)
+	byRole := make(map[kernel.RoleFQRN]int, len(bound))
+	for index, profile := range bound {
+		byRole[profile.RoleFQRN] = index
+	}
+	seenRoles := make(map[kernel.RoleFQRN]struct{}, len(bundle.Qualifications))
+	seenModels := make(map[kernel.Digest]struct{}, len(bundle.Qualifications))
+	for _, binding := range bundle.Qualifications {
+		index, found := byRole[binding.RoleFQRN]
+		_, duplicateRole := seenRoles[binding.RoleFQRN]
+		_, duplicateModel := seenModels[binding.ModelProfileDigest]
+		if !found || duplicateRole || duplicateModel || bound[index].ModelProfileDigest != binding.ModelProfileDigest {
+			return nil, localQualificationBundle{}, errors.New("qualification bundle contains an unknown, duplicated, or mismatched profile binding")
+		}
+		seenRoles[binding.RoleFQRN] = struct{}{}
+		seenModels[binding.ModelProfileDigest] = struct{}{}
+		corpus := binding.QualificationCorpus.Canonical()
+		qualification := binding.Qualification.Clone()
+		bound[index].QualificationCorpus = &corpus
+		bound[index].Qualification = &qualification
+	}
+	if err := operationalruntime.ValidateOperationalProfileQualifications(bound, at); err != nil {
+		return nil, localQualificationBundle{}, fmt.Errorf("qualification bundle is not operationally eligible: %w", err)
+	}
+	return bound, bundle, nil
+}
+
+func localProductionProfiles(teamRoot string, manifest *organization.TeamManifest) ([]operationalruntime.ProductionProfile, error) {
+	if teamRoot == "" || manifest == nil {
+		return nil, errors.New("team manifest is required")
+	}
 	profiles := make([]operationalruntime.ProductionProfile, 0, len(manifest.Roles))
-	for index, role := range manifest.Roles {
+	for index := range manifest.Roles {
+		role := &manifest.Roles[index]
+		roleFQRN, err := kernel.ParseRoleFQRN(role.Role)
+		if err != nil {
+			return nil, err
+		}
+		var bundle organization.RoleBundle
+		if err := readStrictJSON(filepath.Join(teamRoot, role.BundlePath), &bundle); err != nil || bundle.Validate() != nil || bundle.Role != role.Role {
+			return nil, errors.New("role bundle is invalid")
+		}
+		bundleDigest, err := bundle.ContentDigest()
+		if err != nil || bundleDigest != role.BundleDigest {
+			return nil, errors.New("role bundle digest mismatch")
+		}
+		executionTools := openhands.ExecutionToolsForPermissions(bundle.Permissions)
+		endpoint := localBoundedModelEndpoint
+		route := kernel.RouteBoundedExecution
+		thinking := false
+		reasoningEffort := ""
+		maximumOutputTokens := uint32(localBoundedOutputTokens)
+		condenserMaximumEvents := uint32(localCondenserMaximumEvents)
+		if roleFQRN == "coder" || roleFQRN == "senior-coder" {
+			condenserMaximumEvents = localEditCondenserMaximumEvents
+		}
+		if roleFQRN == "architect" || roleFQRN == "security" || roleFQRN == "senior-coder" {
+			endpoint = localComplexModelEndpoint
+			route = kernel.RouteComplexReasoning
+			thinking = true
+			reasoningEffort = localComplexReasoningEffort
+			maximumOutputTokens = localComplexOutputTokens
+			if slices.Contains(bundle.Permissions, "repository.edit") {
+				maximumOutputTokens = localComplexEditingOutputTokens
+			}
+		}
+		agentSettings, err := openhands.NewOpenAICompatibleAgentSettings(openhands.AgentSettingsConfig{
+			Model: "openai/" + localModelIdentity, ModelCanonicalName: "openai/gpt-4o", BaseURL: endpoint,
+			APIKey: "teams-loopback-only", Tools: executionTools, EnableThinking: thinking, CondenserEnableThinking: false,
+			ReasoningEffort: reasoningEffort, MaximumOutputTokens: maximumOutputTokens, CondenserOutputTokens: localCondenserOutputTokens, TimeoutSeconds: 1200, CondenserMaximumEvents: condenserMaximumEvents, CondenserMaximumTokens: 96000,
+		})
+		if err != nil {
+			return nil, err
+		}
+		modelDigest, err := openhands.ModelProfileDigest(roleFQRN, role.BundleDigest, agentSettings)
+		if err != nil {
+			return nil, err
+		}
+		role.ModelProfileDigest = modelDigest
 		profiles = append(profiles, operationalruntime.ProductionProfile{
-			ModelProfileDigest:    role.ModelProfileDigest,
-			RuntimeIdentityDigest: labelDigest("runtime:" + localModelEndpoint + ":" + localModelIdentity + ":" + role.Role),
-			ToolPolicyDigest:      labelDigest("tool-policy:no-delegation:v1"), EffectPolicyDigest: labelDigest("effect-policy:teams-only:v1"), MaximumIterations: 0,
-			Qualification: kernel.AssignmentQualificationReceipt{
-				QualificationID: deterministicUUID("qualification:" + role.Role + fmt.Sprint(index)), QualificationDigest: kernel.Digest(acceptedQualification), QualificationCorpusDigest: kernel.Digest(acceptedCorpus),
-				ModelProfileDigest: role.ModelProfileDigest, DecisionRoute: kernel.RouteBoundedExecution, QualifiedRole: role.Role, Status: kernel.QualificationPass, ObservedAt: time.Date(2026, 8, 31, 0, 0, 0, 0, time.UTC),
-			},
+			ModelProfileDigest: modelDigest, RoleFQRN: roleFQRN, RoleBundleDigest: role.BundleDigest,
+			DecisionRoute:         route,
+			RuntimeIdentityDigest: labelDigest("runtime:" + endpoint + ":" + localModelIdentity + ":" + role.Role),
+			ToolPolicyDigest:      labelDigest("tool-policy:role-tools:v3:" + strings.Join(executionTools, ",")), EffectPolicyDigest: labelDigest("effect-policy:teams-only:v1"), MaximumIterations: 0,
+			AgentSettings: agentSettings,
 		})
 	}
-	return profiles
+	return profiles, nil
 }
 
 func localProductionPolicy(manifest organization.TeamManifest) kernel.AuthorizationPolicy {
 	principal := kernel.AuthorityGrant{Grantee: kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "principal"}, Scope: kernel.AuthorityScope{CommandTypes: []string{"tekroo.command.story.create", "tekroo.command.story.begin-planning", "tekroo.command.story.authorize", "tekroo.command.story.activate", "tekroo.command.task.create", "tekroo.command.evidence.register", "tekroo.command.work-budget.amend", "tekroo.command.work-invocation.request-cancellation", "tekroo.command.story.request-completion", "tekroo.command.story.approve-release", "tekroo.command.story.request-acceptance"}, TargetKinds: []kernel.AggregateKind{kernel.AggregateStory, kernel.AggregateTask, kernel.AggregateEvidence, kernel.AggregateWorkBudget, kernel.AggregateWorkInvocation}, CanReadTarget: true}}
-	policyGrant := kernel.AuthorityGrant{Grantee: kernel.PrincipalRef{Kind: kernel.PrincipalPolicy, ID: "teams-admission-policy"}, Scope: kernel.AuthorityScope{CommandTypes: []string{"tekroo.command.task.bind-work-profile", "tekroo.command.task.mark-ready", "tekroo.command.task.authorize-qualified-assignment", "tekroo.command.work-budget.create", "tekroo.command.task.bind-work-budget", "tekroo.command.task.bind-operational-scope", "tekroo.command.work-invocation.authorize", "tekroo.command.work-invocation.expire", "tekroo.command.work.block", "tekroo.command.completion-review.open", "tekroo.command.completion-review.finalize", "tekroo.command.release-plan.create", "tekroo.command.release-plan.finalize", "tekroo.command.release-plan.record-qualification", "tekroo.command.release-plan.request-execution"}, TargetKinds: []kernel.AggregateKind{kernel.AggregateTask, kernel.AggregateStory, kernel.AggregateCompletionReview, kernel.AggregateReleasePlan, kernel.AggregateWorkBudget, kernel.AggregateWorkInvocation}, CanReadTarget: true}}
+	policyGrant := kernel.AuthorityGrant{Grantee: kernel.PrincipalRef{Kind: kernel.PrincipalPolicy, ID: "teams-admission-policy"}, Scope: kernel.AuthorityScope{CommandTypes: []string{"tekroo.command.task.bind-work-profile", "tekroo.command.task.mark-ready", "tekroo.command.task.authorize-qualified-assignment", "tekroo.command.work-budget.create", "tekroo.command.work-budget.amend", "tekroo.command.task.bind-work-budget", "tekroo.command.task.bind-operational-scope", "tekroo.command.work-invocation.authorize", "tekroo.command.work-invocation.expire", "tekroo.command.work.block", "tekroo.command.work.unblock", "tekroo.command.work.reopen", "tekroo.command.completion-review.open", "tekroo.command.completion-review.record-result", "tekroo.command.completion-review.finalize", "tekroo.command.release-plan.create", "tekroo.command.release-plan.finalize", "tekroo.command.release-plan.record-qualification", "tekroo.command.release-plan.request-execution"}, TargetKinds: []kernel.AggregateKind{kernel.AggregateTask, kernel.AggregateStory, kernel.AggregateCompletionReview, kernel.AggregateReleasePlan, kernel.AggregateWorkBudget, kernel.AggregateWorkInvocation}, CanReadTarget: true}}
 	service := kernel.AuthorityGrant{Grantee: kernel.PrincipalRef{Kind: kernel.PrincipalService, ID: "teams-operational-runtime"}, Scope: kernel.AuthorityScope{CommandTypes: []string{"tekroo.command.execution.register", "tekroo.command.execution.replace", "tekroo.command.evidence.register", "tekroo.command.work-invocation.claim", "tekroo.command.work-invocation.record-started", "tekroo.command.work-invocation.record-terminal", "tekroo.command.release-plan.record-result", "tekroo.command.completion-review.record-result"}, TargetKinds: []kernel.AggregateKind{kernel.AggregateExecution, kernel.AggregateEvidence, kernel.AggregateWorkInvocation, kernel.AggregateReleasePlan, kernel.AggregateCompletionReview}, CanReadTarget: true}}
 	grants := []kernel.AuthorityGrant{principal, policyGrant, service}
 	for _, role := range manifest.Roles {
@@ -349,10 +497,10 @@ func localProductionPolicy(manifest organization.TeamManifest) kernel.Authorizat
 	for index := range grants {
 		grants[index].GrantDigest = labelDigest(fmt.Sprintf("grant:%d:%s:%s", index, grants[index].Grantee.Kind, grants[index].Grantee.ID))
 	}
-	return kernel.AuthorizationPolicy{PolicyDigest: labelDigest("teams-local-production-policy-v2"), Revision: 2, Grants: grants}
+	return kernel.AuthorizationPolicy{PolicyDigest: labelDigest("teams-local-production-policy-v6"), Revision: 6, Grants: grants}
 }
 
-func localProductionProvenance(options localInitOptions, config operationalruntime.ProductionConfig, policy kernel.AuthorizationPolicy, manifest organization.TeamManifest, commit, tree string) (kernel.ProvenanceBasis, error) {
+func localProductionProvenance(options localInitOptions, config operationalruntime.ProductionConfig, policy kernel.AuthorizationPolicy, manifest organization.TeamManifest, commit, tree string, qualificationBundleDigest kernel.Digest) (kernel.ProvenanceBasis, error) {
 	treeDigest := labelDigest("git-tree:" + tree)
 	overlay := kernel.OverlayIdentity{SourceTreeDigest: treeDigest, ChangeDigest: labelDigest("tracked-clean")}
 	overlayDigest, err := overlay.Digest()
@@ -391,7 +539,7 @@ func localProductionProvenance(options localInitOptions, config operationalrunti
 		CatalogueDigest: catalogueDigest, PolicyDigest: policy.PolicyDigest, PolicyRevision: policy.Revision, GrantDigests: grantDigests,
 		Source: kernel.SourceIdentity{Repository: options.RepositoryRoot, Commit: commit, TreeDigest: treeDigest, Scope: "."}, Overlay: overlay,
 		Build:   kernel.BuildIdentity{SourceTreeDigest: treeDigest, OverlayDigest: overlayDigest, DependencyLockDigest: goSumDigest, ToolchainDigest: digestBytes(toolchain), BuildDefinitionDigest: installerDigest, ArtifactDigest: artifactDigest},
-		Runtime: kernel.RuntimeIdentity{BuildArtifactDigest: artifactDigest, ContractManifest: kernel.ContractIdentity, ConfigurationDigest: labelDigest(options.Root + ":" + config.Mongo.Database + ":" + config.OpenHands.BaseURL), EnvironmentDigest: labelDigest(runtime.GOOS + ":" + runtime.GOARCH), RoleLibraryDigests: roleDigests, Capabilities: []string{"teams-kernel", "role-host", "exact-routing", "federation"}, ProviderIdentities: []string{"openhands:http://127.0.0.1:8000", "model:" + localModelIdentity, "sma:http://127.0.0.1:8130"}},
+		Runtime: kernel.RuntimeIdentity{BuildArtifactDigest: artifactDigest, ContractManifest: kernel.ContractIdentity, ConfigurationDigest: labelDigest(options.Root + ":" + config.Mongo.Database + ":" + config.OpenHands.BaseURL + ":" + string(qualificationBundleDigest)), EnvironmentDigest: labelDigest(runtime.GOOS + ":" + runtime.GOARCH), RoleLibraryDigests: roleDigests, Capabilities: []string{"teams-kernel", "role-host", "exact-routing", "federation"}, ProviderIdentities: []string{"openhands:" + options.OpenHandsBaseURL, "model-bounded:" + localBoundedModelEndpoint + ":" + localModelIdentity, "model-complex:" + localComplexModelEndpoint + ":" + localModelIdentity, "sma:http://127.0.0.1:8130"}},
 	}, nil
 }
 
@@ -442,6 +590,36 @@ func gitOutput(ctx context.Context, repository string, arguments ...string) (str
 	command.Dir = repository
 	output, err := command.Output()
 	return strings.TrimSpace(string(output)), err
+}
+
+func ensureGitInfoExclude(ctx context.Context, repository, pattern string) error {
+	path, err := gitOutput(ctx, repository, "rev-parse", "--git-path", "info/exclude")
+	if err != nil || path == "" {
+		return errors.Join(errors.New("Git exclude path is unavailable"), err)
+	}
+	if !filepath.IsAbs(path) {
+		path = filepath.Join(repository, path)
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	for _, line := range strings.Split(string(raw), "\n") {
+		if strings.TrimSpace(line) == pattern {
+			return nil
+		}
+	}
+	file, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	prefix := ""
+	if len(raw) > 0 && raw[len(raw)-1] != '\n' {
+		prefix = "\n"
+	}
+	_, err = io.WriteString(file, prefix+pattern+"\n")
+	return err
 }
 
 func copyTree(source, target string) error {

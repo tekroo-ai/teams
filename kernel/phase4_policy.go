@@ -37,7 +37,13 @@ func evaluatePhase4Command(command KernelCommand, snapshot Snapshot, context Dec
 		binding, err := TaskWorkBudgetBindingFromPayload(command.Payload, context.EventID)
 		accountRef := AggregateRef{Kind: AggregateWorkBudget, ID: binding.BudgetAccountID}
 		account, accountFound := snapshot.WorkBudgetAccounts[accountRef]
-		if err != nil || snapshot.State == nil || binding.TaskID != command.Target.ID || binding.TaskRevision != snapshot.Revision+1 || binding.LifecycleEpoch != snapshot.State.LifecycleEpoch || binding.ScopeRevision != snapshot.State.ScopeRevision || !accountFound || !account.Valid() || account.LifecycleEpoch != binding.LifecycleEpoch || !containsAggregatePrecondition(command.Preconditions, accountRef) || !payloadEvidenceMatchesObject(command.Payload, command.EvidenceRefs) {
+		// The account lifecycle belongs to its root work (normally the parent
+		// story), while this binding's lifecycle belongs to the child task. A
+		// reopened task can therefore advance independently and continue using the
+		// same non-resettable shared account. Task lifecycle freshness is enforced
+		// against snapshot.State; account validity and the aggregate precondition
+		// independently protect the parent budget.
+		if err != nil || snapshot.State == nil || binding.TaskID != command.Target.ID || binding.TaskRevision != snapshot.Revision+1 || binding.LifecycleEpoch != snapshot.State.LifecycleEpoch || binding.ScopeRevision != snapshot.State.ScopeRevision || !accountFound || !account.Valid() || !containsAggregatePrecondition(command.Preconditions, accountRef) || !payloadEvidenceMatchesObject(command.Payload, command.EvidenceRefs) {
 			return result, OutcomeRejectedConflict, "INVALID_BUDGET_BINDING", true
 		}
 		if current, exists := snapshot.TaskWorkBudgets[command.Target]; exists {

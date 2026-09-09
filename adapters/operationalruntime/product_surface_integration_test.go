@@ -4,6 +4,8 @@ package operationalruntime
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -18,7 +20,9 @@ import (
 
 	"github.com/tekroo-ai/teams/adapters/fake"
 	"github.com/tekroo-ai/teams/adapters/mongo"
+	"github.com/tekroo-ai/teams/adapters/openhands"
 	"github.com/tekroo-ai/teams/kernel"
+	"github.com/tekroo-ai/teams/organization"
 )
 
 func TestTekroodAndTekrooExecuteNormalTaskThroughSupportedSurface(t *testing.T) {
@@ -31,7 +35,7 @@ func TestTekroodAndTekrooExecuteNormalTaskThroughSupportedSurface(t *testing.T) 
 	if err := os.Mkdir(workspace, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	serverState := &integratedOpenHands{t: t, conversations: make(map[string]*integratedConversation)}
+	serverState := &integratedOpenHands{t: t, conversations: make(map[string]*integratedConversation), commitResults: true}
 	openHands := httptest.NewServer(http.HandlerFunc(serverState.serveHTTP))
 	defer openHands.Close()
 
@@ -116,7 +120,9 @@ func TestTekroodAndTekrooExecuteNormalTaskThroughSupportedSurface(t *testing.T) 
 		return view.Phase == string(kernel.PhaseAccepted) && view.Completion.State == "COMPLETED" && view.Acceptance.State == "ACCEPTED" && view.Release.State == string(kernel.ReleaseNotRequired)
 	})
 
-	cancelFixture := newIntegratedFixture(t, now, 8000, "teams::coder-2", fixture.workspaceID, fixture.worktreeID)
+	cancelFixture := newIntegratedFixture(t, now, 8000, "teams::coder-2", "phase5-product-workspace-2", "phase5-product-worktree-2")
+	cancelFixture.modelDigest = fixture.modelDigest
+	cancelFixture.baselineSHA = fixture.baselineSHA
 	serverState.mu.Lock()
 	serverState.delays = map[string]time.Duration{string(cancelFixture.invocationID): 5 * time.Second}
 	serverState.mu.Unlock()
@@ -202,10 +208,47 @@ func writeProductSurfaceConfiguration(t *testing.T, mongoURI, openHandsURL, work
 	config.OpenHands.BaseURL = openHandsURL
 	config.Operator.Address = freeProductSurfaceAddress(t)
 	config.Operator.Principal = fixture.human
-	config.Workspaces = []ProductionWorkspace{{WorkspaceID: fixture.workspaceID, WorktreeID: fixture.worktreeID, WorkingDirectory: workspace, Branch: "task/product-surface", BaselineSHA: strings.Repeat("1", 40), WritablePaths: []string{"."}}}
-	qualification := config.Profiles[0].Qualification
-	qualification.ModelProfileDigest = fixture.modelDigest
-	config.Profiles = []ProductionProfile{{ModelProfileDigest: fixture.modelDigest, RuntimeIdentityDigest: fixture.runtimeDigest, ToolPolicyDigest: fixture.toolDigest, EffectPolicyDigest: fixture.effectDigest, MaximumIterations: 24, Qualification: qualification}}
+	secondWorkspace := filepath.Join(filepath.Dir(workspace), "workspace-2")
+	if err := os.Mkdir(secondWorkspace, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	baseline := initializeProductSurfaceWorkspace(t, workspace)
+	secondBaseline := initializeProductSurfaceWorkspace(t, secondWorkspace)
+	if secondBaseline != baseline {
+		t.Fatalf("product workspaces have different baselines: %s != %s", secondBaseline, baseline)
+	}
+	fixture.baselineSHA = baseline
+	config.Workspaces = []ProductionWorkspace{
+		{WorkspaceID: fixture.workspaceID, WorktreeID: fixture.worktreeID, WorkingDirectory: workspace, Branch: "phase4/step7", BaselineSHA: baseline, WritablePaths: []string{"."}},
+		{WorkspaceID: "phase5-product-workspace-2", WorktreeID: "phase5-product-worktree-2", WorkingDirectory: secondWorkspace, Branch: "phase4/step7", BaselineSHA: baseline, WritablePaths: []string{"."}},
+	}
+	manifestPath := filepath.Join(directory, config.Organization.ManifestFile)
+	manifestRaw, err := os.ReadFile(manifestPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest organization.TeamManifest
+	if err := json.Unmarshal(manifestRaw, &manifest); err != nil || len(manifest.Roles) != 1 {
+		t.Fatalf("decode production team fixture: %v", err)
+	}
+	manifest.Team = "teams"
+	manifest.Roles[0].MaximumInstances = 2
+	manifest.Roles[0].LaunchMode = organization.LaunchManual
+	manifest.Roles[0].WorkspaceIDs = []string{fixture.workspaceID, "phase5-product-workspace-2"}
+	writeJSON(t, manifestPath, manifest, 0o600)
+	manifestRaw, err = os.ReadFile(manifestPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifestDigest := sha256.Sum256(manifestRaw)
+	config.Organization.ManifestDigest = kernel.Digest(hex.EncodeToString(manifestDigest[:]))
+	modelDigest, err := openhands.ModelProfileDigest(kernel.RoleFQRN(manifest.Roles[0].Role), manifest.Roles[0].BundleDigest, config.Profiles[0].AgentSettings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixture.modelDigest = modelDigest
+	corpus, qualification := testQualificationBundle(t, fixture.modelDigest, kernel.RoleFQRN(manifest.Roles[0].Role), kernel.RouteBoundedExecution, fixture.toolDigest, allTestWorkKinds(), time.Now().UTC().Add(-time.Minute))
+	config.Profiles = []ProductionProfile{{ModelProfileDigest: fixture.modelDigest, RoleFQRN: kernel.RoleFQRN(manifest.Roles[0].Role), RoleBundleDigest: manifest.Roles[0].BundleDigest, DecisionRoute: kernel.RouteBoundedExecution, RuntimeIdentityDigest: fixture.runtimeDigest, ToolPolicyDigest: fixture.toolDigest, EffectPolicyDigest: fixture.effectDigest, AgentSettings: config.Profiles[0].AgentSettings, MaximumIterations: 24, QualificationCorpus: corpus, Qualification: qualification}}
 	config.Execution.ConsumerID = "teams-phase5-product-surface"
 	config.Execution.OperationTimeout = "3s"
 	config.Worker.LeaseDuration = "4s"
@@ -217,6 +260,35 @@ func writeProductSurfaceConfiguration(t *testing.T, mongoURI, openHandsURL, work
 	config.Projection.OperationTimeout = "1s"
 	writeJSON(t, path, config, 0o600)
 	return path
+}
+
+func initializeProductSurfaceWorkspace(t *testing.T, workspace string) string {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(workspace, "README.md"), []byte("product-surface fixture\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	commands := [][]string{
+		{"init", "-b", "phase4/step7"},
+		{"config", "user.name", "Tekroo Integration"},
+		{"config", "user.email", "integration@tekroo.invalid"},
+		{"add", "README.md"},
+		{"commit", "-m", "Initialize product surface fixture"},
+	}
+	for _, arguments := range commands {
+		command := exec.Command("git", arguments...)
+		command.Dir = workspace
+		command.Env = append(os.Environ(), "GIT_AUTHOR_DATE=2026-01-01T00:00:00Z", "GIT_COMMITTER_DATE=2026-01-01T00:00:00Z")
+		if output, err := command.CombinedOutput(); err != nil {
+			t.Fatalf("git %s: %v\n%s", arguments[0], err, output)
+		}
+	}
+	command := exec.Command("git", "rev-parse", "HEAD")
+	command.Dir = workspace
+	output, err := command.Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return strings.TrimSpace(string(output))
 }
 
 func freeProductSurfaceAddress(t *testing.T) string {

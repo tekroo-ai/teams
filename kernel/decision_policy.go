@@ -61,6 +61,10 @@ func validateCommandPolicy(command KernelCommand, snapshot Snapshot, context Dec
 	if outcome, reason, handled := validateOperatorHumanContinuityCommand(command, snapshot, context); handled {
 		return outcome, reason
 	}
+	// ExpectedPolicyRevision selects the authorization policy evaluated by the
+	// envelope. Classification, selection, release, and escalation revisions in
+	// payloads identify independent domain policies and must not be forced to
+	// advance whenever an authority grant changes.
 	switch command.CommandType {
 	case "tekroo.command.task.bind-work-profile":
 		if command.Authority.Kind != PrincipalPolicy && command.Authority.Kind != PrincipalHuman || !payloadEvidenceFieldMatches(object, "classification_evidence_ids", command.EvidenceRefs) || snapshot.State == nil {
@@ -72,7 +76,7 @@ func validateCommandPolicy(command KernelCommand, snapshot Snapshot, context Dec
 		if found {
 			currentPointer = &current
 		}
-		if err != nil || profile.ClassificationPolicyRevision != command.ExpectedPolicyRevision {
+		if err != nil {
 			return OutcomeRejectedInvalid, reasonInvalidPayload
 		}
 		if decision := PlanWorkProfileBinding(WorkProfileBindingInput{Task: *snapshot.State, Profile: profile, Current: currentPointer}); decision.Status != WorkProfileReady {
@@ -82,7 +86,7 @@ func validateCommandPolicy(command KernelCommand, snapshot Snapshot, context Dec
 		authorization, err := QualifiedAssignmentAuthorizationFromPayload(command.Payload, context.EventID)
 		profile, profileFound := snapshot.WorkProfiles[command.Target]
 		currentExecution, executionFound := snapshot.CurrentExecutions[authorization.SelectedActorFQN]
-		if err != nil || snapshot.State == nil || authorization.TaskID != command.Target.ID || authorization.ExpectedTaskRevision != snapshot.Revision || authorization.WorkProfile.TaskBindingMatches(*snapshot.State) == false || !profileFound || !profile.Valid() || profile.Profile.Binding() != authorization.WorkProfile || authorization.RequiredDecisionRoute != profile.Profile.MinimumDecisionRoute || authorization.SelectionPolicyRevision != command.ExpectedPolicyRevision || !payloadEvidenceMatches(object, command.EvidenceRefs) {
+		if err != nil || snapshot.State == nil || authorization.TaskID != command.Target.ID || authorization.ExpectedTaskRevision != snapshot.Revision || authorization.WorkProfile.TaskBindingMatches(*snapshot.State) == false || !profileFound || !profile.Valid() || profile.Profile.Binding() != authorization.WorkProfile || authorization.RequiredDecisionRoute != profile.Profile.MinimumDecisionRoute || !payloadEvidenceMatches(object, command.EvidenceRefs) {
 			return OutcomeRejectedConflict, reasonRevisionConflict
 		}
 		if !executionFound || currentExecution != authorization.SelectedExecution() {
@@ -151,7 +155,7 @@ func validateCommandPolicy(command KernelCommand, snapshot Snapshot, context Dec
 		}
 	case "tekroo.command.release-plan.create":
 		plan, err := ReleasePlanFromCreatePayload(command.Payload, context.EventID)
-		if err != nil || command.Authority.Kind != PrincipalPolicy || plan.ReleasePlanID != command.Target.ID || plan.PolicyRevision != command.ExpectedPolicyRevision || !payloadEvidenceMatches(object, command.EvidenceRefs) {
+		if err != nil || command.Authority.Kind != PrincipalPolicy || plan.ReleasePlanID != command.Target.ID || !payloadEvidenceMatches(object, command.EvidenceRefs) {
 			return OutcomeRejectedInvalid, reasonInvalidPayload
 		}
 		story, found := snapshot.Related[plan.Story]
@@ -181,7 +185,7 @@ func validateCommandPolicy(command KernelCommand, snapshot Snapshot, context Dec
 			return OutcomeRejectedUnauthorized, reasonUnauthorized
 		}
 		escalation, err := EscalationFromOpenPayload(command.Payload)
-		if err != nil || escalation.EscalationID != command.Target.ID || escalation.PolicyRevision != command.ExpectedPolicyRevision || !context.DecidedAt.Before(escalation.DeadlineAt) || !causalPathMatchesCommand(escalation.CausalPathEventIDs, command.Causation) {
+		if err != nil || escalation.EscalationID != command.Target.ID || !context.DecidedAt.Before(escalation.DeadlineAt) || !causalPathMatchesCommand(escalation.CausalPathEventIDs, command.Causation) {
 			return OutcomeRejectedInvalid, reasonInvalidPayload
 		}
 		related, found := snapshot.Related[escalation.Subject]

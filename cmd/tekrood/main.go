@@ -60,7 +60,7 @@ func run(arguments []string, stdout, stderr io.Writer) error {
 	service, err := operationalruntime.NewProductionService(startupContext, config)
 	startupCancel()
 	if err != nil {
-		return err
+		return fmt.Errorf("construct production service: %w", err)
 	}
 	var federationListener net.Listener
 	var federationServer *http.Server
@@ -94,7 +94,7 @@ func run(arguments []string, stdout, stderr io.Writer) error {
 	err = service.Start(startContext)
 	startCancel()
 	if err != nil {
-		return err
+		return fmt.Errorf("start production service: %w", err)
 	}
 	stopRequested := make(chan struct{}, 1)
 	token, operationTimeout, maximumBodyBytes := service.OperatorCredentials()

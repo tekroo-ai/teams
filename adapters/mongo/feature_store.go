@@ -163,12 +163,20 @@ func (s *Store) ApplyFeaturePlan(ctx context.Context, id kernel.UUIDv7, expected
 	if !found {
 		return organization.FeatureRequest{}, organization.ErrFeatureNotFound
 	}
-	if feature.Revision != expectedRevision || feature.Status != organization.FeatureSpecified || plan.Validate(feature) != nil || now.Before(feature.UpdatedAt) {
+	expectedPlanVersion := uint64(1)
+	if feature.Plan != nil {
+		if feature.PlanSupersession == nil || feature.PlanSupersession.PlanVersion != feature.Plan.Version {
+			return organization.FeatureRequest{}, organization.ErrFeatureRevisionConflict
+		}
+		expectedPlanVersion = feature.Plan.Version + 1
+	}
+	if feature.Revision != expectedRevision || feature.Status != organization.FeatureSpecified || plan.Version != expectedPlanVersion || plan.Validate(feature) != nil || now.Before(feature.UpdatedAt) {
 		return organization.FeatureRequest{}, organization.ErrFeatureRevisionConflict
 	}
 	feature.Revision++
 	feature.Status = organization.FeaturePlanned
 	feature.Plan = &plan
+	feature.PlanSupersession = nil
 	feature.UpdatedAt = now
 	raw, err := json.Marshal(feature)
 	if err != nil {

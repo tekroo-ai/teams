@@ -2,6 +2,9 @@ package organization_test
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -110,6 +113,90 @@ func TestFeatureRoleHandoffsFormFiniteProductOwnerProjectManagerArchitectDAG(t *
 	}
 }
 
+func TestFeaturePlanSupersessionPreservesSpecificationAndRequiresNextPlanVersion(t *testing.T) {
+	now := time.Date(2026, 9, 6, 12, 0, 0, 0, time.UTC)
+	planner := activeRole("teams::architect-1", "architect", featureUUID(93), featureDigest('1'))
+	owner := activeRole("teams::coder-1", "coder", featureUUID(94), featureDigest('2'))
+	validator := activeRole("teams::tester-1", "tester", featureUUID(96), featureDigest('8'))
+	story := organization.PlannedStory{ID: featureUUID(10), Title: "Story", Description: "Deliver the feature.", AcceptanceCriteria: []string{"accepted"}, Priority: organization.PriorityHigh}
+	firstPlan := organization.FeaturePlan{Version: 1, PreparedBy: planner.ActorFQN, PreparedExecution: planner.Execution, Architecture: "Initial architecture.", Stories: []organization.PlannedStory{story}, Tasks: []organization.PlannedTask{
+		{ID: featureUUID(11), StoryID: story.ID, Title: "Initial task", Description: "Implement.", AcceptanceCriteria: []string{"passes"}, Owner: owner.ActorFQN, ModelProfile: owner.ModelProfile, DecisionRoute: kernel.RouteBoundedExecution, Purpose: kernel.PurposeImplementation, Complexity: 3, Risk: organization.RiskLow, CriticalPath: true, AttemptLimit: 2, ReviewRoundLimit: 1},
+		{ID: featureUUID(13), StoryID: story.ID, Title: "Validate", Description: "Validate.", AcceptanceCriteria: []string{"verified"}, DependsOn: []kernel.UUIDv7{featureUUID(11)}, Validates: []kernel.UUIDv7{featureUUID(11)}, Owner: validator.ActorFQN, ModelProfile: validator.ModelProfile, DecisionRoute: kernel.RouteBoundedExecution, Purpose: kernel.PurposeValidation, Complexity: 2, Risk: organization.RiskLow, CriticalPath: true, AttemptLimit: 2, ReviewRoundLimit: 1},
+	}, CreatedAt: now}
+	feature := organization.FeatureRequest{SchemaVersion: organization.FeatureSchemaVersion, ID: featureUUID(1), Revision: 4, SubmittedBy: kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "paul"}, Input: featureInput(), Status: organization.FeaturePlanned, OperatorActor: "teams::operator-1", ProductOwnerActor: "teams::product-owner-1", InitialMessageID: featureUUID(2), LastMessageID: featureUUID(2), LastStepID: featureUUID(3), LastHop: 3, BudgetAccountID: featureUUID(4), LifecycleEpoch: 1, ScopeRevision: 1, CreatedAt: now, UpdatedAt: now, Specification: &organization.FeatureSpecification{PreparedBy: "teams::project-manager-1", PreparedExecution: kernel.ExecutionTuple{ExecutionID: featureUUID(95), FencingEpoch: 1}, Stories: []organization.PlannedStory{story}, PreparedAt: now}, Plan: &firstPlan}
+	store := &featureStoreFake{feature: feature}
+	host := &featureHostFake{roles: map[kernel.ActorFQN]organization.RoleInstanceState{planner.ActorFQN: planner, owner.ActorFQN: owner, validator.ActorFQN: validator}}
+	materializer := &recordingMaterializer{}
+	clock := fixedClock(now.Add(time.Minute))
+	coordinator, err := organization.NewFeatureCoordinator(store, host, materializer, clock, &idQueue{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := json.Marshal(firstPlan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	digest := sha256.Sum256(raw)
+	supersession := organization.FeaturePlanSupersession{PlanVersion: 1, PlanDigest: kernel.Digest(hex.EncodeToString(digest[:])), ArchitectureRound: 2, RequestedBy: feature.SubmittedBy, Reason: "independent review found material plan defects", EvidenceRefs: []kernel.EvidenceRef{{EvidenceID: featureUUID(30), SHA256: featureDigest('a')}}, DeadlineAt: now.Add(4 * time.Hour), RequestedAt: now.Add(time.Minute), IdempotencyKey: "replan-1"}
+	if err := supersession.Validate(feature); err != nil {
+		t.Fatalf("valid supersession rejected: %v", err)
+	}
+	candidate := feature
+	candidate.Revision++
+	candidate.Status = organization.FeatureSpecified
+	candidate.ScopeRevision++
+	candidate.PlanSupersession = &supersession
+	candidate.UpdatedAt = now.Add(time.Minute)
+	if err := candidate.Input.Validate(); err != nil {
+		t.Fatalf("candidate input rejected: %v", err)
+	}
+	if err := candidate.Plan.Validate(candidate); err != nil {
+		t.Fatalf("candidate plan rejected: %v", err)
+	}
+	if err := candidate.Specification.Validate(candidate); err != nil {
+		t.Fatalf("candidate specification rejected: %v", err)
+	}
+	if err := candidate.PlanSupersession.Validate(candidate); err != nil {
+		t.Fatalf("candidate supersession rejected: %v", err)
+	}
+	if err := candidate.Validate(); err != nil {
+		t.Fatalf("valid replanning projection rejected: %v", err)
+	}
+	reopened, err := coordinator.RequestReplan(context.Background(), feature.ID, feature.Revision, supersession)
+	if err != nil || reopened.Status != organization.FeatureSpecified || reopened.Revision != 5 || reopened.ScopeRevision != 2 || reopened.Plan == nil || reopened.Plan.Version != 1 || reopened.PlanSupersession == nil {
+		t.Fatalf("reopened feature=%#v err=%v", reopened, err)
+	}
+	invalid := firstPlan
+	invalid.Architecture = "Replacement architecture."
+	invalid.CreatedAt = now.Add(2 * time.Minute)
+	if _, err := coordinator.ApplyPlan(context.Background(), feature.ID, reopened.Revision, invalid); err == nil {
+		t.Fatal("replacement plan reused superseded version")
+	}
+	replacement := invalid
+	replacement.Version = 2
+	replacement.Stories = append([]organization.PlannedStory(nil), invalid.Stories...)
+	replacement.Stories[0].ID = featureUUID(14)
+	replacement.Tasks = append([]organization.PlannedTask(nil), invalid.Tasks...)
+	replacement.Tasks[0].ID = featureUUID(12)
+	replacement.Tasks[0].StoryID = replacement.Stories[0].ID
+	replacement.Tasks[1].StoryID = replacement.Stories[0].ID
+	replacement.Tasks[1].DependsOn = []kernel.UUIDv7{featureUUID(12)}
+	replacement.Tasks[1].Validates = []kernel.UUIDv7{featureUUID(12)}
+	reusedStory := replacement
+	reusedStory.Stories = append([]organization.PlannedStory(nil), replacement.Stories...)
+	reusedStory.Stories[0].ID = story.ID
+	reusedStory.Tasks = append([]organization.PlannedTask(nil), replacement.Tasks...)
+	reusedStory.Tasks[0].StoryID = story.ID
+	reusedStory.Tasks[1].StoryID = story.ID
+	if _, err := coordinator.ApplyPlan(context.Background(), feature.ID, reopened.Revision, reusedStory); err == nil {
+		t.Fatal("replacement plan reused the superseded story aggregate")
+	}
+	planned, err := coordinator.ApplyPlan(context.Background(), feature.ID, reopened.Revision, replacement)
+	if err != nil || materializer.calls != 1 || planned.Status != organization.FeaturePlanned || planned.Plan == nil || planned.Plan.Version != 2 || planned.PlanSupersession != nil {
+		t.Fatalf("replacement feature=%#v calls=%d err=%v", planned, materializer.calls, err)
+	}
+}
+
 type featureStoreFake struct {
 	feature organization.FeatureRequest
 	message organization.OrganizationalMessage
@@ -136,6 +223,7 @@ func (store *featureStoreFake) ApplyFeaturePlan(_ context.Context, id kernel.UUI
 	store.feature.Revision++
 	store.feature.Status = organization.FeaturePlanned
 	store.feature.Plan = &plan
+	store.feature.PlanSupersession = nil
 	store.feature.UpdatedAt = now
 	return store.feature, nil
 }
@@ -155,8 +243,15 @@ type featureHostFake struct {
 }
 
 func (host *featureHostFake) ConfiguredRoleActors(role string) ([]kernel.ActorFQN, error) {
-	if role == "operator" {
+	switch role {
+	case "operator":
 		return []kernel.ActorFQN{"teams::operator-1"}, nil
+	case "product-owner":
+		return []kernel.ActorFQN{"teams::product-owner-1"}, nil
+	case "project-manager":
+		return []kernel.ActorFQN{"teams::project-manager-1"}, nil
+	case "architect":
+		return []kernel.ActorFQN{"teams::architect-1", "teams::architect-2"}, nil
 	}
 	return nil, organization.ErrRoleNotConfigured
 }

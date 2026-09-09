@@ -1,19 +1,22 @@
 package openhands
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
+	"github.com/tekroo-ai/teams/application"
 	"github.com/tekroo-ai/teams/kernel"
 )
 
-var qualifiedSMAHookConfig = json.RawMessage(`{"hooks":{"UserPromptSubmit":[{"matcher":"*","hooks":[{"type":"command","command":"./.openhands/hooks/sma_context_hook.py","timeout":1}]}]}}`)
+var qualifiedSMAHookConfig = json.RawMessage(`{"hooks":{"UserPromptSubmit":[{"matcher":"*","hooks":[{"type":"command","command":"/usr/bin/python3 ./.openhands/hooks/sma_context_hook.py","timeout":1}]}]}}`)
 var qualifiedSMAAgentSettings = json.RawMessage(qualifiedAgentSettingsJSON)
 
 func acceptedSemanticMemoryBinding(t testing.TB, hookConfig json.RawMessage) SemanticMemoryBinding {
@@ -63,6 +66,133 @@ func TestBoundResolversRequireExactImmutableIdentityTuple(t *testing.T) {
 	}
 }
 
+func TestBoundExecutionProfileBindsExactRoleBundleAndAgentSettings(t *testing.T) {
+	role := kernel.RoleFQRN("architect")
+	bundle := digest('9')
+	settings, err := NewOpenAICompatibleAgentSettings(AgentSettingsConfig{
+		Model: "openai/local-architect", ModelCanonicalName: "openai/gpt-4o", BaseURL: "http://127.0.0.1:8800/v1", APIKey: "fixture",
+		Tools:          []string{"terminal", "file_editor"},
+		EnableThinking: true, CondenserEnableThinking: false, ReasoningEffort: "medium", MaximumOutputTokens: 32768, CondenserOutputTokens: 4096, TimeoutSeconds: 1200, CondenserMaximumEvents: 80, CondenserMaximumTokens: 96000,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded conversationAgentSettings
+	if err := json.Unmarshal(settings, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if decoded.LLM.LiteLLMExtraBody.ReasoningEffort != "medium" || decoded.LLM.LiteLLMExtraBody.ReasoningBudgetTokens != 0 || decoded.LLM.LiteLLMExtraBody.ChatTemplateKwargs.EnableThinking == nil || !*decoded.LLM.LiteLLMExtraBody.ChatTemplateKwargs.EnableThinking || decoded.LLM.LiteLLMExtraBody.ChatTemplateKwargs.PreserveThinking == nil || !*decoded.LLM.LiteLLMExtraBody.ChatTemplateKwargs.PreserveThinking {
+		t.Fatalf("thinking settings were not bound to the model profile: %#v", decoded.LLM.LiteLLMExtraBody)
+	}
+	model, err := ModelProfileDigest(role, bundle, settings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	profile, err := NewBoundExecutionProfile(model, role, bundle, digest('1'), digest('2'), digest('3'), settings, 0, "teams", "sma")
+	if err != nil || !profile.valid() {
+		t.Fatalf("bound profile error = %v, profile = %#v", err, profile)
+	}
+	brief := application.ExecutionBrief{RoleGrounding: application.RoleExecutionGrounding{RoleFQRN: role, BundleDigest: bundle}}
+	if !profile.validFor(brief) {
+		t.Fatal("exact role bundle did not match bound profile")
+	}
+	brief.RoleGrounding.BundleDigest = digest('8')
+	if profile.validFor(brief) {
+		t.Fatal("different role bundle matched bound profile")
+	}
+
+	tampered := profile
+	tampered.AgentSettings = append(json.RawMessage(nil), profile.AgentSettings...)
+	tampered.AgentSettings = bytes.Replace(tampered.AgentSettings, []byte("local-architect"), []byte("other-architect"), 1)
+	if tampered.valid() {
+		t.Fatal("agent settings changed without changing the profile digest")
+	}
+}
+
+func TestAgentSettingsBindExactToolsDerivedFromRolePermissions(t *testing.T) {
+	tests := []struct {
+		name        string
+		permissions []string
+		want        []string
+	}{
+		{name: "organizational-role", permissions: []string{"feature.refine", "story.propose"}, want: []string{}},
+		{name: "read-only-design-role", permissions: []string{"repository.read", "task.create"}, want: []string{"glob", "repository_search", "repository_view"}},
+		{name: "read-only-test-role", permissions: []string{"repository.read", "test.execute"}, want: []string{"terminal", "glob", "repository_search", "repository_view"}},
+		{name: "implementation-role", permissions: []string{"repository.edit", "task.complete-propose"}, want: []string{"terminal", "glob", "repository_search", "file_editor", "task_tracker"}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tools := ExecutionToolsForPermissions(test.permissions)
+			if !slices.Equal(tools, test.want) {
+				t.Fatalf("tools = %#v, want %#v", tools, test.want)
+			}
+			settings, err := NewOpenAICompatibleAgentSettings(AgentSettingsConfig{
+				Model: "openai/local", ModelCanonicalName: "openai/gpt-4o", BaseURL: "http://127.0.0.1:8802/v1", APIKey: "fixture", Tools: tools,
+				MaximumOutputTokens: 8192, CondenserOutputTokens: 4096, TimeoutSeconds: 1200, CondenserMaximumEvents: 80, CondenserMaximumTokens: 96000,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			var decoded conversationAgentSettings
+			if err := json.Unmarshal(settings, &decoded); err != nil {
+				t.Fatal(err)
+			}
+			got := make([]string, len(decoded.Tools))
+			for index, tool := range decoded.Tools {
+				got[index] = tool.Name
+			}
+			if !slices.Equal(got, test.want) {
+				t.Fatalf("serialized tools = %#v, want %#v", got, test.want)
+			}
+			if decoded.LLM.LiteLLMExtraBody.ReasoningEffort != "" || decoded.LLM.LiteLLMExtraBody.ChatTemplateKwargs.EnableThinking == nil || *decoded.LLM.LiteLLMExtraBody.ChatTemplateKwargs.EnableThinking || decoded.LLM.LiteLLMExtraBody.ChatTemplateKwargs.PreserveThinking == nil || *decoded.LLM.LiteLLMExtraBody.ChatTemplateKwargs.PreserveThinking {
+				t.Fatalf("bounded settings were not explicitly non-thinking: %#v", decoded.LLM.LiteLLMExtraBody)
+			}
+		})
+	}
+}
+
+func TestAgentSettingsRejectImplicitOrInvalidTools(t *testing.T) {
+	base := AgentSettingsConfig{
+		Model: "openai/local", ModelCanonicalName: "openai/gpt-4o", BaseURL: "http://127.0.0.1:8802/v1", APIKey: "fixture",
+		MaximumOutputTokens: 8192, CondenserOutputTokens: 4096, TimeoutSeconds: 1200, CondenserMaximumEvents: 80, CondenserMaximumTokens: 96000,
+	}
+	if _, err := NewOpenAICompatibleAgentSettings(base); err != ErrInvalidConfiguration {
+		t.Fatalf("implicit tools error = %v", err)
+	}
+	base.Tools = []string{"file_editor", "repository_search"}
+	if _, err := NewOpenAICompatibleAgentSettings(base); err != ErrInvalidConfiguration {
+		t.Fatalf("non-canonical tools error = %v", err)
+	}
+	base.Tools = []string{"browser_tool_set"}
+	if _, err := NewOpenAICompatibleAgentSettings(base); err != ErrInvalidConfiguration {
+		t.Fatalf("unapproved tools error = %v", err)
+	}
+}
+
+func TestAgentSettingsRejectInvalidThinkingEffort(t *testing.T) {
+	base := AgentSettingsConfig{
+		Model: "openai/local", ModelCanonicalName: "openai/gpt-4o", BaseURL: "http://127.0.0.1:8800/v1", APIKey: "fixture",
+		Tools: []string{"repository_search"}, EnableThinking: true,
+		MaximumOutputTokens: 32768, CondenserOutputTokens: 4096, TimeoutSeconds: 1200, CondenserMaximumEvents: 80, CondenserMaximumTokens: 96000,
+	}
+	if _, err := NewOpenAICompatibleAgentSettings(base); err != ErrInvalidConfiguration {
+		t.Fatalf("missing reasoning effort error = %v", err)
+	}
+	base.ReasoningEffort = "xhigh"
+	if _, err := NewOpenAICompatibleAgentSettings(base); err != ErrInvalidConfiguration {
+		t.Fatalf("runaway reasoning effort error = %v", err)
+	}
+	base.ReasoningEffort = "medium"
+	base.CondenserEnableThinking = true
+	if _, err := NewOpenAICompatibleAgentSettings(base); err != ErrInvalidConfiguration {
+		t.Fatalf("unbounded condenser thinking error = %v", err)
+	}
+	base.CondenserEnableThinking = false
+	if _, err := NewOpenAICompatibleAgentSettings(base); err != nil {
+		t.Fatalf("controlled thinking error = %v", err)
+	}
+}
+
 func TestSemanticMemoryBindingRejectsTupleHookAndAuthorityDrift(t *testing.T) {
 	binding := acceptedSemanticMemoryBinding(t, qualifiedSMAHookConfig)
 	base := ExecutionProfile{
@@ -80,7 +210,10 @@ func TestSemanticMemoryBindingRejectsTupleHookAndAuthorityDrift(t *testing.T) {
 		"s2 acceptance":      func(profile *ExecutionProfile) { profile.SemanticMemory.S2AcceptanceSHA256 = digest('4') },
 		"hook digest":        func(profile *ExecutionProfile) { profile.SemanticMemory.HookConfigurationDigest = digest('6') },
 		"hook command": func(profile *ExecutionProfile) {
-			profile.HookConfig = json.RawMessage(`{"hooks":{"UserPromptSubmit":[{"matcher":"*","hooks":[{"type":"command","command":"./unqualified.py","timeout":1}]}]}}`)
+			profile.HookConfig = json.RawMessage(`{"hooks":{"UserPromptSubmit":[{"matcher":"*","hooks":[{"type":"command","command":"/usr/bin/python3 ./unqualified.py","timeout":1}]}]}}`)
+		},
+		"hook timeout": func(profile *ExecutionProfile) {
+			profile.HookConfig = json.RawMessage(`{"hooks":{"UserPromptSubmit":[{"matcher":"*","hooks":[{"type":"command","command":"/usr/bin/python3 ./.openhands/hooks/sma_context_hook.py","timeout":3}]}]}}`)
 		},
 		"model": func(profile *ExecutionProfile) {
 			profile.AgentSettings = json.RawMessage(`{"llm":{"model":"openai/unqualified","base_url":"http://127.0.0.1:8802/v1","api_mode":"chat","native_tool_calling":true,"max_output_tokens":8192,"timeout":120,"litellm_extra_body":{"chat_template_kwargs":{"enable_thinking":false}}}}`)
@@ -112,7 +245,7 @@ func TestAcceptedSemanticMemoryBindingRequiresQualifiedHookAndSeparateStores(t *
 	if _, err := NewAcceptedSemanticMemoryBinding(json.RawMessage(`{"hooks":{}}`), "teams", "sma"); err != ErrInvalidConfiguration {
 		t.Fatalf("unqualified hook error = %v", err)
 	}
-	if _, err := NewAcceptedSemanticMemoryBinding(json.RawMessage(`{"hooks":{"UserPromptSubmit":[{"matcher":"*","hooks":[{"type":"command","command":"./.openhands/hooks/sma_context_hook.py","timeout":1}]}],"Stop":[{"matcher":"*","hooks":[]}]}}`), "teams", "sma"); err != ErrInvalidConfiguration {
+	if _, err := NewAcceptedSemanticMemoryBinding(json.RawMessage(`{"hooks":{"UserPromptSubmit":[{"matcher":"*","hooks":[{"type":"command","command":"/usr/bin/python3 ./.openhands/hooks/sma_context_hook.py","timeout":1}]}],"Stop":[{"matcher":"*","hooks":[]}]}}`), "teams", "sma"); err != ErrInvalidConfiguration {
 		t.Fatalf("additional hook error = %v", err)
 	}
 	if _, err := NewAcceptedSemanticMemoryBinding(qualifiedSMAHookConfig, "shared", "shared"); err != ErrInvalidConfiguration {
@@ -123,6 +256,18 @@ func TestAcceptedSemanticMemoryBindingRequiresQualifiedHookAndSeparateStores(t *
 func TestQualifiedAgentSettingsUseOperationalRequestTimeout(t *testing.T) {
 	if !qualifiedAgentSettings(qualifiedSMAAgentSettings) {
 		t.Fatal("accepted settings rejected")
+	}
+	mutatedSystemSuffix := json.RawMessage(strings.Replace(string(qualifiedSMAAgentSettings), qualifiedShellDisciplineSystemSuffix, "combine related terminal commands", 1))
+	if qualifiedAgentSettings(mutatedSystemSuffix) {
+		t.Fatal("mutated shell-discipline system suffix accepted")
+	}
+	thinkEnabled := json.RawMessage(strings.Replace(string(qualifiedSMAAgentSettings), `["FinishTool"]`, `["FinishTool","ThinkTool"]`, 1))
+	if qualifiedAgentSettings(thinkEnabled) {
+		t.Fatal("no-op think tool accepted")
+	}
+	missingDefaultTools := json.RawMessage(strings.Replace(string(qualifiedSMAAgentSettings), `"include_default_tools":["FinishTool"],`, "", 1))
+	if qualifiedAgentSettings(missingDefaultTools) {
+		t.Fatal("missing exact default-tool restriction accepted")
 	}
 	shortTimeout := json.RawMessage(strings.Replace(string(qualifiedSMAAgentSettings), `"timeout":1200`, `"timeout":300`, 1))
 	if qualifiedAgentSettings(shortTimeout) {
@@ -137,6 +282,17 @@ func TestQualifiedAgentSettingsUseOperationalRequestTimeout(t *testing.T) {
 		t.Fatal("memory-unsafe condenser token limit accepted")
 	}
 	var settings map[string]any
+	if json.Unmarshal(qualifiedSMAAgentSettings, &settings) != nil {
+		t.Fatal("decode accepted settings")
+	}
+	delete(settings, "agent_context")
+	missingSystemSuffix, err := json.Marshal(settings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if qualifiedAgentSettings(missingSystemSuffix) {
+		t.Fatal("profile without the shell-discipline system suffix accepted")
+	}
 	if json.Unmarshal(qualifiedSMAAgentSettings, &settings) != nil {
 		t.Fatal("decode accepted settings")
 	}

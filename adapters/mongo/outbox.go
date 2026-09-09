@@ -3,6 +3,7 @@ package mongo
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -258,7 +259,7 @@ func (s *Store) openIntentFeed(ctx context.Context, consumerID, kind string) (*I
 		streamOptions.SetResumeAfter(bson.Raw(checkpoint.Data))
 		usedCheckpoint = true
 	} else if err != nil && !errors.Is(err, driver.ErrNoDocuments) {
-		return nil, err
+		return nil, fmt.Errorf("load consumer checkpoint: %w", err)
 	}
 	pipeline := intentFeedPipeline(kind)
 	stream, err := s.db.Collection("outbox").Watch(ctx, pipeline, streamOptions)
@@ -271,18 +272,24 @@ func (s *Store) openIntentFeed(ctx context.Context, consumerID, kind string) (*I
 		resynchronized = true
 	}
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("open outbox change stream: %w", err)
 	}
 	backlog, err := s.openBoundedBacklog(ctx, kind)
 	if err != nil {
 		_ = stream.Close(ctx)
-		return nil, err
+		return nil, fmt.Errorf("open pending-intent backlog: %w", err)
 	}
 	return &IntentFeed{store: s, consumerID: consumerID, stream: stream, backlog: backlog, seen: make(map[string]struct{}), backlogLimit: s.backlogLimit, resynchronized: resynchronized, kind: kind}, nil
 }
 
 func (s *Store) openBoundedBacklog(ctx context.Context, kind string) (*driver.Cursor, error) {
-	filter := bson.D{{Key: "state", Value: bson.D{{Key: "$in", Value: bson.A{DeliveryPending, DeliveryClaimed}}}}}
+	// Only PENDING intents are available work. A CLAIMED intent may still have
+	// an unexpired lease owned by another process. Returning it here causes a
+	// restarted consumer to record a stale acquisition and, because the later
+	// CLAIMED -> PENDING lease-release keeps the same claim epoch, suppress the
+	// valid retry as a duplicate. The lease sweeper performs that release; the
+	// change stream then delivers the resulting PENDING transition.
+	filter := bson.D{{Key: "state", Value: DeliveryPending}}
 	if kind != "" {
 		filter = append(filter, bson.E{Key: "kind", Value: kind})
 	}

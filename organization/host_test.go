@@ -138,6 +138,31 @@ func TestRoleWideResolutionNeverLaunchesAndReturnsOnlyExactActiveActors(t *testi
 	}
 }
 
+func TestConfiguredCapabilityActorsUsesVerifiedRoleBundles(t *testing.T) {
+	team := testLoadedTeam()
+	bundle := testBundle()
+	bundle.Role = "senior-coder"
+	bundle.Capabilities = []string{"complex-implementation", "technical-review"}
+	binding := RoleBinding{
+		Role: "senior-coder", BundlePath: "roles/senior-coder.json", BundleDigest: kernel.Digest(repeat("e", 64)), PublisherKeyID: "test",
+		InitialInstances: 1, MaximumInstances: 2, LaunchMode: LaunchOnDemand,
+		ModelProfileDigest: kernel.Digest(repeat("f", 64)), WorkspaceIDs: []string{"senior-coder-1", "senior-coder-2"},
+	}
+	team.Manifest.Roles = append(team.Manifest.Roles, binding)
+	team.Roles = append(team.Roles, LoadedRole{Binding: binding, Bundle: bundle})
+	host, err := NewHost(team, NewMemoryRoleStore(), newFakeRoleRuntime(), fake.NewClock(time.Date(2026, 8, 31, 10, 0, 0, 0, time.UTC)), fake.NewIDSource())
+	if err != nil {
+		t.Fatal(err)
+	}
+	actors, err := host.ConfiguredCapabilityActors("technical-review")
+	if err != nil || len(actors) != 2 || actors[0] != "teams::senior-coder-1" || actors[1] != "teams::senior-coder-2" {
+		t.Fatalf("technical-review actors=%v err=%v", actors, err)
+	}
+	if _, err := host.ConfiguredCapabilityActors("missing-capability"); !errors.Is(err, ErrRoleNotConfigured) {
+		t.Fatalf("missing capability error=%v", err)
+	}
+}
+
 func testLoadedTeam() LoadedTeam {
 	bundle := testBundle()
 	bundle.Signature = "signed-for-host-test"

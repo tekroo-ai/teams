@@ -37,3 +37,34 @@ func (s *Store) ReadAggregateHead(ctx context.Context, aggregate kernel.Aggregat
 	}
 	return state, eventID, true, nil
 }
+
+// ReadAggregateRevisionHead returns the committed revision and last event for
+// aggregates such as completion reviews that intentionally have no generic
+// lifecycle AggregateState projection.
+func (s *Store) ReadAggregateRevisionHead(ctx context.Context, aggregate kernel.AggregateRef) (uint64, kernel.UUIDv7, bool, error) {
+	if err := requireDeadline(ctx); err != nil {
+		return 0, "", false, err
+	}
+	if s == nil || !aggregate.Valid() {
+		return 0, "", false, ErrInvalidDecision
+	}
+	var document aggregateDocument
+	if err := s.db.Collection("aggregates").FindOne(ctx, bson.D{{Key: "_id", Value: aggregateKey(aggregate)}}).Decode(&document); err != nil {
+		if errors.Is(err, driver.ErrNoDocuments) {
+			return 0, "", false, nil
+		}
+		return 0, "", false, err
+	}
+	if document.Revision == 0 {
+		return 0, "", false, ErrCorruptAggregate
+	}
+	var event eventDocument
+	if err := s.db.Collection("events").FindOne(ctx, bson.D{{Key: "aggregate_key", Value: aggregateKey(aggregate)}, {Key: "revision", Value: document.Revision}}).Decode(&event); err != nil {
+		return 0, "", false, err
+	}
+	var domain kernel.DomainEvent
+	if decode(event.Data, &domain) != nil || domain.EventID != kernel.UUIDv7(event.ID) || domain.Aggregate != aggregate || domain.AggregateRevision != document.Revision {
+		return 0, "", false, ErrCorruptAggregate
+	}
+	return document.Revision, domain.EventID, true, nil
+}

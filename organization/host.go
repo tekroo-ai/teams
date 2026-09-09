@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"sync"
 	"time"
@@ -372,6 +373,29 @@ func (host *Host) ConfiguredRoleActors(role string) ([]kernel.ActorFQN, error) {
 		return actors, nil
 	}
 	return nil, ErrRoleNotConfigured
+}
+
+// ConfiguredCapabilityActors resolves every configured actor whose verified
+// role bundle declares capability. Selection remains data-driven by the loaded
+// team definition; callers do not need to know the role names that provide it.
+func (host *Host) ConfiguredCapabilityActors(capability string) ([]kernel.ActorFQN, error) {
+	if host == nil || !namePattern.MatchString(capability) {
+		return nil, ErrInvalidTeamManifest
+	}
+	actors := make([]kernel.ActorFQN, 0)
+	for _, loaded := range host.team.Roles {
+		if !slices.Contains(loaded.Bundle.Capabilities, capability) {
+			continue
+		}
+		for instance := uint32(1); instance <= loaded.Binding.MaximumInstances; instance++ {
+			actors = append(actors, kernel.ActorFQN(fmt.Sprintf("%s::%s-%d", host.team.Manifest.Team, loaded.Binding.Role, instance)))
+		}
+	}
+	if len(actors) == 0 {
+		return nil, ErrRoleNotConfigured
+	}
+	sort.Slice(actors, func(left, right int) bool { return actors[left] < actors[right] })
+	return actors, nil
 }
 
 // ResolveRoleRecipients converts a role-wide address into currently active,

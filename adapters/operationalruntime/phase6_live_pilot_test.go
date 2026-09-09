@@ -259,16 +259,15 @@ func writePhase6PilotConfig(t *testing.T, mongoURI string, workspaces []Producti
 	}
 	profiles := make([]ProductionProfile, 0, len(manifest.Roles))
 	for index, role := range manifest.Roles {
+		corpus, qualification := testQualificationBundle(t, role.ModelProfileDigest, kernel.RoleFQRN(role.Role), kernel.RouteBoundedExecution, digestByte('d'), allTestWorkKinds(), time.Date(2026, 8, 31, 0, 0, 0, 0, time.UTC))
 		profiles = append(profiles, ProductionProfile{
 			ModelProfileDigest:    role.ModelProfileDigest,
+			RoleFQRN:              kernel.RoleFQRN(role.Role),
+			RoleBundleDigest:      role.BundleDigest,
+			DecisionRoute:         kernel.RouteBoundedExecution,
 			RuntimeIdentityDigest: digestByte(byte('1' + index)),
-			ToolPolicyDigest:      digestByte('d'), EffectPolicyDigest: digestByte('e'), MaximumIterations: 24,
-			Qualification: kernel.AssignmentQualificationReceipt{
-				QualificationID:     kernel.UUIDv7(fmt.Sprintf("00000000-0000-7000-8000-%012d", index+1)),
-				QualificationDigest: digestByte(byte('1' + index)), QualificationCorpusDigest: digestByte('f'),
-				ModelProfileDigest: role.ModelProfileDigest, DecisionRoute: kernel.RouteBoundedExecution,
-				QualifiedRole: role.Role, Status: kernel.QualificationPass, ObservedAt: time.Date(2026, 8, 31, 0, 0, 0, 0, time.UTC),
-			},
+			ToolPolicyDigest:      digestByte('d'), EffectPolicyDigest: digestByte('e'), AgentSettings: config.Profiles[0].AgentSettings, MaximumIterations: 24,
+			QualificationCorpus: corpus, Qualification: qualification,
 		})
 	}
 	database := fmt.Sprintf("tekroo_phase6_pilot_%d", time.Now().UnixNano())

@@ -8,11 +8,11 @@
       "bundle_path": "roles/architect.v1.1.0.json",
       "bundle_digest": "ca2225cce471bb3b11732b9737474eb825e02df64a4e86111f2d51436f1ae405",
       "publisher_key_id": "tekroo-role-grounding-20260901",
-      "initial_instances": 1,
-      "maximum_instances": 1,
+      "initial_instances": 2,
+      "maximum_instances": 2,
       "launch_mode": "ON_DEMAND",
       "model_profile_digest": "1111111111111111111111111111111111111111111111111111111111111111",
-      "workspace_ids": ["architect-1"]
+      "workspace_ids": ["architect-1", "architect-2"]
     },
     {
       "role": "coder",

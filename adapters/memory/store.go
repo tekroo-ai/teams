@@ -58,6 +58,7 @@ type Store struct {
 	eventQualifications   map[kernel.UUIDv7]string
 	attemptBudgets        map[kernel.AttemptBudgetKey]kernel.AttemptBudgetSnapshot
 	workProfiles          map[kernel.AggregateRef]kernel.WorkProfileSnapshot
+	workProfileHistory    map[kernel.UUIDv7]kernel.WorkRiskProfile
 	qualifiedAssignments  map[kernel.AggregateRef]kernel.QualifiedAssignmentAuthorization
 	variantGroups         map[kernel.AggregateRef]kernel.VariantGroupSnapshot
 	variantGroupKeys      map[kernel.VariantGroupKey]kernel.AggregateRef
@@ -121,6 +122,7 @@ func NewStore(policy ...kernel.AuthorizationPolicy) *Store {
 		eventQualifications:   make(map[kernel.UUIDv7]string),
 		attemptBudgets:        make(map[kernel.AttemptBudgetKey]kernel.AttemptBudgetSnapshot),
 		workProfiles:          make(map[kernel.AggregateRef]kernel.WorkProfileSnapshot),
+		workProfileHistory:    make(map[kernel.UUIDv7]kernel.WorkRiskProfile),
 		qualifiedAssignments:  make(map[kernel.AggregateRef]kernel.QualifiedAssignmentAuthorization),
 		variantGroups:         make(map[kernel.AggregateRef]kernel.VariantGroupSnapshot),
 		variantGroupKeys:      make(map[kernel.VariantGroupKey]kernel.AggregateRef),
@@ -222,6 +224,10 @@ func (s *Store) loadLocked(target kernel.AggregateRef, preconditions []kernel.Ag
 	snapshot.WorkProfiles = make(map[kernel.AggregateRef]kernel.WorkProfileSnapshot, len(s.workProfiles))
 	for task, profile := range s.workProfiles {
 		snapshot.WorkProfiles[task] = profile.Clone()
+	}
+	snapshot.WorkProfileHistory = make(map[kernel.UUIDv7]kernel.WorkRiskProfile, len(s.workProfileHistory))
+	for profileID, profile := range s.workProfileHistory {
+		snapshot.WorkProfileHistory[profileID] = profile.Clone()
 	}
 	snapshot.QualifiedAssignments = make(map[kernel.AggregateRef]kernel.QualifiedAssignmentAuthorization, len(s.qualifiedAssignments))
 	for task, authorization := range s.qualifiedAssignments {
@@ -470,6 +476,7 @@ func (s *Store) Commit(ctx context.Context, expected kernel.Snapshot, decision k
 	for _, projection := range capabilityProjections {
 		if projection.profile != nil {
 			s.workProfiles[projection.reference] = projection.profile.Clone()
+			s.workProfileHistory[projection.profile.Profile.ProfileID] = projection.profile.Profile.Clone()
 		}
 		if projection.authorization != nil {
 			s.qualifiedAssignments[projection.reference] = projection.authorization.Clone()

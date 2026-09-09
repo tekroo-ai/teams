@@ -90,6 +90,18 @@ func TestWorkerTreatsAnIdlePollAsHealthy(t *testing.T) {
 	}
 }
 
+func TestWorkerShutdownWinsOverConcurrentIdlePoll(t *testing.T) {
+	runContext, cancel := context.WithCancel(context.Background())
+	runtime := &workerRuntime{
+		nextHook: func(context.Context) { cancel() },
+		nextErrors: []error{mongo.ErrIntentNotFound},
+	}
+	worker := newTestWorker(t, runtime, 1)
+	if err := worker.Run(runContext); !errors.Is(err, context.Canceled) {
+		t.Fatalf("run error = %v", err)
+	}
+}
+
 type workerRuntime struct {
 	intent       kernel.OutboxIntent
 	results      []application.OperationalExecutionResult
@@ -101,9 +113,13 @@ type workerRuntime struct {
 	yieldCalls   int
 	resolution   string
 	nextErrors   []error
+	nextHook     func(context.Context)
 }
 
-func (runtime *workerRuntime) Next(context.Context) (kernel.OutboxIntent, error) {
+func (runtime *workerRuntime) Next(ctx context.Context) (kernel.OutboxIntent, error) {
+	if runtime.nextHook != nil {
+		runtime.nextHook(ctx)
+	}
 	if len(runtime.nextErrors) > 0 {
 		err := runtime.nextErrors[0]
 		runtime.nextErrors = runtime.nextErrors[1:]

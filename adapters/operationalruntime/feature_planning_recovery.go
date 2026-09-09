@@ -13,8 +13,10 @@ import (
 )
 
 // PlanningRecoveryRequest is an explicit operator decision to continue one
-// cancelled, timed-out, or retryable failed feature-planning invocation under
-// a new condition, execution, and finite deadline.
+// recoverable feature-planning invocation under a new condition, execution,
+// and finite deadline. In addition to transport/runtime failures, a succeeded
+// invocation is recoverable when its exact output was blocked by the
+// deterministic structured-handoff validator.
 type PlanningRecoveryRequest struct {
 	ExpectedRevision uint64               `json:"expected_revision"`
 	Reason           string               `json:"reason"`
@@ -49,18 +51,22 @@ func (service *ProductionService) RetryCancelledFeaturePlanning(ctx context.Cont
 		return InvocationStatus{}, errors.Join(application.ErrInvalidOperationalExecution, err)
 	}
 	terminalContext, err := service.Store.LoadOperationalExecution(ctx, invocationID)
-	if err != nil || terminalContext.Invocation.Revision != terminalStatus.Revision || !recoverablePlanningTerminal(terminalContext.Invocation) {
+	if err != nil || terminalContext.Invocation.Revision != terminalStatus.Revision {
 		return InvocationStatus{}, errors.Join(application.ErrInvalidOperationalExecution, err)
 	}
 	terminal := terminalContext.Invocation
 
-	feature, stage, found, err := service.planningFeatureForTask(ctx, terminal.TaskID)
+	feature, stage, reviewedTaskIndex, architectureRound, found, err := service.planningFeatureForTask(ctx, terminal.TaskID)
 	if err != nil || !found {
 		return InvocationStatus{}, errors.Join(organization.ErrInvalidFeature, err)
 	}
-	task, state, head, latest, snapshot, err := service.ensureFeaturePlanningTask(ctx, feature, stage)
+	task, state, head, latest, snapshot, err := service.ensureFeaturePlanningTaskForRound(ctx, feature, stage, reviewedTaskIndex, architectureRound)
 	if err != nil {
 		return InvocationStatus{}, err
+	}
+	recoverable, err := service.recoverablePlanningInvocation(ctx, task, state, head, latest, terminal)
+	if err != nil || !recoverable {
+		return InvocationStatus{}, errors.Join(application.ErrInvalidOperationalExecution, err)
 	}
 	taskRef := kernel.AggregateRef{Kind: kernel.AggregateTask, ID: task.ID}
 	profileSnapshot, profileFound := snapshot.WorkProfiles[taskRef]
@@ -141,7 +147,7 @@ func (service *ProductionService) RetryCancelledFeaturePlanning(ctx context.Cont
 	}
 	profileConfig, configured := service.profilesByModel[owner.ModelProfile]
 	workspace, workspaceFound := service.workspacesByID[owner.WorkspaceID]
-	if !configured || !workspaceFound {
+	if !configured || !profileConfig.qualifiedFor(task.DecisionRoute, workKindForPurpose(task.Purpose, task.Risk), service.clock.Now().UTC()) || !workspaceFound {
 		return InvocationStatus{}, organization.ErrInvalidFeature
 	}
 	state, head, found, err = service.Store.ReadAggregateHead(ctx, taskRef)
@@ -154,6 +160,11 @@ func (service *ProductionService) RetryCancelledFeaturePlanning(ctx context.Cont
 	}
 	if err := service.refreshTaskExecutionBinding(ctx, feature, tracked, profileConfig, workspace); err != nil {
 		return InvocationStatus{}, err
+	}
+	if terminal.State == kernel.InvocationSucceeded {
+		if err := service.ensureInvalidPlanningOutputUnblocked(ctx, feature, tracked, terminal, registered, request.IdempotencyKey); err != nil {
+			return InvocationStatus{}, err
+		}
 	}
 	budgetRevision, err := service.extendTaskTechnicalRetryBudget(ctx, feature, tracked, task.Purpose, terminal.AttemptOrdinal+1)
 	if err != nil {
@@ -192,6 +203,96 @@ func recoverablePlanningTerminal(invocation kernel.WorkInvocation) bool {
 		return true
 	case kernel.InvocationFailed, kernel.InvocationStartFailed:
 		return invocation.Retryable != nil && *invocation.Retryable
+	default:
+		return false
+	}
+}
+
+func (service *ProductionService) recoverablePlanningInvocation(ctx context.Context, task organization.PlannedTask, state kernel.AggregateState, head kernel.UUIDv7, latest, invocation kernel.WorkInvocation) (bool, error) {
+	if recoverablePlanningTerminal(invocation) {
+		return true, nil
+	}
+	if invocation.State != kernel.InvocationSucceeded || state.Condition != kernel.ConditionBlocked && state.Condition != kernel.ConditionRunnable || latest.ID != invocation.ID {
+		return false, nil
+	}
+	return service.invalidPlanningOutputBlockInRecoveryLineage(ctx, task, invocation, head)
+}
+
+func (service *ProductionService) ensureInvalidPlanningOutputUnblocked(ctx context.Context, feature organization.FeatureRequest, task *trackedTask, invocation kernel.WorkInvocation, evidence []kernel.EvidenceRef, idempotencyKey string) error {
+	if task == nil {
+		return organization.ErrInvalidFeature
+	}
+	state, head, found, err := service.Store.ReadAggregateHead(ctx, kernel.AggregateRef{Kind: kernel.AggregateTask, ID: task.plan.ID})
+	if err != nil || !found || state.Revision != task.revision || head != task.last {
+		return errors.Join(organization.ErrInvalidFeature, err)
+	}
+	if state.Condition == kernel.ConditionRunnable {
+		return nil
+	}
+	if state.Condition != kernel.ConditionBlocked {
+		return organization.ErrInvalidFeature
+	}
+	exact, err := service.invalidPlanningOutputBlockInRecoveryLineage(ctx, task.plan, invocation, head)
+	if err != nil || !exact {
+		return errors.Join(organization.ErrInvalidFeature, err)
+	}
+	payload := map[string]any{
+		"resolved_blocker_refs": []string{"teams://work-invocation/" + string(invocation.ID)},
+		"evidence_ids":          evidenceIDs(evidence),
+	}
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	receipt, err := service.submitStandaloneCommand(ctx, "tekroo.command.work.unblock", kernel.AggregateTask, task.plan.ID, service.policyAuthority, state.Revision, encoded, []kernel.DagParent{{ParentEventID: head, EdgeKind: kernel.EdgeResponse}}, evidence, "planning-invalid-output-unblock-"+string(invocation.ID)+"-"+idempotencyKey)
+	if err != nil {
+		return err
+	}
+	if len(receipt.EventIDs) != 1 {
+		return errors.New("planning recovery unblock did not return one event")
+	}
+	task.revision = revisionAfter(receipt, task.revision)
+	task.last = receipt.EventIDs[0]
+	return nil
+}
+
+func (service *ProductionService) invalidPlanningOutputBlockInRecoveryLineage(ctx context.Context, task organization.PlannedTask, invocation kernel.WorkInvocation, head kernel.UUIDv7) (bool, error) {
+	taskRef := kernel.AggregateRef{Kind: kernel.AggregateTask, ID: task.ID}
+	currentID := head
+	for depth := 0; depth < 16; depth++ {
+		current, found, err := service.Store.ReadEvent(ctx, currentID)
+		if err != nil || !found {
+			return false, err
+		}
+		if isExactInvalidPlanningOutputBlock(current, task, invocation, service.policyAuthority) {
+			return true, nil
+		}
+		if current.Aggregate != taskRef || !planningRecoveryPreludeEvent(current.EventType) || current.AggregateRevision <= 1 {
+			return false, nil
+		}
+		foundParent := false
+		for _, parentRef := range current.Parents {
+			parent, parentFound, readErr := service.Store.ReadEvent(ctx, parentRef.ParentEventID)
+			if readErr != nil {
+				return false, readErr
+			}
+			if parentFound && parent.Aggregate == taskRef && parent.AggregateRevision+1 == current.AggregateRevision {
+				currentID = parent.EventID
+				foundParent = true
+				break
+			}
+		}
+		if !foundParent {
+			return false, nil
+		}
+	}
+	return false, nil
+}
+
+func planningRecoveryPreludeEvent(eventType string) bool {
+	switch eventType {
+	case "tekroo.event.task.work-profile-bound", "tekroo.event.task.qualified-assignment-authorized", "tekroo.event.task.operational-scope-bound", "tekroo.event.task.work-budget-bound", "tekroo.event.work.unblocked":
+		return true
 	default:
 		return false
 	}
@@ -344,17 +445,21 @@ func (service *ProductionService) amendPlanningRecoveryBudget(ctx context.Contex
 	if recoveryBudgetAlreadyCovers(account, terminal, deadline) {
 		return account, nil
 	}
-	targetRevision := terminal.AdmissionPolicyRevision + 1
-	targetDigest := digestBytes([]byte("planning-recovery-budget\x00" + string(terminal.AdmissionPolicyDigest) + "\x00" + string(condition) + "\x00" + deadline.Format(time.RFC3339Nano)))
+	if account.PolicyRevision < terminal.AdmissionPolicyRevision || account.PolicyRevision == terminal.AdmissionPolicyRevision && account.PolicyDigest != terminal.AdmissionPolicyDigest || deadline.Before(account.DeadlineAt) {
+		return kernel.WorkBudgetAccount{}, organization.ErrInvalidFeature
+	}
+	// The budget is shared by every task in the feature. Later work may have
+	// legitimately advanced it after the terminal invocation being repaired.
+	// Extend from the current accepted account, while retaining the terminal
+	// invocation and operator evidence in the recovery condition.
+	targetRevision := account.PolicyRevision + 1
+	targetDigest := digestBytes([]byte("planning-recovery-budget\x00" + string(account.PolicyDigest) + "\x00" + string(condition) + "\x00" + deadline.Format(time.RFC3339Nano)))
 	if targetRevision <= service.planning.PolicyRevision {
 		targetRevision = service.planning.PolicyRevision
 		targetDigest = service.planning.BudgetPolicyDigest
 	}
 	if account.PolicyRevision == targetRevision && account.PolicyDigest == targetDigest && account.DeadlineAt.Equal(deadline) {
 		return account, nil
-	}
-	if account.PolicyRevision != terminal.AdmissionPolicyRevision || account.PolicyDigest != terminal.AdmissionPolicyDigest || deadline.Before(account.DeadlineAt) {
-		return kernel.WorkBudgetAccount{}, organization.ErrInvalidFeature
 	}
 	evidenceIDs := make([]kernel.UUIDv7, len(evidence))
 	for index := range evidence {
@@ -391,7 +496,7 @@ func recoveryBudgetAlreadyCovers(account kernel.WorkBudgetAccount, terminal kern
 }
 
 func (service *ProductionService) rebindPlanningRecoveryAssignment(ctx context.Context, feature organization.FeatureRequest, task *trackedTask, profile ProductionProfile, owner organization.RoleInstanceState) error {
-	if task == nil || !task.profile.Valid() || owner.ActorFQN != task.plan.Owner || owner.Execution.Valid() == false {
+	if task == nil || !profile.qualifiedFor(task.plan.DecisionRoute, workKindForPurpose(task.plan.Purpose, task.plan.Risk), service.clock.Now().UTC()) || !task.profile.Valid() || owner.ActorFQN != task.plan.Owner || owner.Execution.Valid() == false {
 		return organization.ErrInvalidFeature
 	}
 	taskRef := kernel.AggregateRef{Kind: kernel.AggregateTask, ID: task.plan.ID}
@@ -401,7 +506,7 @@ func (service *ProductionService) rebindPlanningRecoveryAssignment(ctx context.C
 	}
 	assignment, found := snapshot.QualifiedAssignments[taskRef]
 	profileSnapshot, profileFound := snapshot.WorkProfiles[taskRef]
-	if !found || !assignment.Valid() || !profileFound || !profileSnapshot.Valid() || profileSnapshot.Profile.Binding() != task.profile.Binding() || assignment.TaskID != task.plan.ID || assignment.SelectedActorFQN != owner.ActorFQN || assignment.ModelProfileDigest != profile.ModelProfileDigest || assignment.RuntimeIdentityDigest != profile.RuntimeIdentityDigest {
+	if !found || !assignment.Valid() || !profile.qualificationMatches(assignment.Qualification, task.plan.DecisionRoute, workKindForPurpose(task.plan.Purpose, task.plan.Risk), service.clock.Now().UTC()) || !profileFound || !profileSnapshot.Valid() || profileSnapshot.Profile.Binding() != task.profile.Binding() || assignment.TaskID != task.plan.ID || assignment.SelectedActorFQN != owner.ActorFQN || assignment.ModelProfileDigest != profile.ModelProfileDigest || assignment.RuntimeIdentityDigest != profile.RuntimeIdentityDigest {
 		return organization.ErrInvalidFeature
 	}
 	if assignment.WorkProfile == task.profile.Binding() && assignment.SelectedExecution() == owner.Execution && assignment.SelectionPolicyRevision == service.planning.PolicyRevision && assignment.SelectionPolicyDigest == service.planning.SelectionPolicyDigest {
@@ -451,19 +556,43 @@ func containsEveryUUID(values, required []kernel.UUIDv7) bool {
 	return true
 }
 
-func (service *ProductionService) planningFeatureForTask(ctx context.Context, taskID kernel.UUIDv7) (organization.FeatureRequest, featurePlanningStage, bool, error) {
+func (service *ProductionService) planningFeatureForTask(ctx context.Context, taskID kernel.UUIDv7) (organization.FeatureRequest, featurePlanningStage, *uint32, uint32, bool, error) {
 	statuses := []organization.FeatureStatus{organization.FeatureSubmitted, organization.FeatureReadyForPlanning, organization.FeatureSpecified}
 	features, err := service.Store.ListFeatures(ctx, statuses, 1000)
 	if err != nil {
-		return organization.FeatureRequest{}, "", false, err
+		return organization.FeatureRequest{}, "", nil, 0, false, err
 	}
 	for _, feature := range features {
 		stage, planning := planningStage(feature.Status)
-		if planning && deterministicOperationalUUID("feature-planning-task", string(feature.ID), string(stage)) == taskID {
-			return feature, stage, true, nil
+		if planning && stage != stageArchitecture && featurePlanningTaskID(feature.ID, stage, 0, nil) == taskID {
+			return feature, stage, nil, 0, true, nil
+		}
+		if feature.Status == organization.FeatureSpecified {
+			for round := uint32(0); round <= architecturePlanRecordedRoundLimit; round++ {
+				if featurePlanningTaskID(feature.ID, stageArchitecture, round, nil) == taskID {
+					return feature, stageArchitecture, nil, round, true, nil
+				}
+				if featurePlanningTaskID(feature.ID, stageArchitectureReview, round, nil) == taskID {
+					return feature, stageArchitectureReview, nil, round, true, nil
+				}
+				_, architectureOutput, candidateErr := service.featureArchitectureCandidateForRound(ctx, feature, round)
+				if candidateErr != nil {
+					continue
+				}
+				candidate, candidateErr := parseArchitectureStageResult(architectureOutput, featureAuthorizedActorFQNs(feature)...)
+				if candidateErr != nil {
+					return organization.FeatureRequest{}, "", nil, 0, false, candidateErr
+				}
+				for index := range candidate.Tasks {
+					reviewedTaskIndex := uint32(index)
+					if featurePlanningTaskID(feature.ID, stageArchitectureTaskReview, round, &reviewedTaskIndex) == taskID {
+						return feature, stageArchitectureTaskReview, &reviewedTaskIndex, round, true, nil
+					}
+				}
+			}
 		}
 	}
-	return organization.FeatureRequest{}, "", false, nil
+	return organization.FeatureRequest{}, "", nil, 0, false, nil
 }
 
 func planningRecoveryConditionDigest(invocationID kernel.UUIDv7, request PlanningRecoveryRequest) (kernel.Digest, error) {

@@ -2,6 +2,7 @@ package operationalruntime
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"sync"
 	"time"
@@ -28,8 +29,10 @@ type Config struct {
 	OpenHandsSessionAPIKey   string
 	HTTPClient               *http.Client
 	WorkspaceBindings        []openhands.WorkspaceBinding
+	WorkspaceResolver        openhands.WorkspaceResolver
 	ExecutionProfiles        []openhands.ExecutionProfile
 	RoleGrounding            application.RoleGroundingResolver
+	DeadlineExtensionReader  application.OperationalDeadlineExtensionReader
 	OpenHandsPollInterval    time.Duration
 	OpenHandsMaximumPages    uint32
 	OpenHandsMaximumEvidence int
@@ -62,15 +65,19 @@ func New(ctx context.Context, config Config) (*Runtime, error) {
 	}
 	handler, err := application.NewHandler(config.Store, kernel.Evaluator{Catalogue: config.Catalogue}, config.Clock, config.IDs)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("create application handler: %w", err)
 	}
-	workspaces, err := openhands.NewBoundWorkspaceResolver(config.WorkspaceBindings)
-	if err != nil {
-		return nil, err
+	workspaces := config.WorkspaceResolver
+	if workspaces == nil {
+		var err error
+		workspaces, err = openhands.NewBoundWorkspaceResolver(config.WorkspaceBindings)
+		if err != nil {
+			return nil, fmt.Errorf("create workspace resolver: %w", err)
+		}
 	}
 	profiles, err := openhands.NewBoundExecutionProfileResolver(config.ExecutionProfiles)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("create execution-profile resolver: %w", err)
 	}
 	client, err := openhands.NewClient(openhands.Config{
 		BaseURL: config.OpenHandsBaseURL, SessionAPIKey: config.OpenHandsSessionAPIKey,
@@ -79,28 +86,29 @@ func New(ctx context.Context, config Config) (*Runtime, error) {
 		MaximumEvidenceBytes: config.OpenHandsMaximumEvidence,
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("create OpenHands client: %w", err)
 	}
 	blobs, err := filesystem.NewExecutionEvidenceStore(config.EvidenceRoot)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("open execution-evidence store: %w", err)
 	}
 	recorder, err := application.NewCommandEvidenceRecorder(handler, blobs, config.EvidencePolicy)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("create evidence recorder: %w", err)
 	}
-	coordinator, err := application.NewOperationalExecutionCoordinator(config.Store, handler, client, recorder, config.RoleGrounding, config.Clock, config.ExecutionPolicy)
+	executionReader := assembleOperationalExecutionReader(config.Store, config.DeadlineExtensionReader)
+	coordinator, err := application.NewOperationalExecutionCoordinator(executionReader, handler, client, recorder, config.RoleGrounding, config.Clock, config.ExecutionPolicy)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("create execution coordinator: %w", err)
 	}
 	feed, err := config.Store.OpenIntentFeedForKind(ctx, config.WorkerPolicy.ConsumerID, workInvocationAuthorized)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("open work-intent feed: %w", err)
 	}
 	worker, err := executionruntime.NewWorker(executionruntime.MongoIntentSource{Feed: feed}, executionruntime.MongoIntentLeaser{Store: config.Store}, coordinator, systemClockAdapter{config.Clock}, config.WorkerPolicy)
 	if err != nil {
 		_ = feed.Close(context.WithoutCancel(ctx))
-		return nil, err
+		return nil, fmt.Errorf("create execution worker: %w", err)
 	}
 	return &Runtime{catalogue: config.Catalogue, handler: handler, coordinator: coordinator, worker: worker, feed: feed, evidence: blobs}, nil
 }
@@ -148,3 +156,31 @@ func (runtime *Runtime) Close(ctx context.Context) error {
 type systemClockAdapter struct{ kernel.Clock }
 
 func (adapter systemClockAdapter) Now() time.Time { return adapter.Clock.Now() }
+
+// operationalExecutionReader intentionally exposes only the base reader
+// contract. Interface assignment alone is insufficient because Go preserves
+// the concrete *mongo.Store method set for later type assertions.
+type operationalExecutionReader struct {
+	application.OperationalExecutionReader
+}
+
+// operationalExecutionReaderWithDeadline makes host-suspension deadline
+// extension an explicitly assembled production capability. A bare Runtime is
+// also used by tests and embedders that do not own a runtime-continuity
+// session; those callers receive the immutable invocation deadline instead of
+// accidentally activating a Mongo capability they did not initialize.
+type operationalExecutionReaderWithDeadline struct {
+	application.OperationalExecutionReader
+	application.OperationalDeadlineExtensionReader
+}
+
+func assembleOperationalExecutionReader(base application.OperationalExecutionReader, deadline application.OperationalDeadlineExtensionReader) application.OperationalExecutionReader {
+	reader := operationalExecutionReader{OperationalExecutionReader: base}
+	if deadline == nil {
+		return reader
+	}
+	return operationalExecutionReaderWithDeadline{
+		OperationalExecutionReader:         reader,
+		OperationalDeadlineExtensionReader: deadline,
+	}
+}

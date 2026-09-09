@@ -583,22 +583,27 @@ func PlanWorkInvocationAuthorization(payload []byte, task AggregateState, accoun
 	}
 	var latest *WorkInvocation
 	for _, candidate := range invocations {
-		if candidate.TaskID == task.ID && candidate.Purpose == value.Purpose && candidate.ConditionDigest == value.ConditionDigest {
-			candidateCopy := candidate.Clone()
-			if latest == nil || candidateCopy.AttemptOrdinal > latest.AttemptOrdinal || candidateCopy.AttemptOrdinal == latest.AttemptOrdinal && candidateCopy.Revision > latest.Revision {
-				latest = &candidateCopy
-			}
+		if candidate.TaskID != task.ID || candidate.Purpose != value.Purpose {
+			continue
+		}
+		if !candidate.State.Terminal() {
+			return reject("ACTIVE_INVOCATION_EXISTS")
+		}
+		candidateCopy := candidate.Clone()
+		if latest == nil || candidateCopy.AttemptOrdinal > latest.AttemptOrdinal || candidateCopy.AttemptOrdinal == latest.AttemptOrdinal && candidateCopy.Revision > latest.Revision {
+			latest = &candidateCopy
 		}
 	}
 	if latest == nil {
-		if value.RetryOfInvocationID != nil || value.RetryOrdinal != 0 {
-			if !validChangedConditionContinuation(value, profile.Profile, account, invocations) {
-				return reject("INVALID_RETRY")
-			}
+		if value.AttemptOrdinal != 1 || value.RetryOfInvocationID != nil || value.RetryOrdinal != 0 {
+			return reject("INVALID_RETRY")
 		}
 	} else {
-		if value.RetryOfInvocationID == nil || *value.RetryOfInvocationID != latest.ID || value.RetryOrdinal != latest.RetryOrdinal+1 || !latest.State.Terminal() || latest.Retryable == nil || !*latest.Retryable {
+		if value.ConditionDigest == latest.ConditionDigest {
 			return reject("UNCHANGED_CONDITION")
+		}
+		if !validChangedConditionContinuation(value, profile.Profile, account, *latest) && !validCandidateRevalidation(value, *latest) {
+			return reject("INVALID_RETRY")
 		}
 	}
 	globalUsed := account.ModelInvocationsUsed + 1
@@ -645,25 +650,16 @@ func PlanWorkInvocationAuthorization(payload []byte, task AggregateState, accoun
 	return InvocationAdmissionDecision{Accepted: true, Reason: "ACCEPTED", Invocation: invocation, BudgetDebit: &debit, EventPayload: eventPayload}
 }
 
-func validChangedConditionContinuation(value invocationAuthorizationPayload, profile WorkRiskProfile, account WorkBudgetAccount, invocations map[AggregateRef]WorkInvocation) bool {
+func validChangedConditionContinuation(value invocationAuthorizationPayload, profile WorkRiskProfile, account WorkBudgetAccount, prior WorkInvocation) bool {
 	if value.RetryOfInvocationID == nil || value.RetryOrdinal == 0 || profile.SupersedesProfileID == nil {
 		return false
 	}
-	var prior WorkInvocation
-	found := false
-	for _, candidate := range invocations {
-		if candidate.ID == *value.RetryOfInvocationID {
-			prior = candidate
-			found = true
-			break
-		}
-	}
-	if !found || !prior.Valid() || prior.TaskID != value.TaskID || prior.Purpose != value.Purpose || value.AttemptOrdinal != prior.AttemptOrdinal+1 || value.RetryOrdinal != prior.RetryOrdinal+1 || value.ConditionDigest == prior.ConditionDigest || profile.ProfileRevision <= prior.WorkProfile.ProfileRevision || value.WorkProfile != profile.Binding() || !value.DeadlineAt.After(prior.DeadlineAt) || !profile.Budgets.DeadlineAt.Equal(value.DeadlineAt) || account.PolicyRevision <= prior.AdmissionPolicyRevision || len(prior.TerminalEvidenceIDs) == 0 {
+	if !prior.Valid() || *value.RetryOfInvocationID != prior.ID || prior.TaskID != value.TaskID || prior.Purpose != value.Purpose || value.AttemptOrdinal != prior.AttemptOrdinal+1 || value.RetryOrdinal != prior.RetryOrdinal+1 || value.ConditionDigest == prior.ConditionDigest || profile.ProfileRevision <= prior.WorkProfile.ProfileRevision || value.WorkProfile != profile.Binding() || !value.DeadlineAt.After(prior.DeadlineAt) || !profile.Budgets.DeadlineAt.Equal(value.DeadlineAt) || account.PolicyRevision <= prior.AdmissionPolicyRevision || len(prior.TerminalEvidenceIDs) == 0 {
 		return false
 	}
 	recoverable := prior.State == InvocationTimedOut ||
 		prior.State == InvocationCancelled && prior.CancellationRequestedAt != nil ||
-		(prior.State == InvocationFailed || prior.State == InvocationStartFailed) && prior.Retryable != nil && *prior.Retryable
+		prior.State == InvocationFailed || prior.State == InvocationStartFailed
 	if !recoverable {
 		return false
 	}
@@ -677,6 +673,13 @@ func validChangedConditionContinuation(value invocationAuthorizationPayload, pro
 		}
 	}
 	return true
+}
+
+func validCandidateRevalidation(value invocationAuthorizationPayload, prior WorkInvocation) bool {
+	if value.Purpose != PurposeValidation && value.Purpose != PurposeReview && value.Purpose != PurposeReplan {
+		return false
+	}
+	return value.RetryOfInvocationID != nil && *value.RetryOfInvocationID == prior.ID && value.RetryOrdinal == prior.RetryOrdinal+1 && value.AttemptOrdinal == prior.AttemptOrdinal+1 && prior.State == InvocationSucceeded && value.ConditionDigest != prior.ConditionDigest
 }
 
 func WorkInvocationFromAuthorizedEvent(event DomainEvent) (WorkInvocation, error) {

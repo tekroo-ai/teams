@@ -13,9 +13,12 @@ func validateOperatorHumanContinuityCommand(command KernelCommand, snapshot Snap
 	}
 	switch command.CommandType {
 	case "tekroo.command.system.bind-operator-role":
+		// The embedded authority-policy revision versions the operator-role
+		// domain model; command.ExpectedPolicyRevision independently selects the
+		// authorization envelope already checked by the evaluator.
 		profile, parseErr := OperatorRoleFromPayload(command.Payload)
 		expected, expectedOK := nonnegativeUint64Field(object, "expected_system_revision")
-		if parseErr != nil || !expectedOK || expected != snapshot.Revision || profile.AuthorityPolicyRevision != command.ExpectedPolicyRevision || !payloadEvidenceMatches(object, command.EvidenceRefs) || !evidenceIDsCovered(profile.RoleBundleSignatureEvidenceIDs, command.EvidenceRefs) {
+		if parseErr != nil || !expectedOK || expected != snapshot.Revision || !payloadEvidenceMatches(object, command.EvidenceRefs) || !evidenceIDsCovered(profile.RoleBundleSignatureEvidenceIDs, command.EvidenceRefs) {
 			return OutcomeRejectedConflict, reasonRevisionConflict, true
 		}
 		if !snapshot.Exists && profile.ReplacesBindingID != nil || snapshot.Exists && (snapshot.State == nil || snapshot.State.OperatorRole == nil || profile.ReplacesBindingID == nil || *profile.ReplacesBindingID != snapshot.State.OperatorRole.BindingID) {

@@ -13,7 +13,7 @@ import (
 func TestPlanTaskExecutionRefreshRebindsSameActorProcessReplacement(t *testing.T) {
 	task, profile, workspace, snapshot := taskExecutionRefreshFixture(t)
 
-	plan, err := planTaskExecutionRefresh(task, profile, workspace, snapshot)
+	plan, err := planTaskExecutionRefresh(task, profile, workspace, snapshot, taskExecutionRefreshAt())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -26,7 +26,7 @@ func TestPlanTaskExecutionRefreshRebindsSameActorProcessReplacement(t *testing.T
 	assignment.SelectedExecutionID = task.owner.Execution.ExecutionID
 	assignment.SelectedFencingEpoch = task.owner.Execution.FencingEpoch
 	snapshot.QualifiedAssignments[taskRef] = assignment
-	plan, err = planTaskExecutionRefresh(task, profile, workspace, snapshot)
+	plan, err = planTaskExecutionRefresh(task, profile, workspace, snapshot, taskExecutionRefreshAt())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,7 +38,7 @@ func TestPlanTaskExecutionRefreshRebindsSameActorProcessReplacement(t *testing.T
 	scope.Execution = task.owner.Execution
 	scope.BaselineSHA = workspace.BaselineSHA
 	snapshot.TaskOperationalScopes[taskRef] = scope
-	plan, err = planTaskExecutionRefresh(task, profile, workspace, snapshot)
+	plan, err = planTaskExecutionRefresh(task, profile, workspace, snapshot, taskExecutionRefreshAt())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,24 +52,24 @@ func TestPlanTaskExecutionRefreshRejectsActorOrWorkspaceSubstitution(t *testing.
 
 	other := *task
 	other.owner.ActorFQN = "teams::coder-2"
-	if _, err := planTaskExecutionRefresh(&other, profile, workspace, snapshot); !errors.Is(err, organization.ErrInvalidFeature) {
+	if _, err := planTaskExecutionRefresh(&other, profile, workspace, snapshot, taskExecutionRefreshAt()); !errors.Is(err, organization.ErrInvalidFeature) {
 		t.Fatalf("different FQN error = %v", err)
 	}
 
 	changedWorkspace := workspace
 	changedWorkspace.WorktreeID = "worktree-coder-2"
-	if _, err := planTaskExecutionRefresh(task, profile, changedWorkspace, snapshot); !errors.Is(err, organization.ErrInvalidFeature) {
+	if _, err := planTaskExecutionRefresh(task, profile, changedWorkspace, snapshot, taskExecutionRefreshAt()); !errors.Is(err, organization.ErrInvalidFeature) {
 		t.Fatalf("different worktree error = %v", err)
 	}
 
 	expandedWorkspace := workspace
 	expandedWorkspace.WritablePaths = []string{".", "src"}
-	if _, err := planTaskExecutionRefresh(task, profile, expandedWorkspace, snapshot); !errors.Is(err, organization.ErrInvalidFeature) {
+	if _, err := planTaskExecutionRefresh(task, profile, expandedWorkspace, snapshot, taskExecutionRefreshAt()); !errors.Is(err, organization.ErrInvalidFeature) {
 		t.Fatalf("expanded writable scope error = %v", err)
 	}
 }
 
-func TestPlanTaskExecutionRefreshRebindsDirectSuccessorWorkProfile(t *testing.T) {
+func TestPlanTaskExecutionRefreshRebindsMaintenanceSuccessorWorkProfile(t *testing.T) {
 	task, profile, workspace, snapshot := taskExecutionRefreshFixture(t)
 	taskRef := kernel.AggregateRef{Kind: kernel.AggregateTask, ID: task.plan.ID}
 	assignment := snapshot.QualifiedAssignments[taskRef]
@@ -77,7 +77,8 @@ func TestPlanTaskExecutionRefreshRebindsDirectSuccessorWorkProfile(t *testing.T)
 	assignment.SelectedFencingEpoch = task.owner.Execution.FencingEpoch
 	snapshot.QualifiedAssignments[taskRef] = assignment
 
-	predecessorID := task.profile.ProfileID
+	predecessor := task.profile.Clone()
+	predecessorID := predecessor.ProfileID
 	task.profile.ProfileID = "00000000-0000-7000-8000-000000000121"
 	task.profile.ProfileRevision++
 	task.profile.SupersedesProfileID = &predecessorID
@@ -88,8 +89,9 @@ func TestPlanTaskExecutionRefreshRebindsDirectSuccessorWorkProfile(t *testing.T)
 	}
 	task.profile.ProfileDigest = digestBytes(encoded)
 	snapshot.WorkProfiles[taskRef] = kernel.WorkProfileSnapshot{BoundEventID: "00000000-0000-7000-8000-000000000122", TaskRevision: snapshot.State.Revision, Profile: task.profile}
+	snapshot.WorkProfileHistory = map[kernel.UUIDv7]kernel.WorkRiskProfile{predecessor.ProfileID: predecessor, task.profile.ProfileID: task.profile}
 
-	plan, err := planTaskExecutionRefresh(task, profile, workspace, snapshot)
+	plan, err := planTaskExecutionRefresh(task, profile, workspace, snapshot, taskExecutionRefreshAt())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +102,7 @@ func TestPlanTaskExecutionRefreshRebindsDirectSuccessorWorkProfile(t *testing.T)
 	unrelated := assignment
 	unrelated.WorkProfile.ProfileID = "00000000-0000-7000-8000-000000000123"
 	snapshot.QualifiedAssignments[taskRef] = unrelated
-	if _, err := planTaskExecutionRefresh(task, profile, workspace, snapshot); !errors.Is(err, organization.ErrInvalidFeature) {
+	if _, err := planTaskExecutionRefresh(task, profile, workspace, snapshot, taskExecutionRefreshAt()); !errors.Is(err, organization.ErrInvalidFeature) {
 		t.Fatalf("unrelated profile error = %v", err)
 	}
 }
@@ -160,9 +162,29 @@ func TestTechnicalRetryBudgetExtensionUsesCommittedBindingAsCheckpoint(t *testin
 	}
 }
 
+func TestTaskRetryBudgetRebindRequiredAcrossLifecycleAndScope(t *testing.T) {
+	binding := kernel.TaskWorkBudgetBinding{LifecycleEpoch: 1, ScopeRevision: 1}
+	profile := kernel.WorkRiskProfile{LifecycleEpoch: 1, ScopeRevision: 1}
+	if taskRetryBudgetRebindRequired(binding, profile, false) {
+		t.Fatal("current binding unexpectedly requires rebind")
+	}
+	if !taskRetryBudgetRebindRequired(binding, profile, true) {
+		t.Fatal("capacity extension did not require rebind")
+	}
+	profile.LifecycleEpoch = 2
+	if !taskRetryBudgetRebindRequired(binding, profile, false) {
+		t.Fatal("reopened lifecycle did not require rebind")
+	}
+	profile.LifecycleEpoch = 1
+	profile.ScopeRevision = 2
+	if !taskRetryBudgetRebindRequired(binding, profile, false) {
+		t.Fatal("revised scope did not require rebind")
+	}
+}
+
 func taskExecutionRefreshFixture(t *testing.T) (*trackedTask, ProductionProfile, ProductionWorkspace, kernel.Snapshot) {
 	t.Helper()
-	now := time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC)
+	now := taskExecutionRefreshAt()
 	taskID := kernel.UUIDv7("00000000-0000-7000-8000-000000000101")
 	actor := kernel.ActorFQN("teams::coder-1")
 	oldExecution := kernel.ExecutionTuple{ExecutionID: "00000000-0000-7000-8000-000000000102", FencingEpoch: 1}
@@ -187,16 +209,15 @@ func taskExecutionRefreshFixture(t *testing.T) (*trackedTask, ProductionProfile,
 		ClassificationAuthority:   kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "principal"},
 		ClassificationEvidenceIDs: []kernel.UUIDv7{evidenceID},
 	}
-	qualification := kernel.AssignmentQualificationReceipt{
-		QualificationID: "00000000-0000-7000-8000-000000000106", QualificationDigest: repeatedDigest('6'),
-		QualificationCorpusDigest: repeatedDigest('7'), ModelProfileDigest: repeatedDigest('8'),
-		DecisionRoute: kernel.RouteBoundedExecution, QualifiedRole: "coder", Status: kernel.QualificationPass,
-		ObservedAt: now.Add(-time.Hour),
-	}
+	corpus, modelQualification := testQualificationBundle(t, repeatedDigest('8'), "coder", kernel.RouteBoundedExecution, repeatedDigest('a'), []kernel.WorkKind{kernel.WorkImplementation}, now.Add(-time.Hour))
 	productionProfile := ProductionProfile{
-		ModelProfileDigest: qualification.ModelProfileDigest, RuntimeIdentityDigest: repeatedDigest('9'),
+		ModelProfileDigest: modelQualification.ModelProfileDigest, RoleFQRN: "coder", DecisionRoute: kernel.RouteBoundedExecution, RuntimeIdentityDigest: repeatedDigest('9'),
 		ToolPolicyDigest: repeatedDigest('a'), EffectPolicyDigest: repeatedDigest('b'),
-		MaximumIterations: 0, Qualification: qualification,
+		MaximumIterations: 0, QualificationCorpus: corpus, Qualification: modelQualification,
+	}
+	qualification, qualified := productionProfile.qualificationReceipt()
+	if !qualified {
+		t.Fatal("fixture model profile is not qualified")
 	}
 	assignment := kernel.QualifiedAssignmentAuthorization{
 		AssignmentID: "00000000-0000-7000-8000-000000000107", TaskID: taskID, ExpectedTaskRevision: 3,
@@ -226,7 +247,7 @@ func taskExecutionRefreshFixture(t *testing.T) (*trackedTask, ProductionProfile,
 		Ownership: kernel.Ownership{OwnerFQN: &actor, OwnershipVersion: 1},
 	}
 	tracked := &trackedTask{
-		plan:     organization.PlannedTask{ID: taskID, Owner: actor, ModelProfile: productionProfile.ModelProfileDigest},
+		plan:     organization.PlannedTask{ID: taskID, Owner: actor, ModelProfile: productionProfile.ModelProfileDigest, DecisionRoute: kernel.RouteBoundedExecution},
 		revision: state.Revision, last: "00000000-0000-7000-8000-000000000110", profile: workProfile,
 		owner: organization.RoleInstanceState{ActorFQN: actor, Execution: newExecution, WorkspaceID: workspace.WorkspaceID, ModelProfile: productionProfile.ModelProfileDigest},
 	}
@@ -239,4 +260,8 @@ func taskExecutionRefreshFixture(t *testing.T) (*trackedTask, ProductionProfile,
 		QualifiedAssignments:  map[kernel.AggregateRef]kernel.QualifiedAssignmentAuthorization{taskRef: assignment},
 		TaskOperationalScopes: map[kernel.AggregateRef]kernel.TaskOperationalScope{taskRef: scope},
 	}
+}
+
+func taskExecutionRefreshAt() time.Time {
+	return time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC)
 }

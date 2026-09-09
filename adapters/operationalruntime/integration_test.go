@@ -28,6 +28,7 @@ import (
 	"github.com/tekroo-ai/teams/application"
 	"github.com/tekroo-ai/teams/contract"
 	"github.com/tekroo-ai/teams/kernel"
+	"github.com/tekroo-ai/teams/organization"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	driver "go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
@@ -417,21 +418,28 @@ func integratedPolicy() kernel.AuthorizationPolicy {
 
 type integratedConversation struct {
 	workspace, requestDigest, prompt string
+	agent                            any
 	response                         string
 	created, submitted, finished     bool
 	interrupted                      bool
+	createdAt                        time.Time
 	readyAt                          time.Time
 }
 
 type integratedOpenHands struct {
-	t                  *testing.T
-	mu                 sync.Mutex
-	conversations      map[string]*integratedConversation
-	delays             map[string]time.Duration
-	active             int
-	peakActive         int
-	invalidValidations int
-	failValidations    int
+	t                                     *testing.T
+	mu                                    sync.Mutex
+	conversations                         map[string]*integratedConversation
+	delays                                map[string]time.Duration
+	commitResults                         bool
+	active                                int
+	peakActive                            int
+	invalidValidations                    int
+	failValidations                       int
+	failArchitectureTaskReviews           int
+	invalidArchitectureTaskReviews        int
+	failArchitectureIntegrationReviews    int
+	invalidArchitectureIntegrationReviews int
 }
 
 func (server *integratedOpenHands) serveHTTP(writer http.ResponseWriter, request *http.Request) {
@@ -452,7 +460,7 @@ func (server *integratedOpenHands) serveHTTP(writer http.ResponseWriter, request
 		conversationID, _ := payload["conversation_id"].(string)
 		metadata, _ := payload["observability_metadata"].(map[string]any)
 		workspace, _ := payload["workspace"].(map[string]any)
-		server.conversations[conversationID] = &integratedConversation{created: true, workspace: fmt.Sprint(workspace["working_dir"]), requestDigest: fmt.Sprint(metadata["tekroo_request_digest"])}
+		server.conversations[conversationID] = &integratedConversation{created: true, workspace: fmt.Sprint(workspace["working_dir"]), requestDigest: fmt.Sprint(metadata["tekroo_request_digest"]), agent: payload["agent_settings"], createdAt: time.Now().UTC()}
 		writer.WriteHeader(http.StatusCreated)
 		writeIntegratedJSON(writer, map[string]any{"id": conversationID})
 		return
@@ -479,7 +487,7 @@ func (server *integratedOpenHands) serveHTTP(writer http.ResponseWriter, request
 		if conversation.interrupted {
 			status = "paused"
 		}
-		writeIntegratedJSON(writer, map[string]any{"id": conversationID, "execution_status": status, "created_at": time.Now().UTC(), "updated_at": time.Now().UTC(), "workspace": map[string]any{"kind": "LocalWorkspace", "working_dir": conversation.workspace}, "tags": map[string]string{"tekrooinvocation": conversationID, "tekroorequest": conversation.requestDigest}})
+		writeIntegratedJSON(writer, map[string]any{"id": conversationID, "execution_status": status, "created_at": conversation.createdAt, "updated_at": conversation.createdAt, "workspace": map[string]any{"kind": "LocalWorkspace", "working_dir": conversation.workspace}, "agent": conversation.agent, "tags": map[string]string{"tekrooinvocation": conversationID, "tekroorequest": conversation.requestDigest}})
 		return
 	}
 	if request.Method == http.MethodPost && len(parts) == 4 && parts[3] == "events" {
@@ -496,18 +504,24 @@ func (server *integratedOpenHands) serveHTTP(writer http.ResponseWriter, request
 			writer.WriteHeader(http.StatusBadRequest)
 			return
 		}
+		if conversation.submitted && !conversation.finished && !conversation.interrupted {
+			server.t.Error("concurrent event submission")
+			writer.WriteHeader(http.StatusConflict)
+			return
+		}
 		conversation.prompt = payload.Content[0].Text
-		if !conversation.submitted {
-			conversation.submitted = true
-			delay := 50 * time.Millisecond
-			if configured := server.delays[conversationID]; configured > 0 {
-				delay = configured
-			}
-			conversation.readyAt = time.Now().Add(delay)
-			server.active++
-			if server.active > server.peakActive {
-				server.peakActive = server.active
-			}
+		conversation.response = ""
+		conversation.finished = false
+		conversation.interrupted = false
+		conversation.submitted = true
+		delay := 50 * time.Millisecond
+		if configured := server.delays[conversationID]; configured > 0 {
+			delay = configured
+		}
+		conversation.readyAt = time.Now().Add(delay)
+		server.active++
+		if server.active > server.peakActive {
+			server.peakActive = server.active
 		}
 		writeIntegratedJSON(writer, map[string]any{"accepted": true})
 		return
@@ -525,7 +539,7 @@ func (server *integratedOpenHands) serveHTTP(writer http.ResponseWriter, request
 		items := []any{}
 		if conversation.submitted {
 			items = []any{
-				map[string]any{"id": "user-" + conversationID, "kind": "MessageEvent", "source": "user", "timestamp": time.Now().UTC(), "llm_message": map[string]any{"content": []map[string]any{{"type": "text", "text": conversation.prompt}}}},
+				map[string]any{"id": "user-" + conversationID, "kind": "MessageEvent", "source": "user", "timestamp": conversation.createdAt, "llm_message": map[string]any{"content": []map[string]any{{"type": "text", "text": conversation.prompt}}}},
 			}
 			if conversation.finished {
 				agentText := "completed authorized task"
@@ -542,22 +556,126 @@ func (server *integratedOpenHands) serveHTTP(writer http.ResponseWriter, request
 							server.failValidations--
 							outcome, reason = "FAIL", "repair is required"
 						}
-						agentText = "completed independent validation\n" + application.ValidationResultMarker + "\n{\"schema_version\":\"1.0.0\",\"outcome\":\"" + outcome + "\",\"reasons\":[\"" + reason + "\"]}"
+						result := map[string]any{"schema_version": "1.0.0", "outcome": outcome, "reasons": []string{reason}}
+						var envelope struct {
+							CandidateResultRequirement struct {
+								CandidateID            kernel.UUIDv7 `json:"candidate_id"`
+								CandidateReceiptSHA256 kernel.Digest `json:"candidate_receipt_sha256"`
+							} `json:"candidate_result_requirement"`
+						}
+						if json.Unmarshal([]byte(conversation.prompt), &envelope) == nil && envelope.CandidateResultRequirement.CandidateID.Valid() && envelope.CandidateResultRequirement.CandidateReceiptSHA256.Valid() {
+							result["candidate_id"] = envelope.CandidateResultRequirement.CandidateID
+							result["candidate_receipt_sha256"] = envelope.CandidateResultRequirement.CandidateReceiptSHA256
+						}
+						resultBytes, _ := json.Marshal(result)
+						agentText = "completed independent validation\n" + application.ValidationResultMarker + "\n" + string(resultBytes)
 					}
 				} else if brief.Purpose == kernel.PurposeRepair {
 					agentText = "completed bounded repair for " + string(brief.InvocationID)
 				} else if brief.ResultProtocol != nil && brief.ResultProtocol.Marker == application.OrganizationalResultMarker {
-					switch brief.Task.Title {
-					case "Refine feature request":
-						agentText = application.OrganizationalResultMarker + "\n{\"schema_version\":\"1.0.0\",\"result_type\":\"FEATURE_REFINEMENT\",\"acceptance_criteria\":[\"the requested behavior works\"],\"clarification_questions\":[],\"priority\":\"HIGH\"}"
-					case "Specify feature stories":
-						agentText = application.OrganizationalResultMarker + "\n{\"schema_version\":\"1.0.0\",\"result_type\":\"FEATURE_SPECIFICATION\",\"stories\":[{\"title\":\"Deliver behavior\",\"description\":\"Implement and verify the requested behavior.\",\"acceptance_criteria\":[\"the requested behavior works\"],\"priority\":\"HIGH\"}],\"design_constraints\":[\"preserve current interfaces\"]}"
-					case "Design executable feature DAG":
-						agentText = application.OrganizationalResultMarker + "\n{\"schema_version\":\"1.0.0\",\"result_type\":\"FEATURE_PLAN\",\"architecture\":\"One implementation followed by independent validation.\",\"design_decisions\":[\"use the existing interface\"],\"assumptions\":[],\"tasks\":[{\"story_index\":0,\"title\":\"Implement behavior\",\"description\":\"Implement the accepted behavior.\",\"acceptance_criteria\":[\"the requested behavior works\"],\"depends_on\":[],\"validates\":[],\"role\":\"coder\",\"purpose\":\"IMPLEMENTATION\",\"complexity\":3,\"risk\":\"LOW\",\"critical_path\":true,\"attempt_limit\":2,\"review_round_limit\":2}]}"
+					if strings.HasPrefix(brief.Task.Title, "Review planned task ") {
+						if server.invalidArchitectureTaskReviews > 0 {
+							server.invalidArchitectureTaskReviews--
+							agentText = application.OrganizationalResultMarker + "\n{\"schema_version\":\"1.0.0\",\"result_type\":\"FEATURE_PLAN_TASK_REVIEW\",\"outcome\":\"PASS\"}"
+						} else {
+							planDigest, taskIndex, taskDigest, dependencyIndexes, criterionCount := integratedArchitectureTaskReviewIdentity(brief.Task.Description)
+							outcome, reason := "PASS", "the exact planned task is implementable"
+							descriptionOutcome := "SUPPORTED"
+							descriptionRequiresTaskChange := false
+							if server.failArchitectureTaskReviews > 0 {
+								server.failArchitectureTaskReviews--
+								outcome, reason = "FAIL", "a prescribed task-local state transition is not supported"
+								descriptionOutcome = "UNSUPPORTED"
+								descriptionRequiresTaskChange = true
+							}
+							criterionChecks := make([]map[string]any, criterionCount)
+							for index := range criterionChecks {
+								criterionChecks[index] = map[string]any{
+									"criterion_index": index, "outcome": "SUPPORTED",
+									"requires_task_change": false, "reasons": []string{"the criterion is supported"},
+									"evidence": []string{"organization/feature.go"},
+								}
+							}
+							resultBytes, _ := json.Marshal(map[string]any{
+								"schema_version": "1.0.0", "result_type": "FEATURE_PLAN_TASK_REVIEW", "outcome": outcome,
+								"reviewed_plan_sha256": planDigest, "reviewed_task_index": taskIndex,
+								"reviewed_task_sha256": taskDigest, "reviewed_dependency_indexes": dependencyIndexes,
+								"description_outcome": descriptionOutcome, "description_requires_task_change": descriptionRequiresTaskChange,
+								"acceptance_criterion_checks": criterionChecks, "verified_operations": []string{"the prescribed implementation operation"},
+								"unverified_prescriptions": []string{}, "reasons": []string{reason}, "evidence": []string{"organization/feature.go"},
+							})
+							agentText = application.OrganizationalResultMarker + "\n" + string(resultBytes)
+						}
+					} else {
+						switch brief.Task.Title {
+						case "Refine feature request":
+							agentText = application.OrganizationalResultMarker + "\n{\"schema_version\":\"1.0.0\",\"result_type\":\"FEATURE_REFINEMENT\",\"acceptance_criteria_disposition\":\"PRESERVE_SUBMITTED\",\"clarification_questions\":[],\"priority\":\"HIGH\"}"
+						case "Specify feature stories":
+							criteria := integratedSubmittedCriteria(brief.Task.Description)
+							resultBytes, _ := json.Marshal(map[string]any{
+								"schema_version": "1.0.0",
+								"result_type":    "FEATURE_SPECIFICATION",
+								"stories": []map[string]any{{
+									"title": "Deliver behavior", "description": "Implement and verify the requested behavior.",
+									"acceptance_criteria": criteria, "priority": "HIGH",
+								}},
+								"design_constraints": []string{"preserve current interfaces"},
+							})
+							agentText = application.OrganizationalResultMarker + "\n" + string(resultBytes)
+						case "Design executable feature DAG":
+							if strings.Contains(brief.Task.Description, `"request_title":"Review every planned task"`) {
+								agentText = application.OrganizationalResultMarker + "\n{\"schema_version\":\"1.0.0\",\"result_type\":\"FEATURE_PLAN\",\"architecture\":\"Two dependent implementation tasks followed by independent validation.\",\"design_decisions\":[\"separate the state owner from its consumer\"],\"assumptions\":[],\"tasks\":[{\"story_index\":0,\"title\":\"Implement state owner\",\"description\":\"Implement the accepted state ownership boundary.\",\"acceptance_criteria\":[\"the state owner enforces its invariant\"],\"depends_on\":[],\"validates\":[],\"purpose\":\"IMPLEMENTATION\",\"complexity\":3,\"risk\":\"LOW\",\"critical_path\":true,\"attempt_limit\":2,\"review_round_limit\":2},{\"story_index\":0,\"title\":\"Implement state consumer\",\"description\":\"Consume the accepted state ownership boundary.\",\"acceptance_criteria\":[\"the consumer uses the owning abstraction\"],\"depends_on\":[0],\"validates\":[],\"purpose\":\"IMPLEMENTATION\",\"complexity\":3,\"risk\":\"LOW\",\"critical_path\":true,\"attempt_limit\":2,\"review_round_limit\":2}]}"
+							} else {
+								agentText = application.OrganizationalResultMarker + "\n{\"schema_version\":\"1.0.0\",\"result_type\":\"FEATURE_PLAN\",\"architecture\":\"One implementation followed by independent validation.\",\"design_decisions\":[\"use the existing interface\"],\"assumptions\":[],\"tasks\":[{\"story_index\":0,\"title\":\"Implement behavior\",\"description\":\"Implement the accepted behavior.\",\"acceptance_criteria\":[\"the requested behavior works\"],\"covers\":[0],\"depends_on\":[],\"validates\":[],\"role\":\"coder\",\"purpose\":\"IMPLEMENTATION\",\"complexity\":3,\"risk\":\"LOW\",\"critical_path\":true,\"attempt_limit\":2,\"review_round_limit\":2}]}"
+							}
+						case "Review complete feature plan":
+							if server.invalidArchitectureIntegrationReviews > 0 {
+								server.invalidArchitectureIntegrationReviews--
+								agentText = application.OrganizationalResultMarker + "\n{\"schema_version\":\"1.0.0\",\"result_type\":\"FEATURE_PLAN_REVIEW\",\"outcome\":\"PASS\"}"
+								break
+							}
+							outcome, reason := "PASS", "the proposed operations are supported by the inspected implementation"
+							findings := []map[string]any{}
+							if server.failArchitectureIntegrationReviews > 0 {
+								server.failArchitectureIntegrationReviews--
+								outcome, reason = "FAIL", "a prescribed state transition is not supported by the inspected implementation"
+								findings = append(findings, map[string]any{"subject": "TASK_DESCRIPTION", "task_index": 0, "reasons": []string{reason}, "evidence": []string{"organization/feature.go"}})
+							}
+							taskCount := integratedArchitecturePlanTaskCount(brief.Task.Description)
+							taskCriterionCounts := make([]int, taskCount)
+							for index := range taskCriterionCounts {
+								taskCriterionCounts[index] = integratedArchitecturePlanCriterionCount(brief.Task.Description, index)
+							}
+							storyCount := integratedArchitecturePlanStoryCount(brief.Task.Description)
+							storyCriterionCounts := make([]int, storyCount)
+							for index := range storyCriterionCounts {
+								storyCriterionCounts[index] = integratedArchitectureStoryCriterionCount(brief.Task.Description, index)
+							}
+							resultBytes, _ := json.Marshal(map[string]any{
+								"schema_version": "1.0.0", "result_type": "FEATURE_PLAN_REVIEW", "outcome": outcome,
+								"reviewed_plan_sha256": integratedArchitecturePlanDigest(brief.Task.Description),
+								"coverage": map[string]any{
+									"story_count": storyCount, "story_acceptance_criterion_counts": storyCriterionCounts,
+									"task_count": taskCount, "task_acceptance_criterion_counts": taskCriterionCounts,
+									"plan_check_subjects": requiredArchitecturePlanCheckSubjects,
+								},
+								"findings": findings, "unverified_claims": []string{},
+								"reasons": []string{reason}, "evidence": []string{"organization/feature.go"},
+							})
+							agentText = application.OrganizationalResultMarker + "\n" + string(resultBytes)
+						}
 					}
 				}
+				if brief.Task.Title == "Design executable feature DAG" || brief.Task.Title == "Review complete feature plan" || strings.HasPrefix(brief.Task.Title, "Review planned task ") {
+					items = append(items,
+						map[string]any{"id": "agents-view-" + conversationID, "kind": "ActionEvent", "source": "agent", "tool_name": "repository_view", "tool_call_id": "agents-view", "action": map[string]any{"kind": "RepositoryViewAction", "path": "AGENTS.md"}},
+						map[string]any{"id": "agents-view-result-" + conversationID, "kind": "ObservationEvent", "source": "environment", "tool_name": "repository_view", "tool_call_id": "agents-view", "observation": map[string]any{"kind": "FileEditorObservation", "content": []map[string]any{{"type": "text", "text": "project instructions"}}, "is_error": false}},
+						map[string]any{"id": "source-view-" + conversationID, "kind": "ActionEvent", "source": "agent", "tool_name": "repository_view", "tool_call_id": "source-view", "action": map[string]any{"kind": "RepositoryViewAction", "path": "organization/feature.go"}},
+						map[string]any{"id": "source-view-result-" + conversationID, "kind": "ObservationEvent", "source": "environment", "tool_name": "repository_view", "tool_call_id": "source-view", "observation": map[string]any{"kind": "FileEditorObservation", "content": []map[string]any{{"type": "text", "text": "package organization"}}, "is_error": false}},
+					)
+				}
 				conversation.response = agentText
-				items = append(items, map[string]any{"id": "agent-" + conversationID, "kind": "MessageEvent", "source": "agent", "timestamp": time.Now().UTC(), "llm_message": map[string]any{"content": []map[string]any{{"type": "text", "text": agentText}}}})
+				items = append(items, map[string]any{"id": "agent-" + conversationID, "kind": "MessageEvent", "source": "agent", "timestamp": conversation.createdAt.Add(time.Millisecond), "llm_message": map[string]any{"content": []map[string]any{{"type": "text", "text": agentText}}}})
 			}
 		}
 		writeIntegratedJSON(writer, map[string]any{"items": items, "next_page_id": nil})
@@ -566,11 +684,174 @@ func (server *integratedOpenHands) serveHTTP(writer http.ResponseWriter, request
 	writer.WriteHeader(http.StatusNotFound)
 }
 
+func integratedArchitecturePlanDigest(description string) kernel.Digest {
+	const marker = "AUTHORITATIVE_FEATURE_PLAN_REVIEW_STATE_JSON:\n"
+	index := strings.LastIndex(description, marker)
+	if index < 0 {
+		return ""
+	}
+	var state struct {
+		CandidateOutputSHA256 kernel.Digest `json:"candidate_output_sha256"`
+	}
+	if json.Unmarshal([]byte(description[index+len(marker):]), &state) != nil {
+		return ""
+	}
+	return state.CandidateOutputSHA256
+}
+
+func integratedArchitecturePlanTaskCount(description string) int {
+	const marker = "AUTHORITATIVE_FEATURE_PLAN_REVIEW_STATE_JSON:\n"
+	index := strings.LastIndex(description, marker)
+	if index < 0 {
+		return 0
+	}
+	var state struct {
+		Candidate struct {
+			Tasks []json.RawMessage `json:"tasks"`
+		} `json:"candidate"`
+	}
+	if json.Unmarshal([]byte(description[index+len(marker):]), &state) != nil {
+		return 0
+	}
+	return len(state.Candidate.Tasks)
+}
+
+func integratedArchitecturePlanStoryCount(description string) int {
+	const marker = "AUTHORITATIVE_FEATURE_PLAN_REVIEW_STATE_JSON:\n"
+	index := strings.LastIndex(description, marker)
+	if index < 0 {
+		return 0
+	}
+	var state struct {
+		Specification struct {
+			Stories []json.RawMessage `json:"stories"`
+		} `json:"specification"`
+	}
+	if json.Unmarshal([]byte(description[index+len(marker):]), &state) != nil {
+		return 0
+	}
+	return len(state.Specification.Stories)
+}
+
+func integratedArchitectureStoryCriterionCount(description string, storyIndex int) int {
+	const marker = "AUTHORITATIVE_FEATURE_PLAN_REVIEW_STATE_JSON:\n"
+	index := strings.LastIndex(description, marker)
+	if index < 0 {
+		return 0
+	}
+	var state struct {
+		Specification struct {
+			Stories []struct {
+				AcceptanceCriteria []string `json:"acceptance_criteria"`
+			} `json:"stories"`
+		} `json:"specification"`
+	}
+	if json.Unmarshal([]byte(description[index+len(marker):]), &state) != nil || storyIndex < 0 || storyIndex >= len(state.Specification.Stories) {
+		return 0
+	}
+	return len(state.Specification.Stories[storyIndex].AcceptanceCriteria)
+}
+
+func integratedArchitecturePlanCriterionCount(description string, taskIndex int) int {
+	const marker = "AUTHORITATIVE_FEATURE_PLAN_REVIEW_STATE_JSON:\n"
+	index := strings.LastIndex(description, marker)
+	if index < 0 {
+		return 0
+	}
+	var state struct {
+		Candidate struct {
+			Tasks []struct {
+				AcceptanceCriteria []string `json:"acceptance_criteria"`
+			} `json:"tasks"`
+		} `json:"candidate"`
+	}
+	if json.Unmarshal([]byte(description[index+len(marker):]), &state) != nil || taskIndex < 0 || taskIndex >= len(state.Candidate.Tasks) {
+		return 0
+	}
+	return len(state.Candidate.Tasks[taskIndex].AcceptanceCriteria)
+}
+
+func integratedArchitectureTaskReviewIdentity(description string) (kernel.Digest, uint32, kernel.Digest, []uint32, int) {
+	const marker = "AUTHORITATIVE_FEATURE_PLAN_TASK_REVIEW_STATE_JSON:\n"
+	index := strings.LastIndex(description, marker)
+	if index < 0 {
+		return "", 0, "", nil, 0
+	}
+	var state struct {
+		PlanDigest          kernel.Digest `json:"reviewed_plan_sha256"`
+		TaskIndex           uint32        `json:"reviewed_task_index"`
+		TaskDigest          kernel.Digest `json:"reviewed_task_sha256"`
+		DependencyContracts []struct {
+			TaskIndex uint32 `json:"task_index"`
+		} `json:"dependency_contracts"`
+		Task struct {
+			AcceptanceCriteria []string `json:"acceptance_criteria"`
+		} `json:"task"`
+	}
+	if json.Unmarshal([]byte(description[index+len(marker):]), &state) != nil {
+		return "", 0, "", nil, 0
+	}
+	dependencyIndexes := make([]uint32, len(state.DependencyContracts))
+	for index := range state.DependencyContracts {
+		dependencyIndexes[index] = state.DependencyContracts[index].TaskIndex
+	}
+	return state.PlanDigest, state.TaskIndex, state.TaskDigest, dependencyIndexes, len(state.Task.AcceptanceCriteria)
+}
+
+func integratedSubmittedCriteria(description string) []string {
+	const marker = "AUTHORITATIVE_FEATURE_STATE_JSON:\n"
+	index := strings.LastIndex(description, marker)
+	if index < 0 {
+		return nil
+	}
+	var state struct {
+		Input organization.FeatureRequestInput `json:"input"`
+	}
+	if json.Unmarshal([]byte(description[index+len(marker):]), &state) != nil {
+		return nil
+	}
+	return append([]string(nil), state.Input.AcceptanceCriteria...)
+}
+
 func (server *integratedOpenHands) refresh(conversation *integratedConversation) {
 	if conversation.submitted && !conversation.finished && !conversation.interrupted && !time.Now().Before(conversation.readyAt) {
+		if server.commitResults {
+			if err := commitIntegratedResult(conversation.workspace, conversationIDFromPrompt(conversation.prompt)); err != nil {
+				server.t.Errorf("commit integrated OpenHands result: %v", err)
+				conversation.interrupted = true
+				server.active--
+				return
+			}
+		}
 		conversation.finished = true
 		server.active--
 	}
+}
+
+func conversationIDFromPrompt(prompt string) string {
+	var brief application.ExecutionBrief
+	if json.Unmarshal([]byte(prompt), &brief) != nil {
+		return "invalid-invocation"
+	}
+	return string(brief.InvocationID)
+}
+
+func commitIntegratedResult(workspace, invocationID string) error {
+	path := filepath.Join(workspace, "src", "result-"+invocationID+".txt")
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return err
+	}
+	if err := os.WriteFile(path, []byte("completed "+invocationID+"\n"), 0o600); err != nil {
+		return err
+	}
+	for _, arguments := range [][]string{{"add", filepath.ToSlash(filepath.Join("src", filepath.Base(path)))}, {"commit", "-m", "Complete integrated task " + invocationID}} {
+		command := exec.Command("git", arguments...)
+		command.Dir = workspace
+		if output, err := command.CombinedOutput(); err != nil {
+			return fmt.Errorf("git %s: %w: %s", arguments[0], err, output)
+		}
+	}
+	return nil
 }
 
 func (server *integratedOpenHands) assertAuthorizedPrompts(t *testing.T, fixtures ...*integratedFixture) {

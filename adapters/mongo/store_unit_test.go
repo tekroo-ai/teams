@@ -21,6 +21,44 @@ func TestReleasePlanKeyIsStable(t *testing.T) {
 	}
 }
 
+func TestAuthorizationPolicySuccessorAllowsOnlyMonotonicCommandExpansion(t *testing.T) {
+	prior := kernel.AuthorizationPolicy{
+		PolicyDigest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+		Revision:     3,
+		Grants: []kernel.AuthorityGrant{{
+			GrantDigest: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+			Grantee:     kernel.PrincipalRef{Kind: kernel.PrincipalPolicy, ID: "teams-admission-policy"},
+			Scope:       kernel.AuthorityScope{CommandTypes: []string{"open"}, TargetKinds: []kernel.AggregateKind{kernel.AggregateCompletionReview}, CanReadTarget: true},
+		}},
+	}
+	next := prior
+	next.PolicyDigest = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+	next.Revision = 4
+	next.Grants = append([]kernel.AuthorityGrant(nil), prior.Grants...)
+	next.Grants[0].Scope.CommandTypes = []string{"open", "record-timeout"}
+	if !authorizationPolicySuccessor(prior, next) {
+		t.Fatal("monotonic command expansion was rejected")
+	}
+
+	removed := next
+	removed.Grants = append([]kernel.AuthorityGrant(nil), next.Grants...)
+	removed.Grants[0].Scope.CommandTypes = []string{"record-timeout"}
+	if authorizationPolicySuccessor(prior, removed) {
+		t.Fatal("policy successor removed an existing command")
+	}
+	widenedTarget := next
+	widenedTarget.Grants = append([]kernel.AuthorityGrant(nil), next.Grants...)
+	widenedTarget.Grants[0].Scope.TargetKinds = []kernel.AggregateKind{kernel.AggregateCompletionReview, kernel.AggregateTask}
+	if authorizationPolicySuccessor(prior, widenedTarget) {
+		t.Fatal("policy successor widened target kinds")
+	}
+	skippedRevision := next
+	skippedRevision.Revision = 5
+	if authorizationPolicySuccessor(prior, skippedRevision) {
+		t.Fatal("policy successor skipped a revision")
+	}
+}
+
 func TestOperatorHumanAndContinuityStateBSONRoundTrip(t *testing.T) {
 	validFrom := time.Date(2026, time.August, 13, 0, 0, 0, 0, time.UTC)
 	operator := kernel.OperatorRoleProfile{BindingID: "00000000-0000-7000-8000-000000000901", RoleID: "operator", OperatorActorFQN: "teams::operator-1", RoleBundleVersion: "1.0.0", RoleBundleDigest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", RoleDefinitionDigest: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", CapabilityIDs: []string{"coordinate"}, HumanSelectionPolicyRevision: 1, HumanSelectionPolicyDigest: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", AuthorityPolicyRevision: 1, AuthorityPolicyDigest: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"}

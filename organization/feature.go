@@ -92,27 +92,28 @@ func (input FeatureRequestInput) Validate() error {
 }
 
 type FeatureRequest struct {
-	SchemaVersion     string                `json:"schema_version"`
-	ID                kernel.UUIDv7         `json:"id"`
-	Revision          uint64                `json:"revision"`
-	SubmittedBy       kernel.PrincipalRef   `json:"submitted_by"`
-	Input             FeatureRequestInput   `json:"input"`
-	Status            FeatureStatus         `json:"status"`
-	OperatorActor     kernel.ActorFQN       `json:"operator_actor"`
-	ProductOwnerActor kernel.ActorFQN       `json:"product_owner_actor"`
-	InitialMessageID  kernel.UUIDv7         `json:"initial_message_id"`
-	BudgetAccountID   kernel.UUIDv7         `json:"budget_account_id"`
-	LifecycleEpoch    uint64                `json:"lifecycle_epoch"`
-	ScopeRevision     uint64                `json:"scope_revision"`
-	CreatedAt         time.Time             `json:"created_at"`
-	UpdatedAt         time.Time             `json:"updated_at"`
-	LastMessageID     kernel.UUIDv7         `json:"last_message_id"`
-	LastStepID        kernel.UUIDv7         `json:"last_step_id"`
-	LastHop           uint32                `json:"last_hop"`
-	Refinement        *FeatureRefinement    `json:"refinement,omitempty"`
-	Specification     *FeatureSpecification `json:"specification,omitempty"`
-	Plan              *FeaturePlan          `json:"plan,omitempty"`
-	Acceptance        *FeatureAcceptance    `json:"acceptance,omitempty"`
+	SchemaVersion     string                   `json:"schema_version"`
+	ID                kernel.UUIDv7            `json:"id"`
+	Revision          uint64                   `json:"revision"`
+	SubmittedBy       kernel.PrincipalRef      `json:"submitted_by"`
+	Input             FeatureRequestInput      `json:"input"`
+	Status            FeatureStatus            `json:"status"`
+	OperatorActor     kernel.ActorFQN          `json:"operator_actor"`
+	ProductOwnerActor kernel.ActorFQN          `json:"product_owner_actor"`
+	InitialMessageID  kernel.UUIDv7            `json:"initial_message_id"`
+	BudgetAccountID   kernel.UUIDv7            `json:"budget_account_id"`
+	LifecycleEpoch    uint64                   `json:"lifecycle_epoch"`
+	ScopeRevision     uint64                   `json:"scope_revision"`
+	CreatedAt         time.Time                `json:"created_at"`
+	UpdatedAt         time.Time                `json:"updated_at"`
+	LastMessageID     kernel.UUIDv7            `json:"last_message_id"`
+	LastStepID        kernel.UUIDv7            `json:"last_step_id"`
+	LastHop           uint32                   `json:"last_hop"`
+	Refinement        *FeatureRefinement       `json:"refinement,omitempty"`
+	Specification     *FeatureSpecification    `json:"specification,omitempty"`
+	Plan              *FeaturePlan             `json:"plan,omitempty"`
+	PlanSupersession  *FeaturePlanSupersession `json:"plan_supersession,omitempty"`
+	Acceptance        *FeatureAcceptance       `json:"acceptance,omitempty"`
 }
 
 func (feature FeatureRequest) Validate() error {
@@ -120,6 +121,15 @@ func (feature FeatureRequest) Validate() error {
 		return ErrInvalidFeature
 	}
 	if feature.Plan != nil && feature.Plan.Validate(feature) != nil {
+		return ErrInvalidFeature
+	}
+	if feature.PlanSupersession != nil && feature.PlanSupersession.Validate(feature) != nil {
+		return ErrInvalidFeature
+	}
+	if feature.Status == FeatureSpecified && feature.Plan != nil && feature.PlanSupersession == nil {
+		return ErrInvalidFeature
+	}
+	if feature.PlanSupersession != nil && feature.Status != FeatureSpecified {
 		return ErrInvalidFeature
 	}
 	if feature.Refinement != nil && feature.Refinement.Validate(feature) != nil {
@@ -130,6 +140,39 @@ func (feature FeatureRequest) Validate() error {
 	}
 	if feature.Acceptance != nil && feature.Acceptance.Validate(feature) != nil {
 		return ErrInvalidFeature
+	}
+	return nil
+}
+
+// FeaturePlanSupersession records an operator-authorized correction of an
+// already materialized plan. The superseded plan remains on the feature while
+// the replacement architecture round runs, preserving its exact projection
+// and the immutable task/evidence history that was derived from it.
+type FeaturePlanSupersession struct {
+	PlanVersion       uint64               `json:"plan_version"`
+	PlanDigest        kernel.Digest        `json:"plan_digest"`
+	ArchitectureRound uint32               `json:"architecture_round"`
+	RequestedBy       kernel.PrincipalRef  `json:"requested_by"`
+	Reason            string               `json:"reason"`
+	EvidenceRefs      []kernel.EvidenceRef `json:"evidence_refs"`
+	DeadlineAt        time.Time            `json:"deadline_at"`
+	RequestedAt       time.Time            `json:"requested_at"`
+	IdempotencyKey    string               `json:"idempotency_key"`
+}
+
+func (supersession FeaturePlanSupersession) Validate(feature FeatureRequest) error {
+	if feature.Plan == nil || supersession.PlanVersion == 0 || supersession.PlanVersion != feature.Plan.Version || !supersession.PlanDigest.Valid() || supersession.ArchitectureRound == 0 || supersession.RequestedBy.Kind != kernel.PrincipalHuman || !supersession.RequestedBy.Valid() || supersession.Reason == "" || len(supersession.Reason) > 4096 || len(supersession.EvidenceRefs) == 0 || len(supersession.EvidenceRefs) > 64 || supersession.DeadlineAt.IsZero() || !supersession.DeadlineAt.After(supersession.RequestedAt) || supersession.RequestedAt.Before(feature.CreatedAt) || supersession.IdempotencyKey == "" || len(supersession.IdempotencyKey) > 256 {
+		return ErrInvalidFeature
+	}
+	seen := make(map[kernel.UUIDv7]struct{}, len(supersession.EvidenceRefs))
+	for _, evidence := range supersession.EvidenceRefs {
+		if !evidence.EvidenceID.Valid() || !evidence.SHA256.Valid() {
+			return ErrInvalidFeature
+		}
+		if _, duplicate := seen[evidence.EvidenceID]; duplicate {
+			return ErrInvalidFeature
+		}
+		seen[evidence.EvidenceID] = struct{}{}
 	}
 	return nil
 }

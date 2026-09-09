@@ -18,9 +18,185 @@ import (
 
 	"github.com/tekroo-ai/teams/adapters/fake"
 	"github.com/tekroo-ai/teams/adapters/mongo"
+	"github.com/tekroo-ai/teams/adapters/openhands"
+	"github.com/tekroo-ai/teams/application"
 	"github.com/tekroo-ai/teams/kernel"
 	"github.com/tekroo-ai/teams/organization"
 )
+
+func TestProductionProfileSeparatesConfigurationFromQualification(t *testing.T) {
+	path, config := writeProductionFixture(t)
+	config.Profiles[0].Qualification = nil
+	config.Profiles[0].QualificationCorpus = nil
+	writeJSON(t, path, config, 0o600)
+
+	loaded, err := LoadProductionConfig(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(loaded.Profiles) != 1 || loaded.Profiles[0].Qualification != nil {
+		t.Fatalf("loaded profiles = %#v", loaded.Profiles)
+	}
+	if loaded.Profiles[0].qualifiedFor(kernel.RouteBoundedExecution, kernel.WorkImplementation, time.Now().UTC()) {
+		t.Fatal("unqualified profile became eligible for execution")
+	}
+
+	task := &trackedTask{plan: organization.PlannedTask{DecisionRoute: kernel.RouteBoundedExecution}}
+	err = (&ProductionService{}).activateTask(context.Background(), organization.FeatureRequest{}, task, loaded.Profiles[0], ProductionWorkspace{}, 0, nil, nil, "", nil)
+	if !errors.Is(err, organization.ErrInvalidFeature) {
+		t.Fatalf("unqualified activation error = %v", err)
+	}
+}
+
+func TestFeatureRecoveryOperationContextUsesPlanningDeadline(t *testing.T) {
+	service := &ProductionService{recoveryTimeout: 5 * time.Second, planningDeadline: 20 * time.Minute}
+	ctx, cancel := service.featureRecoveryOperationContext(context.Background())
+	defer cancel()
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		t.Fatal("feature recovery context has no deadline")
+	}
+	remaining := time.Until(deadline)
+	if remaining < 19*time.Minute || remaining > 20*time.Minute {
+		t.Fatalf("feature recovery deadline remaining = %v, want planning deadline near 20m", remaining)
+	}
+	if remaining <= service.recoveryTimeout {
+		t.Fatalf("feature recovery inherited lease-operation timeout: remaining=%v lease=%v", remaining, service.recoveryTimeout)
+	}
+}
+
+func TestLoadProductionConfigRejectsQualificationForDifferentProfileRoute(t *testing.T) {
+	path, config := writeProductionFixture(t)
+	config.Profiles[0].DecisionRoute = kernel.RouteComplexReasoning
+	writeJSON(t, path, config, 0o600)
+
+	if _, err := LoadProductionConfig(path); err == nil {
+		t.Fatal("qualification for a different configured route was accepted")
+	}
+}
+
+func TestLoadProductionConfigRejectsUnregisteredOrTamperedQualificationCorpus(t *testing.T) {
+	path, config := writeProductionFixture(t)
+	config.Profiles[0].QualificationCorpus.ScenarioIDs = append(config.Profiles[0].QualificationCorpus.ScenarioIDs, "unregistered-scenario")
+	writeJSON(t, path, config, 0o600)
+
+	if _, err := LoadProductionConfig(path); !errors.Is(err, ErrInvalidProductionConfiguration) {
+		t.Fatalf("tampered qualification corpus error = %v", err)
+	}
+}
+
+func TestLoadProductionConfigRejectsQualificationForDifferentToolSurface(t *testing.T) {
+	path, config := writeProductionFixture(t)
+	profile := &config.Profiles[0]
+	profile.QualificationCorpus.ToolSurfaceDigest = repeatedDigest('6')
+	corpusDigest, err := profile.QualificationCorpus.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	profile.Qualification.QualificationCorpusDigest = corpusDigest
+	profile.Qualification.QualificationDigest, err = application.QualificationDigest(*profile.Qualification)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeJSON(t, path, config, 0o600)
+
+	if _, err := LoadProductionConfig(path); !errors.Is(err, ErrInvalidProductionConfiguration) {
+		t.Fatalf("qualification for a different tool surface error = %v", err)
+	}
+}
+
+func TestNewProductionServiceRejectsMissingOperationalQualificationBeforeSideEffects(t *testing.T) {
+	path, config := writeProductionFixture(t)
+	config.Profiles[0].Qualification = nil
+	config.Profiles[0].QualificationCorpus = nil
+	writeJSON(t, path, config, 0o600)
+	loaded, err := LoadProductionConfig(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := NewProductionService(context.Background(), loaded); !errors.Is(err, ErrInvalidProductionConfiguration) || !strings.Contains(err.Error(), "no implementation role") {
+		t.Fatalf("unqualified service start error = %v", err)
+	}
+	if _, err := os.Stat(loaded.EvidenceRoot); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("unqualified start created evidence root: %v", err)
+	}
+}
+
+func TestValidateOperationalProfileQualificationsRequiresFixedStagesAndOneImplementer(t *testing.T) {
+	at := time.Date(2026, 9, 3, 12, 0, 0, 0, time.UTC)
+	qualified := func(role kernel.RoleFQRN, kinds ...kernel.WorkKind) ProductionProfile {
+		profile := ProductionProfile{
+			ModelProfileDigest: repeatedDigest(byte('1' + len(role)%8)),
+			RoleFQRN:           role, DecisionRoute: kernel.RouteBoundedExecution,
+			ToolPolicyDigest: repeatedDigest(byte('a' + len(role)%6)),
+		}
+		profile.QualificationCorpus, profile.Qualification = testQualificationBundle(t, profile.ModelProfileDigest, role, profile.DecisionRoute, profile.ToolPolicyDigest, kinds, at.Add(-time.Minute))
+		return profile
+	}
+	profiles := []ProductionProfile{
+		qualified("product-owner", kernel.WorkDesign, kernel.WorkRelease),
+		qualified("project-manager", kernel.WorkDesign),
+		qualified("architect", kernel.WorkDesign),
+		qualified("coder", kernel.WorkImplementation),
+		qualified("tester", kernel.WorkValidation),
+		{RoleFQRN: "senior-coder", DecisionRoute: kernel.RouteBoundedExecution},
+		{RoleFQRN: "security", DecisionRoute: kernel.RouteComplexReasoning},
+	}
+	if err := ValidateOperationalProfileQualifications(profiles, at); err != nil {
+		t.Fatalf("mandatory workflow profiles rejected: %v", err)
+	}
+	profiles[3].Qualification = nil
+	profiles[3].QualificationCorpus = nil
+	if err := ValidateOperationalProfileQualifications(profiles, at); !errors.Is(err, ErrInvalidProductionConfiguration) || !strings.Contains(err.Error(), "no implementation role") {
+		t.Fatalf("missing implementation qualification error = %v", err)
+	}
+}
+
+func TestProductionProfileQualificationIsWorkSpecificAndTimeBound(t *testing.T) {
+	_, config := writeProductionFixture(t)
+	profile := config.Profiles[0]
+	observedAt := time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC)
+	profile.QualificationCorpus, profile.Qualification = testQualificationBundle(t, profile.ModelProfileDigest, profile.RoleFQRN, profile.DecisionRoute, profile.ToolPolicyDigest, []kernel.WorkKind{kernel.WorkImplementation}, observedAt)
+
+	if !profile.qualifiedFor(kernel.RouteBoundedExecution, kernel.WorkImplementation, observedAt.Add(time.Minute)) {
+		t.Fatal("exact qualified work became ineligible")
+	}
+	if profile.qualifiedFor(kernel.RouteBoundedExecution, kernel.WorkDesign, observedAt.Add(time.Minute)) {
+		t.Fatal("qualification escaped its registered work kind")
+	}
+	service := &ProductionService{clock: fixedClock{now: observedAt.Add(time.Minute)}}
+	task := &trackedTask{plan: organization.PlannedTask{DecisionRoute: kernel.RouteBoundedExecution, Purpose: kernel.PurposeReplan, Risk: organization.RiskModerate}}
+	if err := service.activateTask(context.Background(), organization.FeatureRequest{}, task, profile, ProductionWorkspace{}, 0, nil, nil, "", nil); !errors.Is(err, organization.ErrInvalidFeature) {
+		t.Fatalf("wrong-work activation error = %v", err)
+	}
+	expiresAt := observedAt.Add(2 * time.Minute)
+	profile.Qualification.ExpiresAt = &expiresAt
+	var err error
+	profile.Qualification.QualificationDigest, err = application.QualificationDigest(*profile.Qualification)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if profile.qualifiedFor(kernel.RouteBoundedExecution, kernel.WorkImplementation, expiresAt) {
+		t.Fatal("expired qualification remained eligible")
+	}
+}
+
+func TestTaskInvocationRequiresOneFullTransportTimeoutOfRunway(t *testing.T) {
+	_, config := writeProductionFixture(t)
+	now := time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC)
+	profile := config.Profiles[0]
+	profile.QualificationCorpus, profile.Qualification = testQualificationBundle(t, profile.ModelProfileDigest, profile.RoleFQRN, profile.DecisionRoute, profile.ToolPolicyDigest, []kernel.WorkKind{kernel.WorkImplementation}, now)
+	task := &trackedTask{
+		plan:    organization.PlannedTask{DecisionRoute: kernel.RouteBoundedExecution, Purpose: kernel.PurposeImplementation, Risk: organization.RiskLow},
+		profile: kernel.WorkRiskProfile{Budgets: kernel.FiniteWorkBudgets{DeadlineAt: now.Add(10 * time.Minute)}},
+	}
+	service := &ProductionService{clock: fixedClock{now: now}, requestTimeout: 10 * time.Minute}
+	err := service.authorizeTaskInvocationWithConditionPolicy(context.Background(), organization.FeatureRequest{}, task, profile, ProductionWorkspace{}, 0, kernel.PurposeImplementation, 1, nil, nil, false, false)
+	if !errors.Is(err, ErrInsufficientExecutionRunway) {
+		t.Fatalf("authorization error=%v want=%v", err, ErrInsufficientExecutionRunway)
+	}
+}
 
 func TestExpiredLeaseRecoverySweepsImmediatelyAndAfterInterval(t *testing.T) {
 	sweeper := &recordingExpiredIntentSweeper{}
@@ -121,6 +297,41 @@ func TestLoadProductionConfigRejectsDuplicateWorkspace(t *testing.T) {
 	}
 }
 
+func TestLoadProductionConfigValidatesRuntimeContinuityCadence(t *testing.T) {
+	path, config := writeProductionFixture(t)
+	config.Continuity = &ProductionContinuity{HeartbeatInterval: "5s", SuspensionThreshold: "10s"}
+	writeJSON(t, path, config, 0o600)
+	if _, err := LoadProductionConfig(path); err != nil {
+		t.Fatalf("valid continuity cadence: %v", err)
+	}
+	config.Continuity.SuspensionThreshold = "9s"
+	writeJSON(t, path, config, 0o600)
+	if _, err := LoadProductionConfig(path); !errors.Is(err, ErrInvalidProductionConfiguration) {
+		t.Fatalf("unsafe continuity cadence error = %v", err)
+	}
+}
+
+func TestLoadProductionConfigRejectsMissingOrInvalidCandidateGate(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		mutate func(*ProductionConfig)
+	}{
+		{name: "missing", mutate: func(config *ProductionConfig) { config.Planning.CandidateGates = nil }},
+		{name: "blank argument", mutate: func(config *ProductionConfig) { config.Planning.CandidateGates[0].Command = []string{"go", ""} }},
+		{name: "duplicate required identity", mutate: func(config *ProductionConfig) { config.Planning.RequiredGateIDs = []string{"go-test", "go-test"} }},
+		{name: "longer than planning deadline", mutate: func(config *ProductionConfig) { config.Planning.CandidateGates[0].Timeout = "3h" }},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			path, config := writeProductionFixture(t)
+			test.mutate(&config)
+			writeJSON(t, path, config, 0o600)
+			if _, err := LoadProductionConfig(path); !errors.Is(err, ErrInvalidProductionConfiguration) {
+				t.Fatalf("candidate gate error = %v", err)
+			}
+		})
+	}
+}
+
 func TestLoadProductionConfigAcceptsExactLoopbackFederation(t *testing.T) {
 	path, config := writeProductionFixture(t)
 	directory := filepath.Dir(path)
@@ -175,7 +386,16 @@ func writeProductionFixture(t *testing.T) (string, ProductionConfig) {
 	}
 	writeJSON(t, filepath.Join(directory, "authorization.json"), policy, 0o600)
 	writeJSON(t, filepath.Join(directory, "provenance.json"), provenance, 0o600)
-	organizationConfig := writeOrganizationFixture(t, directory)
+	agentSettings, err := openhands.NewOpenAICompatibleAgentSettings(openhands.AgentSettingsConfig{
+		Model: "openai/local-fixture", ModelCanonicalName: "openai/gpt-4o", BaseURL: "http://127.0.0.1:8802/v1", APIKey: "fixture",
+		Tools:               openhands.ExecutionToolsForPermissions([]string{"repository.edit"}),
+		MaximumOutputTokens: 8192, CondenserOutputTokens: 4096, TimeoutSeconds: 1200, CondenserMaximumEvents: 80, CondenserMaximumTokens: 96000,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	organizationConfig, modelDigest, bundleDigest := writeOrganizationFixture(t, directory, agentSettings)
+	qualificationCorpus, qualification := testQualificationBundle(t, modelDigest, "coder", kernel.RouteBoundedExecution, repeatedDigest('4'), allTestWorkKinds(), time.Date(2026, 8, 30, 0, 0, 0, 0, time.UTC))
 	config := ProductionConfig{
 		ContractRoot:          root,
 		Mongo:                 ProductionMongoConfig{URIFile: "mongo-uri", Database: "tekroo_v4", BacklogLimit: 1024, DeliveryPolicyRevision: 1},
@@ -184,20 +404,20 @@ func writeProductionFixture(t *testing.T) (string, ProductionConfig) {
 		TeamsDatabaseIdentity: "tekroo_v4", SMADatabaseIdentity: "sma_v4", DeploymentIdentity: repeatedDigest('1'), AuthorizationPolicyFile: "authorization.json", ProvenanceFile: "provenance.json", EvidenceRoot: "evidence",
 		ServiceAuthority: kernel.PrincipalRef{Kind: kernel.PrincipalService, ID: "teams-operational-runtime"}, ExpiryAuthority: kernel.PrincipalRef{Kind: kernel.PrincipalPolicy, ID: "teams-admission-policy"},
 		Workspaces:   []ProductionWorkspace{{WorkspaceID: "workspace-1", WorktreeID: "worktree-1", WorkingDirectory: "workspace", Branch: "task/workspace-1", BaselineSHA: strings.Repeat("1", 40), WritablePaths: []string{"."}}},
-		Profiles:     []ProductionProfile{{ModelProfileDigest: repeatedDigest('2'), RuntimeIdentityDigest: repeatedDigest('3'), ToolPolicyDigest: repeatedDigest('4'), EffectPolicyDigest: repeatedDigest('5'), MaximumIterations: 24, Qualification: kernel.AssignmentQualificationReceipt{QualificationID: "00000000-0000-7000-8000-000000000099", QualificationDigest: repeatedDigest('6'), QualificationCorpusDigest: repeatedDigest('7'), ModelProfileDigest: repeatedDigest('2'), DecisionRoute: kernel.RouteBoundedExecution, QualifiedRole: "programmer", Status: kernel.QualificationPass, ObservedAt: time.Date(2026, 8, 30, 0, 0, 0, 0, time.UTC)}}},
+		Profiles:     []ProductionProfile{{ModelProfileDigest: modelDigest, RoleFQRN: "coder", RoleBundleDigest: bundleDigest, DecisionRoute: kernel.RouteBoundedExecution, RuntimeIdentityDigest: repeatedDigest('3'), ToolPolicyDigest: repeatedDigest('4'), EffectPolicyDigest: repeatedDigest('5'), AgentSettings: agentSettings, MaximumIterations: 24, QualificationCorpus: qualificationCorpus, Qualification: qualification}},
 		Execution:    ProductionExecution{ConsumerID: "tekrood", OperationTimeout: "130s", MaximumBriefBytes: 1 << 20, PolicyRevision: 1},
 		Evidence:     ProductionEvidence{PolicyRevision: 1, ProducingVersion: "phase5", RetentionPolicy: "local-operational"},
 		Worker:       ProductionWorker{LeaseDuration: "150s", ReconciliationInterval: "1s", MaximumReconciliations: 600, MaximumConcurrentInvocations: 4, LeaseOperationTimeout: "5s"},
 		Projection:   ProductionProjection{Interval: "100ms", OperationTimeout: "5s"},
 		Organization: organizationConfig,
-		Planning:     ProductionPlanning{PolicyRevision: 1, ClassificationPolicyDigest: repeatedDigest('8'), PromotionPolicyDigest: repeatedDigest('9'), VerificationTopologyDigest: repeatedDigest('a'), SelectionPolicyDigest: repeatedDigest('b'), BudgetPolicyDigest: repeatedDigest('c'), RequiredGateIDs: []string{"go-test"}, Deadline: "2h"},
+		Planning:     ProductionPlanning{PolicyRevision: 1, ClassificationPolicyDigest: repeatedDigest('8'), PromotionPolicyDigest: repeatedDigest('9'), VerificationTopologyDigest: repeatedDigest('a'), SelectionPolicyDigest: repeatedDigest('b'), BudgetPolicyDigest: repeatedDigest('c'), RequiredGateIDs: []string{"go-test"}, CandidateGates: []ProductionCandidateGate{{GateID: "go-test", Command: []string{"go", "test", "./..."}, Timeout: "30s"}}, Deadline: "2h"},
 	}
 	path := filepath.Join(directory, "tekrood.json")
 	writeJSON(t, path, config, 0o600)
 	return path, config
 }
 
-func writeOrganizationFixture(t *testing.T, directory string) ProductionOrganization {
+func writeOrganizationFixture(t *testing.T, directory string, agentSettings json.RawMessage) (ProductionOrganization, kernel.Digest, kernel.Digest) {
 	t.Helper()
 	publicKey, privateKey, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
@@ -206,7 +426,7 @@ func writeOrganizationFixture(t *testing.T, directory string) ProductionOrganiza
 	bundle := organization.RoleBundle{
 		SchemaVersion: organization.RoleBundleSchemaVersion, Role: "coder", Version: "1.0.0",
 		Capabilities: []string{"implement"}, Subscriptions: []organization.Subscription{{Type: "tekroo.message.task.assigned", Purpose: "implementation"}},
-		Permissions: []string{"repository.read"}, Instructions: "Implement bounded tasks and return evidence.",
+		Permissions: []string{"repository.edit"}, Instructions: "Implement bounded tasks and return evidence.",
 		Handlers: map[string]string{"tekroo.message.task.assigned": "implement"}, PublisherKeyID: "fixture-publisher",
 	}
 	bundleDigest, err := bundle.ContentDigest()
@@ -218,6 +438,10 @@ func writeOrganizationFixture(t *testing.T, directory string) ProductionOrganiza
 		t.Fatal(err)
 	}
 	bundle.Signature = base64.StdEncoding.EncodeToString(ed25519.Sign(privateKey, digestBytes))
+	modelDigest, err := openhands.ModelProfileDigest("coder", bundleDigest, agentSettings)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := os.Mkdir(filepath.Join(directory, "roles"), 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -227,7 +451,7 @@ func writeOrganizationFixture(t *testing.T, directory string) ProductionOrganiza
 		Roles: []organization.RoleBinding{{
 			Role: "coder", BundlePath: "roles/coder.json", BundleDigest: bundleDigest, PublisherKeyID: "fixture-publisher",
 			InitialInstances: 1, MaximumInstances: 1, LaunchMode: organization.LaunchEager,
-			ModelProfileDigest: repeatedDigest('2'), WorkspaceIDs: []string{"workspace-1"},
+			ModelProfileDigest: modelDigest, WorkspaceIDs: []string{"workspace-1"},
 		}},
 	}
 	manifestPath := filepath.Join(directory, "team.json")
@@ -242,7 +466,7 @@ func writeOrganizationFixture(t *testing.T, directory string) ProductionOrganiza
 		ManifestFile: "team.json", ManifestDigest: kernel.Digest(hex.EncodeToString(manifestHash[:])),
 		Publishers:             []ProductionPublisher{{KeyID: "fixture-publisher", PublicKeyFile: "role-publisher.pub"}},
 		ReconciliationInterval: "100ms", MaximumRestarts: 3, MaximumDeliveryAttempts: 3,
-	}
+	}, modelDigest, bundleDigest
 }
 
 func writeJSON(t *testing.T, path string, value any, mode os.FileMode) {

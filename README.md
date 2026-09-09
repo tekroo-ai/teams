@@ -63,21 +63,24 @@ Initialize a fresh deployment with the installed CLI:
   -openhands-key /absolute/path/to/openhands-api-key \
   -sma-hook /absolute/path/to/sma_context_hook.py \
   -tekrood /absolute/install/root/bin/tekrood \
+  -qualification-bundle /absolute/path/to/accepted-model-profile-qualifications.json \
   -branch-prefix tekroo/
 ```
 
 Initialization fails closed if the deployment root is nonempty, the source has
 tracked changes, a role branch already exists, MongoDB or the operator endpoint
 is not loopback, Teams and SMA database identities overlap, required accepted
-assets are missing, or the generated production configuration does not pass the
-same loader used by `tekrood`.
+assets are missing, the qualification bundle does not exactly bind the generated
+profile, role, route, tool surface, and required work kinds, or the generated
+production configuration does not pass the same loader used by `tekrood`.
 
 Use a different valid branch prefix when two preserved deployments must share
 one repository; initialization never overwrites an existing deployment branch.
 
 The command creates deployment-owned secrets and provenance, copies the signed
-starter role library, creates isolated role worktrees, installs the accepted
-SMA hook in each workspace, and writes `tekrood.json` plus a disabled-by-default
+starter role library and accepted qualification bundle, creates isolated role
+worktrees, installs the accepted SMA hook in each workspace, and writes
+`tekrood.json` plus a disabled-by-default
 LaunchAgent definition. It never reads or migrates v3 data.
 
 Start and inspect the service with:

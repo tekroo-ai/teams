@@ -152,6 +152,7 @@ type Snapshot struct {
 	ReleasePlanKeys       map[ReleasePlanKey]AggregateRef
 	AttemptBudgets        map[AttemptBudgetKey]AttemptBudgetSnapshot
 	WorkProfiles          map[AggregateRef]WorkProfileSnapshot
+	WorkProfileHistory    map[UUIDv7]WorkRiskProfile
 	QualifiedAssignments  map[AggregateRef]QualifiedAssignmentAuthorization
 	VariantGroups         map[AggregateRef]VariantGroupSnapshot
 	VariantGroupKeys      map[VariantGroupKey]AggregateRef

@@ -283,6 +283,10 @@ func TestStoreProjectsModelCapabilityState(t *testing.T) {
 	if !found || projectedProfile.Profile.ProfileDigest != profile.ProfileDigest || projectedProfile.BoundEventID != bind.Events[0].EventID {
 		t.Fatalf("work profile projection = %#v", projectedProfile)
 	}
+	historicalProfile, found := snapshot.WorkProfileHistory[profile.ProfileID]
+	if !found || !reflect.DeepEqual(historicalProfile, profile) {
+		t.Fatalf("work profile history = %#v", historicalProfile)
+	}
 
 	authorization := kernel.QualifiedAssignmentAuthorization{
 		AssignmentID: "00000000-0000-7000-8000-000000000803", TaskID: task.ID, ExpectedTaskRevision: 1, WorkProfile: profile.Binding(),

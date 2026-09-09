@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/tekroo-ai/teams/kernel"
@@ -243,8 +244,37 @@ func (service *ProductionService) submitStandaloneCommand(ctx context.Context, c
 			}
 			actor := assignment.SelectedActorFQN
 			execution := assignment.SelectedExecution()
+			// Lifecycle control may legitimately occur after the assigned actor was
+			// replaced. Stamp the command with the owner's current execution when it
+			// is available; the superseded assignment execution would be rejected by
+			// the kernel's fencing check even though the task owner is unchanged.
+			if service.RoleHost != nil {
+				current, active, statusErr := service.RoleHost.Status(ctx, actor)
+				if statusErr != nil {
+					return kernel.CommandReceipt{}, statusErr
+				}
+				if active {
+					if current.ActorFQN != actor || !current.Execution.Valid() {
+						return kernel.CommandReceipt{}, organization.ErrInvalidHumanOperation
+					}
+					profile, configured := service.profilesByModel[current.ModelProfile]
+					if !configured {
+						return kernel.CommandReceipt{}, organization.ErrInvalidHumanOperation
+					}
+					if err := service.registerExecution(ctx, current, profile); err != nil {
+						return kernel.CommandReceipt{}, err
+					}
+					execution = current.Execution
+				}
+			}
 			command.ActorFQN = &actor
 			command.Execution = &execution
+			// The execution tuple participates in the command fingerprint. Bind it
+			// into both deterministic identities so a control retry after process
+			// replacement cannot collide with the receipt from the prior execution.
+			executionKey := idempotencyKey + ":execution:" + string(execution.ExecutionID) + ":" + strconv.FormatUint(execution.FencingEpoch, 10)
+			command.CommandID = deterministicOperationalUUID("standalone-command", commandType, string(id), executionKey)
+			command.IdempotencyKey = executionKey
 		}
 	}
 	if _, err := service.Runtime.catalogue.ResolveCommand(command.CommandType, command.CommandVersion, command.Target.Kind, command.Payload); err != nil {

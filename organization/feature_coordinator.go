@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"reflect"
+	"sort"
 	"strings"
 	"time"
 
@@ -59,7 +60,7 @@ func (coordinator *FeatureCoordinator) Submit(ctx context.Context, principal ker
 	if err != nil || operator.Status != RoleIdle || !operator.Execution.Valid() {
 		return FeatureRequest{}, false, errors.Join(ErrRoleNotRunning, err)
 	}
-	productOwner, err := coordinator.ensureSingleRole(ctx, "product-owner")
+	productOwner, err := coordinator.ensurePrimaryRole(ctx, "product-owner")
 	if err != nil {
 		return FeatureRequest{}, false, err
 	}
@@ -118,7 +119,18 @@ func (coordinator *FeatureCoordinator) ApplyPlan(ctx context.Context, featureID 
 	if feature.Revision != expectedRevision || feature.Status != FeatureSpecified || feature.Specification == nil {
 		return FeatureRequest{}, ErrFeatureRevisionConflict
 	}
-	if plan.Validate(feature) != nil || !strings.Contains(string(plan.PreparedBy), "::architect-") || !reflect.DeepEqual(plan.Stories, feature.Specification.Stories) {
+	expectedPlanVersion := uint64(1)
+	if feature.Plan != nil {
+		if feature.PlanSupersession == nil || feature.PlanSupersession.PlanVersion != feature.Plan.Version {
+			return FeatureRequest{}, ErrInvalidFeature
+		}
+		expectedPlanVersion = feature.Plan.Version + 1
+	}
+	var priorStories []PlannedStory
+	if feature.Plan != nil {
+		priorStories = feature.Plan.Stories
+	}
+	if plan.Version != expectedPlanVersion || plan.Validate(feature) != nil || !strings.Contains(string(plan.PreparedBy), "::architect-") || !featurePlanStoriesMatchSpecification(plan.Stories, feature.Specification.Stories, priorStories, plan.Version > 1) {
 		return FeatureRequest{}, ErrInvalidFeature
 	}
 	planner, found, err := coordinator.host.Status(ctx, plan.PreparedBy)
@@ -141,6 +153,65 @@ func (coordinator *FeatureCoordinator) ApplyPlan(ctx context.Context, featureID 
 		return FeatureRequest{}, err
 	}
 	return coordinator.store.ApplyFeaturePlan(ctx, feature.ID, expectedRevision, plan, coordinator.clock.Now().UTC())
+}
+
+func featurePlanStoriesMatchSpecification(planned, specified, prior []PlannedStory, replacement bool) bool {
+	if len(planned) != len(specified) {
+		return false
+	}
+	priorIDs := make(map[kernel.UUIDv7]struct{}, len(prior))
+	for _, story := range prior {
+		priorIDs[story.ID] = struct{}{}
+	}
+	for index := range planned {
+		left, right := planned[index], specified[index]
+		if replacement {
+			if left.ID == right.ID {
+				return false
+			}
+			if _, reused := priorIDs[left.ID]; reused {
+				return false
+			}
+			left.ID = right.ID
+		}
+		if !reflect.DeepEqual(left, right) {
+			return false
+		}
+	}
+	return true
+}
+
+// RequestReplan returns one planned feature to architecture without replaying
+// product ownership or specification. The caller is responsible for retiring
+// the materialized tasks before this projection transition is committed.
+func (coordinator *FeatureCoordinator) RequestReplan(ctx context.Context, featureID kernel.UUIDv7, expectedRevision uint64, supersession FeaturePlanSupersession) (FeatureRequest, error) {
+	feature, err := coordinator.currentFeature(ctx, featureID, expectedRevision, FeaturePlanned)
+	if err != nil {
+		return FeatureRequest{}, err
+	}
+	if feature.Plan == nil || supersession.Validate(feature) != nil || supersession.RequestedBy != feature.SubmittedBy || supersession.PlanDigest != featurePlanDigest(*feature.Plan) {
+		return FeatureRequest{}, ErrInvalidFeature
+	}
+	next := feature
+	next.Revision++
+	next.Status = FeatureSpecified
+	next.ScopeRevision++
+	next.PlanSupersession = &supersession
+	next.Acceptance = nil
+	next.UpdatedAt = coordinator.clock.Now().UTC()
+	if next.Validate() != nil {
+		return FeatureRequest{}, ErrInvalidFeature
+	}
+	return coordinator.store.AdvanceFeature(ctx, next, expectedRevision, nil)
+}
+
+func featurePlanDigest(plan FeaturePlan) kernel.Digest {
+	raw, err := json.Marshal(plan)
+	if err != nil {
+		return ""
+	}
+	digest := sha256.Sum256(raw)
+	return kernel.Digest(hex.EncodeToString(digest[:]))
 }
 
 func (coordinator *FeatureCoordinator) RecordAcceptanceRecommendation(ctx context.Context, featureID kernel.UUIDv7, expectedRevision uint64, acceptance FeatureAcceptance) (FeatureRequest, error) {
@@ -202,7 +273,7 @@ func (coordinator *FeatureCoordinator) Refine(ctx context.Context, featureID ker
 		next.Status = FeatureClarificationRequired
 		return coordinator.store.AdvanceFeature(ctx, next, expectedRevision, nil)
 	}
-	recipient, err := coordinator.ensureSingleRole(ctx, "project-manager")
+	recipient, err := coordinator.ensurePrimaryRole(ctx, "project-manager")
 	if err != nil {
 		return FeatureRequest{}, err
 	}
@@ -227,7 +298,7 @@ func (coordinator *FeatureCoordinator) Specify(ctx context.Context, featureID ke
 	if err != nil || !found || actor.Status != RoleIdle {
 		return FeatureRequest{}, errors.Join(ErrStaleOrganizationalClaim, err)
 	}
-	recipient, err := coordinator.ensureSingleRole(ctx, "architect")
+	recipient, err := coordinator.ensurePrimaryRole(ctx, "architect")
 	if err != nil {
 		return FeatureRequest{}, err
 	}
@@ -290,21 +361,20 @@ func (coordinator *FeatureCoordinator) handoffMessage(feature FeatureRequest, se
 	return message, nil
 }
 
-func (coordinator *FeatureCoordinator) ensureSingleRole(ctx context.Context, role string) (RoleInstanceState, error) {
-	recipients, resolveErr := coordinator.host.ResolveRoleRecipients(ctx, role)
-	if resolveErr == nil && len(recipients) == 1 {
-		state, found, err := coordinator.host.Status(ctx, recipients[0])
-		if err == nil && found && state.Status == RoleIdle {
-			return state, nil
-		}
-	}
+func (coordinator *FeatureCoordinator) ensurePrimaryRole(ctx context.Context, role string) (RoleInstanceState, error) {
 	configured, err := coordinator.host.ConfiguredRoleActors(role)
-	if err != nil || len(configured) != 1 {
-		return RoleInstanceState{}, errors.Join(ErrRoleNotRunning, resolveErr, err)
-	}
-	state, err := coordinator.host.EnsureStarted(ctx, configured[0])
-	if err != nil || state.Status != RoleIdle {
+	if err != nil || len(configured) == 0 {
 		return RoleInstanceState{}, errors.Join(ErrRoleNotRunning, err)
+	}
+	sort.Slice(configured, func(left, right int) bool { return configured[left] < configured[right] })
+	primary := configured[0]
+	state, found, statusErr := coordinator.host.Status(ctx, primary)
+	if statusErr == nil && found && state.Status == RoleIdle {
+		return state, nil
+	}
+	state, err = coordinator.host.EnsureStarted(ctx, primary)
+	if err != nil || state.Status != RoleIdle {
+		return RoleInstanceState{}, errors.Join(ErrRoleNotRunning, statusErr, err)
 	}
 	return state, nil
 }

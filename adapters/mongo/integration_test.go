@@ -571,6 +571,10 @@ func TestModelCapabilityProjectionsRoundTrip(t *testing.T) {
 	if !found || projectedProfile.Profile.ProfileDigest != profile.ProfileDigest || projectedProfile.BoundEventID != bind.Events[0].EventID {
 		t.Fatalf("work profile projection = %#v", projectedProfile)
 	}
+	historicalProfile, found := snapshot.WorkProfileHistory[profile.ProfileID]
+	if !found || !reflect.DeepEqual(historicalProfile, profile) {
+		t.Fatalf("work profile history = %#v", historicalProfile)
+	}
 
 	authorization := mongoTestAssignmentAuthorization(task.ID, profile.Binding())
 	authorizationPayload, err := json.Marshal(authorization)
@@ -1014,6 +1018,54 @@ func TestIntentFeedRedeliversYieldedIntentInSameSession(t *testing.T) {
 	}
 }
 
+func TestIntentFeedRestartWaitsForClaimReleaseBeforeDelivery(t *testing.T) {
+	store := openTestStore(t)
+	decision := completeDecision(t, 1)
+	commitDecision(t, store, decision)
+	intent := decision.Outbox[0]
+	now := testNow()
+
+	claimCtx, claimCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	claim, err := store.AcquireIntent(claimCtx, intent.IntentID, "stopped-worker", now, time.Minute)
+	claimCancel()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	openCtx, openCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	feed, err := store.OpenIntentFeedForKind(openCtx, "restart-after-claim-test", intent.Kind)
+	openCancel()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		closeCtx, closeCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer closeCancel()
+		_ = feed.Close(closeCtx)
+	}()
+
+	pollCtx, pollCancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	_, err = feed.Poll(pollCtx)
+	pollCancel()
+	if !errors.Is(err, ErrIntentNotFound) && !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("claimed startup intent was delivered before lease release: %v", err)
+	}
+
+	sweepCtx, sweepCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	swept, err := store.SweepExpiredIntents(sweepCtx, now.Add(2*time.Minute), 3)
+	sweepCancel()
+	if err != nil || swept.Released != 1 || swept.DeadLetter != 0 {
+		t.Fatalf("expired claim sweep = %#v, %v", swept, err)
+	}
+
+	retryCtx, retryCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	retry, err := feed.Next(retryCtx)
+	retryCancel()
+	if err != nil || retry.Intent != intent || retry.State != DeliveryPending || retry.ClaimEpoch != claim.ClaimEpoch {
+		t.Fatalf("released retry = %#v, err=%v", retry, err)
+	}
+}
+
 func TestReaddressIsEpochPinnedAndCannotMutateOrganizationalState(t *testing.T) {
 	store := openTestStore(t)
 	decision := completeDecision(t, 1)
@@ -1279,6 +1331,37 @@ func openTestStore(t *testing.T) *Store {
 		_ = store.Close(ctx)
 	})
 	return store
+}
+
+func TestRuntimeContinuityRecordsSleepAndCleanRestartWindows(t *testing.T) {
+	store := openTestStore(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	deployment := kernel.Digest("abababababababababababababababababababababababababababababababab")
+	first := testUUID(9801)
+	second := testUUID(9802)
+	started := time.Date(2026, 9, 5, 10, 0, 0, 0, time.UTC)
+	if _, observed, err := store.StartRuntimeSession(ctx, deployment, first, started, 10*time.Second); err != nil || observed {
+		t.Fatalf("first start: observed=%v err=%v", observed, err)
+	}
+	if _, observed, err := store.HeartbeatRuntimeSession(ctx, deployment, first, started.Add(2*time.Second), 10*time.Second); err != nil || observed {
+		t.Fatalf("ordinary heartbeat: observed=%v err=%v", observed, err)
+	}
+	sleepWindow, observed, err := store.HeartbeatRuntimeSession(ctx, deployment, first, started.Add(20*time.Second), 10*time.Second)
+	if err != nil || !observed || sleepWindow.SuspendedAt != started.Add(2*time.Second) || sleepWindow.Duration() != 18*time.Second {
+		t.Fatalf("sleep heartbeat: window=%+v observed=%v err=%v", sleepWindow, observed, err)
+	}
+	if err := store.StopRuntimeSession(ctx, deployment, first, started.Add(25*time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	restartWindow, observed, err := store.StartRuntimeSession(ctx, deployment, second, started.Add(55*time.Second), 10*time.Second)
+	if err != nil || !observed || restartWindow.SuspendedAt != started.Add(25*time.Second) || restartWindow.Duration() != 30*time.Second {
+		t.Fatalf("restart: window=%+v observed=%v err=%v", restartWindow, observed, err)
+	}
+	windows, err := store.ListRuntimeSuspensions(ctx, deployment)
+	if err != nil || len(windows) != 2 || windows[0] != sleepWindow || windows[1] != restartWindow {
+		t.Fatalf("suspension ledger=%+v err=%v", windows, err)
+	}
 }
 
 func testConfig(uri, database string) Config {

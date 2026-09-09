@@ -23,6 +23,8 @@ type trackedTask struct {
 	owner    organization.RoleInstanceState
 }
 
+var ErrInsufficientExecutionRunway = errors.New("insufficient execution runway")
+
 func (service *ProductionService) ensureFeatureWorkBudget(ctx context.Context, feature organization.FeatureRequest, evidenceID kernel.UUIDv7, evidence []kernel.EvidenceRef, deadline time.Time) (kernel.WorkBudgetAccount, error) {
 	budgetRef := kernel.AggregateRef{Kind: kernel.AggregateWorkBudget, ID: feature.BudgetAccountID}
 	snapshot, err := service.Store.LoadDecision(ctx, kernel.KernelCommand{Target: budgetRef})
@@ -31,7 +33,16 @@ func (service *ProductionService) ensureFeatureWorkBudget(ctx context.Context, f
 	}
 	if account, found := snapshot.WorkBudgetAccounts[budgetRef]; found {
 		planningStory := kernel.AggregateRef{Kind: kernel.AggregateStory, ID: deterministicOperationalUUID("feature-planning-story", string(feature.ID))}
-		if !account.Valid() || account.LifecycleEpoch != feature.LifecycleEpoch || account.RootWork != planningStory || !featureBudgetPolicyAccepted(account, service.planning, service.clock.Now().UTC()) || account.DeadlineAt.Before(deadline) {
+		if !account.Valid() || account.LifecycleEpoch != feature.LifecycleEpoch || account.RootWork != planningStory || account.DeadlineAt.Before(deadline) {
+			return kernel.WorkBudgetAccount{}, organization.ErrInvalidFeature
+		}
+		if account.PolicyRevision < service.planning.PolicyRevision && service.clock.Now().UTC().Before(account.DeadlineAt) {
+			account, err = service.upgradeFeatureBudgetPolicy(ctx, feature, account, evidence)
+			if err != nil {
+				return kernel.WorkBudgetAccount{}, err
+			}
+		}
+		if !featureBudgetPolicyAccepted(account, service.planning, service.clock.Now().UTC()) {
 			return kernel.WorkBudgetAccount{}, organization.ErrInvalidFeature
 		}
 		return account, nil
@@ -70,6 +81,36 @@ func (service *ProductionService) ensureFeatureWorkBudget(ctx context.Context, f
 		return kernel.WorkBudgetAccount{}, organization.ErrInvalidFeature
 	}
 	return account, nil
+}
+
+func (service *ProductionService) upgradeFeatureBudgetPolicy(ctx context.Context, feature organization.FeatureRequest, account kernel.WorkBudgetAccount, evidence []kernel.EvidenceRef) (kernel.WorkBudgetAccount, error) {
+	if !account.Valid() || account.PolicyRevision >= service.planning.PolicyRevision || account.DeadlineAt.IsZero() || !service.clock.Now().UTC().Before(account.DeadlineAt) {
+		return kernel.WorkBudgetAccount{}, organization.ErrInvalidFeature
+	}
+	payload, err := json.Marshal(map[string]any{
+		"budget_account_id": account.ID, "expected_budget_revision": account.Revision,
+		"expected_lifecycle_epoch": account.LifecycleEpoch, "policy_revision": service.planning.PolicyRevision,
+		"policy_digest": service.planning.BudgetPolicyDigest, "model_invocation_limit": account.ModelInvocationLimit,
+		"purpose_limits": account.PurposeLimits, "deadline_at": account.DeadlineAt,
+		"reason":       "advance an active feature budget to the configured planning policy",
+		"evidence_ids": evidenceIDs(evidence), "authority": feature.SubmittedBy,
+	})
+	if err != nil {
+		return kernel.WorkBudgetAccount{}, err
+	}
+	key := fmt.Sprintf("budget-policy-%d-to-%d", account.PolicyRevision, service.planning.PolicyRevision)
+	if _, err := service.submitDeterministicCommand(ctx, feature, "tekroo.command.work-budget.amend", kernel.OperationalSchemaVersion, kernel.AggregateWorkBudget, account.ID, feature.SubmittedBy, account.Revision, payload, []kernel.DagParent{{ParentEventID: account.LastEventID, EdgeKind: kernel.EdgeCausal}}, evidence, key); err != nil {
+		return kernel.WorkBudgetAccount{}, err
+	}
+	snapshot, err := service.Store.LoadDecision(ctx, kernel.KernelCommand{Target: account.Ref()})
+	if err != nil {
+		return kernel.WorkBudgetAccount{}, err
+	}
+	updated, found := snapshot.WorkBudgetAccounts[account.Ref()]
+	if !found || !updated.Valid() || updated.PolicyRevision != service.planning.PolicyRevision || updated.PolicyDigest != service.planning.BudgetPolicyDigest || !updated.DeadlineAt.Equal(account.DeadlineAt) {
+		return kernel.WorkBudgetAccount{}, organization.ErrInvalidFeature
+	}
+	return updated, nil
 }
 
 func featureBudgetPolicyAccepted(account kernel.WorkBudgetAccount, planning ProductionPlanning, now time.Time) bool {
@@ -115,10 +156,13 @@ func (service *ProductionService) preparePlannedTasks(ctx context.Context, featu
 	}
 	deadline = budget.DeadlineAt
 
-	tasks := make(map[kernel.UUIDv7]*trackedTask, len(plan.Tasks))
 	for _, item := range plan.Tasks {
+		taskState, _, taskFound, err := service.Store.ReadAggregateHead(ctx, kernel.AggregateRef{Kind: kernel.AggregateTask, ID: item.ID})
+		if err != nil || !taskFound || taskState.LifecycleEpoch == 0 || taskState.ScopeRevision == 0 || taskState.Phase == kernel.PhaseClosed || taskState.Condition == kernel.ConditionBlocked {
+			return errors.Join(organization.ErrInvalidFeature, err)
+		}
 		profileConfig, found := service.profilesByModel[item.ModelProfile]
-		if !found || profileConfig.Qualification.DecisionRoute != item.DecisionRoute {
+		if !found || !profileConfig.qualifiedFor(item.DecisionRoute, workKindForPurpose(item.Purpose, item.Risk), service.clock.Now().UTC()) {
 			return organization.ErrInvalidFeature
 		}
 		owner, active, err := service.RoleHost.Status(ctx, item.Owner)
@@ -131,30 +175,28 @@ func (service *ProductionService) preparePlannedTasks(ctx context.Context, featu
 		if err != nil || owner.ModelProfile != item.ModelProfile {
 			return errors.Join(organization.ErrRoleNotRunning, err)
 		}
-		workspace, found := service.workspacesByID[owner.WorkspaceID]
-		if !found {
+		if _, found := service.workspacesByID[owner.WorkspaceID]; !found {
 			return organization.ErrInvalidFeature
 		}
 		if err := service.registerExecution(ctx, owner, profileConfig); err != nil {
 			return err
 		}
-		profile := service.workProfile(feature, item, evidenceID, deadline)
+		profile := service.workProfile(feature, item, taskState.LifecycleEpoch, taskState.ScopeRevision, evidenceID, deadline)
 		tracked := &trackedTask{plan: item, revision: 1, last: taskEvents[item.ID], profile: profile, owner: owner}
-		if err := service.applyTaskCommand(ctx, feature, tracked, "tekroo.command.task.bind-work-profile", kernel.SchemaVersion, service.policyAuthority, profile, evidenceRefs, nil, "profile"); err != nil {
+		profileKey := fmt.Sprintf("profile-policy-%d-%s", profile.ClassificationPolicyRevision, profile.ProfileDigest)
+		if err := service.applyTaskCommand(ctx, feature, tracked, "tekroo.command.task.bind-work-profile", kernel.SchemaVersion, service.policyAuthority, profile, evidenceRefs, nil, profileKey); err != nil {
 			return err
 		}
-		if len(item.DependsOn) == 0 {
-			if err := service.activateTask(ctx, feature, tracked, profileConfig, workspace, budget.Revision, nil, evidenceRefs, evidenceID, nil); err != nil {
-				return err
-			}
-		}
-		tasks[item.ID] = tracked
+		// Admission persists every task and its immutable work profile first.
+		// Reconciliation subsequently activates ready DAG nodes one at a time,
+		// reloading the budget and task projections between activations. This
+		// permits multiple independent roots without reusing a stale budget
+		// revision or sharing an editable repository checkout.
 	}
-	_ = tasks
 	return nil
 }
 
-func (service *ProductionService) workProfile(feature organization.FeatureRequest, task organization.PlannedTask, evidenceID kernel.UUIDv7, deadline time.Time) kernel.WorkRiskProfile {
+func (service *ProductionService) workProfile(feature organization.FeatureRequest, task organization.PlannedTask, lifecycleEpoch, scopeRevision uint64, evidenceID kernel.UUIDv7, deadline time.Time) kernel.WorkRiskProfile {
 	ambiguity, novelty, blast, security := kernel.AmbiguityLow, kernel.NoveltyRoutine, kernel.BlastLocal, kernel.SecurityOrdinary
 	if task.Complexity >= 7 {
 		ambiguity, novelty, blast = kernel.AmbiguityHigh, kernel.NoveltyUnfamiliar, kernel.BlastMultiComponent
@@ -175,7 +217,7 @@ func (service *ProductionService) workProfile(feature organization.FeatureReques
 	profileID := deterministicOperationalUUID("work-profile", string(feature.ID), string(task.ID))
 	profileDigest := digestBytes([]byte(string(feature.ID) + "\x00" + string(task.ID) + "\x00" + string(digestBytes(criteria)) + "\x00" + string(task.DecisionRoute)))
 	return kernel.WorkRiskProfile{
-		TaskID: task.ID, ProfileID: profileID, ProfileRevision: 1, ProfileDigest: profileDigest, LifecycleEpoch: feature.LifecycleEpoch, ScopeRevision: feature.ScopeRevision,
+		TaskID: task.ID, ProfileID: profileID, ProfileRevision: 1, ProfileDigest: profileDigest, LifecycleEpoch: lifecycleEpoch, ScopeRevision: scopeRevision,
 		WorkKind: workKindForPurpose(task.Purpose, task.Risk), Ambiguity: ambiguity, Novelty: novelty, BlastRadius: blast, SecuritySensitivity: security,
 		MinimumDecisionRoute: task.DecisionRoute, AcceptanceCriteriaDigest: digestBytes(criteria), RequiredDeterministicGateIDs: append([]string(nil), service.planning.RequiredGateIDs...),
 		RequiredValidationBranches: 1, RequiredIndependenceDimensions: independence,
@@ -245,29 +287,88 @@ func (service *ProductionService) registerExecution(ctx context.Context, owner o
 }
 
 func (service *ProductionService) activateTask(ctx context.Context, feature organization.FeatureRequest, task *trackedTask, profileConfig ProductionProfile, workspace ProductionWorkspace, budgetRevision uint64, dependencyEvents []kernel.UUIDv7, evidence []kernel.EvidenceRef, evidenceID kernel.UUIDv7, conditionDigests []kernel.Digest) error {
-	if err := service.applyTaskCommand(ctx, feature, task, "tekroo.command.task.mark-ready", kernel.SchemaVersion, service.policyAuthority, map[string]any{"dependency_event_ids": append([]kernel.UUIDv7{}, dependencyEvents...), "readiness_policy_revision": service.planning.PolicyRevision}, nil, nil, "ready"); err != nil {
+	if task == nil || !profileConfig.qualificationDefinitionValid() || service == nil || service.clock == nil || !profileConfig.qualifiedFor(task.plan.DecisionRoute, workKindForPurpose(task.plan.Purpose, task.plan.Risk), service.clock.Now().UTC()) {
+		return organization.ErrInvalidFeature
+	}
+	taskRef := kernel.AggregateRef{Kind: kernel.AggregateTask, ID: task.plan.ID}
+	state, head, found, err := service.Store.ReadAggregateHead(ctx, taskRef)
+	if err != nil || !found {
+		return errors.Join(organization.ErrInvalidFeature, err)
+	}
+	task.revision, task.last = state.Revision, head
+	snapshot, err := service.Store.LoadDecision(ctx, kernel.KernelCommand{Target: taskRef})
+	if err != nil {
 		return err
 	}
-	assignmentID := deterministicOperationalUUID("assignment", string(feature.ID), string(task.plan.ID))
-	qualification := profileConfig.Qualification
-	assignment := map[string]any{
-		"assignment_id": assignmentID, "task_id": task.plan.ID, "expected_task_revision": task.revision, "work_profile": task.profile.Binding(),
-		"required_decision_route": task.plan.DecisionRoute, "selected_decision_route": qualification.DecisionRoute, "selected_actor_fqn": task.owner.ActorFQN,
-		"selected_execution_id": task.owner.Execution.ExecutionID, "selected_fencing_epoch": task.owner.Execution.FencingEpoch,
-		"model_profile_digest": profileConfig.ModelProfileDigest, "runtime_identity_digest": profileConfig.RuntimeIdentityDigest, "qualification": qualification,
-		"selection_policy_revision": service.planning.PolicyRevision, "selection_policy_digest": service.planning.SelectionPolicyDigest,
-		"hard_constraint_results": []map[string]any{{"constraint_id": "exact-role-model-workspace", "outcome": "PASS", "evidence_ids": []kernel.UUIDv7{evidenceID}}},
-		"selection_reasons":       []string{"exact configured role, qualified model profile, and workspace binding"}, "evidence_ids": []kernel.UUIDv7{evidenceID},
+	profileSnapshot, profileFound := snapshot.WorkProfiles[taskRef]
+	if !profileFound || !profileSnapshot.Valid() || profileSnapshot.Profile.Binding() != task.profile.Binding() {
+		return organization.ErrInvalidFeature
 	}
-	if err := service.applyTaskCommand(ctx, feature, task, "tekroo.command.task.authorize-qualified-assignment", kernel.SchemaVersion, service.policyAuthority, assignment, evidence, nil, "assignment"); err != nil {
-		return err
+	if state.Phase == kernel.PhasePlanned {
+		if err := service.applyTaskCommand(ctx, feature, task, "tekroo.command.task.mark-ready", kernel.SchemaVersion, service.policyAuthority, map[string]any{"dependency_event_ids": append([]kernel.UUIDv7{}, dependencyEvents...), "readiness_policy_revision": service.planning.PolicyRevision}, nil, nil, "ready"); err != nil {
+			return err
+		}
+		state.Phase = kernel.PhaseReady
+		snapshot, err = service.Store.LoadDecision(ctx, kernel.KernelCommand{Target: taskRef})
+		if err != nil {
+			return err
+		}
+		if snapshot.State == nil || snapshot.State.Revision != task.revision {
+			return organization.ErrInvalidFeature
+		}
 	}
-	actorAuthority := kernel.PrincipalRef{Kind: kernel.PrincipalActor, ID: string(task.owner.ActorFQN)}
-	if err := service.applyActorTaskCommand(ctx, feature, task, "tekroo.command.task.acquire-ownership", actorAuthority, map[string]any{"owner_fqn": task.owner.ActorFQN, "expected_ownership_version": 0}, "ownership"); err != nil {
-		return err
+	if state.Phase != kernel.PhaseReady && state.Phase != kernel.PhaseActive {
+		return organization.ErrInvalidFeature
 	}
-	if err := service.applyActorTaskCommand(ctx, feature, task, "tekroo.command.task.activate", actorAuthority, map[string]any{"owner_fqn": task.owner.ActorFQN, "ownership_version": 1}, "activate"); err != nil {
-		return err
+	if _, assignmentFound := snapshot.QualifiedAssignments[taskRef]; assignmentFound {
+		if err := service.rebindPlanningRecoveryAssignment(ctx, feature, task, profileConfig, task.owner); err != nil {
+			return err
+		}
+	} else {
+		assignmentID := deterministicOperationalUUID("assignment", string(feature.ID), string(task.plan.ID))
+		qualification, qualified := profileConfig.qualificationReceipt()
+		if !qualified {
+			return organization.ErrInvalidFeature
+		}
+		assignment := map[string]any{
+			"assignment_id": assignmentID, "task_id": task.plan.ID, "expected_task_revision": task.revision, "work_profile": task.profile.Binding(),
+			"required_decision_route": task.plan.DecisionRoute, "selected_decision_route": qualification.DecisionRoute, "selected_actor_fqn": task.owner.ActorFQN,
+			"selected_execution_id": task.owner.Execution.ExecutionID, "selected_fencing_epoch": task.owner.Execution.FencingEpoch,
+			"model_profile_digest": profileConfig.ModelProfileDigest, "runtime_identity_digest": profileConfig.RuntimeIdentityDigest, "qualification": qualification,
+			"selection_policy_revision": service.planning.PolicyRevision, "selection_policy_digest": service.planning.SelectionPolicyDigest,
+			"hard_constraint_results": []map[string]any{{"constraint_id": "exact-role-model-workspace", "outcome": "PASS", "evidence_ids": []kernel.UUIDv7{evidenceID}}},
+			"selection_reasons":       []string{"exact configured role, qualified model profile, and workspace binding"}, "evidence_ids": evidenceIDs(evidence),
+		}
+		currentExecution, executionFound := snapshot.CurrentExecutions[task.owner.ActorFQN]
+		profileSnapshot, profileFound := snapshot.WorkProfiles[taskRef]
+		if snapshot.State == nil || snapshot.State.Revision != task.revision || !task.profile.Binding().TaskBindingMatches(*snapshot.State) || !profileFound || !profileSnapshot.Valid() || profileSnapshot.Profile.Binding() != task.profile.Binding() || profileSnapshot.Profile.MinimumDecisionRoute != task.plan.DecisionRoute || !executionFound || currentExecution != task.owner.Execution {
+			return fmt.Errorf("qualified assignment preflight for task %s does not match current task, profile, or execution state: %w", task.plan.ID, organization.ErrInvalidFeature)
+		}
+		assignmentKey := "assignment-" + string(task.owner.Execution.ExecutionID) + "-" + string(task.profile.ProfileID)
+		if err := service.applyTaskCommand(ctx, feature, task, "tekroo.command.task.authorize-qualified-assignment", kernel.SchemaVersion, service.policyAuthority, assignment, evidence, nil, assignmentKey); err != nil {
+			return fmt.Errorf("authorize assignment at task revision %d: %w", task.revision, err)
+		}
+	}
+	if state.Phase == kernel.PhaseReady {
+		actorAuthority := kernel.PrincipalRef{Kind: kernel.PrincipalActor, ID: string(task.owner.ActorFQN)}
+		if state.Ownership.OwnerFQN == nil {
+			ownershipKey := "ownership-" + string(task.owner.Execution.ExecutionID)
+			if err := service.applyActorTaskCommand(ctx, feature, task, "tekroo.command.task.acquire-ownership", actorAuthority, map[string]any{"owner_fqn": task.owner.ActorFQN, "expected_ownership_version": 0}, ownershipKey); err != nil {
+				return err
+			}
+			state.Ownership.OwnerFQN = &task.owner.ActorFQN
+			state.Ownership.OwnershipVersion = 1
+		}
+		if state.Ownership.OwnerFQN == nil || *state.Ownership.OwnerFQN != task.owner.ActorFQN || state.Ownership.OwnershipVersion != 1 {
+			return organization.ErrInvalidFeature
+		}
+		activateKey := "activate-" + string(task.owner.Execution.ExecutionID)
+		if err := service.applyActorTaskCommand(ctx, feature, task, "tekroo.command.task.activate", actorAuthority, map[string]any{"owner_fqn": task.owner.ActorFQN, "ownership_version": state.Ownership.OwnershipVersion}, activateKey); err != nil {
+			return err
+		}
+		state.Phase = kernel.PhaseActive
+	} else if state.Ownership.OwnerFQN == nil || *state.Ownership.OwnerFQN != task.owner.ActorFQN {
+		return organization.ErrInvalidFeature
 	}
 	taskModelLimit := uint64(task.plan.AttemptLimit + task.plan.ReviewRoundLimit + 2)
 	taskLimits := make(kernel.PurposeCounters, len(kernel.AllWorkPurposes))
@@ -277,14 +378,35 @@ func (service *ProductionService) activateTask(ctx context.Context, feature orga
 	taskLimits[task.plan.Purpose] = uint64(task.plan.AttemptLimit)
 	taskLimits[kernel.PurposeRepair] = uint64(task.plan.ReviewRoundLimit)
 	taskLimits[kernel.PurposeEscalation] = 1
-	budgetPayload := map[string]any{"task_id": task.plan.ID, "budget_account_id": feature.BudgetAccountID, "expected_task_revision": task.revision, "lifecycle_epoch": feature.LifecycleEpoch, "scope_revision": feature.ScopeRevision, "task_model_invocation_limit": taskModelLimit, "purpose_limits": taskLimits, "evidence_ids": []kernel.UUIDv7{evidenceID}}
-	preconditions := []kernel.AggregatePrecondition{{Aggregate: kernel.AggregateRef{Kind: kernel.AggregateWorkBudget, ID: feature.BudgetAccountID}, Expected: kernel.NewExpectedRevision(budgetRevision)}}
-	if err := service.applyTaskCommand(ctx, feature, task, "tekroo.command.task.bind-work-budget", kernel.OperationalSchemaVersion, service.policyAuthority, budgetPayload, evidence, preconditions, "task-budget"); err != nil {
+	if binding, bindingFound := snapshot.TaskWorkBudgets[taskRef]; bindingFound {
+		if !binding.Valid() || binding.BudgetAccountID != feature.BudgetAccountID {
+			return organization.ErrInvalidFeature
+		}
+	} else {
+		budgetPayload := map[string]any{"task_id": task.plan.ID, "budget_account_id": feature.BudgetAccountID, "expected_task_revision": task.revision, "lifecycle_epoch": task.profile.LifecycleEpoch, "scope_revision": task.profile.ScopeRevision, "task_model_invocation_limit": taskModelLimit, "purpose_limits": taskLimits, "evidence_ids": evidenceIDs(evidence)}
+		preconditions := []kernel.AggregatePrecondition{{Aggregate: kernel.AggregateRef{Kind: kernel.AggregateWorkBudget, ID: feature.BudgetAccountID}, Expected: kernel.NewExpectedRevision(budgetRevision)}}
+		budgetKey := "task-budget-" + fmt.Sprint(budgetRevision)
+		if err := service.applyTaskCommand(ctx, feature, task, "tekroo.command.task.bind-work-budget", kernel.OperationalSchemaVersion, service.policyAuthority, budgetPayload, evidence, preconditions, budgetKey); err != nil {
+			return err
+		}
+	}
+	if _, scopeFound := snapshot.TaskOperationalScopes[taskRef]; scopeFound {
+		if err := service.refreshTaskExecutionBinding(ctx, feature, task, profileConfig, workspace); err != nil {
+			return err
+		}
+	} else {
+		scopePayload := map[string]any{"task_id": task.plan.ID, "expected_task_revision": task.revision, "lifecycle_epoch": task.profile.LifecycleEpoch, "scope_revision": task.profile.ScopeRevision, "owner_fqn": task.owner.ActorFQN, "execution_id": task.owner.Execution.ExecutionID, "fencing_epoch": task.owner.Execution.FencingEpoch, "workspace_id": workspace.WorkspaceID, "worktree_id": workspace.WorktreeID, "branch": workspace.Branch, "baseline_sha": workspace.BaselineSHA, "writable_paths": workspace.WritablePaths, "interface_constraint_evidence_ids": evidenceIDs(evidence)}
+		scopeKey := "scope-" + string(task.owner.Execution.ExecutionID) + "-" + workspace.BaselineSHA
+		if err := service.applyTaskCommand(ctx, feature, task, "tekroo.command.task.bind-operational-scope", kernel.OperationalSchemaVersion, service.policyAuthority, scopePayload, evidence, nil, scopeKey); err != nil {
+			return err
+		}
+	}
+	latestSnapshot, err := service.Store.LoadDecision(ctx, kernel.KernelCommand{Target: taskRef})
+	if err != nil {
 		return err
 	}
-	scopePayload := map[string]any{"task_id": task.plan.ID, "expected_task_revision": task.revision, "lifecycle_epoch": feature.LifecycleEpoch, "scope_revision": feature.ScopeRevision, "owner_fqn": task.owner.ActorFQN, "execution_id": task.owner.Execution.ExecutionID, "fencing_epoch": task.owner.Execution.FencingEpoch, "workspace_id": workspace.WorkspaceID, "worktree_id": workspace.WorktreeID, "branch": workspace.Branch, "baseline_sha": workspace.BaselineSHA, "writable_paths": workspace.WritablePaths, "interface_constraint_evidence_ids": []kernel.UUIDv7{evidenceID}}
-	if err := service.applyTaskCommand(ctx, feature, task, "tekroo.command.task.bind-operational-scope", kernel.OperationalSchemaVersion, service.policyAuthority, scopePayload, evidence, nil, "scope"); err != nil {
-		return err
+	if _, alreadyAuthorized := latestTaskInvocation(latestSnapshot.WorkInvocations, task.plan.ID); alreadyAuthorized {
+		return nil
 	}
 	return service.authorizeTaskInvocationWithCondition(ctx, feature, task, profileConfig, workspace, budgetRevision, task.plan.Purpose, 1, nil, conditionDigests)
 }
@@ -298,6 +420,18 @@ func (service *ProductionService) authorizeTaskInvocationWithCondition(ctx conte
 }
 
 func (service *ProductionService) authorizeTaskInvocationWithConditionPolicy(ctx context.Context, feature organization.FeatureRequest, task *trackedTask, profile ProductionProfile, workspace ProductionWorkspace, budgetRevision uint64, purpose kernel.WorkPurpose, attempt uint64, prior *kernel.WorkInvocation, conditionDigests []kernel.Digest, technicalExtension, reusePriorCondition bool) error {
+	if task == nil || !profile.qualifiedFor(task.plan.DecisionRoute, invocationWorkKind(task, purpose), service.clock.Now().UTC()) {
+		return organization.ErrInvalidFeature
+	}
+	releaseAdmission, err := service.beginNewInvocationAdmission()
+	if err != nil {
+		return err
+	}
+	invocationCreated := false
+	defer func() { releaseAdmission(invocationCreated) }()
+	if service.requestTimeout > 0 && !task.profile.Budgets.DeadlineAt.After(service.clock.Now().UTC().Add(service.requestTimeout)) {
+		return ErrInsufficientExecutionRunway
+	}
 	limit := uint64(task.plan.AttemptLimit)
 	if purpose == kernel.PurposeRepair {
 		limit = uint64(task.plan.ReviewRoundLimit)
@@ -346,7 +480,7 @@ func (service *ProductionService) authorizeTaskInvocationWithConditionPolicy(ctx
 	payload, err := json.Marshal(map[string]any{
 		"invocation_id": invocationID, "task_id": task.plan.ID, "budget_account_id": feature.BudgetAccountID,
 		"expected_budget_revision": budgetRevision, "expected_task_revision": task.revision,
-		"lifecycle_epoch": feature.LifecycleEpoch, "scope_revision": feature.ScopeRevision, "parent_event_id": task.last,
+		"lifecycle_epoch": task.profile.LifecycleEpoch, "scope_revision": task.profile.ScopeRevision, "parent_event_id": task.last,
 		"work_profile": task.profile.Binding(), "qualified_assignment_id": deterministicOperationalUUID("assignment", string(feature.ID), string(task.plan.ID)),
 		"purpose": purpose, "attempt_family": strings.ToLower(string(purpose)), "attempt_ordinal": attempt,
 		"condition_digest": conditionDigest, "retry_of_invocation_id": retryID, "retry_ordinal": retryOrdinal,
@@ -381,7 +515,22 @@ func (service *ProductionService) authorizeTaskInvocationWithConditionPolicy(ctx
 	if receipt.OutcomeCode != kernel.OutcomeApplied && receipt.OutcomeCode != kernel.OutcomeNoChange {
 		return fmt.Errorf("%s rejected: %s", command.CommandType, receipt.ReasonCode)
 	}
+	invocationCreated = receipt.OutcomeCode == kernel.OutcomeApplied
 	return nil
+}
+
+// A repair is a new purpose within the already classified task, not a new
+// task classification. Keep it bound to the task's qualified work kind so a
+// failed review can return work to the selected implementer without requiring
+// an unrelated assignment or silently bypassing profile qualification.
+func invocationWorkKind(task *trackedTask, purpose kernel.WorkPurpose) kernel.WorkKind {
+	if task != nil && purpose == kernel.PurposeRepair {
+		return task.profile.WorkKind
+	}
+	if task == nil {
+		return ""
+	}
+	return workKindForPurpose(purpose, task.plan.Risk)
 }
 
 func validInvocationContinuation(prior kernel.WorkInvocation, purpose kernel.WorkPurpose, attempt uint64, technicalExtension, reusePriorCondition bool) bool {
@@ -389,7 +538,7 @@ func validInvocationContinuation(prior kernel.WorkInvocation, purpose kernel.Wor
 		return false
 	}
 	if !reusePriorCondition {
-		return technicalExtension && recoverablePlanningTerminal(prior)
+		return technicalExtension && (recoverableTaskTerminal(prior) || prior.State == kernel.InvocationSucceeded && (purpose == kernel.PurposeValidation || purpose == kernel.PurposeReview || purpose == kernel.PurposeReplan)) || !technicalExtension && prior.State == kernel.InvocationSucceeded && (purpose == kernel.PurposeValidation || purpose == kernel.PurposeReview)
 	}
 	if prior.Retryable == nil || !*prior.Retryable {
 		return false
@@ -416,9 +565,11 @@ func (service *ProductionService) extendTaskTechnicalRetryBudget(ctx context.Con
 	}
 	// A recovery pass can be interrupted after the budget binding commits but
 	// before the replacement invocation is authorized. Treat the committed
-	// capacity as the durable checkpoint instead of submitting the same command
-	// again with a newer task revision.
-	if !extensionRequired {
+	// capacity and lifecycle as the durable checkpoint instead of submitting the
+	// same command again with a newer task revision. A reopened task must rebind
+	// even when it already has enough capacity: invocation authorization rejects
+	// a budget binding from an earlier lifecycle or scope revision.
+	if !taskRetryBudgetRebindRequired(binding, task.profile, extensionRequired) {
 		return account.Revision, nil
 	}
 	evidenceIDs := profile.Profile.ClassificationEvidenceIDs
@@ -428,15 +579,19 @@ func (service *ProductionService) extendTaskTechnicalRetryBudget(ctx context.Con
 	}
 	payload := map[string]any{
 		"task_id": task.plan.ID, "budget_account_id": feature.BudgetAccountID, "expected_task_revision": task.revision,
-		"lifecycle_epoch": feature.LifecycleEpoch, "scope_revision": feature.ScopeRevision,
+		"lifecycle_epoch": task.profile.LifecycleEpoch, "scope_revision": task.profile.ScopeRevision,
 		"task_model_invocation_limit": modelLimit, "purpose_limits": limits, "evidence_ids": evidenceIDs,
 	}
 	preconditions := []kernel.AggregatePrecondition{{Aggregate: budgetRef, Expected: kernel.NewExpectedRevision(account.Revision)}}
-	key := "technical-retry-budget-" + strings.ToLower(string(purpose)) + "-" + fmt.Sprint(attempt) + "-" + string(task.owner.Execution.ExecutionID)
+	key := "technical-retry-budget-" + strings.ToLower(string(purpose)) + "-" + fmt.Sprint(attempt) + "-" + fmt.Sprint(task.profile.LifecycleEpoch) + "-" + fmt.Sprint(task.profile.ScopeRevision) + "-" + string(task.owner.Execution.ExecutionID)
 	if err := service.applyTaskCommand(ctx, feature, task, "tekroo.command.task.bind-work-budget", kernel.OperationalSchemaVersion, service.policyAuthority, payload, evidence, preconditions, key); err != nil {
 		return 0, err
 	}
 	return account.Revision, nil
+}
+
+func taskRetryBudgetRebindRequired(binding kernel.TaskWorkBudgetBinding, profile kernel.WorkRiskProfile, extensionRequired bool) bool {
+	return extensionRequired || binding.LifecycleEpoch != profile.LifecycleEpoch || binding.ScopeRevision != profile.ScopeRevision
 }
 
 func technicalRetryBudgetExtension(binding kernel.TaskWorkBudgetBinding, account kernel.WorkBudgetAccount, purpose kernel.WorkPurpose) (uint64, kernel.PurposeCounters, bool, error) {
@@ -468,8 +623,12 @@ type taskExecutionRefreshPlan struct {
 	scope      bool
 }
 
-func planTaskExecutionRefresh(task *trackedTask, profile ProductionProfile, workspace ProductionWorkspace, snapshot kernel.Snapshot) (taskExecutionRefreshPlan, error) {
-	if task == nil || task.plan.Owner != task.owner.ActorFQN || task.owner.WorkspaceID != workspace.WorkspaceID || task.owner.ModelProfile != task.plan.ModelProfile || task.owner.Execution.Valid() == false {
+func planTaskExecutionRefresh(task *trackedTask, profile ProductionProfile, workspace ProductionWorkspace, snapshot kernel.Snapshot, at time.Time) (taskExecutionRefreshPlan, error) {
+	workKind := kernel.WorkImplementation
+	if task != nil {
+		workKind = workKindForPurpose(task.plan.Purpose, task.plan.Risk)
+	}
+	if task == nil || !profile.qualifiedFor(task.plan.DecisionRoute, workKind, at) || task.plan.Owner != task.owner.ActorFQN || task.owner.WorkspaceID != workspace.WorkspaceID || task.owner.ModelProfile != task.plan.ModelProfile || task.owner.Execution.Valid() == false {
 		return taskExecutionRefreshPlan{}, organization.ErrInvalidFeature
 	}
 	taskRef := kernel.AggregateRef{Kind: kernel.AggregateTask, ID: task.plan.ID}
@@ -481,12 +640,8 @@ func planTaskExecutionRefresh(task *trackedTask, profile ProductionProfile, work
 		return taskExecutionRefreshPlan{}, organization.ErrInvalidFeature
 	}
 	assignmentProfileCurrent := assignment.WorkProfile == task.profile.Binding()
-	assignmentProfilePredecessor := task.profile.SupersedesProfileID != nil &&
-		assignment.WorkProfile.ProfileID == *task.profile.SupersedesProfileID &&
-		assignment.WorkProfile.ProfileRevision+1 == task.profile.ProfileRevision &&
-		assignment.WorkProfile.LifecycleEpoch == task.profile.LifecycleEpoch &&
-		assignment.WorkProfile.ScopeRevision == task.profile.ScopeRevision
-	if assignment.TaskID != task.plan.ID || assignment.SelectedActorFQN != task.owner.ActorFQN || !assignmentProfileCurrent && !assignmentProfilePredecessor || assignment.ModelProfileDigest != profile.ModelProfileDigest || assignment.RuntimeIdentityDigest != profile.RuntimeIdentityDigest || assignment.Qualification.QualificationID != profile.Qualification.QualificationID || assignment.Qualification.QualificationDigest != profile.Qualification.QualificationDigest || assignment.Qualification.QualificationCorpusDigest != profile.Qualification.QualificationCorpusDigest || assignment.Qualification.ModelProfileDigest != profile.Qualification.ModelProfileDigest || assignment.Qualification.DecisionRoute != profile.Qualification.DecisionRoute || assignment.Qualification.QualifiedRole != profile.Qualification.QualifiedRole || assignment.Qualification.Status != profile.Qualification.Status || !assignment.Qualification.ObservedAt.Equal(profile.Qualification.ObservedAt) {
+	assignmentProfileMaintenancePredecessor := workProfileBindingCurrentOrMaintenanceSuccessor(snapshot, task.plan.ID, assignment.WorkProfile, task.profile.ProfileDigest)
+	if assignment.TaskID != task.plan.ID || assignment.SelectedActorFQN != task.owner.ActorFQN || !assignmentProfileCurrent && !assignmentProfileMaintenancePredecessor || assignment.ModelProfileDigest != profile.ModelProfileDigest || assignment.RuntimeIdentityDigest != profile.RuntimeIdentityDigest || !profile.qualificationMatches(assignment.Qualification, task.plan.DecisionRoute, workKind, at) {
 		return taskExecutionRefreshPlan{}, organization.ErrInvalidFeature
 	}
 	if scope.TaskID != task.plan.ID || scope.OwnerFQN != task.owner.ActorFQN || scope.WorkspaceID != workspace.WorkspaceID || scope.WorktreeID != workspace.WorktreeID || scope.Branch != workspace.Branch || !slices.Equal(scope.WritablePaths, sortedStrings(workspace.WritablePaths)) {
@@ -504,7 +659,7 @@ func (service *ProductionService) refreshTaskExecutionBinding(ctx context.Contex
 	if err != nil {
 		return err
 	}
-	plan, err := planTaskExecutionRefresh(task, profile, workspace, snapshot)
+	plan, err := planTaskExecutionRefresh(task, profile, workspace, snapshot, service.clock.Now().UTC())
 	if err != nil {
 		return err
 	}
@@ -536,8 +691,8 @@ func (service *ProductionService) refreshTaskExecutionBinding(ctx context.Contex
 			return err
 		}
 		payload := map[string]any{
-			"task_id": task.plan.ID, "expected_task_revision": task.revision, "lifecycle_epoch": feature.LifecycleEpoch,
-			"scope_revision": feature.ScopeRevision, "owner_fqn": task.owner.ActorFQN,
+			"task_id": task.plan.ID, "expected_task_revision": task.revision, "lifecycle_epoch": task.profile.LifecycleEpoch,
+			"scope_revision": task.profile.ScopeRevision, "owner_fqn": task.owner.ActorFQN,
 			"execution_id": task.owner.Execution.ExecutionID, "fencing_epoch": task.owner.Execution.FencingEpoch,
 			"workspace_id": workspace.WorkspaceID, "worktree_id": workspace.WorktreeID, "branch": workspace.Branch,
 			"baseline_sha": workspace.BaselineSHA, "writable_paths": workspace.WritablePaths,
@@ -587,7 +742,9 @@ func workKindForPurpose(purpose kernel.WorkPurpose, risk organization.RiskLevel)
 	switch purpose {
 	case kernel.PurposeInvestigation:
 		return kernel.WorkInvestigation
-	case kernel.PurposeValidation, kernel.PurposeReview:
+	case kernel.PurposeValidation:
+		return kernel.WorkValidation
+	case kernel.PurposeReview:
 		if risk == organization.RiskHigh || risk == organization.RiskCritical {
 			return kernel.WorkSecurityReview
 		}
@@ -608,7 +765,7 @@ func (service *ProductionService) applyTaskCommand(ctx context.Context, feature 
 	if err != nil {
 		return err
 	}
-	receipt, err := service.submitDeterministicCommand(ctx, feature, commandType, version, kernel.AggregateTask, task.plan.ID, authority, task.revision, encoded, []kernel.DagParent{{ParentEventID: task.last, EdgeKind: kernel.EdgeCausal}}, evidence, key+"-"+string(task.plan.ID), preconditions...)
+	receipt, err := service.submitDeterministicCommandAtLifecycle(ctx, feature, commandType, version, kernel.AggregateTask, task.plan.ID, authority, task.revision, task.profile.LifecycleEpoch, encoded, []kernel.DagParent{{ParentEventID: task.last, EdgeKind: kernel.EdgeCausal}}, evidence, key+"-"+string(task.plan.ID), preconditions...)
 	if err != nil {
 		return err
 	}
@@ -625,7 +782,7 @@ func (service *ProductionService) applyActorTaskCommand(ctx context.Context, fea
 	if err != nil {
 		return err
 	}
-	receipt, err := service.submitDeterministicActorCommand(ctx, feature, commandType, task.plan.ID, authority, task.owner.ActorFQN, task.owner.Execution, task.revision, encoded, []kernel.DagParent{{ParentEventID: task.last, EdgeKind: kernel.EdgeCausal}}, key+"-"+string(task.plan.ID))
+	receipt, err := service.submitDeterministicActorCommand(ctx, feature, commandType, task.plan.ID, authority, task.owner.ActorFQN, task.owner.Execution, task.revision, task.profile.LifecycleEpoch, encoded, []kernel.DagParent{{ParentEventID: task.last, EdgeKind: kernel.EdgeCausal}}, key+"-"+string(task.plan.ID))
 	if err != nil {
 		return err
 	}
@@ -638,7 +795,14 @@ func (service *ProductionService) applyActorTaskCommand(ctx context.Context, fea
 }
 
 func (service *ProductionService) submitDeterministicCommand(ctx context.Context, feature organization.FeatureRequest, commandType, version string, kind kernel.AggregateKind, id kernel.UUIDv7, authority kernel.PrincipalRef, revision uint64, payload []byte, parents []kernel.DagParent, evidence []kernel.EvidenceRef, key string, preconditions ...kernel.AggregatePrecondition) (kernel.CommandReceipt, error) {
-	command := kernel.KernelCommand{ContractManifest: kernel.ContractIdentity, CommandID: deterministicOperationalUUID("command", string(feature.ID), commandType, string(id), key), CommandType: commandType, CommandVersion: version, Target: kernel.AggregateRef{Kind: kind, ID: id}, Authority: authority, ExpectedRevision: expectedRevision(revision), ExpectedLifecycleEpoch: expectedLifecycleEpoch(kind, revision, feature.LifecycleEpoch), Preconditions: append([]kernel.AggregatePrecondition(nil), preconditions...), ExpectedPolicyRevision: service.provenance.PolicyRevision, ExpectedCatalogueRevision: kernel.CatalogueRevision, IdempotencyKey: "feature:" + string(feature.ID) + ":" + key, CorrelationID: feature.ID, Causation: append([]kernel.DagParent(nil), parents...), Payload: append([]byte(nil), payload...), EvidenceRefs: append([]kernel.EvidenceRef(nil), evidence...)}
+	return service.submitDeterministicCommandAtLifecycle(ctx, feature, commandType, version, kind, id, authority, revision, feature.LifecycleEpoch, payload, parents, evidence, key, preconditions...)
+}
+
+func (service *ProductionService) submitDeterministicCommandAtLifecycle(ctx context.Context, feature organization.FeatureRequest, commandType, version string, kind kernel.AggregateKind, id kernel.UUIDv7, authority kernel.PrincipalRef, revision, lifecycleEpoch uint64, payload []byte, parents []kernel.DagParent, evidence []kernel.EvidenceRef, key string, preconditions ...kernel.AggregatePrecondition) (kernel.CommandReceipt, error) {
+	command := kernel.KernelCommand{ContractManifest: kernel.ContractIdentity, CommandID: deterministicOperationalUUID("command", string(feature.ID), commandType, string(id), key), CommandType: commandType, CommandVersion: version, Target: kernel.AggregateRef{Kind: kind, ID: id}, Authority: authority, ExpectedRevision: expectedRevision(revision), ExpectedLifecycleEpoch: expectedLifecycleEpoch(kind, revision, lifecycleEpoch), Preconditions: append([]kernel.AggregatePrecondition(nil), preconditions...), ExpectedPolicyRevision: service.provenance.PolicyRevision, ExpectedCatalogueRevision: kernel.CatalogueRevision, IdempotencyKey: "feature:" + string(feature.ID) + ":" + key, CorrelationID: feature.ID, Causation: append([]kernel.DagParent(nil), parents...), Payload: append([]byte(nil), payload...), EvidenceRefs: append([]kernel.EvidenceRef(nil), evidence...)}
+	if _, err := service.Runtime.catalogue.ResolveCommand(command.CommandType, command.CommandVersion, command.Target.Kind, command.Payload); err != nil {
+		return kernel.CommandReceipt{}, fmt.Errorf("%s payload: %w", commandType, err)
+	}
 	receipt, err := service.Submit(ctx, command)
 	if err != nil {
 		return receipt, fmt.Errorf("%s: %w", commandType, err)
@@ -649,8 +813,8 @@ func (service *ProductionService) submitDeterministicCommand(ctx context.Context
 	return receipt, nil
 }
 
-func (service *ProductionService) submitDeterministicActorCommand(ctx context.Context, feature organization.FeatureRequest, commandType string, id kernel.UUIDv7, authority kernel.PrincipalRef, actor kernel.ActorFQN, execution kernel.ExecutionTuple, revision uint64, payload []byte, parents []kernel.DagParent, key string) (kernel.CommandReceipt, error) {
-	command := kernel.KernelCommand{ContractManifest: kernel.ContractIdentity, CommandID: deterministicOperationalUUID("command", string(feature.ID), commandType, string(id), key), CommandType: commandType, CommandVersion: kernel.SchemaVersion, Target: kernel.AggregateRef{Kind: kernel.AggregateTask, ID: id}, Authority: authority, ActorFQN: &actor, Execution: &execution, ExpectedRevision: kernel.NewExpectedRevision(revision), ExpectedLifecycleEpoch: expectedLifecycleEpoch(kernel.AggregateTask, revision, feature.LifecycleEpoch), Preconditions: []kernel.AggregatePrecondition{}, ExpectedPolicyRevision: service.provenance.PolicyRevision, ExpectedCatalogueRevision: kernel.CatalogueRevision, IdempotencyKey: "feature:" + string(feature.ID) + ":" + key, CorrelationID: feature.ID, Causation: append([]kernel.DagParent(nil), parents...), Payload: append([]byte(nil), payload...), EvidenceRefs: []kernel.EvidenceRef{}}
+func (service *ProductionService) submitDeterministicActorCommand(ctx context.Context, feature organization.FeatureRequest, commandType string, id kernel.UUIDv7, authority kernel.PrincipalRef, actor kernel.ActorFQN, execution kernel.ExecutionTuple, revision, lifecycleEpoch uint64, payload []byte, parents []kernel.DagParent, key string) (kernel.CommandReceipt, error) {
+	command := kernel.KernelCommand{ContractManifest: kernel.ContractIdentity, CommandID: deterministicOperationalUUID("command", string(feature.ID), commandType, string(id), key), CommandType: commandType, CommandVersion: kernel.SchemaVersion, Target: kernel.AggregateRef{Kind: kernel.AggregateTask, ID: id}, Authority: authority, ActorFQN: &actor, Execution: &execution, ExpectedRevision: kernel.NewExpectedRevision(revision), ExpectedLifecycleEpoch: expectedLifecycleEpoch(kernel.AggregateTask, revision, lifecycleEpoch), Preconditions: []kernel.AggregatePrecondition{}, ExpectedPolicyRevision: service.provenance.PolicyRevision, ExpectedCatalogueRevision: kernel.CatalogueRevision, IdempotencyKey: "feature:" + string(feature.ID) + ":" + key, CorrelationID: feature.ID, Causation: append([]kernel.DagParent(nil), parents...), Payload: append([]byte(nil), payload...), EvidenceRefs: []kernel.EvidenceRef{}}
 	receipt, err := service.Submit(ctx, command)
 	if err != nil {
 		return receipt, fmt.Errorf("%s: %w", commandType, err)

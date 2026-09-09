@@ -60,6 +60,7 @@ type ProductionConfig struct {
 	Evidence                ProductionEvidence        `json:"evidence"`
 	Worker                  ProductionWorker          `json:"worker"`
 	Projection              ProductionProjection      `json:"projection"`
+	Continuity              *ProductionContinuity     `json:"continuity,omitempty"`
 	Organization            ProductionOrganization    `json:"organization"`
 	Planning                ProductionPlanning        `json:"planning"`
 	Git                     *ProductionGitConfig      `json:"git,omitempty"`
@@ -130,23 +131,165 @@ type ProductionWorkspace struct {
 }
 
 type ProductionProfile struct {
-	ModelProfileDigest    kernel.Digest                         `json:"model_profile_digest"`
-	RuntimeIdentityDigest kernel.Digest                         `json:"runtime_identity_digest"`
-	ToolPolicyDigest      kernel.Digest                         `json:"tool_policy_digest"`
-	EffectPolicyDigest    kernel.Digest                         `json:"effect_policy_digest"`
-	MaximumIterations     uint32                                `json:"maximum_iterations"`
-	Qualification         kernel.AssignmentQualificationReceipt `json:"qualification"`
+	ModelProfileDigest    kernel.Digest                              `json:"model_profile_digest"`
+	RoleFQRN              kernel.RoleFQRN                            `json:"role_fqrn"`
+	RoleBundleDigest      kernel.Digest                              `json:"role_bundle_digest"`
+	DecisionRoute         kernel.DecisionRoute                       `json:"decision_route"`
+	RuntimeIdentityDigest kernel.Digest                              `json:"runtime_identity_digest"`
+	ToolPolicyDigest      kernel.Digest                              `json:"tool_policy_digest"`
+	EffectPolicyDigest    kernel.Digest                              `json:"effect_policy_digest"`
+	AgentSettings         json.RawMessage                            `json:"agent_settings"`
+	MaximumIterations     uint32                                     `json:"maximum_iterations"`
+	QualificationCorpus   *application.QualificationCorpusDefinition `json:"qualification_corpus,omitempty"`
+	Qualification         *kernel.ModelProfileQualification          `json:"qualification,omitempty"`
+}
+
+func (profile ProductionProfile) qualificationDefinitionValid() bool {
+	qualification := profile.Qualification
+	corpus := profile.QualificationCorpus
+	if qualification == nil || corpus == nil || !qualification.Valid() || !corpus.Valid() {
+		return false
+	}
+	qualificationDigest, qualificationErr := application.QualificationDigest(*qualification)
+	corpusDigest, corpusErr := corpus.Digest()
+	return qualificationErr == nil && corpusErr == nil &&
+		qualification.QualificationDigest == qualificationDigest &&
+		qualification.QualificationCorpusDigest == corpusDigest &&
+		qualification.ModelProfileDigest == profile.ModelProfileDigest &&
+		qualification.DecisionRoute == profile.DecisionRoute &&
+		qualification.QualifiedRole == string(profile.RoleFQRN) &&
+		corpus.DecisionRoute == qualification.DecisionRoute &&
+		corpus.QualifiedRole == qualification.QualifiedRole &&
+		corpus.ToolSurfaceDigest == profile.ToolPolicyDigest &&
+		sameWorkKinds(corpus.WorkKinds, qualification.QualifiedWorkKinds)
+}
+
+// ValidateOperationalProfileQualifications verifies that the fixed stages of
+// the built-in feature workflow are executable and that at least one
+// implementation role is eligible. Optional role/work-kind combinations stay
+// unavailable until their exact profile is qualified; task admission enforces
+// that boundary if a plan selects one. Configuration parsing intentionally
+// remains separate so qualification packages can be inspected before they are
+// activated.
+func ValidateOperationalProfileQualifications(profiles []ProductionProfile, at time.Time) error {
+	if at.IsZero() {
+		return invalidConfig("qualification evaluation time is invalid")
+	}
+	byRole := make(map[kernel.RoleFQRN]ProductionProfile, len(profiles))
+	for _, profile := range profiles {
+		if _, duplicate := byRole[profile.RoleFQRN]; duplicate {
+			return invalidConfig(fmt.Sprintf("execution profile role %s is duplicated", profile.RoleFQRN))
+		}
+		byRole[profile.RoleFQRN] = profile
+	}
+	for _, requirement := range []struct {
+		role kernel.RoleFQRN
+		kind kernel.WorkKind
+	}{
+		{role: "product-owner", kind: kernel.WorkDesign},
+		{role: "product-owner", kind: kernel.WorkRelease},
+		{role: "project-manager", kind: kernel.WorkDesign},
+		{role: "architect", kind: kernel.WorkDesign},
+		{role: "tester", kind: kernel.WorkValidation},
+	} {
+		profile, found := byRole[requirement.role]
+		if !found {
+			continue
+		}
+		if !profile.qualifiedFor(profile.DecisionRoute, requirement.kind, at) {
+			return invalidConfig(fmt.Sprintf("execution profile %s lacks an eligible exact qualification for %s", requirement.role, requirement.kind))
+		}
+	}
+	for _, role := range []kernel.RoleFQRN{"coder", "senior-coder"} {
+		profile, found := byRole[role]
+		if found && profile.qualifiedFor(profile.DecisionRoute, kernel.WorkImplementation, at) {
+			return nil
+		}
+	}
+	return invalidConfig("no implementation role has an eligible exact qualification for IMPLEMENTATION")
+}
+
+func (profile ProductionProfile) qualifiedFor(required kernel.DecisionRoute, workKind kernel.WorkKind, at time.Time) bool {
+	qualification := profile.Qualification
+	return profile.DecisionRoute.ModelExecutable() &&
+		profile.DecisionRoute.Satisfies(required) &&
+		workKind.Valid() &&
+		profile.qualificationDefinitionValid() &&
+		qualification.EligibleAt(at) &&
+		containsWorkKind(qualification.QualifiedWorkKinds, workKind)
+}
+
+func (profile ProductionProfile) qualificationReceipt() (kernel.AssignmentQualificationReceipt, bool) {
+	if !profile.qualificationDefinitionValid() {
+		return kernel.AssignmentQualificationReceipt{}, false
+	}
+	qualification := profile.Qualification
+	return kernel.AssignmentQualificationReceipt{
+		QualificationID: qualification.QualificationID, QualificationDigest: qualification.QualificationDigest,
+		QualificationCorpusDigest: qualification.QualificationCorpusDigest, ModelProfileDigest: qualification.ModelProfileDigest,
+		DecisionRoute: qualification.DecisionRoute, QualifiedRole: qualification.QualifiedRole,
+		Status: qualification.Status, ObservedAt: qualification.ObservedAt,
+	}, true
+}
+
+func (profile ProductionProfile) qualificationMatches(actual kernel.AssignmentQualificationReceipt, required kernel.DecisionRoute, workKind kernel.WorkKind, at time.Time) bool {
+	if !profile.qualifiedFor(required, workKind, at) {
+		return false
+	}
+	expected, valid := profile.qualificationReceipt()
+	if !valid {
+		return false
+	}
+	return actual.QualificationID == expected.QualificationID &&
+		actual.QualificationDigest == expected.QualificationDigest &&
+		actual.QualificationCorpusDigest == expected.QualificationCorpusDigest &&
+		actual.ModelProfileDigest == expected.ModelProfileDigest &&
+		actual.DecisionRoute == expected.DecisionRoute &&
+		actual.QualifiedRole == expected.QualifiedRole &&
+		actual.Status == expected.Status &&
+		actual.ObservedAt.Equal(expected.ObservedAt)
+}
+
+func containsWorkKind(values []kernel.WorkKind, target kernel.WorkKind) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
+}
+
+func sameWorkKinds(left, right []kernel.WorkKind) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for _, value := range left {
+		if !containsWorkKind(right, value) {
+			return false
+		}
+	}
+	return true
 }
 
 type ProductionPlanning struct {
-	PolicyRevision             uint64        `json:"policy_revision"`
-	ClassificationPolicyDigest kernel.Digest `json:"classification_policy_digest"`
-	PromotionPolicyDigest      kernel.Digest `json:"promotion_policy_digest"`
-	VerificationTopologyDigest kernel.Digest `json:"verification_topology_digest"`
-	SelectionPolicyDigest      kernel.Digest `json:"selection_policy_digest"`
-	BudgetPolicyDigest         kernel.Digest `json:"budget_policy_digest"`
-	RequiredGateIDs            []string      `json:"required_gate_ids"`
-	Deadline                   string        `json:"deadline"`
+	PolicyRevision             uint64                    `json:"policy_revision"`
+	ClassificationPolicyDigest kernel.Digest             `json:"classification_policy_digest"`
+	PromotionPolicyDigest      kernel.Digest             `json:"promotion_policy_digest"`
+	VerificationTopologyDigest kernel.Digest             `json:"verification_topology_digest"`
+	SelectionPolicyDigest      kernel.Digest             `json:"selection_policy_digest"`
+	BudgetPolicyDigest         kernel.Digest             `json:"budget_policy_digest"`
+	RequiredGateIDs            []string                  `json:"required_gate_ids"`
+	CandidateGates             []ProductionCandidateGate `json:"candidate_gates,omitempty"`
+	Deadline                   string                    `json:"deadline"`
+}
+
+// ProductionCandidateGate is a deterministic, non-interactive command that
+// Teams executes itself before exposing an implementation candidate to a
+// validator. Command is an argv vector and is never interpreted by a shell.
+type ProductionCandidateGate struct {
+	GateID  string   `json:"gate_id"`
+	Command []string `json:"command"`
+	Timeout string   `json:"timeout"`
 }
 
 type ProductionExecution struct {
@@ -168,11 +311,22 @@ type ProductionWorker struct {
 	MaximumReconciliations       uint32 `json:"maximum_reconciliations"`
 	MaximumConcurrentInvocations uint32 `json:"maximum_concurrent_invocations"`
 	LeaseOperationTimeout        string `json:"lease_operation_timeout"`
+	StartPaused                  bool   `json:"start_paused,omitempty"`
+	SuspendNewInvocations        bool   `json:"suspend_new_invocations,omitempty"`
+	NewInvocationAdmissionLimit  uint64 `json:"new_invocation_admission_limit,omitempty"`
 }
 
 type ProductionProjection struct {
 	Interval         string `json:"interval"`
 	OperationTimeout string `json:"operation_timeout"`
+}
+
+// ProductionContinuity controls the durable host-availability heartbeat. A
+// missing block uses conservative local defaults so existing deployments gain
+// restart safety without a configuration migration.
+type ProductionContinuity struct {
+	HeartbeatInterval   string `json:"heartbeat_interval"`
+	SuspensionThreshold string `json:"suspension_threshold"`
 }
 
 type ProductionOrganization struct {
@@ -211,6 +365,8 @@ type resolvedProductionConfig struct {
 	leaseOperationTimeout time.Duration
 	projectionInterval    time.Duration
 	projectionTimeout     time.Duration
+	continuityHeartbeat   time.Duration
+	continuityThreshold   time.Duration
 	operatorTimeout       time.Duration
 	team                  organization.LoadedTeam
 	libraryTeams          []organization.LoadedTeam
@@ -356,6 +512,18 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 	if err != nil {
 		return resolvedProductionConfig{}, err
 	}
+	continuityHeartbeat := 2 * time.Second
+	continuityThreshold := 10 * time.Second
+	if config.Continuity != nil {
+		continuityHeartbeat, err = positiveDuration("continuity.heartbeat_interval", config.Continuity.HeartbeatInterval)
+		if err != nil {
+			return resolvedProductionConfig{}, err
+		}
+		continuityThreshold, err = positiveDuration("continuity.suspension_threshold", config.Continuity.SuspensionThreshold)
+		if err != nil || continuityThreshold < 2*continuityHeartbeat {
+			return resolvedProductionConfig{}, invalidConfig("continuity suspension threshold must cover at least two heartbeats")
+		}
+	}
 	operatorTimeout, err := positiveDuration("operator.operation_timeout", config.Operator.OperationTimeout)
 	if err != nil {
 		return resolvedProductionConfig{}, err
@@ -367,6 +535,34 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 	planningDeadline, err := positiveDuration("planning.deadline", config.Planning.Deadline)
 	if err != nil || config.Planning.PolicyRevision == 0 || !config.Planning.ClassificationPolicyDigest.Valid() || !config.Planning.PromotionPolicyDigest.Valid() || !config.Planning.VerificationTopologyDigest.Valid() || !config.Planning.SelectionPolicyDigest.Valid() || !config.Planning.BudgetPolicyDigest.Valid() || len(config.Planning.RequiredGateIDs) == 0 || len(config.Planning.RequiredGateIDs) > 32 {
 		return resolvedProductionConfig{}, invalidConfig("planning policy is invalid")
+	}
+	configuredGates := make(map[string]struct{}, len(config.Planning.CandidateGates))
+	for _, gate := range config.Planning.CandidateGates {
+		gateTimeout, timeoutErr := positiveDuration("planning.candidate_gates.timeout", gate.Timeout)
+		invalidArgument := false
+		for _, argument := range gate.Command {
+			invalidArgument = invalidArgument || strings.TrimSpace(argument) == ""
+		}
+		if timeoutErr != nil || gate.GateID == "" || len(gate.Command) == 0 || invalidArgument || gateTimeout > planningDeadline {
+			return resolvedProductionConfig{}, invalidConfig("candidate gate configuration is invalid")
+		}
+		if _, duplicate := configuredGates[gate.GateID]; duplicate {
+			return resolvedProductionConfig{}, invalidConfig("candidate gate configuration is duplicated")
+		}
+		configuredGates[gate.GateID] = struct{}{}
+	}
+	requiredGates := make(map[string]struct{}, len(config.Planning.RequiredGateIDs))
+	for _, gateID := range config.Planning.RequiredGateIDs {
+		if gateID == "" {
+			return resolvedProductionConfig{}, invalidConfig("required candidate gate identity is invalid")
+		}
+		if _, duplicate := requiredGates[gateID]; duplicate {
+			return resolvedProductionConfig{}, invalidConfig("required candidate gate identity is duplicated")
+		}
+		if _, configured := configuredGates[gateID]; !configured {
+			return resolvedProductionConfig{}, invalidConfig("required candidate gate is not configured")
+		}
+		requiredGates[gateID] = struct{}{}
 	}
 	gitOperationTimeout := time.Duration(0)
 	if config.Git != nil {
@@ -425,11 +621,16 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 		return resolvedProductionConfig{}, invalidConfig("service and expiry authorities are invalid")
 	}
 	workspaceBindings := make([]openhands.WorkspaceBinding, 0, len(config.Workspaces))
+	staticWorkspaceIDs := make(map[string]struct{}, len(config.Workspaces))
 	for _, workspace := range config.Workspaces {
 		info, statErr := os.Stat(workspace.WorkingDirectory)
 		if workspace.WorkspaceID == "" || workspace.WorktreeID == "" || !filepath.IsAbs(workspace.WorkingDirectory) || workspace.Branch == "" || len(workspace.BaselineSHA) != 40 || len(workspace.WritablePaths) == 0 || statErr != nil || !info.IsDir() {
 			return resolvedProductionConfig{}, invalidConfig("workspace binding is invalid or missing")
 		}
+		if _, duplicate := staticWorkspaceIDs[workspace.WorkspaceID]; duplicate {
+			return resolvedProductionConfig{}, invalidConfig("static workspace identity is duplicated")
+		}
+		staticWorkspaceIDs[workspace.WorkspaceID] = struct{}{}
 		workspaceBindings = append(workspaceBindings, openhands.WorkspaceBinding{WorkspaceID: workspace.WorkspaceID, WorktreeID: workspace.WorktreeID, WorkingDirectory: workspace.WorkingDirectory})
 	}
 	if _, err := openhands.NewBoundWorkspaceResolver(workspaceBindings); err != nil {
@@ -437,8 +638,11 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 	}
 	profiles := make([]openhands.ExecutionProfile, 0, len(config.Profiles))
 	for _, profile := range config.Profiles {
-		resolved, profileErr := openhands.NewAcceptedExecutionProfile(profile.ModelProfileDigest, profile.RuntimeIdentityDigest, profile.ToolPolicyDigest, profile.EffectPolicyDigest, profile.MaximumIterations, config.TeamsDatabaseIdentity, config.SMADatabaseIdentity)
-		if profileErr != nil || !profile.Qualification.Valid() || profile.Qualification.ModelProfileDigest != profile.ModelProfileDigest {
+		resolved, profileErr := openhands.NewBoundExecutionProfile(profile.ModelProfileDigest, profile.RoleFQRN, profile.RoleBundleDigest, profile.RuntimeIdentityDigest, profile.ToolPolicyDigest, profile.EffectPolicyDigest, profile.AgentSettings, profile.MaximumIterations, config.TeamsDatabaseIdentity, config.SMADatabaseIdentity)
+		if profileErr != nil || !profile.DecisionRoute.ModelExecutable() {
+			return resolvedProductionConfig{}, invalidConfig("execution profile is invalid")
+		}
+		if (profile.Qualification == nil) != (profile.QualificationCorpus == nil) || profile.Qualification != nil && !profile.qualificationDefinitionValid() {
 			return resolvedProductionConfig{}, invalidConfig("execution profile is invalid")
 		}
 		profiles = append(profiles, resolved)
@@ -464,6 +668,23 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 	team, err := organization.LoadTeamManifest(config.Organization.ManifestFile, config.Organization.ManifestDigest, trustedKeys)
 	if err != nil {
 		return resolvedProductionConfig{}, invalidConfig("team manifest or role bundle is invalid")
+	}
+	profilesByRole := make(map[kernel.RoleFQRN]ProductionProfile, len(config.Profiles))
+	for _, profile := range config.Profiles {
+		if _, duplicate := profilesByRole[profile.RoleFQRN]; duplicate {
+			return resolvedProductionConfig{}, invalidConfig("execution profile role is duplicated")
+		}
+		profilesByRole[profile.RoleFQRN] = profile
+	}
+	if len(profilesByRole) != len(team.Roles) {
+		return resolvedProductionConfig{}, invalidConfig("execution profiles do not exactly cover the team roles")
+	}
+	for _, loaded := range team.Roles {
+		role, roleErr := kernel.ParseRoleFQRN(loaded.Binding.Role)
+		profile, found := profilesByRole[role]
+		if roleErr != nil || !found || profile.ModelProfileDigest != loaded.Binding.ModelProfileDigest || profile.RoleBundleDigest != loaded.Binding.BundleDigest {
+			return resolvedProductionConfig{}, invalidConfig("execution profile does not bind the signed team role")
+		}
 	}
 	if config.Federation != nil {
 		for _, route := range config.Federation.Routes {
@@ -494,7 +715,7 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 	if err := readStrictJSONFile(config.ProvenanceFile, &provenance); err != nil || !provenance.Valid() || provenance.PolicyDigest != policy.PolicyDigest || provenance.PolicyRevision != policy.Revision {
 		return resolvedProductionConfig{}, invalidConfig("provenance file is invalid or does not bind the authorization policy")
 	}
-	return resolvedProductionConfig{ProductionConfig: config, mongoURI: mongoURI, sessionAPIKey: sessionKey, operatorBearerToken: operatorToken, humanCredentials: humanCredentials, authorizationPolicy: policy, provenance: provenance, requestTimeout: requestTimeout, pollInterval: pollInterval, operationTimeout: operationTimeout, leaseDuration: leaseDuration, reconciliation: reconciliation, leaseOperationTimeout: leaseOperationTimeout, projectionInterval: projectionInterval, projectionTimeout: projectionTimeout, operatorTimeout: operatorTimeout, team: team, libraryTeams: libraryTeams, trustedRolePublishers: trustedKeys, roleReconciliation: roleReconciliation, planningDeadline: planningDeadline, gitOperationTimeout: gitOperationTimeout, federationRegistry: federationRegistry, federationPrivateKey: federationPrivateKey, federationTimeout: federationTimeout, federationFutureSkew: federationFutureSkew, federationTTL: federationTTL}, nil
+	return resolvedProductionConfig{ProductionConfig: config, mongoURI: mongoURI, sessionAPIKey: sessionKey, operatorBearerToken: operatorToken, humanCredentials: humanCredentials, authorizationPolicy: policy, provenance: provenance, requestTimeout: requestTimeout, pollInterval: pollInterval, operationTimeout: operationTimeout, leaseDuration: leaseDuration, reconciliation: reconciliation, leaseOperationTimeout: leaseOperationTimeout, projectionInterval: projectionInterval, projectionTimeout: projectionTimeout, continuityHeartbeat: continuityHeartbeat, continuityThreshold: continuityThreshold, operatorTimeout: operatorTimeout, team: team, libraryTeams: libraryTeams, trustedRolePublishers: trustedKeys, roleReconciliation: roleReconciliation, planningDeadline: planningDeadline, gitOperationTimeout: gitOperationTimeout, federationRegistry: federationRegistry, federationPrivateKey: federationPrivateKey, federationTimeout: federationTimeout, federationFutureSkew: federationFutureSkew, federationTTL: federationTTL}, nil
 }
 
 func loadedTeamHasActor(team organization.LoadedTeam, actor kernel.ActorFQN) bool {
@@ -536,6 +757,8 @@ type ProductionService struct {
 	projectionDone         chan error
 	recoveryDone           chan error
 	roleRecoveryDone       chan error
+	featureRecoveryDone    chan error
+	continuityDone         chan error
 	failures               chan error
 	provenance             kernel.ProvenanceBasis
 	operatorToken          string
@@ -546,16 +769,30 @@ type ProductionService struct {
 	roleReconciliation     time.Duration
 	roleMaximumRestarts    uint32
 	messageMaximumAttempts uint32
+	startPaused            bool
+	suspendNewInvocations  bool
+	admissionMu            sync.Mutex
+	admissionLimitEnabled  bool
+	admissionRemaining     uint64
 	faultMu                sync.Mutex
 	recoveryFaults         map[string]RecoveryFault
+	requestTimeout         time.Duration
 	planningDeadline       time.Duration
 	planning               ProductionPlanning
 	profilesByModel        map[kernel.Digest]ProductionProfile
 	workspacesByID         map[string]ProductionWorkspace
+	workspaceResolver      *openhands.BoundWorkspaceResolver
+	taskWorkspaces         *taskWorkspaceManager
+	candidates             *candidateWorkspaceManager
 	serviceAuthority       kernel.PrincipalRef
 	policyAuthority        kernel.PrincipalRef
 	clock                  kernel.Clock
 	ids                    kernel.IDSource
+	deploymentIdentity     kernel.Digest
+	continuityHeartbeat    time.Duration
+	continuityThreshold    time.Duration
+	continuitySession      kernel.UUIDv7
+	continuityMu           sync.Mutex
 	librarySources         []ProductionTeamSource
 	trustedRolePublishers  map[string]ed25519.PublicKey
 	federationAddress      string
@@ -567,6 +804,9 @@ func NewProductionService(ctx context.Context, config ProductionConfig) (*Produc
 	if err != nil {
 		return nil, err
 	}
+	if err := ValidateOperationalProfileQualifications(config.Profiles, time.Now().UTC()); err != nil {
+		return nil, err
+	}
 	if err := os.MkdirAll(config.EvidenceRoot, 0o700); err != nil {
 		return nil, fmt.Errorf("create evidence root: %w", err)
 	}
@@ -575,7 +815,7 @@ func NewProductionService(ctx context.Context, config ProductionConfig) (*Produc
 	}
 	store, err := mongo.Open(ctx, mongo.Config{URI: resolved.mongoURI, Database: config.Mongo.Database, ContractIdentity: kernel.ContractIdentity, ManifestSHA256: ManifestSHA256, MigrationLevel: 1, Policy: resolved.authorizationPolicy, BacklogLimit: config.Mongo.BacklogLimit, DeliveryPolicyRevision: config.Mongo.DeliveryPolicyRevision, DeploymentIdentity: config.DeploymentIdentity})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("open production MongoDB store: %w", err)
 	}
 	fail := func(cause error) (*ProductionService, error) {
 		_ = store.Close(context.WithoutCancel(ctx))
@@ -583,21 +823,41 @@ func NewProductionService(ctx context.Context, config ProductionConfig) (*Produc
 	}
 	catalogue, err := contract.Load(os.DirFS(config.ContractRoot), ContractPackagePath)
 	if err != nil {
-		return fail(err)
+		return fail(fmt.Errorf("load contract catalogue: %w", err))
 	}
 	clock := SystemClock{}
 	ids, err := NewUUIDv7Source(clock)
 	if err != nil {
-		return fail(err)
+		return fail(fmt.Errorf("create UUID source: %w", err))
 	}
 	workspaces := make([]openhands.WorkspaceBinding, 0, len(config.Workspaces))
 	for _, item := range config.Workspaces {
 		workspaces = append(workspaces, openhands.WorkspaceBinding{WorkspaceID: item.WorkspaceID, WorktreeID: item.WorktreeID, WorkingDirectory: item.WorkingDirectory})
 	}
+	workspaceResolver, err := openhands.NewBoundWorkspaceResolver(workspaces)
+	if err != nil {
+		return fail(fmt.Errorf("create workspace resolver: %w", err))
+	}
+	gitBinary := "git"
+	candidateTimeout := resolved.operationTimeout
+	if config.Git != nil {
+		if config.Git.Binary != "" {
+			gitBinary = config.Git.Binary
+		}
+		candidateTimeout = resolved.gitOperationTimeout
+	}
+	taskWorkspaces, err := newTaskWorkspaceManagerWithContext(ctx, config.EvidenceRoot, gitBinary, candidateTimeout, workspaceResolver)
+	if err != nil {
+		return fail(fmt.Errorf("create task workspace manager: %w", err))
+	}
+	candidates, err := newCandidateWorkspaceManagerWithContext(ctx, config.EvidenceRoot, gitBinary, candidateTimeout, config.Planning.CandidateGates, workspaceResolver)
+	if err != nil {
+		return fail(fmt.Errorf("create candidate workspace manager: %w", err))
+	}
 	profiles := make([]openhands.ExecutionProfile, 0, len(config.Profiles))
 	profilesByModel := make(map[kernel.Digest]ProductionProfile, len(config.Profiles))
 	for _, item := range config.Profiles {
-		profile, profileErr := openhands.NewAcceptedExecutionProfile(item.ModelProfileDigest, item.RuntimeIdentityDigest, item.ToolPolicyDigest, item.EffectPolicyDigest, item.MaximumIterations, config.TeamsDatabaseIdentity, config.SMADatabaseIdentity)
+		profile, profileErr := openhands.NewBoundExecutionProfile(item.ModelProfileDigest, item.RoleFQRN, item.RoleBundleDigest, item.RuntimeIdentityDigest, item.ToolPolicyDigest, item.EffectPolicyDigest, item.AgentSettings, item.MaximumIterations, config.TeamsDatabaseIdentity, config.SMADatabaseIdentity)
 		if profileErr != nil {
 			return fail(profileErr)
 		}
@@ -606,12 +866,12 @@ func NewProductionService(ctx context.Context, config ProductionConfig) (*Produc
 	}
 	roleGrounding, err := newBoundRoleGroundingResolver(resolved.team)
 	if err != nil {
-		return fail(err)
+		return fail(fmt.Errorf("create role-grounding resolver: %w", err))
 	}
 	runtime, err := New(ctx, Config{
 		Store: store, Catalogue: catalogue, Clock: clock, IDs: ids,
 		OpenHandsBaseURL: config.OpenHands.BaseURL, OpenHandsSessionAPIKey: resolved.sessionAPIKey,
-		HTTPClient: &http.Client{Timeout: resolved.requestTimeout}, WorkspaceBindings: workspaces, ExecutionProfiles: profiles, RoleGrounding: roleGrounding,
+		HTTPClient: &http.Client{Timeout: resolved.requestTimeout}, WorkspaceBindings: workspaces, WorkspaceResolver: workspaceResolver, ExecutionProfiles: profiles, RoleGrounding: roleGrounding, DeadlineExtensionReader: store,
 		OpenHandsPollInterval: resolved.pollInterval, OpenHandsMaximumPages: config.OpenHands.MaximumPages,
 		OpenHandsMaximumEvidence: config.OpenHands.MaximumEvidenceBytes, EvidenceRoot: config.EvidenceRoot,
 		ExecutionPolicy: application.OperationalExecutionPolicy{OperationTimeout: resolved.operationTimeout, MaximumBriefBytes: config.Execution.MaximumBriefBytes, ConsumerID: config.Execution.ConsumerID, PolicyRevision: config.Execution.PolicyRevision, ServiceAuthority: config.ServiceAuthority, ExpiryAuthority: config.ExpiryAuthority, Provenance: resolved.provenance},
@@ -619,34 +879,34 @@ func NewProductionService(ctx context.Context, config ProductionConfig) (*Produc
 		WorkerPolicy:    executionruntime.Policy{ConsumerID: config.Execution.ConsumerID, LeaseDuration: resolved.leaseDuration, ReconciliationInterval: resolved.reconciliation, MaximumReconciliations: config.Worker.MaximumReconciliations, MaximumConcurrentInvocations: config.Worker.MaximumConcurrentInvocations, LeaseOperationTimeout: resolved.leaseOperationTimeout},
 	})
 	if err != nil {
-		return fail(err)
+		return fail(fmt.Errorf("construct execution runtime: %w", err))
 	}
 	controller, err := NewController(runtime, clock)
 	if err != nil {
 		_ = runtime.Close(context.WithoutCancel(ctx))
-		return fail(err)
+		return fail(fmt.Errorf("create runtime controller: %w", err))
 	}
 	roleInbox := organization.NewRoleInbox()
 	messageBus, err := organization.NewMessageBus(store, store)
 	if err != nil {
 		_ = runtime.Close(context.WithoutCancel(ctx))
-		return fail(err)
+		return fail(fmt.Errorf("create message bus: %w", err))
 	}
 	roleRuntime, err := organization.NewInProcessRuntime(&organizationalRoleWorker{store: store, inbox: roleInbox, pollInterval: resolved.pollInterval, openTimeout: resolved.leaseOperationTimeout})
 	if err != nil {
 		_ = runtime.Close(context.WithoutCancel(ctx))
-		return fail(err)
+		return fail(fmt.Errorf("create role runtime: %w", err))
 	}
 	roleHost, err := organization.NewHost(resolved.team, store, roleRuntime, clock, ids)
 	if err != nil {
 		_ = runtime.Close(context.WithoutCancel(ctx))
-		return fail(err)
+		return fail(fmt.Errorf("create role host: %w", err))
 	}
 	libraryTeams := append([]organization.LoadedTeam{resolved.team}, resolved.libraryTeams...)
 	roleLibrary, err := organization.NewRoleLibrary(libraryTeams...)
 	if err != nil {
 		_ = runtime.Close(context.WithoutCancel(ctx))
-		return fail(err)
+		return fail(fmt.Errorf("create role library: %w", err))
 	}
 	workspacesByID := make(map[string]ProductionWorkspace, len(config.Workspaces))
 	for _, workspace := range config.Workspaces {
@@ -657,7 +917,7 @@ func NewProductionService(ctx context.Context, config ProductionConfig) (*Produc
 	for key, value := range resolved.trustedRolePublishers {
 		trustedPublishers[key] = append(ed25519.PublicKey(nil), value...)
 	}
-	service := &ProductionService{Store: store, Runtime: runtime, Controller: controller, RoleHost: roleHost, RoleRuntime: roleRuntime, MessageBus: messageBus, RoleInbox: roleInbox, RoleLibrary: roleLibrary, projectionInterval: resolved.projectionInterval, projectionTimeout: resolved.projectionTimeout, recoveryInterval: resolved.reconciliation, recoveryTimeout: resolved.leaseOperationTimeout, recoveryAttempts: config.Worker.MaximumReconciliations, failures: make(chan error, 4), provenance: resolved.provenance, operatorToken: resolved.operatorBearerToken, operatorIdentity: protocol.AuthenticatedContext{Principal: config.Operator.Principal}, humanCredentials: append([]HumanTransportCredential(nil), resolved.humanCredentials...), operatorTimeout: resolved.operatorTimeout, operatorMaxBody: config.Operator.MaximumBodyBytes, roleReconciliation: resolved.roleReconciliation, roleMaximumRestarts: config.Organization.MaximumRestarts, messageMaximumAttempts: config.Organization.MaximumDeliveryAttempts, recoveryFaults: make(map[string]RecoveryFault), clock: clock, ids: ids, planningDeadline: resolved.planningDeadline, planning: config.Planning, profilesByModel: profilesByModel, workspacesByID: workspacesByID, serviceAuthority: config.ServiceAuthority, policyAuthority: config.ExpiryAuthority, librarySources: librarySources, trustedRolePublishers: trustedPublishers}
+	service := &ProductionService{Store: store, Runtime: runtime, Controller: controller, RoleHost: roleHost, RoleRuntime: roleRuntime, MessageBus: messageBus, RoleInbox: roleInbox, RoleLibrary: roleLibrary, projectionInterval: resolved.projectionInterval, projectionTimeout: resolved.projectionTimeout, recoveryInterval: resolved.reconciliation, recoveryTimeout: resolved.leaseOperationTimeout, recoveryAttempts: config.Worker.MaximumReconciliations, failures: make(chan error, 4), provenance: resolved.provenance, operatorToken: resolved.operatorBearerToken, operatorIdentity: protocol.AuthenticatedContext{Principal: config.Operator.Principal}, humanCredentials: append([]HumanTransportCredential(nil), resolved.humanCredentials...), operatorTimeout: resolved.operatorTimeout, operatorMaxBody: config.Operator.MaximumBodyBytes, roleReconciliation: resolved.roleReconciliation, roleMaximumRestarts: config.Organization.MaximumRestarts, messageMaximumAttempts: config.Organization.MaximumDeliveryAttempts, startPaused: config.Worker.StartPaused, suspendNewInvocations: config.Worker.SuspendNewInvocations, admissionLimitEnabled: config.Worker.NewInvocationAdmissionLimit > 0, admissionRemaining: config.Worker.NewInvocationAdmissionLimit, recoveryFaults: make(map[string]RecoveryFault), requestTimeout: resolved.requestTimeout, clock: clock, ids: ids, deploymentIdentity: config.DeploymentIdentity, continuityHeartbeat: resolved.continuityHeartbeat, continuityThreshold: resolved.continuityThreshold, planningDeadline: resolved.planningDeadline, planning: config.Planning, profilesByModel: profilesByModel, workspacesByID: workspacesByID, workspaceResolver: workspaceResolver, taskWorkspaces: taskWorkspaces, candidates: candidates, serviceAuthority: config.ServiceAuthority, policyAuthority: config.ExpiryAuthority, librarySources: librarySources, trustedRolePublishers: trustedPublishers}
 	if config.Federation != nil {
 		federationIngress, ingressErr := organization.NewFederationIngress(resolved.federationRegistry, store, config.DeploymentIdentity, resolved.federationFutureSkew)
 		if ingressErr != nil {
@@ -679,7 +939,7 @@ func NewProductionService(ctx context.Context, config ProductionConfig) (*Produc
 	}
 	features, err := organization.NewFeatureCoordinator(store, productionFeatureRoleHost{service: service}, service, clock, ids)
 	if err != nil {
-		return fail(err)
+		return fail(fmt.Errorf("create feature coordinator: %w", err))
 	}
 	service.Features = features
 	if config.Git != nil {
@@ -820,13 +1080,7 @@ func (service *ProductionService) StartRole(ctx context.Context, actor kernel.Ac
 		return organization.RoleInstanceState{}, application.ErrInvalidConfiguration
 	}
 	state, err := service.RoleHost.EnsureStarted(ctx, actor)
-	if err != nil {
-		return state, err
-	}
-	if err := service.registerRoleState(ctx, state); err != nil {
-		return state, err
-	}
-	return state, nil
+	return service.completeRoleStart(ctx, state, err)
 }
 
 func (service *ProductionService) StopRole(ctx context.Context, actor kernel.ActorFQN) (organization.RoleInstanceState, error) {
@@ -841,6 +1095,14 @@ func (service *ProductionService) RestartRole(ctx context.Context, actor kernel.
 		return organization.RoleInstanceState{}, application.ErrInvalidConfiguration
 	}
 	state, err := service.RoleHost.Restart(ctx, actor)
+	return service.completeRoleStart(ctx, state, err)
+}
+
+// completeRoleStart is the single completion path for every exported
+// ProductionService role-start or role-restart operation. Keeping durable
+// execution registration here prevents new lifecycle variants from returning a
+// running role that the execution registry cannot observe or fence.
+func (service *ProductionService) completeRoleStart(ctx context.Context, state organization.RoleInstanceState, err error) (organization.RoleInstanceState, error) {
 	if err != nil {
 		return state, err
 	}
@@ -973,24 +1235,52 @@ func (service *ProductionService) Start(ctx context.Context) error {
 	}
 	service.mu.Lock()
 	defer service.mu.Unlock()
-	if service.Controller == nil || service.Store == nil || service.RoleHost == nil || service.projectionCancel != nil || service.recoveryDone != nil || service.roleRecoveryDone != nil {
+	if service.Controller == nil || service.Store == nil || service.RoleHost == nil || service.projectionCancel != nil || service.recoveryDone != nil || service.roleRecoveryDone != nil || service.continuityDone != nil || !service.deploymentIdentity.Valid() || service.continuityHeartbeat <= 0 || service.continuityThreshold < 2*service.continuityHeartbeat {
 		return application.ErrInvalidConfiguration
 	}
-	if err := service.Controller.Start(ctx); err != nil {
+	session, err := service.ids.Next()
+	if err != nil {
 		return err
+	}
+	service.continuitySession = session
+	if _, _, err := service.Store.StartRuntimeSession(ctx, service.deploymentIdentity, session, service.clock.Now().UTC(), service.continuityThreshold); err != nil {
+		service.continuitySession = ""
+		return fmt.Errorf("start runtime continuity session: %w", err)
+	}
+	if err := service.reconcileRuntimeSuspensions(ctx); err != nil {
+		_ = service.stopRuntimeContinuitySession(context.WithoutCancel(ctx))
+		service.continuitySession = ""
+		return fmt.Errorf("reconcile runtime suspension: %w", err)
+	}
+	var controllerErr error
+	if service.startPaused {
+		controllerErr = service.Controller.StartPaused(ctx)
+	} else {
+		controllerErr = service.Controller.Start(ctx)
+	}
+	if controllerErr != nil {
+		_ = service.stopRuntimeContinuitySession(context.WithoutCancel(ctx))
+		service.continuitySession = ""
+		return controllerErr
 	}
 	if err := service.reconcileDurableRoleExecutions(ctx); err != nil {
 		_ = service.Controller.Stop(context.WithoutCancel(ctx))
+		_ = service.stopRuntimeContinuitySession(context.WithoutCancel(ctx))
+		service.continuitySession = ""
 		return fmt.Errorf("reconcile durable role executions: %w", err)
 	}
 	eager, err := service.RoleHost.StartEager(ctx)
 	if err != nil {
 		_ = service.Controller.Stop(context.WithoutCancel(ctx))
+		_ = service.stopRuntimeContinuitySession(context.WithoutCancel(ctx))
+		service.continuitySession = ""
 		return fmt.Errorf("start eager roles: %w", err)
 	}
 	for _, state := range eager {
 		if err := service.registerRoleState(ctx, state); err != nil {
 			_ = service.Controller.Stop(context.WithoutCancel(ctx))
+			_ = service.stopRuntimeContinuitySession(context.WithoutCancel(ctx))
+			service.continuitySession = ""
 			return fmt.Errorf("register eager role %s: %w", state.ActorFQN, err)
 		}
 	}
@@ -999,6 +1289,8 @@ func (service *ProductionService) Start(ctx context.Context) error {
 	service.projectionDone = make(chan error, 1)
 	service.recoveryDone = make(chan error, 1)
 	service.roleRecoveryDone = make(chan error, 1)
+	service.featureRecoveryDone = make(chan error, 1)
+	service.continuityDone = make(chan error, 1)
 	go func() {
 		err := service.runProjector(projectionContext)
 		if err != nil && !errors.Is(err, context.Canceled) {
@@ -1019,6 +1311,20 @@ func (service *ProductionService) Start(ctx context.Context) error {
 			service.failures <- err
 		}
 		service.roleRecoveryDone <- err
+	}()
+	go func() {
+		err := service.runFeatureRecovery(projectionContext)
+		if err != nil && !errors.Is(err, context.Canceled) {
+			service.failures <- err
+		}
+		service.featureRecoveryDone <- err
+	}()
+	go func() {
+		err := service.runRuntimeContinuity(projectionContext)
+		if err != nil && !errors.Is(err, context.Canceled) {
+			service.failures <- err
+		}
+		service.continuityDone <- err
 	}()
 	go func() {
 		select {
@@ -1043,7 +1349,7 @@ func (service *ProductionService) Stop(ctx context.Context) error {
 	}
 	service.mu.Lock()
 	defer service.mu.Unlock()
-	if service.Controller == nil || service.projectionCancel == nil || service.projectionDone == nil || service.recoveryDone == nil || service.roleRecoveryDone == nil {
+	if service.Controller == nil || service.projectionCancel == nil || service.projectionDone == nil || service.recoveryDone == nil || service.roleRecoveryDone == nil || service.featureRecoveryDone == nil || service.continuityDone == nil || !service.continuitySession.Valid() {
 		return application.ErrInvalidConfiguration
 	}
 	service.projectionCancel()
@@ -1087,10 +1393,30 @@ func (service *ProductionService) Stop(ctx context.Context) error {
 	case <-ctx.Done():
 		result = errors.Join(result, ctx.Err())
 	}
+	select {
+	case err := <-service.featureRecoveryDone:
+		if err != nil && !errors.Is(err, context.Canceled) {
+			result = errors.Join(result, err)
+		}
+	case <-ctx.Done():
+		result = errors.Join(result, ctx.Err())
+	}
+	select {
+	case err := <-service.continuityDone:
+		if err != nil && !errors.Is(err, context.Canceled) {
+			result = errors.Join(result, err)
+		}
+	case <-ctx.Done():
+		result = errors.Join(result, ctx.Err())
+	}
+	result = errors.Join(result, service.stopRuntimeContinuitySession(ctx))
 	service.projectionCancel = nil
 	service.projectionDone = nil
 	service.recoveryDone = nil
 	service.roleRecoveryDone = nil
+	service.featureRecoveryDone = nil
+	service.continuityDone = nil
+	service.continuitySession = ""
 	return result
 }
 
@@ -1162,18 +1488,6 @@ func (service *ProductionService) runRoleRecovery(ctx context.Context) error {
 				}
 			}
 		}
-		if err == nil {
-			if planningErr := service.reconcileFeaturePlanning(operationContext); planningErr != nil {
-				service.recordRecoveryFault("feature-planning", planningErr)
-			} else {
-				service.clearRecoveryFault("feature-planning")
-			}
-			if workErr := service.reconcilePlannedFeatureWork(operationContext); workErr != nil {
-				service.recordRecoveryFault("feature-work", workErr)
-			} else {
-				service.clearRecoveryFault("feature-work")
-			}
-		}
 		cancel()
 		if err != nil {
 			if ctx.Err() != nil {
@@ -1189,6 +1503,50 @@ func (service *ProductionService) runRoleRecovery(ctx context.Context) error {
 		case <-timer.C:
 		}
 	}
+}
+
+// runFeatureRecovery is deliberately separate from role recovery. Feature
+// reconciliation may execute deterministic candidate gates whose configured
+// timeout is much longer than the short lease-operation timeout used for
+// message sweeping and role heartbeats. Giving both jobs the same parent
+// context causes valid gates to be killed at the lease timeout.
+func (service *ProductionService) runFeatureRecovery(ctx context.Context) error {
+	if service.roleReconciliation <= 0 || service.planningDeadline <= 0 {
+		return application.ErrInvalidConfiguration
+	}
+	for {
+		if continuityErr := service.observeAndReconcileRuntimeContinuity(ctx); continuityErr != nil {
+			service.recordRecoveryFault("runtime-continuity", continuityErr)
+		} else {
+			service.clearRecoveryFault("runtime-continuity")
+		}
+		operationContext, cancel := service.featureRecoveryOperationContext(ctx)
+		if planningErr := service.reconcileFeaturePlanning(operationContext); planningErr != nil {
+			service.recordRecoveryFault("feature-planning", planningErr)
+		} else {
+			service.clearRecoveryFault("feature-planning")
+		}
+		if workErr := service.reconcilePlannedFeatureWork(operationContext); workErr != nil {
+			service.recordRecoveryFault("feature-work", workErr)
+		} else {
+			service.clearRecoveryFault("feature-work")
+		}
+		cancel()
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		timer := time.NewTimer(service.roleReconciliation)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return ctx.Err()
+		case <-timer.C:
+		}
+	}
+}
+
+func (service *ProductionService) featureRecoveryOperationContext(parent context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(parent, service.planningDeadline)
 }
 
 type expiredIntentSweeper interface {

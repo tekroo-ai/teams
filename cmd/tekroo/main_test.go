@@ -128,6 +128,53 @@ func TestLoadPlanningRecoveryBuildsFocusedExactInvocationRequest(t *testing.T) {
 	}
 }
 
+func TestLoadFeatureReplanBuildsFocusedExactFeatureRequest(t *testing.T) {
+	t.Parallel()
+	featureID := kernel.UUIDv7("018f0000-0000-7000-8000-000000000010")
+	request := operationalruntime.FeatureReplanRequest{ExpectedRevision: 4, ExpectedPlanVersion: 1, Reason: "replace the observed infeasible task graph", EvidenceRefs: []kernel.EvidenceRef{{EvidenceID: "018f0000-0000-7000-8000-000000000003", SHA256: kernel.Digest(strings.Repeat("a", 64))}}, DeadlineAt: time.Date(2026, 9, 1, 20, 0, 0, 0, time.UTC), IdempotencyKey: "feature-replan-1"}
+	raw, err := json.Marshal(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "feature-replan.json")
+	if err := os.WriteFile(path, raw, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	method, target, loaded, err := loadFeatureReplan([]string{string(featureID), path}, bytes.NewReader(nil), 4096)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if method != http.MethodPost || target != "/v1/features/"+string(featureID)+"/replan" || !bytes.Equal(loaded, raw) {
+		t.Fatalf("feature replan method=%s target=%s", method, target)
+	}
+	if _, _, _, err := loadFeatureReplan([]string{"not-a-feature", path}, bytes.NewReader(nil), 4096); err == nil {
+		t.Fatal("invalid feature accepted")
+	}
+}
+
+func TestLoadTaskRecoveryBuildsFocusedExactInvocationRequest(t *testing.T) {
+	t.Parallel()
+	request := operationalruntime.TaskRecoveryRequest{ExpectedRevision: 4, Reason: "continue after correcting repository progress detection", EvidenceRefs: []kernel.EvidenceRef{{EvidenceID: "018f0000-0000-7000-8000-000000000003", SHA256: kernel.Digest(strings.Repeat("a", 64))}}, DeadlineAt: time.Date(2026, 9, 1, 15, 0, 0, 0, time.UTC), IdempotencyKey: "task-recovery-1"}
+	raw, err := json.Marshal(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "task-recovery.json")
+	if err := os.WriteFile(path, raw, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	method, target, loaded, err := loadTaskRecovery([]string{string(testInvocationID), path}, bytes.NewReader(nil), 4096)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if method != http.MethodPost || target != "/v1/invocations/"+string(testInvocationID)+"/retry-task" || !bytes.Equal(loaded, raw) {
+		t.Fatalf("task recovery method=%s target=%s", method, target)
+	}
+	if _, _, _, err := loadTaskRecovery([]string{"not-an-invocation", path}, bytes.NewReader(nil), 4096); err == nil {
+		t.Fatal("invalid invocation accepted")
+	}
+}
+
 func TestLoadCommandRejectsUnknownAndTrailingJSON(t *testing.T) {
 	t.Parallel()
 	for _, input := range []string{

@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"time"
@@ -162,7 +163,11 @@ func (coordinator *OperationalExecutionCoordinator) Process(ctx context.Context,
 			}
 			requestDigest := *invocation.RequestDigest
 			var observation ExternalExecutionObservation
-			deadlineExceeded := !coordinator.clock.Now().Before(invocation.DeadlineAt)
+			effectiveDeadline, deadlineErr := coordinator.effectiveDeadline(ctx, invocation)
+			if deadlineErr != nil {
+				return result, deadlineErr
+			}
+			deadlineExceeded := !coordinator.clock.Now().Before(effectiveDeadline)
 			if requestDigest != currentRequestDigest {
 				observation, err = coordinator.callBoundary(ctx, func(effectCtx context.Context) (ExternalExecutionObservation, error) {
 					return coordinator.boundary.ReconcileSuperseded(effectCtx, brief, *invocation.ConversationID, requestDigest, currentRequestDigest)
@@ -185,8 +190,11 @@ func (coordinator *OperationalExecutionCoordinator) Process(ctx context.Context,
 					return coordinator.boundary.Inspect(effectCtx, brief, *invocation.ConversationID, requestDigest)
 				})
 			}
-			if err != nil || !externalObservationMatches(brief, requestDigest, observation) || observation.ConversationID != *invocation.ConversationID || observation.State == ExternalAbsent || observation.State == ExternalUnknown || observation.State == ExternalRejected {
-				return result, ErrExternalOutcomeUnknown
+			if err != nil {
+				return result, errors.Join(ErrExternalOutcomeUnknown, fmt.Errorf("inspect external execution: %w", err))
+			}
+			if !externalObservationMatches(brief, requestDigest, observation) || observation.ConversationID != *invocation.ConversationID || observation.State == ExternalAbsent || observation.State == ExternalUnknown || observation.State == ExternalRejected {
+				return result, errors.Join(ErrExternalOutcomeUnknown, ErrInvalidOperationalExecution)
 			}
 			if observation.State == ExternalRunning {
 				return result, nil
@@ -208,7 +216,23 @@ func (coordinator *OperationalExecutionCoordinator) Process(ctx context.Context,
 	return OperationalExecutionResult{InvocationID: current.Invocation.ID, State: current.Invocation.State}, ErrInvalidOperationalExecution
 }
 
+func (coordinator *OperationalExecutionCoordinator) effectiveDeadline(ctx context.Context, invocation kernel.WorkInvocation) (time.Time, error) {
+	reader, ok := coordinator.reader.(OperationalDeadlineExtensionReader)
+	if !ok {
+		return invocation.DeadlineAt, nil
+	}
+	deadline, err := reader.EffectiveWorkInvocationDeadline(ctx, invocation, coordinator.clock.Now())
+	if err != nil {
+		return time.Time{}, err
+	}
+	if deadline.Before(invocation.DeadlineAt) {
+		return time.Time{}, ErrInvalidOperationalExecution
+	}
+	return deadline, nil
+}
+
 func (coordinator *OperationalExecutionCoordinator) startOrReconcile(ctx context.Context, brief ExecutionBrief, requestDigest kernel.Digest, claimedThisCall bool) (ExternalExecutionObservation, error) {
+	var startErr error
 	if claimedThisCall {
 		observation, err := coordinator.callBoundary(ctx, func(effectCtx context.Context) (ExternalExecutionObservation, error) {
 			return coordinator.boundary.Start(effectCtx, brief, requestDigest)
@@ -216,19 +240,24 @@ func (coordinator *OperationalExecutionCoordinator) startOrReconcile(ctx context
 		if err == nil {
 			return observation, nil
 		}
+		startErr = err
 	}
 	observation, err := coordinator.callBoundary(ctx, func(effectCtx context.Context) (ExternalExecutionObservation, error) {
 		return coordinator.boundary.ReconcileStart(effectCtx, brief, requestDigest)
 	})
 	if err != nil {
-		return ExternalExecutionObservation{}, ErrExternalOutcomeUnknown
+		return ExternalExecutionObservation{}, errors.Join(ErrExternalOutcomeUnknown, startErr, fmt.Errorf("reconcile external start: %w", err))
 	}
 	if observation.State != ExternalAbsent {
 		return observation, nil
 	}
-	return coordinator.callBoundary(ctx, func(effectCtx context.Context) (ExternalExecutionObservation, error) {
+	observation, err = coordinator.callBoundary(ctx, func(effectCtx context.Context) (ExternalExecutionObservation, error) {
 		return coordinator.boundary.Start(effectCtx, brief, requestDigest)
 	})
+	if err != nil {
+		return ExternalExecutionObservation{}, errors.Join(ErrExternalOutcomeUnknown, startErr, fmt.Errorf("start external execution: %w", err))
+	}
+	return observation, nil
 }
 
 func (coordinator *OperationalExecutionCoordinator) callBoundary(ctx context.Context, call func(context.Context) (ExternalExecutionObservation, error)) (ExternalExecutionObservation, error) {

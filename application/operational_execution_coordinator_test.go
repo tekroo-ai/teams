@@ -40,7 +40,7 @@ func TestOperationalCoordinatorExecutesOneInvocationAndNeverChainsAgentProse(t *
 		t.Fatalf("role grounding = %#v", runtime.lastBrief.RoleGrounding)
 	}
 	guidance := strings.Join(runtime.lastBrief.ExecutionGuidance, "\n")
-	for _, required := range []string{"role_grounding", "role_fqrn", "AGENTS.md", "rg or rg --files", "exactly one shell command", "do not use cd", "Never repeat an identical read-only command", "semantically equivalent searches", "accepted CONTRACTS packages", "within twelve repository-discovery commands", "focused tests"} {
+	for _, required := range []string{"role_grounding", "role_fqrn", "AGENTS.md", "rg or rg --files", "exactly one shell command", "do not use cd", "concrete open question", "stop discovery", "do not enumerate unrelated directories", "accepted CONTRACTS packages", "focused tests"} {
 		if !strings.Contains(guidance, required) {
 			t.Fatalf("execution guidance omitted %q: %v", required, runtime.lastBrief.ExecutionGuidance)
 		}
@@ -69,7 +69,7 @@ func TestRetryExecutionBriefDirectsAgentToContinueFromRetainedState(t *testing.T
 		t.Fatal(err)
 	}
 	guidance := strings.Join(brief.ExecutionGuidance, "\n")
-	for _, required := range []string{"bounded retry", "do not restart repository discovery", "prior OpenHands conversation", "three additional read-only", "explicit blocker"} {
+	for _, required := range []string{"bounded retry", "do not restart repository discovery", "prior OpenHands conversation", "retained checkpoint", "Distinct, relevant inspections", "exact repeated actions"} {
 		if !strings.Contains(guidance, required) {
 			t.Fatalf("retry guidance omitted %q: %v", required, brief.ExecutionGuidance)
 		}
@@ -100,10 +100,44 @@ func TestExplicitRecoveryExecutionBriefUsesCleanConversationAndExistingWorkspace
 			t.Fatalf("explicit recovery guidance omitted %q: %v", required, brief.ExecutionGuidance)
 		}
 	}
-	for _, forbidden := range []string{"prior OpenHands conversation is retained", "three additional read-only", "Make a concrete code or test edit"} {
+	for _, forbidden := range []string{"prior OpenHands conversation is retained", "additional read-only repository actions are allowed", "Make a concrete code or test edit"} {
 		if strings.Contains(guidance, forbidden) {
 			t.Fatalf("explicit recovery guidance contains stale instruction %q: %v", forbidden, brief.ExecutionGuidance)
 		}
+	}
+}
+
+func TestReadOnlyExplicitRecoveryRepairsRejectedStructuredResult(t *testing.T) {
+	runtime := newOperationalRuntime(t)
+	actor := kernel.ActorFQN("teams::architect-1")
+	priorProfileID := runtime.context.Profile.Profile.ProfileID
+	retryOf := testUUID(782)
+	runtime.context.Invocation.ActorFQN = actor
+	runtime.context.Invocation.Purpose = kernel.PurposeReplan
+	runtime.context.Invocation.RetryOfInvocationID = &retryOf
+	runtime.context.Invocation.RetryOrdinal = 1
+	runtime.context.Profile.Profile.ProfileID = testUUID(783)
+	runtime.context.Profile.Profile.ProfileRevision++
+	runtime.context.Profile.Profile.SupersedesProfileID = &priorProfileID
+	runtime.context.Invocation.WorkProfile = runtime.context.Profile.Profile.Binding()
+	runtime.context.Assignment.WorkProfile = runtime.context.Profile.Profile.Binding()
+	grounding := RoleExecutionGrounding{
+		ActorFQN: actor, RoleFQRN: kernel.RoleFQRN("architect"), BundleVersion: "1.1.0", BundleDigest: testDigest('b'),
+		Capabilities: []string{"architecture"}, Permissions: []string{"repository.read"},
+		Instructions: "Inspect the repository and return an evidence-grounded DAG without editing files.",
+	}
+	brief, _, err := BuildExecutionBrief(runtime.context, grounding, 1<<20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	guidance := strings.Join(brief.ExecutionGuidance, "\n")
+	for _, required := range []string{"deterministic result validator", "preserve its supported engineering conclusions", "authoritative task schema", "every required object field", "every required value is non-empty"} {
+		if !strings.Contains(guidance, required) {
+			t.Fatalf("read-only explicit recovery guidance omitted %q: %v", required, brief.ExecutionGuidance)
+		}
+	}
+	if strings.Contains(guidance, "Do not restart implementation") == false {
+		t.Fatalf("read-only explicit recovery lost shared recovery guidance: %v", brief.ExecutionGuidance)
 	}
 }
 
@@ -125,7 +159,7 @@ func TestReadOnlyRoleGuidanceNeverOrdersEditsAndAppliesToHandoffRetry(t *testing
 		t.Fatal(err)
 	}
 	guidance := strings.Join(brief.ExecutionGuidance, "\n")
-	for _, required := range []string{"no repository.edit permission", "Do not edit repository files", "finish the assigned plan", "bounded retry", "prior OpenHands conversation", "three additional read-only", "Produce the assigned plan"} {
+	for _, required := range []string{"does not authorize repository edits", "Do not edit repository files", "Finish the assigned plan", "structured result", "every required field", "bounded retry", "prior OpenHands conversation", "retained checkpoint", "Produce the assigned plan"} {
 		if !strings.Contains(guidance, required) {
 			t.Fatalf("read-only guidance omitted %q: %v", required, brief.ExecutionGuidance)
 		}
@@ -134,6 +168,82 @@ func TestReadOnlyRoleGuidanceNeverOrdersEditsAndAppliesToHandoffRetry(t *testing
 		if strings.Contains(guidance, forbidden) {
 			t.Fatalf("read-only guidance contains %q: %v", forbidden, brief.ExecutionGuidance)
 		}
+	}
+}
+
+func TestEditCapableRoleReceivesReadOnlyGuidanceForReplanWork(t *testing.T) {
+	runtime := newOperationalRuntime(t)
+	runtime.context.Invocation.Purpose = kernel.PurposeReplan
+	grounding := testRoleGrounding(runtime.context.Invocation.ActorFQN)
+	grounding.Permissions = []string{"repository.edit"}
+
+	brief, _, err := BuildExecutionBrief(runtime.context, grounding, 1<<20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	guidance := strings.Join(brief.ExecutionGuidance, "\n")
+	if !strings.Contains(guidance, "Do not edit repository files") {
+		t.Fatalf("edit-capable review lost read-only guidance: %v", brief.ExecutionGuidance)
+	}
+	for _, forbidden := range []string{"make the smallest cohesive edit", "commit the intended changes"} {
+		if strings.Contains(guidance, forbidden) {
+			t.Fatalf("edit-capable review received implementation guidance %q: %v", forbidden, brief.ExecutionGuidance)
+		}
+	}
+}
+
+func TestValidationBriefRequiresIndependentSemanticEvidence(t *testing.T) {
+	runtime := newOperationalRuntime(t)
+	actor := kernel.ActorFQN("teams::tester-1")
+	runtime.context.Invocation.ActorFQN = actor
+	runtime.context.Invocation.Purpose = kernel.PurposeValidation
+	grounding := RoleExecutionGrounding{
+		ActorFQN: actor, RoleFQRN: kernel.RoleFQRN("tester"), BundleVersion: "1.0.0", BundleDigest: testDigest('b'),
+		Capabilities: []string{"independent-validation"}, Permissions: []string{"repository.read", "test.execute"},
+		Instructions: "Independently test acceptance criteria and regressions.",
+	}
+	brief, _, err := BuildExecutionBrief(runtime.context, grounding, 1<<20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	guidance := strings.Join(brief.ExecutionGuidance, "\n")
+	for _, required := range []string{"independent engineering validator", "do not by themselves prove", "production control or data path", "plausible near-miss", "never convert missing evidence into PASS"} {
+		if !strings.Contains(guidance, required) {
+			t.Fatalf("validation guidance omitted %q: %v", required, brief.ExecutionGuidance)
+		}
+	}
+	if brief.ResultProtocol == nil || !strings.Contains(brief.ResultProtocol.Instruction, "every acceptance criterion") || !strings.Contains(brief.ResultProtocol.Instruction, "test names or aggregate test commands alone are insufficient") {
+		t.Fatalf("validation result protocol = %#v", brief.ResultProtocol)
+	}
+}
+
+func TestReviewBriefPreservesSignedReviewBoundary(t *testing.T) {
+	runtime := newOperationalRuntime(t)
+	actor := kernel.ActorFQN("teams::security-1")
+	runtime.context.Invocation.ActorFQN = actor
+	runtime.context.Invocation.Purpose = kernel.PurposeReview
+	grounding := RoleExecutionGrounding{
+		ActorFQN: actor, RoleFQRN: kernel.RoleFQRN("security"), BundleVersion: "1.0.0", BundleDigest: testDigest('b'),
+		Capabilities: []string{"security-review"}, Permissions: []string{"repository.read", "security-check.execute"},
+		Instructions: "Review authorized changes for security and authority-boundary defects.",
+	}
+	brief, _, err := BuildExecutionBrief(runtime.context, grounding, 1<<20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	guidance := strings.Join(brief.ExecutionGuidance, "\n")
+	for _, required := range []string{"only the review defined by the task", "signed role's capabilities", "do not expand the review's authority", "Do not assume ownership", "every review criterion"} {
+		if !strings.Contains(guidance, required) {
+			t.Fatalf("review guidance omitted %q: %v", required, brief.ExecutionGuidance)
+		}
+	}
+	for _, forbidden := range []string{"independent engineering validator", "production control or data path", "plausible near-miss"} {
+		if strings.Contains(guidance, forbidden) {
+			t.Fatalf("review guidance contains validation-only direction %q: %v", forbidden, brief.ExecutionGuidance)
+		}
+	}
+	if brief.ResultProtocol == nil || !strings.Contains(brief.ResultProtocol.Instruction, "signed role's review boundary") || !strings.Contains(brief.ResultProtocol.Instruction, "Do not make a broader implementation") {
+		t.Fatalf("review result protocol = %#v", brief.ResultProtocol)
 	}
 }
 
@@ -259,6 +369,24 @@ func TestOperationalCoordinatorRecordsDeadlineCancellationAsRetryableTimeout(t *
 	}
 }
 
+func TestOperationalCoordinatorKeepsStartedInvocationRunningAcrossRecordedHostSuspension(t *testing.T) {
+	runtime := newOperationalRuntime(t)
+	runtime.applyClaim(t)
+	runtime.applyStarted(t)
+	runtime.clock.current = runtime.context.Invocation.DeadlineAt.Add(time.Second)
+	runtime.deadlineExtension = 2 * time.Minute
+	runtime.inspectState = ExternalRunning
+	coordinator := newTestOperationalCoordinator(t, runtime)
+
+	result, err := coordinator.Process(context.Background(), runtime.intent)
+	if err != nil || result.State != kernel.InvocationStarted {
+		t.Fatalf("result=%#v err=%v", result, err)
+	}
+	if runtime.inspectCalls != 1 || runtime.cancelCalls != 0 || runtime.startCalls != 0 {
+		t.Fatalf("calls inspect=%d cancel=%d start=%d", runtime.inspectCalls, runtime.cancelCalls, runtime.startCalls)
+	}
+}
+
 func TestOperationalCoordinatorRecordsProviderTimeoutAsTerminalEvidence(t *testing.T) {
 	runtime := newOperationalRuntime(t)
 	runtime.startState = ExternalTimedOut
@@ -327,6 +455,7 @@ type operationalRuntime struct {
 	evidenceCalls      int
 	lastBrief          ExecutionBrief
 	roleInstructions   string
+	deadlineExtension  time.Duration
 	lastTerminalOutput []byte
 }
 
@@ -457,6 +586,13 @@ func (runtime *operationalRuntime) LoadOperationalExecutionByAuthorizationEvent(
 		return OperationalExecutionContext{}, ErrInvalidOperationalExecution
 	}
 	return runtime.context, nil
+}
+
+func (runtime *operationalRuntime) EffectiveWorkInvocationDeadline(_ context.Context, invocation kernel.WorkInvocation, _ time.Time) (time.Time, error) {
+	if invocation.ID != runtime.context.Invocation.ID {
+		return time.Time{}, ErrInvalidOperationalExecution
+	}
+	return invocation.DeadlineAt.Add(runtime.deadlineExtension), nil
 }
 
 func (runtime *operationalRuntime) Handle(_ context.Context, command kernel.KernelCommand, _ kernel.ProvenanceBasis) (kernel.CommandReceipt, error) {
