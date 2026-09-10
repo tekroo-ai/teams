@@ -19,6 +19,11 @@ type structuredValidationResult struct {
 	Reasons                []string      `json:"reasons"`
 	CandidateID            kernel.UUIDv7 `json:"candidate_id,omitempty"`
 	CandidateReceiptSHA256 kernel.Digest `json:"candidate_receipt_sha256,omitempty"`
+
+	// TestEvidence carries the raw test receipts a validator ran. It is
+	// advisory evidence only: it cannot change the outcome, and every decision
+	// Teams makes still comes from Outcome plus the candidate binding.
+	TestEvidence []string `json:"test_evidence,omitempty"`
 }
 
 func parseStructuredValidationResult(output []byte) (structuredValidationResult, error) {
@@ -58,6 +63,14 @@ func parseStructuredValidationResult(output []byte) (structuredValidationResult,
 	}
 	if (result.CandidateID == "") != (result.CandidateReceiptSHA256 == "") || result.CandidateID != "" && (!result.CandidateID.Valid() || !result.CandidateReceiptSHA256.Valid()) {
 		return structuredValidationResult{}, errInvalidValidationResult
+	}
+	if len(result.TestEvidence) > 256 {
+		return structuredValidationResult{}, errInvalidValidationResult
+	}
+	for _, receipt := range result.TestEvidence {
+		if strings.TrimSpace(receipt) != receipt || receipt == "" || len(receipt) > 4096 || strings.ContainsAny(receipt, "\r\n\t") {
+			return structuredValidationResult{}, errInvalidValidationResult
+		}
 	}
 	return result, nil
 }
