@@ -61,9 +61,45 @@ type architectureStageResult struct {
 	SchemaVersion   string                   `json:"schema_version"`
 	ResultType      string                   `json:"result_type"`
 	Architecture    stageText                `json:"architecture"`
-	DesignDecisions []string                 `json:"design_decisions"`
+	DesignDecisions stageDecisionList        `json:"design_decisions"`
 	Assumptions     []string                 `json:"assumptions"`
 	Tasks           []architectureTaskResult `json:"tasks"`
+}
+
+// stageDecisionList accepts design decisions as plain strings or as
+// {"decision":…,"rationale":…} objects at the model adapter boundary and
+// normalizes both encodings to "decision: rationale" strings. The distinction
+// is presentational; substantive validation below remains identical.
+type stageDecisionList []string
+
+func (values *stageDecisionList) UnmarshalJSON(data []byte) error {
+	var direct []string
+	if json.Unmarshal(data, &direct) == nil {
+		*values = direct
+		return nil
+	}
+	var entries []struct {
+		Decision  stageText `json:"decision"`
+		Rationale stageText `json:"rationale"`
+	}
+	if err := json.Unmarshal(data, &entries); err != nil {
+		return err
+	}
+	normalized := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		decision := strings.TrimSpace(string(entry.Decision))
+		rationale := strings.TrimSpace(string(entry.Rationale))
+		if decision == "" {
+			return errInvalidValidationResult
+		}
+		if rationale == "" {
+			normalized = append(normalized, decision)
+			continue
+		}
+		normalized = append(normalized, decision+": "+rationale)
+	}
+	*values = normalized
+	return nil
 }
 
 // stageText accepts either one string or an ordered string array at the model
