@@ -481,6 +481,7 @@ func (handler *Handler) acceptFeature(writer http.ResponseWriter, request *http.
 	}
 	feature, err := handler.service.AcceptFeature(request.Context(), id, input.ExpectedRevision, handler.principal, input.NoReleaseReason)
 	if err != nil {
+		log.Printf("feature acceptance rejected feature=%s: %v", id, err)
 		writeError(writer, http.StatusConflict, "FEATURE_ACCEPTANCE_REJECTED")
 		return
 	}
