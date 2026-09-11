@@ -272,6 +272,20 @@ func (service *ProductionService) classifyTaskRecovery(ctx context.Context, task
 	if task.Purpose == kernel.PurposeImplementation && (state.Phase == kernel.PhaseActive || state.Phase == kernel.PhaseCompleted) && state.Condition == kernel.ConditionRunnable && operatorRepairableTaskTerminal(task, invocation) {
 		return taskRecoveryOperatorRepair, nil
 	}
+	if task.Purpose == kernel.PurposePromotion {
+		// Only an unparseable promotion result is operator-recoverable: the
+		// exact-block check below excludes a recorded product decision
+		// ("promotion-not-pass"). Retrying cannot accept the feature, because the
+		// promotion agent must still return a passing structured acceptance.
+		if state.Condition != kernel.ConditionBlocked || invocation.State != kernel.InvocationSucceeded || invocation.OutputDigest == nil {
+			return 0, application.ErrInvalidOperationalExecution
+		}
+		blocked, found, err := service.Store.ReadEvent(ctx, head)
+		if err != nil || !found || !isExactInvalidStructuredOutputBlock(blocked, task, invocation, service.policyAuthority) {
+			return 0, errors.Join(application.ErrInvalidOperationalExecution, err)
+		}
+		return taskRecoveryInvalidStructuredOutput, nil
+	}
 	if task.Purpose != kernel.PurposeValidation && task.Purpose != kernel.PurposeReview || len(task.Validates) == 0 || state.Condition != kernel.ConditionBlocked || invocation.State != kernel.InvocationSucceeded || invocation.OutputDigest == nil {
 		return 0, application.ErrInvalidOperationalExecution
 	}
