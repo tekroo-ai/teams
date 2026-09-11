@@ -8,6 +8,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/tekroo-ai/teams/adapters/mongo"
 	"github.com/tekroo-ai/teams/application"
 	"github.com/tekroo-ai/teams/kernel"
 	"github.com/tekroo-ai/teams/organization"
@@ -263,6 +264,37 @@ const (
 	taskRecoveryOperatorRepair
 )
 
+// findPromotionRecoveryUnblock walks the causal chain from the task head back
+// to a work.unblocked event that resolves exactly this promotion invocation.
+func findPromotionRecoveryUnblock(ctx context.Context, store *mongo.Store, head kernel.UUIDv7, taskID, invocationID kernel.UUIDv7) (kernel.DomainEvent, bool, error) {
+	current := head
+	for depth := 0; depth < 16; depth++ {
+		event, found, err := store.ReadEvent(ctx, current)
+		if err != nil || !found {
+			return kernel.DomainEvent{}, false, err
+		}
+		if event.EventType == "tekroo.event.work.unblocked" && len(event.Parents) == 1 {
+			var resolution struct {
+				ResolvedBlockerRefs []string `json:"resolved_blocker_refs"`
+			}
+			if json.Unmarshal(event.Payload, &resolution) == nil && len(resolution.ResolvedBlockerRefs) == 1 && resolution.ResolvedBlockerRefs[0] == "teams://work-invocation/"+string(invocationID) {
+				return event, true, nil
+			}
+		}
+		var parent kernel.UUIDv7
+		for _, candidate := range event.Parents {
+			if candidate.EdgeKind == kernel.EdgeCausal {
+				parent = candidate.ParentEventID
+			}
+		}
+		if parent == "" || parent == current {
+			return kernel.DomainEvent{}, false, nil
+		}
+		current = parent
+	}
+	return kernel.DomainEvent{}, false, nil
+}
+
 func (service *ProductionService) classifyTaskRecovery(ctx context.Context, task organization.PlannedTask, state kernel.AggregateState, head kernel.UUIDv7, invocation kernel.WorkInvocation) (taskRecoveryKind, error) {
 	recoverablePurpose := task.Purpose == kernel.PurposeImplementation || task.Purpose == kernel.PurposeRepair ||
 		(task.Purpose == kernel.PurposeValidation || task.Purpose == kernel.PurposeReview) && len(task.Validates) > 0
@@ -277,10 +309,28 @@ func (service *ProductionService) classifyTaskRecovery(ctx context.Context, task
 		// exact-block check below excludes a recorded product decision
 		// ("promotion-not-pass"). Retrying cannot accept the feature, because the
 		// promotion agent must still return a passing structured acceptance.
-		if state.Condition != kernel.ConditionBlocked || invocation.State != kernel.InvocationSucceeded || invocation.OutputDigest == nil {
+		if invocation.State != kernel.InvocationSucceeded || invocation.OutputDigest == nil {
 			return 0, application.ErrInvalidOperationalExecution
 		}
-		blocked, found, err := service.Store.ReadEvent(ctx, head)
+		if state.Condition == kernel.ConditionBlocked {
+			blocked, found, err := service.Store.ReadEvent(ctx, head)
+			if err != nil || !found || !isExactInvalidStructuredOutputBlock(blocked, task, invocation, service.policyAuthority) {
+				return 0, errors.Join(application.ErrInvalidOperationalExecution, err)
+			}
+			return taskRecoveryInvalidStructuredOutput, nil
+		}
+		// A prior recovery may have unblocked and re-profiled the task before a
+		// later stage failed. Resume from that durable checkpoint: walking the
+		// causal chain from the head must reach an unblock of this exact
+		// invocation whose response parent is the invalid-structured-output block.
+		if state.Condition != kernel.ConditionRunnable || state.Phase != kernel.PhaseActive {
+			return 0, application.ErrInvalidOperationalExecution
+		}
+		unblock, found, err := findPromotionRecoveryUnblock(ctx, service.Store, head, task.ID, invocation.ID)
+		if err != nil || !found {
+			return 0, errors.Join(application.ErrInvalidOperationalExecution, err)
+		}
+		blocked, found, err := service.Store.ReadEvent(ctx, unblock.Parents[0].ParentEventID)
 		if err != nil || !found || !isExactInvalidStructuredOutputBlock(blocked, task, invocation, service.policyAuthority) {
 			return 0, errors.Join(application.ErrInvalidOperationalExecution, err)
 		}

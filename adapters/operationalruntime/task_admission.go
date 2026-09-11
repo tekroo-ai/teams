@@ -538,7 +538,11 @@ func validInvocationContinuation(prior kernel.WorkInvocation, purpose kernel.Wor
 		return false
 	}
 	if !reusePriorCondition {
-		return technicalExtension && (recoverableTaskTerminal(prior) || prior.State == kernel.InvocationSucceeded && (purpose == kernel.PurposeValidation || purpose == kernel.PurposeReview || purpose == kernel.PurposeReplan)) || !technicalExtension && prior.State == kernel.InvocationSucceeded && (purpose == kernel.PurposeValidation || purpose == kernel.PurposeReview)
+		// Promotion appears here because classifyTaskRecovery admits a blocked
+		// promotion only for the exact invalid-structured-output block; a recorded
+		// product decision remains unrecoverable and still needs a passing
+		// structured result from the next promotion attempt.
+		return technicalExtension && (recoverableTaskTerminal(prior) || prior.State == kernel.InvocationSucceeded && (purpose == kernel.PurposeValidation || purpose == kernel.PurposeReview || purpose == kernel.PurposeReplan || purpose == kernel.PurposePromotion)) || !technicalExtension && prior.State == kernel.InvocationSucceeded && (purpose == kernel.PurposeValidation || purpose == kernel.PurposeReview)
 	}
 	if prior.Retryable == nil || !*prior.Retryable {
 		return false
