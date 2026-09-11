@@ -118,10 +118,10 @@ func (service *ProductionService) reconcileFeaturePlanning(ctx context.Context) 
 		// downstream by per-story validation, security review, whole-feature
 		// validation, and product acceptance.
 		if err := service.resolveFeatureStageMessage(ctx, feature, invocation); err != nil {
-			return err
+			return fmt.Errorf("feature %s stage %s resolve handoff: %w", feature.ID, stage, err)
 		}
 		if err := service.applyFeatureStageOutput(ctx, feature, stage, invocation, output); err != nil {
-			return err
+			return fmt.Errorf("feature %s stage %s apply: %w", feature.ID, stage, err)
 		}
 	}
 	return nil
