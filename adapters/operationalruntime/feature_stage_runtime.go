@@ -1687,7 +1687,7 @@ func (service *ProductionService) addRequiredValidationTasks(ctx context.Context
 				return nil, err
 			}
 			id := deterministicOperationalUUID("required-validator", string(feature.ID), string(target.ID), "security")
-			tasks = append(tasks, organization.PlannedTask{ID: id, StoryID: target.StoryID, Title: "Security review: " + target.Title, Description: description, AcceptanceCriteria: securityReviewAcceptanceCriteria(), DependsOn: []kernel.UUIDv7{target.ID}, Validates: []kernel.UUIDv7{target.ID}, Owner: security.ActorFQN, ModelProfile: security.ModelProfile, DecisionRoute: profile.DecisionRoute, Purpose: kernel.PurposeReview, Complexity: target.Complexity, Risk: target.Risk, CriticalPath: true, AttemptLimit: 2, ReviewRoundLimit: target.ReviewRoundLimit})
+			tasks = append(tasks, organization.PlannedTask{ID: id, StoryID: target.StoryID, Title: "Security review: " + target.Title, Description: description, AcceptanceCriteria: securityReviewAcceptanceCriteria(), DependsOn: []kernel.UUIDv7{target.ID}, Validates: []kernel.UUIDv7{target.ID}, Owner: security.ActorFQN, ModelProfile: security.ModelProfile, DecisionRoute: profile.DecisionRoute, Purpose: kernel.PurposeReview, Complexity: target.Complexity, Risk: target.Risk, CriticalPath: true, AttemptLimit: target.ReviewRoundLimit + 1, ReviewRoundLimit: target.ReviewRoundLimit})
 		}
 		if len(tasks) > int(feature.Input.MaximumTasks) {
 			return nil, organization.ErrInvalidFeature
