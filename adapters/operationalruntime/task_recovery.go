@@ -147,7 +147,7 @@ func (service *ProductionService) RetryFailedTask(ctx context.Context, principal
 	if err != nil {
 		return InvocationStatus{}, fmt.Errorf("resolve recovery workspace: %w", err)
 	}
-	if recoveryKind == taskRecoveryInvalidStructuredOutput {
+	if recoveryKind == taskRecoveryInvalidStructuredOutput && state.Condition == kernel.ConditionBlocked {
 		if err := service.unblockInvalidStructuredTask(ctx, feature, planned, state, head, terminal, registered, request.IdempotencyKey); err != nil {
 			return InvocationStatus{}, fmt.Errorf("unblock invalid validator output: %w", err)
 		}
