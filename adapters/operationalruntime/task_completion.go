@@ -286,9 +286,79 @@ func (service *ProductionService) handleInvalidStructuredTaskOutput(ctx context.
 	if state.Phase != kernel.PhaseActive || invocation.State != kernel.InvocationSucceeded || invocation.OutputDigest == nil {
 		return false, organization.ErrInvalidFeature
 	}
-	_ = head
 	_ = conditionDigests
+	retried, err := service.authorizeStructuredOutputGlitchRetry(ctx, feature, task, state, head, invocation, snapshot)
+	if err != nil {
+		return false, err
+	}
+	if retried {
+		return true, nil
+	}
 	return service.blockStructuredDecisionTask(ctx, feature, task, state, invocation, snapshot, invalidStructuredOutputReason, "invalid-structured-output")
+}
+
+// structuredOutputGlitchRetryAllowed reports whether a malformed structured
+// result may be retried without an operator: validators and reviews whose
+// result contract failed to parse, and the promotion, only while the planned
+// attempt limit still has room. A structured FAIL is a verdict, never a
+// glitch, and never reaches this predicate.
+func structuredOutputGlitchRetryAllowed(task organization.PlannedTask, invocation kernel.WorkInvocation) bool {
+	if invocation.State != kernel.InvocationSucceeded || invocation.AttemptOrdinal >= uint64(task.AttemptLimit) {
+		return false
+	}
+	switch task.Purpose {
+	case kernel.PurposeValidation, kernel.PurposeReview:
+		return len(task.Validates) > 0
+	case kernel.PurposePromotion:
+		return true
+	default:
+		return false
+	}
+}
+
+func (service *ProductionService) authorizeStructuredOutputGlitchRetry(ctx context.Context, feature organization.FeatureRequest, task organization.PlannedTask, state kernel.AggregateState, head kernel.UUIDv7, invocation kernel.WorkInvocation, snapshot kernel.Snapshot) (bool, error) {
+	if !structuredOutputGlitchRetryAllowed(task, invocation) {
+		return false, nil
+	}
+	nextAttempt := invocation.AttemptOrdinal + 1
+	recoveryConditions, err := validationRecoveryConditionDigests(task, snapshot.WorkInvocations, invocation)
+	if err != nil {
+		return false, nil
+	}
+	profileConfig, configured := service.profilesByModel[task.ModelProfile]
+	if !configured || !profileConfig.qualifiedFor(task.DecisionRoute, workKindForPurpose(task.Purpose, task.Risk), service.clock.Now().UTC()) {
+		return false, nil
+	}
+	profileSnapshot, profileFound := snapshot.WorkProfiles[kernel.AggregateRef{Kind: kernel.AggregateTask, ID: task.ID}]
+	if !profileFound || !profileSnapshot.Valid() {
+		return false, organization.ErrInvalidFeature
+	}
+	owner, err := service.StartRole(ctx, task.Owner)
+	if err != nil || owner.Status != organization.RoleIdle {
+		return false, errors.Join(organization.ErrRoleNotRunning, err)
+	}
+	tracked := &trackedTask{plan: task, revision: state.Revision, last: head, profile: profileSnapshot.Profile, owner: owner}
+	latestInvocations := make(map[kernel.UUIDv7]kernel.WorkInvocation, len(feature.Plan.Tasks))
+	for _, planned := range feature.Plan.Tasks {
+		if latest, found := latestTaskInvocation(snapshot.WorkInvocations, planned.ID); found {
+			latestInvocations[planned.ID] = latest
+		}
+	}
+	workspace, candidateEvidence, err := service.prepareCandidateConsumerWorkspace(ctx, feature, task, owner, *feature.Plan, latestInvocations, nil)
+	if err != nil {
+		return false, err
+	}
+	if err := service.rebindTaskCandidateWorkspace(ctx, feature, tracked, workspace, candidateEvidence); err != nil {
+		return false, err
+	}
+	budgetRevision, err := service.extendTaskTechnicalRetryBudget(ctx, feature, tracked, task.Purpose, nextAttempt)
+	if err != nil {
+		return false, err
+	}
+	if err := service.authorizeTaskInvocationWithConditionPolicy(ctx, feature, tracked, profileConfig, workspace, budgetRevision, task.Purpose, nextAttempt, &invocation, recoveryConditions, true, false); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func (service *ProductionService) blockStructuredDecisionTask(ctx context.Context, feature organization.FeatureRequest, task organization.PlannedTask, state kernel.AggregateState, invocation kernel.WorkInvocation, snapshot kernel.Snapshot, reason, key string) (bool, error) {
@@ -822,7 +892,6 @@ func (service *ProductionService) completeEvidenceTask(ctx context.Context, feat
 	}
 	completionPayload, _ := json.Marshal(map[string]any{"lifecycle_epoch": profileSnapshot.Profile.LifecycleEpoch, "criteria_revision": uint64(1), "evidence_ids": evidenceIDs(evidence), "artifact_digests": []kernel.Digest{*invocation.OutputDigest}, "unresolved_exceptions": []string{}, "completion_review_id": reviewID, "completion_review_revision": uint64(2), "branch_policy_revision": service.planning.PolicyRevision, "validation_finalized_event_id": finalized.EventIDs[0], "owner_fqn": task.Owner})
 	_, err = service.submitDeterministicActorTargetCommand(ctx, feature, "tekroo.command.task.request-completion", kernel.AggregateTask, task.ID, kernel.PrincipalRef{Kind: kernel.PrincipalActor, ID: string(task.Owner)}, owner.ActorFQN, owner.Execution, state.Revision, state.LifecycleEpoch, completionPayload, []kernel.DagParent{{ParentEventID: finalized.EventIDs[0], EdgeKind: kernel.EdgeCausal}}, evidence, "evidence-task-complete-"+string(task.ID)+"-"+string(*invocation.OutputDigest))
-	_ = head
 	return err
 }
 
