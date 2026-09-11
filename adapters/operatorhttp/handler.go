@@ -21,6 +21,10 @@ import (
 
 var ErrInvalidConfiguration = errors.New("invalid operator HTTP configuration")
 
+// taskRecoveryTimeout bounds task recovery independently of the ordinary
+// operator operation timeout, which is sized for reads.
+const taskRecoveryTimeout = 10 * time.Minute
+
 type Config struct {
 	Service           Service
 	BearerToken       string
@@ -276,7 +280,12 @@ func (handler *Handler) retryTaskInvocation(writer http.ResponseWriter, request 
 		writeError(writer, http.StatusBadRequest, "INVALID_TASK_RECOVERY_REQUEST")
 		return
 	}
-	status, err := handler.service.RetryFailedTask(request.Context(), handler.principal, id, input)
+	// Recovery re-materializes the immutable candidate workspace, which can
+	// exceed the ordinary operator read timeout; run it decoupled from the
+	// request context so a slow client cannot strand a half-built workspace.
+	recoveryContext, cancel := context.WithTimeout(context.WithoutCancel(request.Context()), taskRecoveryTimeout)
+	defer cancel()
+	status, err := handler.service.RetryFailedTask(recoveryContext, handler.principal, id, input)
 	if err != nil {
 		log.Printf("task recovery rejected invocation=%s: %v", id, err)
 		writeError(writer, http.StatusConflict, "TASK_RECOVERY_REJECTED")
