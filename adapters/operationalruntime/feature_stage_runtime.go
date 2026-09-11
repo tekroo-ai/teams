@@ -110,15 +110,13 @@ func (service *ProductionService) reconcileFeaturePlanning(ctx context.Context) 
 				return err
 			}
 		}
-		if stage == stageArchitecture {
-			accepted, reviewErr := service.reconcileFeatureArchitectureReview(ctx, feature, invocation, output)
-			if reviewErr != nil {
-				return fmt.Errorf("feature %s architecture review: %w", feature.ID, reviewErr)
-			}
-			if !accepted {
-				continue
-			}
-		}
+		// The independent second-architect plan review was dropped after
+		// qualification history (59 runs, 130+ recorded review branch results)
+		// showed zero plan corrections while contributing two planning-path
+		// stalls. Plan shape is still validated deterministically by
+		// validateFeatureStageOutput above, and plan semantics are verified
+		// downstream by per-story validation, security review, whole-feature
+		// validation, and product acceptance.
 		if err := service.resolveFeatureStageMessage(ctx, feature, invocation); err != nil {
 			return err
 		}
