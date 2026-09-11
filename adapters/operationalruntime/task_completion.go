@@ -92,7 +92,29 @@ func (service *ProductionService) reconcileTaskCompletions(ctx context.Context, 
 	changed := false
 	for _, target := range plan.Tasks {
 		validators := validatorsByTarget[target.ID]
-		if len(validators) == 0 || states[target.ID].Phase != kernel.PhaseActive || states[target.ID].Condition != kernel.ConditionRunnable {
+		if len(validators) == 0 {
+			continue
+		}
+		if states[target.ID].Phase == kernel.PhaseCompleted {
+			// A previous pass completed the target but not every validator task's
+			// own evidence review (for example the daemon stopped between review
+			// open and finalize). Re-drive the pending validators; completeEvidenceTask
+			// recovers expired completion reviews and is idempotent otherwise.
+			for _, validator := range validators {
+				validatorState := states[validator.Task.ID]
+				if validatorState.Phase != kernel.PhaseActive || validator.Result.Outcome != "PASS" {
+					continue
+				}
+				if err := service.completeEvidenceTask(ctx, feature, validator.Task, validatorState, heads[validator.Task.ID], validator.Invocation, snapshot); err != nil {
+					return changed, fmt.Errorf("recover validator task %s completion: %w", validator.Task.ID, err)
+				}
+				validatorState.Phase = kernel.PhaseCompleted
+				states[validator.Task.ID] = validatorState
+				changed = true
+			}
+			continue
+		}
+		if states[target.ID].Phase != kernel.PhaseActive || states[target.ID].Condition != kernel.ConditionRunnable {
 			continue
 		}
 		expected := 0
