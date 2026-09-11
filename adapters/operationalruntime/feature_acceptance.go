@@ -69,6 +69,7 @@ func (service *ProductionService) featureAcceptanceEvidence(ctx context.Context,
 	if !foundAcceptance {
 		return organization.PlannedTask{}, kernel.WorkInvocation{}, nil, kernel.Snapshot{}, organization.ErrInvalidFeature
 	}
+	featureValidatorID, _ := wholeFeatureValidationTaskID(*feature.Plan)
 	for _, task := range feature.Plan.Tasks {
 		if len(task.Validates) > 0 {
 			validatorTasks[task.ID] = struct{}{}
@@ -94,12 +95,21 @@ func (service *ProductionService) featureAcceptanceEvidence(ctx context.Context,
 	for taskID := range validatorTasks {
 		validator, present := latestTaskInvocation(snapshot.WorkInvocations, taskID)
 		if !present || validator.State != kernel.InvocationSucceeded || validator.OutputDigest == nil {
-			return organization.PlannedTask{}, kernel.WorkInvocation{}, nil, kernel.Snapshot{}, organization.ErrInvalidFeature
+			return organization.PlannedTask{}, kernel.WorkInvocation{}, nil, kernel.Snapshot{}, fmt.Errorf("%w: validator %s has no succeeded invocation", organization.ErrInvalidFeature, taskID)
 		}
 		validatorOutput, readErr := service.Runtime.ReadExecutionOutput(ctx, *validator.OutputDigest)
 		validatorResult, parseErr := parseStructuredValidationResult(validatorOutput)
-		if readErr != nil || parseErr != nil || validatorResult.Outcome != "PASS" || validatorResult.CandidateID != acceptanceResult.CandidateID {
-			return organization.PlannedTask{}, kernel.WorkInvocation{}, nil, kernel.Snapshot{}, errors.Join(organization.ErrInvalidFeature, readErr, parseErr)
+		if readErr != nil || parseErr != nil || validatorResult.Outcome != "PASS" {
+			return organization.PlannedTask{}, kernel.WorkInvocation{}, nil, kernel.Snapshot{}, fmt.Errorf("%w: validator %s result not PASS: %v %v", organization.ErrInvalidFeature, taskID, readErr, parseErr)
+		}
+		// Task-local validators inspect task-local or larger assembled
+		// candidates and their candidate identity is verified inside their own
+		// task review; only the whole-feature validator and the promotion are
+		// bound to the assembled acceptance candidate.
+		if taskID == featureValidatorID || taskID == acceptanceTask.ID {
+			if validatorResult.CandidateID != acceptanceResult.CandidateID {
+				return organization.PlannedTask{}, kernel.WorkInvocation{}, nil, kernel.Snapshot{}, fmt.Errorf("%w: validator %s candidate %s differs from acceptance candidate %s", organization.ErrInvalidFeature, taskID, validatorResult.CandidateID, acceptanceResult.CandidateID)
+			}
 		}
 		validators = append(validators, validator)
 	}
