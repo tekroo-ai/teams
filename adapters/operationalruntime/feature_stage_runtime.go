@@ -1425,23 +1425,23 @@ func (service *ProductionService) buildExecutableFeaturePlan(ctx context.Context
 	}
 	tasks, err = service.addRequiredValidationTasks(ctx, feature, tasks, allocator)
 	if err != nil {
-		return organization.FeaturePlan{}, err
+		return organization.FeaturePlan{}, fmt.Errorf("build plan: required validation tasks: %w", err)
 	}
 	tasks, err = service.addFeatureValidationTask(ctx, feature, planStories, tasks, planVersion, allocator)
 	if err != nil {
-		return organization.FeaturePlan{}, err
+		return organization.FeaturePlan{}, fmt.Errorf("build plan: whole-feature validation task: %w", err)
 	}
 	tasks, err = service.addStoryAcceptanceTasks(ctx, feature, planStories, tasks, planVersion, allocator)
 	if err != nil {
-		return organization.FeaturePlan{}, err
+		return organization.FeaturePlan{}, fmt.Errorf("build plan: story acceptance tasks: %w", err)
 	}
 	tasks, err = service.bindValidationWorkspaceContext(ctx, tasks)
 	if err != nil {
-		return organization.FeaturePlan{}, err
+		return organization.FeaturePlan{}, fmt.Errorf("build plan: validation workspace bindings: %w", err)
 	}
 	plan := organization.FeaturePlan{Version: planVersion, PreparedBy: invocation.ActorFQN, PreparedExecution: invocation.Execution, Architecture: string(result.Architecture), DesignDecisions: result.DesignDecisions, Assumptions: result.Assumptions, Stories: planStories, Tasks: tasks, CreatedAt: createdAt}
 	if plan.Validate(feature) != nil {
-		return organization.FeaturePlan{}, organization.ErrInvalidFeature
+		return organization.FeaturePlan{}, fmt.Errorf("build plan: assembled plan validation failed: %w", plan.Validate(feature))
 	}
 	return plan, nil
 }
