@@ -91,11 +91,12 @@ func (service *ProductionService) reconcileGlitchTerminatedTasks(ctx context.Con
 		// The recovery deadline must be derived from durable state, not from the
 		// reconciler clock: commands use deterministic IDs over the request, so a
 		// per-pass deadline change turns an interrupted retry into a permanent
-		// COMMAND_ID_REUSE conflict.
+		// COMMAND_ID_REUSE conflict. The kernel also requires the requested
+		// deadline to exceed the failed invocation's own deadline.
 		budgetRef := kernel.AggregateRef{Kind: kernel.AggregateWorkBudget, ID: feature.BudgetAccountID}
 		budget, budgetFound := snapshot.WorkBudgetAccounts[budgetRef]
 		now := service.clock.Now().UTC()
-		if !budgetFound || !budget.Valid() || !budget.DeadlineAt.After(now) || !budget.DeadlineAt.After(invocation.DeadlineAt) {
+		if !budgetFound || !budget.Valid() || !budget.DeadlineAt.After(now) || !budget.DeadlineAt.After(invocation.DeadlineAt) || !budget.DeadlineAt.Before(now.Add(service.planningDeadline)) {
 			continue
 		}
 		_, err = service.RetryFailedTask(ctx, service.operatorIdentity.Principal, invocation.ID, TaskRecoveryRequest{
@@ -123,4 +124,3 @@ func workTerminationReasonLine(output []byte) string {
 	}
 	return termination.Reason + " (command: " + termination.Command + ")"
 }
-
