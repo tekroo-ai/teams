@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -1429,7 +1430,11 @@ func (service *ProductionService) runProjector(ctx context.Context) error {
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}
-			return fmt.Errorf("project operational events: %w", err)
+			// Projections are an eventually-consistent read model. A single
+			// operation exceeding its bounded timeout under host load must not
+			// terminate the daemon: the next tick re-scans pending events.
+			// The failure stays observable in the daemon log.
+			log.Printf("project operational events failed, retrying: %v", err)
 		}
 		timer := time.NewTimer(service.projectionInterval)
 		select {
