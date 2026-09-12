@@ -295,8 +295,13 @@ func (service *ProductionService) reconcileFeatureProfileDeadlines(ctx context.C
 }
 
 func (service *ProductionService) featureDeadlineExtensionEvidenceIDs(ctx context.Context, plan organization.FeaturePlan, snapshot kernel.Snapshot, budget kernel.WorkBudgetAccount) ([]kernel.UUIDv7, error) {
-	evidenceIDs := profileDeadlineExtensionEvidenceIDs(plan, snapshot, budget.DeadlineAt)
-	if len(evidenceIDs) == 0 {
+	// The causal evidence for the budget's current deadline is the evidence
+	// carried by its last amendment event. Collecting the union of every task
+	// profile's classification evidence instead grows without bound as the
+	// feature ages and eventually exceeds the profile Valid() cap of 64,
+	// fault-looping the reconciler permanently.
+	var evidenceIDs []kernel.UUIDv7
+	if service.Store != nil && budget.LastEventID.Valid() {
 		event, found, err := service.Store.ReadEvent(ctx, budget.LastEventID)
 		if err != nil {
 			return nil, err
@@ -308,6 +313,9 @@ func (service *ProductionService) featureDeadlineExtensionEvidenceIDs(ctx contex
 		if found && event.EventType == "tekroo.event.work-budget.amended" && json.Unmarshal(event.Payload, &payload) == nil && payload.DeadlineAt.Equal(budget.DeadlineAt) {
 			evidenceIDs = append(evidenceIDs, payload.EvidenceIDs...)
 		}
+	}
+	if len(evidenceIDs) == 0 {
+		evidenceIDs = profileDeadlineExtensionEvidenceIDs(plan, snapshot, budget.DeadlineAt)
 	}
 	sort.Slice(evidenceIDs, func(left, right int) bool { return evidenceIDs[left] < evidenceIDs[right] })
 	return uniqueUUIDs(evidenceIDs), nil
