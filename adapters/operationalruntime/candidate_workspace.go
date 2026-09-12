@@ -131,20 +131,20 @@ func newCandidateWorkspaceManagerWithContext(ctx context.Context, evidenceRoot, 
 
 func (manager *candidateWorkspaceManager) Prepare(ctx context.Context, feature organization.FeatureRequest, consumer organization.PlannedTask, consumerWorkspaceID string, source ProductionWorkspace, targets []candidateTargetReceipt, requiredGateIDs []string) (ProductionWorkspace, candidateReceipt, kernel.Digest, error) {
 	if manager == nil || !feature.ID.Valid() || !consumer.ID.Valid() || consumerWorkspaceID == "" || source.WorkspaceID == "" || !filepath.IsAbs(source.WorkingDirectory) || len(source.BaselineSHA) != 40 || len(targets) == 0 || len(requiredGateIDs) == 0 {
-		return ProductionWorkspace{}, candidateReceipt{}, "", errInvalidCandidateWorkspace
+		return ProductionWorkspace{}, candidateReceipt{}, "", fmt.Errorf("%w: consumer %s workspace %q workdir %q baseline %d targets %d gates %d", errInvalidCandidateWorkspace, consumer.ID, consumerWorkspaceID, source.WorkingDirectory, len(source.BaselineSHA), len(targets), len(requiredGateIDs))
 	}
 	if !slices.IsSortedFunc(targets, func(left, right candidateTargetReceipt) int {
 		return strings.Compare(string(left.TaskID), string(right.TaskID))
 	}) {
-		return ProductionWorkspace{}, candidateReceipt{}, "", errInvalidCandidateWorkspace
+		return ProductionWorkspace{}, candidateReceipt{}, "", fmt.Errorf("%w: candidate targets not sorted", errInvalidCandidateWorkspace)
 	}
 	for _, target := range targets {
 		if !target.TaskID.Valid() || !target.InvocationID.Valid() || !target.OutputSHA256.Valid() || len(target.TerminalEvidenceIDs) == 0 {
-			return ProductionWorkspace{}, candidateReceipt{}, "", errInvalidCandidateWorkspace
+			return ProductionWorkspace{}, candidateReceipt{}, "", fmt.Errorf("%w: target %s invocation %s evid %d", errInvalidCandidateWorkspace, target.TaskID, target.InvocationID, len(target.TerminalEvidenceIDs))
 		}
 		for _, evidenceID := range target.TerminalEvidenceIDs {
 			if !evidenceID.Valid() {
-				return ProductionWorkspace{}, candidateReceipt{}, "", errInvalidCandidateWorkspace
+				return ProductionWorkspace{}, candidateReceipt{}, "", fmt.Errorf("%w: invalid terminal evidence id on target %s", errInvalidCandidateWorkspace, target.TaskID)
 			}
 		}
 	}
@@ -272,8 +272,55 @@ func (manager *candidateWorkspaceManager) existing(ctx context.Context, feature 
 		return candidateReceipt{}, "", false, err
 	}
 	var receipt candidateReceipt
-	if json.Unmarshal(content, &receipt) != nil || !manager.validReceipt(receipt) || receipt.SchemaVersion != candidateReceiptSchema || receipt.CandidateID != candidateID || receipt.FeatureID != feature.ID || receipt.ConsumerTaskID != consumer.ID || receipt.ConsumerWorkspaceID != consumerWorkspaceID || receipt.SourceWorkspaceID != source.WorkspaceID || receipt.SourceWorktreeID != source.WorktreeID || receipt.SourceWorkingDirectory != filepath.Clean(source.WorkingDirectory) || receipt.SourceBranch != source.Branch || receipt.RepositoryDigest != state.repositoryDigest || receipt.BaselineCommit != source.BaselineSHA || receipt.CandidateCommit != state.commit || receipt.CandidateTree != state.tree || receipt.ChangedFileInventoryDigest != state.changedFilesDigest || receipt.DiffSHA256 != state.diffDigest || receipt.RuntimeHookSHA256 != state.runtimeHookDigest || !slices.Equal(receipt.ChangedFileInventory, state.changedFiles) || !candidateTargetsEqual(receipt.Targets, targets) || receipt.MaterializedWorkspace != workspacePath || receipt.MaterializedReference != reference || !gateIDsEqual(receipt.GateReceipts, requiredGateIDs) {
-		return candidateReceipt{}, "", false, errInvalidCandidateWorkspace
+	mismatch := ""
+	switch {
+	case json.Unmarshal(content, &receipt) != nil || !manager.validReceipt(receipt):
+		mismatch = "receipt-unreadable"
+	case receipt.SchemaVersion != candidateReceiptSchema:
+		mismatch = "schema"
+	case receipt.CandidateID != candidateID:
+		mismatch = "candidate-id"
+	case receipt.FeatureID != feature.ID:
+		mismatch = "feature-id"
+	case receipt.ConsumerTaskID != consumer.ID:
+		mismatch = "consumer-task"
+	case receipt.ConsumerWorkspaceID != consumerWorkspaceID:
+		mismatch = "consumer-workspace"
+	case receipt.SourceWorkspaceID != source.WorkspaceID:
+		mismatch = "source-workspace"
+	case receipt.SourceWorktreeID != source.WorktreeID:
+		mismatch = "source-worktree"
+	case receipt.SourceWorkingDirectory != filepath.Clean(source.WorkingDirectory):
+		mismatch = "source-workdir"
+	case receipt.SourceBranch != source.Branch:
+		mismatch = "source-branch"
+	case receipt.RepositoryDigest != state.repositoryDigest:
+		mismatch = "repository-digest"
+	case receipt.BaselineCommit != source.BaselineSHA:
+		mismatch = "baseline-commit"
+	case receipt.CandidateCommit != state.commit:
+		mismatch = "candidate-commit"
+	case receipt.CandidateTree != state.tree:
+		mismatch = "candidate-tree"
+	case receipt.ChangedFileInventoryDigest != state.changedFilesDigest:
+		mismatch = "changed-files-digest"
+	case receipt.DiffSHA256 != state.diffDigest:
+		mismatch = "diff-sha256"
+	case receipt.RuntimeHookSHA256 != state.runtimeHookDigest:
+		mismatch = "runtime-hook-digest"
+	case !slices.Equal(receipt.ChangedFileInventory, state.changedFiles):
+		mismatch = "changed-file-inventory"
+	case !candidateTargetsEqual(receipt.Targets, targets):
+		mismatch = "targets"
+	case receipt.MaterializedWorkspace != workspacePath:
+		mismatch = "materialized-workspace"
+	case receipt.MaterializedReference != reference:
+		mismatch = "materialized-reference"
+	case !gateIDsEqual(receipt.GateReceipts, requiredGateIDs):
+		mismatch = "gates"
+	}
+	if mismatch != "" {
+		return candidateReceipt{}, "", false, fmt.Errorf("%w: existing receipt mismatch on %s", errInvalidCandidateWorkspace, mismatch)
 	}
 	if err := manager.verifyMaterialized(ctx, receipt); err != nil {
 		return candidateReceipt{}, "", false, err
@@ -729,7 +776,7 @@ func candidateViewID(candidateID, consumerTaskID kernel.UUIDv7) string {
 
 func (service *ProductionService) prepareCandidateConsumerWorkspace(ctx context.Context, feature organization.FeatureRequest, consumer organization.PlannedTask, owner organization.RoleInstanceState, plan organization.FeaturePlan, invocations map[kernel.UUIDv7]kernel.WorkInvocation, baseEvidence []kernel.EvidenceRef) (ProductionWorkspace, []kernel.EvidenceRef, error) {
 	if service == nil || service.candidates == nil {
-		return ProductionWorkspace{}, nil, errInvalidCandidateWorkspace
+		return ProductionWorkspace{}, nil, fmt.Errorf("%w: candidate manager unavailable", errInvalidCandidateWorkspace)
 	}
 	targetIDs := validationCandidateTargetIDs(plan, consumer)
 	if consumer.Purpose == kernel.PurposePromotion && len(targetIDs) == 0 {
