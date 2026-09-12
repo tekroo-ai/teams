@@ -818,7 +818,7 @@ func (service *ProductionService) prepareCandidateConsumerWorkspace(ctx context.
 		}
 		invocation, foundInvocation := invocations[targetID]
 		if !foundTask || !foundInvocation || invocation.State != kernel.InvocationSucceeded || invocation.OutputDigest == nil || len(invocation.TerminalEvidenceIDs) == 0 {
-			return ProductionWorkspace{}, nil, errInvalidCandidateWorkspace
+			return ProductionWorkspace{}, nil, fmt.Errorf("%w: consumer %s target %s task-found %t inv-found %t state %s output %v evid %d", errInvalidCandidateWorkspace, consumer.ID, targetID, foundTask, foundInvocation, invocation.State, invocation.OutputDigest != nil, len(invocation.TerminalEvidenceIDs))
 		}
 		targetWorkspace, err := service.plannedTaskWorkspace(ctx, targetTask)
 		if err != nil {
@@ -1101,7 +1101,7 @@ func (service *ProductionService) validateCandidateResult(ctx context.Context, t
 
 func (service *ProductionService) rebindTaskCandidateWorkspace(ctx context.Context, feature organization.FeatureRequest, task *trackedTask, workspace ProductionWorkspace, evidence []kernel.EvidenceRef) error {
 	if task == nil || !strings.HasPrefix(workspace.WorktreeID, "candidate-") || len(evidence) < 2 {
-		return errInvalidCandidateWorkspace
+		return fmt.Errorf("%w: rebind task %v worktree %q evidence %d", errInvalidCandidateWorkspace, task, workspace.WorktreeID, len(evidence))
 	}
 	taskRef := kernel.AggregateRef{Kind: kernel.AggregateTask, ID: task.plan.ID}
 	snapshot, err := service.Store.LoadDecision(ctx, kernel.KernelCommand{Target: taskRef})

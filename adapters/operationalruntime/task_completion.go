@@ -344,7 +344,15 @@ func (service *ProductionService) authorizeStructuredOutputGlitchRetry(ctx conte
 			latestInvocations[planned.ID] = latest
 		}
 	}
-	workspace, candidateEvidence, err := service.prepareCandidateConsumerWorkspace(ctx, feature, task, owner, *feature.Plan, latestInvocations, nil)
+	// Base evidence must include the failed invocation's terminal evidence, the
+	// same role request evidence plays on the operator recovery path: the scope
+	// rebind requires candidate receipt plus base evidence, and the candidate
+	// receipt alone is a single reference.
+	recoveryEvidence, evidenceErr := evidenceForInvocations(snapshot, invocation)
+	if evidenceErr != nil {
+		return false, evidenceErr
+	}
+	workspace, candidateEvidence, err := service.prepareCandidateConsumerWorkspace(ctx, feature, task, owner, *feature.Plan, latestInvocations, recoveryEvidence)
 	if err != nil {
 		return false, err
 	}
