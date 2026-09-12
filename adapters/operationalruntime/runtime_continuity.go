@@ -257,7 +257,6 @@ func (service *ProductionService) extendFeatureProfilesForRuntimeSuspension(ctx 
 	if deadline.IsZero() || len(evidence) == 0 {
 		return organization.ErrInvalidFeature
 	}
-	evidenceIDs := evidenceIDs(evidence)
 	for _, item := range plan.Tasks {
 		taskRef := kernel.AggregateRef{Kind: kernel.AggregateTask, ID: item.ID}
 		state, head, found, err := service.Store.ReadAggregateHead(ctx, taskRef)
@@ -285,7 +284,12 @@ func (service *ProductionService) extendFeatureProfilesForRuntimeSuspension(ctx 
 			continue
 		}
 		condition := digestBytes([]byte("runtime-suspension-profile\x00" + string(feature.ID) + "\x00" + string(item.ID) + "\x00" + deadline.Format(time.RFC3339Nano)))
-		successor, alreadyBound, err := planningRecoveryProfile(profileSnapshot.Profile, profileSnapshot.Profile.Binding(), service.planning, condition, deadline, evidenceIDs)
+		// The successor keeps the base profile's classification evidence: the
+		// suspension provenance is carried by the budget-amendment event and its
+		// receipt, not by the profile slot. Appending one evidence id per window
+		// accumulated past the Valid() cap of 64 after repeated host suspensions
+		// and made every startup fail.
+		successor, alreadyBound, err := planningRecoveryProfile(profileSnapshot.Profile, profileSnapshot.Profile.Binding(), service.planning, condition, deadline, nil)
 		if err != nil {
 			return fmt.Errorf("%w: suspension profile successor for task %s: %w", organization.ErrInvalidFeature, item.ID, err)
 		}
