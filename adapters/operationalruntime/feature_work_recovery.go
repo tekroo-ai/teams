@@ -78,6 +78,13 @@ func (service *ProductionService) reconcileFeaturePlan(ctx context.Context, feat
 	if revalidationAuthorized {
 		return nil
 	}
+	glitchRetried, err := service.reconcileGlitchTerminatedTasks(ctx, feature, plan, states, invocations)
+	if err != nil {
+		return fmt.Errorf("reconcile glitch terminations: %w", err)
+	}
+	if glitchRetried {
+		return nil
+	}
 	completed, err := service.reconcileTaskCompletions(ctx, feature, plan, states, heads, invocations, snapshot)
 	if err != nil {
 		return fmt.Errorf("reconcile task completions: %w", err)
