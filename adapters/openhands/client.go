@@ -905,7 +905,6 @@ func checkpointCompletionRepositoryViolation(events []rawEvent, promptIndex int)
 	return rawEvent{}, false, false
 }
 
-
 func shellDisciplineViolation(events []rawEvent, promptIndex int) (rawEvent, bool) {
 	for index, event := range events {
 		if index <= promptIndex || event.Kind != "ActionEvent" || event.Source != "agent" || event.ToolName != "terminal" {
@@ -3209,7 +3208,11 @@ func writesThroughRedirection(command string) bool {
 			end++
 		}
 		path := strings.Trim(command[target:end], "\"'")
-		if path == "/dev/null" {
+		// A redirect cannot mutate the repository when its target is outside
+		// it: /dev/null discards and the scratch directories are agent-local.
+		// Scratch written inside the repository would dirty the immutable
+		// candidate and remains a violation.
+		if path == "/dev/null" || strings.HasPrefix(path, "/tmp/") || strings.HasPrefix(path, "/var/tmp/") {
 			index = end - 1
 			continue
 		}

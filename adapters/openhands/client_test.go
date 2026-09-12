@@ -2098,6 +2098,9 @@ func TestMutationActionClassifiesGitStateChangesOnly(t *testing.T) {
 		{command: "go test ./... >/dev/null", want: false},
 		{command: "go test ./... > test.log", want: true},
 		{command: "cp source target", want: true},
+		{command: "git show HEAD:file.go > /tmp/base_file.go", want: false},
+		{command: "go test ./... > /tmp/out.log", want: false},
+		{command: "go test ./... > /var/tmp/out.log", want: false},
 	}
 	for _, test := range tests {
 		if got := mutationAction(rawEvent{ToolName: "terminal", ActionCommand: test.command}); got != test.want {
