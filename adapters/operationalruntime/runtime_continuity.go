@@ -146,9 +146,11 @@ func (service *ProductionService) reconcileFeatureRuntimeSuspension(ctx context.
 			return err
 		}
 	} else {
-		if !account.DeadlineAt.After(window.SuspendedAt) {
-			return nil
-		}
+		// Compensation applies to every unamended window regardless of whether
+		// the budget deadline has already lapsed: a host outage that crosses the
+		// deadline is precisely the downtime being excluded. Skipping expired
+		// budgets let a long crash-loop permanently kill the run. The total
+		// extension remains the exact sum of recorded windows.
 		evidenceRef, evidenceErr := service.ensureRuntimeSuspensionEvidence(ctx, window)
 		if evidenceErr != nil {
 			return evidenceErr
