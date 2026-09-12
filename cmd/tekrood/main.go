@@ -25,12 +25,12 @@ import (
 )
 
 const (
-	// Construction rehydrates every retained task workspace and immutable
-	// candidate with several git inspections each; the budget is proportional
-	// to retained state, not to the number of services. A 20-second budget was
-	// exceeded once retained candidates accumulated, and each killed git
-	// command aborted startup with an attributed-but-misleading sentinel.
-	startupTimeout  = 3 * time.Minute
+	// Construction and start replay retained state: every task workspace,
+	// immutable candidate, and recorded host-suspension window (each a
+	// budget-amendment replay). The budget is proportional to retained state,
+	// not to the number of services; a two-hour crash-loop recorded 150+
+	// windows and no fixed short budget survived their replay.
+	startupTimeout  = 15 * time.Minute
 	shutdownTimeout = 20 * time.Second
 )
 
