@@ -88,11 +88,21 @@ func (service *ProductionService) reconcileGlitchTerminatedTasks(ctx context.Con
 		if len(evidence) == 0 {
 			return false, fmt.Errorf("%w: glitch termination for task %s recorded no evidence", organization.ErrInvalidFeature, task.ID)
 		}
+		// The recovery deadline must be derived from durable state, not from the
+		// reconciler clock: commands use deterministic IDs over the request, so a
+		// per-pass deadline change turns an interrupted retry into a permanent
+		// COMMAND_ID_REUSE conflict.
+		budgetRef := kernel.AggregateRef{Kind: kernel.AggregateWorkBudget, ID: feature.BudgetAccountID}
+		budget, budgetFound := snapshot.WorkBudgetAccounts[budgetRef]
+		now := service.clock.Now().UTC()
+		if !budgetFound || !budget.Valid() || !budget.DeadlineAt.After(now) || !budget.DeadlineAt.After(invocation.DeadlineAt) {
+			continue
+		}
 		_, err = service.RetryFailedTask(ctx, service.operatorIdentity.Principal, invocation.ID, TaskRecoveryRequest{
 			ExpectedRevision: invocation.Revision,
 			Reason:           "automatic glitch recovery: " + workTerminationReasonLine(output),
 			EvidenceRefs:     evidence,
-			DeadlineAt:       service.clock.Now().UTC().Add(service.planningDeadline),
+			DeadlineAt:       budget.DeadlineAt,
 			IdempotencyKey:   "auto-glitch-retry-" + string(task.ID) + "-" + string(invocation.ID),
 		})
 		if err != nil {
