@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"sort"
 	"time"
 
@@ -299,8 +300,15 @@ func planningRecoveryPreludeEvent(eventType string) bool {
 }
 
 func planningRecoveryProfile(current kernel.WorkRiskProfile, prior kernel.WorkProfileBinding, planning ProductionPlanning, condition kernel.Digest, deadline time.Time, evidenceIDs []kernel.UUIDv7) (kernel.WorkRiskProfile, bool, error) {
-	if !current.Valid() || !prior.Valid() || planning.PolicyRevision == 0 || !planning.ClassificationPolicyDigest.Valid() || !planning.PromotionPolicyDigest.Valid() || !planning.VerificationTopologyDigest.Valid() || !condition.Valid() || deadline.IsZero() {
-		return kernel.WorkRiskProfile{}, false, organization.ErrInvalidFeature
+	switch {
+	case !current.Valid():
+		return kernel.WorkRiskProfile{}, false, fmt.Errorf("%w: recovery current profile %s rev %d invalid", organization.ErrInvalidFeature, current.ProfileID, current.ProfileRevision)
+	case !prior.Valid():
+		return kernel.WorkRiskProfile{}, false, fmt.Errorf("%w: recovery prior binding invalid", organization.ErrInvalidFeature)
+	case planning.PolicyRevision == 0, !planning.ClassificationPolicyDigest.Valid(), !planning.PromotionPolicyDigest.Valid(), !planning.VerificationTopologyDigest.Valid():
+		return kernel.WorkRiskProfile{}, false, fmt.Errorf("%w: recovery planning policy rev %d invalid", organization.ErrInvalidFeature, planning.PolicyRevision)
+	case !condition.Valid() || deadline.IsZero():
+		return kernel.WorkRiskProfile{}, false, fmt.Errorf("%w: recovery condition or deadline invalid", organization.ErrInvalidFeature)
 	}
 	targetID := deterministicOperationalUUID("planning-recovery-profile", string(prior.ProfileID), string(condition))
 	targetRevision := prior.ProfileRevision + 1
@@ -337,15 +345,15 @@ func planningRecoveryProfile(current kernel.WorkRiskProfile, prior kernel.WorkPr
 			}
 			completed.ProfileDigest = digestBytes(encoded)
 			if !completed.Valid() {
-				return kernel.WorkRiskProfile{}, false, organization.ErrInvalidFeature
+				return kernel.WorkRiskProfile{}, false, fmt.Errorf("%w: recovery completion profile %s invalid (evidence %d, gates %d)", organization.ErrInvalidFeature, completed.ProfileID, len(completed.ClassificationEvidenceIDs), len(completed.RequiredDeterministicGateIDs))
 			}
 			return completed, false, nil
 		}
 		if current.ProfileID != targetID || current.ProfileRevision != targetRevision || current.SupersedesProfileID == nil || *current.SupersedesProfileID != prior.ProfileID || current.ClassificationPolicyRevision != planning.PolicyRevision || current.ClassificationPolicyDigest != planning.ClassificationPolicyDigest || current.PromotionPolicyRevision != planning.PolicyRevision || current.PromotionPolicyDigest != planning.PromotionPolicyDigest || current.VerificationTopologyDigest != planning.VerificationTopologyDigest || !current.Budgets.DeadlineAt.Equal(deadline) {
-			return kernel.WorkRiskProfile{}, false, organization.ErrInvalidFeature
+			return kernel.WorkRiskProfile{}, false, fmt.Errorf("%w: recovery profile %s rev %d supersedes %v deadline %v does not match target %s rev %d deadline %v", organization.ErrInvalidFeature, current.ProfileID, current.ProfileRevision, current.SupersedesProfileID, current.Budgets.DeadlineAt, targetID, targetRevision, deadline)
 		}
 		if !planningRecoveryProfileDigestMatches(current) {
-			return kernel.WorkRiskProfile{}, false, organization.ErrInvalidFeature
+			return kernel.WorkRiskProfile{}, false, fmt.Errorf("%w: recovery profile %s digest mismatch", organization.ErrInvalidFeature, current.ProfileID)
 		}
 		if containsEveryUUID(current.ClassificationEvidenceIDs, evidenceIDs) {
 			return current, true, nil
@@ -367,7 +375,7 @@ func planningRecoveryProfile(current kernel.WorkRiskProfile, prior kernel.WorkPr
 		}
 		completed.ProfileDigest = digestBytes(encoded)
 		if !completed.Valid() {
-			return kernel.WorkRiskProfile{}, false, organization.ErrInvalidFeature
+			return kernel.WorkRiskProfile{}, false, fmt.Errorf("%w: recovery completion profile invalid: %s", organization.ErrInvalidFeature, encoded)
 		}
 		return completed, false, nil
 	}
@@ -394,7 +402,7 @@ func planningRecoveryProfile(current kernel.WorkRiskProfile, prior kernel.WorkPr
 	}
 	next.ProfileDigest = digestBytes(encoded)
 	if !next.Valid() {
-		return kernel.WorkRiskProfile{}, false, organization.ErrInvalidFeature
+		return kernel.WorkRiskProfile{}, false, fmt.Errorf("%w: recovery successor profile invalid: %s", organization.ErrInvalidFeature, encoded)
 	}
 	return next, false, nil
 }

@@ -3,7 +3,6 @@ package operationalruntime
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"time"
 
@@ -103,8 +102,11 @@ func (service *ProductionService) reconcileRuntimeSuspensions(ctx context.Contex
 }
 
 func (service *ProductionService) reconcileFeatureRuntimeSuspension(ctx context.Context, feature organization.FeatureRequest, plan organization.FeaturePlan, window mongo.RuntimeSuspensionWindow) error {
-	if !window.Valid() || plan.Validate(feature) != nil {
-		return organization.ErrInvalidFeature
+	if !window.Valid() {
+		return fmt.Errorf("%w: suspension window invalid", organization.ErrInvalidFeature)
+	}
+	if err := plan.Validate(feature); err != nil {
+		return fmt.Errorf("%w: suspension replay plan validation: %w", organization.ErrInvalidFeature, err)
 	}
 	if !window.ResumedAt.After(feature.CreatedAt) {
 		return nil
@@ -119,7 +121,7 @@ func (service *ProductionService) reconcileFeatureRuntimeSuspension(ctx context.
 		return nil
 	}
 	if !account.Valid() {
-		return organization.ErrInvalidFeature
+		return fmt.Errorf("%w: budget account %s invalid during suspension replay", organization.ErrInvalidFeature, account.ID)
 	}
 	if startedInvocationExists(snapshot.WorkInvocations, plan) {
 		// An already-started invocation retains its immutable brief. The worker
@@ -170,7 +172,7 @@ func (service *ProductionService) reconcileFeatureRuntimeSuspension(ctx context.
 			return err
 		}
 		if receipt.OutcomeCode != kernel.OutcomeApplied || !receipt.StateChanged {
-			return organization.ErrInvalidFeature
+			return fmt.Errorf("%w: suspension budget amend outcome %s state-changed %t", organization.ErrInvalidFeature, receipt.OutcomeCode, receipt.StateChanged)
 		}
 	}
 	return service.extendFeatureProfilesForRuntimeSuspension(ctx, feature, plan, targetDeadline, evidence)
@@ -222,12 +224,15 @@ func (service *ProductionService) ensureRuntimeSuspensionEvidence(ctx context.Co
 }
 
 func (service *ProductionService) runtimeSuspensionAmendmentReceipt(ctx context.Context, receipt kernel.CommandReceipt, budgetID kernel.UUIDv7, window mongo.RuntimeSuspensionWindow) (time.Time, []kernel.EvidenceRef, error) {
-	if receipt.CommandType != "tekroo.command.work-budget.amend" || receipt.Target != (kernel.AggregateRef{Kind: kernel.AggregateWorkBudget, ID: budgetID}) || receipt.OutcomeCode != kernel.OutcomeApplied || !receipt.StateChanged || len(receipt.EventIDs) != 1 {
-		return time.Time{}, nil, organization.ErrInvalidFeature
+	// A replayed suspension returns its original receipt with NO_CHANGE and
+	// StateChanged false; the idempotent replay is the success path after a
+	// daemon restart, not a defect. Only foreign or rejected receipts are wrong.
+	if receipt.CommandType != "tekroo.command.work-budget.amend" || receipt.Target != (kernel.AggregateRef{Kind: kernel.AggregateWorkBudget, ID: budgetID}) || (receipt.OutcomeCode != kernel.OutcomeApplied && receipt.OutcomeCode != kernel.OutcomeNoChange) || len(receipt.EventIDs) != 1 {
+		return time.Time{}, nil, fmt.Errorf("%w: suspension receipt %s type %s outcome %s changed %t events %d", organization.ErrInvalidFeature, receipt.CommandID, receipt.CommandType, receipt.OutcomeCode, receipt.StateChanged, len(receipt.EventIDs))
 	}
 	event, found, err := service.Store.ReadEvent(ctx, receipt.EventIDs[0])
 	if err != nil || !found {
-		return time.Time{}, nil, errors.Join(organization.ErrInvalidFeature, err)
+		return time.Time{}, nil, fmt.Errorf("%w: suspension receipt event %s found %t: %w", organization.ErrInvalidFeature, receipt.EventIDs[0], found, err)
 	}
 	var payload struct {
 		DeadlineAt  time.Time       `json:"deadline_at"`
@@ -235,7 +240,7 @@ func (service *ProductionService) runtimeSuspensionAmendmentReceipt(ctx context.
 	}
 	expectedEvidenceID := deterministicOperationalUUID("runtime-suspension-evidence", string(window.ID))
 	if json.Unmarshal(event.Payload, &payload) != nil || payload.DeadlineAt.IsZero() || !containsEveryUUID(payload.EvidenceIDs, []kernel.UUIDv7{expectedEvidenceID}) {
-		return time.Time{}, nil, organization.ErrInvalidFeature
+		return time.Time{}, nil, fmt.Errorf("%w: suspension amendment receipt %s payload unreadable (deadline %v evidence %d)", organization.ErrInvalidFeature, event.EventID, payload.DeadlineAt, len(payload.EvidenceIDs))
 	}
 	snapshot, err := service.Store.LoadDecision(ctx, kernel.KernelCommand{Target: receipt.Target})
 	if err != nil {
@@ -274,7 +279,7 @@ func (service *ProductionService) extendFeatureProfilesForRuntimeSuspension(ctx 
 		}
 		profileSnapshot, found := snapshot.WorkProfiles[taskRef]
 		if !found || !profileSnapshot.Valid() {
-			return organization.ErrInvalidFeature
+			return fmt.Errorf("%w: suspension profile extension for task %s has no valid profile snapshot", organization.ErrInvalidFeature, item.ID)
 		}
 		if !profileSnapshot.Profile.Budgets.DeadlineAt.Before(deadline) {
 			continue
@@ -282,19 +287,19 @@ func (service *ProductionService) extendFeatureProfilesForRuntimeSuspension(ctx 
 		condition := digestBytes([]byte("runtime-suspension-profile\x00" + string(feature.ID) + "\x00" + string(item.ID) + "\x00" + deadline.Format(time.RFC3339Nano)))
 		successor, alreadyBound, err := planningRecoveryProfile(profileSnapshot.Profile, profileSnapshot.Profile.Binding(), service.planning, condition, deadline, evidenceIDs)
 		if err != nil {
-			return err
+			return fmt.Errorf("%w: suspension profile successor for task %s: %w", organization.ErrInvalidFeature, item.ID, err)
 		}
 		if alreadyBound {
 			continue
 		}
 		profileEvidence, err := evidenceRefsForIDs(snapshot, successor.ClassificationEvidenceIDs)
 		if err != nil {
-			return err
+			return fmt.Errorf("suspension profile evidence for task %s: %w", item.ID, err)
 		}
 		tracked := &trackedTask{plan: item, revision: state.Revision, last: head, profile: successor}
 		key := "runtime-suspension-profile-evidence-complete-" + string(successor.ProfileID)
 		if err := service.applyTaskCommand(ctx, feature, tracked, "tekroo.command.task.bind-work-profile", kernel.SchemaVersion, service.policyAuthority, successor, profileEvidence, nil, key); err != nil {
-			return err
+			return fmt.Errorf("suspension bind profile task %s rev %d: %w", item.ID, state.Revision, err)
 		}
 	}
 	return nil
