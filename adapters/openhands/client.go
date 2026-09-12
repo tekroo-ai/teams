@@ -855,12 +855,12 @@ const deterministicValidationCorrectionPrefix = "TEKROO_DETERMINISTIC_VALIDATION
 const compactionCheckpointPrefix = "TEKROO_PROGRESS_CHECKPOINT:"
 const maximumEquivalentSuccessfulValidations = 2
 
-// checkpointCompletionRepositoryViolation enforces the handoff already made
-// by a progress checkpoint. Once retained evidence says to submit the result,
-// permit one search/view pair to recover a detail lost during condensation.
-// Further repository work is a return to the completed phase, not additional
-// engineering progress. A repository action after the one correction proves
-// that the model did not follow the handoff.
+// checkpointCompletionRepositoryViolation detects engineering work resuming
+// after a progress checkpoint declared the finish step. Only repository
+// *mutations* count: reading a file to compose the completion result is the
+// last mile of an honest verdict, and the purpose tool policy already governs
+// what a role may touch. A post-announcement mutation is what actually
+// falsifies the declaration that the repository phase is complete.
 func checkpointCompletionRepositoryViolation(events []rawEvent, promptIndex int) (rawEvent, bool, bool) {
 	checkpointIndex := -1
 	for index, event := range events {
@@ -885,25 +885,22 @@ func checkpointCompletionRepositoryViolation(events []rawEvent, promptIndex int)
 	if correctionIndex >= 0 {
 		for index := correctionIndex + 1; index < len(events); index++ {
 			event := events[index]
-			if event.Kind == "ActionEvent" && event.Source == "agent" && repositoryAction(event) {
+			if event.Kind == "ActionEvent" && event.Source == "agent" && mutationAction(event) {
 				return event, true, true
 			}
 		}
 		return rawEvent{}, false, false
 	}
-	repositoryActions := 0
 	for index := checkpointIndex + 1; index < len(events); index++ {
 		event := events[index]
-		if event.Kind != "ActionEvent" || event.Source != "agent" || !repositoryAction(event) {
+		if event.Kind != "ActionEvent" || event.Source != "agent" || !mutationAction(event) {
 			continue
 		}
-		repositoryActions++
-		if repositoryActions > 2 {
-			return event, false, true
-		}
+		return event, false, true
 	}
 	return rawEvent{}, false, false
 }
+
 
 func shellDisciplineViolation(events []rawEvent, promptIndex int) (rawEvent, bool) {
 	for index, event := range events {
@@ -1960,7 +1957,7 @@ func (client *Client) correctCheckpointCompletionViolation(ctx context.Context, 
 			return client.observation(ctx, brief, requestDigest, info, events, false)
 		}
 	}
-	correction := checkpointCompletionCorrectionPrefix + violation.ID + "\nThe retained progress checkpoint has completed the repository-evidence phase and its next_action is now authoritative. Do not issue another repository tool action. Evaluate the retained evidence and call the finish tool exactly once with the result required by result_protocol."
+	correction := checkpointCompletionCorrectionPrefix + violation.ID + "\nThe retained progress checkpoint has completed the repository-evidence phase and its next_action is now authoritative. Do not modify the repository further. You may read files to verify details for your result, then call the finish tool exactly once with the result required by result_protocol."
 	status, _, err := client.request(ctx, http.MethodPost, "/api/conversations/"+url.PathEscape(conversationID)+"/events", map[string]any{
 		"role": "user", "run": true,
 		"content": []map[string]any{{"type": "text", "text": correction}},

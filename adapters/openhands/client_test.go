@@ -868,7 +868,7 @@ func TestRepositoryProgressGuardStartsNewWindowAfterCompactionCheckpoint(t *test
 	}
 }
 
-func TestCheckpointCompletionAllowsOneFocusedSearchViewPairThenStopsRepositoryWork(t *testing.T) {
+func TestCheckpointCompletionAllowsReadsAndRejectsPostAnnouncementMutations(t *testing.T) {
 	checkpoint := progressCheckpoint{
 		SchemaVersion:       "tekroo.teams.execution-progress-checkpoint/1.2.0",
 		SourceJournalSHA256: kernel.Digest(strings.Repeat("a", 64)),
@@ -880,16 +880,29 @@ func TestCheckpointCompletionAllowsOneFocusedSearchViewPairThenStopsRepositoryWo
 		{ID: "focused-view", Kind: "ActionEvent", Source: "agent", ToolName: "repository_view", ActionPath: "adapters/mcp/handler.go"},
 	}
 	if violation, repeated, found := checkpointCompletionRepositoryViolation(events, -1); found {
-		t.Fatalf("one focused search/view pair was rejected: violation=%+v repeated=%t", violation, repeated)
+		t.Fatalf("reads after the completion announcement were rejected: violation=%+v repeated=%t", violation, repeated)
 	}
-	events = append(events, rawEvent{ID: "reopened-work", Kind: "ActionEvent", Source: "agent", ToolName: "repository_search", ActionPath: "cmd/tekroo"})
+	// Composing the completion result may require many reads; none may count
+	// as a return to engineering work.
+	for index := 0; index < 6; index++ {
+		events = append(events, rawEvent{ID: fmt.Sprintf("late-read-%d", index), Kind: "ActionEvent", Source: "agent", ToolName: "file_editor", ActionCommand: "view", ActionPath: "organization/host.go"})
+	}
+	if violation, repeated, found := checkpointCompletionRepositoryViolation(events, -1); found {
+		t.Fatalf("verification reads after the completion announcement were rejected: violation=%+v repeated=%t", violation, repeated)
+	}
+	events = append(events, rawEvent{ID: "post-announcement-edit", Kind: "ActionEvent", Source: "agent", ToolName: "file_editor", ActionCommand: "str_replace", ActionPath: "organization/host.go"})
 	violation, repeated, found := checkpointCompletionRepositoryViolation(events, -1)
-	if !found || repeated || violation.ID != "reopened-work" {
-		t.Fatalf("repository work after completion handoff was not detected: found=%t repeated=%t violation=%+v", found, repeated, violation)
+	if !found || repeated || violation.ID != "post-announcement-edit" {
+		t.Fatalf("repository mutation after completion handoff was not detected: found=%t repeated=%t violation=%+v", found, repeated, violation)
 	}
 	events = append(events, rawEvent{ID: "correction", Kind: "MessageEvent", Source: "user", Text: checkpointCompletionCorrectionPrefix + violation.ID})
 	if violation, repeated, found := checkpointCompletionRepositoryViolation(events, -1); found {
-		t.Fatalf("correction did not close prior repository work: violation=%+v repeated=%t", violation, repeated)
+		t.Fatalf("correction did not close prior mutation: violation=%+v repeated=%t", violation, repeated)
+	}
+	// A read after the correction is diligence, not defiance.
+	events = append(events, rawEvent{ID: "post-correction-read", Kind: "ActionEvent", Source: "agent", ToolName: "repository_view", ActionPath: "cmd/tekroo"})
+	if violation, repeated, found := checkpointCompletionRepositoryViolation(events, -1); found {
+		t.Fatalf("read after correction was rejected: violation=%+v repeated=%t", violation, repeated)
 	}
 }
 
@@ -902,7 +915,7 @@ func TestCheckpointCompletionRejectsRepositoryWorkAfterCorrection(t *testing.T) 
 	events := []rawEvent{
 		{ID: "checkpoint", Kind: "MessageEvent", Source: "user", Text: compactionCheckpointPrefix + "2\nrestored\n" + string(mustJSON(checkpoint))},
 		{ID: "correction", Kind: "MessageEvent", Source: "user", Text: checkpointCompletionCorrectionPrefix + "prior"},
-		{ID: "ignored-correction", Kind: "ActionEvent", Source: "agent", ToolName: "repository_view", ActionPath: "organization/host.go"},
+		{ID: "ignored-correction", Kind: "ActionEvent", Source: "agent", ToolName: "terminal", ActionCommand: "touch organization/host.go"},
 	}
 	violation, repeated, found := checkpointCompletionRepositoryViolation(events, -1)
 	if !found || !repeated || violation.ID != "ignored-correction" {
