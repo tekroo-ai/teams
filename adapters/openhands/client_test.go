@@ -2214,20 +2214,52 @@ func TestRoleToolPolicyEnforcesSignedRepositoryPermissions(t *testing.T) {
 }
 
 func TestWorkPurposeToolPolicyPreventsRoleAuthorityFromWideningReadOnlyWork(t *testing.T) {
-	events := []rawEvent{
-		{Kind: "MessageEvent", Source: "user"},
-		{ID: "edit", Kind: "ActionEvent", Source: "agent", ToolName: "file_editor", ActionCommand: "str_replace", ActionPath: "/workspace/a.go"},
-	}
+	mutation := rawEvent{ID: "edit", Kind: "ActionEvent", Source: "agent", ToolName: "file_editor", ActionCommand: "str_replace", ActionPath: "/workspace/a.go"}
+	success := rawEvent{Kind: "ObservationEvent", Source: "agent", ToolName: "file_editor", ToolCallID: mutation.ToolCallID}
+	events := []rawEvent{{Kind: "MessageEvent", Source: "user"}, mutation, success}
 	for _, purpose := range []kernel.WorkPurpose{kernel.PurposeReplan, kernel.PurposeReview, kernel.PurposeValidation, kernel.PurposePromotion} {
-		violation, reason, found := workPurposeToolPolicyViolation(purpose, events, 0)
-		if !found || violation.ID != "edit" || reason != "WORK_PURPOSE_REPOSITORY_MUTATION_NOT_AUTHORIZED" {
-			t.Fatalf("purpose=%s violation=%#v reason=%q found=%t", purpose, violation, reason, found)
+		violation, repeated, found := workPurposeToolPolicyViolation(purpose, events, 0)
+		if !found || repeated || violation.ID != "edit" {
+			t.Fatalf("purpose=%s violation=%#v repeated=%t found=%t", purpose, violation, repeated, found)
 		}
 	}
 	for _, purpose := range []kernel.WorkPurpose{kernel.PurposeImplementation, kernel.PurposeRepair} {
-		if violation, reason, found := workPurposeToolPolicyViolation(purpose, events, 0); found {
-			t.Fatalf("purpose=%s violation=%#v reason=%q", purpose, violation, reason)
+		if violation, _, found := workPurposeToolPolicyViolation(purpose, events, 0); found {
+			t.Fatalf("purpose=%s violation=%#v", purpose, violation)
 		}
+	}
+}
+
+func TestWorkPurposeToolPolicyIgnoresRefusedMutationsAndFencesRepeats(t *testing.T) {
+	purpose := kernel.PurposeValidation
+	refused := rawEvent{ID: "mkdir", Kind: "ActionEvent", Source: "agent", ToolName: "terminal", ActionCommand: "mkdir -p /tmp/tk-repro/db"}
+	exit1 := 1
+	events := []rawEvent{
+		{Kind: "MessageEvent", Source: "user"},
+		refused,
+		{Kind: "ObservationEvent", Source: "agent", ToolName: "terminal", ObservationExitCode: &exit1},
+	}
+	if violation, repeated, found := workPurposeToolPolicyViolation(purpose, events, 0); found {
+		t.Fatalf("a mutation the sandbox refused was treated as a violation: violation=%#v repeated=%t", violation, repeated)
+	}
+	exit0 := 0
+	didEdit := rawEvent{ID: "edit", Kind: "ActionEvent", Source: "agent", ToolName: "file_editor", ActionCommand: "str_replace", ActionPath: "organization/host.go"}
+	events = append(events, didEdit, rawEvent{Kind: "ObservationEvent", Source: "agent", ToolName: "file_editor", ObservationExitCode: &exit0})
+	violation, repeated, found := workPurposeToolPolicyViolation(purpose, events, 0)
+	if !found || repeated || violation.ID != "edit" {
+		t.Fatalf("first effective mutation must correct, not fence: violation=%#v repeated=%t", violation, repeated)
+	}
+	// After the correction for that action, it no longer counts; a second
+	// effective mutation fences.
+	events = append(events, rawEvent{Kind: "MessageEvent", Source: "user", Text: workPurposeMutationCorrectionPrefix + violation.ID + "\nkeep going"})
+	if violation, _, found := workPurposeToolPolicyViolation(purpose, events, 0); found {
+		t.Fatalf("corrected mutation was counted again: violation=%#v", violation)
+	}
+	second := rawEvent{ID: "edit2", Kind: "ActionEvent", Source: "agent", ToolName: "file_editor", ActionCommand: "str_replace", ActionPath: "kernel/types.go"}
+	events = append(events, second, rawEvent{Kind: "ObservationEvent", Source: "agent", ToolName: "file_editor", ObservationExitCode: &exit0})
+	violation, repeated, found = workPurposeToolPolicyViolation(purpose, events, 0)
+	if !found || !repeated || violation.ID != "edit2" {
+		t.Fatalf("second effective mutation must fence: violation=%#v repeated=%t", violation, repeated)
 	}
 }
 

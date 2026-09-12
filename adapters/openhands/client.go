@@ -743,8 +743,11 @@ func (client *Client) Inspect(ctx context.Context, brief application.ExecutionBr
 			return client.failForExecutionPolicyViolation(ctx, brief, requestDigest, info, events, "MODEL_RESPONSE_WITHOUT_ACTION_OR_RESULT", violation.ID, false)
 		}
 	}
-	if violation, reason, violated := workPurposeToolPolicyViolation(brief.Purpose, events, currentPromptIndex); violated {
-		return client.failForExecutionPolicyViolation(ctx, brief, requestDigest, info, events, reason, describeAction(violation), false)
+	if violation, repeated, violated := workPurposeToolPolicyViolation(brief.Purpose, events, currentPromptIndex); violated {
+		if repeated {
+			return client.failForExecutionPolicyViolation(ctx, brief, requestDigest, info, events, "WORK_PURPOSE_REPOSITORY_MUTATION_NOT_AUTHORIZED", describeAction(violation), false)
+		}
+		return client.correctWorkPurposeMutationViolation(ctx, brief, requestDigest, info, events, violation)
 	}
 	if violation, reason, violated := roleToolPolicyViolation(brief.RoleGrounding, events, currentPromptIndex); violated {
 		return client.failForExecutionPolicyViolation(ctx, brief, requestDigest, info, events, reason, describeAction(violation), false)
@@ -846,6 +849,7 @@ func (client *Client) ReconcileSuperseded(ctx context.Context, brief application
 }
 
 const shellDisciplineCorrectionPrefix = "TEKROO_SHELL_DISCIPLINE_CORRECTION:"
+const workPurposeMutationCorrectionPrefix = "TEKROO_WORK_PURPOSE_MUTATION_CORRECTION:"
 const repositoryProgressCorrectionPrefix = "TEKROO_REPOSITORY_PROGRESS_CORRECTION:"
 const repositoryGroundingCorrectionPrefix = "TEKROO_REPOSITORY_GROUNDING_CORRECTION:"
 const repositoryScopeCorrectionPrefix = "TEKROO_REPOSITORY_SCOPE_CORRECTION:"
@@ -1131,17 +1135,65 @@ func roleToolPolicyViolation(grounding application.RoleExecutionGrounding, event
 	return rawEvent{}, "", false
 }
 
-func workPurposeToolPolicyViolation(purpose kernel.WorkPurpose, events []rawEvent, promptIndex int) (rawEvent, string, bool) {
+// workPurposeToolPolicyViolation detects repository mutations that actually
+// took effect during a purpose which may not modify the repository (validator,
+// reviewer, architect, promoter). An attempted mutation the sandbox already
+// refused carries no damage and needs no harness response: the agent has its
+// own error observation. Only a mutation that succeeded can contaminate the
+// state being evaluated, so the first one earns a correction and a repeat
+// proves the agent will not stop and fences the invocation.
+func workPurposeToolPolicyViolation(purpose kernel.WorkPurpose, events []rawEvent, promptIndex int) (rawEvent, bool, bool) {
 	if purposeRequiresEditableCandidate(purpose) {
-		return rawEvent{}, "", false
+		return rawEvent{}, false, false
 	}
+	uncorrected := 0
+	corrected := 0
 	for index, event := range events {
 		if index <= promptIndex || event.Kind != "ActionEvent" || event.Source != "agent" || !mutationAction(event) {
 			continue
 		}
-		return event, "WORK_PURPOSE_REPOSITORY_MUTATION_NOT_AUTHORIZED", true
+		if !repositoryMutationTookEffect(events, index) {
+			continue
+		}
+		if workPurposeMutationCorrected(events, index) {
+			corrected++
+			continue
+		}
+		uncorrected++
+		if uncorrected == 1 {
+			return event, corrected > 0, true
+		}
+		return event, true, true
 	}
-	return rawEvent{}, "", false
+	return rawEvent{}, false, false
+}
+
+func workPurposeMutationCorrected(events []rawEvent, actionIndex int) bool {
+	for index := actionIndex + 1; index < len(events); index++ {
+		if events[index].Kind == "MessageEvent" && events[index].Source == "user" && strings.Contains(events[index].Text, workPurposeMutationCorrectionPrefix+events[actionIndex].ID) {
+			return true
+		}
+	}
+	return false
+}
+
+// repositoryMutationTookEffect reports whether the action at actionIndex is
+// followed by an observation showing the mutation succeeded. An action whose
+// observation has not arrived yet is deliberately not treated as effective;
+// the next observation cycle re-evaluates it.
+func repositoryMutationTookEffect(events []rawEvent, actionIndex int) bool {
+	action := events[actionIndex]
+	for index := actionIndex + 1; index < len(events); index++ {
+		event := events[index]
+		if event.Kind != "ObservationEvent" {
+			continue
+		}
+		if event.ToolName != action.ToolName || (action.ToolCallID != "" && event.ToolCallID != "" && event.ToolCallID != action.ToolCallID) {
+			continue
+		}
+		return !event.ObservationError && !event.ObservationTimeout && (event.ObservationExitCode == nil || *event.ObservationExitCode == 0)
+	}
+	return false
 }
 
 func repositoryGroundingViolation(events []rawEvent, promptIndex int, retainedGrounding bool) (rawEvent, bool) {
@@ -1919,6 +1971,44 @@ func (client *Client) correctRepositoryProgressViolation(ctx context.Context, br
 		return client.observation(ctx, brief, requestDigest, info, events, false)
 	}
 	correction := repositoryProgressCorrectionPrefix + violation.ID + "\nThe most recent repository action exactly repeated an earlier action and returned the same result within the current uninterrupted work period. Continue from that result. Choose the next action required by your assigned role; do not repeat the same action unless repository state or its inputs change."
+	status, _, err := client.request(ctx, http.MethodPost, "/api/conversations/"+url.PathEscape(conversationID)+"/events", map[string]any{
+		"role": "user", "run": true,
+		"content": []map[string]any{{"type": "text", "text": correction}},
+	})
+	if err != nil || status != http.StatusOK {
+		return application.ExternalExecutionObservation{}, ErrProtocol
+	}
+	if refreshed, refreshedStatus, refreshErr := client.getConversation(ctx, conversationID); refreshErr == nil && refreshedStatus == http.StatusOK {
+		info = refreshed
+	}
+	if refreshed, refreshErr := client.events(ctx, conversationID); refreshErr == nil {
+		events = refreshed
+	}
+	return client.observation(ctx, brief, requestDigest, info, events, false)
+}
+
+// correctWorkPurposeMutationViolation gives a non-writing purpose one
+// correction after a repository mutation actually took effect. A second
+// effective mutation fences the invocation: the verifier's own result can no
+// longer be trusted.
+func (client *Client) correctWorkPurposeMutationViolation(ctx context.Context, brief application.ExecutionBrief, requestDigest kernel.Digest, info conversationInfo, events []rawEvent, violation rawEvent) (application.ExternalExecutionObservation, error) {
+	conversationID := string(brief.InvocationID)
+	if executionStillActive(info.ExecutionStatus) {
+		status, _, err := client.request(ctx, http.MethodPost, "/api/conversations/"+url.PathEscape(conversationID)+"/interrupt", nil)
+		if err != nil || status != http.StatusOK && status != http.StatusNoContent && status != http.StatusConflict {
+			return application.ExternalExecutionObservation{}, ErrProtocol
+		}
+	}
+	if refreshed, refreshedStatus, err := client.getConversation(ctx, conversationID); err == nil && refreshedStatus == http.StatusOK {
+		info = refreshed
+	}
+	if refreshed, err := client.events(ctx, conversationID); err == nil {
+		events = refreshed
+	}
+	if index := eventIndexByID(events, violation.ID); index >= 0 && workPurposeMutationCorrected(events, index) {
+		return client.observation(ctx, brief, requestDigest, info, events, false)
+	}
+	correction := workPurposeMutationCorrectionPrefix + violation.ID + "\nThe previous action modified the repository, which this task's purpose does not authorize. The change stands; do not modify the repository further and do not attempt to undo it. Complete the assigned evaluation using the repository as it now is, and disclose the modification in your result."
 	status, _, err := client.request(ctx, http.MethodPost, "/api/conversations/"+url.PathEscape(conversationID)+"/events", map[string]any{
 		"role": "user", "run": true,
 		"content": []map[string]any{{"type": "text", "text": correction}},
