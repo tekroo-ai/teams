@@ -1048,6 +1048,15 @@ func TestCheckpointNextActionIgnoresFailedReadOnlyInspection(t *testing.T) {
 	}
 }
 
+func TestCheckpointNextActionRequiresRepairBeforeFailedValidationRerun(t *testing.T) {
+	brief, _ := openHandsTestBrief(t)
+	actions := []checkpointAction{{Tool: "terminal", Command: "go test -run TestActorName ./adapters/operationalruntime", Outcome: "FAILED"}}
+	next := checkpointNextAction(brief, actions, nil, nil)
+	if !strings.Contains(next, "repair its root cause") || !strings.Contains(next, "Do not rerun the same validation") {
+		t.Fatalf("next action = %q", next)
+	}
+}
+
 func TestProgressCheckpointPairsParallelToolResultsByToolCallID(t *testing.T) {
 	brief, _ := openHandsTestBrief(t)
 	exitFailure := 1
@@ -1367,6 +1376,80 @@ func TestDeterministicValidationGuardStopsThirdEquivalentSuccess(t *testing.T) {
 	}
 	violation, repeated, found := repeatedDeterministicValidationViolation(events, -1)
 	if !found || repeated || violation.ID != "third" {
+		t.Fatalf("violation=%+v repeated=%t found=%t", violation, repeated, found)
+	}
+}
+
+func TestFailedDeterministicValidationGuardStopsUnchangedSecondFailure(t *testing.T) {
+	exitFailure := 1
+	command := "go test -run TestActorName ./adapters/operationalruntime"
+	events := []rawEvent{
+		{ID: "first", Kind: "ActionEvent", Source: "agent", ToolName: "terminal", ToolCallID: "call-1", ActionCommand: command},
+		{Kind: "ObservationEvent", ToolName: "terminal", ToolCallID: "call-1", Text: "invalid team manifest", ObservationExitCode: &exitFailure},
+		{ID: "second", Kind: "ActionEvent", Source: "agent", ToolName: "terminal", ToolCallID: "call-2", ActionCommand: command},
+		{Kind: "ObservationEvent", ToolName: "terminal", ToolCallID: "call-2", Text: "invalid team manifest", ObservationExitCode: &exitFailure},
+	}
+	violation, repeated, found := repeatedFailedDeterministicValidationViolation(events, -1)
+	if !found || repeated || violation.ID != "second" {
+		t.Fatalf("violation=%+v repeated=%t found=%t", violation, repeated, found)
+	}
+}
+
+func TestFailedDeterministicValidationGuardAllowsOnePostCompactionRetry(t *testing.T) {
+	exitFailure := 1
+	command := "go test -run TestActorName ./adapters/operationalruntime"
+	events := []rawEvent{
+		{ID: "before", Kind: "ActionEvent", Source: "agent", ToolName: "terminal", ToolCallID: "call-1", ActionCommand: command},
+		{Kind: "ObservationEvent", ToolName: "terminal", ToolCallID: "call-1", Text: "invalid team manifest", ObservationExitCode: &exitFailure},
+		{Kind: "Condensation"},
+		{Kind: "MessageEvent", Source: "user", Text: compactionCheckpointPrefix + "1\nrestored\n{}"},
+		{ID: "first-after", Kind: "ActionEvent", Source: "agent", ToolName: "terminal", ToolCallID: "call-2", ActionCommand: command},
+		{Kind: "ObservationEvent", ToolName: "terminal", ToolCallID: "call-2", Text: "invalid team manifest", ObservationExitCode: &exitFailure},
+	}
+	if violation, repeated, found := repeatedFailedDeterministicValidationViolation(events, -1); found {
+		t.Fatalf("first post-compaction retry was rejected: violation=%+v repeated=%t", violation, repeated)
+	}
+	events = append(events,
+		rawEvent{ID: "second-after", Kind: "ActionEvent", Source: "agent", ToolName: "terminal", ToolCallID: "call-3", ActionCommand: command},
+		rawEvent{Kind: "ObservationEvent", ToolName: "terminal", ToolCallID: "call-3", Text: "invalid team manifest", ObservationExitCode: &exitFailure},
+	)
+	violation, repeated, found := repeatedFailedDeterministicValidationViolation(events, -1)
+	if !found || repeated || violation.ID != "second-after" {
+		t.Fatalf("violation=%+v repeated=%t found=%t", violation, repeated, found)
+	}
+}
+
+func TestFailedDeterministicValidationGuardResetsAfterMutation(t *testing.T) {
+	exitFailure := 1
+	exitSuccess := 0
+	command := "go test -run TestActorName ./adapters/operationalruntime"
+	events := []rawEvent{
+		{ID: "first", Kind: "ActionEvent", Source: "agent", ToolName: "terminal", ToolCallID: "call-1", ActionCommand: command},
+		{Kind: "ObservationEvent", ToolName: "terminal", ToolCallID: "call-1", Text: "invalid team manifest", ObservationExitCode: &exitFailure},
+		{ID: "edit", Kind: "ActionEvent", Source: "agent", ToolName: "file_editor", ToolCallID: "call-2", ActionCommand: "str_replace", ActionPath: "fixture_test.go"},
+		{Kind: "ObservationEvent", ToolName: "file_editor", ToolCallID: "call-2", ObservationExitCode: &exitSuccess},
+		{ID: "after-edit", Kind: "ActionEvent", Source: "agent", ToolName: "terminal", ToolCallID: "call-3", ActionCommand: command},
+		{Kind: "ObservationEvent", ToolName: "terminal", ToolCallID: "call-3", Text: "invalid team manifest", ObservationExitCode: &exitFailure},
+	}
+	if violation, repeated, found := repeatedFailedDeterministicValidationViolation(events, -1); found {
+		t.Fatalf("post-mutation validation was rejected: violation=%+v repeated=%t", violation, repeated)
+	}
+}
+
+func TestFailedDeterministicValidationGuardRejectsRepeatAfterCorrection(t *testing.T) {
+	exitFailure := 1
+	command := "go test -run TestActorName ./adapters/operationalruntime"
+	events := []rawEvent{
+		{ID: "first", Kind: "ActionEvent", Source: "agent", ToolName: "terminal", ToolCallID: "call-1", ActionCommand: command},
+		{Kind: "ObservationEvent", ToolName: "terminal", ToolCallID: "call-1", Text: "invalid team manifest", ObservationExitCode: &exitFailure},
+		{ID: "second", Kind: "ActionEvent", Source: "agent", ToolName: "terminal", ToolCallID: "call-2", ActionCommand: command},
+		{Kind: "ObservationEvent", ToolName: "terminal", ToolCallID: "call-2", Text: "invalid team manifest", ObservationExitCode: &exitFailure},
+		{Kind: "MessageEvent", Source: "user", Text: failedDeterministicValidationCorrectionPrefix + "second\nrepair it"},
+		{ID: "ignored", Kind: "ActionEvent", Source: "agent", ToolName: "terminal", ToolCallID: "call-3", ActionCommand: command},
+		{Kind: "ObservationEvent", ToolName: "terminal", ToolCallID: "call-3", Text: "invalid team manifest", ObservationExitCode: &exitFailure},
+	}
+	violation, repeated, found := repeatedFailedDeterministicValidationViolation(events, -1)
+	if !found || !repeated || violation.ID != "ignored" {
 		t.Fatalf("violation=%+v repeated=%t found=%t", violation, repeated, found)
 	}
 }

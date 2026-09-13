@@ -769,6 +769,9 @@ func (client *Client) Inspect(ctx context.Context, brief application.ExecutionBr
 			return client.correctCheckpointCompletionViolation(ctx, brief, requestDigest, info, events, violation, repeated)
 		}
 	}
+	if violation, repeated, violated := repeatedFailedDeterministicValidationViolation(events, currentPromptIndex); violated {
+		return client.correctFailedDeterministicValidationViolation(ctx, brief, requestDigest, info, events, violation, repeated)
+	}
 	if violation, repeated, violated := repeatedDeterministicValidationViolation(events, currentPromptIndex); violated {
 		return client.correctDeterministicValidationViolation(ctx, brief, requestDigest, info, events, violation, repeated)
 	}
@@ -858,6 +861,7 @@ const repositoryScopeCorrectionPrefix = "TEKROO_REPOSITORY_SCOPE_CORRECTION:"
 const editableCandidateCompletionCorrectionPrefix = "TEKROO_CANDIDATE_COMPLETION_CORRECTION:"
 const checkpointCompletionCorrectionPrefix = "TEKROO_CHECKPOINT_COMPLETION_CORRECTION:"
 const deterministicValidationCorrectionPrefix = "TEKROO_DETERMINISTIC_VALIDATION_CORRECTION:"
+const failedDeterministicValidationCorrectionPrefix = "TEKROO_FAILED_DETERMINISTIC_VALIDATION_CORRECTION:"
 const compactionCheckpointPrefix = "TEKROO_PROGRESS_CHECKPOINT:"
 const maximumEquivalentSuccessfulValidations = 2
 const maximumCheckpointCompletionReads = 8
@@ -1855,6 +1859,125 @@ func successfulActionIndexes(events []rawEvent) map[int]bool {
 	return succeeded
 }
 
+// failedActionResultSignatures binds each completed failed action to the
+// observable failure it produced. Command identity alone is insufficient here:
+// two different checks may fail for different reasons and still be useful.
+func failedActionResultSignatures(events []rawEvent) map[int]string {
+	type pendingAction struct {
+		index      int
+		toolCallID string
+	}
+	pendingByTool := make(map[string][]pendingAction)
+	failed := make(map[int]string)
+	for index, event := range events {
+		if event.Kind == "ActionEvent" && event.Source == "agent" {
+			pendingByTool[event.ToolName] = append(pendingByTool[event.ToolName], pendingAction{index: index, toolCallID: event.ToolCallID})
+			continue
+		}
+		if event.Kind != "ObservationEvent" || len(pendingByTool[event.ToolName]) == 0 {
+			continue
+		}
+		pendingIndex := 0
+		if event.ToolCallID != "" {
+			pendingIndex = slices.IndexFunc(pendingByTool[event.ToolName], func(pending pendingAction) bool {
+				return pending.toolCallID == event.ToolCallID
+			})
+			if pendingIndex < 0 {
+				continue
+			}
+		}
+		pending := pendingByTool[event.ToolName][pendingIndex]
+		pendingByTool[event.ToolName] = slices.Delete(pendingByTool[event.ToolName], pendingIndex, pendingIndex+1)
+		if !event.ObservationError && !event.ObservationTimeout && (event.ObservationExitCode == nil || *event.ObservationExitCode == 0) {
+			continue
+		}
+		encoded, err := json.Marshal(struct {
+			Text     string `json:"text"`
+			Error    bool   `json:"error"`
+			Timeout  bool   `json:"timeout"`
+			ExitCode *int   `json:"exit_code,omitempty"`
+		}{event.Text, event.ObservationError, event.ObservationTimeout, event.ObservationExitCode})
+		if err != nil {
+			continue
+		}
+		digest := sha256.Sum256(encoded)
+		failed[pending.index] = hex.EncodeToString(digest[:])
+	}
+	return failed
+}
+
+// repeatedFailedDeterministicValidationViolation prevents a model from
+// rerunning an unchanged failing check instead of repairing its cause. A
+// successful repository mutation and a compaction checkpoint both open a new
+// continuity period; the latter deliberately permits one focused post-
+// compaction retry before the guard applies again.
+func repeatedFailedDeterministicValidationViolation(events []rawEvent, promptIndex int) (rawEvent, bool, bool) {
+	succeeded := successfulActionIndexes(events)
+	failed := failedActionResultSignatures(events)
+	boundary := promptIndex
+	for index, event := range events {
+		if index <= promptIndex {
+			continue
+		}
+		if event.Kind == "Condensation" || event.Kind == "MessageEvent" && event.Source == "user" && strings.HasPrefix(event.Text, compactionCheckpointPrefix) {
+			boundary = index
+			continue
+		}
+		if succeeded[index] && mutationAction(event) {
+			boundary = index
+		}
+	}
+
+	correctionIndex := -1
+	correctedSignature := ""
+	for index := boundary + 1; index < len(events); index++ {
+		event := events[index]
+		if event.Kind != "MessageEvent" || event.Source != "user" || !strings.HasPrefix(event.Text, failedDeterministicValidationCorrectionPrefix) {
+			continue
+		}
+		correctionIndex = index
+		line := strings.SplitN(event.Text, "\n", 2)[0]
+		violationID := strings.TrimSpace(strings.TrimPrefix(line, failedDeterministicValidationCorrectionPrefix))
+		for prior := boundary + 1; prior < index; prior++ {
+			if events[prior].ID != violationID {
+				continue
+			}
+			actionSignature, validation := equivalentDeterministicValidationSignature(events[prior])
+			if validation && failed[prior] != "" {
+				correctedSignature = actionSignature + ":" + failed[prior]
+			}
+			break
+		}
+	}
+
+	start := boundary + 1
+	repeated := false
+	if correctionIndex >= start {
+		start = correctionIndex + 1
+		repeated = true
+	}
+	seen := make(map[string]struct{})
+	for index := start; index < len(events); index++ {
+		resultSignature := failed[index]
+		if resultSignature == "" {
+			continue
+		}
+		actionSignature, validation := equivalentDeterministicValidationSignature(events[index])
+		if !validation {
+			continue
+		}
+		signature := actionSignature + ":" + resultSignature
+		if repeated && correctedSignature != "" && signature == correctedSignature {
+			return events[index], true, true
+		}
+		if _, exists := seen[signature]; exists {
+			return events[index], repeated, true
+		}
+		seen[signature] = struct{}{}
+	}
+	return rawEvent{}, false, false
+}
+
 func equivalentDeterministicValidationSignature(event rawEvent) (string, bool) {
 	if !deterministicValidationAction(event) {
 		return "", false
@@ -1942,6 +2065,45 @@ func (client *Client) correctDeterministicValidationViolation(ctx context.Contex
 		}
 	}
 	correction := deterministicValidationCorrectionPrefix + violation.ID + "\nAn equivalent deterministic validation has already succeeded twice without an intervening repository change or compaction boundary. Reuse that evidence. Run only a materially different check still required by the acceptance criteria; otherwise call the finish tool exactly once with the result required by result_protocol."
+	status, _, err := client.request(ctx, http.MethodPost, "/api/conversations/"+url.PathEscape(conversationID)+"/events", map[string]any{
+		"role": "user", "run": true,
+		"content": []map[string]any{{"type": "text", "text": correction}},
+	})
+	if err != nil || status != http.StatusOK {
+		return application.ExternalExecutionObservation{}, ErrProtocol
+	}
+	if refreshed, refreshedStatus, refreshErr := client.getConversation(ctx, conversationID); refreshErr == nil && refreshedStatus == http.StatusOK {
+		info = refreshed
+	}
+	if refreshed, refreshErr := client.events(ctx, conversationID); refreshErr == nil {
+		events = refreshed
+	}
+	return client.observation(ctx, brief, requestDigest, info, events, false)
+}
+
+func (client *Client) correctFailedDeterministicValidationViolation(ctx context.Context, brief application.ExecutionBrief, requestDigest kernel.Digest, info conversationInfo, events []rawEvent, violation rawEvent, repeated bool) (application.ExternalExecutionObservation, error) {
+	if repeated {
+		return client.failForExecutionPolicyViolation(ctx, brief, requestDigest, info, events, "REPEATED_FAILED_DETERMINISTIC_VALIDATION_NO_PROGRESS", describeAction(violation), true)
+	}
+	conversationID := string(brief.InvocationID)
+	if executionStillActive(info.ExecutionStatus) {
+		status, _, err := client.request(ctx, http.MethodPost, "/api/conversations/"+url.PathEscape(conversationID)+"/interrupt", nil)
+		if err != nil || status != http.StatusOK && status != http.StatusNoContent && status != http.StatusConflict {
+			return application.ExternalExecutionObservation{}, ErrProtocol
+		}
+	}
+	if refreshed, refreshedStatus, err := client.getConversation(ctx, conversationID); err == nil && refreshedStatus == http.StatusOK {
+		info = refreshed
+	}
+	if refreshed, err := client.events(ctx, conversationID); err == nil {
+		events = refreshed
+	}
+	for index := eventIndexByID(events, violation.ID) + 1; index > 0 && index < len(events); index++ {
+		if events[index].Kind == "MessageEvent" && events[index].Source == "user" && strings.HasPrefix(events[index].Text, failedDeterministicValidationCorrectionPrefix) {
+			return client.observation(ctx, brief, requestDigest, info, events, false)
+		}
+	}
+	correction := failedDeterministicValidationCorrectionPrefix + violation.ID + "\nThe latest deterministic validation repeated an earlier unchanged failure. Do not run that validation again until a repository mutation or a relevant external prerequisite changes. Use the retained failure output to repair its root cause, then rerun the affected validation once."
 	status, _, err := client.request(ctx, http.MethodPost, "/api/conversations/"+url.PathEscape(conversationID)+"/events", map[string]any{
 		"role": "user", "run": true,
 		"content": []map[string]any{{"type": "text", "text": correction}},
@@ -2588,6 +2750,9 @@ func checkpointNextAction(brief application.ExecutionBrief, actions []checkpoint
 		case "FAILED", "TIMED_OUT", "PENDING":
 			if checkpointActionIsReadOnlyInspection(actions[index]) {
 				continue
+			}
+			if actions[index].Outcome == "FAILED" && deterministicValidationAction(rawEvent{ToolName: actions[index].Tool, ActionCommand: actions[index].Command}) {
+				return "Use the retained failed validation output to repair its root cause. Do not rerun the same validation until repository state or its relevant external prerequisite changes."
 			}
 			return fmt.Sprintf("Resolve the retained %s %s action before continuing; do not repeat any unrelated successful discovery.", strings.ToLower(actions[index].Outcome), actions[index].Tool)
 		}
