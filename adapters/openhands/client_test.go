@@ -2225,6 +2225,61 @@ func TestRepositorySearchLoopAllowsDifferentFileRanges(t *testing.T) {
 	}
 }
 
+func TestOverlappingRepositoryViewLoopRejectsProgressiveRangeExpansion(t *testing.T) {
+	events := []rawEvent{{Kind: "MessageEvent", Source: "user"}}
+	for index := 0; index <= maximumConsecutiveOverlappingRepositoryViews; index++ {
+		start := 284 - index
+		end := 320 + 2*index
+		callID := fmt.Sprintf("call-%d", index)
+		events = append(events,
+			rawEvent{ID: fmt.Sprintf("view-%d", index), Kind: "ActionEvent", Source: "agent", ToolName: "file_editor", ToolCallID: callID, ActionCommand: "view", ActionPath: "/workspace/actor_name.go", ActionPayload: json.RawMessage(fmt.Sprintf(`{"command":"view","path":"/workspace/actor_name.go","view_range":[%d,%d]}`, start, end))},
+			rawEvent{Kind: "ObservationEvent", ToolName: "file_editor", ToolCallID: callID, Text: fmt.Sprintf("lines %d-%d", start, end), ObservationExitCode: intPointer(0)},
+		)
+	}
+	violation, found := overlappingRepositoryViewLoopViolation(events, 0)
+	if !found || violation.ID != fmt.Sprintf("view-%d", maximumConsecutiveOverlappingRepositoryViews) {
+		t.Fatalf("violation=%+v found=%t", violation, found)
+	}
+}
+
+func TestOverlappingRepositoryViewLoopAllowsDistinctSections(t *testing.T) {
+	events := []rawEvent{{Kind: "MessageEvent", Source: "user"}}
+	for index := 0; index < 12; index++ {
+		start := 1 + index*80
+		end := start + 79
+		callID := fmt.Sprintf("call-%d", index)
+		events = append(events,
+			rawEvent{ID: fmt.Sprintf("view-%d", index), Kind: "ActionEvent", Source: "agent", ToolName: "file_editor", ToolCallID: callID, ActionCommand: "view", ActionPath: "/workspace/large.go", ActionPayload: json.RawMessage(fmt.Sprintf(`{"command":"view","path":"/workspace/large.go","view_range":[%d,%d]}`, start, end))},
+			rawEvent{Kind: "ObservationEvent", ToolName: "file_editor", ToolCallID: callID, Text: fmt.Sprintf("lines %d-%d", start, end), ObservationExitCode: intPointer(0)},
+		)
+	}
+	if violation, found := overlappingRepositoryViewLoopViolation(events, 0); found {
+		t.Fatalf("distinct sections were misclassified as a loop: %+v", violation)
+	}
+}
+
+func TestOverlappingRepositoryViewLoopResetsAfterCompaction(t *testing.T) {
+	events := []rawEvent{{Kind: "MessageEvent", Source: "user"}}
+	for index := 0; index < maximumConsecutiveOverlappingRepositoryViews; index++ {
+		callID := fmt.Sprintf("before-%d", index)
+		events = append(events,
+			rawEvent{Kind: "ActionEvent", Source: "agent", ToolName: "file_editor", ToolCallID: callID, ActionCommand: "view", ActionPath: "/workspace/a.go", ActionPayload: json.RawMessage(`{"command":"view","path":"/workspace/a.go","view_range":[100,200]}`)},
+			rawEvent{Kind: "ObservationEvent", ToolName: "file_editor", ToolCallID: callID, Text: "before", ObservationExitCode: intPointer(0)},
+		)
+	}
+	events = append(events, rawEvent{Kind: "MessageEvent", Source: "user", Text: compactionCheckpointPrefix + "1"})
+	for index := 0; index < maximumConsecutiveOverlappingRepositoryViews; index++ {
+		callID := fmt.Sprintf("after-%d", index)
+		events = append(events,
+			rawEvent{Kind: "ActionEvent", Source: "agent", ToolName: "file_editor", ToolCallID: callID, ActionCommand: "view", ActionPath: "/workspace/a.go", ActionPayload: json.RawMessage(`{"command":"view","path":"/workspace/a.go","view_range":[99,201]}`)},
+			rawEvent{Kind: "ObservationEvent", ToolName: "file_editor", ToolCallID: callID, Text: "after", ObservationExitCode: intPointer(0)},
+		)
+	}
+	if violation, found := overlappingRepositoryViewLoopViolation(events, 0); found {
+		t.Fatalf("post-compaction allowance was not reset: %+v", violation)
+	}
+}
+
 func TestRepositorySearchLoopAllowsDistinctDiscoveryActions(t *testing.T) {
 	events := []rawEvent{
 		{Kind: "MessageEvent", Source: "user"},

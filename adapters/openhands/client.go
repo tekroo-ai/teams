@@ -783,6 +783,9 @@ func (client *Client) Inspect(ctx context.Context, brief application.ExecutionBr
 	if violation, repeated, violated := repeatedDeterministicValidationViolation(events, currentPromptIndex); violated {
 		return client.correctDeterministicValidationViolation(ctx, brief, requestDigest, info, events, violation, repeated)
 	}
+	if violation, violated := overlappingRepositoryViewLoopViolation(events, currentPromptIndex); violated {
+		return client.correctRepositoryProgressViolation(ctx, brief, requestDigest, info, events, currentPromptIndex, violation)
+	}
 	if violation, violated := repositorySearchLoopViolation(events, currentPromptIndex); violated {
 		return client.correctRepositoryProgressViolation(ctx, brief, requestDigest, info, events, currentPromptIndex, violation)
 	}
@@ -1512,6 +1515,105 @@ func repositorySearchLoopViolation(events []rawEvent, promptIndex int) (rawEvent
 		results[resultSignature] = struct{}{}
 	}
 	return rawEvent{}, false
+}
+
+const maximumConsecutiveOverlappingRepositoryViews = 5
+
+type repositoryViewWindow struct {
+	event      rawEvent
+	toolCallID string
+	start      int
+	end        int
+}
+
+// overlappingRepositoryViewLoopViolation catches a no-progress pattern that an
+// exact action signature cannot: repeatedly reopening almost the same range
+// while moving either boundary by only a few lines. Distinct sections of the
+// same file remain legitimate evidence gathering and reset the sequence.
+func overlappingRepositoryViewLoopViolation(events []rawEvent, promptIndex int) (rawEvent, bool) {
+	var pending []repositoryViewWindow
+	var previous repositoryViewWindow
+	consecutive := 0
+	for index, event := range events {
+		if index <= promptIndex {
+			continue
+		}
+		if event.Kind == "MessageEvent" && event.Source == "user" && strings.HasPrefix(event.Text, compactionCheckpointPrefix) {
+			pending = nil
+			previous = repositoryViewWindow{}
+			consecutive = 0
+			continue
+		}
+		if event.Kind == "ActionEvent" && event.Source == "agent" {
+			current, ok := repositoryViewRange(event)
+			if !ok {
+				pending = nil
+				previous = repositoryViewWindow{}
+				consecutive = 0
+				continue
+			}
+			pending = append(pending, current)
+			continue
+		}
+		if event.Kind != "ObservationEvent" || len(pending) == 0 {
+			continue
+		}
+		pendingIndex := 0
+		if event.ToolCallID != "" {
+			pendingIndex = slices.IndexFunc(pending, func(candidate repositoryViewWindow) bool {
+				return candidate.toolCallID == event.ToolCallID
+			})
+			if pendingIndex < 0 {
+				continue
+			}
+		}
+		current := pending[pendingIndex]
+		pending = slices.Delete(pending, pendingIndex, pendingIndex+1)
+		succeeded := !event.ObservationError && !event.ObservationTimeout && (event.ObservationExitCode == nil || *event.ObservationExitCode == 0)
+		if !succeeded {
+			previous = repositoryViewWindow{}
+			consecutive = 0
+			continue
+		}
+		if previous.event.ActionPath == current.event.ActionPath && heavilyOverlappingRanges(previous.start, previous.end, current.start, current.end) {
+			consecutive++
+		} else {
+			consecutive = 1
+		}
+		previous = current
+		if consecutive > maximumConsecutiveOverlappingRepositoryViews && !repositoryProgressViolationCorrected(events, eventIndexByID(events, current.event.ID)) {
+			return current.event, true
+		}
+	}
+	return rawEvent{}, false
+}
+
+func repositoryViewRange(event rawEvent) (view repositoryViewWindow, ok bool) {
+	if event.ToolName != "file_editor" && event.ToolName != "repository_view" || !strings.EqualFold(strings.TrimSpace(event.ActionCommand), "view") || event.ActionPath == "" {
+		return view, false
+	}
+	var action struct {
+		ViewRange []int `json:"view_range"`
+	}
+	if json.Unmarshal(event.ActionPayload, &action) != nil || len(action.ViewRange) != 2 || action.ViewRange[0] < 1 || action.ViewRange[1] < action.ViewRange[0] {
+		return view, false
+	}
+	view.event = event
+	view.toolCallID = event.ToolCallID
+	view.start = action.ViewRange[0]
+	view.end = action.ViewRange[1]
+	return view, true
+}
+
+func heavilyOverlappingRanges(leftStart, leftEnd, rightStart, rightEnd int) bool {
+	intersectionStart := max(leftStart, rightStart)
+	intersectionEnd := min(leftEnd, rightEnd)
+	if intersectionEnd < intersectionStart {
+		return false
+	}
+	intersection := intersectionEnd - intersectionStart + 1
+	shorter := min(leftEnd-leftStart+1, rightEnd-rightStart+1)
+	return intersection*10 >= shorter*9
 }
 
 func repositoryObservationSignature(event rawEvent) (string, bool) {
