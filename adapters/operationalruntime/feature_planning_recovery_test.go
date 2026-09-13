@@ -377,6 +377,18 @@ func TestClassifyTaskRecoveryAllowsOperatorRepairOfSucceededRepair(t *testing.T)
 	}
 }
 
+func TestFailedRepairContinuationPreservesRepairPurpose(t *testing.T) {
+	task := organization.PlannedTask{Purpose: kernel.PurposeImplementation}
+	terminal := kernel.WorkInvocation{Purpose: kernel.PurposeRepair, AttemptOrdinal: 2}
+	if nextPurpose := taskRecoverySuccessorPurpose(task, terminal); nextPurpose != kernel.PurposeRepair {
+		t.Fatalf("successor purpose=%s", nextPurpose)
+	}
+	terminal.Purpose = kernel.PurposeImplementation
+	if nextPurpose := taskRecoverySuccessorPurpose(task, terminal); nextPurpose != kernel.PurposeImplementation {
+		t.Fatalf("implementation successor purpose=%s", nextPurpose)
+	}
+}
+
 func TestSucceededRepairCanContinueWithChangedCondition(t *testing.T) {
 	prior := recoveryTerminalFixture(kernel.InvocationSucceeded, nil, nil)
 	prior.Purpose = kernel.PurposeRepair

@@ -187,7 +187,7 @@ func (service *ProductionService) RetryFailedTask(ctx context.Context, principal
 	} else if err := service.refreshTaskExecutionBinding(ctx, feature, tracked, profileConfig, workspace); err != nil {
 		return InvocationStatus{}, fmt.Errorf("refresh recovery execution binding: %w", err)
 	}
-	nextPurpose := planned.Purpose
+	nextPurpose := taskRecoverySuccessorPurpose(planned, terminal)
 	nextAttempt := terminal.AttemptOrdinal + 1
 	predecessor := &terminal
 	conditionDigests := []kernel.Digest{recoveryCondition}
@@ -237,6 +237,16 @@ func (service *ProductionService) RetryFailedTask(ctx context.Context, principal
 		return InvocationStatus{}, fmt.Errorf("read authorized recovery invocation: %w", errors.Join(application.ErrInvalidOperationalExecution, err))
 	}
 	return status, nil
+}
+
+func taskRecoverySuccessorPurpose(task organization.PlannedTask, terminal kernel.WorkInvocation) kernel.WorkPurpose {
+	// A failed repair resumes the same repair lineage. Returning to the planned
+	// IMPLEMENTATION purpose would violate the predecessor binding and discard
+	// the repair checkpoint.
+	if terminal.Purpose == kernel.PurposeRepair {
+		return kernel.PurposeRepair
+	}
+	return task.Purpose
 }
 
 func nextTaskPurposeAttempt(invocations map[kernel.AggregateRef]kernel.WorkInvocation, taskID kernel.UUIDv7, purpose kernel.WorkPurpose) uint64 {
