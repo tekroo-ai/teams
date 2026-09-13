@@ -16,7 +16,7 @@ func TestWorkflowPlanningStageDefinitionComesFromConfiguredWorkflow(t *testing.T
 		t.Fatal(err)
 	}
 	path := filepath.Join(filepath.Dir(filepath.Dir(workingDirectory)), "config", "workflows", "software-development.v1.json")
-	definition, err := organization.LoadWorkflowDefinition(path, kernel.Digest("0fad72aa1ffd2a5a671a610165d8686fa68331f8206627874bf6ce3628b4bfa6"))
+	definition, err := organization.LoadWorkflowDefinition(path, kernel.Digest("c66b63320ad59d42241a292b1684436ba8f286f7312056fd4abd90fc95facb9f"))
 	if err != nil {
 		t.Fatal(err)
 	}
