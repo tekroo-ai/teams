@@ -3346,12 +3346,22 @@ func mutationAction(event rawEvent) bool {
 		}
 	}
 	switch executable {
-	case "mkdir", "touch", "rm", "truncate":
+	case "mkdir", "touch", "rm", "truncate", "tee":
 		if mutationTargetsOnlyScratch(fields[1:]) {
 			return false
 		}
 		return true
-	case "apply_patch", "tee", "mv", "cp", "patch":
+	case "cp":
+		if mutationDestinationIsScratch(fields[1:]) {
+			return false
+		}
+		return true
+	case "mv":
+		if mutationTargetsOnlyScratch(fields[1:]) {
+			return false
+		}
+		return true
+	case "apply_patch", "patch":
 		return true
 	case "gofmt":
 		if slices.Contains(fields[1:], "-w") {
@@ -3387,13 +3397,30 @@ func mutationTargetsOnlyScratch(arguments []string) bool {
 		if strings.HasPrefix(argument, "-") {
 			continue
 		}
-		path := filepath.Clean(strings.Trim(argument, "\"'"))
-		if !filepath.IsAbs(path) || path == "/tmp" || path == "/var/tmp" || !strings.HasPrefix(path, "/tmp/") && !strings.HasPrefix(path, "/var/tmp/") {
+		if !scratchPath(argument) {
 			return false
 		}
 		found = true
 	}
 	return found
+}
+
+// Copying reads its sources and mutates only its destination. A copy whose
+// final path is scratch therefore cannot change the repository even when the
+// source is a repository file.
+func mutationDestinationIsScratch(arguments []string) bool {
+	for index := len(arguments) - 1; index >= 0; index-- {
+		if strings.HasPrefix(arguments[index], "-") {
+			continue
+		}
+		return scratchPath(arguments[index])
+	}
+	return false
+}
+
+func scratchPath(value string) bool {
+	path := filepath.Clean(strings.Trim(value, "\"'"))
+	return filepath.IsAbs(path) && path != "/tmp" && path != "/var/tmp" && (strings.HasPrefix(path, "/tmp/") || strings.HasPrefix(path, "/var/tmp/"))
 }
 
 func writesThroughRedirection(command string) bool {
