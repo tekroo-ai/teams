@@ -234,6 +234,11 @@ func TestPlanningCandidateCanBeRevalidatedAfterDeterministicOutputRejection(t *t
 	if !validCandidateRevalidation(value, prior) {
 		t.Fatal("changed-condition planning revalidation was rejected")
 	}
+	value.Purpose = PurposeHandoff
+	prior.Purpose = PurposeHandoff
+	if !validCandidateRevalidation(value, prior) {
+		t.Fatal("changed-condition configured-workflow handoff revalidation was rejected")
+	}
 	value.Purpose = PurposeRepair
 	prior.Purpose = PurposeRepair
 	if !validCandidateRevalidation(value, prior) {
