@@ -348,6 +348,7 @@ var readOnlyRetainedRetryExecutionGuidance = []string{
 
 var sharedExplicitRecoveryExecutionGuidance = []string{
 	"This explicit recovery starts a clean OpenHands conversation. Prior conversational history is not available; use the current workspace and task evidence as the durable recovery state.",
+	"The recovery_directive records the exact condition that made the preceding result unacceptable. Address it before re-evaluating the original acceptance criteria; satisfying the original task without resolving the directive is not a successful recovery.",
 	"Inspect Git status, recent commits, and the focused diff before reading source broadly. The workspace may already contain a completed implementation from the failed invocation.",
 	"Do not restart implementation or force a new edit when the current committed work already satisfies the task. Verify the existing result against the acceptance criteria and finish promptly.",
 }

@@ -146,6 +146,9 @@ func (service *ProductionService) RetryFailedTask(ctx context.Context, principal
 		workspace, candidateEvidence, err = service.prepareCandidateConsumerWorkspace(ctx, feature, planned, owner, *feature.Plan, latestPlannedInvocations(*feature.Plan, snapshot.WorkInvocations), registered)
 	} else {
 		workspace, err = service.workspaceForExistingTask(ctx, planned, owner, snapshot)
+		if err == nil && recoveryKind == taskRecoveryOperatorRepair {
+			workspace, err = service.taskWorkspaces.prepareRepairWorkspace(ctx, workspace)
+		}
 	}
 	if err != nil {
 		return InvocationStatus{}, fmt.Errorf("resolve recovery workspace: %w", err)

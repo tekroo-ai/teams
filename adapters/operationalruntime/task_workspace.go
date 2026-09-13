@@ -491,6 +491,45 @@ func (service *ProductionService) plannedTaskWorkspace(ctx context.Context, task
 	return service.workspaceForExistingTask(ctx, task, owner, snapshot)
 }
 
+// prepareRepairWorkspace advances the editable baseline to the exact clean
+// commit that the repair invocation receives. A repair must therefore produce
+// a successor commit; the implementation commit that triggered the repair can
+// never be mistaken for new repair work.
+func (manager *taskWorkspaceManager) prepareRepairWorkspace(ctx context.Context, workspace ProductionWorkspace) (ProductionWorkspace, error) {
+	if manager == nil || !validTaskWorkspaceRoot(workspace) {
+		return ProductionWorkspace{}, errInvalidTaskWorkspace
+	}
+	branch, err := manager.gitText(ctx, workspace.WorkingDirectory, "symbolic-ref", "--quiet", "--short", "HEAD")
+	if err != nil || branch != workspace.Branch {
+		return ProductionWorkspace{}, errors.Join(errInvalidTaskWorkspace, err)
+	}
+	status, err := manager.git(ctx, workspace.WorkingDirectory, "--no-optional-locks", "status", "--porcelain=v1", "--untracked-files=all")
+	if err != nil || !repairWorkspaceStatusClean(status) {
+		return ProductionWorkspace{}, errors.Join(errInvalidTaskWorkspace, err)
+	}
+	head, err := manager.gitText(ctx, workspace.WorkingDirectory, "rev-parse", "HEAD")
+	if err != nil || !validGitCommit(head) {
+		return ProductionWorkspace{}, errors.Join(errInvalidTaskWorkspace, err)
+	}
+	ancestor, err := manager.isAncestor(ctx, workspace.WorkingDirectory, workspace.BaselineSHA, head)
+	if err != nil || !ancestor {
+		return ProductionWorkspace{}, errors.Join(errInvalidTaskWorkspace, err)
+	}
+	workspace.BaselineSHA = head
+	return workspace, nil
+}
+
+func repairWorkspaceStatusClean(status []byte) bool {
+	for _, line := range strings.Split(strings.TrimSpace(string(status)), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || line == "?? .openhands/hooks/sma_context_hook.py" {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
 // persistedTaskWorkspaceOwner reconstructs the stable workspace identity from
 // the task's durable operational scope. Completed task output remains usable by
 // downstream DAG nodes after its actor stops or the daemon restarts; process

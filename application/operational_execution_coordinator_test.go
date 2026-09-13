@@ -99,7 +99,7 @@ func TestExplicitRecoveryExecutionBriefUsesCleanConversationAndExistingWorkspace
 		t.Fatal(err)
 	}
 	guidance := strings.Join(brief.ExecutionGuidance, "\n")
-	for _, required := range []string{"clean OpenHands conversation", "Prior conversational history is not available", "current workspace", "recent commits", "may already contain a completed implementation", "without changing it"} {
+	for _, required := range []string{"clean OpenHands conversation", "Prior conversational history is not available", "current workspace", "recovery_directive records the exact condition", "recent commits", "may already contain a completed implementation", "without changing it"} {
 		if !strings.Contains(guidance, required) {
 			t.Fatalf("explicit recovery guidance omitted %q: %v", required, brief.ExecutionGuidance)
 		}

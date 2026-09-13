@@ -164,6 +164,40 @@ func TestPersistedTaskWorkspaceOwnerDoesNotDependOnActorLiveness(t *testing.T) {
 	}
 }
 
+func TestRepairWorkspaceUsesCurrentCleanHeadAsSuccessorBaseline(t *testing.T) {
+	rootDirectory, _, baseline := candidateRepository(t)
+	root := ProductionWorkspace{WorkspaceID: "repository", WorktreeID: "main", WorkingDirectory: rootDirectory, Branch: "source", BaselineSHA: baseline, WritablePaths: []string{"."}}
+	resolver, err := openhands.NewBoundWorkspaceResolver([]openhands.WorkspaceBinding{{WorkspaceID: root.WorkspaceID, WorktreeID: root.WorktreeID, WorkingDirectory: root.WorkingDirectory}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager, err := newTaskWorkspaceManagerWithContext(context.Background(), t.TempDir(), "git", time.Minute, resolver)
+	if err != nil {
+		t.Fatal(err)
+	}
+	feature := organization.FeatureRequest{ID: candidateTestUUID(1031)}
+	task := organization.PlannedTask{ID: candidateTestUUID(1032), Purpose: kernel.PurposeImplementation}
+	workspace, _, err := manager.PrepareTask(context.Background(), feature, task, "coder-1", root, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	commitTaskFile(t, workspace.WorkingDirectory, "implemented.txt", "implemented\n", "implementation")
+	implementationHead := candidateGit(t, workspace.WorkingDirectory, "rev-parse", "HEAD")
+	repair, err := manager.prepareRepairWorkspace(context.Background(), workspace)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if repair.BaselineSHA != implementationHead || repair.BaselineSHA == workspace.BaselineSHA {
+		t.Fatalf("repair baseline=%s implementation=%s original=%s", repair.BaselineSHA, implementationHead, workspace.BaselineSHA)
+	}
+	if err := os.WriteFile(filepath.Join(workspace.WorkingDirectory, "uncommitted.txt"), []byte("dirty\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := manager.prepareRepairWorkspace(context.Background(), repair); !errors.Is(err, errInvalidTaskWorkspace) {
+		t.Fatalf("dirty repair workspace returned %v", err)
+	}
+}
+
 func commitTaskFile(t *testing.T, directory, name, content, message string) {
 	t.Helper()
 	if err := os.WriteFile(filepath.Join(directory, name), []byte(content), 0o644); err != nil {
