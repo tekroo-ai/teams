@@ -764,8 +764,10 @@ func (client *Client) Inspect(ctx context.Context, brief application.ExecutionBr
 	if violation, violated := acceptedContractInspectionViolation(brief, events, currentPromptIndex); violated {
 		return client.correctRepositoryScopeViolation(ctx, brief, requestDigest, info, events, currentPromptIndex, violation)
 	}
-	if violation, repeated, violated := checkpointCompletionRepositoryViolation(events, currentPromptIndex); violated {
-		return client.correctCheckpointCompletionViolation(ctx, brief, requestDigest, info, events, violation, repeated)
+	if checkpointCompletionGuardApplies(brief.Purpose) {
+		if violation, repeated, violated := checkpointCompletionRepositoryViolation(events, currentPromptIndex); violated {
+			return client.correctCheckpointCompletionViolation(ctx, brief, requestDigest, info, events, violation, repeated)
+		}
 	}
 	if violation, repeated, violated := repeatedDeterministicValidationViolation(events, currentPromptIndex); violated {
 		return client.correctDeterministicValidationViolation(ctx, brief, requestDigest, info, events, violation, repeated)
@@ -859,6 +861,15 @@ const deterministicValidationCorrectionPrefix = "TEKROO_DETERMINISTIC_VALIDATION
 const compactionCheckpointPrefix = "TEKROO_PROGRESS_CHECKPOINT:"
 const maximumEquivalentSuccessfulValidations = 2
 const maximumCheckpointCompletionReads = 8
+
+// checkpointCompletionGuardApplies limits the bounded post-completion read
+// window to non-writing work. An implementation or repair checkpoint cannot
+// prove from the retained journal alone that the current working tree contains
+// a complete, validated, committed candidate; fencing further repository work
+// there can make the assigned task impossible to finish.
+func checkpointCompletionGuardApplies(purpose kernel.WorkPurpose) bool {
+	return purpose != kernel.PurposeImplementation && purpose != kernel.PurposeRepair
+}
 
 // checkpointCompletionRepositoryViolation detects engineering work resuming
 // after a progress checkpoint declared the finish step. A bounded number of
@@ -2594,7 +2605,7 @@ func checkpointNextAction(brief application.ExecutionBrief, actions []checkpoint
 		if len(validations) == 0 {
 			return "Run the narrowest deterministic validation that covers the retained changes."
 		}
-		return "Compare the validated changes with every authoritative acceptance criterion and " + submit + "."
+		return "Inspect the current repository state, complete any remaining implementation and tests, run the narrowest deterministic validation after the final repository change, commit only the intended source and test changes, verify the worktree is clean apart from any injected runtime hook, and then " + submit + "."
 	case kernel.PurposeValidation:
 		if len(validations) == 0 {
 			return "Run the first required deterministic validation against the authoritative candidate."

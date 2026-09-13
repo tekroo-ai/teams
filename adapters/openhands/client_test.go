@@ -947,6 +947,20 @@ func TestCheckpointCompletionAllowsBoundedReadsAndRejectsPostAnnouncementWork(t 
 	}
 }
 
+func TestCheckpointCompletionGuardDoesNotFenceWritingWork(t *testing.T) {
+	if checkpointCompletionGuardApplies(kernel.PurposeImplementation) {
+		t.Fatal("implementation was incorrectly subject to the read-only completion guard")
+	}
+	if checkpointCompletionGuardApplies(kernel.PurposeRepair) {
+		t.Fatal("repair was incorrectly subject to the read-only completion guard")
+	}
+	for _, purpose := range []kernel.WorkPurpose{kernel.PurposeInvestigation, kernel.PurposeReview, kernel.PurposeValidation, kernel.PurposePromotion} {
+		if !checkpointCompletionGuardApplies(purpose) {
+			t.Fatalf("%s unexpectedly bypassed the completion guard", purpose)
+		}
+	}
+}
+
 func TestCheckpointCompletionRejectsRepositoryWorkAfterCorrection(t *testing.T) {
 	checkpoint := progressCheckpoint{
 		SchemaVersion:       "tekroo.teams.execution-progress-checkpoint/1.2.0",
@@ -1154,6 +1168,15 @@ func TestProgressCheckpointNextActionAdvancesImplementation(t *testing.T) {
 	checkpoint = buildProgressCheckpoint(brief, changed, -1)
 	if !strings.Contains(checkpoint.NextAction, "Run the narrowest deterministic validation") {
 		t.Fatalf("changed next action = %q", checkpoint.NextAction)
+	}
+
+	validated := append(changed,
+		rawEvent{ID: "test", Kind: "ActionEvent", Source: "agent", ToolName: "terminal", ToolCallID: "test-call", ActionCommand: "go test ./..."},
+		rawEvent{Kind: "ObservationEvent", ToolName: "terminal", ToolCallID: "test-call", ObservationExitCode: &exitSuccess},
+	)
+	checkpoint = buildProgressCheckpoint(brief, validated, -1)
+	if !strings.Contains(checkpoint.NextAction, "complete any remaining implementation and tests") || !strings.Contains(checkpoint.NextAction, "after the final repository change") || !strings.Contains(checkpoint.NextAction, "commit only the intended source and test changes") {
+		t.Fatalf("validated next action = %q", checkpoint.NextAction)
 	}
 }
 
