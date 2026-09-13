@@ -110,6 +110,7 @@ type FeatureRequest struct {
 	LastStepID        kernel.UUIDv7            `json:"last_step_id"`
 	LastHop           uint32                   `json:"last_hop"`
 	Refinement        *FeatureRefinement       `json:"refinement,omitempty"`
+	Clarification     *FeatureClarification    `json:"clarification,omitempty"`
 	Specification     *FeatureSpecification    `json:"specification,omitempty"`
 	Plan              *FeaturePlan             `json:"plan,omitempty"`
 	PlanSupersession  *FeaturePlanSupersession `json:"plan_supersession,omitempty"`
@@ -133,6 +134,15 @@ func (feature FeatureRequest) Validate() error {
 		return ErrInvalidFeature
 	}
 	if feature.Refinement != nil && feature.Refinement.Validate(feature) != nil {
+		return ErrInvalidFeature
+	}
+	if feature.Clarification != nil && feature.Clarification.Validate(feature) != nil {
+		return ErrInvalidFeature
+	}
+	if feature.Status == FeatureClarificationRequired && (feature.Refinement == nil || len(feature.Refinement.ClarificationQuestions) == 0 || feature.Clarification != nil) {
+		return ErrInvalidFeature
+	}
+	if feature.Refinement != nil && len(feature.Refinement.ClarificationQuestions) > 0 && feature.Status != FeatureClarificationRequired && feature.Clarification == nil {
 		return ErrInvalidFeature
 	}
 	if feature.Specification != nil && feature.Specification.Validate(feature) != nil {
@@ -223,6 +233,38 @@ type FeatureRefinement struct {
 	ClarificationQuestions []string              `json:"clarification_questions"`
 	Priority               FeaturePriority       `json:"priority"`
 	PreparedAt             time.Time             `json:"prepared_at"`
+}
+
+type FeatureClarificationAnswer struct {
+	Question string `json:"question"`
+	Answer   string `json:"answer"`
+}
+
+type FeatureClarification struct {
+	RespondedBy kernel.PrincipalRef          `json:"responded_by"`
+	Answers     []FeatureClarificationAnswer `json:"answers"`
+	RespondedAt time.Time                    `json:"responded_at"`
+}
+
+func (clarification FeatureClarification) Validate(feature FeatureRequest) error {
+	if feature.Refinement == nil || clarification.RespondedBy != feature.SubmittedBy || clarification.RespondedBy.Kind != kernel.PrincipalHuman || clarification.RespondedAt.Before(feature.Refinement.PreparedAt) || len(clarification.Answers) != len(feature.Refinement.ClarificationQuestions) {
+		return ErrInvalidFeature
+	}
+	for index, answer := range clarification.Answers {
+		if answer.Question != feature.Refinement.ClarificationQuestions[index] || answer.Answer == "" || len(answer.Answer) > 4096 {
+			return ErrInvalidFeature
+		}
+	}
+	return nil
+}
+
+type FeatureClarificationResponseInput struct {
+	ExpectedRevision uint64   `json:"expected_revision"`
+	Answers          []string `json:"answers"`
+}
+
+func (input FeatureClarificationResponseInput) Valid() bool {
+	return input.ExpectedRevision > 0 && len(input.Answers) > 0 && len(input.Answers) <= 16 && validBoundedStrings(input.Answers, 4096) == nil
 }
 
 func (refinement FeatureRefinement) Validate(feature FeatureRequest) error {

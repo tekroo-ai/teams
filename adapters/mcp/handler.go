@@ -30,6 +30,7 @@ const (
 	FeatureSubmitToolName  = "tekroo.feature.submit"
 	FeatureGetToolName     = "tekroo.feature.get"
 	FeatureTimingToolName  = "tekroo.feature.timing.get"
+	FeatureClarifyToolName = "tekroo.feature.clarification.respond"
 	FeaturePlanToolName    = "tekroo.feature.plan.apply"
 	FeatureAcceptToolName  = "tekroo.feature.accept"
 	FeatureReleaseToolName = "tekroo.feature.release"
@@ -394,6 +395,7 @@ func organizationalTools() []any {
 		map[string]any{"name": FeatureSubmitToolName, "title": "Submit feature request", "description": "Submit one bounded feature request to the configured product owner.", "inputSchema": map[string]any{"$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object"}},
 		map[string]any{"name": FeatureGetToolName, "title": "Inspect feature request", "description": "Read the canonical feature workflow and finite plan.", "inputSchema": object([]string{"feature_id"}, map[string]any{"feature_id": uuid})},
 		map[string]any{"name": FeatureTimingToolName, "title": "Inspect feature timing", "description": "Measure design, implementation, validation, queue, and parallel execution timing from durable workflow evidence.", "inputSchema": object([]string{"feature_id"}, map[string]any{"feature_id": uuid})},
+		map[string]any{"name": FeatureClarifyToolName, "title": "Respond to feature clarification", "description": "Record the submitting human's answers to the product owner's exact questions and resume planning.", "inputSchema": object([]string{"feature_id", "expected_revision", "answers"}, map[string]any{"feature_id": uuid, "expected_revision": map[string]any{"type": "integer", "minimum": 1}, "answers": map[string]any{"type": "array", "minItems": 1, "maxItems": 16, "items": map[string]any{"type": "string", "minLength": 1, "maxLength": 4096}}})},
 		map[string]any{"name": FeaturePlanToolName, "title": "Apply reviewed feature plan", "description": "Materialize a finite reviewed story/task DAG.", "inputSchema": map[string]any{"$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object"}},
 		map[string]any{"name": FeatureAcceptToolName, "title": "Accept completed feature without a code release", "description": "Apply the submitting human's acceptance to a completed, independently reviewed feature and record an explicit reason that no repository release is required.", "inputSchema": object([]string{"feature_id", "expected_revision", "no_release_reason"}, map[string]any{"feature_id": uuid, "expected_revision": map[string]any{"type": "integer", "minimum": 1}, "no_release_reason": map[string]any{"type": "string", "minLength": 1, "maxLength": 4096}})},
 		map[string]any{"name": FeatureReleaseToolName, "title": "Release and accept completed feature", "description": "Execute the exact qualified FF-only release plan, verify authoritative Git state, and accept the feature.", "inputSchema": map[string]any{"$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object"}},

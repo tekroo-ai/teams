@@ -113,6 +113,36 @@ func TestFeatureRoleHandoffsFormFiniteProductOwnerProjectManagerArchitectDAG(t *
 	}
 }
 
+func TestFeatureClarificationResponsePreservesQuestionsAndResumesPlanning(t *testing.T) {
+	now := time.Date(2026, 9, 13, 12, 0, 0, 0, time.UTC)
+	operator := activeRole("teams::operator-1", "operator", featureUUID(81), featureDigest('3'))
+	productOwner := activeRole("teams::product-owner-1", "product-owner", featureUUID(82), featureDigest('4'))
+	projectManager := activeRole("teams::project-manager-1", "project-manager", featureUUID(83), featureDigest('5'))
+	feature := organization.FeatureRequest{SchemaVersion: organization.FeatureSchemaVersion, ID: featureUUID(1), Revision: 1, SubmittedBy: kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "paul"}, Input: featureInput(), Status: organization.FeatureSubmitted, OperatorActor: operator.ActorFQN, ProductOwnerActor: productOwner.ActorFQN, InitialMessageID: featureUUID(2), LastMessageID: featureUUID(2), LastStepID: featureUUID(3), LastHop: 1, BudgetAccountID: featureUUID(4), LifecycleEpoch: 1, ScopeRevision: 1, CreatedAt: now, UpdatedAt: now}
+	store := &featureStoreFake{feature: feature}
+	host := &featureHostFake{roles: map[kernel.ActorFQN]organization.RoleInstanceState{operator.ActorFQN: operator, productOwner.ActorFQN: productOwner, projectManager.ActorFQN: projectManager}}
+	coordinator, err := organization.NewFeatureCoordinator(store, host, materializerFake{}, fixedClock(now.Add(time.Minute)), &idQueue{ids: []kernel.UUIDv7{featureUUID(20), featureUUID(21)}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	questions := []string{"Which syntax is canonical?", "Should invalid input fail before launch?"}
+	refinement := organization.FeatureRefinement{PreparedBy: productOwner.ActorFQN, PreparedExecution: productOwner.Execution, AcceptanceCriteria: []string{"finite DAG"}, ClarificationQuestions: questions, Priority: organization.PriorityHigh, PreparedAt: now.Add(time.Minute)}
+	blocked, err := coordinator.Refine(context.Background(), feature.ID, feature.Revision, refinement)
+	if err != nil || blocked.Status != organization.FeatureClarificationRequired || blocked.Revision != 2 {
+		t.Fatalf("blocked feature=%#v err=%v", blocked, err)
+	}
+	if _, err := coordinator.RespondToClarification(context.Background(), feature.ID, kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "someone-else"}, organization.FeatureClarificationResponseInput{ExpectedRevision: 2, Answers: []string{"A", "B"}}); err == nil {
+		t.Fatal("different human answered submitting human's clarification")
+	}
+	resumed, err := coordinator.RespondToClarification(context.Background(), feature.ID, feature.SubmittedBy, organization.FeatureClarificationResponseInput{ExpectedRevision: 2, Answers: []string{"TEAM followed by FQRN instance", "Yes"}})
+	if err != nil || resumed.Status != organization.FeatureReadyForPlanning || resumed.Revision != 3 || resumed.Clarification == nil || len(resumed.Clarification.Answers) != 2 {
+		t.Fatalf("resumed feature=%#v err=%v", resumed, err)
+	}
+	if resumed.Clarification.Answers[0].Question != questions[0] || resumed.Clarification.Answers[0].Answer != "TEAM followed by FQRN instance" || store.message.Sender != operator.ActorFQN || store.message.Recipient != projectManager.ActorFQN || store.message.Type != "tekroo.message.feature.refined" {
+		t.Fatalf("clarification=%#v message=%#v", resumed.Clarification, store.message)
+	}
+}
+
 func TestFeaturePlanSupersessionPreservesSpecificationAndRequiresNextPlanVersion(t *testing.T) {
 	now := time.Date(2026, 9, 6, 12, 0, 0, 0, time.UTC)
 	planner := activeRole("teams::architect-1", "architect", featureUUID(93), featureDigest('1'))

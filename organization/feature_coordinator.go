@@ -286,6 +286,50 @@ func (coordinator *FeatureCoordinator) Refine(ctx context.Context, featureID ker
 	return coordinator.store.AdvanceFeature(ctx, next, expectedRevision, &message)
 }
 
+func (coordinator *FeatureCoordinator) RespondToClarification(ctx context.Context, featureID kernel.UUIDv7, principal kernel.PrincipalRef, input FeatureClarificationResponseInput) (FeatureRequest, error) {
+	if coordinator == nil || !principal.Valid() || principal.Kind != kernel.PrincipalHuman || !input.Valid() {
+		return FeatureRequest{}, ErrInvalidFeature
+	}
+	feature, err := coordinator.currentFeature(ctx, featureID, input.ExpectedRevision, FeatureClarificationRequired)
+	if err != nil {
+		return FeatureRequest{}, err
+	}
+	if principal != feature.SubmittedBy || feature.Refinement == nil || len(input.Answers) != len(feature.Refinement.ClarificationQuestions) {
+		return FeatureRequest{}, ErrInvalidFeature
+	}
+	now := coordinator.clock.Now().UTC()
+	answers := make([]FeatureClarificationAnswer, len(input.Answers))
+	for index, answer := range input.Answers {
+		answers[index] = FeatureClarificationAnswer{Question: feature.Refinement.ClarificationQuestions[index], Answer: answer}
+	}
+	clarification := FeatureClarification{RespondedBy: principal, Answers: answers, RespondedAt: now}
+	if clarification.Validate(feature) != nil {
+		return FeatureRequest{}, ErrInvalidFeature
+	}
+	operator, err := coordinator.host.EnsureStarted(ctx, feature.OperatorActor)
+	if err != nil || operator.Status != RoleIdle || !operator.Execution.Valid() {
+		return FeatureRequest{}, errors.Join(ErrRoleNotRunning, err)
+	}
+	recipient, err := coordinator.ensurePrimaryRole(ctx, "project-manager")
+	if err != nil {
+		return FeatureRequest{}, err
+	}
+	message, err := coordinator.handoffMessage(feature, operator.ActorFQN, operator.Execution, recipient.ActorFQN, "tekroo.message.feature.refined", PurposeHandoff, map[string]any{"feature_id": feature.ID, "refinement": feature.Refinement, "clarification": clarification})
+	if err != nil {
+		return FeatureRequest{}, err
+	}
+	next := feature
+	next.Revision++
+	next.Status = FeatureReadyForPlanning
+	next.Clarification = &clarification
+	next.UpdatedAt = now
+	next.LastMessageID, next.LastStepID, next.LastHop = message.ID, message.Flow.StepID, message.Flow.Hop
+	if next.Validate() != nil {
+		return FeatureRequest{}, ErrInvalidFeature
+	}
+	return coordinator.store.AdvanceFeature(ctx, next, input.ExpectedRevision, &message)
+}
+
 func (coordinator *FeatureCoordinator) Specify(ctx context.Context, featureID kernel.UUIDv7, expectedRevision uint64, specification FeatureSpecification) (FeatureRequest, error) {
 	feature, err := coordinator.currentFeature(ctx, featureID, expectedRevision, FeatureReadyForPlanning)
 	if err != nil {

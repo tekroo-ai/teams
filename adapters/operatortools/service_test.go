@@ -76,6 +76,19 @@ func TestFeatureTimingUsesDurableWorkflowMeasurement(t *testing.T) {
 	}
 }
 
+func TestFeatureClarificationUsesAuthenticatedHuman(t *testing.T) {
+	backend := &fakeOrganization{}
+	service, err := operatortools.New(backend)
+	if err != nil {
+		t.Fatal(err)
+	}
+	identity := protocol.AuthenticatedContext{Principal: kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "operator"}}
+	_, err = service.CallTool(context.Background(), identity, mcp.FeatureClarifyToolName, json.RawMessage(`{"feature_id":"00000000-0000-7000-8000-000000000005","expected_revision":2,"answers":["Use the documented syntax."]}`))
+	if err != nil || backend.clarificationPrincipal != identity.Principal || backend.clarificationInput.ExpectedRevision != 2 {
+		t.Fatalf("err=%v principal=%#v input=%#v", err, backend.clarificationPrincipal, backend.clarificationInput)
+	}
+}
+
 func TestEventWaitToolUsesGenericAggregatePredicate(t *testing.T) {
 	backend := &fakeOrganization{}
 	service, err := operatortools.New(backend)
@@ -101,8 +114,10 @@ func TestEventWaitToolUsesGenericAggregatePredicate(t *testing.T) {
 }
 
 type fakeOrganization struct {
-	restarted kernel.ActorFQN
-	waited    operationalruntime.EventWaitRequest
+	restarted              kernel.ActorFQN
+	waited                 operationalruntime.EventWaitRequest
+	clarificationPrincipal kernel.PrincipalRef
+	clarificationInput     organization.FeatureClarificationResponseInput
 }
 
 func (*fakeOrganization) OperatorIdentity() protocol.AuthenticatedContext {
@@ -163,6 +178,11 @@ func (*fakeOrganization) SubmitFeature(context.Context, kernel.PrincipalRef, org
 }
 func (*fakeOrganization) ReadFeature(context.Context, kernel.UUIDv7) (organization.FeatureRequest, bool, error) {
 	return organization.FeatureRequest{}, false, nil
+}
+func (fake *fakeOrganization) RespondToFeatureClarification(_ context.Context, principal kernel.PrincipalRef, _ kernel.UUIDv7, input organization.FeatureClarificationResponseInput) (organization.FeatureRequest, error) {
+	fake.clarificationPrincipal = principal
+	fake.clarificationInput = input
+	return organization.FeatureRequest{}, nil
 }
 func (*fakeOrganization) ReadFeatureWorkflowTiming(_ context.Context, featureID kernel.UUIDv7) (operationalruntime.FeatureWorkflowTiming, error) {
 	return operationalruntime.FeatureWorkflowTiming{FeatureID: featureID, Timing: kernel.WorkflowTiming{PeakParallelism: 2}}, nil

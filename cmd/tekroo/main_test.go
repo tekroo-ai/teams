@@ -175,6 +175,26 @@ func TestLoadFeatureReplanBuildsFocusedExactFeatureRequest(t *testing.T) {
 	}
 }
 
+func TestLoadFeatureClarificationBuildsFocusedExactFeatureRequest(t *testing.T) {
+	t.Parallel()
+	featureID := kernel.UUIDv7("00000000-0000-7000-8000-000000000005")
+	raw := []byte(`{"expected_revision":2,"answers":["Use the documented syntax."]}`)
+	path := filepath.Join(t.TempDir(), "feature-clarification.json")
+	if err := os.WriteFile(path, raw, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	method, target, loaded, err := loadFeatureClarification([]string{string(featureID), path}, bytes.NewReader(nil), 4096)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if method != http.MethodPost || target != "/v1/features/"+string(featureID)+"/clarifications" || !bytes.Equal(loaded, raw) {
+		t.Fatalf("method=%s target=%s body=%s", method, target, loaded)
+	}
+	if _, _, _, err := loadFeatureClarification([]string{string(featureID), path}, bytes.NewReader(nil), 16); err == nil {
+		t.Fatal("oversized clarification response accepted")
+	}
+}
+
 func TestLoadTaskRecoveryBuildsFocusedExactInvocationRequest(t *testing.T) {
 	t.Parallel()
 	request := operationalruntime.TaskRecoveryRequest{ExpectedRevision: 4, Reason: "continue after correcting repository progress detection", EvidenceRefs: []kernel.EvidenceRef{{EvidenceID: "018f0000-0000-7000-8000-000000000003", SHA256: kernel.Digest(strings.Repeat("a", 64))}}, DeadlineAt: time.Date(2026, 9, 1, 15, 0, 0, 0, time.UTC), IdempotencyKey: "task-recovery-1"}

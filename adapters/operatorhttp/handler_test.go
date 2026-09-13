@@ -173,6 +173,16 @@ func TestHandlerReportsDurableFeatureWhenMaterializationIsPending(t *testing.T) 
 	}
 }
 
+func TestHandlerRespondsToFeatureClarificationWithBoundHumanIdentity(t *testing.T) {
+	service := &operatorService{state: operationalruntime.ControlRunning}
+	handler := newTestHandler(t, service, func() {})
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, authorizedRequest(http.MethodPost, "/v1/features/00000000-0000-7000-8000-000000000005/clarifications", strings.NewReader(`{"expected_revision":2,"answers":["Use the documented syntax."]}`)))
+	if response.Code != http.StatusOK || service.clarificationPrincipal != (kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "operator"}) || service.clarificationInput.ExpectedRevision != 2 || len(service.clarificationInput.Answers) != 1 {
+		t.Fatalf("status=%d principal=%#v input=%#v body=%s", response.Code, service.clarificationPrincipal, service.clarificationInput, response.Body.String())
+	}
+}
+
 func TestHandlerRequestsFeatureReplanWithBoundHumanIdentity(t *testing.T) {
 	service := &operatorService{state: operationalruntime.ControlRunning}
 	handler := newTestHandler(t, service, func() {})
@@ -255,19 +265,21 @@ func authorizedRequest(method, target string, body *strings.Reader) *http.Reques
 }
 
 type operatorService struct {
-	state                 operationalruntime.ControlState
-	submissions           int
-	lastCommand           kernel.KernelCommand
-	featurePrincipal      kernel.PrincipalRef
-	featureErr            error
-	planningRecoveryCalls int
-	planningRecovery      operationalruntime.PlanningRecoveryRequest
-	taskRecoveryCalls     int
-	taskRecovery          operationalruntime.TaskRecoveryRequest
-	featureReplanCalls    int
-	featureReplan         operationalruntime.FeatureReplanRequest
-	eventWait             operationalruntime.EventWaitRequest
-	eventWaitDelay        time.Duration
+	state                  operationalruntime.ControlState
+	submissions            int
+	lastCommand            kernel.KernelCommand
+	featurePrincipal       kernel.PrincipalRef
+	featureErr             error
+	planningRecoveryCalls  int
+	planningRecovery       operationalruntime.PlanningRecoveryRequest
+	taskRecoveryCalls      int
+	taskRecovery           operationalruntime.TaskRecoveryRequest
+	featureReplanCalls     int
+	featureReplan          operationalruntime.FeatureReplanRequest
+	clarificationPrincipal kernel.PrincipalRef
+	clarificationInput     organization.FeatureClarificationResponseInput
+	eventWait              operationalruntime.EventWaitRequest
+	eventWaitDelay         time.Duration
 }
 
 func (service *operatorService) Status() operationalruntime.ControlStatus {
@@ -323,6 +335,12 @@ func (service *operatorService) SubmitFeature(_ context.Context, principal kerne
 
 func (service *operatorService) ReadFeature(context.Context, kernel.UUIDv7) (organization.FeatureRequest, bool, error) {
 	return organization.FeatureRequest{ID: "00000000-0000-7000-8000-000000000005"}, true, nil
+}
+
+func (service *operatorService) RespondToFeatureClarification(_ context.Context, principal kernel.PrincipalRef, _ kernel.UUIDv7, input organization.FeatureClarificationResponseInput) (organization.FeatureRequest, error) {
+	service.clarificationPrincipal = principal
+	service.clarificationInput = input
+	return organization.FeatureRequest{ID: "00000000-0000-7000-8000-000000000005"}, nil
 }
 
 func (service *operatorService) ReadFeatureWorkflowTiming(context.Context, kernel.UUIDv7) (operationalruntime.FeatureWorkflowTiming, error) {

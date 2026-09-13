@@ -65,6 +65,13 @@ func (service *ProductionService) RefineFeature(ctx context.Context, id kernel.U
 	return service.Features.Refine(ctx, id, expectedRevision, refinement)
 }
 
+func (service *ProductionService) RespondToFeatureClarification(ctx context.Context, principal kernel.PrincipalRef, id kernel.UUIDv7, input organization.FeatureClarificationResponseInput) (organization.FeatureRequest, error) {
+	if service == nil || service.Features == nil {
+		return organization.FeatureRequest{}, organization.ErrInvalidFeature
+	}
+	return service.Features.RespondToClarification(ctx, id, principal, input)
+}
+
 func (service *ProductionService) SpecifyFeature(ctx context.Context, id kernel.UUIDv7, expectedRevision uint64, specification organization.FeatureSpecification) (organization.FeatureRequest, error) {
 	if service == nil || service.Features == nil {
 		return organization.FeatureRequest{}, organization.ErrInvalidFeature
