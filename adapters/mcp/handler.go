@@ -9,6 +9,7 @@ import (
 	"mime"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/tekroo-ai/teams/adapters/httpapi"
 	"github.com/tekroo-ai/teams/adapters/protocol"
@@ -41,6 +42,7 @@ const (
 	TaskGetToolName        = "tekroo.task.get"
 	StoryGetToolName       = "tekroo.story.get"
 	InvocationGetToolName  = "tekroo.invocation.get"
+	EventWaitToolName      = "tekroo.event.wait"
 	LibrariesListToolName  = "tekroo.libraries.list"
 	LibrariesSyncToolName  = "tekroo.libraries.sync"
 	DiagnosticsToolName    = "tekroo.diagnostics.get"
@@ -257,6 +259,10 @@ func (handler *Handler) callTool(writer http.ResponseWriter, request *http.Reque
 		return
 	}
 	if params.Name != CommandToolName {
+		if params.Name == EventWaitToolName {
+			// The focused wait operation carries its own bounded deadline.
+			_ = http.NewResponseController(writer).SetWriteDeadline(time.Time{})
+		}
 		handler.callFocusedTool(writer, request, message, identity, params.Name, params.Arguments)
 		return
 	}
@@ -400,6 +406,22 @@ func organizationalTools() []any {
 		map[string]any{"name": TaskGetToolName, "title": "Inspect task", "description": "Read one canonical task projection, assignment, scope, budget, and latest invocation.", "inputSchema": object([]string{"task_id"}, map[string]any{"task_id": uuid})},
 		map[string]any{"name": StoryGetToolName, "title": "Inspect story", "description": "Read one canonical story projection and its task DAG.", "inputSchema": object([]string{"story_id"}, map[string]any{"story_id": uuid})},
 		map[string]any{"name": InvocationGetToolName, "title": "Inspect invocation", "description": "Read one single-use work invocation and terminal evidence state.", "inputSchema": object([]string{"invocation_id"}, map[string]any{"invocation_id": uuid})},
+		map[string]any{
+			"name": EventWaitToolName, "title": "Wait for an organizational event",
+			"description": "Block without model polling until a matching event is committed for one exact aggregate, or the bounded timeout expires.",
+			"inputSchema": object([]string{"aggregate", "after_revision", "timeout_millis"}, map[string]any{
+				"aggregate": map[string]any{
+					"type": "object", "additionalProperties": false, "required": []string{"kind", "id"},
+					"properties": map[string]any{
+						"kind": map[string]any{"type": "string", "enum": []string{"story", "task", "completion-review", "escalation", "release-plan", "variant-group", "human-participant", "human-interaction", "evidence", "execution", "system", "work-budget-account", "work-invocation"}},
+						"id":   uuid,
+					},
+				},
+				"after_revision": map[string]any{"type": "integer", "minimum": 0},
+				"event_types":    map[string]any{"type": "array", "maxItems": 64, "uniqueItems": true, "items": map[string]any{"type": "string", "minLength": 1, "maxLength": 256}},
+				"timeout_millis": map[string]any{"type": "integer", "minimum": 1, "maximum": 86400000},
+			}),
+		},
 		map[string]any{"name": LibrariesListToolName, "title": "List role libraries", "description": "Inspect exact versions and content identities of configured role libraries.", "inputSchema": object(nil, map[string]any{})},
 		map[string]any{"name": LibrariesSyncToolName, "title": "Synchronize role libraries", "description": "Revalidate and synchronize only the exact signed library sources bound by tekrood configuration.", "inputSchema": object(nil, map[string]any{})},
 		map[string]any{"name": DiagnosticsToolName, "title": "Inspect operational diagnostics", "description": "Read active tasks, message claims, dead letters, projection faults, role state, and library identities without mutation.", "inputSchema": object(nil, map[string]any{})},

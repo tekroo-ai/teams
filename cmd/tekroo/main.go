@@ -64,6 +64,7 @@ func run(arguments []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	operands := remaining[1:]
 	var method, path string
 	var body []byte
+	requestTimeout := timeout
 	switch command {
 	case "health":
 		method, path, err = noOperand(http.MethodGet, "/health", operands)
@@ -81,6 +82,8 @@ func run(arguments []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		method, path, err = identityRead("/v1/stories/", operands)
 	case "invocation":
 		method, path, err = identityRead("/v1/invocations/", operands)
+	case "wait":
+		method, path, body, requestTimeout, err = eventWaitOperation(operands)
 	case "roles":
 		method, path, err = noOperand(http.MethodGet, "/v1/roles", operands)
 	case "libraries":
@@ -156,6 +159,7 @@ func run(arguments []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
+	client.http.Timeout = requestTimeout
 	response, err := client.request(context.Background(), method, path, body)
 	if err != nil {
 		return err
@@ -167,6 +171,49 @@ func run(arguments []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		_, err = io.WriteString(stdout, "\n")
 	}
 	return err
+}
+
+func eventWaitOperation(operands []string) (string, string, []byte, time.Duration, error) {
+	if len(operands) < 4 {
+		return "", "", nil, 0, usageError()
+	}
+	request := operationalruntime.EventWaitRequest{
+		Aggregate: kernel.AggregateRef{Kind: kernel.AggregateKind(operands[0]), ID: kernel.UUIDv7(operands[1])},
+	}
+	var wait time.Duration
+	for index := 2; index < len(operands); {
+		if index+1 >= len(operands) {
+			return "", "", nil, 0, usageError()
+		}
+		switch operands[index] {
+		case "--after-revision":
+			value, err := strconv.ParseUint(operands[index+1], 10, 64)
+			if err != nil {
+				return "", "", nil, 0, usageError()
+			}
+			request.AfterRevision = value
+		case "--timeout":
+			value, err := time.ParseDuration(operands[index+1])
+			if err != nil || value <= 0 || value > operationalruntime.MaximumEventWait {
+				return "", "", nil, 0, usageError()
+			}
+			wait = value
+			request.TimeoutMillis = uint64(value / time.Millisecond)
+		case "--event-type":
+			request.EventTypes = append(request.EventTypes, operands[index+1])
+		default:
+			return "", "", nil, 0, usageError()
+		}
+		index += 2
+	}
+	if wait == 0 || !request.Valid() {
+		return "", "", nil, 0, usageError()
+	}
+	body, err := json.Marshal(request)
+	if err != nil {
+		return "", "", nil, 0, err
+	}
+	return http.MethodPost, "/v1/events/wait", body, wait + 5*time.Second, nil
 }
 
 func roleOperation(operands []string) (string, string, error) {
@@ -534,5 +581,5 @@ func loadCommand(operands []string, stdin io.Reader, maximum int64) ([]byte, ker
 }
 
 func usageError() error {
-	return errors.New("usage: tekroo init-local [OPTIONS] | tekroo -config CONFIG health|status|diagnostics|federation|federation-alias NAME|federation-send ALIAS FILE|-|pause|resume|stop|feature FILE|-|feature-status ID|feature-plan ID FILE|-|feature-replan ID FILE|-|feature-accept ID REVISION NO_RELEASE_REASON|feature-release ID FILE|-|human-register FILE|-|human-ask FILE|-|human-notifications [open|all]|human-respond FILE|-|human-interaction ID|roles|libraries|library-sync|role ACTOR start|stop|restart|pause|resume|inbox ACTOR|message FILE|-|message-status ID|message-trace THREAD_ID|deadletters [ACTOR]|deadletter-repair ID FILE|-|task ID|story ID|invocation ID|submit FILE|-|cancel INVOCATION_ID FILE|-|retry-planning INVOCATION_ID FILE|-|retry-task INVOCATION_ID FILE|-")
+	return errors.New("usage: tekroo init-local [OPTIONS] | tekroo -config CONFIG health|status|diagnostics|federation|federation-alias NAME|federation-send ALIAS FILE|-|pause|resume|stop|feature FILE|-|feature-status ID|feature-plan ID FILE|-|feature-replan ID FILE|-|feature-accept ID REVISION NO_RELEASE_REASON|feature-release ID FILE|-|human-register FILE|-|human-ask FILE|-|human-notifications [open|all]|human-respond FILE|-|human-interaction ID|roles|libraries|library-sync|role ACTOR start|stop|restart|pause|resume|inbox ACTOR|message FILE|-|message-status ID|message-trace THREAD_ID|deadletters [ACTOR]|deadletter-repair ID FILE|-|task ID|story ID|invocation ID|wait KIND ID --timeout DURATION [--after-revision REVISION] [--event-type TYPE]...|submit FILE|-|cancel INVOCATION_ID FILE|-|retry-planning INVOCATION_ID FILE|-|retry-task INVOCATION_ID FILE|-")
 }

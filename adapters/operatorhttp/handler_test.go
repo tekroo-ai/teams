@@ -89,6 +89,47 @@ func TestHandlerSubmitsStrictCommandAndReadsProjections(t *testing.T) {
 	}
 }
 
+func TestHandlerWaitsForEventWithoutOrdinaryOperationTimeout(t *testing.T) {
+	service := &operatorService{state: operationalruntime.ControlRunning}
+	handler := newTestHandler(t, service, func() {})
+	body := `{"aggregate":{"kind":"work-invocation","id":"00000000-0000-7000-8000-000000000003"},"after_revision":3,"event_types":["tekroo.event.work-invocation.terminal-recorded"],"timeout_millis":5400000}`
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, authorizedRequest(http.MethodPost, "/v1/events/wait", strings.NewReader(body)))
+	if response.Code != http.StatusOK || service.eventWait.TimeoutMillis != 5_400_000 || service.eventWait.AfterRevision != 3 || !strings.Contains(response.Body.String(), `"outcome":"TIMED_OUT"`) {
+		t.Fatalf("status=%d request=%#v body=%s", response.Code, service.eventWait, response.Body.String())
+	}
+
+	response = httptest.NewRecorder()
+	handler.ServeHTTP(response, authorizedRequest(http.MethodPost, "/v1/events/wait", strings.NewReader(`{"aggregate":{"kind":"unknown","id":"00000000-0000-7000-8000-000000000003"},"timeout_millis":1}`)))
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("invalid wait status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
+func TestEventWaitClearsShortServerWriteDeadline(t *testing.T) {
+	service := &operatorService{state: operationalruntime.ControlRunning, eventWaitDelay: 75 * time.Millisecond}
+	handler := newTestHandler(t, service, func() {})
+	server := httptest.NewUnstartedServer(handler)
+	server.Config.WriteTimeout = 25 * time.Millisecond
+	server.Start()
+	defer server.Close()
+
+	body := `{"aggregate":{"kind":"work-invocation","id":"00000000-0000-7000-8000-000000000003"},"after_revision":3,"timeout_millis":1000}`
+	request, err := http.NewRequest(http.MethodPost, server.URL+"/v1/events/wait", strings.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.Header.Set("Authorization", "Bearer "+testToken)
+	response, err := server.Client().Do(request)
+	if err != nil {
+		t.Fatalf("event wait was cut off by server write deadline: %v", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("event wait status=%d", response.StatusCode)
+	}
+}
+
 func TestHandlerDecodesCanonicalContractCommandShape(t *testing.T) {
 	service := &operatorService{state: operationalruntime.ControlRunning}
 	handler := newTestHandler(t, service, func() {})
@@ -225,6 +266,8 @@ type operatorService struct {
 	taskRecovery          operationalruntime.TaskRecoveryRequest
 	featureReplanCalls    int
 	featureReplan         operationalruntime.FeatureReplanRequest
+	eventWait             operationalruntime.EventWaitRequest
+	eventWaitDelay        time.Duration
 }
 
 func (service *operatorService) Status() operationalruntime.ControlStatus {
@@ -263,6 +306,14 @@ func (service *operatorService) ReadStory(context.Context, kernel.UUIDv7) (mongo
 
 func (service *operatorService) ReadInvocation(context.Context, kernel.UUIDv7) (operationalruntime.InvocationStatus, bool, error) {
 	return operationalruntime.InvocationStatus{InvocationID: "00000000-0000-7000-8000-000000000003", Revision: 2, State: kernel.InvocationStarted, LastEventID: "00000000-0000-7000-8000-000000000004"}, true, nil
+}
+
+func (service *operatorService) WaitForEvent(_ context.Context, request operationalruntime.EventWaitRequest) (operationalruntime.EventWaitResult, error) {
+	service.eventWait = request
+	if service.eventWaitDelay > 0 {
+		time.Sleep(service.eventWaitDelay)
+	}
+	return operationalruntime.EventWaitResult{Outcome: operationalruntime.EventWaitTimedOut, Aggregate: request.Aggregate, AfterRevision: request.AfterRevision}, nil
 }
 
 func (service *operatorService) SubmitFeature(_ context.Context, principal kernel.PrincipalRef, input organization.FeatureRequestInput) (organization.FeatureRequest, bool, error) {

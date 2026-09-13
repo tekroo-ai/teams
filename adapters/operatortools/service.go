@@ -58,6 +58,10 @@ type Organization interface {
 	SendFederatedMessage(context.Context, string, organization.OrganizationalMessage) (organization.FederationDeliveryReceipt, error)
 }
 
+type EventWaiter interface {
+	WaitForEvent(context.Context, operationalruntime.EventWaitRequest) (operationalruntime.EventWaitResult, error)
+}
+
 // Service translates focused operator operations into domain calls while the
 // MCP package remains a transport-only adapter.
 type Service struct {
@@ -89,7 +93,7 @@ func (service *Service) CallTool(ctx context.Context, identity protocol.Authenti
 	if !identity.Valid() || identity.Principal.Kind != kernel.PrincipalHuman || identity.ActorFQN != nil || identity.Execution != nil {
 		return nil, ErrInvalidArguments
 	}
-	if name == mcp.FederationSendName && service.operator.Valid() && identity.Principal != service.operator {
+	if (name == mcp.FederationSendName || name == mcp.EventWaitToolName) && service.operator.Valid() && identity.Principal != service.operator {
 		return nil, ErrInvalidArguments
 	}
 	switch name {
@@ -144,6 +148,16 @@ func (service *Service) CallTool(ctx context.Context, identity protocol.Authenti
 			return nil, ErrNotFound
 		}
 		return value, nil
+	case mcp.EventWaitToolName:
+		var input operationalruntime.EventWaitRequest
+		if err := decodeStrict(arguments, &input); err != nil || !input.Valid() {
+			return nil, ErrInvalidArguments
+		}
+		waiter, ok := service.organization.(EventWaiter)
+		if !ok {
+			return nil, ErrInvalidConfiguration
+		}
+		return waiter.WaitForEvent(ctx, input)
 	case mcp.LibrariesListToolName:
 		var input struct{}
 		if err := decodeStrict(arguments, &input); err != nil {

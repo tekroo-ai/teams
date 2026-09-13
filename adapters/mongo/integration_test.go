@@ -788,6 +788,64 @@ func TestChangeStreamOpensBeforeBacklogWithoutGap(t *testing.T) {
 	}
 }
 
+func TestWaitForAggregateEventReadsBacklogAndLiveCommit(t *testing.T) {
+	store := openTestStore(t)
+	aggregate := kernel.AggregateRef{Kind: kernel.AggregateWorkInvocation, ID: "00000000-0000-7000-8000-000000000701"}
+	insert := func(event kernel.DomainEvent) {
+		t.Helper()
+		data, err := encode(event)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_, err = store.db.Collection("events").InsertOne(ctx, eventDocument{ID: string(event.EventID), AggregateKey: aggregateKey(event.Aggregate), Revision: event.AggregateRevision, EventType: event.EventType, Data: data})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	backlog := kernel.DomainEvent{EventID: "00000000-0000-7000-8000-000000000702", EventType: "tekroo.event.work-invocation.started", Aggregate: aggregate, AggregateRevision: 3}
+	insert(backlog)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	observed, err := store.WaitForAggregateEvent(ctx, aggregate, 2, []string{backlog.EventType})
+	cancel()
+	if err != nil || observed.EventID != backlog.EventID {
+		t.Fatalf("backlog event=%#v err=%v", observed, err)
+	}
+
+	type result struct {
+		event kernel.DomainEvent
+		err   error
+	}
+	resultChannel := make(chan result, 1)
+	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	go func() {
+		event, waitErr := store.WaitForAggregateEvent(ctx, aggregate, 3, []string{"tekroo.event.work-invocation.terminal-recorded"})
+		resultChannel <- result{event: event, err: waitErr}
+	}()
+	time.Sleep(100 * time.Millisecond)
+	insert(kernel.DomainEvent{EventID: "00000000-0000-7000-8000-000000000703", EventType: "tekroo.event.work-invocation.cancellation-requested", Aggregate: aggregate, AggregateRevision: 4})
+	terminal := kernel.DomainEvent{EventID: "00000000-0000-7000-8000-000000000704", EventType: "tekroo.event.work-invocation.terminal-recorded", Aggregate: aggregate, AggregateRevision: 5}
+	insert(terminal)
+	select {
+	case received := <-resultChannel:
+		if received.err != nil || received.event.EventID != terminal.EventID {
+			t.Fatalf("live event=%#v err=%v", received.event, received.err)
+		}
+	case <-ctx.Done():
+		t.Fatal("live event wait did not complete")
+	}
+
+	timeoutContext, timeoutCancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer timeoutCancel()
+	_, err = store.WaitForAggregateEvent(timeoutContext, aggregate, 5, []string{"tekroo.event.work-invocation.never-committed"})
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("empty live wait err=%v", err)
+	}
+}
+
 func TestKindFilteredIntentFeedExcludesUnrelatedBacklog(t *testing.T) {
 	store := openTestStore(t)
 	invocationIntent := kernel.OutboxIntent{IntentID: testUUID(8891), EventID: testUUID(8892), Kind: "WORK_INVOCATION_AUTHORIZED"}

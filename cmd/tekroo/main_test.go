@@ -82,6 +82,29 @@ func TestOperatorClientRejectsOversizedRequestAndResponse(t *testing.T) {
 	}
 }
 
+func TestEventWaitOperationBuildsBoundedGenericRequest(t *testing.T) {
+	t.Parallel()
+	method, path, raw, timeout, err := eventWaitOperation([]string{
+		"work-invocation", string(testInvocationID),
+		"--after-revision", "3",
+		"--event-type", "tekroo.event.work-invocation.terminal-recorded",
+		"--timeout", "90m",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var request operationalruntime.EventWaitRequest
+	if err := json.Unmarshal(raw, &request); err != nil {
+		t.Fatal(err)
+	}
+	if method != http.MethodPost || path != "/v1/events/wait" || request.Aggregate.Kind != kernel.AggregateWorkInvocation || request.Aggregate.ID != testInvocationID || request.AfterRevision != 3 || request.TimeoutMillis != 5_400_000 || timeout != 90*time.Minute+5*time.Second {
+		t.Fatalf("method=%s path=%s request=%#v timeout=%s", method, path, request, timeout)
+	}
+	if _, _, _, _, err := eventWaitOperation([]string{"unknown", string(testInvocationID), "--timeout", "1m"}); err == nil {
+		t.Fatal("invalid aggregate kind accepted")
+	}
+}
+
 func TestLoadCancellationBuildsFocusedExactInvocationRequest(t *testing.T) {
 	t.Parallel()
 	request := operationalruntime.CancellationRequest{ExpectedRevision: 2, Reason: "operator requested stop", EvidenceRefs: []kernel.EvidenceRef{{EvidenceID: "018f0000-0000-7000-8000-000000000003", SHA256: kernel.Digest(strings.Repeat("a", 64))}}, IdempotencyKey: "cancel-1"}

@@ -83,6 +83,10 @@ type FeatureWorkflowTimingService interface {
 	ReadFeatureWorkflowTiming(context.Context, kernel.UUIDv7) (operationalruntime.FeatureWorkflowTiming, error)
 }
 
+type EventWaitService interface {
+	WaitForEvent(context.Context, operationalruntime.EventWaitRequest) (operationalruntime.EventWaitResult, error)
+}
+
 type Handler struct {
 	service      Service
 	organization OrganizationalService
@@ -112,6 +116,12 @@ func (handler *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Requ
 	if !handler.authorized(request) {
 		writer.Header().Set("WWW-Authenticate", "Bearer")
 		writeError(writer, http.StatusUnauthorized, "UNAUTHORIZED")
+		return
+	}
+	// A wait carries its own bounded timeout and must not inherit the short
+	// timeout used for point-in-time operator reads.
+	if request.Method == http.MethodPost && request.URL.Path == "/v1/events/wait" {
+		handler.waitForEvent(writer, request)
 		return
 	}
 	ctx, cancel := context.WithTimeout(request.Context(), handler.timeout)
@@ -231,6 +241,32 @@ func (handler *Handler) featureWorkflowTiming(writer http.ResponseWriter, reques
 		return
 	}
 	writeJSON(writer, http.StatusOK, timing)
+}
+
+func (handler *Handler) waitForEvent(writer http.ResponseWriter, request *http.Request) {
+	// tekrood keeps a short server-wide write deadline for ordinary operations.
+	// This route is independently bounded by EventWaitRequest.TimeoutMillis.
+	_ = http.NewResponseController(writer).SetWriteDeadline(time.Time{})
+	waiter, ok := handler.service.(EventWaitService)
+	if !ok {
+		writeError(writer, http.StatusNotImplemented, "EVENT_WAIT_UNAVAILABLE")
+		return
+	}
+	var input operationalruntime.EventWaitRequest
+	if decodeBody(writer, request, handler.maxBody, &input) != nil || !input.Valid() {
+		writeError(writer, http.StatusBadRequest, "INVALID_EVENT_WAIT")
+		return
+	}
+	result, err := waiter.WaitForEvent(request.Context(), input)
+	if errors.Is(err, operationalruntime.ErrInvalidEventWait) {
+		writeError(writer, http.StatusBadRequest, "INVALID_EVENT_WAIT")
+		return
+	}
+	if err != nil {
+		writeError(writer, http.StatusInternalServerError, "EVENT_WAIT_FAILED")
+		return
+	}
+	writeJSON(writer, http.StatusOK, result)
 }
 
 func (handler *Handler) resolveFederationAlias(writer http.ResponseWriter, request *http.Request, name string) {

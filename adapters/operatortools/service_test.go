@@ -76,8 +76,33 @@ func TestFeatureTimingUsesDurableWorkflowMeasurement(t *testing.T) {
 	}
 }
 
+func TestEventWaitToolUsesGenericAggregatePredicate(t *testing.T) {
+	backend := &fakeOrganization{}
+	service, err := operatortools.New(backend)
+	if err != nil {
+		t.Fatal(err)
+	}
+	identity := protocol.AuthenticatedContext{Principal: kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "operator"}}
+	value, err := service.CallTool(context.Background(), identity, mcp.EventWaitToolName, json.RawMessage(`{"aggregate":{"kind":"work-invocation","id":"00000000-0000-7000-8000-000000000003"},"after_revision":3,"event_types":["tekroo.event.work-invocation.terminal-recorded"],"timeout_millis":90000}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, ok := value.(operationalruntime.EventWaitResult)
+	if !ok || result.Outcome != operationalruntime.EventWaitTimedOut || backend.waited.AfterRevision != 3 || backend.waited.TimeoutMillis != 90_000 {
+		t.Fatalf("result=%#v request=%#v", value, backend.waited)
+	}
+	if _, err := service.CallTool(context.Background(), identity, mcp.EventWaitToolName, json.RawMessage(`{"aggregate":{"kind":"invalid","id":"00000000-0000-7000-8000-000000000003"},"timeout_millis":1}`)); !errors.Is(err, operatortools.ErrInvalidArguments) {
+		t.Fatalf("invalid wait err=%v", err)
+	}
+	nonOperator := protocol.AuthenticatedContext{Principal: kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "sme"}}
+	if _, err := service.CallTool(context.Background(), nonOperator, mcp.EventWaitToolName, json.RawMessage(`{"aggregate":{"kind":"work-invocation","id":"00000000-0000-7000-8000-000000000003"},"after_revision":3,"timeout_millis":1}`)); !errors.Is(err, operatortools.ErrInvalidArguments) {
+		t.Fatalf("non-operator wait err=%v", err)
+	}
+}
+
 type fakeOrganization struct {
 	restarted kernel.ActorFQN
+	waited    operationalruntime.EventWaitRequest
 }
 
 func (*fakeOrganization) OperatorIdentity() protocol.AuthenticatedContext {
@@ -95,6 +120,11 @@ func (*fakeOrganization) ReadStory(context.Context, kernel.UUIDv7) (mongo.StoryP
 }
 func (*fakeOrganization) ReadInvocation(context.Context, kernel.UUIDv7) (operationalruntime.InvocationStatus, bool, error) {
 	return operationalruntime.InvocationStatus{}, false, nil
+}
+
+func (fake *fakeOrganization) WaitForEvent(_ context.Context, request operationalruntime.EventWaitRequest) (operationalruntime.EventWaitResult, error) {
+	fake.waited = request
+	return operationalruntime.EventWaitResult{Outcome: operationalruntime.EventWaitTimedOut, Aggregate: request.Aggregate, AfterRevision: request.AfterRevision}, nil
 }
 
 func (*fakeOrganization) RoleRoster(context.Context) ([]organization.RoleInstanceState, error) {

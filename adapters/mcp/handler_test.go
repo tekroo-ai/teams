@@ -239,7 +239,7 @@ func TestMCPOrganizationalToolsAreDiscoverableAndInvokeExactRole(t *testing.T) {
 	list := mcpRequest(t, "tools/list", 1, map[string]any{})
 	listed := httptest.NewRecorder()
 	handler.ServeHTTP(listed, list)
-	if listed.Code != http.StatusOK || !strings.Contains(listed.Body.String(), mcp.RolesListToolName) || !strings.Contains(listed.Body.String(), mcp.MessageTraceToolName) {
+	if listed.Code != http.StatusOK || !strings.Contains(listed.Body.String(), mcp.RolesListToolName) || !strings.Contains(listed.Body.String(), mcp.MessageTraceToolName) || !strings.Contains(listed.Body.String(), mcp.EventWaitToolName) {
 		t.Fatalf("tools/list status=%d body=%s", listed.Code, listed.Body.String())
 	}
 	call := mcpRequest(t, "tools/call", 2, map[string]any{
