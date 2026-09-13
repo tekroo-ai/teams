@@ -138,7 +138,7 @@ func TestFeatureClarificationResponsePreservesQuestionsAndResumesPlanning(t *tes
 	if err != nil || resumed.Status != organization.FeatureReadyForPlanning || resumed.Revision != 3 || resumed.Clarification == nil || len(resumed.Clarification.Answers) != 2 {
 		t.Fatalf("resumed feature=%#v err=%v", resumed, err)
 	}
-	if resumed.Clarification.Answers[0].Question != questions[0] || resumed.Clarification.Answers[0].Answer != "TEAM followed by FQRN instance" || store.message.Sender != operator.ActorFQN || store.message.Recipient != projectManager.ActorFQN || store.message.Type != "tekroo.message.feature.refined" {
+	if resumed.Clarification.Answers[0].Question != questions[0] || resumed.Clarification.Answers[0].Answer != "TEAM followed by FQRN instance" || store.message.Sender != productOwner.ActorFQN || store.message.Recipient != projectManager.ActorFQN || store.message.Type != "tekroo.message.feature.refined" || store.message.CausationID == nil || *store.message.CausationID != feature.InitialMessageID || store.message.Flow.ParentStepID == nil || *store.message.Flow.ParentStepID != feature.LastStepID {
 		t.Fatalf("clarification=%#v message=%#v", resumed.Clarification, store.message)
 	}
 }

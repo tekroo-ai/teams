@@ -306,15 +306,15 @@ func (coordinator *FeatureCoordinator) RespondToClarification(ctx context.Contex
 	if clarification.Validate(feature) != nil {
 		return FeatureRequest{}, ErrInvalidFeature
 	}
-	operator, err := coordinator.host.EnsureStarted(ctx, feature.OperatorActor)
-	if err != nil || operator.Status != RoleIdle || !operator.Execution.Valid() {
+	productOwner, err := coordinator.host.EnsureStarted(ctx, feature.ProductOwnerActor)
+	if err != nil || productOwner.Status != RoleIdle || !productOwner.Execution.Valid() {
 		return FeatureRequest{}, errors.Join(ErrRoleNotRunning, err)
 	}
 	recipient, err := coordinator.ensurePrimaryRole(ctx, "project-manager")
 	if err != nil {
 		return FeatureRequest{}, err
 	}
-	message, err := coordinator.handoffMessage(feature, operator.ActorFQN, operator.Execution, recipient.ActorFQN, "tekroo.message.feature.refined", PurposeHandoff, map[string]any{"feature_id": feature.ID, "refinement": feature.Refinement, "clarification": clarification})
+	message, err := coordinator.handoffMessage(feature, productOwner.ActorFQN, productOwner.Execution, recipient.ActorFQN, "tekroo.message.feature.refined", PurposeHandoff, map[string]any{"feature_id": feature.ID, "refinement": feature.Refinement, "clarification": clarification})
 	if err != nil {
 		return FeatureRequest{}, err
 	}
