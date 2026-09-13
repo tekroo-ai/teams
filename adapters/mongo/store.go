@@ -300,6 +300,18 @@ func (s *Store) ensureIndexes(ctx context.Context) error {
 			{Keys: bson.D{{Key: "thread_id", Value: 1}, {Key: "hop", Value: 1}}, Options: options.Index().SetName("message_thread_hop_unique").SetUnique(true)},
 			{Keys: bson.D{{Key: "thread_id", Value: 1}, {Key: "step_id", Value: 1}}, Options: options.Index().SetName("message_thread_step_unique").SetUnique(true)},
 		},
+		"workflow_instances": {
+			{Keys: bson.D{{Key: "state", Value: 1}, {Key: "_id", Value: 1}}, Options: options.Index().SetName("workflow_state")},
+			{Keys: bson.D{{Key: "root_key", Value: 1}}, Options: options.Index().SetName("workflow_root_unique").SetUnique(true).SetSparse(true)},
+			{Keys: bson.D{{Key: "budget_account_id", Value: 1}}, Options: options.Index().SetName("workflow_budget_unique").SetUnique(true)},
+		},
+		"workflow_admissions": {
+			{Keys: bson.D{{Key: "actor_fqn", Value: 1}, {Key: "outcome", Value: 1}, {Key: "recorded_at_unix_nano", Value: 1}}, Options: options.Index().SetName("workflow_actor_admission")},
+			{Keys: bson.D{{Key: "workflow_instance_id", Value: 1}, {Key: "node_id", Value: 1}}, Options: options.Index().SetName("workflow_node_unique").SetUnique(true)},
+		},
+		"workflow_events": {
+			{Keys: bson.D{{Key: "workflow_instance_id", Value: 1}, {Key: "revision", Value: 1}}, Options: options.Index().SetName("workflow_revision_unique").SetUnique(true)},
+		},
 		"feature_requests": {
 			{Keys: bson.D{{Key: "submitted_by_kind", Value: 1}, {Key: "submitted_by_id", Value: 1}, {Key: "idempotency_key", Value: 1}}, Options: options.Index().SetName("feature_submitter_idempotency_unique").SetUnique(true)},
 			{Keys: bson.D{{Key: "status", Value: 1}, {Key: "updated_at", Value: 1}}, Options: options.Index().SetName("feature_status_updated")},

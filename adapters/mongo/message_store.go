@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"strings"
 	"time"
 
 	"github.com/tekroo-ai/teams/kernel"
@@ -52,7 +51,6 @@ type organizationalThreadDocument struct {
 	VisitedSteps    []string `bson:"visited_steps"`
 	ProgressDigests []string `bson:"progress_digests"`
 	LastRecipient   string   `bson:"last_recipient"`
-	VisitedRoles    []string `bson:"visited_roles"`
 }
 
 func (s *Store) AppendMessage(ctx context.Context, message organization.OrganizationalMessage) error {
@@ -113,14 +111,14 @@ func (s *Store) advanceMessageThread(ctx context.Context, message organization.O
 			ID: string(message.Flow.ThreadID), Revision: 1, LastMessageID: string(message.ID), LastStepID: string(message.Flow.StepID), LastHop: 1,
 			MaximumHops: message.Flow.MaximumHops, BudgetAccountID: string(message.Flow.BudgetAccountID), LifecycleEpoch: message.Flow.LifecycleEpoch,
 			ScopeRevision: message.Flow.ScopeRevision, VisitedSteps: []string{string(message.Flow.StepID)}, ProgressDigests: []string{string(message.Flow.ProgressDigest)},
-			LastRecipient: string(message.Recipient), VisitedRoles: []string{messageActorRole(message.Sender), messageActorRole(message.Recipient)},
+			LastRecipient: string(message.Recipient),
 		})
 		return err
 	}
 	if err != nil {
 		return err
 	}
-	if message.Flow.Hop != current.LastHop+1 || message.Flow.MaximumHops != current.MaximumHops || string(message.Flow.BudgetAccountID) != current.BudgetAccountID || message.Flow.LifecycleEpoch != current.LifecycleEpoch || message.Flow.ScopeRevision != current.ScopeRevision || message.CausationID == nil || string(*message.CausationID) != current.LastMessageID || message.Flow.ParentStepID == nil || string(*message.Flow.ParentStepID) != current.LastStepID || string(message.Sender) != current.LastRecipient || containsString(current.VisitedSteps, string(message.Flow.StepID)) || containsString(current.ProgressDigests, string(message.Flow.ProgressDigest)) || containsString(current.VisitedRoles, messageActorRole(message.Recipient)) {
+	if message.Flow.Hop != current.LastHop+1 || message.Flow.MaximumHops != current.MaximumHops || string(message.Flow.BudgetAccountID) != current.BudgetAccountID || message.Flow.LifecycleEpoch != current.LifecycleEpoch || message.Flow.ScopeRevision != current.ScopeRevision || message.CausationID == nil || string(*message.CausationID) != current.LastMessageID || message.Flow.ParentStepID == nil || string(*message.Flow.ParentStepID) != current.LastStepID || string(message.Sender) != current.LastRecipient || containsString(current.VisitedSteps, string(message.Flow.StepID)) || containsString(current.ProgressDigests, string(message.Flow.ProgressDigest)) {
 		return organization.ErrOrganizationalLoop
 	}
 	next := current
@@ -131,7 +129,6 @@ func (s *Store) advanceMessageThread(ctx context.Context, message organization.O
 	next.VisitedSteps = append(next.VisitedSteps, string(message.Flow.StepID))
 	next.ProgressDigests = append(next.ProgressDigests, string(message.Flow.ProgressDigest))
 	next.LastRecipient = string(message.Recipient)
-	next.VisitedRoles = append(next.VisitedRoles, messageActorRole(message.Recipient))
 	result, err := collection.ReplaceOne(ctx, bson.D{{Key: "_id", Value: current.ID}, {Key: "revision", Value: current.Revision}}, next)
 	if err != nil {
 		return err
@@ -229,14 +226,14 @@ func (s *Store) ReaddressMessage(ctx context.Context, id kernel.UUIDv7, sender k
 			return nil, decodeErr
 		}
 		message := claim.Message
-		if document.State != organization.MessagePending || message.Sender != sender || message.SenderExecution != execution || message.Recipient == recipient || document.ReaddressCount >= maximumReaddresses || messageActorRole(message.Recipient) == messageActorRole(recipient) {
+		if document.State != organization.MessagePending || message.Sender != sender || message.SenderExecution != execution || message.Recipient == recipient || document.ReaddressCount >= maximumReaddresses {
 			return nil, organization.ErrOrganizationalMessageConflict
 		}
 		var thread organizationalThreadDocument
 		if threadErr := s.db.Collection("organizational_message_threads").FindOne(transactionContext, bson.D{{Key: "_id", Value: string(message.Flow.ThreadID)}}).Decode(&thread); threadErr != nil {
 			return nil, threadErr
 		}
-		if thread.LastMessageID != string(id) || containsString(thread.VisitedRoles, messageActorRole(recipient)) {
+		if thread.LastMessageID != string(id) {
 			return nil, organization.ErrOrganizationalLoop
 		}
 		prior := message.Recipient
@@ -248,7 +245,6 @@ func (s *Store) ReaddressMessage(ctx context.Context, id kernel.UUIDv7, sender k
 		threadNext := thread
 		threadNext.Revision++
 		threadNext.LastRecipient = string(recipient)
-		threadNext.VisitedRoles = replaceString(threadNext.VisitedRoles, messageActorRole(prior), messageActorRole(recipient))
 		threadResult, replaceErr := s.db.Collection("organizational_message_threads").ReplaceOne(transactionContext, bson.D{{Key: "_id", Value: thread.ID}, {Key: "revision", Value: thread.Revision}}, threadNext)
 		if replaceErr != nil || threadResult.MatchedCount != 1 {
 			return nil, errors.Join(organization.ErrOrganizationalMessageConflict, replaceErr)
@@ -405,25 +401,4 @@ func containsString(values []string, target string) bool {
 		}
 	}
 	return false
-}
-
-func messageActorRole(actor kernel.ActorFQN) string {
-	text := string(actor)
-	separator := strings.Index(text, "::")
-	instance := strings.LastIndex(text, "-")
-	if separator < 0 || instance <= separator+2 {
-		return text
-	}
-	return text[separator+2 : instance]
-}
-
-func replaceString(values []string, old, replacement string) []string {
-	result := append([]string(nil), values...)
-	for index, value := range result {
-		if value == old {
-			result[index] = replacement
-			return result
-		}
-	}
-	return append(result, replacement)
 }

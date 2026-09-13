@@ -2,6 +2,8 @@ package mongo
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"strconv"
 
@@ -126,7 +128,8 @@ func (feed *OrganizationalMessageFeed) Poll(ctx context.Context) (organization.O
 }
 
 func (feed *OrganizationalMessageFeed) accept(document organizationalMessageDocument) (organization.OrganizationalMessage, bool, error) {
-	key := document.ID + ":" + strconv.FormatUint(document.ClaimEpoch, 10)
+	digest := sha256.Sum256(document.Data)
+	key := document.ID + ":" + strconv.FormatUint(document.ClaimEpoch, 10) + ":" + hex.EncodeToString(digest[:])
 	if _, duplicate := feed.seen[key]; duplicate {
 		return organization.OrganizationalMessage{}, false, nil
 	}

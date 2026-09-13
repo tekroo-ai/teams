@@ -79,6 +79,10 @@ type OrganizationalService interface {
 	DeadLetters(context.Context, kernel.ActorFQN, int64) ([]organization.MessageClaim, error)
 }
 
+type FeatureWorkflowTimingService interface {
+	ReadFeatureWorkflowTiming(context.Context, kernel.UUIDv7) (operationalruntime.FeatureWorkflowTiming, error)
+}
+
 type Handler struct {
 	service      Service
 	organization OrganizationalService
@@ -193,6 +197,8 @@ func (handler *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Requ
 		handler.acceptFeature(writer, request, strings.TrimSuffix(strings.TrimPrefix(request.URL.Path, "/v1/features/"), "/accept"))
 	case request.Method == http.MethodPost && strings.HasPrefix(request.URL.Path, "/v1/features/") && strings.HasSuffix(request.URL.Path, "/release"):
 		handler.releaseFeature(writer, request, strings.TrimSuffix(strings.TrimPrefix(request.URL.Path, "/v1/features/"), "/release"))
+	case request.Method == http.MethodGet && strings.HasPrefix(request.URL.Path, "/v1/features/") && strings.HasSuffix(request.URL.Path, "/timing"):
+		handler.featureWorkflowTiming(writer, request, strings.TrimSuffix(strings.TrimPrefix(request.URL.Path, "/v1/features/"), "/timing"))
 	case request.Method == http.MethodGet && strings.HasPrefix(request.URL.Path, "/v1/features/"):
 		handler.readFeature(writer, request, strings.TrimPrefix(request.URL.Path, "/v1/features/"))
 	case request.Method == http.MethodGet && strings.HasPrefix(request.URL.Path, "/v1/roles/") && strings.HasSuffix(request.URL.Path, "/inbox"):
@@ -210,6 +216,21 @@ func (handler *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Requ
 	default:
 		writeError(writer, http.StatusNotFound, "NOT_FOUND")
 	}
+}
+
+func (handler *Handler) featureWorkflowTiming(writer http.ResponseWriter, request *http.Request, value string) {
+	featureID := kernel.UUIDv7(value)
+	service, supported := handler.service.(FeatureWorkflowTimingService)
+	if !supported || !featureID.Valid() || strings.Contains(value, "/") {
+		writeError(writer, http.StatusBadRequest, "INVALID_FEATURE_TIMING_REQUEST")
+		return
+	}
+	timing, err := service.ReadFeatureWorkflowTiming(request.Context(), featureID)
+	if err != nil {
+		writeError(writer, http.StatusNotFound, "FEATURE_TIMING_NOT_FOUND")
+		return
+	}
+	writeJSON(writer, http.StatusOK, timing)
 }
 
 func (handler *Handler) resolveFederationAlias(writer http.ResponseWriter, request *http.Request, name string) {

@@ -90,7 +90,10 @@ func (service *ProductionService) reconcileFeaturePlan(ctx context.Context, feat
 		return fmt.Errorf("reconcile task completions: %w", err)
 	}
 	if completed {
-		return nil
+		// Completion is deterministic and changes dependency readiness. Reload
+		// immediately so the next frontier can be admitted without waiting for a
+		// timer tick; each recursion closes at least one finite plan node.
+		return service.reconcileFeaturePlan(ctx, feature, plan)
 	}
 	allCompleted := true
 	for _, item := range plan.Tasks {
@@ -217,8 +220,11 @@ func (service *ProductionService) reconcileFeaturePlan(ctx context.Context, feat
 			return err
 		}
 		// Activation mutates task, budget, actor, and invocation state. Reload
-		// those authoritative snapshots before admitting another ready node.
-		return nil
+		// those authoritative snapshots before admitting another ready node in
+		// the same reconciliation pass. Each recursion consumes one previously
+		// inactive finite plan node, so it terminates after at most len(tasks)
+		// admissions while allowing independent actors to begin concurrently.
+		return service.reconcileFeaturePlan(ctx, feature, plan)
 	}
 	return nil
 }
@@ -254,19 +260,20 @@ func (service *ProductionService) reconcileFeatureProfileDeadlines(ctx context.C
 		if !stateFound || state.Phase == kernel.PhaseCompleted {
 			continue
 		}
-		// Once a task has an invocation, that invocation's recovery path owns any
-		// deadline extension. Advancing the task profile independently would make
-		// an in-flight or completed result appear stale during reconciliation.
-		if _, found := invocations[item.ID]; found {
-			continue
-		}
 		taskRef := kernel.AggregateRef{Kind: kernel.AggregateTask, ID: item.ID}
 		profileSnapshot, found := snapshot.WorkProfiles[taskRef]
 		if !found || !profileSnapshot.Valid() {
 			return false, organization.ErrInvalidFeature
 		}
 		current := profileSnapshot.Profile
-		if current.Budgets.DeadlineAt.After(now) || !current.Budgets.DeadlineAt.Before(budget.DeadlineAt) {
+		// An invocation owns deadline recovery only while it is bound to the
+		// task's current lifecycle, scope, and profile. A reopened validator keeps
+		// its prior invocation as history; that stale invocation must not prevent
+		// the successor profile from inheriting an extended feature deadline.
+		if invocation, found := invocations[item.ID]; invocationOwnsProfileDeadline(invocation, found, current) {
+			continue
+		}
+		if !profileDeadlineNeedsExtension(current.Budgets.DeadlineAt, budget.DeadlineAt, now, service.requestTimeout) {
 			continue
 		}
 		if len(evidenceIDs) == 0 {
@@ -292,6 +299,18 @@ func (service *ProductionService) reconcileFeatureProfileDeadlines(ctx context.C
 		changed = true
 	}
 	return changed, nil
+}
+
+func invocationOwnsProfileDeadline(invocation kernel.WorkInvocation, found bool, current kernel.WorkRiskProfile) bool {
+	return found && invocation.WorkProfile == current.Binding()
+}
+
+func profileDeadlineNeedsExtension(current, account, now time.Time, requestTimeout time.Duration) bool {
+	requiredRunway := now
+	if requestTimeout > 0 {
+		requiredRunway = now.Add(requestTimeout)
+	}
+	return !current.After(requiredRunway) && current.Before(account)
 }
 
 func (service *ProductionService) featureDeadlineExtensionEvidenceIDs(ctx context.Context, plan organization.FeaturePlan, snapshot kernel.Snapshot, budget kernel.WorkBudgetAccount) ([]kernel.UUIDv7, error) {
@@ -464,7 +483,8 @@ func (service *ProductionService) recordFeatureAcceptanceRecommendation(ctx cont
 
 func (service *ProductionService) reconcileValidationRounds(ctx context.Context, feature organization.FeatureRequest, plan organization.FeaturePlan, states map[kernel.UUIDv7]kernel.AggregateState, heads map[kernel.UUIDv7]kernel.UUIDv7, invocations map[kernel.UUIDv7]kernel.WorkInvocation, snapshot kernel.Snapshot, budgetRevision uint64, evidence []kernel.EvidenceRef) (bool, error) {
 	for _, validator := range plan.Tasks {
-		if len(validator.Validates) == 0 || states[validator.ID].Phase != kernel.PhaseActive {
+		state := states[validator.ID]
+		if len(validator.Validates) == 0 || !changedCandidateValidatorPhase(state.Phase) {
 			continue
 		}
 		latest, found := invocations[validator.ID]
@@ -512,6 +532,9 @@ func (service *ProductionService) reconcileValidationRounds(ctx context.Context,
 			continue
 		}
 		nextAttempt := latest.AttemptOrdinal + 1
+		if featureValidationAtCeiling(feature, snapshot, service.clock.Now().UTC()) {
+			return service.blockStructuredDecisionTask(ctx, feature, validator, state, latest, snapshot, validationTimeCeilingReason, "changed-candidate-validation-time-ceiling")
+		}
 		technicalExtension := nextAttempt > uint64(validator.AttemptLimit)
 		profileConfig, configured := service.profilesByModel[validator.ModelProfile]
 		owner, ownerErr := service.StartRole(ctx, validator.Owner)
@@ -523,8 +546,32 @@ func (service *ProductionService) reconcileValidationRounds(ctx context.Context,
 		if workspaceErr != nil {
 			return false, workspaceErr
 		}
+		if state.Phase == kernel.PhaseCompleted {
+			updated, updatedHead, successor, reopenErr := service.reopenCompletedValidatorForChangedCandidate(ctx, feature, validator, state, heads[validator.ID], profileSnapshot.Profile, expectedCondition, candidateEvidence)
+			if reopenErr != nil {
+				return false, reopenErr
+			}
+			state = updated
+			states[validator.ID] = updated
+			heads[validator.ID] = updatedHead
+			tracked.revision = updated.Revision
+			tracked.last = updatedHead
+			tracked.profile = successor
+		}
+		// A daemon or role restart may replace the validator execution between
+		// candidate rounds. Keep the qualified assignment aligned with the
+		// current profile and execution before rebinding scope or authorizing the
+		// successor invocation, exactly as explicit task recovery does.
+		if err := service.rebindPlanningRecoveryAssignment(ctx, feature, tracked, profileConfig, owner); err != nil {
+			return false, err
+		}
 		if err := service.rebindTaskCandidateWorkspace(ctx, feature, tracked, workspace, candidateEvidence); err != nil {
 			return false, err
+		}
+		if state.Condition == kernel.ConditionBlocked {
+			if err := service.unblockValidationForChangedCandidate(ctx, tracked, latest, workspace, candidateEvidence); err != nil {
+				return false, err
+			}
 		}
 		invocationBudgetRevision, budgetErr := service.extendTaskTechnicalRetryBudget(ctx, feature, tracked, validator.Purpose, nextAttempt)
 		if budgetErr != nil || invocationBudgetRevision != budgetRevision {
@@ -539,6 +586,60 @@ func (service *ProductionService) reconcileValidationRounds(ctx context.Context,
 		return true, nil
 	}
 	return false, nil
+}
+
+func changedCandidateValidatorPhase(phase kernel.Phase) bool {
+	return phase == kernel.PhaseActive || phase == kernel.PhaseCompleted
+}
+
+func (service *ProductionService) reopenCompletedValidatorForChangedCandidate(ctx context.Context, feature organization.FeatureRequest, validator organization.PlannedTask, state kernel.AggregateState, head kernel.UUIDv7, current kernel.WorkRiskProfile, condition kernel.Digest, evidence []kernel.EvidenceRef) (kernel.AggregateState, kernel.UUIDv7, kernel.WorkRiskProfile, error) {
+	if state.Phase != kernel.PhaseCompleted || !current.Valid() || !condition.Valid() || len(evidence) == 0 {
+		return kernel.AggregateState{}, "", kernel.WorkRiskProfile{}, organization.ErrInvalidFeature
+	}
+	evidenceIDs := evidenceIDs(evidence)
+	request := TaskRecoveryRequest{
+		Reason:         "A validated dependency produced a changed candidate; revalidate only this dependent task against the new immutable candidate.",
+		IdempotencyKey: "changed-candidate-" + string(condition),
+	}
+	updated, updatedHead, err := service.reopenCompletedTaskForRecovery(ctx, feature, validator, state, head, request, evidence)
+	if err != nil {
+		return kernel.AggregateState{}, "", kernel.WorkRiskProfile{}, err
+	}
+	successor, err := reopenedTaskRecoveryProfile(current, service.planning, condition, current.Budgets.DeadlineAt, evidenceIDs, updated.LifecycleEpoch, updated.ScopeRevision)
+	if err != nil {
+		return kernel.AggregateState{}, "", kernel.WorkRiskProfile{}, err
+	}
+	tracked := &trackedTask{plan: validator, revision: updated.Revision, last: updatedHead, profile: successor}
+	profileKey := fmt.Sprintf("changed-candidate-profile-%d-%s", successor.ProfileRevision, successor.ProfileDigest)
+	if err := service.applyTaskCommand(ctx, feature, tracked, "tekroo.command.task.bind-work-profile", kernel.SchemaVersion, service.policyAuthority, successor, evidence, nil, profileKey); err != nil {
+		return kernel.AggregateState{}, "", kernel.WorkRiskProfile{}, err
+	}
+	updated.Revision = tracked.revision
+	return updated, tracked.last, successor, nil
+}
+
+func (service *ProductionService) unblockValidationForChangedCandidate(ctx context.Context, task *trackedTask, prior kernel.WorkInvocation, workspace ProductionWorkspace, evidence []kernel.EvidenceRef) error {
+	if task == nil || prior.State != kernel.InvocationSucceeded || prior.OutputDigest == nil || !validGitCommit(workspace.BaselineSHA) || len(evidence) == 0 {
+		return organization.ErrInvalidFeature
+	}
+	payload, err := json.Marshal(map[string]any{
+		"resolved_blocker_refs": []string{"teams://work-invocation/" + string(prior.ID)},
+		"evidence_ids":          evidenceIDs(evidence),
+	})
+	if err != nil {
+		return err
+	}
+	key := "changed-validation-candidate-unblock-" + string(prior.ID) + "-" + workspace.BaselineSHA
+	receipt, err := service.submitStandaloneCommand(ctx, "tekroo.command.work.unblock", kernel.AggregateTask, task.plan.ID, service.policyAuthority, task.revision, payload, []kernel.DagParent{{ParentEventID: task.last, EdgeKind: kernel.EdgeResponse}}, evidence, key)
+	if err != nil {
+		return err
+	}
+	if len(receipt.EventIDs) != 1 {
+		return organization.ErrInvalidFeature
+	}
+	task.revision = revisionAfter(receipt, task.revision)
+	task.last = receipt.EventIDs[0]
+	return nil
 }
 
 func latestTaskInvocation(values map[kernel.AggregateRef]kernel.WorkInvocation, taskID kernel.UUIDv7) (kernel.WorkInvocation, bool) {

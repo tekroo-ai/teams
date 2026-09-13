@@ -333,11 +333,7 @@ func planningRecoveryProfile(current kernel.WorkRiskProfile, prior kernel.WorkPr
 			completed.ProfileRevision = current.ProfileRevision + 1
 			currentID := current.ProfileID
 			completed.SupersedesProfileID = &currentID
-			completed.ClassificationEvidenceIDs = append(completed.ClassificationEvidenceIDs, evidenceIDs...)
-			sort.Slice(completed.ClassificationEvidenceIDs, func(left, right int) bool {
-				return completed.ClassificationEvidenceIDs[left] < completed.ClassificationEvidenceIDs[right]
-			})
-			completed.ClassificationEvidenceIDs = uniqueUUIDs(completed.ClassificationEvidenceIDs)
+			completed.ClassificationEvidenceIDs = reopenedProfileEvidenceIDs(current.ClassificationEvidenceIDs, evidenceIDs)
 			completed.ProfileDigest = ""
 			encoded, err := json.Marshal(completed)
 			if err != nil {
@@ -363,11 +359,7 @@ func planningRecoveryProfile(current kernel.WorkRiskProfile, prior kernel.WorkPr
 		completed.ProfileRevision = current.ProfileRevision + 1
 		currentID := current.ProfileID
 		completed.SupersedesProfileID = &currentID
-		completed.ClassificationEvidenceIDs = append(completed.ClassificationEvidenceIDs, evidenceIDs...)
-		sort.Slice(completed.ClassificationEvidenceIDs, func(left, right int) bool {
-			return completed.ClassificationEvidenceIDs[left] < completed.ClassificationEvidenceIDs[right]
-		})
-		completed.ClassificationEvidenceIDs = uniqueUUIDs(completed.ClassificationEvidenceIDs)
+		completed.ClassificationEvidenceIDs = reopenedProfileEvidenceIDs(current.ClassificationEvidenceIDs, evidenceIDs)
 		completed.ProfileDigest = ""
 		encoded, err := json.Marshal(completed)
 		if err != nil {
@@ -390,11 +382,7 @@ func planningRecoveryProfile(current kernel.WorkRiskProfile, prior kernel.WorkPr
 	next.VerificationTopologyDigest = planning.VerificationTopologyDigest
 	priorID := prior.ProfileID
 	next.SupersedesProfileID = &priorID
-	next.ClassificationEvidenceIDs = append(next.ClassificationEvidenceIDs, evidenceIDs...)
-	sort.Slice(next.ClassificationEvidenceIDs, func(left, right int) bool {
-		return next.ClassificationEvidenceIDs[left] < next.ClassificationEvidenceIDs[right]
-	})
-	next.ClassificationEvidenceIDs = uniqueUUIDs(next.ClassificationEvidenceIDs)
+	next.ClassificationEvidenceIDs = reopenedProfileEvidenceIDs(current.ClassificationEvidenceIDs, evidenceIDs)
 	next.ProfileDigest = ""
 	encoded, err := json.Marshal(next)
 	if err != nil {

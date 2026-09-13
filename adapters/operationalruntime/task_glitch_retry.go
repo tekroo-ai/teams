@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/tekroo-ai/teams/kernel"
 	"github.com/tekroo-ai/teams/organization"
@@ -19,6 +20,7 @@ import (
 // decision; failure reason codes that suggest deliberate boundary-crossing are
 // deliberately excluded.
 var autoGlitchTerminationReasons = map[string]bool{
+	"ROLE_REPOSITORY_MUTATION_NOT_AUTHORIZED":         true,
 	"WORK_PURPOSE_REPOSITORY_MUTATION_NOT_AUTHORIZED": true,
 }
 
@@ -91,19 +93,24 @@ func (service *ProductionService) reconcileGlitchTerminatedTasks(ctx context.Con
 		// The recovery deadline must be derived from durable state, not from the
 		// reconciler clock: commands use deterministic IDs over the request, so a
 		// per-pass deadline change turns an interrupted retry into a permanent
-		// COMMAND_ID_REUSE conflict. The kernel also requires the requested
-		// deadline to exceed the failed invocation's own deadline.
+		// COMMAND_ID_REUSE conflict. Original invocations normally consume the
+		// account's exact deadline, while recovery requires a strict successor.
+		// Advance that durable maximum by the smallest representable duration.
 		budgetRef := kernel.AggregateRef{Kind: kernel.AggregateWorkBudget, ID: feature.BudgetAccountID}
 		budget, budgetFound := snapshot.WorkBudgetAccounts[budgetRef]
 		now := service.clock.Now().UTC()
-		if !budgetFound || !budget.Valid() || !budget.DeadlineAt.After(now) || !budget.DeadlineAt.After(invocation.DeadlineAt) || !budget.DeadlineAt.Before(now.Add(service.planningDeadline)) {
+		if !budgetFound || !budget.Valid() {
+			continue
+		}
+		deadline := automaticGlitchRecoveryDeadline(budget.DeadlineAt, invocation.DeadlineAt)
+		if !deadline.After(now) || deadline.After(now.Add(service.planningDeadline)) {
 			continue
 		}
 		_, err = service.RetryFailedTask(ctx, service.operatorIdentity.Principal, invocation.ID, TaskRecoveryRequest{
 			ExpectedRevision: invocation.Revision,
 			Reason:           "automatic glitch recovery: " + workTerminationReasonLine(output),
 			EvidenceRefs:     evidence,
-			DeadlineAt:       budget.DeadlineAt,
+			DeadlineAt:       deadline,
 			IdempotencyKey:   "auto-glitch-retry-" + string(task.ID) + "-" + string(invocation.ID),
 		})
 		if err != nil {
@@ -112,6 +119,13 @@ func (service *ProductionService) reconcileGlitchTerminatedTasks(ctx context.Con
 		return true, nil
 	}
 	return false, nil
+}
+
+func automaticGlitchRecoveryDeadline(budgetDeadline, invocationDeadline time.Time) time.Time {
+	if invocationDeadline.After(budgetDeadline) {
+		return invocationDeadline.Add(time.Nanosecond)
+	}
+	return budgetDeadline.Add(time.Nanosecond)
 }
 
 func workTerminationReasonLine(output []byte) string {

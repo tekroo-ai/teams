@@ -1,0 +1,73 @@
+{
+  "schema_version": "1.0.0",
+  "name": "software-development",
+  "version": "1.0.0",
+  "content_digest": "0fad72aa1ffd2a5a671a610165d8686fa68331f8206627874bf6ce3628b4bfa6",
+  "trigger_types": [
+    "tekroo.message.feature.submitted"
+  ],
+  "stages": [
+    {
+      "stage_id": "refine",
+      "depends_on": [],
+      "input_schema": "tekroo.feature-request/1.0.0",
+      "output_schema": "tekroo.feature-refinement/1.0.0",
+      "required_capabilities": ["feature-intake", "requirements"],
+      "preferred_fqrns": ["product-owner"],
+      "purpose": "HANDOFF",
+      "risk": "LOW",
+      "concurrency_group": "planning",
+      "maximum_parallelism": 1,
+      "attempt_limit": 2,
+      "allowed_outgoing_purposes": ["HANDOFF"],
+      "target_selection": "CAPABILITY",
+      "validation_policy": "DETERMINISTIC_ONLY",
+      "completion_condition": "Return TEKROO_ORGANIZATIONAL_RESULT followed by one JSON object matching tekroo.feature-refinement/1.0.0 with result_type FEATURE_REFINEMENT, acceptance_criteria_disposition PRESERVE_SUBMITTED, clarification_questions, and priority. The refinement preserves submitted acceptance criteria and makes material ambiguity explicit."
+    },
+    {
+      "stage_id": "specify",
+      "depends_on": ["refine"],
+      "input_schema": "tekroo.feature-refinement/1.0.0",
+      "output_schema": "tekroo.feature-specification/1.0.0",
+      "required_capabilities": ["planning", "story-management"],
+      "preferred_fqrns": ["project-manager"],
+      "purpose": "HANDOFF",
+      "risk": "LOW",
+      "concurrency_group": "planning",
+      "maximum_parallelism": 1,
+      "attempt_limit": 2,
+      "allowed_outgoing_purposes": ["HANDOFF"],
+      "target_selection": "CAPABILITY",
+      "validation_policy": "DETERMINISTIC_ONLY",
+      "completion_condition": "Return TEKROO_ORGANIZATIONAL_RESULT followed by one JSON object matching tekroo.feature-specification/1.0.0 with result_type FEATURE_SPECIFICATION, stories containing title, description, acceptance_criteria, and priority, plus design_constraints. The smallest finite set of independently useful stories covers every submitted acceptance criterion."
+    },
+    {
+      "stage_id": "design",
+      "depends_on": ["specify"],
+      "input_schema": "tekroo.feature-specification/1.0.0",
+      "output_schema": "tekroo.feature-plan/1.0.0",
+      "required_capabilities": ["architecture", "decomposition", "risk-analysis"],
+      "preferred_fqrns": ["architect"],
+      "purpose": "HANDOFF",
+      "risk": "MODERATE",
+      "complexity_minimum": 2,
+      "complexity_maximum": 5,
+      "concurrency_group": "planning",
+      "maximum_parallelism": 1,
+      "attempt_limit": 2,
+      "review_round_limit": 1,
+      "allowed_outgoing_purposes": ["HANDOFF"],
+      "target_selection": "CAPABILITY",
+      "validation_policy": "DETERMINISTIC_ONLY",
+      "completion_condition": "Return TEKROO_ORGANIZATIONAL_RESULT followed by one JSON object matching tekroo.feature-plan/1.0.0 with result_type FEATURE_PLAN, architecture, design_decisions, assumptions, and an acyclic tasks array. Each task declares story_index, title, description, acceptance_criteria, backward depends_on indexes, empty validates, purpose IMPLEMENTATION, complexity, risk, critical_path, attempt_limit, and review_round_limit. The plan is repository-grounded, uses true dependencies, preserves layer ownership, and contains only work needed for the accepted feature."
+    }
+  ],
+  "root_budgets": {
+    "maximum_model_invocations": 24,
+    "maximum_hops": 32,
+    "maximum_attempts": 16,
+    "maximum_tokens": 1000000,
+    "maximum_elapsed_seconds": 86400
+  },
+  "projection_rules": ["FEATURE", "MESSAGE", "STATUS", "STORY", "TASK"]
+}

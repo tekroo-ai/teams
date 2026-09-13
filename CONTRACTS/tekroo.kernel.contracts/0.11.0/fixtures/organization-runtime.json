@@ -1,0 +1,78 @@
+{
+  "contractIdentity": "tekroo.kernel.contracts/0.11.0",
+  "fixtures": [
+    {
+      "assertion": "a signed content-addressed manifest resolves an exact finite roster",
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "P6-ORG-001",
+      "kind": "TEAM_MANIFEST"
+    },
+    {
+      "assertion": "a missing, changed, or untrusted bundle fails activation",
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "P6-ORG-002",
+      "kind": "TEAM_MANIFEST"
+    },
+    {
+      "assertion": "one exact directed message produces one durable recipient claim",
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "P6-ORG-003",
+      "kind": "MESSAGE_DELIVERY"
+    },
+    {
+      "assertion": "message delivery has no path to model invocation or role launch",
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "P6-ORG-004",
+      "kind": "MESSAGE_DELIVERY"
+    },
+    {
+      "assertion": "fanout materializes one exact delivery per recipient",
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "P6-ORG-005",
+      "kind": "MESSAGE_FANOUT"
+    },
+    {
+      "assertion": "renaming a message or role cannot reset hop, progress, or work budgets",
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "P6-ORG-006",
+      "kind": "MESSAGE_LOOP"
+    },
+    {
+      "assertion": "stream-before-backlog recovery is lossless and duplicate-safe",
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "P6-ORG-007",
+      "kind": "MESSAGE_RECOVERY"
+    },
+    {
+      "assertion": "poison delivery reaches dead letter within the attempt limit",
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "P6-ORG-008",
+      "kind": "MESSAGE_RECOVERY"
+    },
+    {
+      "assertion": "one feature request binds one product owner and a finite story/task DAG",
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "P6-ORG-009",
+      "kind": "FEATURE_INTAKE"
+    },
+    {
+      "assertion": "an authenticated exact recipient response resumes only the linked blocked task",
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "P6-ORG-010",
+      "kind": "HUMAN_PARTICIPATION"
+    },
+    {
+      "assertion": "waiting for a human consumes no model invocation",
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "P6-ORG-011",
+      "kind": "HUMAN_PARTICIPATION"
+    },
+    {
+      "assertion": "SMA, prompts, tools, providers, and channels cannot create organizational authority",
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "P6-ORG-012",
+      "kind": "AUTHORITY_BOUNDARY"
+    }
+  ],
+  "schemaVersion": "1.0.0"
+}

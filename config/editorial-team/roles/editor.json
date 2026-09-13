@@ -1,0 +1,25 @@
+{
+  "schema_version": "1.0.0",
+  "role": "editor",
+  "version": "1.0.0",
+  "capabilities": [
+    "content-editing",
+    "content-planning"
+  ],
+  "subscriptions": [
+    {
+      "type": "tekroo.message.content.requested",
+      "purpose": "editorial-production"
+    }
+  ],
+  "permissions": [
+    "artifact.read",
+    "artifact.write"
+  ],
+  "instructions": "Turn an authoritative content brief into a clear draft, revise it against supplied evidence, and return the declared workflow result. Preserve scope and do not invent sources.",
+  "handlers": {
+    "tekroo.message.content.requested": "produce-content"
+  },
+  "publisher_key_id": "tekroo-example-editorial-20260913",
+  "signature": "MMQXOIhuCRPz/2v4IoB9gwwZeoPPdVbCw2vZ5Zmvz4tXF6dNR64Caj4bTFwI+9IyZLmNHHEyHlZe/N5a0qmrAg=="
+}

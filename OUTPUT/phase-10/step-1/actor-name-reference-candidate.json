@@ -1,0 +1,38 @@
+{
+  "schema_version": "1.0.0",
+  "kind": "quarantined-reference-candidate",
+  "status": "PRESERVED_EXCLUDED",
+  "repository": "/Users/paul/.local/share/tekroo/phase10/quarantine/actor-name-reference.git",
+  "base_commit": "4c486fd746578a4bfd1b7f23f966d6d7228c5498",
+  "candidate_commit": "673d74054c04439b6eaa25e663fc28ecf8297bb4",
+  "candidate_tree": "8c9157dca4434effdcc475341567825166e8b25b",
+  "candidate_commits": [
+    "421708f",
+    "f9545c2",
+    "8cad3d1",
+    "4929ea1",
+    "673d740"
+  ],
+  "changed_paths": [
+    "adapters/mcp/handler.go",
+    "adapters/mcp/handler_test.go",
+    "adapters/mongo/actor_name_store.go",
+    "adapters/mongo/actor_name_store_integration_test.go",
+    "adapters/mongo/actor_name_store_test.go",
+    "adapters/mongo/store.go",
+    "adapters/operationalruntime/actor_names_test.go",
+    "adapters/operationalruntime/production.go",
+    "adapters/operatorhttp/handler.go",
+    "adapters/operatorhttp/handler_test.go",
+    "adapters/operatortools/service.go",
+    "adapters/operatortools/service_test.go",
+    "cmd/tekroo/main.go",
+    "cmd/tekroo/main_test.go",
+    "go.mod",
+    "organization/actor_name.go",
+    "organization/actor_name_test.go"
+  ],
+  "integrity_check": "git fsck --full: PASS",
+  "allowed_use": "Post-terminal comparison after the Phase 10 clean canary only",
+  "prohibited_use": "Phase 10 implementation input, agent workspace input, prompt context, or baseline source"
+}

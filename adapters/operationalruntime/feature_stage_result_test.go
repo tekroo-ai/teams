@@ -89,6 +89,17 @@ func TestInvalidValidatorOutputBlockMatchingIsExact(t *testing.T) {
 	if !isExactInvalidStructuredOutputBlock(event, task, invocation, authority) {
 		t.Fatal("exact invalid-validator-output block was not recognized")
 	}
+	if !isExactRecoverableStructuredDecisionBlock(event, task, invocation, authority) {
+		t.Fatal("exact structured-decision block was not recognized")
+	}
+	failedDecision := event
+	failedDecision.Payload = []byte(`{"blocker_refs":["teams://work-invocation/00000000-0000-7000-8000-000000000321"],"reason":"whole-feature validation did not pass: material interface mismatch","review_policy":"operator-or-product-owner-must-amend-scope-or-cancel"}`)
+	if !isExactRecoverableStructuredDecisionBlock(failedDecision, task, invocation, authority) {
+		t.Fatal("material validator failure was not recognized as operator-recoverable")
+	}
+	if isExactInvalidStructuredOutputBlock(failedDecision, task, invocation, authority) {
+		t.Fatal("material validator failure was misclassified as invalid structured output")
+	}
 
 	wrongInvocation := invocation
 	wrongInvocation.ID = "00000000-0000-7000-8000-000000000113"
@@ -99,6 +110,9 @@ func TestInvalidValidatorOutputBlockMatchingIsExact(t *testing.T) {
 	wrongReason.Payload = []byte(`{"blocker_refs":["teams://work-invocation/00000000-0000-7000-8000-000000000321"],"reason":"human requested pause","review_policy":"operator-or-product-owner-must-amend-scope-or-cancel"}`)
 	if isExactInvalidStructuredOutputBlock(wrongReason, task, invocation, authority) {
 		t.Fatal("unrelated task block was accepted for validator recovery")
+	}
+	if isExactRecoverableStructuredDecisionBlock(wrongReason, task, invocation, authority) {
+		t.Fatal("unrelated task block was accepted as a structured decision")
 	}
 }
 
@@ -369,16 +383,16 @@ func TestArchitectureTaskReviewUsesExactTransitiveDependencyContracts(t *testing
 	}
 }
 
-func TestRequiredMaterializedTaskCountIncludesGeneratedReviewWork(t *testing.T) {
+func TestRequiredMaterializedTaskCountSelectsReviewWorkByRisk(t *testing.T) {
 	tasks := []architectureTaskResult{
 		{Purpose: kernel.PurposeImplementation, Risk: organization.RiskModerate},
 		{Purpose: kernel.PurposeImplementation, Risk: organization.RiskHigh},
 		{Purpose: kernel.PurposeInvestigation, Risk: organization.RiskLow},
 	}
-	// Three authored tasks, two task-local tester tasks, one high-risk security
-	// review, one whole-feature validator, and one final product-acceptance task.
-	if got := requiredMaterializedTaskCount(tasks); got != 8 {
-		t.Fatalf("materialized task count = %d, want 8", got)
+	// Three authored tasks, one high-risk task review, one high-risk security
+	// review, one joined feature validator, and one final acceptance task.
+	if got := requiredMaterializedTaskCount(tasks); got != 7 {
+		t.Fatalf("materialized task count = %d, want 7", got)
 	}
 }
 
@@ -442,7 +456,7 @@ func TestFeaturePlanningDescriptionCarriesAuthoritativeFeatureState(t *testing.T
 		},
 	}
 	for _, stage := range []featurePlanningStage{stageRefinement, stageSpecification, stageArchitecture} {
-		_, _, route, _, instruction, _, err := planningStageDefinition(stage)
+		_, _, route, _, instruction, _, err := legacyPlanningStageDefinition(stage)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -453,7 +467,7 @@ func TestFeaturePlanningDescriptionCarriesAuthoritativeFeatureState(t *testing.T
 		if route != wantRoute {
 			t.Fatalf("%s route = %s, want %s", stage, route, wantRoute)
 		}
-		description, err := featurePlanningDescription(feature, stage, instruction)
+		description, err := featurePlanningDescription(feature, stage, instruction, softwareDevelopmentTaskRoutingPolicy())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -526,7 +540,7 @@ func TestFeaturePlanningDescriptionCarriesAuthoritativeFeatureState(t *testing.T
 	planOutput := []byte(application.OrganizationalResultMarker + "\n{\"schema_version\":\"1.0.0\",\"result_type\":\"FEATURE_PLAN\",\"architecture\":\"bounded\",\"design_decisions\":[],\"assumptions\":[],\"tasks\":[{\"story_index\":0,\"title\":\"Define\",\"description\":\"Define the interface.\",\"acceptance_criteria\":[\"interface exists\"],\"depends_on\":[],\"validates\":[],\"purpose\":\"IMPLEMENTATION\",\"complexity\":3,\"risk\":\"LOW\",\"critical_path\":true,\"attempt_limit\":2,\"review_round_limit\":2},{\"story_index\":0,\"title\":\"Implement\",\"description\":\"Implement it.\",\"acceptance_criteria\":[\"works\"],\"depends_on\":[0],\"validates\":[],\"purpose\":\"IMPLEMENTATION\",\"complexity\":3,\"risk\":\"LOW\",\"critical_path\":true,\"attempt_limit\":2,\"review_round_limit\":2}]}")
 	planDigest := digestBytes(planOutput)
 	invocation := kernel.WorkInvocation{OutputDigest: &planDigest}
-	_, _, _, _, instruction, _, err := planningStageDefinition(stageArchitectureReview)
+	_, _, _, _, instruction, _, err := legacyPlanningStageDefinition(stageArchitectureReview)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -539,7 +553,7 @@ func TestFeaturePlanningDescriptionCarriesAuthoritativeFeatureState(t *testing.T
 			t.Fatalf("architecture review description omitted %q", required)
 		}
 	}
-	taskReviewRole, taskReviewPurpose, taskReviewRoute, _, taskReviewInstruction, _, err := planningStageDefinition(stageArchitectureTaskReview)
+	taskReviewRole, taskReviewPurpose, taskReviewRoute, _, taskReviewInstruction, _, err := legacyPlanningStageDefinition(stageArchitectureTaskReview)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -572,6 +586,19 @@ func TestFeaturePlanningDescriptionCarriesAuthoritativeFeatureState(t *testing.T
 			t.Fatalf("architecture task review description retained redundant model-transcribed identity %q", redundant)
 		}
 	}
+}
+
+func softwareDevelopmentTaskRoutingPolicy() workflowTaskRoutingPolicy {
+	return workflowTaskRoutingPolicy{PurposeRoutes: []purposeTaskRoutingPolicy{{
+		Purpose:                  kernel.PurposeImplementation,
+		MaximumTaskComplexity:    6,
+		MayAuthorValidationLinks: false,
+		SerializeTasks:           false,
+		PlanComplexityRoleBands: []planComplexityRoleBand{
+			{MinimumPlanComplexity: 1, Role: "coder"},
+			{MinimumPlanComplexity: 5, Role: "senior-coder"},
+		},
+	}}}
 }
 
 func parseArchitectureTaskForTest(t *testing.T, output []byte) architectureTaskResult {

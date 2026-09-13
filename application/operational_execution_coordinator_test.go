@@ -82,14 +82,18 @@ func TestRetryExecutionBriefDirectsAgentToContinueFromRetainedState(t *testing.T
 func TestExplicitRecoveryExecutionBriefUsesCleanConversationAndExistingWorkspace(t *testing.T) {
 	runtime := newOperationalRuntime(t)
 	retryOf := testUUID(780)
+	priorConversationID := string(retryOf)
 	priorProfileID := runtime.context.Profile.Profile.ProfileID
 	runtime.context.Invocation.RetryOfInvocationID = &retryOf
+	runtime.context.RetryOfConversationID = &priorConversationID
 	runtime.context.Invocation.RetryOrdinal = 2
 	runtime.context.Profile.Profile.ProfileID = testUUID(781)
 	runtime.context.Profile.Profile.ProfileRevision++
 	runtime.context.Profile.Profile.SupersedesProfileID = &priorProfileID
 	runtime.context.Invocation.WorkProfile = runtime.context.Profile.Profile.Binding()
 	runtime.context.Assignment.WorkProfile = runtime.context.Profile.Profile.Binding()
+	runtime.context.RecoveryDirective = testExecutionRecoveryDirective()
+	runtime.context.Evidence = append(runtime.context.Evidence, runtime.context.RecoveryDirective.Evidence...)
 	brief, _, err := BuildExecutionBrief(runtime.context, testRoleGrounding(runtime.context.Invocation.ActorFQN), 1<<20)
 	if err != nil {
 		t.Fatal(err)
@@ -104,6 +108,57 @@ func TestExplicitRecoveryExecutionBriefUsesCleanConversationAndExistingWorkspace
 		if strings.Contains(guidance, forbidden) {
 			t.Fatalf("explicit recovery guidance contains stale instruction %q: %v", forbidden, brief.ExecutionGuidance)
 		}
+	}
+	if brief.RecoveryDirective == nil || brief.RecoveryDirective.Reason != "Correct the evidence-confirmed interface mismatch." {
+		t.Fatalf("recovery directive = %#v", brief.RecoveryDirective)
+	}
+	if brief.RetryOfConversationID == nil || *brief.RetryOfConversationID != priorConversationID {
+		t.Fatalf("retry conversation = %v, want %s", brief.RetryOfConversationID, priorConversationID)
+	}
+}
+
+func TestPreStartFailureRecoveryBriefHasNoPriorConversation(t *testing.T) {
+	runtime := newOperationalRuntime(t)
+	retryOf := testUUID(788)
+	priorProfileID := runtime.context.Profile.Profile.ProfileID
+	runtime.context.Invocation.RetryOfInvocationID = &retryOf
+	runtime.context.Invocation.RetryOrdinal = 1
+	runtime.context.Profile.Profile.ProfileID = testUUID(789)
+	runtime.context.Profile.Profile.ProfileRevision++
+	runtime.context.Profile.Profile.SupersedesProfileID = &priorProfileID
+	runtime.context.Invocation.WorkProfile = runtime.context.Profile.Profile.Binding()
+	runtime.context.Assignment.WorkProfile = runtime.context.Profile.Profile.Binding()
+	runtime.context.RecoveryDirective = testExecutionRecoveryDirective()
+	runtime.context.Evidence = append(runtime.context.Evidence, runtime.context.RecoveryDirective.Evidence...)
+
+	brief, _, err := BuildExecutionBrief(runtime.context, testRoleGrounding(runtime.context.Invocation.ActorFQN), 1<<20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if brief.RetryOfInvocationID == nil || *brief.RetryOfInvocationID != retryOf || brief.RetryOfConversationID != nil {
+		t.Fatalf("retry source=%v prior conversation=%v", brief.RetryOfInvocationID, brief.RetryOfConversationID)
+	}
+}
+
+func TestChangedCandidateValidationRetryDoesNotRequireOperatorRecoveryDirective(t *testing.T) {
+	runtime := newOperationalRuntime(t)
+	retryOf := testUUID(786)
+	priorProfileID := runtime.context.Profile.Profile.ProfileID
+	runtime.context.Invocation.Purpose = kernel.PurposeValidation
+	runtime.context.Invocation.RetryOfInvocationID = &retryOf
+	runtime.context.Invocation.RetryOrdinal = 1
+	runtime.context.Profile.Profile.ProfileID = testUUID(787)
+	runtime.context.Profile.Profile.ProfileRevision++
+	runtime.context.Profile.Profile.SupersedesProfileID = &priorProfileID
+	runtime.context.Invocation.WorkProfile = runtime.context.Profile.Profile.Binding()
+	runtime.context.Assignment.WorkProfile = runtime.context.Profile.Profile.Binding()
+	brief, _, err := BuildExecutionBrief(runtime.context, testRoleGrounding(runtime.context.Invocation.ActorFQN), 1<<20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	guidance := strings.Join(brief.ExecutionGuidance, "\n")
+	if brief.RecoveryDirective != nil || !strings.Contains(guidance, "bounded retry") || !strings.Contains(guidance, "prior OpenHands conversation") {
+		t.Fatalf("changed-candidate retry brief=%#v guidance=%v", brief.RecoveryDirective, brief.ExecutionGuidance)
 	}
 }
 
@@ -121,6 +176,8 @@ func TestReadOnlyExplicitRecoveryRepairsRejectedStructuredResult(t *testing.T) {
 	runtime.context.Profile.Profile.SupersedesProfileID = &priorProfileID
 	runtime.context.Invocation.WorkProfile = runtime.context.Profile.Profile.Binding()
 	runtime.context.Assignment.WorkProfile = runtime.context.Profile.Profile.Binding()
+	runtime.context.RecoveryDirective = testExecutionRecoveryDirective()
+	runtime.context.Evidence = append(runtime.context.Evidence, runtime.context.RecoveryDirective.Evidence...)
 	grounding := RoleExecutionGrounding{
 		ActorFQN: actor, RoleFQRN: kernel.RoleFQRN("architect"), BundleVersion: "1.1.0", BundleDigest: testDigest('b'),
 		Capabilities: []string{"architecture"}, Permissions: []string{"repository.read"},
@@ -138,6 +195,14 @@ func TestReadOnlyExplicitRecoveryRepairsRejectedStructuredResult(t *testing.T) {
 	}
 	if strings.Contains(guidance, "Do not restart implementation") == false {
 		t.Fatalf("read-only explicit recovery lost shared recovery guidance: %v", brief.ExecutionGuidance)
+	}
+}
+
+func testExecutionRecoveryDirective() *ExecutionRecoveryDirective {
+	return &ExecutionRecoveryDirective{
+		SourceEventID: testUUID(784),
+		Reason:        "Correct the evidence-confirmed interface mismatch.",
+		Evidence:      []kernel.EvidenceRef{{EvidenceID: testUUID(785), SHA256: testDigest('e')}},
 	}
 }
 

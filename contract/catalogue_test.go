@@ -45,7 +45,7 @@ func loadCatalogue(t *testing.T) *contract.Catalogue {
 		t.Fatal("locate catalogue test")
 	}
 	repositoryRoot := filepath.Clean(filepath.Join(filepath.Dir(file), ".."))
-	catalogue, err := contract.Load(os.DirFS(repositoryRoot), "CONTRACTS/tekroo.kernel.contracts/0.10.0")
+	catalogue, err := contract.Load(os.DirFS(repositoryRoot), "CONTRACTS/tekroo.kernel.contracts/0.11.0")
 	if err != nil {
 		t.Fatal(err)
 	}

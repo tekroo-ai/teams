@@ -115,7 +115,7 @@ func TestNewProductionServiceRejectsMissingOperationalQualificationBeforeSideEff
 		t.Fatal(err)
 	}
 
-	if _, err := NewProductionService(context.Background(), loaded); !errors.Is(err, ErrInvalidProductionConfiguration) || !strings.Contains(err.Error(), "no implementation role") {
+	if _, err := NewProductionService(context.Background(), loaded); !errors.Is(err, ErrInvalidProductionConfiguration) || !strings.Contains(err.Error(), "no execution profile") {
 		t.Fatalf("unqualified service start error = %v", err)
 	}
 	if _, err := os.Stat(loaded.EvidenceRoot); !errors.Is(err, os.ErrNotExist) {
@@ -123,7 +123,7 @@ func TestNewProductionServiceRejectsMissingOperationalQualificationBeforeSideEff
 	}
 }
 
-func TestValidateOperationalProfileQualificationsRequiresFixedStagesAndOneImplementer(t *testing.T) {
+func TestValidateOperationalProfileQualificationsDoesNotAssumeSoftwareRoles(t *testing.T) {
 	at := time.Date(2026, 9, 3, 12, 0, 0, 0, time.UTC)
 	qualified := func(role kernel.RoleFQRN, kinds ...kernel.WorkKind) ProductionProfile {
 		profile := ProductionProfile{
@@ -144,12 +144,39 @@ func TestValidateOperationalProfileQualificationsRequiresFixedStagesAndOneImplem
 		{RoleFQRN: "security", DecisionRoute: kernel.RouteComplexReasoning},
 	}
 	if err := ValidateOperationalProfileQualifications(profiles, at); err != nil {
-		t.Fatalf("mandatory workflow profiles rejected: %v", err)
+		t.Fatalf("qualified profiles rejected: %v", err)
 	}
 	profiles[3].Qualification = nil
 	profiles[3].QualificationCorpus = nil
-	if err := ValidateOperationalProfileQualifications(profiles, at); !errors.Is(err, ErrInvalidProductionConfiguration) || !strings.Contains(err.Error(), "no implementation role") {
-		t.Fatalf("missing implementation qualification error = %v", err)
+	if err := ValidateOperationalProfileQualifications(profiles, at); err != nil {
+		t.Fatalf("non-software qualified profiles were rejected after removing coder qualification: %v", err)
+	}
+	for index := range profiles {
+		profiles[index].Qualification = nil
+		profiles[index].QualificationCorpus = nil
+	}
+	if err := ValidateOperationalProfileQualifications(profiles, at); !errors.Is(err, ErrInvalidProductionConfiguration) || !strings.Contains(err.Error(), "no execution profile") {
+		t.Fatalf("missing all execution qualifications error = %v", err)
+	}
+}
+
+func TestWorkflowTaskRoutingDerivesRolesFromQualifications(t *testing.T) {
+	at := time.Date(2026, 9, 3, 12, 0, 0, 0, time.UTC)
+	qualified := func(role kernel.RoleFQRN, route kernel.DecisionRoute, marker byte) ProductionProfile {
+		profile := ProductionProfile{ModelProfileDigest: repeatedDigest(marker), RoleFQRN: role, DecisionRoute: route, ToolPolicyDigest: repeatedDigest(marker + 1)}
+		profile.QualificationCorpus, profile.Qualification = testQualificationBundle(t, profile.ModelProfileDigest, role, route, profile.ToolPolicyDigest, []kernel.WorkKind{kernel.WorkImplementation}, at.Add(-time.Minute))
+		return profile
+	}
+	routine := qualified("draft-writer", kernel.RouteBoundedExecution, '1')
+	complex := qualified("investigative-writer", kernel.RouteComplexReasoning, '3')
+	service := &ProductionService{profilesByModel: map[kernel.Digest]ProductionProfile{routine.ModelProfileDigest: routine, complex.ModelProfileDigest: complex}}
+	policy, err := service.workflowTaskRoutingPolicy(at)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bands := policy.PurposeRoutes[0].PlanComplexityRoleBands
+	if len(bands) != 2 || bands[0].Role != "draft-writer" || bands[0].MinimumPlanComplexity != 1 || bands[1].Role != "investigative-writer" || bands[1].MinimumPlanComplexity != 5 {
+		t.Fatalf("derived routing bands = %#v", bands)
 	}
 }
 
@@ -249,6 +276,35 @@ func TestLoadProductionConfigResolvesAndValidatesExactLocalBindings(t *testing.T
 	}
 	if observed.Mongo.Database != expected.Mongo.Database || observed.TeamsDatabaseIdentity != expected.TeamsDatabaseIdentity || observed.SMADatabaseIdentity != expected.SMADatabaseIdentity || len(observed.Workspaces) != 1 || !filepath.IsAbs(observed.Workspaces[0].WorkingDirectory) || !filepath.IsAbs(observed.OpenHands.SessionAPIKeyFile) || !filepath.IsAbs(observed.Organization.ManifestFile) || !filepath.IsAbs(observed.Organization.Publishers[0].PublicKeyFile) {
 		t.Fatalf("resolved config = %#v", observed)
+	}
+}
+
+func TestLoadProductionConfigLoadsVersionedWorkflowDefinitions(t *testing.T) {
+	path, config := writeProductionFixture(t)
+	definition := kernel.WorkflowDefinition{
+		SchemaVersion: kernel.WorkflowDefinitionSchemaVersion, Name: "publication", Version: "1.0.0", TriggerTypes: []string{"publication.requested"},
+		Stages:      []kernel.WorkflowStageDefinition{{StageID: "publish", DependsOn: []string{}, InputSchema: "request/v1", OutputSchema: "publication/v1", RequiredCapabilities: []string{"publish"}, PreferredFQRNs: []kernel.RoleFQRN{}, Purpose: kernel.WorkflowPurposeImplementation, Risk: kernel.WorkflowRiskLow, ConcurrencyGroup: "publication", MaximumParallelism: 1, AttemptLimit: 1, AllowedOutgoingPurposes: []string{}, TargetSelection: kernel.WorkflowTargetCapability, ValidationPolicy: kernel.WorkflowValidationDeterministic}},
+		RootBudgets: kernel.WorkflowBudgetLimits{MaximumModelInvocations: 1, MaximumHops: 2, MaximumAttempts: 1}, ProjectionRules: []string{},
+	}
+	digest, err := definition.CalculatedDigest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	definition.ContentDigest = digest
+	definitionPath := filepath.Join(filepath.Dir(path), "publication.workflow.json")
+	writeJSON(t, definitionPath, definition, 0o600)
+	config.Organization.WorkflowDefinitions = []ProductionWorkflowSource{{DefinitionFile: "publication.workflow.json", DefinitionDigest: digest}}
+	writeJSON(t, path, config, 0o600)
+	loaded, err := LoadProductionConfig(path)
+	if err != nil || !filepath.IsAbs(loaded.Organization.WorkflowDefinitions[0].DefinitionFile) {
+		t.Fatalf("workflow config=%+v err=%v", loaded.Organization.WorkflowDefinitions, err)
+	}
+	resolved, err := resolveProductionConfig(loaded)
+	if err != nil || resolved.workflowLibrary == nil {
+		t.Fatalf("workflow library missing: %v", err)
+	}
+	if _, err := resolved.workflowLibrary.Lookup("publication", "1.0.0"); err != nil {
+		t.Fatalf("workflow lookup: %v", err)
 	}
 }
 

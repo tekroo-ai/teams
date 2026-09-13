@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -81,6 +82,17 @@ func TestTaskWorkspacesIsolateBranchesAndAssembleTheDAGDeterministically(t *test
 	if second.WorkingDirectory != assembly.WorkingDirectory || secondReceipt.PreparedCommit != receipt.PreparedCommit || secondReceipt.PreparedTree != receipt.PreparedTree {
 		t.Fatalf("assembly was not deterministic: first=%#v second=%#v", receipt, secondReceipt)
 	}
+	commitTaskFile(t, rightWorkspace.WorkingDirectory, "right-successor.txt", "right successor\n", "advance right task")
+	successor, successorReceipt, err := manager.PrepareAssembly(context.Background(), feature, "tester-1", root, components)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if successor.WorkingDirectory == assembly.WorkingDirectory || successorReceipt.WorkID == receipt.WorkID || successorReceipt.PreparedCommit == receipt.PreparedCommit {
+		t.Fatalf("advanced component reused immutable assembly: first=%#v successor=%#v", receipt, successorReceipt)
+	}
+	if _, err := os.Stat(filepath.Join(successor.WorkingDirectory, "right-successor.txt")); err != nil {
+		t.Fatalf("successor assembly omitted advanced component: %v", err)
+	}
 	if err := os.WriteFile(filepath.Join(leftWorkspace.WorkingDirectory, "in-progress.txt"), []byte("resume me\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -128,6 +140,27 @@ func TestTaskWorkspaceAssemblyStopsOnSiblingMergeConflict(t *testing.T) {
 	}
 	if _, _, err := manager.PrepareAssembly(context.Background(), feature, "tester-1", root, components); !errors.Is(err, errTaskWorkspaceMergeConflict) {
 		t.Fatalf("conflicting sibling branches returned %v", err)
+	}
+}
+
+func TestPersistedTaskWorkspaceOwnerDoesNotDependOnActorLiveness(t *testing.T) {
+	task := organization.PlannedTask{ID: candidateTestUUID(1021), Owner: kernel.ActorFQN("teams::coder-1")}
+	scope := kernel.TaskOperationalScope{
+		TaskID: task.ID, TaskRevision: 2, LifecycleEpoch: 1, ScopeRevision: 1,
+		OwnerFQN: task.Owner, Execution: kernel.ExecutionTuple{ExecutionID: candidateTestUUID(1022), FencingEpoch: 1},
+		WorkspaceID: "coder-1", WorktreeID: "task-" + string(task.ID), Branch: "tekroo/task/example",
+		BaselineSHA: strings.Repeat("a", 40), WritablePaths: []string{"."}, BoundEventID: candidateTestUUID(1023),
+	}
+	snapshot := kernel.Snapshot{TaskOperationalScopes: map[kernel.AggregateRef]kernel.TaskOperationalScope{{Kind: kernel.AggregateTask, ID: task.ID}: scope}}
+	owner, err := persistedTaskWorkspaceOwner(task, snapshot)
+	if err != nil || owner.ActorFQN != task.Owner || owner.WorkspaceID != scope.WorkspaceID {
+		t.Fatalf("persisted owner=%#v err=%v", owner, err)
+	}
+
+	scope.OwnerFQN = kernel.ActorFQN("teams::coder-2")
+	snapshot.TaskOperationalScopes[kernel.AggregateRef{Kind: kernel.AggregateTask, ID: task.ID}] = scope
+	if _, err := persistedTaskWorkspaceOwner(task, snapshot); !errors.Is(err, errInvalidTaskWorkspace) {
+		t.Fatalf("mismatched persisted owner returned %v", err)
 	}
 }
 

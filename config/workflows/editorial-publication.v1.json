@@ -1,0 +1,70 @@
+{
+  "schema_version": "1.0.0",
+  "name": "editorial-publication",
+  "version": "1.0.0",
+  "content_digest": "00e125b5b442f54ac1525f627ae5dab6ef63ea5fc1af2183a473239578d625b6",
+  "trigger_types": [
+    "tekroo.message.content.requested"
+  ],
+  "stages": [
+    {
+      "stage_id": "draft",
+      "depends_on": [],
+      "input_schema": "tekroo.content-brief/1.0.0",
+      "output_schema": "tekroo.content-draft/1.0.0",
+      "required_capabilities": [
+        "content-planning"
+      ],
+      "preferred_fqrns": [
+        "editor"
+      ],
+      "purpose": "IMPLEMENTATION",
+      "risk": "LOW",
+      "concurrency_group": "editorial",
+      "maximum_parallelism": 2,
+      "attempt_limit": 2,
+      "allowed_outgoing_purposes": [
+        "HANDOFF"
+      ],
+      "target_selection": "CAPABILITY",
+      "validation_policy": "DETERMINISTIC_ONLY",
+      "completion_condition": "Produce a draft matching tekroo.content-draft/1.0.0 and preserve every requirement in the authoritative brief."
+    },
+    {
+      "stage_id": "edit",
+      "depends_on": [
+        "draft"
+      ],
+      "input_schema": "tekroo.content-draft/1.0.0",
+      "output_schema": "tekroo.content-final/1.0.0",
+      "required_capabilities": [
+        "content-editing"
+      ],
+      "preferred_fqrns": [
+        "editor"
+      ],
+      "purpose": "REVIEW",
+      "risk": "LOW",
+      "concurrency_group": "editorial",
+      "maximum_parallelism": 2,
+      "attempt_limit": 1,
+      "allowed_outgoing_purposes": [
+        "NOTIFICATION"
+      ],
+      "target_selection": "CAPABILITY",
+      "validation_policy": "DETERMINISTIC_ONLY",
+      "completion_condition": "Produce the final content matching tekroo.content-final/1.0.0 using the draft and retained evidence."
+    }
+  ],
+  "root_budgets": {
+    "maximum_model_invocations": 3,
+    "maximum_hops": 4,
+    "maximum_attempts": 3,
+    "maximum_tokens": 64000,
+    "maximum_elapsed_seconds": 3600
+  },
+  "projection_rules": [
+    "MESSAGE",
+    "STATUS"
+  ]
+}

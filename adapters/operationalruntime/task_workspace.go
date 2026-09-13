@@ -88,35 +88,39 @@ func (manager *taskWorkspaceManager) PrepareTask(ctx context.Context, feature or
 	if !task.ID.Valid() {
 		return ProductionWorkspace{}, taskWorkspaceReceipt{}, errInvalidTaskWorkspace
 	}
-	return manager.prepare(ctx, taskWorkspaceEditable, feature, task.ID, ownerWorkspaceID, root, dependencies)
+	observed, err := manager.observeComponents(ctx, root.BaselineSHA, dependencies)
+	if err != nil {
+		return ProductionWorkspace{}, taskWorkspaceReceipt{}, err
+	}
+	return manager.prepareObserved(ctx, taskWorkspaceEditable, feature, task.ID, ownerWorkspaceID, root, observed)
 }
 
 func (manager *taskWorkspaceManager) PrepareAssembly(ctx context.Context, feature organization.FeatureRequest, workspaceID string, root ProductionWorkspace, components []taskWorkspaceComponent) (ProductionWorkspace, taskWorkspaceReceipt, error) {
 	if len(components) == 0 {
 		return ProductionWorkspace{}, taskWorkspaceReceipt{}, errInvalidTaskWorkspace
 	}
+	observed, err := manager.observeComponents(ctx, root.BaselineSHA, components)
+	if err != nil {
+		return ProductionWorkspace{}, taskWorkspaceReceipt{}, err
+	}
 	seed, err := json.Marshal(struct {
 		FeatureID  kernel.UUIDv7            `json:"feature_id"`
 		Baseline   string                   `json:"baseline"`
 		Components []taskWorkspaceComponent `json:"components"`
-	}{feature.ID, root.BaselineSHA, components})
+	}{feature.ID, root.BaselineSHA, observed})
 	if err != nil {
 		return ProductionWorkspace{}, taskWorkspaceReceipt{}, err
 	}
 	workID := deterministicOperationalUUID("feature-candidate-assembly", string(feature.ID), string(digestBytes(seed)))
-	return manager.prepare(ctx, taskWorkspaceAssembly, feature, workID, workspaceID, root, components)
+	return manager.prepareObserved(ctx, taskWorkspaceAssembly, feature, workID, workspaceID, root, observed)
 }
 
-func (manager *taskWorkspaceManager) prepare(ctx context.Context, kind taskWorkspaceKind, feature organization.FeatureRequest, workID kernel.UUIDv7, workspaceID string, root ProductionWorkspace, components []taskWorkspaceComponent) (ProductionWorkspace, taskWorkspaceReceipt, error) {
+func (manager *taskWorkspaceManager) prepareObserved(ctx context.Context, kind taskWorkspaceKind, feature organization.FeatureRequest, workID kernel.UUIDv7, workspaceID string, root ProductionWorkspace, observed []taskWorkspaceComponent) (ProductionWorkspace, taskWorkspaceReceipt, error) {
 	if manager == nil || !feature.ID.Valid() || !workID.Valid() || workspaceID == "" || !validTaskWorkspaceRoot(root) || kind != taskWorkspaceEditable && kind != taskWorkspaceAssembly {
 		return ProductionWorkspace{}, taskWorkspaceReceipt{}, errInvalidTaskWorkspace
 	}
-	if kind == taskWorkspaceAssembly && len(components) == 0 {
+	if kind == taskWorkspaceAssembly && len(observed) == 0 {
 		return ProductionWorkspace{}, taskWorkspaceReceipt{}, errInvalidTaskWorkspace
-	}
-	observed, err := manager.observeComponents(ctx, root.BaselineSHA, components)
-	if err != nil {
-		return ProductionWorkspace{}, taskWorkspaceReceipt{}, err
 	}
 	worktreeID := "task-" + string(workID)
 	branchPrefix := "task"
@@ -476,15 +480,27 @@ func (service *ProductionService) prepareImplementationWorkspace(ctx context.Con
 }
 
 func (service *ProductionService) plannedTaskWorkspace(ctx context.Context, task organization.PlannedTask) (ProductionWorkspace, error) {
-	owner, active, err := service.RoleHost.Status(ctx, task.Owner)
-	if err != nil || !active {
-		return ProductionWorkspace{}, errors.Join(errInvalidTaskWorkspace, err)
-	}
 	snapshot, err := service.Store.LoadDecision(ctx, kernel.KernelCommand{Target: kernel.AggregateRef{Kind: kernel.AggregateTask, ID: task.ID}})
 	if err != nil {
 		return ProductionWorkspace{}, err
 	}
+	owner, err := persistedTaskWorkspaceOwner(task, snapshot)
+	if err != nil {
+		return ProductionWorkspace{}, err
+	}
 	return service.workspaceForExistingTask(ctx, task, owner, snapshot)
+}
+
+// persistedTaskWorkspaceOwner reconstructs the stable workspace identity from
+// the task's durable operational scope. Completed task output remains usable by
+// downstream DAG nodes after its actor stops or the daemon restarts; process
+// liveness is not part of the Git-workspace identity.
+func persistedTaskWorkspaceOwner(task organization.PlannedTask, snapshot kernel.Snapshot) (organization.RoleInstanceState, error) {
+	scope, found := snapshot.TaskOperationalScopes[kernel.AggregateRef{Kind: kernel.AggregateTask, ID: task.ID}]
+	if !found || !scope.Valid() || scope.TaskID != task.ID || scope.OwnerFQN != task.Owner {
+		return organization.RoleInstanceState{}, errInvalidTaskWorkspace
+	}
+	return organization.RoleInstanceState{ActorFQN: scope.OwnerFQN, WorkspaceID: scope.WorkspaceID}, nil
 }
 
 func (service *ProductionService) prepareAssembledCandidateSource(ctx context.Context, feature organization.FeatureRequest, plan organization.FeaturePlan, targetIDs []kernel.UUIDv7) (ProductionWorkspace, kernel.EvidenceRef, error) {
@@ -506,12 +522,8 @@ func (service *ProductionService) prepareAssembledCandidateSource(ctx context.Co
 			return ProductionWorkspace{}, kernel.EvidenceRef{}, err
 		}
 		if root.WorkspaceID == "" {
-			owner, active, err := service.RoleHost.Status(ctx, target.Owner)
-			if err != nil || !active {
-				return ProductionWorkspace{}, kernel.EvidenceRef{}, errors.Join(errInvalidTaskWorkspace, err)
-			}
 			var found bool
-			root, found = service.workspacesByID[owner.WorkspaceID]
+			root, found = service.workspacesByID[workspace.WorkspaceID]
 			if !found {
 				return ProductionWorkspace{}, kernel.EvidenceRef{}, errInvalidTaskWorkspace
 			}

@@ -39,6 +39,7 @@ type Organization interface {
 	DeadLetters(context.Context, kernel.ActorFQN, int64) ([]organization.MessageClaim, error)
 	SubmitFeature(context.Context, kernel.PrincipalRef, organization.FeatureRequestInput) (organization.FeatureRequest, bool, error)
 	ReadFeature(context.Context, kernel.UUIDv7) (organization.FeatureRequest, bool, error)
+	ReadFeatureWorkflowTiming(context.Context, kernel.UUIDv7) (operationalruntime.FeatureWorkflowTiming, error)
 	ApplyFeaturePlan(context.Context, kernel.UUIDv7, uint64, organization.FeaturePlan) (organization.FeatureRequest, error)
 	AcceptFeature(context.Context, kernel.UUIDv7, uint64, kernel.PrincipalRef, string) (organization.FeatureRequest, error)
 	AcceptFeatureWithRelease(context.Context, kernel.UUIDv7, kernel.PrincipalRef, organization.FeatureAcceptanceInput) (organization.FeatureRequest, error)
@@ -237,6 +238,14 @@ func (service *Service) CallTool(ctx context.Context, identity protocol.Authenti
 			return nil, ErrNotFound
 		}
 		return feature, nil
+	case mcp.FeatureTimingToolName:
+		var input struct {
+			ID kernel.UUIDv7 `json:"feature_id"`
+		}
+		if err := decodeStrict(arguments, &input); err != nil || !input.ID.Valid() {
+			return nil, ErrInvalidArguments
+		}
+		return service.organization.ReadFeatureWorkflowTiming(ctx, input.ID)
 	case mcp.FeaturePlanToolName:
 		var input struct {
 			ID               kernel.UUIDv7            `json:"feature_id"`

@@ -14,7 +14,7 @@ import (
 	"github.com/tekroo-ai/teams/kernel"
 )
 
-const contractRoot = "CONTRACTS/tekroo.kernel.contracts/0.10.0"
+const contractRoot = "CONTRACTS/tekroo.kernel.contracts/0.11.0"
 
 type fixtureDocument struct {
 	Fixtures []fixture `json:"fixtures"`
@@ -43,8 +43,8 @@ func TestFrozenContractCorpus(t *testing.T) {
 		loadFixtures(t, filepath.Join(repositoryRoot, contractRoot, "fixtures/catalogue-coverage.json")),
 		loadFixtures(t, filepath.Join(repositoryRoot, contractRoot, "fixtures/model-and-invariant-scenarios.json"))...,
 	)
-	if len(fixtures) != 297 {
-		t.Fatalf("fixture count = %d, want 297", len(fixtures))
+	if len(fixtures) != 305 {
+		t.Fatalf("fixture count = %d, want 305", len(fixtures))
 	}
 
 	for _, item := range fixtures {

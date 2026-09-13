@@ -23,6 +23,8 @@ type taskValidatorResult struct {
 const (
 	invalidStructuredOutputReason = "task returned an invalid structured result; a changed-condition recovery is required"
 	invalidStructuredReviewPolicy = "operator-or-product-owner-must-amend-scope-or-cancel"
+	validationTimeCeilingReason   = "validation wall time reached the design-plus-implementation hard ceiling; a changed condition or explicit escalation is required"
+	maximumWorkBlockReasonRunes   = 4096
 )
 
 func (service *ProductionService) reconcileTaskCompletions(ctx context.Context, feature organization.FeatureRequest, plan organization.FeaturePlan, states map[kernel.UUIDv7]kernel.AggregateState, heads map[kernel.UUIDv7]kernel.UUIDv7, invocations map[kernel.UUIDv7]kernel.WorkInvocation, snapshot kernel.Snapshot) (bool, error) {
@@ -31,6 +33,36 @@ func (service *ProductionService) reconcileTaskCompletions(ctx context.Context, 
 		return promotionChanged, err
 	}
 	featureValidatorID, _ := wholeFeatureValidationTaskID(plan)
+	independentlyValidated := make(map[kernel.UUIDv7]struct{})
+	for _, task := range plan.Tasks {
+		if task.ID == featureValidatorID {
+			continue
+		}
+		for _, targetID := range task.Validates {
+			independentlyValidated[targetID] = struct{}{}
+		}
+	}
+	// Low- and moderate-risk implementation nodes do not receive a redundant
+	// task-local model review. Their retained execution evidence closes the task
+	// deterministically; the joined whole-feature validator still evaluates the
+	// composed candidate and all authoritative acceptance criteria.
+	for _, task := range plan.Tasks {
+		if task.Purpose != kernel.PurposeImplementation {
+			continue
+		}
+		if _, covered := independentlyValidated[task.ID]; covered {
+			continue
+		}
+		state := states[task.ID]
+		invocation, found := invocations[task.ID]
+		if state.Phase != kernel.PhaseActive || state.Condition != kernel.ConditionRunnable || !found || invocation.State != kernel.InvocationSucceeded || invocation.OutputDigest == nil || invocation.Purpose != kernel.PurposeImplementation && invocation.Purpose != kernel.PurposeRepair {
+			continue
+		}
+		if err := service.completeEvidenceTask(ctx, feature, task, state, heads[task.ID], invocation, snapshot); err != nil {
+			return false, fmt.Errorf("complete implementation task %s from retained execution evidence: %w", task.ID, err)
+		}
+		return true, nil
+	}
 	validatorsByTarget := make(map[kernel.UUIDv7][]taskValidatorResult)
 	for _, task := range plan.Tasks {
 		// Whole-feature validation consumes the assembled candidate and is a
@@ -287,6 +319,9 @@ func (service *ProductionService) handleInvalidStructuredTaskOutput(ctx context.
 		return false, organization.ErrInvalidFeature
 	}
 	_ = conditionDigests
+	if featureValidationAtCeiling(feature, snapshot, service.clock.Now().UTC()) {
+		return service.blockStructuredDecisionTask(ctx, feature, task, state, invocation, snapshot, validationTimeCeilingReason, "validation-time-ceiling")
+	}
 	retried, err := service.authorizeStructuredOutputGlitchRetry(ctx, feature, task, state, head, invocation, snapshot)
 	if err != nil {
 		return false, err
@@ -374,15 +409,38 @@ func (service *ProductionService) blockStructuredDecisionTask(ctx context.Contex
 	if err != nil {
 		return false, err
 	}
+	reason = boundedWorkBlockReason(reason, invocation.ID)
 	payload, err := json.Marshal(map[string]any{"blocker_refs": []string{"teams://work-invocation/" + string(invocation.ID)}, "reason": reason, "review_policy": invalidStructuredReviewPolicy})
 	if err != nil {
 		return false, err
 	}
-	_, err = service.submitDeterministicActorTargetCommand(ctx, feature, "tekroo.command.work.block", kernel.AggregateTask, task.ID, service.policyAuthority, invocation.ActorFQN, invocation.Execution, state.Revision, state.LifecycleEpoch, payload, []kernel.DagParent{{ParentEventID: invocation.LastEventID, EdgeKind: kernel.EdgeResponse}}, evidence, key+"-"+string(task.ID)+"-"+string(*invocation.OutputDigest))
+	// Include the admitted payload in the deterministic identity. A prior binary
+	// may have durably rejected a malformed version of this logical command; the
+	// corrected payload must not collide with that rejected command, while exact
+	// retries of either version remain idempotent.
+	commandKey := key + "-" + string(task.ID) + "-" + string(*invocation.OutputDigest) + "-" + string(digestBytes(payload))
+	_, err = service.submitDeterministicActorTargetCommand(ctx, feature, "tekroo.command.work.block", kernel.AggregateTask, task.ID, service.policyAuthority, invocation.ActorFQN, invocation.Execution, state.Revision, state.LifecycleEpoch, payload, []kernel.DagParent{{ParentEventID: invocation.LastEventID, EdgeKind: kernel.EdgeResponse}}, evidence, commandKey)
 	return err == nil, err
 }
 
+func boundedWorkBlockReason(reason string, invocationID kernel.UUIDv7) string {
+	runes := []rune(reason)
+	if len(runes) <= maximumWorkBlockReasonRunes {
+		return reason
+	}
+	suffix := []rune("… full result: teams://work-invocation/" + string(invocationID))
+	return string(runes[:maximumWorkBlockReasonRunes-len(suffix)]) + string(suffix)
+}
+
 func isExactInvalidStructuredOutputBlock(event kernel.DomainEvent, task organization.PlannedTask, invocation kernel.WorkInvocation, authority kernel.PrincipalRef) bool {
+	if !isExactRecoverableStructuredDecisionBlock(event, task, invocation, authority) {
+		return false
+	}
+	var payload planningOutputBlockPayload
+	return json.Unmarshal(event.Payload, &payload) == nil && payload.Reason == invalidStructuredOutputReason
+}
+
+func isExactRecoverableStructuredDecisionBlock(event kernel.DomainEvent, task organization.PlannedTask, invocation kernel.WorkInvocation, authority kernel.PrincipalRef) bool {
 	if event.EventID == "" || event.EventType != "tekroo.event.work.blocked" || event.Aggregate != (kernel.AggregateRef{Kind: kernel.AggregateTask, ID: task.ID}) || event.Authority != authority || event.ActorFQN == nil || *event.ActorFQN != invocation.ActorFQN || event.Execution == nil || *event.Execution != invocation.Execution || len(event.Parents) != 1 || event.Parents[0] != (kernel.DagParent{ParentEventID: invocation.LastEventID, EdgeKind: kernel.EdgeResponse}) {
 		return false
 	}
@@ -390,7 +448,8 @@ func isExactInvalidStructuredOutputBlock(event kernel.DomainEvent, task organiza
 	if json.Unmarshal(event.Payload, &payload) != nil {
 		return false
 	}
-	return len(payload.BlockerRefs) == 1 && payload.BlockerRefs[0] == "teams://work-invocation/"+string(invocation.ID) && payload.Reason == invalidStructuredOutputReason && payload.ReviewPolicy == invalidStructuredReviewPolicy
+	recoverableReason := payload.Reason == invalidStructuredOutputReason || strings.HasPrefix(payload.Reason, "whole-feature validation did not pass:")
+	return len(payload.BlockerRefs) == 1 && payload.BlockerRefs[0] == "teams://work-invocation/"+string(invocation.ID) && recoverableReason && payload.ReviewPolicy == invalidStructuredReviewPolicy
 }
 
 func validatorConditionMatches(snapshot kernel.Snapshot, taskID kernel.UUIDv7, invocation kernel.WorkInvocation, profileDigest, criteriaDigest kernel.Digest, baseConditions []kernel.Digest, baseDigest kernel.Digest) bool {

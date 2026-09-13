@@ -650,10 +650,10 @@ func (client *Client) createOrForkConversation(ctx context.Context, brief applic
 	// checkpoint lineage in the immutable execution brief. Start it cleanly so
 	// a failed agent loop is not copied into the successor model context.
 	// Automatic retries still fork for ordinary conversational continuity.
-	if explicitRecoveryProfile(brief) && !prepared.recoveryCheckpointPresent {
+	if explicitRecoveryProfile(brief) && brief.RetryOfConversationID != nil && !prepared.recoveryCheckpointPresent {
 		return 0, nil, false, ErrProtocol
 	}
-	if brief.RetryOfInvocationID == nil || explicitRecoveryProfile(brief) || prepared.workspace.Candidate != nil {
+	if brief.RetryOfInvocationID == nil || brief.RetryOfConversationID == nil || explicitRecoveryProfile(brief) || prepared.workspace.Candidate != nil {
 		status, body, err := client.createConversation(ctx, brief, prepared)
 		return status, body, false, err
 	}
@@ -858,13 +858,13 @@ const checkpointCompletionCorrectionPrefix = "TEKROO_CHECKPOINT_COMPLETION_CORRE
 const deterministicValidationCorrectionPrefix = "TEKROO_DETERMINISTIC_VALIDATION_CORRECTION:"
 const compactionCheckpointPrefix = "TEKROO_PROGRESS_CHECKPOINT:"
 const maximumEquivalentSuccessfulValidations = 2
+const maximumCheckpointCompletionReads = 8
 
 // checkpointCompletionRepositoryViolation detects engineering work resuming
-// after a progress checkpoint declared the finish step. Only repository
-// *mutations* count: reading a file to compose the completion result is the
-// last mile of an honest verdict, and the purpose tool policy already governs
-// what a role may touch. A post-announcement mutation is what actually
-// falsifies the declaration that the repository phase is complete.
+// after a progress checkpoint declared the finish step. A bounded number of
+// reads remains available to recover exact details lost at compaction, but it
+// must not permit an agent to reconstruct the same evidence indefinitely.
+// Mutations remain immediate violations.
 func checkpointCompletionRepositoryViolation(events []rawEvent, promptIndex int) (rawEvent, bool, bool) {
 	checkpointIndex := -1
 	for index, event := range events {
@@ -889,18 +889,25 @@ func checkpointCompletionRepositoryViolation(events []rawEvent, promptIndex int)
 	if correctionIndex >= 0 {
 		for index := correctionIndex + 1; index < len(events); index++ {
 			event := events[index]
-			if event.Kind == "ActionEvent" && event.Source == "agent" && mutationAction(event) {
+			if event.Kind == "ActionEvent" && event.Source == "agent" && repositoryAction(event) {
 				return event, true, true
 			}
 		}
 		return rawEvent{}, false, false
 	}
+	reads := 0
 	for index := checkpointIndex + 1; index < len(events); index++ {
 		event := events[index]
-		if event.Kind != "ActionEvent" || event.Source != "agent" || !mutationAction(event) {
+		if event.Kind != "ActionEvent" || event.Source != "agent" || !repositoryAction(event) {
 			continue
 		}
-		return event, false, true
+		if mutationAction(event) {
+			return event, false, true
+		}
+		reads++
+		if reads > maximumCheckpointCompletionReads {
+			return event, false, true
+		}
 	}
 	return rawEvent{}, false, false
 }
@@ -1219,6 +1226,13 @@ func repositoryGroundingViolation(events []rawEvent, promptIndex int, retainedGr
 				pending = append(pending, pendingRead{toolName: event.ToolName, toolCallID: event.ToolCallID})
 				continue
 			}
+			// Agents may establish where they are and whether the workspace is
+			// clean before reading repository instructions. These actions expose
+			// no source or design content and do not mutate repository state, so
+			// treating them as substantive work creates false grounding failures.
+			if workspaceOrientationAction(event) {
+				continue
+			}
 			if grounded {
 				continue
 			}
@@ -1308,6 +1322,27 @@ func agentsInstructionReadAction(event rawEvent) bool {
 		target = event.ActionCommand
 	}
 	return strings.Contains(strings.ToLower(target), "agents.md")
+}
+
+func workspaceOrientationAction(event rawEvent) bool {
+	if event.Kind != "ActionEvent" || event.Source != "agent" || event.ToolName != "terminal" {
+		return false
+	}
+	command := strings.TrimSpace(event.ActionCommand)
+	if command == "" || violatesShellDiscipline(command) {
+		return false
+	}
+	fields := strings.Fields(command)
+	if len(fields) == 1 && fields[0] == "pwd" {
+		return true
+	}
+	if len(fields) >= 1 && fields[0] == "ls" {
+		return true
+	}
+	if len(fields) >= 2 && fields[0] == "git" && fields[1] == "status" {
+		return true
+	}
+	return len(fields) >= 3 && fields[0] == "git" && fields[1] == "rev-parse" && slices.Contains(fields[2:], "--show-toplevel")
 }
 
 func violatesShellDiscipline(command string) bool {
@@ -2046,7 +2081,7 @@ func (client *Client) correctCheckpointCompletionViolation(ctx context.Context, 
 			return client.observation(ctx, brief, requestDigest, info, events, false)
 		}
 	}
-	correction := checkpointCompletionCorrectionPrefix + violation.ID + "\nThe retained progress checkpoint has completed the repository-evidence phase and its next_action is now authoritative. Do not modify the repository further. You may read files to verify details for your result, then call the finish tool exactly once with the result required by result_protocol."
+	correction := checkpointCompletionCorrectionPrefix + violation.ID + "\nThe retained progress checkpoint has completed the repository-evidence phase and the bounded last-mile read allowance is exhausted. Do not read or modify the repository further. Evaluate the retained evidence and call the finish tool exactly once with the result required by result_protocol."
 	status, _, err := client.request(ctx, http.MethodPost, "/api/conversations/"+url.PathEscape(conversationID)+"/events", map[string]any{
 		"role": "user", "run": true,
 		"content": []map[string]any{{"type": "text", "text": correction}},
@@ -2720,7 +2755,7 @@ func (client *Client) prepare(ctx context.Context, brief application.ExecutionBr
 		return preparedExecution{}, err
 	}
 	digest := sha256.Sum256(encoded)
-	invalidRetry := brief.RetryOfInvocationID == nil && brief.RetryOrdinal != 0 || brief.RetryOfInvocationID != nil && (!brief.RetryOfInvocationID.Valid() || *brief.RetryOfInvocationID == brief.InvocationID || brief.RetryOrdinal == 0)
+	invalidRetry := brief.RetryOfInvocationID == nil && (brief.RetryOrdinal != 0 || brief.RetryOfConversationID != nil) || brief.RetryOfInvocationID != nil && (!brief.RetryOfInvocationID.Valid() || *brief.RetryOfInvocationID == brief.InvocationID || brief.RetryOrdinal == 0 || brief.RetryOfConversationID != nil && *brief.RetryOfConversationID != string(*brief.RetryOfInvocationID))
 	if kernel.Digest(hex.EncodeToString(digest[:])) != requestDigest || brief.ContractManifest != kernel.ContractIdentity || brief.CoordinationRule == "" || !brief.RoleGrounding.Valid(brief.ActorFQN) || invalidRetry {
 		return preparedExecution{}, ErrProtocol
 	}
@@ -2735,7 +2770,7 @@ func (client *Client) prepare(ctx context.Context, brief application.ExecutionBr
 		if json.Unmarshal(encoded, &envelope) != nil {
 			return preparedExecution{}, ErrProtocol
 		}
-		if explicitRecoveryProfile(brief) {
+		if explicitRecoveryProfile(brief) && brief.RetryOfConversationID != nil {
 			checkpoint, checkpointErr := client.recoveryCheckpoint(ctx, brief, workspace)
 			if checkpointErr != nil && !errors.Is(checkpointErr, errRecoveryCheckpointUnavailable) {
 				return preparedExecution{}, errors.Join(ErrProtocol, checkpointErr)

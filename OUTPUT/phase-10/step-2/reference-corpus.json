@@ -1,0 +1,4398 @@
+{
+  "cases": [
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-001-EXECUTION-REGISTER-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.execution.registered"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.execution.registered"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-001-EXECUTION-REGISTER-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-002-EXECUTION-REPLACE-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.execution.replaced"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.execution.replaced"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-002-EXECUTION-REPLACE-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-003-EVIDENCE-REGISTER-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.evidence.registered"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.evidence.registered"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-003-EVIDENCE-REGISTER-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-004-STORY-CREATE-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.story.created"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.story.created"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-004-STORY-CREATE-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-005-STORY-AUTHORIZE-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.story.authorized"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.story.authorized"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-005-STORY-AUTHORIZE-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-006-STORY-BEGIN-PLANNING-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.story.planning-started"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.story.planning-started"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-006-STORY-BEGIN-PLANNING-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-007-STORY-ACTIVATE-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.story.activated"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.story.activated"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-007-STORY-ACTIVATE-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-008-WORK-BLOCK-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.work.blocked"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.work.blocked"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-008-WORK-BLOCK-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-009-WORK-UNBLOCK-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.work.unblocked"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.work.unblocked"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-009-WORK-UNBLOCK-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-010-TASK-CREATE-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.task.created"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.task.created"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-010-TASK-CREATE-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-011-TASK-MARK-READY-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.task.readied"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.task.readied"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-011-TASK-MARK-READY-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-012-TASK-DISPATCH-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.task.dispatched"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.task.dispatched"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-012-TASK-DISPATCH-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-013-TASK-ACQUIRE-OWNERSHIP-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.task.ownership-acquired"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.task.ownership-acquired"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-013-TASK-ACQUIRE-OWNERSHIP-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-014-TASK-RELEASE-OWNERSHIP-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.task.ownership-released"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.task.ownership-released"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-014-TASK-RELEASE-OWNERSHIP-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-015-TASK-HANDOFF-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.task.handed-off"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.task.handed-off"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-015-TASK-HANDOFF-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-016-TASK-FORCE-REASSIGN-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.task.force-reassigned"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.task.force-reassigned"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-016-TASK-FORCE-REASSIGN-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-017-TASK-ACTIVATE-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.task.activated"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.task.activated"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-017-TASK-ACTIVATE-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-018-TASK-REQUEST-COMPLETION-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.task.completed"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.task.completed"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-018-TASK-REQUEST-COMPLETION-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-019-STORY-REQUEST-COMPLETION-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.story.completed"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.story.completed"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-019-STORY-REQUEST-COMPLETION-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-020-STORY-REQUEST-ACCEPTANCE-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.story.accepted"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.story.accepted"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-020-STORY-REQUEST-ACCEPTANCE-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-021-WORK-REOPEN-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.work.reopened"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.work.reopened"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-021-WORK-REOPEN-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-022-WORK-CLOSE-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.work.closed"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.work.closed"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-022-WORK-CLOSE-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-023-WORK-CREATE-SUCCESSOR-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.work.successor-created"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.work.successor-created"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-023-WORK-CREATE-SUCCESSOR-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-024-COMPLETION-REVIEW-OPEN-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.completion-review.opened"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.completion-review.opened"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-024-COMPLETION-REVIEW-OPEN-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-025-COMPLETION-REVIEW-RECORD-RESULT-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.completion-review.result-recorded"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.completion-review.result-recorded"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-025-COMPLETION-REVIEW-RECORD-RESULT-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-026-RECORD-CORRECT-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.record.corrected"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.record.corrected"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-026-RECORD-CORRECT-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-027-COMPLETION-REVIEW-FINALIZE-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.completion-review.finalized"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.completion-review.finalized"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-027-COMPLETION-REVIEW-FINALIZE-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-028-ESCALATION-OPEN-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.escalation.opened"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.escalation.opened"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-028-ESCALATION-OPEN-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-029-ESCALATION-RESOLVE-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.escalation.resolved"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.escalation.resolved"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-029-ESCALATION-RESOLVE-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-030-RELEASE-CREATE-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.release-plan.created"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.release-plan.created"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-030-RELEASE-CREATE-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-031-RELEASE-QUALIFY-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.release-plan.qualification-recorded"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.release-plan.qualification-recorded"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-031-RELEASE-QUALIFY-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-032-RELEASE-EXECUTE-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.release-plan.execution-requested"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.release-plan.execution-requested"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-032-RELEASE-EXECUTE-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-033-RELEASE-RESULT-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.release-plan.result-recorded"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.release-plan.result-recorded"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-033-RELEASE-RESULT-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-034-RELEASE-RECONCILE-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.release-plan.reconciliation-recorded"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.release-plan.reconciliation-recorded"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-034-RELEASE-RECONCILE-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-035-RELEASE-FINALIZE-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.release-plan.finalized"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.release-plan.finalized"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-035-RELEASE-FINALIZE-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-036-RELEASE-APPROVAL-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.story.release-approved"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.story.release-approved"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-036-RELEASE-APPROVAL-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-037-WORK-PROFILE-BIND-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.task.work-profile-bound"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.task.work-profile-bound"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-037-WORK-PROFILE-BIND-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-038-QUALIFIED-ASSIGNMENT-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.task.qualified-assignment-authorized"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.task.qualified-assignment-authorized"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-038-QUALIFIED-ASSIGNMENT-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-039-VARIANT-GROUP-OPEN-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.variant-group.opened"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.variant-group.opened"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-039-VARIANT-GROUP-OPEN-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-040-VARIANT-CANDIDATE-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.variant-group.candidate-submitted"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.variant-group.candidate-submitted"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-040-VARIANT-CANDIDATE-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-041-VARIANT-COMPARISON-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.variant-group.comparison-recorded"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.variant-group.comparison-recorded"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-041-VARIANT-COMPARISON-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-042-VARIANT-SELECTION-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.variant-group.selected"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.variant-group.selected"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-042-VARIANT-SELECTION-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-043-OPERATOR-ROLE-BIND-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.system.operator-role-bound"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.system.operator-role-bound"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-043-OPERATOR-ROLE-BIND-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-044-CONTINUITY-CONFIGURE-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.system.continuity-configured"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.system.continuity-configured"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-044-CONTINUITY-CONFIGURE-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-045-QUIESCENCE-REQUEST-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.system.quiescence-requested"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.system.quiescence-requested"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-045-QUIESCENCE-REQUEST-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-046-SUSPENDED-RECORD-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.system.suspended"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.system.suspended"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-046-SUSPENDED-RECORD-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-047-UNEXPECTED-OUTAGE-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.system.unexpected-outage-recorded"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.system.unexpected-outage-recorded"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-047-UNEXPECTED-OUTAGE-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-048-RECONCILIATION-BEGIN-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.system.reconciliation-started"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.system.reconciliation-started"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-048-RECONCILIATION-BEGIN-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-049-RESUME-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.system.resumed"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.system.resumed"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-049-RESUME-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-050-HUMAN-PARTICIPANT-BIND-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.human-participant.profile-bound"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.human-participant.profile-bound"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-050-HUMAN-PARTICIPANT-BIND-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-051-HUMAN-PARTICIPANT-REVOKE-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.human-participant.revoked"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.human-participant.revoked"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-051-HUMAN-PARTICIPANT-REVOKE-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-052-HUMAN-INTERACTION-OPEN-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.human-interaction.opened"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.human-interaction.opened"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-052-HUMAN-INTERACTION-OPEN-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-053-HUMAN-DELIVERY-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.human-interaction.delivery-recorded"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.human-interaction.delivery-recorded"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-053-HUMAN-DELIVERY-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-054-HUMAN-RESPONSE-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.human-interaction.response-recorded"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.human-interaction.response-recorded"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-054-HUMAN-RESPONSE-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-055-HUMAN-INTERACTION-CLOSE-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.human-interaction.closed"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.human-interaction.closed"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-055-HUMAN-INTERACTION-CLOSE-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-056-HUMAN-INTERACTION-EXPIRE-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.human-interaction.expired"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.human-interaction.expired"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-056-HUMAN-INTERACTION-EXPIRE-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-UNKNOWN-COMMAND",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.work-budget.created"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.work-budget.created"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-057-PHASE4-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-057-PHASE4-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.work-budget.amended"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.work-budget.amended"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-058-PHASE4-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-058-PHASE4-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.task.work-budget-bound"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.task.work-budget-bound"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-059-PHASE4-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-059-PHASE4-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.task.operational-scope-bound"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.task.operational-scope-bound"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-060-PHASE4-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-060-PHASE4-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.work-invocation.authorized"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.work-invocation.authorized"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-061-PHASE4-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-061-PHASE4-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.work-invocation.claimed"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.work-invocation.claimed"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-062-PHASE4-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-062-PHASE4-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.work-invocation.started"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.work-invocation.started"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-063-PHASE4-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-063-PHASE4-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.work-invocation.terminal-recorded"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.work-invocation.terminal-recorded"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-064-PHASE4-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-064-PHASE4-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.work-invocation.cancellation-requested"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.work-invocation.cancellation-requested"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-065-PHASE4-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-065-PHASE4-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.work-invocation.expired"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.work-invocation.expired"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-066-PHASE4-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-066-PHASE4-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.projection.fault-recorded"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.projection.fault-recorded"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "CAT-067-PHASE4-VALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "CAT-067-PHASE4-INVALID",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.workflow.created"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.workflow.created"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "P10-CAT-001-P",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "P10-CAT-001-N",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.workflow.work-admitted",
+          "tekroo.event.workflow.work-rejected"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.workflow.work-admitted",
+          "tekroo.event.workflow.work-rejected"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "P10-CAT-002-P",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "P10-CAT-002-N",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.workflow.stage-result-recorded"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.workflow.stage-result-recorded"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "P10-CAT-003-P",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "P10-CAT-003-N",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [
+          "tekroo.event.workflow.checkpoint-recorded"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "expected": {
+        "eventTypes": [
+          "tekroo.event.workflow.checkpoint-recorded"
+        ],
+        "outcomeCode": "APPLIED"
+      },
+      "fixtureId": "P10-CAT-004-P",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "expected": {
+        "eventTypes": [],
+        "outcomeCode": "REJECTED_INVALID"
+      },
+      "fixtureId": "P10-CAT-004-N",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "outcome": "MIGRATION_REQUIRED"
+      },
+      "expected": {
+        "outcome": "MIGRATION_REQUIRED"
+      },
+      "fixtureId": "COMPATIBILITY-1.0-MISSING-CONTEXT",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "reason": "CYCLE",
+        "valid": false
+      },
+      "expected": {
+        "reason": "CYCLE",
+        "valid": false
+      },
+      "fixtureId": "DAG-REJECT-CYCLE",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "reason": null,
+        "valid": true
+      },
+      "expected": {
+        "reason": null,
+        "valid": true
+      },
+      "fixtureId": "DAG-VALID-BRANCH-JOIN",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "ADJUDICATOR_DEADLINE_EXCEEDED",
+        "state": "OPEN"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "ADJUDICATOR_DEADLINE_EXCEEDED",
+        "state": "OPEN"
+      },
+      "fixtureId": "ESCALATION-ADJUDICATOR-DEADLINE",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "reason": "ACCEPTED",
+        "state": "TERMINAL"
+      },
+      "expected": {
+        "accepted": true,
+        "reason": "ACCEPTED",
+        "state": "TERMINAL"
+      },
+      "fixtureId": "ESCALATION-EXACT-ADJUDICATOR",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "REROUTE_PROHIBITED",
+        "state": "OPEN"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "REROUTE_PROHIBITED",
+        "state": "OPEN"
+      },
+      "fixtureId": "ESCALATION-NO-REROUTE",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "reason": "ACCEPTED",
+        "state": "TERMINAL"
+      },
+      "expected": {
+        "accepted": true,
+        "reason": "ACCEPTED",
+        "state": "TERMINAL"
+      },
+      "fixtureId": "ESCALATION-POLICY-TIMEOUT",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "RESOLUTION_BUDGET_EXHAUSTED",
+        "state": "OPEN"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "RESOLUTION_BUDGET_EXHAUSTED",
+        "state": "OPEN"
+      },
+      "fixtureId": "ESCALATION-ROUND-EXHAUSTED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "ESCALATION_ALREADY_OPEN",
+        "state": "OPEN"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "ESCALATION_ALREADY_OPEN",
+        "state": "OPEN"
+      },
+      "fixtureId": "ESCALATION-ROUTE-ONCE",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "LIFECYCLE_EPOCH_MISMATCH",
+        "state": "OPEN"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "LIFECYCLE_EPOCH_MISMATCH",
+        "state": "OPEN"
+      },
+      "fixtureId": "ESCALATION-STALE-LIFECYCLE",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "ESCALATION_TERMINAL",
+        "state": "TERMINAL"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "ESCALATION_TERMINAL",
+        "state": "TERMINAL"
+      },
+      "fixtureId": "ESCALATION-TERMINAL",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "DEADLINE_NOT_REACHED",
+        "state": "OPEN"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "DEADLINE_NOT_REACHED",
+        "state": "OPEN"
+      },
+      "fixtureId": "ESCALATION-TIMEOUT-BEFORE-DEADLINE",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "INVALID_TIMEOUT_OUTCOME",
+        "state": "OPEN"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "INVALID_TIMEOUT_OUTCOME",
+        "state": "OPEN"
+      },
+      "fixtureId": "ESCALATION-TIMEOUT-OUTCOME",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "ADJUDICATOR_MISMATCH",
+        "state": "OPEN"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "ADJUDICATOR_MISMATCH",
+        "state": "OPEN"
+      },
+      "fixtureId": "ESCALATION-WRONG-ADJUDICATOR",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "ADMISSION_CLOSED"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "ADMISSION_CLOSED"
+      },
+      "fixtureId": "HC-ADMISSION-CLOSED-DURING-QUIESCENCE",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "admissionOpen": false,
+        "reason": "ACCEPTED",
+        "state": "RECONCILING",
+        "unresolvedExecutionIds": [
+          "00000000-0000-7000-8000-000000000905"
+        ]
+      },
+      "expected": {
+        "accepted": true,
+        "admissionOpen": false,
+        "reason": "ACCEPTED",
+        "state": "RECONCILING",
+        "unresolvedExecutionIds": [
+          "00000000-0000-7000-8000-000000000905"
+        ]
+      },
+      "fixtureId": "HC-BEGIN-RECONCILIATION",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "HOST_CONTINUITY_LOST"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "HOST_CONTINUITY_LOST"
+      },
+      "fixtureId": "HC-CONTINUOUS-POSTURE-REQUIRES-HEALTH",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "RECONCILIATION_REQUIRED",
+        "state": "SUSPENDED"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "RECONCILIATION_REQUIRED",
+        "state": "SUSPENDED"
+      },
+      "fixtureId": "HC-NO-DIRECT-SUSPENDED-TO-ACTIVE",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "LATE_RESULT_QUARANTINED"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "LATE_RESULT_QUARANTINED"
+      },
+      "fixtureId": "HC-OLD-EPOCH-RESULT-QUARANTINED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "admissionOpen": false,
+        "powerEpoch": 8,
+        "reason": "ACCEPTED",
+        "state": "QUIESCING"
+      },
+      "expected": {
+        "accepted": true,
+        "admissionOpen": false,
+        "powerEpoch": 8,
+        "reason": "ACCEPTED",
+        "state": "QUIESCING"
+      },
+      "fixtureId": "HC-PLANNED-QUIESCENCE",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "admissionOpen": true,
+        "powerEpoch": 7,
+        "reason": "POWER_EPOCH_MISMATCH",
+        "state": "ACTIVE"
+      },
+      "expected": {
+        "accepted": false,
+        "admissionOpen": true,
+        "powerEpoch": 7,
+        "reason": "POWER_EPOCH_MISMATCH",
+        "state": "ACTIVE"
+      },
+      "fixtureId": "HC-QUIESCENCE-EPOCH-MUST-INCREMENT",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "admissionOpen": true,
+        "powerEpoch": 8,
+        "reason": "ACCEPTED",
+        "state": "ACTIVE",
+        "unresolvedExecutionIds": []
+      },
+      "expected": {
+        "accepted": true,
+        "admissionOpen": true,
+        "powerEpoch": 8,
+        "reason": "ACCEPTED",
+        "state": "ACTIVE",
+        "unresolvedExecutionIds": []
+      },
+      "fixtureId": "HC-RESUME-AFTER-EXACT-RECONCILIATION",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "UNRESOLVED_EXECUTIONS",
+        "state": "RECONCILING"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "UNRESOLVED_EXECUTIONS",
+        "state": "RECONCILING"
+      },
+      "fixtureId": "HC-RESUME-REQUIRES-EXACT-RECONCILIATION",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "EXECUTION_INVENTORY_INCOMPLETE",
+        "state": "QUIESCING"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "EXECUTION_INVENTORY_INCOMPLETE",
+        "state": "QUIESCING"
+      },
+      "fixtureId": "HC-SUSPEND-REQUIRES-COMPLETE-INVENTORY",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "admissionOpen": false,
+        "reason": "ACCEPTED",
+        "state": "SUSPENDED",
+        "unresolvedExecutionIds": [
+          "00000000-0000-7000-8000-000000000905"
+        ]
+      },
+      "expected": {
+        "accepted": true,
+        "admissionOpen": false,
+        "reason": "ACCEPTED",
+        "state": "SUSPENDED",
+        "unresolvedExecutionIds": [
+          "00000000-0000-7000-8000-000000000905"
+        ]
+      },
+      "fixtureId": "HC-SUSPEND-WITH-RECORDED-UNKNOWN",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "admissionOpen": false,
+        "powerEpoch": 8,
+        "reason": "ACCEPTED",
+        "state": "RECONCILING",
+        "unresolvedExecutionIds": [
+          "00000000-0000-7000-8000-000000000904"
+        ]
+      },
+      "expected": {
+        "accepted": true,
+        "admissionOpen": false,
+        "powerEpoch": 8,
+        "reason": "ACCEPTED",
+        "state": "RECONCILING",
+        "unresolvedExecutionIds": [
+          "00000000-0000-7000-8000-000000000904"
+        ]
+      },
+      "fixtureId": "HC-UNEXPECTED-OUTAGE-FENCES",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "reason": "RECORDED_AS_ADVISORY",
+        "resolvedEffect": "ADVISORY_ONLY"
+      },
+      "expected": {
+        "accepted": true,
+        "reason": "RECORDED_AS_ADVISORY",
+        "resolvedEffect": "ADVISORY_ONLY"
+      },
+      "fixtureId": "HI-ADVISORY-RESPONSE-CANNOT-AUTHORIZE",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "RESPONSE_POLICY_UNSATISFIED"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "RESPONSE_POLICY_UNSATISFIED"
+      },
+      "fixtureId": "HI-ALL-REQUIRES-EVERY-DISTINCT-HUMAN",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "SCOPED_AUTHORITY_REQUIRED",
+        "resolvedEffect": "EVIDENCE_ONLY"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "SCOPED_AUTHORITY_REQUIRED",
+        "resolvedEffect": "EVIDENCE_ONLY"
+      },
+      "fixtureId": "HI-AUTHORIZED-EFFECT-REQUIRES-SCOPE",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "reason": "DELIVERY_RECORDED",
+        "responsePolicySatisfied": false
+      },
+      "expected": {
+        "accepted": true,
+        "reason": "DELIVERY_RECORDED",
+        "responsePolicySatisfied": false
+      },
+      "fixtureId": "HI-DELIVERY-IS-NOT-RESPONSE",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "capabilityConsumed": false,
+        "reason": "COMMIT_FAILED"
+      },
+      "expected": {
+        "accepted": false,
+        "capabilityConsumed": false,
+        "reason": "COMMIT_FAILED"
+      },
+      "fixtureId": "HI-FAILED-COMMIT-PRESERVES-RETRY",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "HUMAN_ACTOR_ATTRIBUTION"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "HUMAN_ACTOR_ATTRIBUTION"
+      },
+      "fixtureId": "HI-HUMAN-ORIGIN-CANNOT-BORROW-ACTOR",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "reason": "ACCEPTED"
+      },
+      "expected": {
+        "accepted": true,
+        "reason": "ACCEPTED"
+      },
+      "fixtureId": "HI-HUMAN-ORIGIN-HAS-NO-ACTOR-EXECUTION",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "HUMAN_ACTOR_ATTRIBUTION"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "HUMAN_ACTOR_ATTRIBUTION"
+      },
+      "fixtureId": "HI-HUMAN-RESPONSE-CANNOT-CARRY-ACTOR",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "PRESENTATION_EQUIVALENCE_REQUIRED"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "PRESENTATION_EQUIVALENCE_REQUIRED"
+      },
+      "fixtureId": "HI-MATERIAL-RENDERING-CHANGE-REJECTED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "HUMAN_AUTHORITY_REQUIRED"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "HUMAN_AUTHORITY_REQUIRED"
+      },
+      "fixtureId": "HI-OPERATOR-RELAY-NOT-HUMAN-RESPONSE",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "reason": "RESPONSE_POLICY_SATISFIED"
+      },
+      "expected": {
+        "accepted": true,
+        "reason": "RESPONSE_POLICY_SATISFIED"
+      },
+      "fixtureId": "HI-QUORUM-SATISFIED-BY-DISTINCT-HUMANS",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "capabilityConsumed": true,
+        "reason": "ACCEPTED"
+      },
+      "expected": {
+        "accepted": true,
+        "capabilityConsumed": true,
+        "reason": "ACCEPTED"
+      },
+      "fixtureId": "HI-RESPONSE-CAPABILITY-CONSUMED-AFTER-COMMIT",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "reason": "ACCEPTED"
+      },
+      "expected": {
+        "accepted": true,
+        "reason": "ACCEPTED"
+      },
+      "fixtureId": "HI-SELECTED-HUMAN-RESPONSE",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "reason": "EXPIRED_WITHOUT_CONSENT",
+        "state": "EXPIRED"
+      },
+      "expected": {
+        "accepted": true,
+        "reason": "EXPIRED_WITHOUT_CONSENT",
+        "state": "EXPIRED"
+      },
+      "fixtureId": "HI-SILENCE-IS-NOT-CONSENT",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "QUESTION_REVISION_MISMATCH"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "QUESTION_REVISION_MISMATCH"
+      },
+      "fixtureId": "HI-STALE-QUESTION-REJECTED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "RECIPIENT_MISMATCH"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "RECIPIENT_MISMATCH"
+      },
+      "fixtureId": "HI-UNSELECTED-HUMAN-REJECTED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "reason": "ACCEPTED"
+      },
+      "expected": {
+        "accepted": true,
+        "reason": "ACCEPTED"
+      },
+      "fixtureId": "HP-AUTHENTICATION-BINDING-EXACT",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "AUTHENTICATION_SUBJECT_MISMATCH"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "AUTHENTICATION_SUBJECT_MISMATCH"
+      },
+      "fixtureId": "HP-CHANNEL-IDENTITY-NOT-HUMAN",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "CONFIDENTIALITY_CEILING_EXCEEDED"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "CONFIDENTIALITY_CEILING_EXCEEDED"
+      },
+      "fixtureId": "HP-CONFIDENTIALITY-CEILING-REJECTS",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "reason": "ACCEPTED"
+      },
+      "expected": {
+        "accepted": true,
+        "reason": "ACCEPTED"
+      },
+      "fixtureId": "HP-DELIVERY-BINDING-REFERENCES-ACTIVE-AUTH",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "AUTHENTICATION_BINDING_REFERENCE_INVALID"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "AUTHENTICATION_BINDING_REFERENCE_INVALID"
+      },
+      "fixtureId": "HP-DELIVERY-BINDING-UNKNOWN-AUTH-REJECTED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "reason": "ACCEPTED",
+        "recipientIds": [
+          "human:alice",
+          "human:bob"
+        ]
+      },
+      "expected": {
+        "accepted": true,
+        "reason": "ACCEPTED",
+        "recipientIds": [
+          "human:alice",
+          "human:bob"
+        ]
+      },
+      "fixtureId": "HP-DISTINCT-HUMANS-SAME-ROLE",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "ROLE_BINDING_EXPIRED"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "ROLE_BINDING_EXPIRED"
+      },
+      "fixtureId": "HP-EXPIRED-ROLE-REJECTED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "PARTICIPANT_REVOKED"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "PARTICIPANT_REVOKED"
+      },
+      "fixtureId": "HP-REVOKED-HUMAN-REJECTED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "SCOPED_AUTHORITY_REQUIRED"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "SCOPED_AUTHORITY_REQUIRED"
+      },
+      "fixtureId": "HP-ROLE-LABEL-NO-INTRINSIC-AUTHORITY",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "reason": "ACCEPTED"
+      },
+      "expected": {
+        "accepted": true,
+        "reason": "ACCEPTED"
+      },
+      "fixtureId": "HP-SCOPED-HUMAN-AUTHORITY",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "durableDecisionCount": 1,
+        "receipts": [
+          {
+            "eventCount": 1,
+            "fingerprint": "5d731c4556822547ffc0009f11868f67036020cd2e6c958bec656871037160b4",
+            "outcome": "APPLIED"
+          },
+          {
+            "eventCount": 1,
+            "fingerprint": "5d731c4556822547ffc0009f11868f67036020cd2e6c958bec656871037160b4",
+            "outcome": "APPLIED"
+          },
+          {
+            "eventCount": 0,
+            "outcome": "REJECTED_CONFLICT",
+            "reason": "IDEMPOTENCY_KEY_REUSE"
+          }
+        ]
+      },
+      "expected": {
+        "durableDecisionCount": 1,
+        "receipts": [
+          {
+            "eventCount": 1,
+            "fingerprint": "5d731c4556822547ffc0009f11868f67036020cd2e6c958bec656871037160b4",
+            "outcome": "APPLIED"
+          },
+          {
+            "eventCount": 1,
+            "fingerprint": "5d731c4556822547ffc0009f11868f67036020cd2e6c958bec656871037160b4",
+            "outcome": "APPLIED"
+          },
+          {
+            "eventCount": 0,
+            "outcome": "REJECTED_CONFLICT",
+            "reason": "IDEMPOTENCY_KEY_REUSE"
+          }
+        ]
+      },
+      "fixtureId": "IDEMPOTENCY-DUPLICATE-AND-CONFLICT",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "valid": true
+      },
+      "expected": {
+        "valid": true
+      },
+      "fixtureId": "IDENTITY-CONCRETE-FQN",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "valid": false
+      },
+      "expected": {
+        "valid": false
+      },
+      "fixtureId": "IDENTITY-REJECT-LEADING-ZERO",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "valid": false
+      },
+      "expected": {
+        "valid": false
+      },
+      "fixtureId": "IDENTITY-REJECT-WILDCARD",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "CAPABILITY_MISMATCH"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "CAPABILITY_MISMATCH"
+      },
+      "fixtureId": "MC-ASSIGNMENT-DOWNGRADE-REJECTED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "reason": "ACCEPTED"
+      },
+      "expected": {
+        "accepted": true,
+        "reason": "ACCEPTED"
+      },
+      "fixtureId": "MC-ASSIGNMENT-EXACT-QUALIFICATION",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "QUALIFICATION_REVOKED"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "QUALIFICATION_REVOKED"
+      },
+      "fixtureId": "MC-ASSIGNMENT-REVOKED-REJECTED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "reason": "ACCEPTED"
+      },
+      "expected": {
+        "accepted": true,
+        "reason": "ACCEPTED"
+      },
+      "fixtureId": "MC-ROUTINE-REVISION-PRESERVES-PROFILE",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "reason": "ACCEPTED"
+      },
+      "expected": {
+        "accepted": true,
+        "reason": "ACCEPTED"
+      },
+      "fixtureId": "MC-SCOPE-BINDING-EXACT",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "STALE_WORK_PROFILE"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "STALE_WORK_PROFILE"
+      },
+      "fixtureId": "MC-SCOPE-BINDING-STALE",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "reason": "ESCALATION_REQUIRED"
+      },
+      "expected": {
+        "accepted": true,
+        "reason": "ESCALATION_REQUIRED"
+      },
+      "fixtureId": "MC-VARIANT-MATERIAL-DISAGREEMENT-ESCALATES",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "MATERIAL_DISAGREEMENT"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "MATERIAL_DISAGREEMENT"
+      },
+      "fixtureId": "MC-VARIANT-MATERIAL-DISAGREEMENT-NO-SELECTION",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "CANDIDATE_NOT_SUBMITTED"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "CANDIDATE_NOT_SUBMITTED"
+      },
+      "fixtureId": "MC-VARIANT-UNSUBMITTED-CANDIDATE-REJECTED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "reason": "ACCEPTED"
+      },
+      "expected": {
+        "accepted": true,
+        "reason": "ACCEPTED"
+      },
+      "fixtureId": "MC-VERIFICATION-TOPOLOGY-EXACT",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "INDEPENDENCE_NOT_PROVEN"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "INDEPENDENCE_NOT_PROVEN"
+      },
+      "fixtureId": "MC-VERIFICATION-TOPOLOGY-MISSING",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "condition": "RUNNABLE",
+        "lifecycleEpoch": 1,
+        "phase": "ACTIVE",
+        "rejected": null
+      },
+      "expected": {
+        "condition": "RUNNABLE",
+        "lifecycleEpoch": 1,
+        "phase": "ACTIVE",
+        "rejected": null
+      },
+      "fixtureId": "MODEL-BLOCK-ORTHOGONAL",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "condition": "RUNNABLE",
+        "lifecycleEpoch": 1,
+        "phase": "COMPLETED",
+        "rejected": null
+      },
+      "expected": {
+        "condition": "RUNNABLE",
+        "lifecycleEpoch": 1,
+        "phase": "COMPLETED",
+        "rejected": null
+      },
+      "fixtureId": "MODEL-COMPLETION-NO-REQUESTED-PHASE",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "condition": "RUNNABLE",
+        "lifecycleEpoch": 1,
+        "phase": "READY",
+        "rejected": "REJECTED_POLICY"
+      },
+      "expected": {
+        "condition": "RUNNABLE",
+        "lifecycleEpoch": 1,
+        "phase": "READY",
+        "rejected": "REJECTED_POLICY"
+      },
+      "fixtureId": "MODEL-ILLEGAL-COMPLETION",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "condition": "RUNNABLE",
+        "lifecycleEpoch": 2,
+        "phase": "ACTIVE",
+        "rejected": null
+      },
+      "expected": {
+        "condition": "RUNNABLE",
+        "lifecycleEpoch": 2,
+        "phase": "ACTIVE",
+        "rejected": null
+      },
+      "fixtureId": "MODEL-REOPEN-INCREMENTS-EPOCH",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "condition": "RUNNABLE",
+        "lifecycleEpoch": 1,
+        "phase": "ACCEPTED",
+        "rejected": null
+      },
+      "expected": {
+        "condition": "RUNNABLE",
+        "lifecycleEpoch": 1,
+        "phase": "ACCEPTED",
+        "rejected": null
+      },
+      "fixtureId": "MODEL-STORY-FORWARD",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "condition": "RUNNABLE",
+        "lifecycleEpoch": 1,
+        "phase": "COMPLETED",
+        "rejected": null
+      },
+      "expected": {
+        "condition": "RUNNABLE",
+        "lifecycleEpoch": 1,
+        "phase": "COMPLETED",
+        "rejected": null
+      },
+      "fixtureId": "MODEL-TASK-FORWARD",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "HUMAN_IMPERSONATION"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "HUMAN_IMPERSONATION"
+      },
+      "fixtureId": "OP-ACTOR-CANNOT-IMPERSONATE-HUMAN",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "reason": "ACCEPTED"
+      },
+      "expected": {
+        "accepted": true,
+        "reason": "ACCEPTED"
+      },
+      "fixtureId": "OP-ACTOR-EXPLICIT-AUTHORITY",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "ADAPTER_NOT_PRINCIPAL"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "ADAPTER_NOT_PRINCIPAL"
+      },
+      "fixtureId": "OP-CONTROL-SURFACE-IS-NOT-PRINCIPAL",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "reason": "ACCEPTED"
+      },
+      "expected": {
+        "accepted": true,
+        "reason": "ACCEPTED"
+      },
+      "fixtureId": "OP-HUMAN-ATTRIBUTION-PRESERVED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "reason": "ACCEPTED"
+      },
+      "expected": {
+        "accepted": true,
+        "reason": "ACCEPTED"
+      },
+      "fixtureId": "OP-HUMAN-REQUIRED-EXACT-HUMAN",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "HUMAN_PRINCIPAL_REQUIRED"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "HUMAN_PRINCIPAL_REQUIRED"
+      },
+      "fixtureId": "OP-HUMAN-REQUIRED-NOT-OPERATOR-ACTOR",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "AUTHORITY_REQUIRED"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "AUTHORITY_REQUIRED"
+      },
+      "fixtureId": "OP-ROLE-NAME-NO-AUTHORITY",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "STALE_EXECUTION"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "STALE_EXECUTION"
+      },
+      "fixtureId": "OP-STALE-EXECUTION-FENCED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "valid": true
+      },
+      "expected": {
+        "valid": true
+      },
+      "fixtureId": "PRECONDITION-EXACT-ALL",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "valid": false
+      },
+      "expected": {
+        "valid": false
+      },
+      "fixtureId": "PRECONDITION-STALE-NONE",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "reason": "ACCEPTED",
+        "state": "QUALIFIED"
+      },
+      "expected": {
+        "accepted": true,
+        "reason": "ACCEPTED",
+        "state": "QUALIFIED"
+      },
+      "fixtureId": "RELEASE-ALREADY-MERGED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "AUTHOR_APPROVAL_MISMATCH",
+        "state": "ABSENT"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "AUTHOR_APPROVAL_MISMATCH",
+        "state": "ABSENT"
+      },
+      "fixtureId": "RELEASE-AUTHOR-APPROVAL-MISMATCH",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "reason": "ACCEPTED",
+        "state": "EXECUTING"
+      },
+      "expected": {
+        "accepted": true,
+        "reason": "ACCEPTED",
+        "state": "EXECUTING"
+      },
+      "fixtureId": "RELEASE-BOUNDED-RETRY",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "QUALIFICATION_INPUT_MISMATCH",
+        "state": "PLANNED"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "QUALIFICATION_INPUT_MISMATCH",
+        "state": "PLANNED"
+      },
+      "fixtureId": "RELEASE-CHANGED-BASE",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "QUALIFICATION_INPUT_MISMATCH",
+        "state": "PLANNED"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "QUALIFICATION_INPUT_MISMATCH",
+        "state": "PLANNED"
+      },
+      "fixtureId": "RELEASE-CHANGED-HEAD",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "PLAN_DIGEST_MISMATCH",
+        "state": "PLANNED"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "PLAN_DIGEST_MISMATCH",
+        "state": "PLANNED"
+      },
+      "fixtureId": "RELEASE-CHANGED-PLAN",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "reason": "ACCEPTED",
+        "state": "QUALIFIED"
+      },
+      "expected": {
+        "accepted": true,
+        "reason": "ACCEPTED",
+        "state": "QUALIFIED"
+      },
+      "fixtureId": "RELEASE-CLEAN-MERGE",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "EXECUTION_IN_PROGRESS",
+        "state": "EXECUTING"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "EXECUTION_IN_PROGRESS",
+        "state": "EXECUTING"
+      },
+      "fixtureId": "RELEASE-CONCURRENT-WORKER",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "reason": "ACCEPTED",
+        "state": "PLANNED"
+      },
+      "expected": {
+        "accepted": true,
+        "reason": "ACCEPTED",
+        "state": "PLANNED"
+      },
+      "fixtureId": "RELEASE-EXACT-AUTHOR-APPROVAL",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "reason": "ACCEPTED",
+        "state": "QUALIFIED"
+      },
+      "expected": {
+        "accepted": true,
+        "reason": "ACCEPTED",
+        "state": "QUALIFIED"
+      },
+      "fixtureId": "RELEASE-EXACT-QUALIFICATION",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "reason": "ACCEPTED",
+        "state": "QUALIFIED"
+      },
+      "expected": {
+        "accepted": true,
+        "reason": "ACCEPTED",
+        "state": "QUALIFIED"
+      },
+      "fixtureId": "RELEASE-EXACT-RECONCILIATION",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "QUALIFICATION_REQUIRED",
+        "state": "PLANNED"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "QUALIFICATION_REQUIRED",
+        "state": "PLANNED"
+      },
+      "fixtureId": "RELEASE-EXECUTE-BEFORE-QUALIFICATION",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "reason": "ACCEPTED",
+        "state": "EXECUTING"
+      },
+      "expected": {
+        "accepted": true,
+        "reason": "ACCEPTED",
+        "state": "EXECUTING"
+      },
+      "fixtureId": "RELEASE-FIRST-ORDERED-REQUEST",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "reason": "ACCEPTED",
+        "state": "FAILED"
+      },
+      "expected": {
+        "accepted": true,
+        "reason": "ACCEPTED",
+        "state": "FAILED"
+      },
+      "fixtureId": "RELEASE-GENUINE-FAILURE-EXHAUSTED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "reason": "ACCEPTED",
+        "state": "QUALIFIED"
+      },
+      "expected": {
+        "accepted": true,
+        "reason": "ACCEPTED",
+        "state": "QUALIFIED"
+      },
+      "fixtureId": "RELEASE-GENUINE-FAILURE-RETRYABLE",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "durableDecisionCount": 1,
+        "receipts": [
+          {
+            "eventCount": 1,
+            "fingerprint": "be2789e543e64998adf537c69dba0460d360566d6d2c53137ed2d2e4e0e4d9e3",
+            "outcome": "APPLIED"
+          },
+          {
+            "eventCount": 1,
+            "fingerprint": "be2789e543e64998adf537c69dba0460d360566d6d2c53137ed2d2e4e0e4d9e3",
+            "outcome": "APPLIED"
+          },
+          {
+            "eventCount": 0,
+            "outcome": "REJECTED_CONFLICT",
+            "reason": "IDEMPOTENCY_KEY_REUSE"
+          }
+        ]
+      },
+      "expected": {
+        "durableDecisionCount": 1,
+        "receipts": [
+          {
+            "eventCount": 1,
+            "fingerprint": "be2789e543e64998adf537c69dba0460d360566d6d2c53137ed2d2e4e0e4d9e3",
+            "outcome": "APPLIED"
+          },
+          {
+            "eventCount": 1,
+            "fingerprint": "be2789e543e64998adf537c69dba0460d360566d6d2c53137ed2d2e4e0e4d9e3",
+            "outcome": "APPLIED"
+          },
+          {
+            "eventCount": 0,
+            "outcome": "REJECTED_CONFLICT",
+            "reason": "IDEMPOTENCY_KEY_REUSE"
+          }
+        ]
+      },
+      "fixtureId": "RELEASE-IDEMPOTENCY-DUPLICATE-AND-CONFLICT",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "reason": "ACCEPTED",
+        "state": "NO_RELEASE_REQUIRED"
+      },
+      "expected": {
+        "accepted": true,
+        "reason": "ACCEPTED",
+        "state": "NO_RELEASE_REQUIRED"
+      },
+      "fixtureId": "RELEASE-NO-CODE-FINALIZE",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "RECONCILIATION_REQUIRED",
+        "state": "RECONCILING"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "RECONCILIATION_REQUIRED",
+        "state": "RECONCILING"
+      },
+      "fixtureId": "RELEASE-NO-RETRY-WHILE-UNKNOWN",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "RELEASE_INCOMPLETE",
+        "state": "QUALIFIED"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "RELEASE_INCOMPLETE",
+        "state": "QUALIFIED"
+      },
+      "fixtureId": "RELEASE-PARTIAL-FINALIZE",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "reason": "ACCEPTED",
+        "state": "RECONCILING"
+      },
+      "expected": {
+        "accepted": true,
+        "reason": "ACCEPTED",
+        "state": "RECONCILING"
+      },
+      "fixtureId": "RELEASE-PROVIDER-UNAVAILABLE",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "RETRY_BUDGET_EXHAUSTED",
+        "state": "QUALIFIED"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "RETRY_BUDGET_EXHAUSTED",
+        "state": "QUALIFIED"
+      },
+      "fixtureId": "RELEASE-RETRY-BUDGET-EXHAUSTED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "RELEASE_TERMINAL",
+        "state": "READY_FOR_ACCEPTANCE"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "RELEASE_TERMINAL",
+        "state": "READY_FOR_ACCEPTANCE"
+      },
+      "fixtureId": "RELEASE-TERMINAL-IMMUTABLE",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "TREE_MISMATCH",
+        "state": "QUALIFIED"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "TREE_MISMATCH",
+        "state": "QUALIFIED"
+      },
+      "fixtureId": "RELEASE-TREE-MISMATCH",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "reason": "ACCEPTED",
+        "state": "RECONCILING"
+      },
+      "expected": {
+        "accepted": true,
+        "reason": "ACCEPTED",
+        "state": "RECONCILING"
+      },
+      "fixtureId": "RELEASE-UNKNOWN-RESULT",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "reason": "ACCEPTED",
+        "state": "READY_FOR_ACCEPTANCE"
+      },
+      "expected": {
+        "accepted": true,
+        "reason": "ACCEPTED",
+        "state": "READY_FOR_ACCEPTANCE"
+      },
+      "fixtureId": "RELEASE-VERIFIED-FINALIZE",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "MERGE_ORDER_CONFLICT",
+        "state": "QUALIFIED"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "MERGE_ORDER_CONFLICT",
+        "state": "QUALIFIED"
+      },
+      "fixtureId": "RELEASE-WRONG-ORDER",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "RESULT_SUPERSESSION_MISMATCH",
+        "state": "RECONCILING"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "RESULT_SUPERSESSION_MISMATCH",
+        "state": "RECONCILING"
+      },
+      "fixtureId": "RELEASE-WRONG-SUPERSESSION",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "reason": "ACCEPTED"
+      },
+      "expected": {
+        "accepted": true,
+        "reason": "ACCEPTED"
+      },
+      "fixtureId": "REVIEW-BOUNDED-ADJUDICATOR",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "CHANGED_CONDITION_REQUIRED"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "CHANGED_CONDITION_REQUIRED"
+      },
+      "fixtureId": "REVIEW-BOUNDED-CHANGED-CONDITION",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "BRANCH_DEADLINE_EXCEEDED"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "BRANCH_DEADLINE_EXCEEDED"
+      },
+      "fixtureId": "REVIEW-BOUNDED-DEADLINE",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "reason": "ACCEPTED"
+      },
+      "expected": {
+        "accepted": true,
+        "reason": "ACCEPTED"
+      },
+      "fixtureId": "REVIEW-BOUNDED-POLICY-TIMEOUT",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "REVIEW_ALREADY_FINALIZED"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "REVIEW_ALREADY_FINALIZED"
+      },
+      "fixtureId": "REVIEW-BOUNDED-POST-FINALIZATION",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "BRANCH_ROUND_EXHAUSTED"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "BRANCH_ROUND_EXHAUSTED"
+      },
+      "fixtureId": "REVIEW-BOUNDED-ROUND-LIMIT",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "reason": "ACCEPTED"
+      },
+      "expected": {
+        "accepted": true,
+        "reason": "ACCEPTED"
+      },
+      "fixtureId": "REVIEW-BOUNDED-VALIDATOR-PASS",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "VALIDATOR_MISMATCH"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "VALIDATOR_MISMATCH"
+      },
+      "fixtureId": "REVIEW-BOUNDED-WRONG-VALIDATOR",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "complete": false,
+        "status": "CONFLICT"
+      },
+      "expected": {
+        "complete": false,
+        "status": "CONFLICT"
+      },
+      "fixtureId": "REVIEW-JOIN-DUPLICATE-CONFLICT",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "complete": true,
+        "status": "PASS"
+      },
+      "expected": {
+        "complete": true,
+        "status": "PASS"
+      },
+      "fixtureId": "REVIEW-JOIN-ORDER-INDEPENDENT",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "valid": true
+      },
+      "expected": {
+        "valid": true
+      },
+      "fixtureId": "SUCCESSOR-SET-CANONICAL",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "valid": false
+      },
+      "expected": {
+        "valid": false
+      },
+      "fixtureId": "SUCCESSOR-SET-REJECT-UNORDERED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "MISSING_BUDGET"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "MISSING_BUDGET"
+      },
+      "fixtureId": "P4-MISSING-BUDGET-FAILS-CLOSED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "DIRECT_WAKEUP_PROHIBITED"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "DIRECT_WAKEUP_PROHIBITED"
+      },
+      "fixtureId": "P4-DIRECT-AGENT-WAKEUP-REJECTED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "DIRECT_WAKEUP_PROHIBITED"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "DIRECT_WAKEUP_PROHIBITED"
+      },
+      "fixtureId": "P4-COOPTED-MESSAGE-WAKEUP-REJECTED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "DIRECT_WAKEUP_PROHIBITED"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "DIRECT_WAKEUP_PROHIBITED"
+      },
+      "fixtureId": "P4-TASK-DISPATCH-NOT-EXECUTABLE",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "STALE_TASK_REVISION"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "STALE_TASK_REVISION"
+      },
+      "fixtureId": "P4-STALE-TASK-REVISION-REJECTED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "STALE_LIFECYCLE"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "STALE_LIFECYCLE"
+      },
+      "fixtureId": "P4-STALE-LIFECYCLE-REJECTED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "RUNTIME_IDENTITY_MISMATCH"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "RUNTIME_IDENTITY_MISMATCH"
+      },
+      "fixtureId": "P4-STALE-FENCE-REJECTED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "RUNTIME_IDENTITY_MISMATCH"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "RUNTIME_IDENTITY_MISMATCH"
+      },
+      "fixtureId": "P4-WRONG-ACTOR-REJECTED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "RUNTIME_IDENTITY_MISMATCH"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "RUNTIME_IDENTITY_MISMATCH"
+      },
+      "fixtureId": "P4-WRONG-MODEL-REJECTED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "RUNTIME_IDENTITY_MISMATCH"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "RUNTIME_IDENTITY_MISMATCH"
+      },
+      "fixtureId": "P4-WRONG-RUNTIME-REJECTED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "globalUsed": 3,
+        "maximumAdditionalInvocations": 5,
+        "purposeUsed": 2,
+        "reason": "ACCEPTED"
+      },
+      "expected": {
+        "accepted": true,
+        "globalUsed": 3,
+        "maximumAdditionalInvocations": 5,
+        "purposeUsed": 2,
+        "reason": "ACCEPTED"
+      },
+      "fixtureId": "P4-FIRST-INVOCATION-ACCEPTED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "UNCHANGED_CONDITION"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "UNCHANGED_CONDITION"
+      },
+      "fixtureId": "P4-UNCHANGED-CONDITION-REDISPATCH-REJECTED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "globalUsed": 3,
+        "maximumAdditionalInvocations": 5,
+        "purposeUsed": 2,
+        "reason": "ACCEPTED"
+      },
+      "expected": {
+        "accepted": true,
+        "globalUsed": 3,
+        "maximumAdditionalInvocations": 5,
+        "purposeUsed": 2,
+        "reason": "ACCEPTED"
+      },
+      "fixtureId": "P4-CHANGED-EVIDENCE-CONTINUATION-ACCEPTED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "globalUsed": 3,
+        "maximumAdditionalInvocations": 5,
+        "purposeUsed": 2,
+        "reason": "ACCEPTED"
+      },
+      "expected": {
+        "accepted": true,
+        "globalUsed": 3,
+        "maximumAdditionalInvocations": 5,
+        "purposeUsed": 2,
+        "reason": "ACCEPTED"
+      },
+      "fixtureId": "P4-RETRYABLE-TERMINAL-CONTINUATION-ACCEPTED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "UNCHANGED_CONDITION"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "UNCHANGED_CONDITION"
+      },
+      "fixtureId": "P4-NONRETRYABLE-CONTINUATION-REJECTED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "reason": "ACCEPTED",
+        "state": "CLAIMED"
+      },
+      "expected": {
+        "accepted": true,
+        "reason": "ACCEPTED",
+        "state": "CLAIMED"
+      },
+      "fixtureId": "P4-PERMIT-FIRST-CLAIM-ACCEPTED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "PERMIT_ALREADY_CONSUMED",
+        "state": "CLAIMED"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "PERMIT_ALREADY_CONSUMED",
+        "state": "CLAIMED"
+      },
+      "fixtureId": "P4-PERMIT-REUSE-REJECTED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "cancellationRequested": true,
+        "reason": "CANCELLATION_REQUESTED",
+        "state": "STARTED"
+      },
+      "expected": {
+        "accepted": true,
+        "cancellationRequested": true,
+        "reason": "CANCELLATION_REQUESTED",
+        "state": "STARTED"
+      },
+      "fixtureId": "P4-CANCELLATION-REQUEST-NOT-TERMINAL",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "TERMINAL_EVIDENCE_REQUIRED",
+        "state": "STARTED"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "TERMINAL_EVIDENCE_REQUIRED",
+        "state": "STARTED"
+      },
+      "fixtureId": "P4-CANCELLED-REQUIRES-TERMINAL-EVIDENCE",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "maximumAdditionalInvocations": 5,
+        "reason": "ACCEPTED"
+      },
+      "expected": {
+        "accepted": true,
+        "maximumAdditionalInvocations": 5,
+        "reason": "ACCEPTED"
+      },
+      "fixtureId": "P4-ROOT-BOUND-COMPUTED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "maximumAdditionalInvocations": 5,
+        "reason": "BUDGET_RESET_PROHIBITED"
+      },
+      "expected": {
+        "accepted": false,
+        "maximumAdditionalInvocations": 5,
+        "reason": "BUDGET_RESET_PROHIBITED"
+      },
+      "fixtureId": "P4-CHILD-BUDGET-RESET-REJECTED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "maximumAdditionalInvocations": 5,
+        "reason": "BUDGET_RESET_PROHIBITED"
+      },
+      "expected": {
+        "accepted": false,
+        "maximumAdditionalInvocations": 5,
+        "reason": "BUDGET_RESET_PROHIBITED"
+      },
+      "fixtureId": "P4-HANDOFF-BUDGET-RESET-REJECTED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "maximumAdditionalInvocations": 5,
+        "reason": "BUDGET_RESET_PROHIBITED"
+      },
+      "expected": {
+        "accepted": false,
+        "maximumAdditionalInvocations": 5,
+        "reason": "BUDGET_RESET_PROHIBITED"
+      },
+      "fixtureId": "P4-REPLAN-BUDGET-RESET-REJECTED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "maximumAdditionalInvocations": 5,
+        "reason": "BUDGET_RESET_PROHIBITED"
+      },
+      "expected": {
+        "accepted": false,
+        "maximumAdditionalInvocations": 5,
+        "reason": "BUDGET_RESET_PROHIBITED"
+      },
+      "fixtureId": "P4-PROMOTION-BUDGET-RESET-REJECTED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "maximumAdditionalInvocations": 5,
+        "reason": "BUDGET_RESET_PROHIBITED"
+      },
+      "expected": {
+        "accepted": false,
+        "maximumAdditionalInvocations": 5,
+        "reason": "BUDGET_RESET_PROHIBITED"
+      },
+      "fixtureId": "P4-REVIEW-BUDGET-RESET-REJECTED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "maximumAdditionalInvocations": 5,
+        "reason": "BUDGET_RESET_PROHIBITED"
+      },
+      "expected": {
+        "accepted": false,
+        "maximumAdditionalInvocations": 5,
+        "reason": "BUDGET_RESET_PROHIBITED"
+      },
+      "fixtureId": "P4-REPAIR-BUDGET-RESET-REJECTED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "maximumAdditionalInvocations": 5,
+        "reason": "BUDGET_RESET_PROHIBITED"
+      },
+      "expected": {
+        "accepted": false,
+        "maximumAdditionalInvocations": 5,
+        "reason": "BUDGET_RESET_PROHIBITED"
+      },
+      "fixtureId": "P4-ACTOR-REPLACEMENT-BUDGET-RESET-REJECTED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "maximumAdditionalInvocations": 5,
+        "reason": "BUDGET_RESET_PROHIBITED"
+      },
+      "expected": {
+        "accepted": false,
+        "maximumAdditionalInvocations": 5,
+        "reason": "BUDGET_RESET_PROHIBITED"
+      },
+      "fixtureId": "P4-MODEL-REPLACEMENT-BUDGET-RESET-REJECTED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "maximumAdditionalInvocations": 5,
+        "reason": "CAPACITY_MINT_PROHIBITED"
+      },
+      "expected": {
+        "accepted": false,
+        "maximumAdditionalInvocations": 5,
+        "reason": "CAPACITY_MINT_PROHIBITED"
+      },
+      "fixtureId": "P4-RESTART-BUDGET-RESET-REJECTED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "maximumAdditionalInvocations": 6,
+        "reason": "ACCEPTED",
+        "revision": 2
+      },
+      "expected": {
+        "accepted": true,
+        "maximumAdditionalInvocations": 6,
+        "reason": "ACCEPTED",
+        "revision": 2
+      },
+      "fixtureId": "P4-EXPLICIT-BUDGET-AMENDMENT-ACCEPTED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "reason": "DUPLICATE",
+        "revision": 3
+      },
+      "expected": {
+        "accepted": true,
+        "reason": "DUPLICATE",
+        "revision": 3
+      },
+      "fixtureId": "P4-PROJECTION-DUPLICATE-IDEMPOTENT",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "REVISION_GAP",
+        "revision": 3
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "REVISION_GAP",
+        "revision": 3
+      },
+      "fixtureId": "P4-PROJECTION-GAP-FAILS-CLOSED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "REVISION_CONFLICT",
+        "revision": 3
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "REVISION_CONFLICT",
+        "revision": 3
+      },
+      "fixtureId": "P4-PROJECTION-CONFLICT-FAILS-CLOSED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "reason": "EXACT_REBUILD_MATCH"
+      },
+      "expected": {
+        "accepted": true,
+        "reason": "EXACT_REBUILD_MATCH"
+      },
+      "fixtureId": "P4-PROJECTION-REBUILD-EQUIVALENT",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "REBUILD_MISMATCH"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "REBUILD_MISMATCH"
+      },
+      "fixtureId": "P4-PROJECTION-REBUILD-MISMATCH",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "TEAMS_AUTHORITY_REQUIRED"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "TEAMS_AUTHORITY_REQUIRED"
+      },
+      "fixtureId": "P4-SMA-AUTHORITATIVE-TASK-WRITE-REJECTED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "TEAMS_AUTHORITY_REQUIRED"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "TEAMS_AUTHORITY_REQUIRED"
+      },
+      "fixtureId": "P4-SMA-ROUTING-WRITE-REJECTED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": false,
+        "reason": "TEAMS_AUTHORITY_REQUIRED"
+      },
+      "expected": {
+        "accepted": false,
+        "reason": "TEAMS_AUTHORITY_REQUIRED"
+      },
+      "fixtureId": "P4-OPENHANDS-LEASE-WRITE-REJECTED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "reason": "SMA_MEMORY_DOMAIN"
+      },
+      "expected": {
+        "accepted": true,
+        "reason": "SMA_MEMORY_DOMAIN"
+      },
+      "fixtureId": "P4-SMA-SEMANTIC-MEMORY-WRITE-ACCEPTED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "accepted": true,
+        "reason": "ACCEPTED"
+      },
+      "expected": {
+        "accepted": true,
+        "reason": "ACCEPTED"
+      },
+      "fixtureId": "P4-TEAMS-OPERATIONAL-WRITE-ACCEPTED",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "admittedNodeIds": [
+          "code-a",
+          "code-b",
+          "code-c",
+          "code-d"
+        ],
+        "readyNodeIds": [
+          "code-a",
+          "code-b",
+          "code-c",
+          "code-d"
+        ]
+      },
+      "expected": {
+        "admittedNodeIds": [
+          "code-a",
+          "code-b",
+          "code-c",
+          "code-d"
+        ],
+        "readyNodeIds": [
+          "code-a",
+          "code-b",
+          "code-c",
+          "code-d"
+        ]
+      },
+      "fixtureId": "P10-WF-001",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "admitted": true,
+        "budgetPreserved": true,
+        "completedNodeIds": [
+          "design",
+          "code-a"
+        ],
+        "nextAttempt": 2
+      },
+      "expected": {
+        "admitted": true,
+        "budgetPreserved": true,
+        "completedNodeIds": [
+          "design",
+          "code-a"
+        ],
+        "nextAttempt": 2
+      },
+      "fixtureId": "P10-WF-002",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "distinctNodeCount": 3,
+        "reason": null,
+        "reusedRoles": [
+          "architect"
+        ],
+        "valid": true
+      },
+      "expected": {
+        "distinctNodeCount": 3,
+        "reason": null,
+        "reusedRoles": [
+          "architect"
+        ],
+        "valid": true
+      },
+      "fixtureId": "P10-WF-003",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "reason": "CYCLE",
+        "valid": false
+      },
+      "expected": {
+        "reason": "CYCLE",
+        "valid": false
+      },
+      "fixtureId": "P10-WF-004",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "createdInvocationCount": 0,
+        "invocationCount": 7
+      },
+      "expected": {
+        "createdInvocationCount": 0,
+        "invocationCount": 7
+      },
+      "fixtureId": "P10-WF-005",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "preservedCompletedNodeIds": [
+          "intake",
+          "design",
+          "code-a"
+        ],
+        "replayNodeIds": [],
+        "resumeNodeIds": [
+          "code-b",
+          "code-c"
+        ]
+      },
+      "expected": {
+        "preservedCompletedNodeIds": [
+          "intake",
+          "design",
+          "code-a"
+        ],
+        "replayNodeIds": [],
+        "resumeNodeIds": [
+          "code-b",
+          "code-c"
+        ]
+      },
+      "fixtureId": "P10-WF-006",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "loaded": true,
+        "sourceChangeRequired": false
+      },
+      "expected": {
+        "loaded": true,
+        "sourceChangeRequired": false
+      },
+      "fixtureId": "P10-WF-007",
+      "status": "PASS"
+    },
+    {
+      "actual": {
+        "additionalValidationAdmitted": false,
+        "ceilingSeconds": 360,
+        "reusePriorEvidence": true
+      },
+      "expected": {
+        "additionalValidationAdmitted": false,
+        "ceilingSeconds": 360,
+        "reusePriorEvidence": true
+      },
+      "fixtureId": "P10-WF-008",
+      "status": "PASS"
+    }
+  ],
+  "contractIdentity": "tekroo.kernel.contracts/0.11.0",
+  "counts": {
+    "failed": 0,
+    "passed": 313,
+    "total": 313
+  },
+  "generatedAt": "2026-08-11T00:00:00Z",
+  "manifestSha256": "85306c8edc703e85df502280642ef30161e16b8e82ff48f568c5a5c6d421f12d",
+  "profile": "core-hermetic-reference-model",
+  "qualificationBoundary": "This report validates the reference corpus and model only; it does not qualify a Tekroo implementation or production system.",
+  "reportSha256": "3c8baa8e614d466f982e1642c72f060c7a99ae73c676c701a5e47e137a2e0bf4",
+  "reportType": "REFERENCE_CORPUS",
+  "schemaVersion": "1.0.0",
+  "status": "PASS"
+}

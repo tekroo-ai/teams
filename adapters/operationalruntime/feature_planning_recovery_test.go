@@ -3,6 +3,7 @@ package operationalruntime
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
@@ -71,6 +72,32 @@ func TestPlanningRecoveryProfileSupersedesDeadlineAndIsIdempotent(t *testing.T) 
 	reloaded, alreadyBound, err := planningRecoveryProfile(successor, prior, planning, condition, deadline, []kernel.UUIDv7{evidenceID})
 	if err != nil || !alreadyBound || reloaded.ProfileDigest != successor.ProfileDigest {
 		t.Fatalf("idempotent successor = %#v alreadyBound=%t err=%v", reloaded, alreadyBound, err)
+	}
+}
+
+func TestPlanningRecoveryProfileCompactsFullHistoricalEvidence(t *testing.T) {
+	tracked, _, _, _ := taskExecutionRefreshFixture(t)
+	current := tracked.profile
+	current.ClassificationEvidenceIDs = make([]kernel.UUIDv7, 64)
+	for index := range current.ClassificationEvidenceIDs {
+		current.ClassificationEvidenceIDs[index] = kernel.UUIDv7(fmt.Sprintf("00000000-0000-7000-8000-%012d", index+1))
+	}
+	current.ProfileDigest = ""
+	encoded, err := json.Marshal(current)
+	if err != nil {
+		t.Fatal(err)
+	}
+	current.ProfileDigest = digestBytes(encoded)
+	prior := current.Binding()
+	recoveryEvidence := []kernel.UUIDv7{
+		"00000000-0000-7000-8001-000000000005",
+		"00000000-0000-7000-8001-000000000006",
+	}
+	planning := ProductionPlanning{PolicyRevision: 2, ClassificationPolicyDigest: repeatedDigest('d'), PromotionPolicyDigest: repeatedDigest('e'), VerificationTopologyDigest: repeatedDigest('f')}
+
+	next, bound, err := planningRecoveryProfile(current, prior, planning, repeatedDigest('c'), current.Budgets.DeadlineAt.Add(time.Hour), recoveryEvidence)
+	if err != nil || bound || !next.Valid() || len(next.ClassificationEvidenceIDs) != len(recoveryEvidence) || !containsEveryUUID(next.ClassificationEvidenceIDs, recoveryEvidence) || next.SupersedesProfileID == nil || *next.SupersedesProfileID != current.ProfileID {
+		t.Fatalf("compacted planning-recovery profile=%#v bound=%t err=%v", next, bound, err)
 	}
 }
 
@@ -333,6 +360,35 @@ func TestClassifyTaskRecoveryAllowsOperatorRepairOfSucceededImplementation(t *te
 	}
 }
 
+func TestClassifyTaskRecoveryAllowsOperatorRepairOfSucceededRepair(t *testing.T) {
+	taskID := kernel.UUIDv7("00000000-0000-7000-8000-000000000324")
+	task := organization.PlannedTask{ID: taskID, Purpose: kernel.PurposeImplementation}
+	state := kernel.AggregateState{Phase: kernel.PhaseActive, Condition: kernel.ConditionRunnable}
+	invocation := recoveryTerminalFixture(kernel.InvocationSucceeded, nil, nil)
+	invocation.Purpose = kernel.PurposeRepair
+	invocation.AttemptFamily = "repair"
+	invocation.AttemptOrdinal = 1
+	output := repeatedDigest('9')
+	invocation.OutputDigest = &output
+
+	kind, err := (&ProductionService{}).classifyTaskRecovery(context.Background(), task, state, "", invocation)
+	if err != nil || kind != taskRecoveryOperatorRepair {
+		t.Fatalf("successful repair successor kind=%v err=%v", kind, err)
+	}
+}
+
+func TestSucceededRepairCanContinueWithChangedCondition(t *testing.T) {
+	prior := recoveryTerminalFixture(kernel.InvocationSucceeded, nil, nil)
+	prior.Purpose = kernel.PurposeRepair
+	prior.AttemptFamily = "repair"
+	prior.AttemptOrdinal = 1
+	output := repeatedDigest('9')
+	prior.OutputDigest = &output
+	if !validInvocationContinuation(prior, kernel.PurposeRepair, 2, true, false) {
+		t.Fatal("succeeded repair could not be superseded by an evidence-bound correction")
+	}
+}
+
 func TestNextTaskPurposeAttemptIsIndependentPerPurpose(t *testing.T) {
 	taskID := kernel.UUIDv7("00000000-0000-7000-8000-000000000334")
 	invocations := map[kernel.AggregateRef]kernel.WorkInvocation{
@@ -368,6 +424,30 @@ func TestReopenedTaskRecoveryProfileAdvancesLifecycleAndPreservesClassification(
 	}
 }
 
+func TestReopenedTaskRecoveryProfileCompactsFullHistoricalEvidenceAtLifecycleBoundary(t *testing.T) {
+	tracked, _, _, _ := taskExecutionRefreshFixture(t)
+	current := tracked.profile
+	current.ClassificationEvidenceIDs = make([]kernel.UUIDv7, 64)
+	for index := range current.ClassificationEvidenceIDs {
+		current.ClassificationEvidenceIDs[index] = kernel.UUIDv7(fmt.Sprintf("00000000-0000-7000-8000-%012d", index+1))
+	}
+	current.ProfileDigest = ""
+	encoded, err := json.Marshal(current)
+	if err != nil {
+		t.Fatal(err)
+	}
+	current.ProfileDigest = digestBytes(encoded)
+	planning := ProductionPlanning{PolicyRevision: 2, ClassificationPolicyDigest: repeatedDigest('d'), PromotionPolicyDigest: repeatedDigest('e'), VerificationTopologyDigest: repeatedDigest('f')}
+	recoveryEvidence := []kernel.UUIDv7{
+		"00000000-0000-7000-8001-000000000001",
+		"00000000-0000-7000-8001-000000000002",
+	}
+	next, err := reopenedTaskRecoveryProfile(current, planning, repeatedDigest('9'), current.Budgets.DeadlineAt.Add(time.Hour), recoveryEvidence, current.LifecycleEpoch+1, current.ScopeRevision+1)
+	if err != nil || !next.Valid() || len(next.ClassificationEvidenceIDs) != len(recoveryEvidence) || !containsEveryUUID(next.ClassificationEvidenceIDs, recoveryEvidence) || next.SupersedesProfileID == nil || *next.SupersedesProfileID != current.ProfileID {
+		t.Fatalf("compacted reopened profile=%#v err=%v", next, err)
+	}
+}
+
 func TestContinuedOperatorRepairProfileResumesOrAdvancesCommittedRecovery(t *testing.T) {
 	tracked, _, _, _ := taskExecutionRefreshFixture(t)
 	current := tracked.profile
@@ -395,6 +475,30 @@ func TestContinuedOperatorRepairProfileResumesOrAdvancesCommittedRecovery(t *tes
 	next, bound, err := continuedTaskRecoveryProfile(current, planning, repeatedDigest('8'), deadline, []kernel.UUIDv7{evidenceID}, current.LifecycleEpoch, current.ScopeRevision)
 	if err != nil || bound || !next.Valid() || next.ProfileRevision != current.ProfileRevision+1 || next.SupersedesProfileID == nil || *next.SupersedesProfileID != current.ProfileID || !next.Budgets.DeadlineAt.Equal(deadline) {
 		t.Fatalf("continued profile=%#v bound=%t err=%v", next, bound, err)
+	}
+}
+
+func TestContinuedTaskRecoveryProfileCompactsFullHistoricalEvidence(t *testing.T) {
+	tracked, _, _, _ := taskExecutionRefreshFixture(t)
+	current := tracked.profile
+	current.ClassificationEvidenceIDs = make([]kernel.UUIDv7, 64)
+	for index := range current.ClassificationEvidenceIDs {
+		current.ClassificationEvidenceIDs[index] = kernel.UUIDv7(fmt.Sprintf("00000000-0000-7000-8000-%012d", index+1))
+	}
+	current.ProfileDigest = ""
+	encoded, err := json.Marshal(current)
+	if err != nil {
+		t.Fatal(err)
+	}
+	current.ProfileDigest = digestBytes(encoded)
+	planning := ProductionPlanning{PolicyRevision: 2, ClassificationPolicyDigest: repeatedDigest('d'), PromotionPolicyDigest: repeatedDigest('e'), VerificationTopologyDigest: repeatedDigest('f')}
+	recoveryEvidence := []kernel.UUIDv7{
+		"00000000-0000-7000-8001-000000000003",
+		"00000000-0000-7000-8001-000000000004",
+	}
+	next, bound, err := continuedTaskRecoveryProfile(current, planning, repeatedDigest('7'), current.Budgets.DeadlineAt.Add(time.Hour), recoveryEvidence, current.LifecycleEpoch, current.ScopeRevision)
+	if err != nil || bound || !next.Valid() || len(next.ClassificationEvidenceIDs) != len(recoveryEvidence) || !containsEveryUUID(next.ClassificationEvidenceIDs, recoveryEvidence) || next.SupersedesProfileID == nil || *next.SupersedesProfileID != current.ProfileID {
+		t.Fatalf("compacted continued profile=%#v bound=%t err=%v", next, bound, err)
 	}
 }
 

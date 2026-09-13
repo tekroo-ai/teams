@@ -40,13 +40,13 @@ func TestMessageThreadAllowsProgressAndRejectsRenamedLoopBudgetResetAndCycle(t *
 	if err := store.AppendMessage(context.Background(), cycle); !errors.Is(err, ErrOrganizationalLoop) {
 		t.Fatalf("DAG-node cycle error=%v", err)
 	}
-	roleCycle := nextTestMessage(second, 4)
-	roleCycle.Recipient = "teams::architect-2"
-	if err := store.AppendMessage(context.Background(), roleCycle); !errors.Is(err, ErrOrganizationalLoop) {
-		t.Fatalf("role cycle error=%v", err)
+	roleReuse := nextTestMessage(second, 4)
+	roleReuse.Recipient = "teams::architect-2"
+	if err := store.AppendMessage(context.Background(), roleReuse); err != nil {
+		t.Fatalf("legitimate later role use rejected: %v", err)
 	}
 
-	third := nextTestMessage(second, 5)
+	third := nextTestMessage(roleReuse, 5)
 	if err := store.AppendMessage(context.Background(), third); err != nil {
 		t.Fatalf("legitimate progress rejected: %v", err)
 	}

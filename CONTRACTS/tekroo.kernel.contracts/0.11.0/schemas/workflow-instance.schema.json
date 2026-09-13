@@ -1,0 +1,190 @@
+{
+  "$id": "tekroo.kernel.contracts/0.11.0/schemas/workflow-instance.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "accepted_message_ids": {
+      "items": {
+        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+        "type": "string"
+      },
+      "maxItems": 4096,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "budget_account_id": {
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "type": "string"
+    },
+    "definition_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "definition_name": {
+      "pattern": "^[a-z0-9](?:[a-z0-9.-]{0,126}[a-z0-9])?$",
+      "type": "string"
+    },
+    "definition_version": {
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "type": "string"
+    },
+    "instance_id": {
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "type": "string"
+    },
+    "last_event_id": {
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "type": "string"
+    },
+    "nodes": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "actor_fqn": {
+            "pattern": "^(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])::(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])-[1-9][0-9]{0,19}$",
+            "type": "string"
+          },
+          "attempt": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "blocked_from": {
+            "enum": [
+              "READY",
+              "ADMITTED",
+              "RUNNING"
+            ]
+          },
+          "checkpoint_id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "continuation_node_id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "failure_classification": {
+            "enum": [
+              "NONE",
+              "RECOVERABLE_TRANSPORT",
+              "CORRECTABLE_WORK",
+              "TERMINAL_POLICY",
+              "CANCELLED"
+            ]
+          },
+          "input_evidence_ids": {
+            "items": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            },
+            "maxItems": 1024,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "invocation_id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "node_id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "output_evidence_ids": {
+            "items": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            },
+            "maxItems": 1024,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "predecessor_node_ids": {
+            "items": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            },
+            "maxItems": 255,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "progress_digest": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "stage_id": {
+            "pattern": "^[a-z0-9](?:[a-z0-9.-]{0,126}[a-z0-9])?$",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "PENDING",
+              "READY",
+              "ADMITTED",
+              "RUNNING",
+              "BLOCKED",
+              "COMPLETED",
+              "FAILED",
+              "CANCELLED"
+            ]
+          }
+        },
+        "required": [
+          "node_id",
+          "stage_id",
+          "predecessor_node_ids",
+          "state",
+          "attempt",
+          "input_evidence_ids",
+          "output_evidence_ids",
+          "failure_classification"
+        ],
+        "type": "object"
+      },
+      "maxItems": 4096,
+      "type": "array"
+    },
+    "proposed_message_ids": {
+      "items": {
+        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+        "type": "string"
+      },
+      "maxItems": 4096,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "revision": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "root_request": {
+      "$ref": "core.schema.json#/$defs/AggregateRef"
+    },
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "state": {
+      "enum": [
+        "PENDING",
+        "ACTIVE",
+        "BLOCKED",
+        "COMPLETED",
+        "FAILED",
+        "CANCELLED"
+      ]
+    }
+  },
+  "required": [
+    "schema_version",
+    "instance_id",
+    "revision",
+    "definition_name",
+    "definition_version",
+    "definition_digest",
+    "root_request",
+    "budget_account_id",
+    "state",
+    "nodes"
+  ],
+  "title": "Tekroo durable workflow instance",
+  "type": "object"
+}

@@ -93,6 +93,12 @@
   "organization": {
     "manifest_file": "/Users/you/.config/tekroo/teams/team.json",
     "manifest_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+    "workflow_definitions": [
+      {
+        "definition_file": "/Users/you/work/tekroo-ai/teams/config/workflows/software-development.v1.json",
+        "definition_digest": "0fad72aa1ffd2a5a671a610165d8686fa68331f8206627874bf6ce3628b4bfa6"
+      }
+    ],
     "reconciliation_interval": "5s",
     "maximum_restarts": 3,
     "maximum_delivery_attempts": 3,

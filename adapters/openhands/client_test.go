@@ -310,7 +310,9 @@ func TestClientAcceptsFinishObservationAsFinalOutput(t *testing.T) {
 func TestClientForksPriorConversationForRetryContinuity(t *testing.T) {
 	brief, _ := openHandsTestBrief(t)
 	priorID := kernel.UUIDv7("00000000-0000-7000-8000-000000000200")
+	priorConversationID := string(priorID)
 	brief.RetryOfInvocationID = &priorID
+	brief.RetryOfConversationID = &priorConversationID
 	brief.RetryOrdinal = 1
 	brief.AttemptOrdinal = 2
 	brief.ExecutionGuidance = append(brief.ExecutionGuidance, "reuse the prior conversation")
@@ -338,8 +340,10 @@ func TestClientForksPriorConversationForRetryContinuity(t *testing.T) {
 func TestClientCreatesCleanConversationForExplicitRecovery(t *testing.T) {
 	brief, _ := openHandsTestBrief(t)
 	priorID := kernel.UUIDv7("00000000-0000-7000-8000-000000000200")
+	priorConversationID := string(priorID)
 	priorProfileID := brief.WorkProfile.ProfileID
 	brief.RetryOfInvocationID = &priorID
+	brief.RetryOfConversationID = &priorConversationID
 	brief.RetryOrdinal = 2
 	brief.AttemptOrdinal = 3
 	brief.WorkProfile.ProfileID = "00000000-0000-7000-8000-000000000211"
@@ -815,6 +819,27 @@ func TestClientExplicitRecoveryCannotStartWithoutPriorCheckpoint(t *testing.T) {
 	}
 }
 
+func TestClientExplicitRecoveryAfterPreStartFailureCreatesCleanConversation(t *testing.T) {
+	brief, _ := explicitRecoveryTestBrief(t)
+	brief.RetryOfConversationID = nil
+	encoded := mustJSON(brief)
+	hash := sha256.Sum256(encoded)
+	digest := kernel.Digest(hex.EncodeToString(hash[:]))
+	workspace := filepath.Join(t.TempDir(), "workspace")
+	state := &retryForkServerState{t: t, prompt: string(encoded), workspace: workspace, priorID: string(*brief.RetryOfInvocationID), currentID: string(brief.InvocationID), requestDigest: string(digest)}
+	server := httptest.NewServer(http.HandlerFunc(state.serveHTTP))
+	defer server.Close()
+	client := newOpenHandsTestClient(t, server.URL, workspace, brief)
+
+	observation, err := client.Start(context.Background(), brief, digest)
+	if err != nil || observation.State != application.ExternalSucceeded {
+		t.Fatalf("observation=%#v err=%v", observation, err)
+	}
+	if state.createCalls != 1 || state.forkCalls != 0 || state.priorGets != 0 || state.submitCalls != 1 || strings.Contains(state.submittedPrompt, `"recovery_checkpoint"`) {
+		t.Fatalf("create=%d fork=%d prior_get=%d submit=%d prompt=%s", state.createCalls, state.forkCalls, state.priorGets, state.submitCalls, state.submittedPrompt)
+	}
+}
+
 func TestEquivalentActionHistoryResetsAfterSuccessfulMutation(t *testing.T) {
 	exitSuccess := 0
 	events := []rawEvent{
@@ -868,7 +893,7 @@ func TestRepositoryProgressGuardStartsNewWindowAfterCompactionCheckpoint(t *test
 	}
 }
 
-func TestCheckpointCompletionAllowsReadsAndRejectsPostAnnouncementMutations(t *testing.T) {
+func TestCheckpointCompletionAllowsBoundedReadsAndRejectsPostAnnouncementWork(t *testing.T) {
 	checkpoint := progressCheckpoint{
 		SchemaVersion:       "tekroo.teams.execution-progress-checkpoint/1.2.0",
 		SourceJournalSHA256: kernel.Digest(strings.Repeat("a", 64)),
@@ -882,16 +907,32 @@ func TestCheckpointCompletionAllowsReadsAndRejectsPostAnnouncementMutations(t *t
 	if violation, repeated, found := checkpointCompletionRepositoryViolation(events, -1); found {
 		t.Fatalf("reads after the completion announcement were rejected: violation=%+v repeated=%t", violation, repeated)
 	}
-	// Composing the completion result may require many reads; none may count
-	// as a return to engineering work.
-	for index := 0; index < 6; index++ {
+	// Composing the completion result may require a bounded number of reads.
+	for index := 0; index < maximumCheckpointCompletionReads-2; index++ {
 		events = append(events, rawEvent{ID: fmt.Sprintf("late-read-%d", index), Kind: "ActionEvent", Source: "agent", ToolName: "file_editor", ActionCommand: "view", ActionPath: "organization/host.go"})
 	}
 	if violation, repeated, found := checkpointCompletionRepositoryViolation(events, -1); found {
 		t.Fatalf("verification reads after the completion announcement were rejected: violation=%+v repeated=%t", violation, repeated)
 	}
-	events = append(events, rawEvent{ID: "post-announcement-edit", Kind: "ActionEvent", Source: "agent", ToolName: "file_editor", ActionCommand: "str_replace", ActionPath: "organization/host.go"})
+	events = append(events, rawEvent{ID: "excess-read", Kind: "ActionEvent", Source: "agent", ToolName: "repository_view", ActionPath: "organization/host.go"})
 	violation, repeated, found := checkpointCompletionRepositoryViolation(events, -1)
+	if !found || repeated || violation.ID != "excess-read" {
+		t.Fatalf("excess completion read was not detected: found=%t repeated=%t violation=%+v", found, repeated, violation)
+	}
+	events = append(events, rawEvent{ID: "correction", Kind: "MessageEvent", Source: "user", Text: checkpointCompletionCorrectionPrefix + violation.ID})
+	if violation, repeated, found := checkpointCompletionRepositoryViolation(events, -1); found {
+		t.Fatalf("correction did not close prior excess reads: violation=%+v repeated=%t", violation, repeated)
+	}
+	events = append(events, rawEvent{ID: "post-correction-read", Kind: "ActionEvent", Source: "agent", ToolName: "repository_view", ActionPath: "cmd/tekroo"})
+	violation, repeated, found = checkpointCompletionRepositoryViolation(events, -1)
+	if !found || !repeated || violation.ID != "post-correction-read" {
+		t.Fatalf("repository read after correction was not detected: found=%t repeated=%t violation=%+v", found, repeated, violation)
+	}
+
+	// A fresh sequence still rejects mutations immediately.
+	events = events[:3]
+	events = append(events, rawEvent{ID: "post-announcement-edit", Kind: "ActionEvent", Source: "agent", ToolName: "file_editor", ActionCommand: "str_replace", ActionPath: "organization/host.go"})
+	violation, repeated, found = checkpointCompletionRepositoryViolation(events, -1)
 	if !found || repeated || violation.ID != "post-announcement-edit" {
 		t.Fatalf("repository mutation after completion handoff was not detected: found=%t repeated=%t violation=%+v", found, repeated, violation)
 	}
@@ -899,10 +940,10 @@ func TestCheckpointCompletionAllowsReadsAndRejectsPostAnnouncementMutations(t *t
 	if violation, repeated, found := checkpointCompletionRepositoryViolation(events, -1); found {
 		t.Fatalf("correction did not close prior mutation: violation=%+v repeated=%t", violation, repeated)
 	}
-	// A read after the correction is diligence, not defiance.
-	events = append(events, rawEvent{ID: "post-correction-read", Kind: "ActionEvent", Source: "agent", ToolName: "repository_view", ActionPath: "cmd/tekroo"})
-	if violation, repeated, found := checkpointCompletionRepositoryViolation(events, -1); found {
-		t.Fatalf("read after correction was rejected: violation=%+v repeated=%t", violation, repeated)
+	events = append(events, rawEvent{ID: "post-mutation-correction-read", Kind: "ActionEvent", Source: "agent", ToolName: "repository_view", ActionPath: "cmd/tekroo"})
+	violation, repeated, found = checkpointCompletionRepositoryViolation(events, -1)
+	if !found || !repeated || violation.ID != "post-mutation-correction-read" {
+		t.Fatalf("repository work after mutation correction was not detected: found=%t repeated=%t violation=%+v", found, repeated, violation)
 	}
 }
 
@@ -984,8 +1025,8 @@ func TestProgressCheckpointCompactsLongActionHistory(t *testing.T) {
 func TestCheckpointNextActionIgnoresFailedReadOnlyInspection(t *testing.T) {
 	brief, _ := openHandsTestBrief(t)
 	actions := []checkpointAction{
-		{Tool: "terminal", Command: `grep -rn ActorName CONTRACTS 2>/dev/null`, Outcome: "FAILED"},
-		{Tool: "repository_search", Command: `{"pattern":"ActorName"}`, Path: "organization", Outcome: "PENDING"},
+		{Tool: "terminal", Command: `grep -rn RetentionPolicy CONTRACTS 2>/dev/null`, Outcome: "FAILED"},
+		{Tool: "repository_search", Command: `{"pattern":"RetentionPolicy"}`, Path: "organization", Outcome: "PENDING"},
 	}
 	next := checkpointNextAction(brief, actions, nil, nil)
 	if !strings.Contains(next, "implement the first unmet acceptance criterion") {
@@ -1294,11 +1335,11 @@ func TestRepositoryProgressGuardDoesNotTreatRepeatedValidationAsDiscoveryLoop(t 
 func TestDeterministicValidationGuardStopsThirdEquivalentSuccess(t *testing.T) {
 	exitSuccess := 0
 	events := []rawEvent{
-		{ID: "first", Kind: "ActionEvent", Source: "agent", ToolName: "terminal", ToolCallID: "call-1", ActionCommand: "go test -tags mongo_integration -run 'TestActorNameStore' ./adapters/mongo/"},
+		{ID: "first", Kind: "ActionEvent", Source: "agent", ToolName: "terminal", ToolCallID: "call-1", ActionCommand: "go test -tags mongo_integration -run 'TestRetentionPolicyStore' ./adapters/mongo/"},
 		{Kind: "ObservationEvent", ToolName: "terminal", ToolCallID: "call-1", ObservationExitCode: &exitSuccess},
-		{ID: "second", Kind: "ActionEvent", Source: "agent", ToolName: "terminal", ToolCallID: "call-2", ActionCommand: "go test -tags mongo_integration -run 'TestActorNameStore' -count=3 ./adapters/mongo/"},
+		{ID: "second", Kind: "ActionEvent", Source: "agent", ToolName: "terminal", ToolCallID: "call-2", ActionCommand: "go test -tags mongo_integration -run 'TestRetentionPolicyStore' -count=3 ./adapters/mongo/"},
 		{Kind: "ObservationEvent", ToolName: "terminal", ToolCallID: "call-2", ObservationExitCode: &exitSuccess},
-		{ID: "third", Kind: "ActionEvent", Source: "agent", ToolName: "terminal", ToolCallID: "call-3", ActionCommand: "go test -tags mongo_integration -run 'TestActorNameStore' -v ./adapters/mongo/"},
+		{ID: "third", Kind: "ActionEvent", Source: "agent", ToolName: "terminal", ToolCallID: "call-3", ActionCommand: "go test -tags mongo_integration -run 'TestRetentionPolicyStore' -v ./adapters/mongo/"},
 		{Kind: "ObservationEvent", ToolName: "terminal", ToolCallID: "call-3", ObservationExitCode: &exitSuccess},
 	}
 	violation, repeated, found := repeatedDeterministicValidationViolation(events, -1)
@@ -1639,8 +1680,8 @@ func TestClientCorrectsRepositoryActionBeforeAgentsGroundingOnce(t *testing.T) {
 	workspace := filepath.Join(t.TempDir(), "workspace")
 	events := []map[string]any{
 		event("evt-user", "MessageEvent", "user", string(mustJSON(brief))),
-		actionEvent("status-before-grounding", "terminal", "git status"),
-		observationEvent("status-observation", "terminal", false, 0),
+		actionEvent("source-before-grounding", "terminal", "sed -n '1,80p' organization/host.go"),
+		observationEvent("source-observation", "terminal", false, 0),
 	}
 	state := &progressGuardServerState{prompt: string(mustJSON(brief)), workspace: workspace, events: events}
 	server := httptest.NewServer(http.HandlerFunc(state.serveHTTP))
@@ -1648,10 +1689,10 @@ func TestClientCorrectsRepositoryActionBeforeAgentsGroundingOnce(t *testing.T) {
 	client := newOpenHandsTestClient(t, server.URL, workspace, brief)
 
 	observation, err := client.Inspect(context.Background(), brief, string(brief.InvocationID), digest)
-	if err != nil || observation.State != application.ExternalRunning || state.interruptCalls != 1 || state.correctionCalls != 1 || !strings.HasPrefix(state.correctionText, repositoryGroundingCorrectionPrefix+"status-before-grounding\n") {
+	if err != nil || observation.State != application.ExternalRunning || state.interruptCalls != 1 || state.correctionCalls != 1 || !strings.HasPrefix(state.correctionText, repositoryGroundingCorrectionPrefix+"source-before-grounding\n") {
 		t.Fatalf("first observation=%#v err=%v interrupts=%d corrections=%d text=%q", observation, err, state.interruptCalls, state.correctionCalls, state.correctionText)
 	}
-	state.events = append(state.events, actionEvent("second-status-before-grounding", "terminal", "git status --short"))
+	state.events = append(state.events, actionEvent("second-source-before-grounding", "terminal", "sed -n '1,80p' adapters/mongo/store.go"))
 	observation, err = client.Inspect(context.Background(), brief, string(brief.InvocationID), digest)
 	if err != nil || observation.State != application.ExternalFailed || observation.Retryable || state.interruptCalls != 2 || state.correctionCalls != 1 || !strings.Contains(string(observation.Output), "REPEATED_REPOSITORY_ACTION_BEFORE_AGENTS_GROUNDING") {
 		t.Fatalf("second observation=%#v err=%v interrupts=%d corrections=%d", observation, err, state.interruptCalls, state.correctionCalls)
@@ -1725,22 +1766,38 @@ func TestRepositoryGroundingRequiresSuccessfulAgentsReadBeforeOtherActions(t *te
 		{Kind: "MessageEvent", Source: "user"},
 		{ID: "agents-read", Kind: "ActionEvent", Source: "agent", ToolName: "file_editor", ToolCallID: "agents-call", ActionCommand: "view", ActionPath: "/workspace/AGENTS.md"},
 		{Kind: "ObservationEvent", ToolName: "file_editor", ToolCallID: "agents-call", Text: "# instructions"},
-		{ID: "status", Kind: "ActionEvent", Source: "agent", ToolName: "terminal", ActionCommand: "git status"},
+		{ID: "source", Kind: "ActionEvent", Source: "agent", ToolName: "terminal", ActionCommand: "sed -n '1,80p' organization/host.go"},
 	}
 	if violation, found := repositoryGroundingViolation(events, 0, false); found {
 		t.Fatalf("unexpected violation: %+v", violation)
 	}
 	events[2].Text = ""
 	violation, found := repositoryGroundingViolation(events, 0, false)
-	if !found || violation.ID != "status" {
+	if !found || violation.ID != "source" {
 		t.Fatalf("violation=%+v found=%t", violation, found)
+	}
+}
+
+func TestRepositoryGroundingAllowsWorkspaceOrientationBeforeAgentsRead(t *testing.T) {
+	events := []rawEvent{
+		{Kind: "MessageEvent", Source: "user"},
+		{ID: "pwd", Kind: "ActionEvent", Source: "agent", ToolName: "terminal", ActionCommand: "pwd"},
+		{ID: "status", Kind: "ActionEvent", Source: "agent", ToolName: "terminal", ActionCommand: "git status --short"},
+		{ID: "list", Kind: "ActionEvent", Source: "agent", ToolName: "terminal", ActionCommand: "ls -la /workspace"},
+		{ID: "root", Kind: "ActionEvent", Source: "agent", ToolName: "terminal", ActionCommand: "git rev-parse --show-toplevel"},
+		{ID: "agents-read", Kind: "ActionEvent", Source: "agent", ToolName: "file_editor", ToolCallID: "agents-call", ActionCommand: "view", ActionPath: "/workspace/AGENTS.md"},
+		{Kind: "ObservationEvent", ToolName: "file_editor", ToolCallID: "agents-call", Text: "# instructions"},
+		{ID: "source", Kind: "ActionEvent", Source: "agent", ToolName: "terminal", ActionCommand: "git rev-parse HEAD"},
+	}
+	if violation, found := repositoryGroundingViolation(events, 0, false); found {
+		t.Fatalf("unexpected violation: %+v", violation)
 	}
 }
 
 func TestRepositoryGroundingAcceptsSuccessfulReadFromRecoveryCheckpoint(t *testing.T) {
 	events := []rawEvent{
 		{Kind: "MessageEvent", Source: "user"},
-		{ID: "focused-source", Kind: "ActionEvent", Source: "agent", ToolName: "repository_view", ToolCallID: "source-call", ActionPath: "adapters/mongo/actor_name_store.go"},
+		{ID: "focused-source", Kind: "ActionEvent", Source: "agent", ToolName: "repository_view", ToolCallID: "source-call", ActionPath: "adapters/mongo/retention_policy_store.go"},
 	}
 	if violation, found := repositoryGroundingViolation(events, 0, true); found {
 		t.Fatalf("retained recovery grounding was ignored: %+v", violation)
@@ -1764,16 +1821,16 @@ func TestRepositoryGroundingSurvivesLaterShellCorrection(t *testing.T) {
 func TestRepositoryGroundingDoesNotRediscoverCorrectedAction(t *testing.T) {
 	events := []rawEvent{
 		{Kind: "MessageEvent", Source: "user"},
-		{ID: "status", Kind: "ActionEvent", Source: "agent", ToolName: "terminal", ToolCallID: "status-call", ActionCommand: "git status"},
-		{Kind: "MessageEvent", Source: "user", Text: repositoryGroundingCorrectionPrefix + "status"},
+		{ID: "source", Kind: "ActionEvent", Source: "agent", ToolName: "terminal", ToolCallID: "source-call", ActionCommand: "sed -n '1,80p' organization/host.go"},
+		{Kind: "MessageEvent", Source: "user", Text: repositoryGroundingCorrectionPrefix + "source"},
 	}
 	if violation, found := repositoryGroundingViolation(events, 0, false); found {
 		t.Fatalf("corrected action was rediscovered: %+v", violation)
 	}
 
-	events = append(events, rawEvent{ID: "second-status", Kind: "ActionEvent", Source: "agent", ToolName: "terminal", ToolCallID: "second-status-call", ActionCommand: "git status --short"})
+	events = append(events, rawEvent{ID: "second-source", Kind: "ActionEvent", Source: "agent", ToolName: "terminal", ToolCallID: "second-source-call", ActionCommand: "sed -n '1,80p' adapters/mongo/store.go"})
 	violation, found := repositoryGroundingViolation(events, 0, false)
-	if !found || violation.ID != "second-status" {
+	if !found || violation.ID != "second-source" {
 		t.Fatalf("violation=%+v found=%t", violation, found)
 	}
 }
@@ -1959,7 +2016,7 @@ func TestRepositorySearchLoopRejectsExactRepeatedCustomToolAction(t *testing.T) 
 }
 
 func TestRepositorySearchLoopRejectsExactRepeatedGrepAction(t *testing.T) {
-	command := `grep -ri "ActorName" CONTRACTS/tekroo.kernel.contracts/0.10.0`
+	command := `grep -ri "RetentionPolicy" CONTRACTS/tekroo.kernel.contracts/0.10.0`
 	events := []rawEvent{
 		{Kind: "MessageEvent", Source: "user"},
 		{ID: "first-grep", Kind: "ActionEvent", Source: "agent", ToolName: "terminal", ActionCommand: command},
@@ -2092,7 +2149,7 @@ func TestMutationActionClassifiesGitStateChangesOnly(t *testing.T) {
 		{command: "git log -1", want: false},
 		{command: "ls adapters/mcp adapters/operatortools adapters/operatorhttp", want: false},
 		{command: "rg 'cp ' adapters/mcp", want: false},
-		{command: `grep -rn "ActorName" CONTRACTS 2>/dev/null`, want: false},
+		{command: `grep -rn "RetentionPolicy" CONTRACTS 2>/dev/null`, want: false},
 		{command: `grep ">" organization/*.go`, want: false},
 		{command: "go test ./... 2>&1", want: false},
 		{command: "go test ./... >/dev/null", want: false},
@@ -2708,8 +2765,10 @@ func newOpenHandsTestClient(t *testing.T, baseURL, workspace string, brief appli
 func explicitRecoveryTestBrief(t *testing.T) (application.ExecutionBrief, kernel.Digest) {
 	brief, _ := openHandsTestBrief(t)
 	priorID := kernel.UUIDv7("00000000-0000-7000-8000-000000000200")
+	priorConversationID := string(priorID)
 	priorProfileID := brief.WorkProfile.ProfileID
 	brief.RetryOfInvocationID = &priorID
+	brief.RetryOfConversationID = &priorConversationID
 	brief.RetryOrdinal = 1
 	brief.AttemptOrdinal = 2
 	brief.WorkProfile.ProfileID = "00000000-0000-7000-8000-000000000211"

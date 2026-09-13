@@ -1,0 +1,19 @@
+{
+  "schema_version": "1.0.0",
+  "kind": "phase10-acceptance-fixture",
+  "name": "durable-local-actor-names",
+  "request_path": "testdata/phase10/actor-name-feature-request.json",
+  "request_sha256": "a715c0a895ac014d5c650311cb47d95addc19d528b3a0da037e78f6610416c2e",
+  "source_run": "phase9/run-060",
+  "source_feature_id": "01a09280-1845-7c9b-8a5f-385c7240dc42",
+  "source_feature_revision": 6,
+  "source_feature_state": "ACCEPTED",
+  "source_starting_commit": "4c486fd746578a4bfd1b7f23f966d6d7228c5498",
+  "solution_disclosure": "NONE",
+  "submission": {
+    "method": "POST /v1/features",
+    "body": "request_path",
+    "bind_clean_baseline_at_execution": true,
+    "compare_reference_candidate_only_after_terminal_state": true
+  }
+}

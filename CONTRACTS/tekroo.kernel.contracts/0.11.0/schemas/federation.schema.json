@@ -1,0 +1,357 @@
+{
+  "$defs": {
+    "aliasBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "actor_fqn": {
+          "pattern": "^(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])::(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])-[1-9][0-9]{0,19}$",
+          "type": "string"
+        },
+        "deployment_identity": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "name": {
+          "pattern": "^[a-z0-9](?:[a-z0-9.-]{0,62}[a-z0-9])?$",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "route_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "route_revision": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "schema_version": {
+          "const": "1.0.0"
+        }
+      },
+      "required": [
+        "schema_version",
+        "name",
+        "revision",
+        "route_id",
+        "route_revision",
+        "deployment_identity",
+        "actor_fqn"
+      ],
+      "type": "object"
+    },
+    "deliveryReceipt": {
+      "additionalProperties": false,
+      "properties": {
+        "accepted_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "delivery_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "message_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "message_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "outcome": {
+          "const": "ACCEPTED"
+        },
+        "replay_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "route_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "route_revision": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "schema_version": {
+          "const": "1.0.0"
+        }
+      },
+      "required": [
+        "schema_version",
+        "delivery_id",
+        "replay_id",
+        "route_id",
+        "route_revision",
+        "message_id",
+        "message_sha256",
+        "accepted_at",
+        "outcome"
+      ],
+      "type": "object"
+    },
+    "route": {
+      "additionalProperties": false,
+      "properties": {
+        "allow_insecure_loopback_for_test": {
+          "default": false,
+          "type": "boolean"
+        },
+        "destination_actor": {
+          "pattern": "^(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])::(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])-[1-9][0-9]{0,19}$",
+          "type": "string"
+        },
+        "destination_deployment": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "endpoint": {
+          "format": "uri",
+          "maxLength": 4096,
+          "type": "string"
+        },
+        "key_id": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        },
+        "message_types": {
+          "items": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "purposes": {
+          "items": {
+            "enum": [
+              "REQUEST",
+              "HANDOFF",
+              "EVIDENCE",
+              "RESPONSE",
+              "NOTIFICATION"
+            ]
+          },
+          "maxItems": 5,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "revision": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "route_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "1.0.0"
+        },
+        "source_actor": {
+          "pattern": "^(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])::(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])-[1-9][0-9]{0,19}$",
+          "type": "string"
+        },
+        "source_deployment": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "ACTIVE",
+            "DISABLED"
+          ]
+        }
+      },
+      "required": [
+        "schema_version",
+        "route_id",
+        "revision",
+        "source_deployment",
+        "destination_deployment",
+        "source_actor",
+        "destination_actor",
+        "message_types",
+        "purposes",
+        "key_id",
+        "endpoint",
+        "status"
+      ],
+      "type": "object"
+    },
+    "signedEnvelope": {
+      "additionalProperties": false,
+      "properties": {
+        "alias_name": {
+          "maxLength": 64,
+          "type": "string"
+        },
+        "alias_revision": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "delivery_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "destination_actor": {
+          "pattern": "^(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])::(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])-[1-9][0-9]{0,19}$",
+          "type": "string"
+        },
+        "destination_deployment": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "expires_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "issued_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "key_epoch": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "key_id": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        },
+        "message": {
+          "type": "object"
+        },
+        "message_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "replay_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "route_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "route_revision": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "route_trace": {
+          "items": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "maxItems": 16,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "schema_version": {
+          "const": "1.0.0"
+        },
+        "signature": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        },
+        "source_actor": {
+          "pattern": "^(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])::(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])-[1-9][0-9]{0,19}$",
+          "type": "string"
+        },
+        "source_deployment": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "delivery_id",
+        "replay_id",
+        "route_id",
+        "route_revision",
+        "source_deployment",
+        "destination_deployment",
+        "source_actor",
+        "destination_actor",
+        "key_id",
+        "key_epoch",
+        "issued_at",
+        "expires_at",
+        "message_sha256",
+        "message",
+        "route_trace",
+        "signature"
+      ],
+      "type": "object"
+    },
+    "trustGrant": {
+      "additionalProperties": false,
+      "properties": {
+        "deployment_identity": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "key_epoch": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "key_id": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        },
+        "not_after": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "not_before": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "peer_id": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        },
+        "public_key": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "1.0.0"
+        },
+        "status": {
+          "enum": [
+            "ACTIVE",
+            "REVOKED"
+          ]
+        }
+      },
+      "required": [
+        "schema_version",
+        "peer_id",
+        "deployment_identity",
+        "key_id",
+        "key_epoch",
+        "public_key",
+        "not_before",
+        "not_after",
+        "status"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "tekroo.kernel.contracts/0.11.0/schemas/federation.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Tekroo Teams exact federation contract"
+}

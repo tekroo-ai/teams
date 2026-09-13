@@ -1,0 +1,69 @@
+{
+  "contractIdentity": "tekroo.kernel.contracts/0.11.0",
+  "invariants": [
+    {
+      "invariantId": "P7-INV-001",
+      "statement": "Aliases are revisioned convenience names and never durable actor identities.",
+      "testIds": [
+        "P7-FED-001",
+        "P7-FED-002"
+      ]
+    },
+    {
+      "invariantId": "P7-INV-002",
+      "statement": "Signature verification and exact route authorization are both required before append.",
+      "testIds": [
+        "P7-FED-003",
+        "P7-FED-004",
+        "P7-FED-005"
+      ]
+    },
+    {
+      "invariantId": "P7-INV-003",
+      "statement": "Replay identity and content digest make inbound acceptance exactly-once and conflict-detecting.",
+      "testIds": [
+        "P7-FED-006",
+        "P7-FED-007",
+        "P7-FED-009"
+      ]
+    },
+    {
+      "invariantId": "P7-INV-004",
+      "statement": "Federation time windows and route traces are finite and fail closed.",
+      "testIds": [
+        "P7-FED-008",
+        "P7-FED-010"
+      ]
+    },
+    {
+      "invariantId": "P7-INV-005",
+      "statement": "Production federation uses a dedicated HTTPS transport surface.",
+      "testIds": [
+        "P7-FED-011"
+      ]
+    },
+    {
+      "invariantId": "P7-INV-006",
+      "statement": "Federated messages carry information but no local execution or memory authority.",
+      "testIds": [
+        "P7-FED-012"
+      ]
+    },
+    {
+      "invariantId": "P7-INV-007",
+      "statement": "Organizational DAG and budget lineage is invariant across federation.",
+      "testIds": [
+        "P7-FED-013"
+      ]
+    },
+    {
+      "invariantId": "P7-INV-008",
+      "statement": "Outbound uncertainty is reconciled by exact delivery identity through the supported operator path.",
+      "testIds": [
+        "P7-FED-014",
+        "P7-FED-015"
+      ]
+    }
+  ],
+  "schemaVersion": "1.0.0"
+}

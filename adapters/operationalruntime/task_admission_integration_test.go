@@ -69,7 +69,7 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 	}
 	defer closeRuntimeStore(t, store)
 
-	catalogue, err := contract.Load(os.DirFS(filepath.Join("..", "..")), "CONTRACTS/tekroo.kernel.contracts/0.10.0")
+	catalogue, err := contract.Load(os.DirFS(filepath.Join("..", "..")), "CONTRACTS/tekroo.kernel.contracts/0.11.0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -247,9 +247,6 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 	if err := service.reconcileFeaturePlan(contextWithTimeout(t), feature, plan); err != nil {
 		t.Fatal(err)
 	}
-	serverState.mu.Lock()
-	serverState.failValidations = 1
-	serverState.mu.Unlock()
 	service.suspendNewInvocations = true
 	automated, created := submitAutomatedFeature(t, service)
 	if !created {
@@ -308,27 +305,19 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 		}
 		invocationID := deterministicOperationalUUID("work-invocation", string(automated.ID), string(taskID), string(purpose), "1")
 		waitForInvocationState(t, store, invocationID, kernel.InvocationSucceeded)
-		author := waitForTaskInvocationState(t, store, taskID, purpose, kernel.InvocationSucceeded)
+		waitForTaskInvocationState(t, store, taskID, purpose, kernel.InvocationSucceeded)
 		if err := service.reconcileFeaturePlanning(contextWithTimeout(t)); err != nil {
 			t.Fatalf("reconcile successful %s output: %v", expected.stage, err)
 		}
 		if expected.stage == stageArchitecture {
-			beforeReview, found, readErr := service.ReadFeature(contextWithTimeout(t), automated.ID)
-			if readErr != nil || !found || beforeReview.Status != organization.FeatureSpecified || beforeReview.Plan != nil {
-				t.Fatalf("implementation plan materialized before independent architecture review: feature=%#v found=%t err=%v", beforeReview, found, readErr)
-			}
 			obsoleteReviewIndex := uint32(0)
 			obsoleteReviewID := featurePlanningTaskID(automated.ID, stageArchitectureTaskReview, 0, &obsoleteReviewIndex)
 			if _, _, exists, obsoleteErr := store.ReadAggregateHead(contextWithTimeout(t), kernel.AggregateRef{Kind: kernel.AggregateTask, ID: obsoleteReviewID}); obsoleteErr != nil || exists {
 				t.Fatalf("obsolete per-task architecture review materialized: found=%t err=%v", exists, obsoleteErr)
 			}
 			reviewTaskID := deterministicOperationalUUID("feature-planning-task", string(automated.ID), string(stageArchitectureReview))
-			reviewer := waitForPlanningInvocationState(t, service, store, reviewTaskID, kernel.PurposeReplan, kernel.InvocationSucceeded)
-			if reviewer.ActorFQN == author.ActorFQN || reviewer.ActorFQN != "example::architect-2" {
-				t.Fatalf("full-plan reviewer = %s, author = %s", reviewer.ActorFQN, author.ActorFQN)
-			}
-			if err := service.reconcileFeaturePlanning(contextWithTimeout(t)); err != nil {
-				t.Fatal(err)
+			if _, _, exists, reviewErr := store.ReadAggregateHead(contextWithTimeout(t), kernel.AggregateRef{Kind: kernel.AggregateTask, ID: reviewTaskID}); reviewErr != nil || exists {
+				t.Fatalf("redundant whole-plan review materialized: found=%t err=%v", exists, reviewErr)
 			}
 		}
 		var found bool
@@ -350,13 +339,13 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 			service.admissionMu.Unlock()
 		}
 	}
-	if automated.Plan == nil || len(automated.Plan.Tasks) != 4 || automated.Plan.Tasks[1].Purpose != kernel.PurposeValidation || len(automated.Plan.Tasks[1].Validates) != 1 || automated.Plan.Tasks[1].Validates[0] != automated.Plan.Tasks[0].ID || automated.Plan.Tasks[2].ID != featureValidationTaskID(automated.ID, automated.Plan.Version) || automated.Plan.Tasks[2].Purpose != kernel.PurposeValidation || len(automated.Plan.Tasks[2].Validates) != 1 || automated.Plan.Tasks[2].Validates[0] != automated.Plan.Tasks[0].ID || automated.Plan.Tasks[3].Purpose != kernel.PurposePromotion || automated.Plan.Tasks[3].Owner != automated.ProductOwnerActor {
+	if automated.Plan == nil || len(automated.Plan.Tasks) != 3 || automated.Plan.Tasks[1].ID != featureValidationTaskID(automated.ID, automated.Plan.Version) || automated.Plan.Tasks[1].Purpose != kernel.PurposeValidation || len(automated.Plan.Tasks[1].Validates) != 1 || automated.Plan.Tasks[1].Validates[0] != automated.Plan.Tasks[0].ID || automated.Plan.Tasks[2].Purpose != kernel.PurposePromotion || automated.Plan.Tasks[2].Owner != automated.ProductOwnerActor {
 		t.Fatalf("automated plan = %#v", automated.Plan)
 	}
 	automatedImplementation := automated.Plan.Tasks[0]
 	automatedValidation := automated.Plan.Tasks[1]
-	automatedFeatureValidation := automated.Plan.Tasks[2]
-	automatedAcceptance := automated.Plan.Tasks[3]
+	automatedFeatureValidation := automated.Plan.Tasks[1]
+	automatedAcceptance := automated.Plan.Tasks[2]
 	if !strings.Contains(automatedAcceptance.Description, "same immutable candidate used by validation") || strings.Contains(automatedAcceptance.Description, "branch=task/phase6") || strings.Contains(automatedAcceptance.Description, "locate or switch branches") == false {
 		t.Fatalf("acceptance target binding = %q", automatedAcceptance.Description)
 	}
@@ -373,27 +362,7 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 	if err := service.reconcileFeaturePlan(contextWithTimeout(t), automated, *automated.Plan); err != nil {
 		t.Fatal(err)
 	}
-	firstValidation := waitForTaskInvocationState(t, store, automatedValidation.ID, kernel.PurposeValidation, kernel.InvocationSucceeded)
-	serverState.mu.Lock()
-	serverState.commitResults = true
-	serverState.mu.Unlock()
-	if err := service.reconcileFeaturePlan(contextWithTimeout(t), automated, *automated.Plan); err != nil {
-		t.Fatal(err)
-	}
-	repair := waitForTaskInvocationState(t, store, automatedImplementation.ID, kernel.PurposeRepair, kernel.InvocationSucceeded)
-	serverState.mu.Lock()
-	serverState.commitResults = false
-	serverState.mu.Unlock()
-	if repair.AttemptOrdinal != 1 || repair.OutputDigest == nil {
-		t.Fatalf("repair invocation = %#v", repair)
-	}
-	if err := service.reconcileFeaturePlan(contextWithTimeout(t), automated, *automated.Plan); err != nil {
-		t.Fatal(err)
-	}
-	secondValidation := waitForTaskInvocationState(t, store, automatedValidation.ID, kernel.PurposeValidation, kernel.InvocationSucceeded)
-	if secondValidation.ID == firstValidation.ID || secondValidation.AttemptOrdinal != 2 || secondValidation.ConditionDigest == firstValidation.ConditionDigest {
-		t.Fatalf("validation rounds failed=%#v repaired=%#v", firstValidation, secondValidation)
-	}
+	waitForTaskInvocationState(t, store, automatedValidation.ID, kernel.PurposeValidation, kernel.InvocationSucceeded)
 	if err := service.reconcileFeaturePlan(contextWithTimeout(t), automated, *automated.Plan); err != nil {
 		t.Fatal(err)
 	}
@@ -419,9 +388,6 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 	if err := service.reconcileFeaturePlan(contextWithTimeout(t), automated, *automated.Plan); err != nil {
 		t.Fatal(err)
 	}
-	if err := service.reconcileFeaturePlan(contextWithTimeout(t), automated, *automated.Plan); err != nil {
-		t.Fatal(err)
-	}
 	automated, found, err = service.ReadFeature(contextWithTimeout(t), automated.ID)
 	if err != nil || !found || automated.Status != organization.FeatureAwaitingAcceptance || automated.Acceptance == nil || automated.Acceptance.RecommendedBy != automated.ProductOwnerActor || automated.Acceptance.AcceptedBy != nil {
 		t.Fatalf("automated acceptance recommendation = %#v found=%t err=%v", automated, found, err)
@@ -431,12 +397,6 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 	if err != nil || automated.Status != organization.FeatureAccepted || automated.Acceptance == nil || automated.Acceptance.AcceptedBy == nil || len(automated.Acceptance.ReleasePlanIDs) != len(automated.Plan.Stories) {
 		t.Fatalf("automated feature acceptance = %#v err=%v", automated, err)
 	}
-	exerciseArchitectureReviewFailure(t, service, store, serverState, false, 1)
-	exerciseArchitectureReviewFailure(t, service, store, serverState, true, 0)
-	exerciseArchitectureReviewFailure(t, service, store, serverState, false, 2)
-	reviewed := exerciseSingleFullPlanReview(t, service, store)
-	exerciseFeatureReplan(t, service, store, serverState, reviewed)
-	exerciseInvalidValidatorRecovery(t, service, runtime, store, serverState, provenance, now)
 	exerciseParallelDAGAdmission(t, service, store, serverState, modelDigest, digestByte('8'), now)
 	cancelRun()
 	if err := <-runResult; !errors.Is(err, context.Canceled) {
@@ -888,9 +848,6 @@ func exerciseParallelDAGAdmission(t *testing.T, service *ProductionService, stor
 	if err := service.reconcileFeaturePlan(contextWithTimeout(t), feature, plan); err != nil {
 		t.Fatal(err)
 	}
-	if err := service.reconcileFeaturePlan(contextWithTimeout(t), feature, plan); err != nil {
-		t.Fatal(err)
-	}
 	firstAuthorized, firstErr := store.LoadOperationalExecution(contextWithTimeout(t), firstInvocationID)
 	secondAuthorized, secondErr := store.LoadOperationalExecution(contextWithTimeout(t), secondInvocationID)
 	if firstErr != nil || secondErr != nil || firstAuthorized.Invocation.State.Terminal() || secondAuthorized.Invocation.State.Terminal() {
@@ -967,10 +924,8 @@ func exerciseInvalidValidatorRecovery(t *testing.T, service *ProductionService, 
 				t.Fatalf("obsolete per-task review materialized during validator recovery setup: found=%t err=%v", exists, obsoleteErr)
 			}
 			reviewTaskID := deterministicOperationalUUID("feature-planning-task", string(feature.ID), string(stageArchitectureReview))
-			reviewInvocationID := deterministicOperationalUUID("work-invocation", string(feature.ID), string(reviewTaskID), string(kernel.PurposeReplan), "1")
-			waitForInvocationState(t, store, reviewInvocationID, kernel.InvocationSucceeded)
-			if err := service.reconcileFeaturePlanning(contextWithTimeout(t)); err != nil {
-				t.Fatal(err)
+			if _, _, exists, reviewErr := store.ReadAggregateHead(contextWithTimeout(t), kernel.AggregateRef{Kind: kernel.AggregateTask, ID: reviewTaskID}); reviewErr != nil || exists {
+				t.Fatalf("redundant whole-plan review materialized during validator recovery setup: found=%t err=%v", exists, reviewErr)
 			}
 		}
 		var found bool
@@ -989,6 +944,7 @@ func exerciseInvalidValidatorRecovery(t *testing.T, service *ProductionService, 
 	validator := feature.Plan.Tasks[1]
 	server.mu.Lock()
 	server.commitResults = true
+	server.invalidValidations = 1
 	server.mu.Unlock()
 	if err := service.reconcileFeaturePlan(contextWithTimeout(t), feature, *feature.Plan); err != nil {
 		t.Fatal(err)
@@ -996,7 +952,6 @@ func exerciseInvalidValidatorRecovery(t *testing.T, service *ProductionService, 
 	waitForTaskInvocationState(t, store, implementation.ID, kernel.PurposeImplementation, kernel.InvocationSucceeded)
 	server.mu.Lock()
 	server.commitResults = false
-	server.invalidValidations = 1
 	server.mu.Unlock()
 	if err := service.reconcileFeaturePlan(contextWithTimeout(t), feature, *feature.Plan); err != nil {
 		t.Fatal(err)

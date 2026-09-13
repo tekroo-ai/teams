@@ -1,0 +1,1083 @@
+{
+  "$id": "https://contracts.tekroo.ai/tekroo.kernel.contracts/0.11.0/schemas/operational-projection.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "oneOf": [
+    {
+      "additionalProperties": false,
+      "properties": {
+        "acceptance": {
+          "additionalProperties": false,
+          "properties": {
+            "event_id": {
+              "anyOf": [
+                {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "evidence_ids": {
+              "items": {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              "maxItems": 64,
+              "minItems": 0,
+              "type": "array",
+              "uniqueItems": true
+            },
+            "state": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "state",
+            "event_id",
+            "evidence_ids"
+          ],
+          "type": "object"
+        },
+        "acceptance_criteria": {
+          "items": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "aggregate_revision": {
+          "maximum": 1000000,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "blocker": {
+          "additionalProperties": false,
+          "properties": {
+            "event_id": {
+              "anyOf": [
+                {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "evidence_ids": {
+              "items": {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              "maxItems": 64,
+              "minItems": 0,
+              "type": "array",
+              "uniqueItems": true
+            },
+            "state": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "state",
+            "event_id",
+            "evidence_ids"
+          ],
+          "type": "object"
+        },
+        "completion": {
+          "additionalProperties": false,
+          "properties": {
+            "event_id": {
+              "anyOf": [
+                {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "evidence_ids": {
+              "items": {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              "maxItems": 64,
+              "minItems": 0,
+              "type": "array",
+              "uniqueItems": true
+            },
+            "state": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "state",
+            "event_id",
+            "evidence_ids"
+          ],
+          "type": "object"
+        },
+        "condition": {
+          "maxLength": 64,
+          "minLength": 1,
+          "type": "string"
+        },
+        "dependency_ids": {
+          "items": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "maxItems": 256,
+          "minItems": 0,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "description": {
+          "maxLength": 65536,
+          "type": "string"
+        },
+        "escalation": {
+          "additionalProperties": false,
+          "properties": {
+            "event_id": {
+              "anyOf": [
+                {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "evidence_ids": {
+              "items": {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              "maxItems": 64,
+              "minItems": 0,
+              "type": "array",
+              "uniqueItems": true
+            },
+            "state": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "state",
+            "event_id",
+            "evidence_ids"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "kind": {
+          "const": "story_projection"
+        },
+        "last_event_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "lifecycle_epoch": {
+          "maximum": 1000000,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "phase": {
+          "maxLength": 64,
+          "minLength": 1,
+          "type": "string"
+        },
+        "projection_revision": {
+          "maximum": 1000000,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "release": {
+          "additionalProperties": false,
+          "properties": {
+            "event_id": {
+              "anyOf": [
+                {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "evidence_ids": {
+              "items": {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              "maxItems": 64,
+              "minItems": 0,
+              "type": "array",
+              "uniqueItems": true
+            },
+            "state": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "state",
+            "event_id",
+            "evidence_ids"
+          ],
+          "type": "object"
+        },
+        "scope_revision": {
+          "maximum": 1000000,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "source_contract_identity": {
+          "const": "tekroo.kernel.contracts/0.11.0"
+        },
+        "task_counts": {
+          "additionalProperties": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "object"
+        },
+        "task_ids": {
+          "items": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "maxItems": 1024,
+          "minItems": 0,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "title": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "aggregate_revision",
+        "lifecycle_epoch",
+        "scope_revision",
+        "phase",
+        "condition",
+        "projection_revision",
+        "last_event_id",
+        "source_contract_identity",
+        "title",
+        "description",
+        "acceptance_criteria",
+        "dependency_ids",
+        "task_ids",
+        "task_counts",
+        "completion",
+        "acceptance",
+        "release",
+        "blocker",
+        "escalation"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "acceptance": {
+          "additionalProperties": false,
+          "properties": {
+            "event_id": {
+              "anyOf": [
+                {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "evidence_ids": {
+              "items": {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              "maxItems": 64,
+              "minItems": 0,
+              "type": "array",
+              "uniqueItems": true
+            },
+            "state": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "state",
+            "event_id",
+            "evidence_ids"
+          ],
+          "type": "object"
+        },
+        "acceptance_criteria": {
+          "items": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "aggregate_revision": {
+          "maximum": 1000000,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "budget": {
+          "additionalProperties": false,
+          "properties": {
+            "account_id": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            },
+            "account_revision": {
+              "maximum": 1000000,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "deadline_at": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "model_invocation_limit": {
+              "maximum": 1000,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "model_invocations_used": {
+              "maximum": 1000,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "purpose_limits": {
+              "additionalProperties": false,
+              "properties": {
+                "ESCALATION": {
+                  "maximum": 1000,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "HANDOFF": {
+                  "maximum": 1000,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "IMPLEMENTATION": {
+                  "maximum": 1000,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "INVESTIGATION": {
+                  "maximum": 1000,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "PROMOTION": {
+                  "maximum": 1000,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "REPAIR": {
+                  "maximum": 1000,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "REPLAN": {
+                  "maximum": 1000,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "REVIEW": {
+                  "maximum": 1000,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "VALIDATION": {
+                  "maximum": 1000,
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "INVESTIGATION",
+                "IMPLEMENTATION",
+                "VALIDATION",
+                "REVIEW",
+                "REPAIR",
+                "HANDOFF",
+                "REPLAN",
+                "PROMOTION",
+                "ESCALATION"
+              ],
+              "type": "object"
+            },
+            "purpose_used": {
+              "additionalProperties": false,
+              "properties": {
+                "ESCALATION": {
+                  "maximum": 1000,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "HANDOFF": {
+                  "maximum": 1000,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "IMPLEMENTATION": {
+                  "maximum": 1000,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "INVESTIGATION": {
+                  "maximum": 1000,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "PROMOTION": {
+                  "maximum": 1000,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "REPAIR": {
+                  "maximum": 1000,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "REPLAN": {
+                  "maximum": 1000,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "REVIEW": {
+                  "maximum": 1000,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "VALIDATION": {
+                  "maximum": 1000,
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "INVESTIGATION",
+                "IMPLEMENTATION",
+                "VALIDATION",
+                "REVIEW",
+                "REPAIR",
+                "HANDOFF",
+                "REPLAN",
+                "PROMOTION",
+                "ESCALATION"
+              ],
+              "type": "object"
+            },
+            "remaining_model_invocations": {
+              "maximum": 1000,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "account_id",
+            "account_revision",
+            "model_invocation_limit",
+            "model_invocations_used",
+            "remaining_model_invocations",
+            "purpose_limits",
+            "purpose_used",
+            "deadline_at"
+          ],
+          "type": "object"
+        },
+        "classification": {
+          "additionalProperties": false,
+          "properties": {
+            "ambiguity": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            },
+            "blast_radius": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            },
+            "minimum_decision_route": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            },
+            "novelty": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            },
+            "security_sensitivity": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            },
+            "work_kind": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "work_kind",
+            "ambiguity",
+            "novelty",
+            "blast_radius",
+            "security_sensitivity",
+            "minimum_decision_route"
+          ],
+          "type": "object"
+        },
+        "completion": {
+          "additionalProperties": false,
+          "properties": {
+            "event_id": {
+              "anyOf": [
+                {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "evidence_ids": {
+              "items": {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              "maxItems": 64,
+              "minItems": 0,
+              "type": "array",
+              "uniqueItems": true
+            },
+            "state": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "state",
+            "event_id",
+            "evidence_ids"
+          ],
+          "type": "object"
+        },
+        "condition": {
+          "maxLength": 64,
+          "minLength": 1,
+          "type": "string"
+        },
+        "dependency_ids": {
+          "items": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "maxItems": 256,
+          "minItems": 0,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "description": {
+          "maxLength": 65536,
+          "type": "string"
+        },
+        "escalation": {
+          "additionalProperties": false,
+          "properties": {
+            "event_id": {
+              "anyOf": [
+                {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "evidence_ids": {
+              "items": {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              "maxItems": 64,
+              "minItems": 0,
+              "type": "array",
+              "uniqueItems": true
+            },
+            "state": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "state",
+            "event_id",
+            "evidence_ids"
+          ],
+          "type": "object"
+        },
+        "finding": {
+          "additionalProperties": false,
+          "properties": {
+            "event_id": {
+              "anyOf": [
+                {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "evidence_ids": {
+              "items": {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              "maxItems": 64,
+              "minItems": 0,
+              "type": "array",
+              "uniqueItems": true
+            },
+            "state": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "state",
+            "event_id",
+            "evidence_ids"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "invocation_counts": {
+          "additionalProperties": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "object"
+        },
+        "kind": {
+          "const": "task_projection"
+        },
+        "last_event_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "latest_invocation": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "attempt_ordinal": {
+                  "maximum": 1000,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "condition_digest": {
+                  "pattern": "^[0-9a-f]{64}$",
+                  "type": "string"
+                },
+                "invocation_id": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                "purpose": {
+                  "enum": [
+                    "INVESTIGATION",
+                    "IMPLEMENTATION",
+                    "VALIDATION",
+                    "REVIEW",
+                    "REPAIR",
+                    "HANDOFF",
+                    "REPLAN",
+                    "PROMOTION",
+                    "ESCALATION"
+                  ],
+                  "type": "string"
+                },
+                "state": {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "invocation_id",
+                "state",
+                "purpose",
+                "attempt_ordinal",
+                "condition_digest"
+              ],
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lifecycle_epoch": {
+          "maximum": 1000000,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "operational_scope": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "baseline_sha": {
+                  "pattern": "^[0-9a-f]{40}$",
+                  "type": "string"
+                },
+                "branch": {
+                  "maxLength": 256,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "execution_id": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                "fencing_epoch": {
+                  "maximum": 1000000,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "interface_constraint_evidence_ids": {
+                  "items": {
+                    "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                    "type": "string"
+                  },
+                  "maxItems": 64,
+                  "minItems": 0,
+                  "type": "array",
+                  "uniqueItems": true
+                },
+                "owner_fqn": {
+                  "pattern": "^(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])::(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])-[1-9][0-9]{0,19}$",
+                  "type": "string"
+                },
+                "workspace_id": {
+                  "maxLength": 1024,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "worktree_id": {
+                  "maxLength": 1024,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "writable_paths": {
+                  "items": {
+                    "maxLength": 4096,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "maxItems": 256,
+                  "minItems": 1,
+                  "type": "array",
+                  "uniqueItems": true
+                }
+              },
+              "required": [
+                "owner_fqn",
+                "execution_id",
+                "fencing_epoch",
+                "workspace_id",
+                "worktree_id",
+                "branch",
+                "baseline_sha",
+                "writable_paths",
+                "interface_constraint_evidence_ids"
+              ],
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "owner_fqn": {
+          "anyOf": [
+            {
+              "pattern": "^(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])::(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])-[1-9][0-9]{0,19}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ownership_version": {
+          "maximum": 1000000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "phase": {
+          "maxLength": 64,
+          "minLength": 1,
+          "type": "string"
+        },
+        "projection_revision": {
+          "maximum": 1000000,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "qualified_assignment": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "actor_fqn": {
+                  "pattern": "^(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])::(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])-[1-9][0-9]{0,19}$",
+                  "type": "string"
+                },
+                "assignment_id": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                "execution_id": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                "fencing_epoch": {
+                  "maximum": 1000000,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "model_profile_digest": {
+                  "pattern": "^[0-9a-f]{64}$",
+                  "type": "string"
+                },
+                "required_route": {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "runtime_identity_digest": {
+                  "pattern": "^[0-9a-f]{64}$",
+                  "type": "string"
+                },
+                "selected_route": {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "assignment_id",
+                "required_route",
+                "selected_route",
+                "actor_fqn",
+                "execution_id",
+                "fencing_epoch",
+                "model_profile_digest",
+                "runtime_identity_digest"
+              ],
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "scope_revision": {
+          "maximum": 1000000,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "source_contract_identity": {
+          "const": "tekroo.kernel.contracts/0.11.0"
+        },
+        "story_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        },
+        "validation": {
+          "additionalProperties": false,
+          "properties": {
+            "event_id": {
+              "anyOf": [
+                {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "evidence_ids": {
+              "items": {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              "maxItems": 64,
+              "minItems": 0,
+              "type": "array",
+              "uniqueItems": true
+            },
+            "state": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "state",
+            "event_id",
+            "evidence_ids"
+          ],
+          "type": "object"
+        },
+        "work_profile_digest": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "work_profile_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "work_profile_revision": {
+          "maximum": 1000000,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "aggregate_revision",
+        "lifecycle_epoch",
+        "scope_revision",
+        "phase",
+        "condition",
+        "projection_revision",
+        "last_event_id",
+        "source_contract_identity",
+        "title",
+        "description",
+        "acceptance_criteria",
+        "dependency_ids",
+        "story_id",
+        "owner_fqn",
+        "ownership_version",
+        "operational_scope",
+        "work_profile_id",
+        "work_profile_revision",
+        "work_profile_digest",
+        "classification",
+        "budget",
+        "qualified_assignment",
+        "latest_invocation",
+        "invocation_counts",
+        "validation",
+        "finding",
+        "escalation",
+        "completion",
+        "acceptance"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "projection_checkpoint"
+        },
+        "last_event_digest": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "last_event_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "projection_revision": {
+          "maximum": 1000000,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "projector": {
+          "maxLength": 128,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "projector",
+        "last_event_id",
+        "last_event_digest",
+        "projection_revision"
+      ],
+      "type": "object"
+    }
+  ],
+  "title": "Teams operational task and story projections"
+}

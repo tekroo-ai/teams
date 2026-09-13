@@ -680,7 +680,7 @@ func validCandidateRevalidation(value invocationAuthorizationPayload, prior Work
 	// revalidation only after verifying the exact invalid-structured-output
 	// block; a recorded product decision never reaches this path, and the new
 	// attempt must still return a passing structured acceptance.
-	if value.Purpose != PurposeValidation && value.Purpose != PurposeReview && value.Purpose != PurposeReplan && value.Purpose != PurposePromotion {
+	if value.Purpose != PurposeValidation && value.Purpose != PurposeReview && value.Purpose != PurposeRepair && value.Purpose != PurposeReplan && value.Purpose != PurposePromotion {
 		return false
 	}
 	return value.RetryOfInvocationID != nil && *value.RetryOfInvocationID == prior.ID && value.RetryOrdinal == prior.RetryOrdinal+1 && value.AttemptOrdinal == prior.AttemptOrdinal+1 && prior.State == InvocationSucceeded && value.ConditionDigest != prior.ConditionDigest

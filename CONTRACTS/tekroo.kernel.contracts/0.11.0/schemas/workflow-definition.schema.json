@@ -1,0 +1,255 @@
+{
+  "$id": "tekroo.kernel.contracts/0.11.0/schemas/workflow-definition.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "content_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "name": {
+      "pattern": "^[a-z0-9](?:[a-z0-9.-]{0,126}[a-z0-9])?$",
+      "type": "string"
+    },
+    "projection_rules": {
+      "items": {
+        "enum": [
+          "FEATURE",
+          "STORY",
+          "TASK",
+          "MESSAGE",
+          "STATUS"
+        ]
+      },
+      "maxItems": 64,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "root_budgets": {
+      "additionalProperties": false,
+      "properties": {
+        "maximum_attempts": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "maximum_elapsed_seconds": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "maximum_hops": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "maximum_model_invocations": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "maximum_tokens": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "maximum_model_invocations",
+        "maximum_hops",
+        "maximum_attempts"
+      ],
+      "type": "object"
+    },
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "stages": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "allowed_outgoing_purposes": {
+            "items": {
+              "enum": [
+                "REQUEST",
+                "HANDOFF",
+                "EVIDENCE",
+                "RESPONSE",
+                "NOTIFICATION"
+              ]
+            },
+            "maxItems": 5,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "attempt_limit": {
+            "maximum": 32,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "completion_condition": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          },
+          "complexity_maximum": {
+            "maximum": 5,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "complexity_minimum": {
+            "maximum": 5,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "concurrency_group": {
+            "pattern": "^[a-z0-9](?:[a-z0-9.-]{0,126}[a-z0-9])?$",
+            "type": "string"
+          },
+          "depends_on": {
+            "items": {
+              "pattern": "^[a-z0-9](?:[a-z0-9.-]{0,126}[a-z0-9])?$",
+              "type": "string"
+            },
+            "maxItems": 255,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "failure_condition": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          },
+          "input_schema": {
+            "maxLength": 1024,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maximum_parallelism": {
+            "maximum": 1024,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "output_schema": {
+            "maxLength": 1024,
+            "minLength": 1,
+            "type": "string"
+          },
+          "preferred_fqrns": {
+            "items": {
+              "pattern": "^(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])$",
+              "type": "string"
+            },
+            "maxItems": 32,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "purpose": {
+            "enum": [
+              "HANDOFF",
+              "IMPLEMENTATION",
+              "VALIDATION",
+              "REVIEW",
+              "REPAIR",
+              "REPLAN",
+              "PROMOTION"
+            ]
+          },
+          "required_capabilities": {
+            "items": {
+              "pattern": "^[a-z0-9](?:[a-z0-9.-]{0,126}[a-z0-9])?$",
+              "type": "string"
+            },
+            "maxItems": 64,
+            "minItems": 1,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "review_round_limit": {
+            "maximum": 16,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "risk": {
+            "enum": [
+              "LOW",
+              "MODERATE",
+              "HIGH",
+              "CRITICAL"
+            ]
+          },
+          "stage_id": {
+            "pattern": "^[a-z0-9](?:[a-z0-9.-]{0,126}[a-z0-9])?$",
+            "type": "string"
+          },
+          "target_selection": {
+            "enum": [
+              "EXACT_ACTOR",
+              "CAPABILITY",
+              "OPERATOR",
+              "NONE"
+            ]
+          },
+          "timeout_seconds": {
+            "maximum": 604800,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "token_budget": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "validation_policy": {
+            "enum": [
+              "DETERMINISTIC_ONLY",
+              "RISK_SELECTED",
+              "SPECIALIZED",
+              "OPERATOR_APPROVED"
+            ]
+          }
+        },
+        "required": [
+          "stage_id",
+          "depends_on",
+          "input_schema",
+          "output_schema",
+          "required_capabilities",
+          "purpose",
+          "risk",
+          "concurrency_group",
+          "maximum_parallelism",
+          "attempt_limit",
+          "allowed_outgoing_purposes",
+          "target_selection",
+          "validation_policy"
+        ],
+        "type": "object"
+      },
+      "maxItems": 256,
+      "minItems": 1,
+      "type": "array"
+    },
+    "trigger_types": {
+      "items": {
+        "maxLength": 256,
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxItems": 64,
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "version": {
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "name",
+    "version",
+    "content_digest",
+    "trigger_types",
+    "stages",
+    "root_budgets",
+    "projection_rules"
+  ],
+  "title": "Tekroo versioned workflow definition",
+  "type": "object"
+}

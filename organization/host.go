@@ -375,6 +375,42 @@ func (host *Host) ConfiguredRoleActors(role string) ([]kernel.ActorFQN, error) {
 	return nil, ErrRoleNotConfigured
 }
 
+// ConfiguredModelProfileActors resolves configured actor identities from the
+// model profile bound by the team manifest. This lets generic scheduling code
+// select qualified execution capacity without knowing role names.
+func (host *Host) ConfiguredModelProfileActors(profile kernel.Digest) ([]kernel.ActorFQN, error) {
+	if host == nil || !profile.Valid() {
+		return nil, ErrInvalidTeamManifest
+	}
+	actors := make([]kernel.ActorFQN, 0)
+	for _, binding := range host.team.Manifest.Roles {
+		if binding.ModelProfileDigest != profile {
+			continue
+		}
+		for instance := uint32(1); instance <= binding.MaximumInstances; instance++ {
+			actors = append(actors, kernel.ActorFQN(fmt.Sprintf("%s::%s-%d", host.team.Manifest.Team, binding.Role, instance)))
+		}
+	}
+	if len(actors) == 0 {
+		return nil, ErrRoleNotConfigured
+	}
+	sort.Slice(actors, func(left, right int) bool { return actors[left] < actors[right] })
+	return actors, nil
+}
+
+// ConfiguredActorModelProfile returns the immutable model-profile binding from
+// the signed team manifest without requiring the actor process to be running.
+func (host *Host) ConfiguredActorModelProfile(actor kernel.ActorFQN) (kernel.Digest, error) {
+	if host == nil || !actor.Valid() {
+		return "", ErrInvalidTeamManifest
+	}
+	binding, _, _, err := host.configured(actor)
+	if err != nil {
+		return "", err
+	}
+	return binding.ModelProfileDigest, nil
+}
+
 // ConfiguredCapabilityActors resolves every configured actor whose verified
 // role bundle declares capability. Selection remains data-driven by the loaded
 // team definition; callers do not need to know the role names that provide it.
@@ -396,6 +432,28 @@ func (host *Host) ConfiguredCapabilityActors(capability string) ([]kernel.ActorF
 	}
 	sort.Slice(actors, func(left, right int) bool { return actors[left] < actors[right] })
 	return actors, nil
+}
+
+// EligibleForWorkflowStage checks only configured role-bundle capabilities and
+// definition-declared targeting. It does not start the actor or invoke a model.
+func (host *Host) EligibleForWorkflowStage(actor kernel.ActorFQN, stage kernel.WorkflowStageDefinition) bool {
+	if host == nil || !actor.Valid() || !stage.TargetSelection.Valid() || stage.TargetSelection == kernel.WorkflowTargetNone {
+		return false
+	}
+	_, bundle, _, err := host.configured(actor)
+	if err != nil {
+		return false
+	}
+	for _, capability := range stage.RequiredCapabilities {
+		if !slices.Contains(bundle.Capabilities, capability) {
+			return false
+		}
+	}
+	if (stage.TargetSelection == kernel.WorkflowTargetExactActor || stage.TargetSelection == kernel.WorkflowTargetOperator) && len(stage.PreferredFQRNs) > 0 {
+		role, err := kernel.RoleFQRNFromActor(actor)
+		return err == nil && slices.Contains(stage.PreferredFQRNs, role)
+	}
+	return true
 }
 
 // ResolveRoleRecipients converts a role-wide address into currently active,

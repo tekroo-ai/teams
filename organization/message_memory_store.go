@@ -21,17 +21,28 @@ type messageThreadState struct {
 	Visited         map[kernel.UUIDv7]struct{}
 	Progress        map[kernel.Digest]struct{}
 	LastRecipient   kernel.ActorFQN
-	VisitedRoles    map[string]struct{}
 }
 
 type MemoryOrganizationalMessageStore struct {
-	mu       sync.Mutex
-	messages map[kernel.UUIDv7]MessageClaim
-	threads  map[kernel.UUIDv7]messageThreadState
+	mu                 sync.Mutex
+	messages           map[kernel.UUIDv7]MessageClaim
+	threads            map[kernel.UUIDv7]messageThreadState
+	workflows          map[kernel.UUIDv7]kernel.WorkflowInstance
+	workflowProposals  map[kernel.UUIDv7]kernel.WorkProposal
+	workflowAdmissions map[kernel.UUIDv7]kernel.WorkAdmissionResult
+	workflowIntents    map[kernel.UUIDv7]kernel.OutboxIntent
+	workflowRoots      map[kernel.AggregateRef]kernel.UUIDv7
+	workflowEvents     map[kernel.UUIDv7]kernel.Digest
 }
 
 func NewMemoryOrganizationalMessageStore() *MemoryOrganizationalMessageStore {
-	return &MemoryOrganizationalMessageStore{messages: make(map[kernel.UUIDv7]MessageClaim), threads: make(map[kernel.UUIDv7]messageThreadState)}
+	return &MemoryOrganizationalMessageStore{
+		messages: make(map[kernel.UUIDv7]MessageClaim), threads: make(map[kernel.UUIDv7]messageThreadState),
+		workflows: make(map[kernel.UUIDv7]kernel.WorkflowInstance), workflowProposals: make(map[kernel.UUIDv7]kernel.WorkProposal),
+		workflowAdmissions: make(map[kernel.UUIDv7]kernel.WorkAdmissionResult), workflowIntents: make(map[kernel.UUIDv7]kernel.OutboxIntent),
+		workflowRoots:  make(map[kernel.AggregateRef]kernel.UUIDv7),
+		workflowEvents: make(map[kernel.UUIDv7]kernel.Digest),
+	}
 }
 
 func (store *MemoryOrganizationalMessageStore) AppendMessage(ctx context.Context, message OrganizationalMessage) error {
@@ -63,15 +74,11 @@ func (store *MemoryOrganizationalMessageStore) AppendMessages(ctx context.Contex
 		copyThread := thread
 		copyThread.Visited = make(map[kernel.UUIDv7]struct{}, len(thread.Visited))
 		copyThread.Progress = make(map[kernel.Digest]struct{}, len(thread.Progress))
-		copyThread.VisitedRoles = make(map[string]struct{}, len(thread.VisitedRoles))
 		for value := range thread.Visited {
 			copyThread.Visited[value] = struct{}{}
 		}
 		for value := range thread.Progress {
 			copyThread.Progress[value] = struct{}{}
-		}
-		for value := range thread.VisitedRoles {
-			copyThread.VisitedRoles[value] = struct{}{}
 		}
 		scratch.threads[id] = copyThread
 	}
@@ -100,9 +107,8 @@ func (store *MemoryOrganizationalMessageStore) appendMessageLocked(message Organ
 		thread = messageThreadState{
 			MaximumHops: message.Flow.MaximumHops, BudgetAccountID: message.Flow.BudgetAccountID,
 			LifecycleEpoch: message.Flow.LifecycleEpoch, ScopeRevision: message.Flow.ScopeRevision,
-			Visited: make(map[kernel.UUIDv7]struct{}), Progress: make(map[kernel.Digest]struct{}), VisitedRoles: make(map[string]struct{}),
+			Visited: make(map[kernel.UUIDv7]struct{}), Progress: make(map[kernel.Digest]struct{}),
 		}
-		thread.VisitedRoles[actorRole(message.Sender)] = struct{}{}
 	} else if message.Flow.Hop != thread.LastHop+1 || message.Flow.MaximumHops != thread.MaximumHops || message.Flow.BudgetAccountID != thread.BudgetAccountID || message.Flow.LifecycleEpoch != thread.LifecycleEpoch || message.Flow.ScopeRevision != thread.ScopeRevision || message.CausationID == nil || *message.CausationID != thread.LastMessageID || message.Flow.ParentStepID == nil || *message.Flow.ParentStepID != thread.LastStepID || message.Sender != thread.LastRecipient {
 		return ErrOrganizationalLoop
 	}
@@ -112,16 +118,12 @@ func (store *MemoryOrganizationalMessageStore) appendMessageLocked(message Organ
 	if _, repeated := thread.Progress[message.Flow.ProgressDigest]; repeated {
 		return ErrOrganizationalLoop
 	}
-	if _, repeated := thread.VisitedRoles[actorRole(message.Recipient)]; repeated {
-		return ErrOrganizationalLoop
-	}
 	thread.LastMessageID = message.ID
 	thread.LastStepID = message.Flow.StepID
 	thread.LastHop = message.Flow.Hop
 	thread.Visited[message.Flow.StepID] = struct{}{}
 	thread.Progress[message.Flow.ProgressDigest] = struct{}{}
 	thread.LastRecipient = message.Recipient
-	thread.VisitedRoles[actorRole(message.Recipient)] = struct{}{}
 	store.threads[message.Flow.ThreadID] = thread
 	store.messages[message.ID] = MessageClaim{Message: message, State: MessagePending}
 	return nil
@@ -211,11 +213,8 @@ func (store *MemoryOrganizationalMessageStore) ReaddressMessage(ctx context.Cont
 	}
 	message := claim.Message
 	thread := store.threads[message.Flow.ThreadID]
-	if claim.State != MessagePending || message.Sender != sender || message.SenderExecution != execution || message.Recipient == recipient || uint32(len(message.ReaddressHistory)) >= maximumReaddresses || thread.LastMessageID != id || actorRole(message.Recipient) == actorRole(recipient) {
+	if claim.State != MessagePending || message.Sender != sender || message.SenderExecution != execution || message.Recipient == recipient || uint32(len(message.ReaddressHistory)) >= maximumReaddresses || thread.LastMessageID != id {
 		return OrganizationalMessage{}, ErrOrganizationalMessageConflict
-	}
-	if _, visited := thread.VisitedRoles[actorRole(recipient)]; visited {
-		return OrganizationalMessage{}, ErrOrganizationalLoop
 	}
 	prior := message.Recipient
 	message.Recipient = recipient
@@ -223,8 +222,6 @@ func (store *MemoryOrganizationalMessageStore) ReaddressMessage(ctx context.Cont
 	if message.Validate() != nil {
 		return OrganizationalMessage{}, ErrInvalidOrganizationalMessage
 	}
-	delete(thread.VisitedRoles, actorRole(prior))
-	thread.VisitedRoles[actorRole(recipient)] = struct{}{}
 	thread.LastRecipient = recipient
 	store.threads[message.Flow.ThreadID] = thread
 	claim.Message = message

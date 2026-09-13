@@ -32,8 +32,8 @@ import (
 )
 
 const (
-	ContractPackagePath = "CONTRACTS/tekroo.kernel.contracts/0.10.0"
-	ManifestSHA256      = kernel.Digest("2752b876d5a71bb1367a088b9f8cc0ad5df6343b0833906c49aae5a404b8db98")
+	ContractPackagePath = "CONTRACTS/tekroo.kernel.contracts/0.11.0"
+	ManifestSHA256      = kernel.Digest("85306c8edc703e85df502280642ef30161e16b8e82ff48f568c5a5c6d421f12d")
 	maximumConfigBytes  = 1 << 20
 )
 
@@ -165,49 +165,34 @@ func (profile ProductionProfile) qualificationDefinitionValid() bool {
 		sameWorkKinds(corpus.WorkKinds, qualification.QualifiedWorkKinds)
 }
 
-// ValidateOperationalProfileQualifications verifies that the fixed stages of
-// the built-in feature workflow are executable and that at least one
-// implementation role is eligible. Optional role/work-kind combinations stay
-// unavailable until their exact profile is qualified; task admission enforces
-// that boundary if a plan selects one. Configuration parsing intentionally
-// remains separate so qualification packages can be inspected before they are
-// activated.
+// ValidateOperationalProfileQualifications validates the configured execution
+// profiles without assuming any particular organizational role. Profiles with
+// no qualification package remain deliberately unavailable; partially bound or
+// invalid packages are rejected. Workflow-stage and task admission later apply
+// their exact capability, purpose, route, and work-kind requirements.
 func ValidateOperationalProfileQualifications(profiles []ProductionProfile, at time.Time) error {
-	if at.IsZero() {
+	if at.IsZero() || len(profiles) == 0 {
 		return invalidConfig("qualification evaluation time is invalid")
 	}
-	byRole := make(map[kernel.RoleFQRN]ProductionProfile, len(profiles))
+	roles := make(map[kernel.RoleFQRN]struct{}, len(profiles))
+	eligible := 0
 	for _, profile := range profiles {
-		if _, duplicate := byRole[profile.RoleFQRN]; duplicate {
+		if _, duplicate := roles[profile.RoleFQRN]; duplicate {
 			return invalidConfig(fmt.Sprintf("execution profile role %s is duplicated", profile.RoleFQRN))
 		}
-		byRole[profile.RoleFQRN] = profile
-	}
-	for _, requirement := range []struct {
-		role kernel.RoleFQRN
-		kind kernel.WorkKind
-	}{
-		{role: "product-owner", kind: kernel.WorkDesign},
-		{role: "product-owner", kind: kernel.WorkRelease},
-		{role: "project-manager", kind: kernel.WorkDesign},
-		{role: "architect", kind: kernel.WorkDesign},
-		{role: "tester", kind: kernel.WorkValidation},
-	} {
-		profile, found := byRole[requirement.role]
-		if !found {
+		roles[profile.RoleFQRN] = struct{}{}
+		if profile.Qualification == nil && profile.QualificationCorpus == nil {
 			continue
 		}
-		if !profile.qualifiedFor(profile.DecisionRoute, requirement.kind, at) {
-			return invalidConfig(fmt.Sprintf("execution profile %s lacks an eligible exact qualification for %s", requirement.role, requirement.kind))
+		if !profile.qualificationDefinitionValid() || !profile.DecisionRoute.ModelExecutable() || !profile.Qualification.EligibleAt(at) {
+			return invalidConfig(fmt.Sprintf("execution profile %s has an invalid or ineligible qualification", profile.RoleFQRN))
 		}
+		eligible++
 	}
-	for _, role := range []kernel.RoleFQRN{"coder", "senior-coder"} {
-		profile, found := byRole[role]
-		if found && profile.qualifiedFor(profile.DecisionRoute, kernel.WorkImplementation, at) {
-			return nil
-		}
+	if eligible == 0 {
+		return invalidConfig("no execution profile has an eligible exact qualification")
 	}
-	return invalidConfig("no implementation role has an eligible exact qualification for IMPLEMENTATION")
+	return nil
 }
 
 func (profile ProductionProfile) qualifiedFor(required kernel.DecisionRoute, workKind kernel.WorkKind, at time.Time) bool {
@@ -331,13 +316,19 @@ type ProductionContinuity struct {
 }
 
 type ProductionOrganization struct {
-	ManifestFile            string                 `json:"manifest_file"`
-	ManifestDigest          kernel.Digest          `json:"manifest_digest"`
-	LibraryManifests        []ProductionTeamSource `json:"library_manifests,omitempty"`
-	Publishers              []ProductionPublisher  `json:"trusted_publishers"`
-	ReconciliationInterval  string                 `json:"reconciliation_interval"`
-	MaximumRestarts         uint32                 `json:"maximum_restarts"`
-	MaximumDeliveryAttempts uint32                 `json:"maximum_delivery_attempts"`
+	ManifestFile            string                     `json:"manifest_file"`
+	ManifestDigest          kernel.Digest              `json:"manifest_digest"`
+	LibraryManifests        []ProductionTeamSource     `json:"library_manifests,omitempty"`
+	WorkflowDefinitions     []ProductionWorkflowSource `json:"workflow_definitions,omitempty"`
+	Publishers              []ProductionPublisher      `json:"trusted_publishers"`
+	ReconciliationInterval  string                     `json:"reconciliation_interval"`
+	MaximumRestarts         uint32                     `json:"maximum_restarts"`
+	MaximumDeliveryAttempts uint32                     `json:"maximum_delivery_attempts"`
+}
+
+type ProductionWorkflowSource struct {
+	DefinitionFile   string        `json:"definition_file"`
+	DefinitionDigest kernel.Digest `json:"definition_digest"`
 }
 
 type ProductionTeamSource struct {
@@ -372,6 +363,7 @@ type resolvedProductionConfig struct {
 	team                  organization.LoadedTeam
 	libraryTeams          []organization.LoadedTeam
 	trustedRolePublishers map[string]ed25519.PublicKey
+	workflowLibrary       *organization.WorkflowLibrary
 	federationRegistry    *organization.StaticFederationRegistry
 	federationPrivateKey  ed25519.PrivateKey
 	federationTimeout     time.Duration
@@ -419,6 +411,9 @@ func LoadProductionConfig(path string) (ProductionConfig, error) {
 	for index := range config.Organization.LibraryManifests {
 		config.Organization.LibraryManifests[index].ManifestFile = absoluteFrom(base, config.Organization.LibraryManifests[index].ManifestFile)
 	}
+	for index := range config.Organization.WorkflowDefinitions {
+		config.Organization.WorkflowDefinitions[index].DefinitionFile = absoluteFrom(base, config.Organization.WorkflowDefinitions[index].DefinitionFile)
+	}
 	for index := range config.Organization.Publishers {
 		config.Organization.Publishers[index].PublicKeyFile = absoluteFrom(base, config.Organization.Publishers[index].PublicKeyFile)
 	}
@@ -442,7 +437,7 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 		return resolvedProductionConfig{}, invalidConfig("required identity, storage, workspace, or profile binding is missing")
 	}
 	if info, err := os.Stat(filepath.Join(config.ContractRoot, ContractPackagePath, "manifest.json")); err != nil || !info.Mode().IsRegular() {
-		return resolvedProductionConfig{}, invalidConfig("contract root does not contain contract 0.10.0")
+		return resolvedProductionConfig{}, invalidConfig("contract root does not contain contract 0.11.0")
 	}
 	if !loopbackHTTPURL(config.OpenHands.BaseURL) {
 		return resolvedProductionConfig{}, invalidConfig("OpenHands base URL must be an explicit loopback HTTP endpoint with no path")
@@ -708,6 +703,16 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 		}
 		libraryTeams = append(libraryTeams, loaded)
 	}
+	var workflowLibrary *organization.WorkflowLibrary
+	if len(config.Organization.WorkflowDefinitions) > 0 {
+		workflowLibrary = organization.NewWorkflowLibrary()
+		for _, source := range config.Organization.WorkflowDefinitions {
+			definition, loadErr := organization.LoadWorkflowDefinition(source.DefinitionFile, source.DefinitionDigest)
+			if loadErr != nil || workflowLibrary.Add(definition) != nil {
+				return resolvedProductionConfig{}, invalidConfig("workflow definition is invalid or duplicated")
+			}
+		}
+	}
 	var policy kernel.AuthorizationPolicy
 	if err := readStrictJSONFile(config.AuthorizationPolicyFile, &policy); err != nil || !productionPolicyValid(policy, config.ServiceAuthority, config.ExpiryAuthority) || config.Execution.PolicyRevision != policy.Revision || config.Evidence.PolicyRevision != policy.Revision {
 		return resolvedProductionConfig{}, invalidConfig("authorization policy file is invalid")
@@ -716,7 +721,7 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 	if err := readStrictJSONFile(config.ProvenanceFile, &provenance); err != nil || !provenance.Valid() || provenance.PolicyDigest != policy.PolicyDigest || provenance.PolicyRevision != policy.Revision {
 		return resolvedProductionConfig{}, invalidConfig("provenance file is invalid or does not bind the authorization policy")
 	}
-	return resolvedProductionConfig{ProductionConfig: config, mongoURI: mongoURI, sessionAPIKey: sessionKey, operatorBearerToken: operatorToken, humanCredentials: humanCredentials, authorizationPolicy: policy, provenance: provenance, requestTimeout: requestTimeout, pollInterval: pollInterval, operationTimeout: operationTimeout, leaseDuration: leaseDuration, reconciliation: reconciliation, leaseOperationTimeout: leaseOperationTimeout, projectionInterval: projectionInterval, projectionTimeout: projectionTimeout, continuityHeartbeat: continuityHeartbeat, continuityThreshold: continuityThreshold, operatorTimeout: operatorTimeout, team: team, libraryTeams: libraryTeams, trustedRolePublishers: trustedKeys, roleReconciliation: roleReconciliation, planningDeadline: planningDeadline, gitOperationTimeout: gitOperationTimeout, federationRegistry: federationRegistry, federationPrivateKey: federationPrivateKey, federationTimeout: federationTimeout, federationFutureSkew: federationFutureSkew, federationTTL: federationTTL}, nil
+	return resolvedProductionConfig{ProductionConfig: config, mongoURI: mongoURI, sessionAPIKey: sessionKey, operatorBearerToken: operatorToken, humanCredentials: humanCredentials, authorizationPolicy: policy, provenance: provenance, requestTimeout: requestTimeout, pollInterval: pollInterval, operationTimeout: operationTimeout, leaseDuration: leaseDuration, reconciliation: reconciliation, leaseOperationTimeout: leaseOperationTimeout, projectionInterval: projectionInterval, projectionTimeout: projectionTimeout, continuityHeartbeat: continuityHeartbeat, continuityThreshold: continuityThreshold, operatorTimeout: operatorTimeout, team: team, libraryTeams: libraryTeams, trustedRolePublishers: trustedKeys, workflowLibrary: workflowLibrary, roleReconciliation: roleReconciliation, planningDeadline: planningDeadline, gitOperationTimeout: gitOperationTimeout, federationRegistry: federationRegistry, federationPrivateKey: federationPrivateKey, federationTimeout: federationTimeout, federationFutureSkew: federationFutureSkew, federationTTL: federationTTL}, nil
 }
 
 func loadedTeamHasActor(team organization.LoadedTeam, actor kernel.ActorFQN) bool {
@@ -742,6 +747,7 @@ type ProductionService struct {
 	MessageBus         *organization.MessageBus
 	RoleInbox          *organization.RoleInbox
 	RoleLibrary        *organization.RoleLibrary
+	WorkflowLibrary    *organization.WorkflowLibrary
 	FederationRegistry *organization.StaticFederationRegistry
 	FederationIngress  *organization.FederationIngress
 	Federation         *organization.FederationCoordinator
@@ -893,7 +899,8 @@ func NewProductionService(ctx context.Context, config ProductionConfig) (*Produc
 		_ = runtime.Close(context.WithoutCancel(ctx))
 		return fail(fmt.Errorf("create message bus: %w", err))
 	}
-	roleRuntime, err := organization.NewInProcessRuntime(&organizationalRoleWorker{store: store, inbox: roleInbox, pollInterval: resolved.pollInterval, openTimeout: resolved.leaseOperationTimeout})
+	roleWorker := &organizationalRoleWorker{store: store, inbox: roleInbox, pollInterval: resolved.pollInterval, openTimeout: resolved.leaseOperationTimeout}
+	roleRuntime, err := organization.NewInProcessRuntime(roleWorker)
 	if err != nil {
 		_ = runtime.Close(context.WithoutCancel(ctx))
 		return fail(fmt.Errorf("create role runtime: %w", err))
@@ -902,6 +909,14 @@ func NewProductionService(ctx context.Context, config ProductionConfig) (*Produc
 	if err != nil {
 		_ = runtime.Close(context.WithoutCancel(ctx))
 		return fail(fmt.Errorf("create role host: %w", err))
+	}
+	if resolved.workflowLibrary != nil {
+		workflowAdmission, admissionErr := organization.NewWorkflowAdmissionCoordinator(store, resolved.workflowLibrary, roleHost, clock, ids)
+		if admissionErr != nil {
+			_ = runtime.Close(context.WithoutCancel(ctx))
+			return fail(fmt.Errorf("create workflow admission coordinator: %w", admissionErr))
+		}
+		roleWorker.admission = workflowAdmission
 	}
 	libraryTeams := append([]organization.LoadedTeam{resolved.team}, resolved.libraryTeams...)
 	roleLibrary, err := organization.NewRoleLibrary(libraryTeams...)
@@ -918,7 +933,7 @@ func NewProductionService(ctx context.Context, config ProductionConfig) (*Produc
 	for key, value := range resolved.trustedRolePublishers {
 		trustedPublishers[key] = append(ed25519.PublicKey(nil), value...)
 	}
-	service := &ProductionService{Store: store, Runtime: runtime, Controller: controller, RoleHost: roleHost, RoleRuntime: roleRuntime, MessageBus: messageBus, RoleInbox: roleInbox, RoleLibrary: roleLibrary, projectionInterval: resolved.projectionInterval, projectionTimeout: resolved.projectionTimeout, recoveryInterval: resolved.reconciliation, recoveryTimeout: resolved.leaseOperationTimeout, recoveryAttempts: config.Worker.MaximumReconciliations, failures: make(chan error, 4), provenance: resolved.provenance, operatorToken: resolved.operatorBearerToken, operatorIdentity: protocol.AuthenticatedContext{Principal: config.Operator.Principal}, humanCredentials: append([]HumanTransportCredential(nil), resolved.humanCredentials...), operatorTimeout: resolved.operatorTimeout, operatorMaxBody: config.Operator.MaximumBodyBytes, roleReconciliation: resolved.roleReconciliation, roleMaximumRestarts: config.Organization.MaximumRestarts, messageMaximumAttempts: config.Organization.MaximumDeliveryAttempts, startPaused: config.Worker.StartPaused, suspendNewInvocations: config.Worker.SuspendNewInvocations, admissionLimitEnabled: config.Worker.NewInvocationAdmissionLimit > 0, admissionRemaining: config.Worker.NewInvocationAdmissionLimit, recoveryFaults: make(map[string]RecoveryFault), requestTimeout: resolved.requestTimeout, clock: clock, ids: ids, deploymentIdentity: config.DeploymentIdentity, continuityHeartbeat: resolved.continuityHeartbeat, continuityThreshold: resolved.continuityThreshold, planningDeadline: resolved.planningDeadline, planning: config.Planning, profilesByModel: profilesByModel, workspacesByID: workspacesByID, workspaceResolver: workspaceResolver, taskWorkspaces: taskWorkspaces, candidates: candidates, serviceAuthority: config.ServiceAuthority, policyAuthority: config.ExpiryAuthority, librarySources: librarySources, trustedRolePublishers: trustedPublishers}
+	service := &ProductionService{Store: store, Runtime: runtime, Controller: controller, RoleHost: roleHost, RoleRuntime: roleRuntime, MessageBus: messageBus, RoleInbox: roleInbox, RoleLibrary: roleLibrary, WorkflowLibrary: resolved.workflowLibrary, projectionInterval: resolved.projectionInterval, projectionTimeout: resolved.projectionTimeout, recoveryInterval: resolved.reconciliation, recoveryTimeout: resolved.leaseOperationTimeout, recoveryAttempts: config.Worker.MaximumReconciliations, failures: make(chan error, 4), provenance: resolved.provenance, operatorToken: resolved.operatorBearerToken, operatorIdentity: protocol.AuthenticatedContext{Principal: config.Operator.Principal}, humanCredentials: append([]HumanTransportCredential(nil), resolved.humanCredentials...), operatorTimeout: resolved.operatorTimeout, operatorMaxBody: config.Operator.MaximumBodyBytes, roleReconciliation: resolved.roleReconciliation, roleMaximumRestarts: config.Organization.MaximumRestarts, messageMaximumAttempts: config.Organization.MaximumDeliveryAttempts, startPaused: config.Worker.StartPaused, suspendNewInvocations: config.Worker.SuspendNewInvocations, admissionLimitEnabled: config.Worker.NewInvocationAdmissionLimit > 0, admissionRemaining: config.Worker.NewInvocationAdmissionLimit, recoveryFaults: make(map[string]RecoveryFault), requestTimeout: resolved.requestTimeout, clock: clock, ids: ids, deploymentIdentity: config.DeploymentIdentity, continuityHeartbeat: resolved.continuityHeartbeat, continuityThreshold: resolved.continuityThreshold, planningDeadline: resolved.planningDeadline, planning: config.Planning, profilesByModel: profilesByModel, workspacesByID: workspacesByID, workspaceResolver: workspaceResolver, taskWorkspaces: taskWorkspaces, candidates: candidates, serviceAuthority: config.ServiceAuthority, policyAuthority: config.ExpiryAuthority, librarySources: librarySources, trustedRolePublishers: trustedPublishers}
 	if config.Federation != nil {
 		federationIngress, ingressErr := organization.NewFederationIngress(resolved.federationRegistry, store, config.DeploymentIdentity, resolved.federationFutureSkew)
 		if ingressErr != nil {
@@ -1131,7 +1146,25 @@ func (service *ProductionService) SendMessage(ctx context.Context, message organ
 	if service == nil || service.MessageBus == nil {
 		return application.ErrInvalidConfiguration
 	}
-	return service.MessageBus.Send(ctx, message)
+	root, hasRoot := workflowRootFromMessage(message)
+	workflowTrigger := false
+	if service.WorkflowLibrary != nil {
+		if _, err := service.WorkflowLibrary.LookupTrigger(message.Type); err == nil {
+			workflowTrigger = true
+			if !hasRoot {
+				return kernel.ErrInvalidWorkflowInstance
+			}
+		} else if !errors.Is(err, organization.ErrWorkflowDefinitionNotFound) {
+			return err
+		}
+	}
+	if err := service.MessageBus.Send(ctx, message); err != nil {
+		return err
+	}
+	if !workflowTrigger {
+		return nil
+	}
+	return service.bindTriggeredMessageWorkflow(ctx, message, root)
 }
 
 func (service *ProductionService) SendMessageFanout(ctx context.Context, messages []organization.OrganizationalMessage) error {

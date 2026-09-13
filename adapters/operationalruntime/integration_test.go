@@ -52,7 +52,7 @@ func TestAssembledRuntimeExecutesIndependentAuthorizedTasksConcurrentlyAndBuilds
 	}
 	defer closeRuntimeStore(t, store)
 
-	catalogue, err := contract.Load(os.DirFS(filepath.Join("..", "..")), "CONTRACTS/tekroo.kernel.contracts/0.10.0")
+	catalogue, err := contract.Load(os.DirFS(filepath.Join("..", "..")), "CONTRACTS/tekroo.kernel.contracts/0.11.0")
 	if err != nil {
 		t.Fatal(err)
 	}

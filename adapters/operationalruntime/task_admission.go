@@ -287,6 +287,10 @@ func (service *ProductionService) registerExecution(ctx context.Context, owner o
 }
 
 func (service *ProductionService) activateTask(ctx context.Context, feature organization.FeatureRequest, task *trackedTask, profileConfig ProductionProfile, workspace ProductionWorkspace, budgetRevision uint64, dependencyEvents []kernel.UUIDv7, evidence []kernel.EvidenceRef, evidenceID kernel.UUIDv7, conditionDigests []kernel.Digest) error {
+	return service.activateTaskWithInvocationID(ctx, feature, task, profileConfig, workspace, budgetRevision, dependencyEvents, evidence, evidenceID, conditionDigests, nil)
+}
+
+func (service *ProductionService) activateTaskWithInvocationID(ctx context.Context, feature organization.FeatureRequest, task *trackedTask, profileConfig ProductionProfile, workspace ProductionWorkspace, budgetRevision uint64, dependencyEvents []kernel.UUIDv7, evidence []kernel.EvidenceRef, evidenceID kernel.UUIDv7, conditionDigests []kernel.Digest, authorizedInvocationID *kernel.UUIDv7) error {
 	if task == nil || !profileConfig.qualificationDefinitionValid() || service == nil || service.clock == nil || !profileConfig.qualifiedFor(task.plan.DecisionRoute, workKindForPurpose(task.plan.Purpose, task.plan.Risk), service.clock.Now().UTC()) {
 		return organization.ErrInvalidFeature
 	}
@@ -408,7 +412,7 @@ func (service *ProductionService) activateTask(ctx context.Context, feature orga
 	if _, alreadyAuthorized := latestTaskInvocation(latestSnapshot.WorkInvocations, task.plan.ID); alreadyAuthorized {
 		return nil
 	}
-	return service.authorizeTaskInvocationWithCondition(ctx, feature, task, profileConfig, workspace, budgetRevision, task.plan.Purpose, 1, nil, conditionDigests)
+	return service.authorizeTaskInvocationWithConditionPolicyAndID(ctx, feature, task, profileConfig, workspace, budgetRevision, task.plan.Purpose, 1, nil, conditionDigests, false, false, authorizedInvocationID)
 }
 
 func (service *ProductionService) authorizeTaskInvocation(ctx context.Context, feature organization.FeatureRequest, task *trackedTask, profile ProductionProfile, workspace ProductionWorkspace, budgetRevision, attempt uint64, retry *kernel.WorkInvocation) error {
@@ -420,6 +424,10 @@ func (service *ProductionService) authorizeTaskInvocationWithCondition(ctx conte
 }
 
 func (service *ProductionService) authorizeTaskInvocationWithConditionPolicy(ctx context.Context, feature organization.FeatureRequest, task *trackedTask, profile ProductionProfile, workspace ProductionWorkspace, budgetRevision uint64, purpose kernel.WorkPurpose, attempt uint64, prior *kernel.WorkInvocation, conditionDigests []kernel.Digest, technicalExtension, reusePriorCondition bool) error {
+	return service.authorizeTaskInvocationWithConditionPolicyAndID(ctx, feature, task, profile, workspace, budgetRevision, purpose, attempt, prior, conditionDigests, technicalExtension, reusePriorCondition, nil)
+}
+
+func (service *ProductionService) authorizeTaskInvocationWithConditionPolicyAndID(ctx context.Context, feature organization.FeatureRequest, task *trackedTask, profile ProductionProfile, workspace ProductionWorkspace, budgetRevision uint64, purpose kernel.WorkPurpose, attempt uint64, prior *kernel.WorkInvocation, conditionDigests []kernel.Digest, technicalExtension, reusePriorCondition bool, authorizedInvocationID *kernel.UUIDv7) error {
 	if task == nil || !profile.qualifiedFor(task.plan.DecisionRoute, invocationWorkKind(task, purpose), service.clock.Now().UTC()) {
 		return organization.ErrInvalidFeature
 	}
@@ -468,6 +476,12 @@ func (service *ProductionService) authorizeTaskInvocationWithConditionPolicy(ctx
 		invocationIDParts = append(invocationIDParts, string(conditionDigest))
 	}
 	invocationID := deterministicOperationalUUID(invocationIDParts...)
+	if authorizedInvocationID != nil {
+		if !authorizedInvocationID.Valid() || prior != nil || attempt != 1 {
+			return organization.ErrInvalidFeature
+		}
+		invocationID = *authorizedInvocationID
+	}
 	idempotencyKey := "feature:" + string(feature.ID) + ":invocation-" + string(task.plan.ID) + "-" + strings.ToLower(string(purpose)) + "-" + attemptLabel + "-" + string(conditionDigest) + "-execution-" + string(task.owner.Execution.ExecutionID)
 	outputPredicateDigest := digestBytes([]byte("accepted-task-output\x00" + string(task.plan.ID) + "\x00" + string(criteriaDigest) + "\x00" + string(conditionDigest)))
 	var retryID *kernel.UUIDv7
@@ -542,7 +556,7 @@ func validInvocationContinuation(prior kernel.WorkInvocation, purpose kernel.Wor
 		// promotion only for the exact invalid-structured-output block; a recorded
 		// product decision remains unrecoverable and still needs a passing
 		// structured result from the next promotion attempt.
-		return technicalExtension && (recoverableTaskTerminal(prior) || prior.State == kernel.InvocationSucceeded && (purpose == kernel.PurposeValidation || purpose == kernel.PurposeReview || purpose == kernel.PurposeReplan || purpose == kernel.PurposePromotion)) || !technicalExtension && prior.State == kernel.InvocationSucceeded && (purpose == kernel.PurposeValidation || purpose == kernel.PurposeReview)
+		return technicalExtension && (recoverableTaskTerminal(prior) || prior.State == kernel.InvocationSucceeded && (purpose == kernel.PurposeValidation || purpose == kernel.PurposeReview || purpose == kernel.PurposeRepair || purpose == kernel.PurposeReplan || purpose == kernel.PurposePromotion)) || !technicalExtension && prior.State == kernel.InvocationSucceeded && (purpose == kernel.PurposeValidation || purpose == kernel.PurposeReview)
 	}
 	if prior.Retryable == nil || !*prior.Retryable {
 		return false

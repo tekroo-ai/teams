@@ -1,0 +1,79 @@
+{
+  "schema_version": "1.0.0",
+  "kind": "phase10-step1-baseline-separation-receipt",
+  "recorded_at": "2026-09-13T07:26:51Z",
+  "result": "PASS",
+  "phase9_run": {
+    "run_id": "run-060",
+    "root": "/Users/paul/.local/share/tekroo/phase9/run-060",
+    "database": "tekroo_teams_v4_phase9_run060",
+    "feature_id": "01a09280-1845-7c9b-8a5f-385c7240dc42",
+    "feature_revision": 6,
+    "feature_state": "ACCEPTED",
+    "story_id": "52fca336-b99d-7c53-8197-007581423eb6",
+    "plan_version": 1,
+    "planned_tasks": 12,
+    "task_dag_sha256": "23e8354dc10aa033c626a55ac3b79833c24176749a14a333e7e858670842d855",
+    "active_stage": null,
+    "worker_active_count": 0,
+    "acceptance_recommendation_digest": "50f27f3a21ee64221d295cae58ced5fd016a15f2f52def31f8f91adfca7caa10",
+    "release_disposition": "NO_RELEASE_REQUIRED",
+    "workflow_instance": {
+      "present": false,
+      "surrogate": "feature request plus hard-coded stage runtime",
+      "reason": "Phase 9 predates the Phase 10 generic WorkflowInstance"
+    },
+    "invocations": {
+      "total": 33,
+      "succeeded": 23,
+      "failed": 7,
+      "start_failed": 3,
+      "unique_terminal_evidence_ids": 149,
+      "canonical_identity_set_sha256": "d1efa707d2cc61dce075e26693e28e4092469d640ed0c9742337af96caf619c2"
+    },
+    "execution_metrics": {
+      "summed_active_seconds": 51026.331,
+      "model_calls": 2947,
+      "reported_prompt_tokens": 199214100,
+      "reported_cache_read_tokens": 186214586,
+      "reported_completion_tokens": 737736,
+      "cache_read_percent_of_prompt": 93.5
+    }
+  },
+  "infrastructure_baseline": {
+    "worktree": "/Users/paul/.local/share/tekroo/phase10/worktree",
+    "branch": "codex/phase10-hybrid",
+    "committed_head": "049fec7dc33b27cf677a085d765fa3ce991af022",
+    "committed_tree": "31b1d5081f82facf26e7607e6652c9b69d7b0871",
+    "source_run_tracked_delta_sha256": "700e7348350b140b3aad4a3bf087b46ba0ed480f3b1e3f68979524bc51e68a17",
+    "source_run_untracked_regressions": {
+      "adapters/mongo/operational_execution_test.go": "e1fe318bcc4a803cc22ffea4ddb33b2e880540269f5c8b1c96496e6029c3155e",
+      "adapters/operationalruntime/task_completion_reason_test.go": "fd6b58b1ffdd5f3c81fba807af3daae9002bfe351a4a36ed04b91dbd7fb74e1e"
+    },
+    "full_go_test": "PASS",
+    "full_go_test_elapsed_seconds": 13.7
+  },
+  "acceptance_fixture": {
+    "request": "testdata/phase10/actor-name-feature-request.json",
+    "request_sha256": "a715c0a895ac014d5c650311cb47d95addc19d528b3a0da037e78f6610416c2e",
+    "acceptance_criteria": 23,
+    "direct_submission_validation": "PASS",
+    "contains_prior_plan_or_implementation": false
+  },
+  "reference_candidate": {
+    "manifest": "OUTPUT/phase-10/step-1/actor-name-reference-candidate.json",
+    "repository": "/Users/paul/.local/share/tekroo/phase10/quarantine/actor-name-reference.git",
+    "candidate_commit": "673d74054c04439b6eaa25e663fc28ecf8297bb4",
+    "candidate_tree": "8c9157dca4434effdcc475341567825166e8b25b",
+    "integrity": "PASS",
+    "included_in_baseline": false
+  },
+  "separation_assertions": {
+    "actor_name_production_code_in_baseline": false,
+    "actor_name_implementation_tests_in_baseline": false,
+    "actor_name_solution_commit_in_baseline_history": false,
+    "generated_actor_name_candidate_in_baseline": false,
+    "phase9_run_modified": false,
+    "canonical_checkout_modified_by_separation": false
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "schema_version": "1.0.0",
+  "receipt_type": "PHASE_10_CONTRACT_CANDIDATE",
+  "recorded_at": "2026-09-13T07:40:09Z",
+  "status": "ACCEPTED_FROZEN",
+  "contract": {
+    "identity": "tekroo.kernel.contracts/0.11.0",
+    "manifest_sha256": "85306c8edc703e85df502280642ef30161e16b8e82ff48f568c5a5c6d421f12d",
+    "manifest_file_sha256": "85306c8edc703e85df502280642ef30161e16b8e82ff48f568c5a5c6d421f12d",
+    "file_count": 44,
+    "catalogue_entries": 143,
+    "command_types": 71,
+    "event_types": 72,
+    "fixtures": 340,
+    "invariants": 76,
+    "schemas": 23,
+    "traceability_requirements": 217
+  },
+  "qualification": {
+    "generation_repetitions": 2,
+    "generation_identity_stable": true,
+    "structural_validator": {
+      "status": "PASS",
+      "checks": 3730,
+      "failed": 0,
+      "report_sha256": "5a07ecbf54ff18847d24cf0617561528adaefe5e974361fc336790ff8f36dc0f",
+      "file_sha256": "58bfc898a2b2b1905a4a1f84b803d11568a9b44c663ed577d308c252bf1b9785"
+    },
+    "reference_corpus": {
+      "status": "PASS",
+      "cases": 313,
+      "failed": 0,
+      "report_sha256": "3c8baa8e614d466f982e1642c72f060c7a99ae73c676c701a5e47e137a2e0bf4",
+      "file_sha256": "4ec02cb05c72e631b45849bd543fc8dfd38e03a33aaf88ed8cb32f281eadee30"
+    }
+  },
+  "predecessor": {
+    "identity": "tekroo.kernel.contracts/0.10.0",
+    "manifest_sha256": "2752b876d5a71bb1367a088b9f8cc0ad5df6343b0833906c49aae5a404b8db98",
+    "tracked_diff": "NONE",
+    "untracked_files": "NONE",
+    "byte_for_byte_unchanged": true
+  },
+  "generator": {
+    "path": "scripts/generate_phase10_contract_0_11.mjs",
+    "sha256": "8a8316c80c68ed272a2dd1e7824190fad1180a1547ac2a2e0097806da71281f6"
+  },
+  "authorization_boundary": {
+    "accepted_or_frozen": true,
+    "implementation_started": false,
+    "committed": false,
+    "pushed": false
+  }
+}

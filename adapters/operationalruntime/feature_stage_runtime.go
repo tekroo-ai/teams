@@ -63,12 +63,31 @@ func (service *ProductionService) reconcileFeaturePlanning(ctx context.Context) 
 		if !ok {
 			continue
 		}
+		var workflowAdmission kernel.WorkAdmissionResult
+		if service.WorkflowLibrary != nil {
+			var found bool
+			workflowAdmission, found, err = service.featureWorkflowAdmission(ctx, feature)
+			if err != nil {
+				return fmt.Errorf("feature %s %s workflow admission: %w", feature.ID, stage, err)
+			}
+			if !found || workflowAdmission.Outcome != kernel.WorkAdmitted {
+				continue
+			}
+		}
 		task, state, head, invocation, snapshot, err := service.ensureFeaturePlanningTask(ctx, feature, stage)
 		if errors.Is(err, errNewInvocationAdmissionSuspended) {
 			continue
 		}
 		if err != nil {
 			return fmt.Errorf("feature %s %s: %w", feature.ID, stage, err)
+		}
+		if service.WorkflowLibrary != nil {
+			if workflowAdmission.AuthorizedInvocationID == nil || invocation.ID != *workflowAdmission.AuthorizedInvocationID {
+				return fmt.Errorf("feature %s %s workflow invocation identity mismatch", feature.ID, stage)
+			}
+			if err := service.startFeatureWorkflowStage(ctx, feature, workflowAdmission); err != nil {
+				return fmt.Errorf("feature %s %s workflow start: %w", feature.ID, stage, err)
+			}
 		}
 		if invocation.State != kernel.InvocationSucceeded {
 			// Failed planning work remains visible and stopped. A successor model
@@ -110,6 +129,11 @@ func (service *ProductionService) reconcileFeaturePlanning(ctx context.Context) 
 				return err
 			}
 		}
+		if service.WorkflowLibrary != nil {
+			if err := service.completeFeatureWorkflowStage(ctx, feature, workflowAdmission, *invocation.OutputDigest); err != nil {
+				return fmt.Errorf("feature %s %s workflow completion: %w", feature.ID, stage, err)
+			}
+		}
 		// The independent second-architect plan review was dropped after
 		// qualification history (59 runs, 130+ recorded review branch results)
 		// showed zero plan corrections while contributing two planning-path
@@ -122,6 +146,15 @@ func (service *ProductionService) reconcileFeaturePlanning(ctx context.Context) 
 		}
 		if err := service.applyFeatureStageOutput(ctx, feature, stage, invocation, output); err != nil {
 			return fmt.Errorf("feature %s stage %s apply: %w", feature.ID, stage, err)
+		}
+		if service.WorkflowLibrary != nil {
+			updated, found, readErr := service.Features.Read(ctx, feature.ID)
+			if readErr != nil || !found {
+				return errors.Join(organization.ErrFeatureNotFound, readErr)
+			}
+			if bindErr := service.bindCurrentFeatureWorkflowStage(ctx, updated); bindErr != nil {
+				return fmt.Errorf("feature %s bind next workflow stage: %w", feature.ID, bindErr)
+			}
 		}
 	}
 	return nil
@@ -443,7 +476,7 @@ func (service *ProductionService) ensureFeaturePlanningTaskFor(ctx context.Conte
 }
 
 func (service *ProductionService) ensureFeaturePlanningTaskForRound(ctx context.Context, feature organization.FeatureRequest, stage featurePlanningStage, reviewedTaskIndex *uint32, architectureRound uint32) (organization.PlannedTask, kernel.AggregateState, kernel.UUIDv7, kernel.WorkInvocation, kernel.Snapshot, error) {
-	role, purpose, requiredRoute, title, description, criteria, err := planningStageDefinition(stage)
+	role, purpose, requiredRoute, title, description, criteria, err := service.workflowPlanningStageDefinition(stage)
 	if err != nil {
 		return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, err
 	}
@@ -483,7 +516,13 @@ func (service *ProductionService) ensureFeaturePlanningTaskForRound(ctx context.
 	} else if stage == stageArchitecture && architectureRound > 0 {
 		description, err = service.featureArchitectureSuccessorDescription(ctx, feature, architectureRound, description)
 	} else {
-		description, err = featurePlanningDescription(feature, stage, description)
+		var routing workflowTaskRoutingPolicy
+		if stage == stageArchitecture {
+			routing, err = service.workflowTaskRoutingPolicy(service.clock.Now().UTC())
+		}
+		if err == nil {
+			description, err = featurePlanningDescription(feature, stage, description, routing)
+		}
 	}
 	if err != nil {
 		return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, err
@@ -624,7 +663,15 @@ func (service *ProductionService) ensureFeaturePlanningTaskForRound(ctx context.
 	for _, parent := range parents[1:] {
 		dependencyEvents = append(dependencyEvents, parent.ParentEventID)
 	}
-	if err := service.activateTask(ctx, feature, tracked, profileConfig, workspace, budget.Revision, dependencyEvents, evidence, evidenceID, nil); err != nil {
+	var authorizedInvocationID *kernel.UUIDv7
+	if service.WorkflowLibrary != nil {
+		admission, found, admissionErr := service.featureWorkflowAdmission(ctx, feature)
+		if admissionErr != nil || !found || admission.Outcome != kernel.WorkAdmitted || admission.AuthorizedInvocationID == nil {
+			return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, errors.Join(organization.ErrInvalidFeature, admissionErr)
+		}
+		authorizedInvocationID = admission.AuthorizedInvocationID
+	}
+	if err := service.activateTaskWithInvocationID(ctx, feature, tracked, profileConfig, workspace, budget.Revision, dependencyEvents, evidence, evidenceID, nil, authorizedInvocationID); err != nil {
 		return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, err
 	}
 	state, head, _, err = service.Store.ReadAggregateHead(ctx, kernel.AggregateRef{Kind: kernel.AggregateTask, ID: task.ID})
@@ -639,7 +686,10 @@ func (service *ProductionService) ensureFeaturePlanningTaskForRound(ctx context.
 	return task, state, head, invocation, snapshot, nil
 }
 
-func planningStageDefinition(stage featurePlanningStage) (string, kernel.WorkPurpose, kernel.DecisionRoute, string, string, []string, error) {
+// legacyPlanningStageDefinition preserves pre-Phase-10 deployments that do not
+// configure a workflow library. New deployments use the signed workflow
+// definition path and never consult these software-specific defaults.
+func legacyPlanningStageDefinition(stage featurePlanningStage) (string, kernel.WorkPurpose, kernel.DecisionRoute, string, string, []string, error) {
 	switch stage {
 	case stageRefinement:
 		return "product-owner", kernel.PurposeHandoff, kernel.RouteBoundedExecution, "Refine feature request", "Review the authoritative request for ambiguity and priority without changing its submitted acceptance criteria. Return exactly TEKROO_ORGANIZATIONAL_RESULT: followed by one JSON object with schema_version=1.0.0, result_type=FEATURE_REFINEMENT, acceptance_criteria_disposition=PRESERVE_SUBMITTED, clarification_questions (empty when none), and priority (LOW, NORMAL, HIGH, or CRITICAL). Do not add operational identities or delegate. Put only that result in finish.message and call finish once.", []string{"requirements are testable and ambiguities are explicit"}, nil
@@ -656,7 +706,7 @@ func planningStageDefinition(stage featurePlanningStage) (string, kernel.WorkPur
 	}
 }
 
-func featurePlanningDescription(feature organization.FeatureRequest, stage featurePlanningStage, instruction string) (string, error) {
+func featurePlanningDescription(feature organization.FeatureRequest, stage featurePlanningStage, instruction string, executionRouting workflowTaskRoutingPolicy) (string, error) {
 	type sourceDigests struct {
 		Input         kernel.Digest `json:"input_sha256"`
 		Refinement    kernel.Digest `json:"refinement_sha256"`
@@ -704,7 +754,7 @@ func featurePlanningDescription(feature organization.FeatureRequest, stage featu
 			},
 		}
 	case stageArchitecture:
-		if feature.Refinement == nil || feature.Specification == nil {
+		if feature.Refinement == nil || feature.Specification == nil || len(executionRouting.PurposeRoutes) == 0 {
 			return "", organization.ErrInvalidFeature
 		}
 		inputDigest, err := featurePlanningStateDigest(feature.Input)
@@ -769,7 +819,7 @@ func featurePlanningDescription(feature organization.FeatureRequest, stage featu
 				RoleSelectionOwner:    "TEAMS_ROUTING_POLICY",
 				TasksAreSerialized:    false,
 			},
-			ExecutionRouting: softwareDevelopmentTaskRoutingPolicy(),
+			ExecutionRouting: executionRouting,
 			Specification:    *feature.Specification,
 		}
 	default:
@@ -997,7 +1047,11 @@ func (service *ProductionService) featureArchitectureSuccessorDescription(ctx co
 	if err != nil || !rejected && !operatorCorrection || rejected && len(rejections) == 0 {
 		return "", errors.Join(organization.ErrInvalidFeature, err)
 	}
-	base, err := featurePlanningDescription(feature, stageArchitecture, instruction)
+	routing, err := service.workflowTaskRoutingPolicy(service.clock.Now().UTC())
+	if err != nil {
+		return "", err
+	}
+	base, err := featurePlanningDescription(feature, stageArchitecture, instruction, routing)
 	if err != nil {
 		return "", err
 	}
@@ -1245,6 +1299,73 @@ func (allocator *planningRoleAllocator) ensure(ctx context.Context, role string)
 	return organization.RoleInstanceState{}, errors.Join(append([]error{organization.ErrRoleNotRunning}, failures...)...)
 }
 
+func (service *ProductionService) ensureQualifiedRole(ctx context.Context, allocator *planningRoleAllocator, workKind kernel.WorkKind, requiredRoute kernel.DecisionRoute) (organization.RoleInstanceState, ProductionProfile, error) {
+	if service == nil || allocator == nil || !workKind.Valid() || !requiredRoute.ModelExecutable() {
+		return organization.RoleInstanceState{}, ProductionProfile{}, organization.ErrRoleNotRunning
+	}
+	type candidate struct {
+		role    kernel.RoleFQRN
+		profile ProductionProfile
+	}
+	candidates := make([]candidate, 0, len(service.profilesByModel))
+	if service.RoleHost != nil {
+		actors, err := service.RoleHost.ConfiguredCapabilityActors(workKindCapability(workKind))
+		if err != nil {
+			return organization.RoleInstanceState{}, ProductionProfile{}, errors.Join(organization.ErrRoleNotRunning, err)
+		}
+		seen := make(map[kernel.RoleFQRN]struct{})
+		for _, actor := range actors {
+			modelProfile, profileErr := service.RoleHost.ConfiguredActorModelProfile(actor)
+			profile, found := service.profilesByModel[modelProfile]
+			role, roleErr := kernel.RoleFQRNFromActor(actor)
+			if profileErr != nil || roleErr != nil || !found || !profile.qualifiedFor(requiredRoute, workKind, service.clock.Now().UTC()) {
+				continue
+			}
+			if _, duplicate := seen[role]; duplicate {
+				continue
+			}
+			seen[role] = struct{}{}
+			candidates = append(candidates, candidate{role: role, profile: profile})
+		}
+	} else {
+		for _, profile := range service.profilesByModel {
+			if profile.qualifiedFor(requiredRoute, workKind, service.clock.Now().UTC()) {
+				candidates = append(candidates, candidate{role: profile.RoleFQRN, profile: profile})
+			}
+		}
+	}
+	sort.Slice(candidates, func(left, right int) bool {
+		if candidates[left].profile.DecisionRoute == candidates[right].profile.DecisionRoute {
+			return candidates[left].role < candidates[right].role
+		}
+		return candidates[left].profile.DecisionRoute < candidates[right].profile.DecisionRoute
+	})
+	var failures []error
+	for _, candidate := range candidates {
+		state, err := allocator.ensure(ctx, string(candidate.role))
+		if err == nil {
+			return state, candidate.profile, nil
+		}
+		failures = append(failures, err)
+	}
+	return organization.RoleInstanceState{}, ProductionProfile{}, errors.Join(append([]error{organization.ErrRoleNotRunning}, failures...)...)
+}
+
+func workKindCapability(workKind kernel.WorkKind) string {
+	switch workKind {
+	case kernel.WorkImplementation:
+		return "implementation"
+	case kernel.WorkValidation:
+		return "independent-validation"
+	case kernel.WorkSecurityReview:
+		return "security-review"
+	case kernel.WorkRelease:
+		return "acceptance"
+	default:
+		return string(workKind)
+	}
+}
+
 func (service *ProductionService) ensureExactPlanningRoleExcept(ctx context.Context, role string, excluded kernel.ActorFQN) (organization.RoleInstanceState, error) {
 	actors, err := service.RoleHost.ConfiguredRoleActors(role)
 	if err != nil {
@@ -1321,7 +1442,7 @@ func (service *ProductionService) validateFeatureStageOutput(feature organizatio
 		if err != nil {
 			return err
 		}
-		_, err = normalizeArchitecturePlanTasks(feature, result.Tasks)
+		_, err = normalizeArchitecturePlanTasks(feature, result.Tasks, structuralTaskRoutingPolicy())
 		return err
 	case stageArchitectureTaskReview:
 		_, err := parseArchitectureTaskReviewStageResult(output)
@@ -1376,7 +1497,11 @@ func (service *ProductionService) applyFeatureStageOutput(ctx context.Context, f
 }
 
 func (service *ProductionService) buildExecutableFeaturePlan(ctx context.Context, feature organization.FeatureRequest, invocation kernel.WorkInvocation, result architectureStageResult, createdAt time.Time) (organization.FeaturePlan, error) {
-	normalizedTasks, err := normalizeArchitecturePlanTasks(feature, result.Tasks)
+	routing, err := service.workflowTaskRoutingPolicy(service.clock.Now().UTC())
+	if err != nil {
+		return organization.FeaturePlan{}, err
+	}
+	normalizedTasks, err := normalizeArchitecturePlanTasks(feature, result.Tasks, routing)
 	if err != nil {
 		return organization.FeaturePlan{}, err
 	}
@@ -1446,7 +1571,7 @@ func (service *ProductionService) buildExecutableFeaturePlan(ctx context.Context
 	return plan, nil
 }
 
-func normalizeArchitecturePlanTasks(feature organization.FeatureRequest, tasks []architectureTaskResult) ([]architectureTaskResult, error) {
+func normalizeArchitecturePlanTasks(feature organization.FeatureRequest, tasks []architectureTaskResult, routing workflowTaskRoutingPolicy) ([]architectureTaskResult, error) {
 	if feature.Specification == nil || requiredMaterializedTaskCount(tasks) > int(feature.Input.MaximumTasks) {
 		return nil, organization.ErrInvalidFeature
 	}
@@ -1454,19 +1579,16 @@ func normalizeArchitecturePlanTasks(feature organization.FeatureRequest, tasks [
 	if err != nil {
 		return nil, err
 	}
-	return normalizeArchitectureTaskRelations(normalizedTasks, softwareDevelopmentTaskRoutingPolicy())
+	return normalizeArchitectureTaskRelations(normalizedTasks, routing)
 }
 
 func requiredMaterializedTaskCount(tasks []architectureTaskResult) int {
 	count := len(tasks) + 2 // whole-feature validation and final product acceptance
 	for _, task := range tasks {
-		if task.Purpose != kernel.PurposeImplementation {
+		if task.Purpose != kernel.PurposeImplementation || task.Risk != organization.RiskHigh && task.Risk != organization.RiskCritical {
 			continue
 		}
-		count++ // independent tester task
-		if task.Risk == organization.RiskHigh || task.Risk == organization.RiskCritical {
-			count++ // independent security-review task
-		}
+		count += 2 // one targeted implementation review and one specialized security review
 	}
 	return count
 }
@@ -1515,19 +1637,77 @@ type workflowTaskRoutingPolicy struct {
 	PurposeRoutes []purposeTaskRoutingPolicy `json:"purpose_routes"`
 }
 
-// softwareDevelopmentTaskRoutingPolicy is supplied workflow data. The routing
-// engine below has no knowledge of these role names and accepts any FQRN.
-func softwareDevelopmentTaskRoutingPolicy() workflowTaskRoutingPolicy {
+func structuralTaskRoutingPolicy() workflowTaskRoutingPolicy {
 	return workflowTaskRoutingPolicy{PurposeRoutes: []purposeTaskRoutingPolicy{{
-		Purpose:                  kernel.PurposeImplementation,
-		MaximumTaskComplexity:    6,
-		MayAuthorValidationLinks: false,
-		SerializeTasks:           false,
-		PlanComplexityRoleBands: []planComplexityRoleBand{
-			{MinimumPlanComplexity: 1, Role: "coder"},
-			{MinimumPlanComplexity: 5, Role: "senior-coder"},
-		},
+		Purpose: kernel.PurposeImplementation, MaximumTaskComplexity: 6,
+		MayAuthorValidationLinks: false, SerializeTasks: false,
+		PlanComplexityRoleBands: []planComplexityRoleBand{{MinimumPlanComplexity: 1, Role: "qualified-role"}},
 	}}}
+}
+
+// workflowTaskRoutingPolicy derives the implementation-role bands from exact
+// qualified profiles. Generic runtime code therefore does not need to know the
+// names of software roles. Bounded profiles handle routine work; stronger
+// profiles become the high-complexity band. If only a stronger profile exists,
+// it is eligible for the complete range.
+func (service *ProductionService) workflowTaskRoutingPolicy(at time.Time) (workflowTaskRoutingPolicy, error) {
+	if service == nil || at.IsZero() {
+		return workflowTaskRoutingPolicy{}, organization.ErrInvalidFeature
+	}
+	rolesByThreshold := make(map[uint8]string)
+	profiles := make(map[kernel.RoleFQRN]ProductionProfile)
+	if service.RoleHost != nil {
+		actors, err := service.RoleHost.ConfiguredCapabilityActors(workKindCapability(kernel.WorkImplementation))
+		if err != nil {
+			return workflowTaskRoutingPolicy{}, organization.ErrInvalidFeature
+		}
+		for _, actor := range actors {
+			modelProfile, profileErr := service.RoleHost.ConfiguredActorModelProfile(actor)
+			profile, found := service.profilesByModel[modelProfile]
+			role, roleErr := kernel.RoleFQRNFromActor(actor)
+			if profileErr == nil && roleErr == nil && found {
+				profiles[role] = profile
+			}
+		}
+	} else {
+		for _, profile := range service.profilesByModel {
+			profiles[profile.RoleFQRN] = profile
+		}
+	}
+	for role, profile := range profiles {
+		if !profile.qualifiedFor(profile.DecisionRoute, kernel.WorkImplementation, at) {
+			continue
+		}
+		threshold := uint8(1)
+		if profile.DecisionRoute == kernel.RouteComplexReasoning {
+			threshold = 5
+		}
+		roleName := string(role)
+		if current := rolesByThreshold[threshold]; current == "" || roleName < current {
+			rolesByThreshold[threshold] = roleName
+		}
+	}
+	if len(rolesByThreshold) == 0 {
+		return workflowTaskRoutingPolicy{}, organization.ErrInvalidFeature
+	}
+	if rolesByThreshold[1] == "" {
+		rolesByThreshold[1] = rolesByThreshold[5]
+		delete(rolesByThreshold, 5)
+	}
+	thresholds := make([]int, 0, len(rolesByThreshold))
+	for threshold := range rolesByThreshold {
+		thresholds = append(thresholds, int(threshold))
+	}
+	sort.Ints(thresholds)
+	bands := make([]planComplexityRoleBand, 0, len(thresholds))
+	for _, threshold := range thresholds {
+		bands = append(bands, planComplexityRoleBand{MinimumPlanComplexity: uint8(threshold), Role: rolesByThreshold[uint8(threshold)]})
+	}
+	return workflowTaskRoutingPolicy{PurposeRoutes: []purposeTaskRoutingPolicy{{
+		Purpose: kernel.PurposeImplementation, MaximumTaskComplexity: 6,
+		MayAuthorValidationLinks: false, SerializeTasks: false,
+		PlanComplexityRoleBands: bands,
+	}}}, nil
 }
 
 func normalizeArchitectureTaskRelations(tasks []architectureTaskResult, policy workflowTaskRoutingPolicy) ([]architectureTaskResult, error) {
@@ -1655,17 +1835,19 @@ func (service *ProductionService) addRequiredValidationTasks(ctx context.Context
 		if target.Purpose != kernel.PurposeImplementation && target.Purpose != kernel.PurposeRepair {
 			continue
 		}
+		if target.Risk != organization.RiskHigh && target.Risk != organization.RiskCritical {
+			continue
+		}
 		if !coverage[target.ID][kernel.PurposeValidation] {
-			validator, err := allocator.ensure(ctx, "tester")
+			validator, profile, err := service.ensureQualifiedRole(ctx, allocator, kernel.WorkValidation, kernel.RouteBoundedExecution)
 			if err != nil {
 				return nil, err
 			}
-			profile, found := service.profilesByModel[validator.ModelProfile]
 			workKind := workKindForPurpose(kernel.PurposeValidation, target.Risk)
-			if !found || !profile.qualifiedFor(profile.DecisionRoute, workKind, service.clock.Now().UTC()) {
-				return nil, fmt.Errorf("tester profile %s is not qualified for %s: %w", validator.ModelProfile, workKind, organization.ErrInvalidFeature)
+			if !profile.qualifiedFor(profile.DecisionRoute, workKind, service.clock.Now().UTC()) {
+				return nil, fmt.Errorf("validation profile %s is not qualified for %s: %w", validator.ModelProfile, workKind, organization.ErrInvalidFeature)
 			}
-			id := deterministicOperationalUUID("required-validator", string(feature.ID), string(target.ID), "tester")
+			id := deterministicOperationalUUID("required-validator", string(feature.ID), string(target.ID), string(profile.RoleFQRN))
 			tasks = append(tasks, organization.PlannedTask{ID: id, StoryID: target.StoryID, Title: "Validate: " + target.Title, Description: "Independently inspect the implementation, run the acceptance checks, and report the structured validation result.", AcceptanceCriteria: append([]string(nil), target.AcceptanceCriteria...), DependsOn: []kernel.UUIDv7{target.ID}, Validates: []kernel.UUIDv7{target.ID}, Owner: validator.ActorFQN, ModelProfile: validator.ModelProfile, DecisionRoute: profile.DecisionRoute, Purpose: kernel.PurposeValidation, Complexity: target.Complexity, Risk: target.Risk, CriticalPath: true, AttemptLimit: target.ReviewRoundLimit + 1, ReviewRoundLimit: target.ReviewRoundLimit})
 			if coverage[target.ID] == nil {
 				coverage[target.ID] = make(map[kernel.WorkPurpose]bool)
@@ -1673,20 +1855,19 @@ func (service *ProductionService) addRequiredValidationTasks(ctx context.Context
 			coverage[target.ID][kernel.PurposeValidation] = true
 		}
 		if (target.Risk == organization.RiskHigh || target.Risk == organization.RiskCritical) && !coverage[target.ID][kernel.PurposeReview] {
-			security, err := allocator.ensure(ctx, "security")
+			security, profile, err := service.ensureQualifiedRole(ctx, allocator, kernel.WorkSecurityReview, kernel.RouteComplexReasoning)
 			if err != nil {
 				return nil, err
 			}
-			profile, found := service.profilesByModel[security.ModelProfile]
 			workKind := workKindForPurpose(kernel.PurposeReview, target.Risk)
-			if !found || !profile.qualifiedFor(profile.DecisionRoute, workKind, service.clock.Now().UTC()) {
-				return nil, fmt.Errorf("security profile %s is not qualified for %s: %w", security.ModelProfile, workKind, organization.ErrInvalidFeature)
+			if !profile.qualifiedFor(profile.DecisionRoute, workKind, service.clock.Now().UTC()) {
+				return nil, fmt.Errorf("specialized review profile %s is not qualified for %s: %w", security.ModelProfile, workKind, organization.ErrInvalidFeature)
 			}
 			description, err := securityReviewDescription(target)
 			if err != nil {
 				return nil, err
 			}
-			id := deterministicOperationalUUID("required-validator", string(feature.ID), string(target.ID), "security")
+			id := deterministicOperationalUUID("required-validator", string(feature.ID), string(target.ID), string(profile.RoleFQRN))
 			tasks = append(tasks, organization.PlannedTask{ID: id, StoryID: target.StoryID, Title: "Security review: " + target.Title, Description: description, AcceptanceCriteria: securityReviewAcceptanceCriteria(), DependsOn: []kernel.UUIDv7{target.ID}, Validates: []kernel.UUIDv7{target.ID}, Owner: security.ActorFQN, ModelProfile: security.ModelProfile, DecisionRoute: profile.DecisionRoute, Purpose: kernel.PurposeReview, Complexity: target.Complexity, Risk: target.Risk, CriticalPath: true, AttemptLimit: target.ReviewRoundLimit + 1, ReviewRoundLimit: target.ReviewRoundLimit})
 		}
 		if len(tasks) > int(feature.Input.MaximumTasks) {
@@ -1697,9 +1878,9 @@ func (service *ProductionService) addRequiredValidationTasks(ctx context.Context
 }
 
 // addFeatureValidationTask adds one independent validation of the complete
-// assembled candidate against the authoritative story criteria. Per-task
-// validators prove local handoffs; this task prevents criteria lost during
-// task decomposition from reaching product acceptance unnoticed.
+// assembled candidate against the authoritative story criteria. Targeted
+// task review is reserved for high-risk work; this joined check prevents
+// criteria lost during task decomposition from reaching acceptance unnoticed.
 func (service *ProductionService) addFeatureValidationTask(ctx context.Context, feature organization.FeatureRequest, stories []organization.PlannedStory, tasks []organization.PlannedTask, planVersion uint64, allocator *planningRoleAllocator) ([]organization.PlannedTask, error) {
 	if len(stories) == 0 || planVersion == 0 {
 		return nil, organization.ErrInvalidFeature
@@ -1725,14 +1906,13 @@ func (service *ProductionService) addFeatureValidationTask(ctx context.Context, 
 	if finalImplementation == nil {
 		return nil, organization.ErrInvalidFeature
 	}
-	validator, err := allocator.ensure(ctx, "tester")
+	validator, profile, err := service.ensureQualifiedRole(ctx, allocator, kernel.WorkValidation, kernel.RouteBoundedExecution)
 	if err != nil {
 		return nil, err
 	}
-	profile, found := service.profilesByModel[validator.ModelProfile]
 	workKind := workKindForPurpose(kernel.PurposeValidation, risk)
-	if !found || !profile.qualifiedFor(profile.DecisionRoute, workKind, service.clock.Now().UTC()) {
-		return nil, fmt.Errorf("tester profile %s is not qualified for %s: %w", validator.ModelProfile, workKind, organization.ErrInvalidFeature)
+	if !profile.qualifiedFor(profile.DecisionRoute, workKind, service.clock.Now().UTC()) {
+		return nil, fmt.Errorf("validation profile %s is not qualified for %s: %w", validator.ModelProfile, workKind, organization.ErrInvalidFeature)
 	}
 	criteria := make([]string, 0)
 	for _, story := range stories {
@@ -1798,12 +1978,11 @@ func (service *ProductionService) addStoryAcceptanceTasks(ctx context.Context, f
 	if len(stories) == 0 || planVersion == 0 {
 		return nil, organization.ErrInvalidFeature
 	}
-	productOwner, err := allocator.ensure(ctx, "product-owner")
+	productOwner, profile, err := service.ensureQualifiedRole(ctx, allocator, kernel.WorkRelease, kernel.RouteBoundedExecution)
 	if err != nil {
 		return nil, err
 	}
-	profile, found := service.profilesByModel[productOwner.ModelProfile]
-	if !found || !profile.qualifiedFor(profile.DecisionRoute, kernel.WorkRelease, service.clock.Now().UTC()) {
+	if !profile.qualifiedFor(profile.DecisionRoute, kernel.WorkRelease, service.clock.Now().UTC()) {
 		return nil, organization.ErrInvalidFeature
 	}
 	dependencies := make([]kernel.UUIDv7, len(tasks))

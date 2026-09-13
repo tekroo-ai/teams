@@ -161,6 +161,14 @@ func TestConfiguredCapabilityActorsUsesVerifiedRoleBundles(t *testing.T) {
 	if _, err := host.ConfiguredCapabilityActors("missing-capability"); !errors.Is(err, ErrRoleNotConfigured) {
 		t.Fatalf("missing capability error=%v", err)
 	}
+	profileActors, err := host.ConfiguredModelProfileActors(binding.ModelProfileDigest)
+	if err != nil || len(profileActors) != 2 || profileActors[0] != actors[0] || profileActors[1] != actors[1] {
+		t.Fatalf("profile actors=%v err=%v", profileActors, err)
+	}
+	profile, err := host.ConfiguredActorModelProfile(actors[1])
+	if err != nil || profile != binding.ModelProfileDigest {
+		t.Fatalf("actor profile=%s err=%v", profile, err)
+	}
 }
 
 func testLoadedTeam() LoadedTeam {

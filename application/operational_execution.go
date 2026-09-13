@@ -91,6 +91,7 @@ func (s TaskExecutionSpecification) Valid() bool {
 
 type OperationalExecutionContext struct {
 	Invocation             kernel.WorkInvocation
+	RetryOfConversationID  *string
 	Task                   kernel.AggregateState
 	Budget                 kernel.WorkBudgetAccount
 	TaskBudget             kernel.TaskWorkBudgetBinding
@@ -100,8 +101,35 @@ type OperationalExecutionContext struct {
 	CurrentExecution       kernel.ExecutionTuple
 	Specification          TaskExecutionSpecification
 	Evidence               []kernel.EvidenceRef
+	RecoveryDirective      *ExecutionRecoveryDirective
 	AuthorizationEventSeen bool
 	ParentEventSeen        bool
+}
+
+// ExecutionRecoveryDirective is the exact operator-authored reason and
+// evidence that changed the conditions for an explicit recovery. It is
+// reconstructed from accepted Teams events rather than conversational state.
+type ExecutionRecoveryDirective struct {
+	SourceEventID kernel.UUIDv7        `json:"source_event_id"`
+	Reason        string               `json:"reason"`
+	Evidence      []kernel.EvidenceRef `json:"evidence"`
+}
+
+func (directive ExecutionRecoveryDirective) Valid() bool {
+	if !directive.SourceEventID.Valid() || strings.TrimSpace(directive.Reason) == "" || len(directive.Reason) > 4096 || len(directive.Evidence) == 0 || len(directive.Evidence) > 64 {
+		return false
+	}
+	for index, evidence := range directive.Evidence {
+		if !evidence.EvidenceID.Valid() || !evidence.SHA256.Valid() || index > 0 && evidence.EvidenceID <= directive.Evidence[index-1].EvidenceID {
+			return false
+		}
+	}
+	return true
+}
+
+func (directive ExecutionRecoveryDirective) Clone() ExecutionRecoveryDirective {
+	directive.Evidence = append([]kernel.EvidenceRef(nil), directive.Evidence...)
+	return directive
 }
 
 type OperationalExecutionReader interface {
@@ -118,7 +146,8 @@ type OperationalDeadlineExtensionReader interface {
 
 func (c OperationalExecutionContext) Validate(now time.Time) error {
 	invocation := c.Invocation
-	if !invocation.Valid() || c.Task.Kind != kernel.AggregateTask || c.Task.ID != invocation.TaskID || c.Task.Revision != invocation.TaskRevision || c.Task.LifecycleEpoch != invocation.LifecycleEpoch || c.Task.ScopeRevision != invocation.ScopeRevision || c.Task.Phase != kernel.PhaseActive || c.Task.Condition != kernel.ConditionRunnable || !c.AuthorizationEventSeen || !c.ParentEventSeen {
+	invalidRetryContext := invocation.RetryOfInvocationID == nil && c.RetryOfConversationID != nil || invocation.RetryOfInvocationID != nil && c.RetryOfConversationID != nil && *c.RetryOfConversationID != string(*invocation.RetryOfInvocationID)
+	if !invocation.Valid() || invalidRetryContext || c.Task.Kind != kernel.AggregateTask || c.Task.ID != invocation.TaskID || c.Task.Revision != invocation.TaskRevision || c.Task.LifecycleEpoch != invocation.LifecycleEpoch || c.Task.ScopeRevision != invocation.ScopeRevision || c.Task.Phase != kernel.PhaseActive || c.Task.Condition != kernel.ConditionRunnable || !c.AuthorizationEventSeen || !c.ParentEventSeen {
 		return ErrStaleWorkInvocation
 	}
 	if !c.Budget.Valid() || c.Budget.ID != invocation.BudgetAccountID || c.Budget.PolicyRevision != invocation.AdmissionPolicyRevision || c.Budget.PolicyDigest != invocation.AdmissionPolicyDigest || c.Budget.ModelInvocationsUsed < invocation.GlobalDebitOrdinal || c.Budget.PurposeUsed[invocation.Purpose] < invocation.PurposeDebitOrdinal || !now.Before(c.Budget.DeadlineAt) || !now.Before(invocation.DeadlineAt) {
@@ -174,6 +203,7 @@ type ExecutionBrief struct {
 	AttemptFamily          string                      `json:"attempt_family"`
 	AttemptOrdinal         uint64                      `json:"attempt_ordinal"`
 	RetryOfInvocationID    *kernel.UUIDv7              `json:"retry_of_invocation_id"`
+	RetryOfConversationID  *string                     `json:"retry_of_conversation_id,omitempty"`
 	RetryOrdinal           uint64                      `json:"retry_ordinal"`
 	ConditionDigest        kernel.Digest               `json:"condition_digest"`
 	OutputPredicateDigest  kernel.Digest               `json:"output_predicate_digest"`
@@ -194,6 +224,7 @@ type ExecutionBrief struct {
 	DeadlineAt             time.Time                   `json:"deadline_at"`
 	CoordinationRule       string                      `json:"coordination_rule"`
 	ExecutionGuidance      []string                    `json:"execution_guidance"`
+	RecoveryDirective      *ExecutionRecoveryDirective `json:"recovery_directive,omitempty"`
 	ResultProtocol         *ExecutionResultProtocol    `json:"result_protocol,omitempty"`
 	SemanticContext        SemanticContextRequest      `json:"semantic_context"`
 }
@@ -438,6 +469,14 @@ func cloneUUID(value *kernel.UUIDv7) *kernel.UUIDv7 {
 	return &copy
 }
 
+func cloneString(value *string) *string {
+	if value == nil {
+		return nil
+	}
+	copy := *value
+	return &copy
+}
+
 func BuildExecutionBrief(current OperationalExecutionContext, grounding RoleExecutionGrounding, maximumBytes int) (ExecutionBrief, kernel.Digest, error) {
 	if maximumBytes <= 0 || maximumBytes > 1<<20 {
 		return ExecutionBrief{}, "", ErrInvalidOperationalExecution
@@ -454,7 +493,7 @@ func BuildExecutionBrief(current OperationalExecutionContext, grounding RoleExec
 		Task: current.Specification, TaskRevision: invocation.TaskRevision,
 		LifecycleEpoch: invocation.LifecycleEpoch, ScopeRevision: invocation.ScopeRevision,
 		Purpose: invocation.Purpose, AttemptFamily: invocation.AttemptFamily,
-		AttemptOrdinal: invocation.AttemptOrdinal, RetryOfInvocationID: cloneUUID(invocation.RetryOfInvocationID), RetryOrdinal: invocation.RetryOrdinal,
+		AttemptOrdinal: invocation.AttemptOrdinal, RetryOfInvocationID: cloneUUID(invocation.RetryOfInvocationID), RetryOfConversationID: cloneString(current.RetryOfConversationID), RetryOrdinal: invocation.RetryOrdinal,
 		ConditionDigest: invocation.ConditionDigest, OutputPredicateDigest: invocation.OutputPredicateDigest,
 		ToolPolicyDigest: invocation.ToolPolicyDigest, EffectPolicyDigest: invocation.EffectPolicyDigest,
 		WorkProfile: current.Profile.Profile.Clone(), AssignmentID: invocation.QualifiedAssignmentID,
@@ -469,7 +508,27 @@ func BuildExecutionBrief(current OperationalExecutionContext, grounding RoleExec
 	brief.ExecutionGuidance = append([]string(nil), sharedExecutionGuidance...)
 	mutationAuthorized := hasExecutionPermission(grounding.Permissions, "repository.edit") &&
 		(invocation.Purpose == kernel.PurposeImplementation || invocation.Purpose == kernel.PurposeRepair)
-	explicitRecovery := invocation.RetryOrdinal > 0 && current.Profile.Profile.SupersedesProfileID != nil
+	// A retry is not necessarily an operator-directed recovery. Changed-candidate
+	// validation and other technical continuations can legitimately use a
+	// successor profile without an operator-authored directive. Presence of the
+	// durable directive distinguishes those paths; REPAIR always requires it.
+	explicitRecovery := current.Profile.Profile.SupersedesProfileID != nil && (current.RecoveryDirective != nil || invocation.Purpose == kernel.PurposeRepair)
+	if explicitRecovery {
+		if current.RecoveryDirective == nil || !current.RecoveryDirective.Valid() {
+			return ExecutionBrief{}, "", ErrInvalidOperationalExecution
+		}
+		availableEvidence := make(map[kernel.UUIDv7]kernel.Digest, len(evidence))
+		for _, reference := range evidence {
+			availableEvidence[reference.EvidenceID] = reference.SHA256
+		}
+		for _, reference := range current.RecoveryDirective.Evidence {
+			if availableEvidence[reference.EvidenceID] != reference.SHA256 {
+				return ExecutionBrief{}, "", ErrInvalidOperationalExecution
+			}
+		}
+		directive := current.RecoveryDirective.Clone()
+		brief.RecoveryDirective = &directive
+	}
 	if explicitRecovery {
 		brief.ExecutionGuidance = append(brief.ExecutionGuidance, sharedExplicitRecoveryExecutionGuidance...)
 		if mutationAuthorized {

@@ -1,0 +1,20 @@
+{
+  "schema_version": "1.0.0",
+  "team": "editorial",
+  "version": "1.0.0",
+  "roles": [
+    {
+      "role": "editor",
+      "bundle_path": "roles/editor.json",
+      "bundle_digest": "ff57be1c186f3beae7961c0c6a7711f027071e61a6f67017fd6bf37fe36b3422",
+      "publisher_key_id": "tekroo-example-editorial-20260913",
+      "initial_instances": 1,
+      "maximum_instances": 1,
+      "launch_mode": "ON_DEMAND",
+      "model_profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "workspace_ids": [
+        "editor-1"
+      ]
+    }
+  ]
+}

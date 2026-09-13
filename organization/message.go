@@ -47,14 +47,20 @@ func (purpose MessagePurpose) Valid() bool {
 }
 
 type MessageWorkLink struct {
-	FeatureID *kernel.UUIDv7 `json:"feature_id,omitempty"`
-	StoryID   *kernel.UUIDv7 `json:"story_id,omitempty"`
-	TaskID    *kernel.UUIDv7 `json:"task_id,omitempty"`
-	DAGNodeID kernel.UUIDv7  `json:"dag_node_id"`
+	FeatureID          *kernel.UUIDv7 `json:"feature_id,omitempty"`
+	StoryID            *kernel.UUIDv7 `json:"story_id,omitempty"`
+	TaskID             *kernel.UUIDv7 `json:"task_id,omitempty"`
+	WorkflowInstanceID *kernel.UUIDv7 `json:"workflow_instance_id,omitempty"`
+	WorkflowStageID    string         `json:"workflow_stage_id,omitempty"`
+	DAGNodeID          kernel.UUIDv7  `json:"dag_node_id"`
 }
 
 func (link MessageWorkLink) Valid() bool {
 	if !link.DAGNodeID.Valid() {
+		return false
+	}
+	workflowLinked := link.WorkflowInstanceID != nil || link.WorkflowStageID != ""
+	if workflowLinked && (link.WorkflowInstanceID == nil || !link.WorkflowInstanceID.Valid() || !workflowStagePattern.MatchString(link.WorkflowStageID)) {
 		return false
 	}
 	return (link.FeatureID == nil || link.FeatureID.Valid()) && (link.StoryID == nil || link.StoryID.Valid()) && (link.TaskID == nil || link.TaskID.Valid())

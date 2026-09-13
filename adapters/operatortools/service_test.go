@@ -60,6 +60,22 @@ func TestFederationInspectionUsesFocusedOperatorSurface(t *testing.T) {
 	}
 }
 
+func TestFeatureTimingUsesDurableWorkflowMeasurement(t *testing.T) {
+	service, err := operatortools.New(&fakeOrganization{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	identity := protocol.AuthenticatedContext{Principal: kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "operator"}}
+	value, err := service.CallTool(context.Background(), identity, mcp.FeatureTimingToolName, json.RawMessage(`{"feature_id":"00000000-0000-7000-8000-000000000005"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	timing, ok := value.(operationalruntime.FeatureWorkflowTiming)
+	if !ok || timing.FeatureID != "00000000-0000-7000-8000-000000000005" || timing.Timing.PeakParallelism != 2 {
+		t.Fatalf("timing=%#v", value)
+	}
+}
+
 type fakeOrganization struct {
 	restarted kernel.ActorFQN
 }
@@ -117,6 +133,9 @@ func (*fakeOrganization) SubmitFeature(context.Context, kernel.PrincipalRef, org
 }
 func (*fakeOrganization) ReadFeature(context.Context, kernel.UUIDv7) (organization.FeatureRequest, bool, error) {
 	return organization.FeatureRequest{}, false, nil
+}
+func (*fakeOrganization) ReadFeatureWorkflowTiming(_ context.Context, featureID kernel.UUIDv7) (operationalruntime.FeatureWorkflowTiming, error) {
+	return operationalruntime.FeatureWorkflowTiming{FeatureID: featureID, Timing: kernel.WorkflowTiming{PeakParallelism: 2}}, nil
 }
 func (*fakeOrganization) ApplyFeaturePlan(context.Context, kernel.UUIDv7, uint64, organization.FeaturePlan) (organization.FeatureRequest, error) {
 	return organization.FeatureRequest{}, nil

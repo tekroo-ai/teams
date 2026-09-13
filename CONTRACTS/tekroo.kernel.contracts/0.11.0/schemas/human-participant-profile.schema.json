@@ -1,0 +1,366 @@
+{
+  "$id": "https://contracts.tekroo.ai/tekroo.kernel.contracts/0.11.0/schemas/human-participant-profile.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "authentication_bindings": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "active": {
+            "const": true
+          },
+          "assurance": {
+            "enum": [
+              "HIGH",
+              "STANDARD"
+            ],
+            "type": "string"
+          },
+          "authentication_binding_id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "binding_revision": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "evidence_ids": {
+            "items": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            },
+            "maxItems": 64,
+            "minItems": 1,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "issuer_digest": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "method": {
+            "enum": [
+              "API_CREDENTIAL",
+              "CHANNEL_IDENTITY",
+              "IN_PERSON_ATTESTATION",
+              "MAGIC_LINK",
+              "OIDC",
+              "WEBAUTHN"
+            ],
+            "type": "string"
+          },
+          "subject_digest": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "authentication_binding_id",
+          "method",
+          "issuer_digest",
+          "subject_digest",
+          "assurance",
+          "binding_revision",
+          "active",
+          "evidence_ids"
+        ],
+        "type": "object"
+      },
+      "maxItems": 32,
+      "minItems": 1,
+      "type": "array"
+    },
+    "delivery_bindings": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "active": {
+            "const": true
+          },
+          "adapter_profile_digest": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "authentication_binding_ids": {
+            "items": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            },
+            "maxItems": 16,
+            "minItems": 1,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "binding_revision": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "channel": {
+            "enum": [
+              "EMAIL",
+              "OTHER",
+              "SLACK",
+              "SMS",
+              "TEAMS",
+              "WEB_PORTAL"
+            ],
+            "type": "string"
+          },
+          "confidentiality_ceiling": {
+            "enum": [
+              "PUBLIC",
+              "INTERNAL",
+              "CONFIDENTIAL",
+              "RESTRICTED"
+            ],
+            "type": "string"
+          },
+          "delivery_binding_id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "endpoint_digest": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "evidence_ids": {
+            "items": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            },
+            "maxItems": 64,
+            "minItems": 1,
+            "type": "array",
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "delivery_binding_id",
+          "channel",
+          "endpoint_digest",
+          "adapter_profile_digest",
+          "confidentiality_ceiling",
+          "authentication_binding_ids",
+          "binding_revision",
+          "active",
+          "evidence_ids"
+        ],
+        "type": "object"
+      },
+      "maxItems": 32,
+      "minItems": 1,
+      "type": "array"
+    },
+    "display_label": {
+      "maxLength": 256,
+      "minLength": 1,
+      "type": "string"
+    },
+    "evidence_ids": {
+      "items": {
+        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+        "type": "string"
+      },
+      "maxItems": 64,
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "expected_participant_revision": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "participant": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        },
+        "kind": {
+          "const": "HUMAN"
+        }
+      },
+      "required": [
+        "kind",
+        "id"
+      ],
+      "type": "object"
+    },
+    "participant_policy_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "participant_policy_revision": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "privacy_classification": {
+      "enum": [
+        "PUBLIC",
+        "INTERNAL",
+        "CONFIDENTIAL",
+        "RESTRICTED"
+      ],
+      "type": "string"
+    },
+    "profile_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "profile_id": {
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "type": "string"
+    },
+    "profile_revision": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "role_bindings": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "active": {
+            "const": true
+          },
+          "advisory_topic_ids": {
+            "items": {
+              "maxLength": 4096,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 64,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "authority_policy_digest": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "authority_policy_revision": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "authorized_command_types": {
+            "items": {
+              "pattern": "^tekroo\\.command\\.[a-z0-9]+(?:[.-][a-z0-9]+)*$",
+              "type": "string"
+            },
+            "maxItems": 64,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "evidence_ids": {
+            "items": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            },
+            "maxItems": 64,
+            "minItems": 1,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "role_binding_id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "role_class": {
+            "enum": [
+              "APPROVER",
+              "CLIENT",
+              "END_USER",
+              "PRINCIPAL",
+              "PROJECT_DEFINED",
+              "SME"
+            ],
+            "type": "string"
+          },
+          "role_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "type": "string"
+          },
+          "scope_id": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "scope_kind": {
+            "enum": [
+              "DOMAIN",
+              "PROJECT",
+              "SYSTEM",
+              "WORK"
+            ],
+            "type": "string"
+          },
+          "valid_from": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "valid_until": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "role_binding_id",
+          "role_class",
+          "role_id",
+          "scope_kind",
+          "scope_id",
+          "advisory_topic_ids",
+          "authorized_command_types",
+          "authority_policy_revision",
+          "authority_policy_digest",
+          "valid_from",
+          "valid_until",
+          "active",
+          "evidence_ids"
+        ],
+        "type": "object"
+      },
+      "maxItems": 64,
+      "minItems": 1,
+      "type": "array"
+    },
+    "supersedes_profile_id": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "participant",
+    "expected_participant_revision",
+    "profile_id",
+    "profile_revision",
+    "profile_digest",
+    "display_label",
+    "privacy_classification",
+    "role_bindings",
+    "authentication_bindings",
+    "delivery_bindings",
+    "participant_policy_revision",
+    "participant_policy_digest",
+    "supersedes_profile_id",
+    "evidence_ids"
+  ],
+  "title": "Versioned human participant with scoped roles and opaque authentication and delivery bindings",
+  "type": "object"
+}

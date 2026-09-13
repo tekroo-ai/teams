@@ -92,7 +92,7 @@ func TestHandlerSubmitsStrictCommandAndReadsProjections(t *testing.T) {
 func TestHandlerDecodesCanonicalContractCommandShape(t *testing.T) {
 	service := &operatorService{state: operationalruntime.ControlRunning}
 	handler := newTestHandler(t, service, func() {})
-	body := `{"contract_manifest":"tekroo.kernel.contracts/0.10.0","command_id":"00000000-0000-7000-8000-000000000001","command_type":"tekroo.command.story.create","command_version":"1.6.0","target":{"kind":"story","id":"00000000-0000-7000-8000-000000000002"},"authority":{"kind":"HUMAN","id":"operator"},"actor_fqn":null,"execution":null,"expected_revision":{"must_not_exist":true,"revision":0},"preconditions":[],"expected_lifecycle_epoch":null,"expected_policy_revision":1,"expected_catalogue_revision":8,"idempotency_key":"canonical-shape","correlation_id":"00000000-0000-7000-8000-000000000003","causation":[],"issued_at":null,"payload":{},"evidence_refs":[]}`
+	body := `{"contract_manifest":"tekroo.kernel.contracts/0.11.0","command_id":"00000000-0000-7000-8000-000000000001","command_type":"tekroo.command.story.create","command_version":"1.6.0","target":{"kind":"story","id":"00000000-0000-7000-8000-000000000002"},"authority":{"kind":"HUMAN","id":"operator"},"actor_fqn":null,"execution":null,"expected_revision":{"must_not_exist":true,"revision":0},"preconditions":[],"expected_lifecycle_epoch":null,"expected_policy_revision":1,"expected_catalogue_revision":8,"idempotency_key":"canonical-shape","correlation_id":"00000000-0000-7000-8000-000000000003","causation":[],"issued_at":null,"payload":{},"evidence_refs":[]}`
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, authorizedRequest(http.MethodPost, "/v1/commands", strings.NewReader(body)))
 	if response.Code != http.StatusOK || service.lastCommand.CommandType != "tekroo.command.story.create" || service.lastCommand.Target.Kind != kernel.AggregateStory {
@@ -146,6 +146,16 @@ func TestHandlerRequestsFeatureReplanWithBoundHumanIdentity(t *testing.T) {
 	handler.ServeHTTP(response, authorizedRequest(http.MethodPost, "/v1/features/00000000-0000-7000-8000-000000000005/replan", strings.NewReader(`{"expected_revision":4}`)))
 	if response.Code != http.StatusBadRequest || service.featureReplanCalls != 1 {
 		t.Fatalf("invalid status=%d calls=%d", response.Code, service.featureReplanCalls)
+	}
+}
+
+func TestHandlerReadsFeatureWorkflowTiming(t *testing.T) {
+	service := &operatorService{state: operationalruntime.ControlRunning}
+	handler := newTestHandler(t, service, func() {})
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, authorizedRequest(http.MethodGet, "/v1/features/00000000-0000-7000-8000-000000000005/timing", nil))
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"peak_parallelism":2`) {
+		t.Fatalf("timing status=%d body=%s", response.Code, response.Body.String())
 	}
 }
 
@@ -262,6 +272,14 @@ func (service *operatorService) SubmitFeature(_ context.Context, principal kerne
 
 func (service *operatorService) ReadFeature(context.Context, kernel.UUIDv7) (organization.FeatureRequest, bool, error) {
 	return organization.FeatureRequest{ID: "00000000-0000-7000-8000-000000000005"}, true, nil
+}
+
+func (service *operatorService) ReadFeatureWorkflowTiming(context.Context, kernel.UUIDv7) (operationalruntime.FeatureWorkflowTiming, error) {
+	return operationalruntime.FeatureWorkflowTiming{
+		FeatureID:  "00000000-0000-7000-8000-000000000005",
+		ObservedAt: time.Date(2026, time.August, 10, 12, 0, 0, 0, time.UTC),
+		Timing:     kernel.WorkflowTiming{PeakParallelism: 2},
+	}, nil
 }
 
 func (service *operatorService) ApplyFeaturePlan(context.Context, kernel.UUIDv7, uint64, organization.FeaturePlan) (organization.FeatureRequest, error) {

@@ -57,7 +57,7 @@ func TestInitializeLocalDeploymentProducesValidatedIsolatedInstallation(t *testi
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Team != "teams" || result.WorkspaceCount != 14 || result.AutomaticStartup || result.ContractIdentity != "tekroo.kernel.contracts/0.10.0" || result.BranchPrefix != "tekroo-test/" || result.OpenHands != "http://127.0.0.1:18002" {
+	if result.Team != "teams" || result.WorkspaceCount != 14 || result.AutomaticStartup || result.ContractIdentity != "tekroo.kernel.contracts/0.11.0" || result.BranchPrefix != "tekroo-test/" || result.OpenHands != "http://127.0.0.1:18002" {
 		t.Fatalf("result = %#v", result)
 	}
 	config, err := operationalruntime.LoadProductionConfig(result.ConfigPath)

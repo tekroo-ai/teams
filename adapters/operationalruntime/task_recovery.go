@@ -91,10 +91,13 @@ func (service *ProductionService) RetryFailedTask(ctx context.Context, principal
 	var successorProfile kernel.WorkRiskProfile
 	profileBound := false
 	profileAlreadyAdvanced := profileSnapshot.Profile.Binding() != terminal.WorkProfile
-	if profileAlreadyAdvanced {
-		successorProfile, profileBound, err = continuedTaskRecoveryProfile(profileSnapshot.Profile, service.planning, recoveryCondition, deadline, profileEvidenceIDs, state.LifecycleEpoch, state.ScopeRevision)
-	} else if reopenCompleted {
+	if reopenCompleted {
+		// Reopening changes the task's lifecycle and scope even when runtime
+		// suspension previously advanced only the maintenance profile. The reopen
+		// transition therefore takes precedence over same-lifecycle continuation.
 		successorProfile, err = reopenedTaskRecoveryProfile(profileSnapshot.Profile, service.planning, recoveryCondition, deadline, profileEvidenceIDs, state.LifecycleEpoch+1, state.ScopeRevision+1)
+	} else if profileAlreadyAdvanced {
+		successorProfile, profileBound, err = continuedTaskRecoveryProfile(profileSnapshot.Profile, service.planning, recoveryCondition, deadline, profileEvidenceIDs, state.LifecycleEpoch, state.ScopeRevision)
 	} else if recoveryKind == taskRecoveryOperatorRepair || operatorRevalidation {
 		successorProfile, profileBound, err = continuedTaskRecoveryProfile(profileSnapshot.Profile, service.planning, recoveryCondition, deadline, profileEvidenceIDs, state.LifecycleEpoch, state.ScopeRevision)
 	} else {
@@ -188,7 +191,15 @@ func (service *ProductionService) RetryFailedTask(ctx context.Context, principal
 	if recoveryKind == taskRecoveryOperatorRepair {
 		nextPurpose = kernel.PurposeRepair
 		nextAttempt = nextTaskPurposeAttempt(snapshot.WorkInvocations, planned.ID, nextPurpose)
-		predecessor = nil
+		// The first repair changes purpose from IMPLEMENTATION to REPAIR and has
+		// no same-purpose predecessor. A correction to a succeeded repair must,
+		// however, continue the latest repair lineage so the kernel can reject
+		// stale or unchanged retries deterministically.
+		if terminal.Purpose == kernel.PurposeRepair {
+			predecessor = &terminal
+		} else {
+			predecessor = nil
+		}
 		conditionDigests = []kernel.Digest{*terminal.OutputDigest, recoveryCondition}
 	}
 	budgetRevision, err := service.extendTaskTechnicalRetryBudget(ctx, feature, tracked, nextPurpose, nextAttempt)
@@ -336,23 +347,26 @@ func (service *ProductionService) classifyTaskRecovery(ctx context.Context, task
 		}
 		return taskRecoveryInvalidStructuredOutput, nil
 	}
-	if task.Purpose != kernel.PurposeValidation && task.Purpose != kernel.PurposeReview || len(task.Validates) == 0 || state.Condition != kernel.ConditionBlocked || invocation.State != kernel.InvocationSucceeded || invocation.OutputDigest == nil {
+	if task.Purpose != kernel.PurposeValidation && task.Purpose != kernel.PurposeReview || state.Condition != kernel.ConditionBlocked || invocation.State != kernel.InvocationSucceeded || invocation.OutputDigest == nil {
 		return 0, application.ErrInvalidOperationalExecution
 	}
 	blocked, found, err := service.Store.ReadEvent(ctx, head)
-	if err != nil || !found || !isExactInvalidStructuredOutputBlock(blocked, task, invocation, service.policyAuthority) {
+	if err != nil || !found || !isExactRecoverableStructuredDecisionBlock(blocked, task, invocation, service.policyAuthority) {
 		return 0, errors.Join(application.ErrInvalidOperationalExecution, err)
 	}
 	return taskRecoveryInvalidStructuredOutput, nil
 }
 
 // A later validator or operator inspection can find a material defect after an
-// implementation invocation succeeded. While the task is still active and
-// runnable, preserve that result as evidence and authorize a repair on the
-// same planned task instead of restarting the feature workflow.
+// implementation or repair invocation succeeded. While the implementation
+// task is still active and runnable, preserve that result as evidence and
+// authorize a successor repair on the same planned task instead of restarting
+// the feature workflow. Accepting a succeeded repair here is necessary because
+// a repair agent can return a syntactically successful but materially unchanged
+// candidate; the latest-invocation precondition still prevents stale retries.
 func operatorRepairableTaskTerminal(task organization.PlannedTask, invocation kernel.WorkInvocation) bool {
 	return task.Purpose == kernel.PurposeImplementation && invocation.Valid() &&
-		invocation.TaskID == task.ID && invocation.Purpose == kernel.PurposeImplementation &&
+		invocation.TaskID == task.ID && (invocation.Purpose == kernel.PurposeImplementation || invocation.Purpose == kernel.PurposeRepair) &&
 		invocation.State == kernel.InvocationSucceeded && invocation.OutputDigest != nil
 }
 
@@ -373,11 +387,7 @@ func reopenedTaskRecoveryProfile(current kernel.WorkRiskProfile, planning Produc
 	next.VerificationTopologyDigest = planning.VerificationTopologyDigest
 	priorID := current.ProfileID
 	next.SupersedesProfileID = &priorID
-	next.ClassificationEvidenceIDs = append(next.ClassificationEvidenceIDs, evidenceIDs...)
-	sort.Slice(next.ClassificationEvidenceIDs, func(left, right int) bool {
-		return next.ClassificationEvidenceIDs[left] < next.ClassificationEvidenceIDs[right]
-	})
-	next.ClassificationEvidenceIDs = uniqueUUIDs(next.ClassificationEvidenceIDs)
+	next.ClassificationEvidenceIDs = reopenedProfileEvidenceIDs(current.ClassificationEvidenceIDs, evidenceIDs)
 	next.ProfileDigest = ""
 	encoded, err := json.Marshal(next)
 	if err != nil {
@@ -388,6 +398,22 @@ func reopenedTaskRecoveryProfile(current kernel.WorkRiskProfile, planning Produc
 		return kernel.WorkRiskProfile{}, organization.ErrInvalidFeature
 	}
 	return next, nil
+}
+
+func reopenedProfileEvidenceIDs(historical, recovery []kernel.UUIDv7) []kernel.UUIDv7 {
+	combined := append(append([]kernel.UUIDv7(nil), historical...), recovery...)
+	sort.Slice(combined, func(left, right int) bool { return combined[left] < combined[right] })
+	combined = uniqueUUIDs(combined)
+	if len(combined) <= 64 {
+		return combined
+	}
+	// A reopen is a new lifecycle and the predecessor profile remains immutable
+	// and linked by SupersedesProfileID. When its historical evidence set has
+	// reached the contract limit, carry the evidence for this recovery in the
+	// new profile instead of duplicating the predecessor's complete set.
+	result := append([]kernel.UUIDv7(nil), recovery...)
+	sort.Slice(result, func(left, right int) bool { return result[left] < result[right] })
+	return uniqueUUIDs(result)
 }
 
 // A crash or rejected downstream command can leave a reopened task active with
@@ -421,11 +447,7 @@ func continuedTaskRecoveryProfile(current kernel.WorkRiskProfile, planning Produ
 	next.VerificationTopologyDigest = planning.VerificationTopologyDigest
 	priorID := current.ProfileID
 	next.SupersedesProfileID = &priorID
-	next.ClassificationEvidenceIDs = append(next.ClassificationEvidenceIDs, evidenceIDs...)
-	sort.Slice(next.ClassificationEvidenceIDs, func(left, right int) bool {
-		return next.ClassificationEvidenceIDs[left] < next.ClassificationEvidenceIDs[right]
-	})
-	next.ClassificationEvidenceIDs = uniqueUUIDs(next.ClassificationEvidenceIDs)
+	next.ClassificationEvidenceIDs = reopenedProfileEvidenceIDs(current.ClassificationEvidenceIDs, evidenceIDs)
 	next.ProfileDigest = ""
 	encoded, err := json.Marshal(next)
 	if err != nil {

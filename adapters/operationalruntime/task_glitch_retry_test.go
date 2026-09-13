@@ -2,6 +2,7 @@ package operationalruntime
 
 import (
 	"testing"
+	"time"
 
 	"github.com/tekroo-ai/teams/kernel"
 	"github.com/tekroo-ai/teams/organization"
@@ -15,6 +16,9 @@ func TestTerminationReasonGlitchClassification(t *testing.T) {
 
 	if !terminationReasonIsAutoRetryableGlitch([]byte(`{"reason":"WORK_PURPOSE_REPOSITORY_MUTATION_NOT_AUTHORIZED","command":"mkdir -p /tmp/tekroo-fold-probe"}`)) {
 		t.Error("an allow-listed enforcement trip must classify as a retryable glitch")
+	}
+	if !terminationReasonIsAutoRetryableGlitch([]byte(`{"reason":"ROLE_REPOSITORY_MUTATION_NOT_AUTHORIZED","command":"git diff base head -- file > /tmp/file.diff"}`)) {
+		t.Error("a role-level repository enforcement trip must classify as a retryable glitch")
 	}
 	if terminationReasonIsAutoRetryableGlitch([]byte("I finished the validation, here is a summary in prose")) {
 		t.Error("unparseable terminal output must stay with the operator")
@@ -41,5 +45,17 @@ func TestTerminationReasonGlitchClassification(t *testing.T) {
 	}
 	if !glitchTerminatedTaskEligible(organization.PlannedTask{Purpose: kernel.PurposeImplementation, AttemptLimit: 3}, kernel.AggregateState{Phase: kernel.PhaseActive}, failed) {
 		t.Error("eligibility is set by the verdict-less reason class and attempt bound, not by purpose")
+	}
+}
+
+func TestAutomaticGlitchRecoveryDeadlineIsDeterministicStrictSuccessor(t *testing.T) {
+	budget := time.Date(2026, time.September, 13, 5, 47, 36, 0, time.UTC)
+
+	if got, want := automaticGlitchRecoveryDeadline(budget, budget), budget.Add(time.Nanosecond); !got.Equal(want) {
+		t.Fatalf("equal deadlines: got %s want %s", got, want)
+	}
+	invocation := budget.Add(time.Second)
+	if got, want := automaticGlitchRecoveryDeadline(budget, invocation), invocation.Add(time.Nanosecond); !got.Equal(want) {
+		t.Fatalf("later invocation deadline: got %s want %s", got, want)
 	}
 }

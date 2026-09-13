@@ -23,6 +23,14 @@ func (service *ProductionService) SubmitFeature(ctx context.Context, principal k
 		return feature, created, err
 	}
 	if feature.Status == organization.FeatureSubmitted {
+		if service.WorkflowLibrary != nil {
+			if err := service.prepareFeatureWorkflow(ctx, feature); err != nil {
+				service.recordRecoveryFault("feature-workflow:"+string(feature.ID), err)
+				return feature, created, fmt.Errorf("%w: %v", ErrFeatureMaterializationPending, err)
+			}
+			service.clearRecoveryFault("feature-workflow:" + string(feature.ID))
+			return feature, created, nil
+		}
 		if err := service.materializeFeatureIntake(ctx, feature); err != nil {
 			if errors.Is(err, errNewInvocationAdmissionSuspended) {
 				service.clearRecoveryFault("feature-intake:" + string(feature.ID))

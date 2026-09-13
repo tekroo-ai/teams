@@ -6,12 +6,18 @@ import (
 	"time"
 
 	"github.com/tekroo-ai/teams/adapters/mongo"
+	"github.com/tekroo-ai/teams/kernel"
 	"github.com/tekroo-ai/teams/organization"
 )
+
+type workflowMessageAdmission interface {
+	Admit(context.Context, organization.OrganizationalMessage) (kernel.WorkAdmissionResult, bool, bool, error)
+}
 
 type organizationalRoleWorker struct {
 	store        *mongo.Store
 	inbox        *organization.RoleInbox
+	admission    workflowMessageAdmission
 	pollInterval time.Duration
 	openTimeout  time.Duration
 }
@@ -30,6 +36,17 @@ func (worker *organizationalRoleWorker) Run(ctx context.Context, request organiz
 		pollCancel()
 		switch {
 		case err == nil:
+			if worker.admission != nil {
+				admissionContext, admissionCancel := context.WithTimeout(ctx, worker.openTimeout)
+				result, handled, _, admissionErr := worker.admission.Admit(admissionContext, message)
+				admissionCancel()
+				if admissionErr != nil {
+					return admissionErr
+				}
+				if handled && result.Outcome != kernel.WorkAdmitted {
+					continue
+				}
+			}
 			if notifyErr := worker.inbox.Notify(message); notifyErr != nil {
 				return notifyErr
 			}

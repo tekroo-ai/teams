@@ -1,0 +1,300 @@
+{
+  "contractIdentity": "tekroo.kernel.contracts/0.11.0",
+  "fixtures": [
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "P10-WF-001",
+      "given": {
+        "capacity": 4,
+        "completedNodeIds": [
+          "design"
+        ],
+        "nodes": [
+          {
+            "dependsOn": [],
+            "id": "design"
+          },
+          {
+            "dependsOn": [
+              "design"
+            ],
+            "id": "code-a"
+          },
+          {
+            "dependsOn": [
+              "design"
+            ],
+            "id": "code-b"
+          },
+          {
+            "dependsOn": [
+              "design"
+            ],
+            "id": "code-c"
+          },
+          {
+            "dependsOn": [
+              "design"
+            ],
+            "id": "code-d"
+          },
+          {
+            "dependsOn": [
+              "code-a",
+              "code-b",
+              "code-c",
+              "code-d"
+            ],
+            "id": "join"
+          }
+        ]
+      },
+      "kind": "WORKFLOW_MODEL",
+      "model": "PARALLEL_READY",
+      "then": {
+        "expected": {
+          "admittedNodeIds": [
+            "code-a",
+            "code-b",
+            "code-c",
+            "code-d"
+          ],
+          "readyNodeIds": [
+            "code-a",
+            "code-b",
+            "code-c",
+            "code-d"
+          ]
+        }
+      },
+      "when": {
+        "action": "ADMIT_READY"
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "P10-WF-002",
+      "given": {
+        "attempt": 1,
+        "attemptLimit": 2,
+        "budgetAccountId": "root-budget",
+        "completedNodeIds": [
+          "design",
+          "code-a"
+        ],
+        "failedNodeId": "validation"
+      },
+      "kind": "WORKFLOW_MODEL",
+      "model": "BOUNDED_REPAIR",
+      "then": {
+        "expected": {
+          "admitted": true,
+          "budgetPreserved": true,
+          "completedNodeIds": [
+            "design",
+            "code-a"
+          ],
+          "nextAttempt": 2
+        }
+      },
+      "when": {
+        "action": "CREATE_REPAIR_SUCCESSOR",
+        "changedConditionEvidenceIds": [
+          "failure-receipt"
+        ],
+        "requestedBudgetAccountId": "root-budget"
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "P10-WF-003",
+      "given": {
+        "nodes": [
+          {
+            "dependsOn": [],
+            "id": "architecture",
+            "role": "architect"
+          },
+          {
+            "dependsOn": [
+              "architecture"
+            ],
+            "id": "implementation",
+            "role": "coder"
+          },
+          {
+            "dependsOn": [
+              "implementation"
+            ],
+            "id": "architecture-review",
+            "role": "architect"
+          }
+        ]
+      },
+      "kind": "WORKFLOW_MODEL",
+      "model": "ROLE_REUSE",
+      "then": {
+        "expected": {
+          "distinctNodeCount": 3,
+          "reason": null,
+          "reusedRoles": [
+            "architect"
+          ],
+          "valid": true
+        }
+      },
+      "when": {
+        "action": "VALIDATE_TOPOLOGY"
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "P10-WF-004",
+      "given": {
+        "nodes": [
+          {
+            "dependsOn": [
+              "c"
+            ],
+            "id": "a"
+          },
+          {
+            "dependsOn": [
+              "a"
+            ],
+            "id": "b"
+          },
+          {
+            "dependsOn": [
+              "b"
+            ],
+            "id": "c"
+          }
+        ]
+      },
+      "kind": "WORKFLOW_MODEL",
+      "model": "NODE_CYCLE",
+      "then": {
+        "expected": {
+          "reason": "CYCLE",
+          "valid": false
+        }
+      },
+      "when": {
+        "action": "VALIDATE_TOPOLOGY"
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "P10-WF-005",
+      "given": {
+        "invocationCount": 7
+      },
+      "kind": "WORKFLOW_MODEL",
+      "model": "MESSAGE_ADMISSION",
+      "then": {
+        "expected": {
+          "createdInvocationCount": 0,
+          "invocationCount": 7
+        }
+      },
+      "when": {
+        "messages": [
+          {
+            "admission": "NOT_APPLICABLE",
+            "purpose": "EVIDENCE"
+          },
+          {
+            "admission": "REJECTED",
+            "purpose": "REQUEST"
+          }
+        ]
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "P10-WF-006",
+      "given": {
+        "completedNodeIds": [
+          "intake",
+          "design",
+          "code-a"
+        ],
+        "frontierNodeIds": [
+          "code-b",
+          "code-c"
+        ],
+        "stateDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "kind": "WORKFLOW_MODEL",
+      "model": "CHECKPOINT_RESUME",
+      "then": {
+        "expected": {
+          "preservedCompletedNodeIds": [
+            "intake",
+            "design",
+            "code-a"
+          ],
+          "replayNodeIds": [],
+          "resumeNodeIds": [
+            "code-b",
+            "code-c"
+          ]
+        }
+      },
+      "when": {
+        "action": "RESUME"
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "P10-WF-007",
+      "given": {
+        "configuredRoles": [
+          "editor",
+          "fact-checker",
+          "publisher"
+        ],
+        "genericRuntimeRoleNames": [],
+        "workflowDomain": "content-publication"
+      },
+      "kind": "WORKFLOW_MODEL",
+      "model": "CONFIG_GENERALITY",
+      "then": {
+        "expected": {
+          "loaded": true,
+          "sourceChangeRequired": false
+        }
+      },
+      "when": {
+        "action": "LOAD"
+      }
+    },
+    {
+      "classification": "BOUNDARY_NEGATIVE",
+      "fixtureId": "P10-WF-008",
+      "given": {
+        "currentInputDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "designSeconds": 120,
+        "implementationSeconds": 240,
+        "priorEvidenceDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "requestedAdditionalSeconds": 60,
+        "validationSeconds": 330
+      },
+      "kind": "WORKFLOW_MODEL",
+      "model": "VALIDATION_CEILING",
+      "then": {
+        "expected": {
+          "additionalValidationAdmitted": false,
+          "ceilingSeconds": 360,
+          "reusePriorEvidence": true
+        }
+      },
+      "when": {
+        "action": "ADMIT_VALIDATION",
+        "changedConditionEvidenceIds": []
+      }
+    }
+  ],
+  "schemaVersion": "1.0.0"
+}
