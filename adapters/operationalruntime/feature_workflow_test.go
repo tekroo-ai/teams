@@ -44,3 +44,49 @@ func TestWorkflowPlanningStageDefinitionComesFromConfiguredWorkflow(t *testing.T
 		}
 	}
 }
+
+func TestWorkflowInvocationAdmissionFamilyIncludesChangedConditionRetries(t *testing.T) {
+	root := workflowTestInvocation("root")
+	retry := workflowTestInvocation("retry")
+	retry.RetryOfInvocationID = &root.ID
+	secondRetry := workflowTestInvocation("second-retry")
+	secondRetry.RetryOfInvocationID = &retry.ID
+	invocations := map[kernel.AggregateRef]kernel.WorkInvocation{root.Ref(): root, retry.Ref(): retry, secondRetry.Ref(): secondRetry}
+
+	if !workflowInvocationInAdmissionFamily(secondRetry, root.ID, invocations) {
+		t.Fatal("changed-condition retry was detached from admitted workflow stage")
+	}
+	unrelated := workflowTestInvocation("unrelated")
+	if workflowInvocationInAdmissionFamily(unrelated, root.ID, invocations) {
+		t.Fatal("unrelated invocation joined admitted workflow stage")
+	}
+}
+
+func TestPlanningInvocationWaitsWhileRecoveryProfileIsBeingRebound(t *testing.T) {
+	invocation := workflowTestInvocation("stale-output")
+	taskID := deterministicOperationalUUID("workflow-test-task")
+	current := kernel.WorkRiskProfile{ProfileID: deterministicOperationalUUID("workflow-test-profile", "current"), ProfileRevision: invocation.WorkProfile.ProfileRevision + 1, ProfileDigest: kernel.Digest(strings.Repeat("b", 64)), LifecycleEpoch: invocation.WorkProfile.LifecycleEpoch, ScopeRevision: invocation.WorkProfile.ScopeRevision}
+	snapshot := kernel.Snapshot{WorkProfiles: map[kernel.AggregateRef]kernel.WorkProfileSnapshot{
+		{Kind: kernel.AggregateTask, ID: taskID}: {Profile: current},
+	}}
+	if planningInvocationUsesCurrentProfile(snapshot, taskID, invocation) {
+		t.Fatal("prior output remained eligible during recovery profile rebind")
+	}
+	snapshot.WorkProfiles[kernel.AggregateRef{Kind: kernel.AggregateTask, ID: taskID}] = kernel.WorkProfileSnapshot{Profile: kernel.WorkRiskProfile{ProfileID: invocation.WorkProfile.ProfileID, ProfileRevision: invocation.WorkProfile.ProfileRevision, ProfileDigest: invocation.WorkProfile.ProfileDigest, LifecycleEpoch: invocation.WorkProfile.LifecycleEpoch, ScopeRevision: invocation.WorkProfile.ScopeRevision}}
+	if !planningInvocationUsesCurrentProfile(snapshot, taskID, invocation) {
+		t.Fatal("current invocation profile was not accepted")
+	}
+}
+
+func workflowTestInvocation(label string) kernel.WorkInvocation {
+	return kernel.WorkInvocation{
+		ID: deterministicOperationalUUID("workflow-test-invocation", label),
+		WorkProfile: kernel.WorkProfileBinding{
+			ProfileID:       deterministicOperationalUUID("workflow-test-profile", label),
+			ProfileRevision: 1,
+			ProfileDigest:   kernel.Digest(strings.Repeat("a", 64)),
+			LifecycleEpoch:  1,
+			ScopeRevision:   1,
+		},
+	}
+}

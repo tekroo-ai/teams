@@ -82,7 +82,7 @@ func (service *ProductionService) reconcileFeaturePlanning(ctx context.Context) 
 			return fmt.Errorf("feature %s %s: %w", feature.ID, stage, err)
 		}
 		if service.WorkflowLibrary != nil {
-			if workflowAdmission.AuthorizedInvocationID == nil || invocation.ID != *workflowAdmission.AuthorizedInvocationID {
+			if workflowAdmission.AuthorizedInvocationID == nil || !workflowInvocationInAdmissionFamily(invocation, *workflowAdmission.AuthorizedInvocationID, snapshot.WorkInvocations) {
 				return fmt.Errorf("feature %s %s workflow invocation identity mismatch", feature.ID, stage)
 			}
 			if err := service.startFeatureWorkflowStage(ctx, feature, workflowAdmission); err != nil {
@@ -96,6 +96,13 @@ func (service *ProductionService) reconcileFeaturePlanning(ctx context.Context) 
 			continue
 		}
 		if invocation.OutputDigest == nil {
+			continue
+		}
+		// An explicit changed-condition recovery rebinds the task profile before
+		// authorizing its successor invocation. During that short durable prelude,
+		// the prior succeeded invocation is still the latest one. Do not reprocess
+		// and re-block its already-rejected output while recovery is in progress.
+		if !planningInvocationUsesCurrentProfile(snapshot, task.ID, invocation) {
 			continue
 		}
 		output, err := service.Runtime.ReadExecutionOutput(ctx, *invocation.OutputDigest)

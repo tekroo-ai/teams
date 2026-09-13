@@ -47,6 +47,36 @@ func configuredWorkflowStage(definition kernel.WorkflowDefinition, stageID strin
 	return kernel.WorkflowStageDefinition{}, false
 }
 
+// workflowInvocationInAdmissionFamily keeps the workflow node bound to the
+// invocation that admitted the stage while allowing task-level, changed-
+// condition retries to finish that same stage. The task invocation chain
+// retains the exact attempt provenance.
+func workflowInvocationInAdmissionFamily(current kernel.WorkInvocation, admitted kernel.UUIDv7, invocations map[kernel.AggregateRef]kernel.WorkInvocation) bool {
+	visited := make(map[kernel.UUIDv7]struct{})
+	for {
+		if current.ID == admitted {
+			return true
+		}
+		if _, seen := visited[current.ID]; seen {
+			return false
+		}
+		visited[current.ID] = struct{}{}
+		if current.RetryOfInvocationID == nil {
+			return false
+		}
+		prior, found := invocations[kernel.AggregateRef{Kind: kernel.AggregateWorkInvocation, ID: *current.RetryOfInvocationID}]
+		if !found {
+			return false
+		}
+		current = prior
+	}
+}
+
+func planningInvocationUsesCurrentProfile(snapshot kernel.Snapshot, taskID kernel.UUIDv7, invocation kernel.WorkInvocation) bool {
+	profile, found := snapshot.WorkProfiles[kernel.AggregateRef{Kind: kernel.AggregateTask, ID: taskID}]
+	return found && profile.Profile.Binding() == invocation.WorkProfile
+}
+
 func (service *ProductionService) prepareFeatureWorkflow(ctx context.Context, feature organization.FeatureRequest) error {
 	if service == nil || service.WorkflowLibrary == nil {
 		return nil
