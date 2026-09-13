@@ -947,6 +947,48 @@ func TestCheckpointCompletionAllowsBoundedReadsAndRejectsPostAnnouncementWork(t 
 	}
 }
 
+func TestCheckpointCompletionAllowanceDoesNotResetAtLaterCompaction(t *testing.T) {
+	checkpoint := progressCheckpoint{
+		SchemaVersion:       "tekroo.teams.execution-progress-checkpoint/1.2.0",
+		SourceJournalSHA256: kernel.Digest(strings.Repeat("c", 64)),
+		NextAction:          "Submit the required result through the finish tool.",
+	}
+	checkpointEvent := func(id string) rawEvent {
+		return rawEvent{ID: id, Kind: "MessageEvent", Source: "user", Text: compactionCheckpointPrefix + "1\nrestored\n" + string(mustJSON(checkpoint))}
+	}
+	events := []rawEvent{checkpointEvent("checkpoint-1")}
+	for index := 0; index < maximumCheckpointCompletionReads/2; index++ {
+		events = append(events, rawEvent{ID: fmt.Sprintf("first-window-%d", index), Kind: "ActionEvent", Source: "agent", ToolName: "repository_view", ActionPath: "organization/host.go"})
+	}
+	events = append(events, checkpointEvent("checkpoint-2"))
+	for index := maximumCheckpointCompletionReads / 2; index <= maximumCheckpointCompletionReads; index++ {
+		events = append(events, rawEvent{ID: fmt.Sprintf("second-window-%d", index), Kind: "ActionEvent", Source: "agent", ToolName: "repository_view", ActionPath: "organization/host.go"})
+	}
+	violation, repeated, found := checkpointCompletionRepositoryViolation(events, -1)
+	if !found || repeated || violation.ID != fmt.Sprintf("second-window-%d", maximumCheckpointCompletionReads) {
+		t.Fatalf("later checkpoint reset completion allowance: found=%t repeated=%t violation=%+v", found, repeated, violation)
+	}
+}
+
+func TestResultBoundaryRecoveryAllowsNoNewRepositoryWork(t *testing.T) {
+	invocationID := kernel.UUIDv7("018f0000-0000-7000-8000-000000000101")
+	priorInvocationID := kernel.UUIDv7("018f0000-0000-7000-8000-000000000102")
+	checkpoint := progressCheckpoint{
+		SchemaVersion:       "tekroo.teams.execution-progress-checkpoint/1.2.0",
+		InvocationID:        invocationID,
+		PriorInvocationID:   &priorInvocationID,
+		Source:              "OPENHANDS_EVENT_JOURNAL",
+		SourceJournalSHA256: kernel.Digest(strings.Repeat("d", 64)),
+		NextAction:          "Evaluate retained evidence and submit the required result through the finish tool.",
+	}
+	prompt := rawEvent{ID: "prompt", Kind: "MessageEvent", Source: "user", Text: string(mustJSON(map[string]any{"recovery_checkpoint": checkpoint}))}
+	read := rawEvent{ID: "unexpected-read", Kind: "ActionEvent", Source: "agent", ToolName: "repository_view", ActionPath: "organization/host.go"}
+	violation, repeated, found := checkpointCompletionRepositoryViolation([]rawEvent{prompt, read}, 0)
+	if !found || repeated || violation.ID != read.ID {
+		t.Fatalf("result-boundary recovery allowed repository work: found=%t repeated=%t violation=%+v", found, repeated, violation)
+	}
+}
+
 func TestCheckpointCompletionGuardDoesNotFenceWritingWork(t *testing.T) {
 	if checkpointCompletionGuardApplies(kernel.PurposeImplementation) {
 		t.Fatal("implementation was incorrectly subject to the read-only completion guard")
