@@ -1808,6 +1808,29 @@ func TestClientCorrectsLaterShellDisciplineIncidentAfterCompliantProgress(t *tes
 	}
 }
 
+func TestClientTreatsCompliantNoMatchAsShellDisciplineRecovery(t *testing.T) {
+	brief, digest := openHandsTestBrief(t)
+	workspace := filepath.Join(t.TempDir(), "workspace")
+	events := []map[string]any{
+		event("evt-user", "MessageEvent", "user", string(mustJSON(brief))),
+		actionEvent("first-compound-action", "terminal", "rg -n name . | head"),
+		observationEvent("first-compound-observation", "terminal", false, 0),
+		event("first-correction", "MessageEvent", "user", shellDisciplineCorrectionPrefix+"first-compound-action\ncorrect it"),
+		actionEvent("compliant-no-match", "terminal", `rg -n "missing symbol" organization`),
+		observationEvent("compliant-no-match-observation", "terminal", false, 1),
+		actionEvent("later-compound-action", "terminal", "go doc golang.org/x/text/cases | head"),
+	}
+	state := &progressGuardServerState{prompt: string(mustJSON(brief)), workspace: workspace, events: events}
+	server := httptest.NewServer(http.HandlerFunc(state.serveHTTP))
+	defer server.Close()
+	client := newOpenHandsTestClient(t, server.URL, workspace, brief)
+
+	observation, err := client.Inspect(context.Background(), brief, string(brief.InvocationID), digest)
+	if err != nil || observation.State != application.ExternalRunning || state.interruptCalls != 1 || state.correctionCalls != 1 || !strings.Contains(state.correctionText, shellDisciplineCorrectionPrefix+"later-compound-action") {
+		t.Fatalf("observation=%#v err=%v interrupts=%d corrections=%d text=%q", observation, err, state.interruptCalls, state.correctionCalls, state.correctionText)
+	}
+}
+
 func TestClientCorrectsGitWorkingDirectoryOverrideAndRequiresAgentsGrounding(t *testing.T) {
 	brief, _ := openHandsTestBrief(t)
 	brief.ExecutionGuidance = []string{"Read and follow AGENTS.md before taking repository actions."}

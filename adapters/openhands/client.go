@@ -1022,7 +1022,11 @@ func shellDisciplineCorrectionAllowed(events []rawEvent, promptIndex int, violat
 		if _, found := compliant[event.ToolCallID]; !found {
 			continue
 		}
-		if !event.ObservationError && !event.ObservationTimeout && (event.ObservationExitCode == nil || *event.ObservationExitCode == 0) {
+		// A well-formed command that completes with a nonzero status still proves
+		// the model recovered its shell usage. In particular, grep/rg use exit 1
+		// for a valid no-match result, which is useful negative evidence rather
+		// than another shell-discipline violation.
+		if !event.ObservationError && !event.ObservationTimeout {
 			return true
 		}
 	}
