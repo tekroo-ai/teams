@@ -29,8 +29,8 @@ import (
 )
 
 const (
-	localModelIdentity        = "ddalcu--Qwen3.8-27B-MLX-Serve-8bit"
-	localBoundedModelEndpoint = "http://127.0.0.1:8802/v1"
+	localModelIdentity        = "ddalcu--Qwen3.8-Flash-Next-MLX-Serve-mixed-4-8bit"
+	localBoundedModelEndpoint = "http://127.0.0.1:8800/v1"
 	localComplexModelEndpoint = "http://127.0.0.1:8800/v1"
 	localOpenHandsEndpoint    = "http://127.0.0.1:8000"
 	localDeploymentTeam       = "teams"
@@ -470,7 +470,7 @@ func localProductionProfiles(teamRoot string, manifest *organization.TeamManifes
 		}
 		agentSettings, err := openhands.NewOpenAICompatibleAgentSettings(openhands.AgentSettingsConfig{
 			Model: "openai/" + localModelIdentity, ModelCanonicalName: "openai/gpt-4o", BaseURL: endpoint,
-			APIKey: "teams-loopback-only", Tools: executionTools, EnableThinking: thinking, CondenserEnableThinking: false,
+			APIKey: "teams-loopback-only", Tools: executionTools, EnableThinking: thinking, CondenserEnableThinking: false, EnableMTP: thinking, CondenserEnableMTP: false,
 			ReasoningEffort: reasoningEffort, MaximumOutputTokens: maximumOutputTokens, CondenserOutputTokens: localCondenserOutputTokens, TimeoutSeconds: 1200, CondenserMaximumEvents: condenserMaximumEvents, CondenserMaximumTokens: 96000,
 		})
 		if err != nil {

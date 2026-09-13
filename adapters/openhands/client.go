@@ -126,6 +126,8 @@ type AgentSettingsConfig struct {
 	Tools                   []string
 	EnableThinking          bool
 	CondenserEnableThinking bool
+	EnableMTP               bool
+	CondenserEnableMTP      bool
 	ReasoningEffort         string
 	MaximumOutputTokens     uint32
 	CondenserOutputTokens   uint32
@@ -146,8 +148,9 @@ func NewOpenAICompatibleAgentSettings(config AgentSettingsConfig) (json.RawMessa
 	if err != nil || endpoint.Scheme != "http" && endpoint.Scheme != "https" || endpoint.Host == "" || endpoint.User != nil {
 		return nil, ErrInvalidConfiguration
 	}
-	llm := func(thinking bool, usageID string, maximumOutputTokens uint32, reasoningEffort string) map[string]any {
+	llm := func(thinking, mtp bool, usageID string, maximumOutputTokens uint32, reasoningEffort string) map[string]any {
 		extraBody := map[string]any{
+			"enable_mtp": mtp,
 			"chat_template_kwargs": map[string]any{
 				"enable_thinking":   thinking,
 				"preserve_thinking": thinking,
@@ -182,9 +185,9 @@ func NewOpenAICompatibleAgentSettings(config AgentSettingsConfig) (json.RawMessa
 		"kind": "Agent", "include_default_tools": []string{"FinishTool"},
 		"tools": tools, "system_prompt": teamsRoleExecutionSystemPrompt,
 		"agent_context": map[string]any{"system_message_suffix": qualifiedShellDisciplineSystemSuffix},
-		"llm":           llm(config.EnableThinking, "", config.MaximumOutputTokens, config.ReasoningEffort),
+		"llm":           llm(config.EnableThinking, config.EnableMTP, "", config.MaximumOutputTokens, config.ReasoningEffort),
 		"condenser": map[string]any{
-			"kind": "LLMSummarizingCondenser", "llm": llm(config.CondenserEnableThinking, "condenser", config.CondenserOutputTokens, ""),
+			"kind": "LLMSummarizingCondenser", "llm": llm(config.CondenserEnableThinking, config.CondenserEnableMTP, "condenser", config.CondenserOutputTokens, ""),
 			"max_size": config.CondenserMaximumEvents, "max_tokens": config.CondenserMaximumTokens, "keep_first": 2,
 		},
 	}
