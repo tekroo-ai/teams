@@ -6,16 +6,23 @@ import (
 )
 
 type WorkflowTiming struct {
-	CriticalPathTime       time.Duration `json:"critical_path_time"`
-	DesignWallTime         time.Duration `json:"design_wall_time"`
-	ImplementationWallTime time.Duration `json:"implementation_wall_time"`
-	ValidationWallTime     time.Duration `json:"validation_wall_time"`
-	AggregateModelTime     time.Duration `json:"aggregate_model_time"`
-	QueueTime              time.Duration `json:"queue_time"`
-	ModelTokens            *uint64       `json:"model_tokens,omitempty"`
-	EvidenceReused         *uint64       `json:"evidence_reused,omitempty"`
-	DuplicateChecksAvoided *uint64       `json:"duplicate_checks_avoided,omitempty"`
-	PeakParallelism        uint32        `json:"peak_parallelism"`
+	CriticalPathTime        time.Duration `json:"critical_path_time"`
+	DesignWallTime          time.Duration `json:"design_wall_time"`
+	ImplementationWallTime  time.Duration `json:"implementation_wall_time"`
+	ValidationWallTime      time.Duration `json:"validation_wall_time"`
+	AggregateModelTime      time.Duration `json:"aggregate_model_time"`
+	NonSuccessfulModelTime  time.Duration `json:"non_successful_model_time"`
+	QueueTime               time.Duration `json:"queue_time"`
+	LogicalTaskCount        uint32        `json:"logical_task_count"`
+	InvocationCount         uint32        `json:"invocation_count"`
+	RetryInvocationCount    uint32        `json:"retry_invocation_count"`
+	RecoveryInvocationCount uint32        `json:"recovery_invocation_count"`
+	NonSuccessfulCount      uint32        `json:"non_successful_count"`
+	ActiveInvocationCount   uint32        `json:"active_invocation_count"`
+	ModelTokens             *uint64       `json:"model_tokens,omitempty"`
+	EvidenceReused          *uint64       `json:"evidence_reused,omitempty"`
+	DuplicateChecksAvoided  *uint64       `json:"duplicate_checks_avoided,omitempty"`
+	PeakParallelism         uint32        `json:"peak_parallelism"`
 }
 
 type workflowInterval struct{ start, end time.Time }
@@ -30,8 +37,24 @@ func MeasureWorkflowTiming(invocations []WorkInvocation, observedAt time.Time) W
 	}
 	var result WorkflowTiming
 	categories := make(map[WorkPurpose][]workflowInterval)
+	tasks := make(map[UUIDv7]struct{})
 	all := make([]workflowInterval, 0, len(invocations))
 	for _, invocation := range invocations {
+		result.InvocationCount++
+		if invocation.TaskID.Valid() {
+			tasks[invocation.TaskID] = struct{}{}
+		}
+		if invocation.AttemptOrdinal > 1 || invocation.RetryOfInvocationID != nil {
+			result.RetryInvocationCount++
+		}
+		if invocation.Purpose == PurposeRepair || invocation.Purpose == PurposeReplan {
+			result.RecoveryInvocationCount++
+		}
+		if invocation.State.Terminal() && invocation.State != InvocationSucceeded {
+			result.NonSuccessfulCount++
+		} else if !invocation.State.Terminal() {
+			result.ActiveInvocationCount++
+		}
 		if invocation.ClaimedAt != nil && invocation.StartedAt != nil && !invocation.StartedAt.Before(*invocation.ClaimedAt) {
 			result.QueueTime += invocation.StartedAt.Sub(*invocation.ClaimedAt)
 		}
@@ -49,7 +72,11 @@ func MeasureWorkflowTiming(invocations []WorkInvocation, observedAt time.Time) W
 		categories[invocation.Purpose] = append(categories[invocation.Purpose], interval)
 		all = append(all, interval)
 		result.AggregateModelTime += end.Sub(*invocation.StartedAt)
+		if invocation.State.Terminal() && invocation.State != InvocationSucceeded {
+			result.NonSuccessfulModelTime += end.Sub(*invocation.StartedAt)
+		}
 	}
+	result.LogicalTaskCount = uint32(len(tasks))
 	result.DesignWallTime = unionWorkflowDuration(append(append(append([]workflowInterval(nil), categories[PurposeHandoff]...), categories[PurposeReplan]...), categories[PurposeInvestigation]...))
 	result.ImplementationWallTime = unionWorkflowDuration(append(append([]workflowInterval(nil), categories[PurposeImplementation]...), categories[PurposeRepair]...))
 	result.ValidationWallTime = unionWorkflowDuration(append(append(append([]workflowInterval(nil), categories[PurposeValidation]...), categories[PurposeReview]...), categories[PurposePromotion]...))

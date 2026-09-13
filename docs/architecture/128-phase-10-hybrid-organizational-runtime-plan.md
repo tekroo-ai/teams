@@ -368,7 +368,10 @@ software role names in generic runtime code.
 - [x] Add durable per-stage checkpoints and resume from the failed stage only.
 - [x] Add validation-time target and ceiling enforcement.
 - [ ] Expose critical-path time, aggregate model time, queue time, model tokens,
-  evidence reuse, duplicate checks, and achieved parallelism.
+  evidence reuse, duplicate checks, and achieved parallelism. Timing now also
+  exposes logical task and invocation counts, retry and recovery counts, and
+  non-successful model time; model-token and evidence-reuse counters still need
+  raw adapter receipts.
 
 **Exit:** deterministic tests demonstrate parallel execution, no duplicated
 passing checks, and ceiling enforcement.

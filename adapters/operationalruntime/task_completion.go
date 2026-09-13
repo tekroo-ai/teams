@@ -355,6 +355,9 @@ func (service *ProductionService) authorizeStructuredOutputGlitchRetry(ctx conte
 	if !structuredOutputGlitchRetryAllowed(task, invocation) {
 		return false, nil
 	}
+	if repeatedTerminalOutput(snapshot, invocation) {
+		return false, nil
+	}
 	nextAttempt := invocation.AttemptOrdinal + 1
 	recoveryConditions, err := validationRecoveryConditionDigests(task, snapshot.WorkInvocations, invocation)
 	if err != nil {

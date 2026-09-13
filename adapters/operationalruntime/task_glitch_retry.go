@@ -72,16 +72,22 @@ func (service *ProductionService) reconcileGlitchTerminatedTasks(ctx context.Con
 		if !present || !glitchTerminatedTaskEligible(task, state, invocation) {
 			continue
 		}
+		snapshot, err := service.Store.LoadDecision(ctx, kernel.KernelCommand{Target: kernel.AggregateRef{Kind: kernel.AggregateTask, ID: task.ID}})
+		if err != nil {
+			return false, err
+		}
+		// A byte-identical terminal result is an unchanged condition, not a new
+		// recovery opportunity. Leave it for explicit diagnosis instead of
+		// spending another model invocation on the same failure.
+		if repeatedTerminalOutput(snapshot, invocation) {
+			continue
+		}
 		output, err := service.Runtime.ReadExecutionOutput(ctx, *invocation.OutputDigest)
 		if err != nil {
 			return false, fmt.Errorf("read terminal output for task %s: %w", task.ID, err)
 		}
 		if !terminationReasonIsAutoRetryableGlitch(output) {
 			continue
-		}
-		snapshot, err := service.Store.LoadDecision(ctx, kernel.KernelCommand{Target: kernel.AggregateRef{Kind: kernel.AggregateTask, ID: task.ID}})
-		if err != nil {
-			return false, err
 		}
 		evidence, err := evidenceRefsForIDs(snapshot, invocation.TerminalEvidenceIDs)
 		if err != nil {
@@ -119,6 +125,21 @@ func (service *ProductionService) reconcileGlitchTerminatedTasks(ctx context.Con
 		return true, nil
 	}
 	return false, nil
+}
+
+func repeatedTerminalOutput(snapshot kernel.Snapshot, current kernel.WorkInvocation) bool {
+	if current.OutputDigest == nil {
+		return false
+	}
+	for _, prior := range snapshot.WorkInvocations {
+		if prior.ID == current.ID || prior.TaskID != current.TaskID || !prior.State.Terminal() || prior.OutputDigest == nil {
+			continue
+		}
+		if *prior.OutputDigest == *current.OutputDigest {
+			return true
+		}
+	}
+	return false
 }
 
 func automaticGlitchRecoveryDeadline(budgetDeadline, invocationDeadline time.Time) time.Time {

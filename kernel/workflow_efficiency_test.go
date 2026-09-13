@@ -43,22 +43,25 @@ func TestValidationReusesExactEvidenceAndSelectsByRisk(t *testing.T) {
 
 func TestMeasureWorkflowTimingUsesWallClockUnionAndAggregateModelTime(t *testing.T) {
 	base := time.Date(2026, 9, 13, 12, 0, 0, 0, time.UTC)
-	interval := func(purpose WorkPurpose, start, finish time.Duration) WorkInvocation {
+	interval := func(task UUIDv7, purpose WorkPurpose, attempt uint64, state WorkInvocationState, start, finish time.Duration) WorkInvocation {
 		startedAt := base.Add(start)
 		finishedAt := base.Add(finish)
-		return WorkInvocation{Purpose: purpose, StartedAt: &startedAt, FinishedAt: &finishedAt}
+		return WorkInvocation{TaskID: task, Purpose: purpose, AttemptOrdinal: attempt, State: state, StartedAt: &startedAt, FinishedAt: &finishedAt}
 	}
-	first := interval(PurposeImplementation, 0, 10*time.Second)
+	designTask := workflowTestID(501)
+	implementationTask := workflowTestID(502)
+	validationTask := workflowTestID(503)
+	first := interval(implementationTask, PurposeImplementation, 1, InvocationSucceeded, 0, 10*time.Second)
 	claimedAt := base.Add(-2 * time.Second)
 	first.ClaimedAt = &claimedAt
 	invocations := []WorkInvocation{
-		interval(PurposeHandoff, -20*time.Second, -10*time.Second),
+		interval(designTask, PurposeHandoff, 1, InvocationSucceeded, -20*time.Second, -10*time.Second),
 		first,
-		interval(PurposeImplementation, 2*time.Second, 8*time.Second),
-		interval(PurposeValidation, 10*time.Second, 14*time.Second),
+		interval(implementationTask, PurposeRepair, 2, InvocationFailed, 2*time.Second, 8*time.Second),
+		interval(validationTask, PurposeValidation, 1, InvocationSucceeded, 10*time.Second, 14*time.Second),
 	}
 	timing := MeasureWorkflowTiming(invocations, base.Add(20*time.Second))
-	if timing.CriticalPathTime != 34*time.Second || timing.DesignWallTime != 10*time.Second || timing.ImplementationWallTime != 10*time.Second || timing.ValidationWallTime != 4*time.Second || timing.AggregateModelTime != 30*time.Second || timing.QueueTime != 2*time.Second || timing.PeakParallelism != 2 {
+	if timing.CriticalPathTime != 34*time.Second || timing.DesignWallTime != 10*time.Second || timing.ImplementationWallTime != 10*time.Second || timing.ValidationWallTime != 4*time.Second || timing.AggregateModelTime != 30*time.Second || timing.NonSuccessfulModelTime != 6*time.Second || timing.QueueTime != 2*time.Second || timing.PeakParallelism != 2 || timing.LogicalTaskCount != 3 || timing.InvocationCount != 4 || timing.RetryInvocationCount != 1 || timing.RecoveryInvocationCount != 1 || timing.NonSuccessfulCount != 1 || timing.ActiveInvocationCount != 0 {
 		t.Fatalf("timing=%+v", timing)
 	}
 }

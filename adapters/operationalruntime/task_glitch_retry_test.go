@@ -59,3 +59,31 @@ func TestAutomaticGlitchRecoveryDeadlineIsDeterministicStrictSuccessor(t *testin
 		t.Fatalf("later invocation deadline: got %s want %s", got, want)
 	}
 }
+
+func TestRepeatedTerminalOutputDoesNotConsumeAnotherAutomaticAttempt(t *testing.T) {
+	digest := kernel.Digest("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+	current := kernel.WorkInvocation{
+		ID: "00000000-0000-7000-8000-0000000000a3", TaskID: "00000000-0000-7000-8000-0000000000a1",
+		State: kernel.InvocationFailed, OutputDigest: &digest,
+	}
+	prior := current
+	prior.ID = "00000000-0000-7000-8000-0000000000a2"
+	snapshot := kernel.Snapshot{WorkInvocations: map[kernel.AggregateRef]kernel.WorkInvocation{
+		{Kind: kernel.AggregateWorkInvocation, ID: prior.ID}:   prior,
+		{Kind: kernel.AggregateWorkInvocation, ID: current.ID}: current,
+	}}
+	if !repeatedTerminalOutput(snapshot, current) {
+		t.Fatal("identical prior terminal output was not detected")
+	}
+	prior.State = kernel.InvocationSucceeded
+	snapshot.WorkInvocations[kernel.AggregateRef{Kind: kernel.AggregateWorkInvocation, ID: prior.ID}] = prior
+	if !repeatedTerminalOutput(snapshot, current) {
+		t.Fatal("identical successful structured output was not detected")
+	}
+	otherDigest := kernel.Digest("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
+	prior.OutputDigest = &otherDigest
+	snapshot.WorkInvocations[kernel.AggregateRef{Kind: kernel.AggregateWorkInvocation, ID: prior.ID}] = prior
+	if repeatedTerminalOutput(snapshot, current) {
+		t.Fatal("changed terminal output was incorrectly suppressed")
+	}
+}
