@@ -727,18 +727,6 @@ func (client *Client) Inspect(ctx context.Context, brief application.ExecutionBr
 		return application.ExternalExecutionObservation{}, ErrProtocol
 	}
 	currentPromptIndex := executionPromptIndex(events, prepared, brief, requestDigest)
-	// Enforce a previously reached result boundary before injecting another
-	// compaction checkpoint. Otherwise a fast agent can consume a fresh read
-	// allowance and compact again between daemon polls, indefinitely starving
-	// the completion guard.
-	if checkpointCompletionGuardApplies(brief.Purpose) {
-		if violation, repeated, violated := checkpointCompletionRepositoryViolation(events, currentPromptIndex); violated {
-			return client.correctCheckpointCompletionViolation(ctx, brief, requestDigest, info, events, violation, repeated)
-		}
-	}
-	if checkpointOrdinal := missingCompactionCheckpoint(info, events, currentPromptIndex); checkpointOrdinal > 0 && (executionStillActive(info.ExecutionStatus) || info.ExecutionStatus == "paused" && pausedAtCompactionBoundary(events, currentPromptIndex)) {
-		return client.injectCompactionCheckpoint(ctx, brief, requestDigest, info, events, currentPromptIndex, checkpointOrdinal)
-	}
 	if violation, unresolved := unresolvedModelResponsesWithoutActionOrResult(events, currentPromptIndex); unresolved > 0 {
 		// OpenHands automatically asks the model to continue after one response
 		// that contains neither an action nor a visible result. Do not race that
@@ -772,6 +760,18 @@ func (client *Client) Inspect(ctx context.Context, brief application.ExecutionBr
 	}
 	if violation, violated := acceptedContractInspectionViolation(brief, events, currentPromptIndex); violated {
 		return client.correctRepositoryScopeViolation(ctx, brief, requestDigest, info, events, currentPromptIndex, violation)
+	}
+	// Enforce a previously reached result boundary before injecting another
+	// compaction checkpoint. Otherwise a fast agent can consume a fresh read
+	// allowance and compact again between daemon polls, indefinitely starving
+	// the completion guard.
+	if checkpointCompletionGuardApplies(brief.Purpose) {
+		if violation, repeated, violated := checkpointCompletionRepositoryViolation(events, currentPromptIndex); violated {
+			return client.correctCheckpointCompletionViolation(ctx, brief, requestDigest, info, events, violation, repeated)
+		}
+	}
+	if checkpointOrdinal := missingCompactionCheckpoint(info, events, currentPromptIndex); checkpointOrdinal > 0 && (executionStillActive(info.ExecutionStatus) || info.ExecutionStatus == "paused" && pausedAtCompactionBoundary(events, currentPromptIndex)) {
+		return client.injectCompactionCheckpoint(ctx, brief, requestDigest, info, events, currentPromptIndex, checkpointOrdinal)
 	}
 	if violation, repeated, violated := repeatedFailedDeterministicValidationViolation(events, currentPromptIndex); violated {
 		return client.correctFailedDeterministicValidationViolation(ctx, brief, requestDigest, info, events, violation, repeated)
