@@ -107,6 +107,7 @@ func TestInitializeLocalDeploymentProducesValidatedIsolatedInstallation(t *testi
 			} `json:"tools"`
 			LLM struct {
 				BaseURL             string `json:"base_url"`
+				MaximumInputTokens  uint32 `json:"max_input_tokens"`
 				MaximumOutputTokens uint32 `json:"max_output_tokens"`
 				LiteLLMExtraBody    struct {
 					EnableMTP             bool   `json:"enable_mtp"`
@@ -121,6 +122,7 @@ func TestInitializeLocalDeploymentProducesValidatedIsolatedInstallation(t *testi
 			Condenser struct {
 				MaximumEvents uint32 `json:"max_size"`
 				LLM           struct {
+					MaximumInputTokens  uint32 `json:"max_input_tokens"`
 					MaximumOutputTokens uint32 `json:"max_output_tokens"`
 					LiteLLMExtraBody    struct {
 						EnableMTP          bool   `json:"enable_mtp"`
@@ -136,10 +138,10 @@ func TestInitializeLocalDeploymentProducesValidatedIsolatedInstallation(t *testi
 		if err := json.Unmarshal(profile.AgentSettings, &settings); err != nil {
 			t.Fatalf("decode local profile %s: %v", profile.RoleFQRN, err)
 		}
-		if settings.LLM.BaseURL != wantEndpoint || settings.LLM.MaximumOutputTokens != wantMaximumOutputTokens || settings.LLM.LiteLLMExtraBody.EnableMTP != wantThinking || settings.LLM.LiteLLMExtraBody.ReasoningEffort != wantReasoningEffort || settings.LLM.LiteLLMExtraBody.ReasoningBudgetTokens != wantReasoningBudgetTokens || settings.LLM.LiteLLMExtraBody.ChatTemplateKwargs.EnableThinking != wantThinking || settings.LLM.LiteLLMExtraBody.ChatTemplateKwargs.PreserveThinking != wantThinking {
+		if settings.LLM.BaseURL != wantEndpoint || settings.LLM.MaximumInputTokens != 262144 || settings.LLM.MaximumOutputTokens != wantMaximumOutputTokens || settings.LLM.LiteLLMExtraBody.EnableMTP != wantThinking || settings.LLM.LiteLLMExtraBody.ReasoningEffort != wantReasoningEffort || settings.LLM.LiteLLMExtraBody.ReasoningBudgetTokens != wantReasoningBudgetTokens || settings.LLM.LiteLLMExtraBody.ChatTemplateKwargs.EnableThinking != wantThinking || settings.LLM.LiteLLMExtraBody.ChatTemplateKwargs.PreserveThinking != wantThinking {
 			t.Fatalf("local profile %s endpoint/thinking = %s/%t, want %s/%t", profile.RoleFQRN, settings.LLM.BaseURL, settings.LLM.LiteLLMExtraBody.ChatTemplateKwargs.EnableThinking, wantEndpoint, wantThinking)
 		}
-		if settings.Condenser.LLM.MaximumOutputTokens != localCondenserOutputTokens || settings.Condenser.LLM.LiteLLMExtraBody.EnableMTP || settings.Condenser.LLM.LiteLLMExtraBody.ReasoningEffort != "" || settings.Condenser.LLM.LiteLLMExtraBody.ChatTemplateKwargs.EnableThinking || settings.Condenser.LLM.LiteLLMExtraBody.ChatTemplateKwargs.PreserveThinking {
+		if settings.Condenser.LLM.MaximumInputTokens != 262144 || settings.Condenser.LLM.MaximumOutputTokens != localCondenserOutputTokens || settings.Condenser.LLM.LiteLLMExtraBody.EnableMTP || settings.Condenser.LLM.LiteLLMExtraBody.ReasoningEffort != "" || settings.Condenser.LLM.LiteLLMExtraBody.ChatTemplateKwargs.EnableThinking || settings.Condenser.LLM.LiteLLMExtraBody.ChatTemplateKwargs.PreserveThinking {
 			t.Fatalf("local profile %s condenser is not independently bounded and non-thinking", profile.RoleFQRN)
 		}
 		wantCondenserMaximumEvents := uint32(localCondenserMaximumEvents)

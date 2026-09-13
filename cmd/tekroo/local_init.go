@@ -47,6 +47,7 @@ const (
 	localComplexEditingOutputTokens = 16384
 	localComplexReasoningEffort     = "medium"
 	localCondenserOutputTokens      = 4096
+	localCondenserMaximumTokens     = 196608
 	localCondenserMaximumEvents     = 80
 	localEditCondenserMaximumEvents = 240
 	localQualificationSchema        = "tekroo.local-model-profile-qualifications/1.0.0"
@@ -471,7 +472,7 @@ func localProductionProfiles(teamRoot string, manifest *organization.TeamManifes
 		agentSettings, err := openhands.NewOpenAICompatibleAgentSettings(openhands.AgentSettingsConfig{
 			Model: "openai/" + localModelIdentity, ModelCanonicalName: "openai/gpt-4o", BaseURL: endpoint,
 			APIKey: "teams-loopback-only", Tools: executionTools, EnableThinking: thinking, CondenserEnableThinking: false, EnableMTP: thinking, CondenserEnableMTP: false,
-			ReasoningEffort: reasoningEffort, MaximumOutputTokens: maximumOutputTokens, CondenserOutputTokens: localCondenserOutputTokens, TimeoutSeconds: 1200, CondenserMaximumEvents: condenserMaximumEvents, CondenserMaximumTokens: 96000,
+			ReasoningEffort: reasoningEffort, MaximumOutputTokens: maximumOutputTokens, CondenserOutputTokens: localCondenserOutputTokens, TimeoutSeconds: 1200, CondenserMaximumEvents: condenserMaximumEvents, CondenserMaximumTokens: localCondenserMaximumTokens,
 		})
 		if err != nil {
 			return nil, err

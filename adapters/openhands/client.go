@@ -148,6 +148,7 @@ func NewOpenAICompatibleAgentSettings(config AgentSettingsConfig) (json.RawMessa
 	if err != nil || endpoint.Scheme != "http" && endpoint.Scheme != "https" || endpoint.Host == "" || endpoint.User != nil {
 		return nil, ErrInvalidConfiguration
 	}
+	const nativeContextTokens = uint32(262144)
 	llm := func(thinking, mtp bool, usageID string, maximumOutputTokens uint32, reasoningEffort string) map[string]any {
 		extraBody := map[string]any{
 			"enable_mtp": mtp,
@@ -167,7 +168,7 @@ func NewOpenAICompatibleAgentSettings(config AgentSettingsConfig) (json.RawMessa
 			"model": config.Model, "model_canonical_name": config.ModelCanonicalName,
 			"base_url": config.BaseURL, "api_mode": "chat", "api_key": config.APIKey,
 			"native_tool_calling": true, "force_string_serializer": false,
-			"stream": false, "temperature": 0, "max_output_tokens": maximumOutputTokens,
+			"stream": false, "temperature": 0, "max_input_tokens": nativeContextTokens, "max_output_tokens": maximumOutputTokens,
 			"num_retries": 0, "retry_multiplier": 0, "retry_min_wait": 0, "retry_max_wait": 0,
 			"timeout": config.TimeoutSeconds, "log_completions": false,
 			"litellm_extra_body": extraBody,
