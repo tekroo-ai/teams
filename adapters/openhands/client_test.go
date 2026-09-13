@@ -2264,6 +2264,12 @@ func TestMutationActionClassifiesGitStateChangesOnly(t *testing.T) {
 		{command: "git show HEAD:file.go > /tmp/base_file.go", want: false},
 		{command: "go test ./... > /tmp/out.log", want: false},
 		{command: "go test ./... > /var/tmp/out.log", want: false},
+		{command: "mkdir -p /tmp/actornameprobe", want: false},
+		{command: "touch /var/tmp/validator-probe", want: false},
+		{command: "rm -f /tmp/validator-probe", want: false},
+		{command: "mkdir -p /tmp/../repository-write", want: true},
+		{command: "mkdir -p scratch", want: true},
+		{command: "rm -rf /tmp", want: true},
 	}
 	for _, test := range tests {
 		if got := mutationAction(rawEvent{ToolName: "terminal", ActionCommand: test.command}); got != test.want {

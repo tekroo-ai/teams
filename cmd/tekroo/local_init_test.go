@@ -67,6 +67,9 @@ func TestInitializeLocalDeploymentProducesValidatedIsolatedInstallation(t *testi
 	if config.Mongo.Database != "teams_test_prod" || config.SMADatabaseIdentity != "sma_test" || config.OpenHands.BaseURL != "http://127.0.0.1:18002" || len(config.Workspaces) != 14 || len(config.Profiles) != 8 {
 		t.Fatalf("config = %#v", config)
 	}
+	if len(config.Planning.CandidateGates) != 1 || len(config.Planning.CandidateGates[0].Command) == 0 || !filepath.IsAbs(config.Planning.CandidateGates[0].Command[0]) || filepath.Base(config.Planning.CandidateGates[0].Command[0]) != "go" {
+		t.Fatalf("deterministic Go gate is not bound to an absolute toolchain path: %#v", config.Planning.CandidateGates)
+	}
 	if !result.QualificationBundleDigest.Valid() || result.QualificationBundle == "" {
 		t.Fatalf("qualification bundle result = %#v", result)
 	}

@@ -3346,7 +3346,12 @@ func mutationAction(event rawEvent) bool {
 		}
 	}
 	switch executable {
-	case "apply_patch", "tee", "touch", "mkdir", "rm", "mv", "cp", "truncate", "patch":
+	case "mkdir", "touch", "rm", "truncate":
+		if mutationTargetsOnlyScratch(fields[1:]) {
+			return false
+		}
+		return true
+	case "apply_patch", "tee", "mv", "cp", "patch":
 		return true
 	case "gofmt":
 		if slices.Contains(fields[1:], "-w") {
@@ -3370,6 +3375,25 @@ func mutationAction(event rawEvent) bool {
 		}
 	}
 	return writesThroughRedirection(command)
+}
+
+// mutationTargetsOnlyScratch distinguishes agent-local temporary work from a
+// repository mutation. Only simple path-taking commands qualify, every target
+// must be an absolute descendant of /tmp or /var/tmp, and the scratch roots
+// themselves remain protected.
+func mutationTargetsOnlyScratch(arguments []string) bool {
+	found := false
+	for _, argument := range arguments {
+		if strings.HasPrefix(argument, "-") {
+			continue
+		}
+		path := filepath.Clean(strings.Trim(argument, "\"'"))
+		if !filepath.IsAbs(path) || path == "/tmp" || path == "/var/tmp" || !strings.HasPrefix(path, "/tmp/") && !strings.HasPrefix(path, "/var/tmp/") {
+			return false
+		}
+		found = true
+	}
+	return found
 }
 
 func writesThroughRedirection(command string) bool {

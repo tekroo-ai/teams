@@ -304,6 +304,14 @@ func initializeLocalDeployment(ctx context.Context, options localInitOptions) (r
 	if err != nil {
 		return result, err
 	}
+	goBinary, err := exec.LookPath("go")
+	if err != nil {
+		return result, fmt.Errorf("resolve Go toolchain for deterministic gate: %w", err)
+	}
+	goBinary, err = filepath.Abs(goBinary)
+	if err != nil {
+		return result, fmt.Errorf("resolve absolute Go toolchain path: %w", err)
+	}
 	configPath := filepath.Join(configRoot, "tekrood.json")
 	config := operationalruntime.ProductionConfig{
 		ContractRoot:          options.SourceRoot,
@@ -320,7 +328,7 @@ func initializeLocalDeployment(ctx context.Context, options localInitOptions) (r
 		Projection:   operationalruntime.ProductionProjection{Interval: "100ms", OperationTimeout: "5s"},
 		Continuity:   &operationalruntime.ProductionContinuity{HeartbeatInterval: "2s", SuspensionThreshold: "10s"},
 		Organization: operationalruntime.ProductionOrganization{ManifestFile: teamPath, ManifestDigest: manifestDigest, Publishers: []operationalruntime.ProductionPublisher{{KeyID: localBootstrapPublisher, PublicKeyFile: filepath.Join(deploymentTeamRoot, "publisher.pub")}, {KeyID: localGroundingPublisher, PublicKeyFile: filepath.Join(deploymentTeamRoot, "role-grounding-publisher.pub")}}, ReconciliationInterval: "1s", MaximumRestarts: 3, MaximumDeliveryAttempts: 3},
-		Planning:     operationalruntime.ProductionPlanning{PolicyRevision: 3, ClassificationPolicyDigest: labelDigest("classification-policy-v3"), PromotionPolicyDigest: labelDigest("promotion-policy-v3"), VerificationTopologyDigest: labelDigest("verification-topology-v3"), SelectionPolicyDigest: labelDigest("selection-policy-v3"), BudgetPolicyDigest: labelDigest("budget-policy-v3"), RequiredGateIDs: []string{"go-test"}, CandidateGates: []operationalruntime.ProductionCandidateGate{{GateID: "go-test", Command: []string{"go", "test", "./..."}, Timeout: "20m"}}, Deadline: "8h"},
+		Planning:     operationalruntime.ProductionPlanning{PolicyRevision: 3, ClassificationPolicyDigest: labelDigest("classification-policy-v3"), PromotionPolicyDigest: labelDigest("promotion-policy-v3"), VerificationTopologyDigest: labelDigest("verification-topology-v3"), SelectionPolicyDigest: labelDigest("selection-policy-v3"), BudgetPolicyDigest: labelDigest("budget-policy-v3"), RequiredGateIDs: []string{"go-test"}, CandidateGates: []operationalruntime.ProductionCandidateGate{{GateID: "go-test", Command: []string{goBinary, "test", "./..."}, Timeout: "20m"}}, Deadline: "8h"},
 		Git:          &operationalruntime.ProductionGitConfig{Binary: "git", AllowedRoot: filepath.Dir(options.RepositoryRoot), OperationTimeout: "2m"},
 	}
 	provenance, err := localProductionProvenance(options, config, policy, manifest, baseline, tree, qualificationBundleDigest)
