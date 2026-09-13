@@ -1078,6 +1078,27 @@ func TestProgressCheckpointCompactsLongActionHistory(t *testing.T) {
 	}
 }
 
+func TestProgressCheckpointPreservesRepositoryInstructionEvidence(t *testing.T) {
+	brief, _ := openHandsTestBrief(t)
+	exitSuccess := 0
+	events := []rawEvent{
+		{Raw: json.RawMessage(`{"id":"agents-read"}`), ID: "agents-read", Kind: "ActionEvent", Source: "agent", ToolName: "terminal", ToolCallID: "agents-call", ActionCommand: "cat AGENTS.md"},
+		{Raw: json.RawMessage(`{"id":"agents-result"}`), Kind: "ObservationEvent", ToolName: "terminal", ToolCallID: "agents-call", Text: "repository instructions", ObservationExitCode: &exitSuccess},
+	}
+	for index := 0; index < maximumCheckpointRepositoryEvidence+4; index++ {
+		callID := fmt.Sprintf("source-call-%02d", index)
+		events = append(events,
+			rawEvent{Raw: json.RawMessage(fmt.Sprintf(`{"id":"source-%02d"}`, index)), ID: fmt.Sprintf("source-%02d", index), Kind: "ActionEvent", Source: "agent", ToolName: "repository_view", ToolCallID: callID, ActionPath: fmt.Sprintf("organization/source-%02d.go", index)},
+			rawEvent{Raw: json.RawMessage(fmt.Sprintf(`{"id":"source-result-%02d"}`, index)), Kind: "ObservationEvent", ToolName: "repository_view", ToolCallID: callID, Text: "package organization", ObservationExitCode: &exitSuccess},
+		)
+	}
+
+	checkpoint := buildProgressCheckpoint(brief, events, -1)
+	if len(checkpoint.RepositoryEvidence) != maximumCheckpointRepositoryEvidence || !slices.ContainsFunc(checkpoint.RepositoryEvidence, checkpointActionTargetsRepositoryInstructions) {
+		t.Fatalf("repository instruction evidence was evicted: %#v", checkpoint.RepositoryEvidence)
+	}
+}
+
 func TestCheckpointNextActionIgnoresFailedReadOnlyInspection(t *testing.T) {
 	brief, _ := openHandsTestBrief(t)
 	actions := []checkpointAction{

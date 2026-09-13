@@ -2531,7 +2531,7 @@ func buildProgressCheckpoint(brief application.ExecutionBrief, events []rawEvent
 		}
 		for _, evidence := range retained.RepositoryEvidence {
 			if evidence.Outcome == "SUCCEEDED" {
-				repositoryEvidence = retainCheckpointAction(repositoryEvidence, evidence, maximumCheckpointRepositoryEvidence)
+				repositoryEvidence = retainCheckpointRepositoryEvidence(repositoryEvidence, evidence, maximumCheckpointRepositoryEvidence)
 			}
 		}
 		// Version 1.1 did not have repository_evidence. Its Actions are
@@ -2539,7 +2539,7 @@ func buildProgressCheckpoint(brief application.ExecutionBrief, events []rawEvent
 		// recover useful source evidence from the immediately prior slice.
 		for _, action := range retained.Actions {
 			if action.Outcome == "SUCCEEDED" && checkpointActionIsRepositoryEvidence(action) {
-				repositoryEvidence = retainCheckpointAction(repositoryEvidence, action, maximumCheckpointRepositoryEvidence)
+				repositoryEvidence = retainCheckpointRepositoryEvidence(repositoryEvidence, action, maximumCheckpointRepositoryEvidence)
 			}
 		}
 	}
@@ -2594,7 +2594,7 @@ func buildProgressCheckpoint(brief application.ExecutionBrief, events []rawEvent
 			inspected[pending.event.ActionPath] = struct{}{}
 		}
 		if outcome == "SUCCEEDED" && checkpointRepositoryEvidenceAction(pending.event) {
-			repositoryEvidence = retainCheckpointAction(repositoryEvidence, actions[pending.index], maximumCheckpointRepositoryEvidence)
+			repositoryEvidence = retainCheckpointRepositoryEvidence(repositoryEvidence, actions[pending.index], maximumCheckpointRepositoryEvidence)
 		}
 		if outcome == "SUCCEEDED" && mutationAction(pending.event) && pending.event.ActionPath != "" {
 			changed[pending.event.ActionPath] = struct{}{}
@@ -2672,6 +2672,34 @@ func retainCheckpointAction(retained []checkpointAction, action checkpointAction
 		retained = retained[len(retained)-maximum:]
 	}
 	return retained
+}
+
+func retainCheckpointRepositoryEvidence(retained []checkpointAction, action checkpointAction, maximum int) []checkpointAction {
+	if checkpointActionTargetsRepositoryInstructions(action) {
+		retained = slices.DeleteFunc(retained, checkpointActionTargetsRepositoryInstructions)
+	}
+	key := action.Tool + "\x00" + action.Command + "\x00" + action.Path
+	if index := slices.IndexFunc(retained, func(candidate checkpointAction) bool {
+		return candidate.Tool+"\x00"+candidate.Command+"\x00"+candidate.Path == key
+	}); index >= 0 {
+		retained = slices.Delete(retained, index, index+1)
+	}
+	retained = append(retained, action)
+	for len(retained) > maximum {
+		remove := slices.IndexFunc(retained, func(candidate checkpointAction) bool {
+			return !checkpointActionTargetsRepositoryInstructions(candidate)
+		})
+		if remove < 0 {
+			remove = 0
+		}
+		retained = slices.Delete(retained, remove, remove+1)
+	}
+	return retained
+}
+
+func checkpointActionTargetsRepositoryInstructions(action checkpointAction) bool {
+	target := strings.ToLower(action.Path + " " + action.Command)
+	return strings.Contains(target, "agents.md")
 }
 
 func checkpointRepositoryEvidenceAction(event rawEvent) bool {
