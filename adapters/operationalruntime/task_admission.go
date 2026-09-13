@@ -552,11 +552,12 @@ func validInvocationContinuation(prior kernel.WorkInvocation, purpose kernel.Wor
 		return false
 	}
 	if !reusePriorCondition {
-		// Promotion appears here because classifyTaskRecovery admits a blocked
-		// promotion only for the exact invalid-structured-output block; a recorded
-		// product decision remains unrecoverable and still needs a passing
+		// HANDOFF is the configured workflow's planning purpose and reaches this
+		// path only through explicit invalid-planning-output recovery. Promotion is
+		// likewise admitted only for the exact invalid-structured-output block; a
+		// recorded product decision remains unrecoverable and still needs a passing
 		// structured result from the next promotion attempt.
-		return technicalExtension && (recoverableTaskTerminal(prior) || prior.State == kernel.InvocationSucceeded && (purpose == kernel.PurposeValidation || purpose == kernel.PurposeReview || purpose == kernel.PurposeRepair || purpose == kernel.PurposeReplan || purpose == kernel.PurposePromotion)) || !technicalExtension && prior.State == kernel.InvocationSucceeded && (purpose == kernel.PurposeValidation || purpose == kernel.PurposeReview)
+		return technicalExtension && (recoverableTaskTerminal(prior) || prior.State == kernel.InvocationSucceeded && (purpose == kernel.PurposeHandoff || purpose == kernel.PurposeValidation || purpose == kernel.PurposeReview || purpose == kernel.PurposeRepair || purpose == kernel.PurposeReplan || purpose == kernel.PurposePromotion)) || !technicalExtension && prior.State == kernel.InvocationSucceeded && (purpose == kernel.PurposeValidation || purpose == kernel.PurposeReview)
 	}
 	if prior.Retryable == nil || !*prior.Retryable {
 		return false

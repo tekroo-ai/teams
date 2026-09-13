@@ -872,6 +872,15 @@ func TestExplicitPlanningRecoveryPreservesLineageWithoutReusingCondition(t *test
 
 func TestExplicitInvalidValidatorRecoveryPreservesLineageUnderChangedCondition(t *testing.T) {
 	prior := recoveryTerminalFixture(kernel.InvocationSucceeded, nil, nil)
+	prior.Purpose = kernel.PurposeHandoff
+	prior.AttemptFamily = "handoff"
+	if !validInvocationContinuation(prior, kernel.PurposeHandoff, prior.AttemptOrdinal+1, true, false) {
+		t.Fatal("configured workflow handoff recovery did not preserve prior invocation lineage")
+	}
+	if validInvocationContinuation(prior, kernel.PurposeHandoff, prior.AttemptOrdinal+1, false, false) {
+		t.Fatal("ordinary handoff continuation accepted a succeeded invocation")
+	}
+
 	prior.Purpose = kernel.PurposeReplan
 	prior.AttemptFamily = "replan"
 	if !validInvocationContinuation(prior, kernel.PurposeReplan, prior.AttemptOrdinal+1, true, false) {
