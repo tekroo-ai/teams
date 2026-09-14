@@ -1,0 +1,879 @@
+{
+  "contractIdentity": "tekroo.kernel.contracts/0.12.0",
+  "invariants": [
+    {
+      "decisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-007"
+      ],
+      "description": "Accepted transitions advance exact contiguous revisions; rejections do not.",
+      "fixtureIds": [
+        "MODEL-TASK-FORWARD",
+        "PRECONDITION-EXACT-ALL",
+        "PRECONDITION-STALE-NONE"
+      ],
+      "invariantId": "INV-001-REVISION-CONTIGUITY",
+      "negativeRequirementIds": []
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-007",
+        "P2-KCF-010"
+      ],
+      "description": "One semantic command produces at most one durable decision and canonical receipt.",
+      "fixtureIds": [
+        "IDEMPOTENCY-DUPLICATE-AND-CONFLICT"
+      ],
+      "invariantId": "INV-002-IDEMPOTENT-DECISION",
+      "negativeRequirementIds": [
+        "NEG-012"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-005"
+      ],
+      "description": "Accepted event lineage remains an immutable acyclic graph with explicit parents.",
+      "fixtureIds": [
+        "DAG-VALID-BRANCH-JOIN",
+        "DAG-REJECT-CYCLE"
+      ],
+      "invariantId": "INV-003-DAG-ACYCLIC",
+      "negativeRequirementIds": [
+        "NEG-004",
+        "NEG-014"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-002",
+        "P2-KCF-006"
+      ],
+      "description": "At most one concrete FQN owns work; routing and claims do not.",
+      "fixtureIds": [
+        "IDENTITY-CONCRETE-FQN",
+        "IDENTITY-REJECT-WILDCARD"
+      ],
+      "invariantId": "INV-004-EXACT-OWNERSHIP",
+      "negativeRequirementIds": [
+        "NEG-007"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-002",
+        "P2-KCF-007"
+      ],
+      "description": "Only the current execution tuple may commit actor-attributed commands.",
+      "fixtureIds": [
+        "CAT-001-EXECUTION-REGISTER-VALID",
+        "CAT-002-EXECUTION-REPLACE-VALID"
+      ],
+      "invariantId": "INV-005-EXECUTION-FENCING",
+      "negativeRequirementIds": [
+        "NEG-011"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-006",
+        "P2-KCF-008"
+      ],
+      "description": "Completion, acceptance, reopening, and correction preserve immutable lifecycle epochs.",
+      "fixtureIds": [
+        "MODEL-COMPLETION-NO-REQUESTED-PHASE",
+        "MODEL-REOPEN-INCREMENTS-EPOCH",
+        "MODEL-ILLEGAL-COMPLETION",
+        "REVIEW-JOIN-ORDER-INDEPENDENT",
+        "REVIEW-JOIN-DUPLICATE-CONFLICT",
+        "SUCCESSOR-SET-CANONICAL",
+        "SUCCESSOR-SET-REJECT-UNORDERED"
+      ],
+      "invariantId": "INV-006-LIFECYCLE-EPOCHS",
+      "negativeRequirementIds": [
+        "NEG-003",
+        "NEG-008"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-005",
+        "P2-KCF-007"
+      ],
+      "description": "Retry, validation, planning, handoff, and escalation are finite and durable across restart.",
+      "fixtureIds": [
+        "IDEMPOTENCY-DUPLICATE-AND-CONFLICT"
+      ],
+      "invariantId": "INV-007-BOUNDED-ITERATION",
+      "negativeRequirementIds": [
+        "NEG-001",
+        "NEG-002",
+        "NEG-005",
+        "NEG-006"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-004"
+      ],
+      "description": "Unknown types are preserved and cannot produce canonical organizational effects.",
+      "fixtureIds": [
+        "CAT-UNKNOWN-COMMAND"
+      ],
+      "invariantId": "INV-008-UNKNOWN-NO-EFFECT",
+      "negativeRequirementIds": [
+        "NEG-009"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-003",
+        "P2-KCF-009",
+        "P2-KCF-010"
+      ],
+      "description": "Every event and receipt carries exact authority, evidence, contract, source, and runtime provenance.",
+      "fixtureIds": [
+        "CAT-003-EVIDENCE-REGISTER-VALID"
+      ],
+      "invariantId": "INV-009-PROVENANCE-COMPLETE",
+      "negativeRequirementIds": [
+        "NEG-014"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-009"
+      ],
+      "description": "Provider, model, tool, and SMA output remains evidence until accepted by policy.",
+      "fixtureIds": [
+        "CAT-003-EVIDENCE-REGISTER-VALID"
+      ],
+      "invariantId": "INV-010-NONAUTHORITATIVE-EVIDENCE",
+      "negativeRequirementIds": [
+        "NEG-008",
+        "NEG-013"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-010"
+      ],
+      "description": "State, events, receipt, audit, and outbox commit atomically or remain explicitly uncertain.",
+      "fixtureIds": [
+        "IDEMPOTENCY-DUPLICATE-AND-CONFLICT"
+      ],
+      "invariantId": "INV-011-ATOMIC-MONGO-DECISION",
+      "negativeRequirementIds": [
+        "NEG-012"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-011",
+        "P2-KCF-012"
+      ],
+      "description": "Canonical fixtures and reports reproduce under pinned deterministic inputs.",
+      "fixtureIds": [
+        "MODEL-STORY-FORWARD",
+        "DAG-VALID-BRANCH-JOIN",
+        "COMPATIBILITY-1.0-MISSING-CONTEXT"
+      ],
+      "invariantId": "INV-012-CONFORMANCE-REPRODUCIBLE",
+      "negativeRequirementIds": []
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-012"
+      ],
+      "description": "Qualification binds exact base, heads, ordered merge plan, contract, and resulting tree.",
+      "fixtureIds": [
+        "IDEMPOTENCY-DUPLICATE-AND-CONFLICT"
+      ],
+      "invariantId": "INV-013-MERGE-TREE-QUALIFIED",
+      "negativeRequirementIds": []
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-001",
+        "P2-KCF-004",
+        "P2-KCF-009"
+      ],
+      "description": "Provider, persistence, transport, credential, and process fields cannot redefine kernel semantics.",
+      "fixtureIds": [
+        "CAT-UNKNOWN-COMMAND"
+      ],
+      "invariantId": "INV-014-PROVIDER-NEUTRAL-KERNEL",
+      "negativeRequirementIds": [
+        "NEG-010"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-008"
+      ],
+      "description": "Every validation branch has exact validator and resolution-owner identity, explicit inputs and criteria, a finite round limit, and a deadline.",
+      "fixtureIds": [
+        "REVIEW-BOUNDED-VALIDATOR-PASS",
+        "REVIEW-BOUNDED-WRONG-VALIDATOR",
+        "REVIEW-BOUNDED-DEADLINE",
+        "REVIEW-BOUNDED-ROUND-LIMIT"
+      ],
+      "invariantId": "INV-015-BOUNDED-VALIDATION-BRANCH",
+      "negativeRequirementIds": [
+        "NEG-002"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-008"
+      ],
+      "description": "Finding keys deduplicate exact logical findings; revalidation cites superseded results and changed-condition evidence; inconclusive or conflicting review is resolved only by the exact bounded adjudicator.",
+      "fixtureIds": [
+        "REVIEW-BOUNDED-CHANGED-CONDITION",
+        "REVIEW-BOUNDED-ADJUDICATOR",
+        "REVIEW-BOUNDED-POLICY-TIMEOUT"
+      ],
+      "invariantId": "INV-016-VALIDATION-SUPERSESSION-ADJUDICATION",
+      "negativeRequirementIds": [
+        "NEG-002"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-008"
+      ],
+      "description": "Authoritative completion references one current policy-finalized bounded review, cannot treat an individual validator result as organizational completion, and rejects post-finalization results.",
+      "fixtureIds": [
+        "CAT-027-COMPLETION-REVIEW-FINALIZE-VALID",
+        "CAT-027-COMPLETION-REVIEW-FINALIZE-INVALID",
+        "REVIEW-BOUNDED-POST-FINALIZATION"
+      ],
+      "invariantId": "INV-017-POLICY-FINALIZED-COMPLETION",
+      "negativeRequirementIds": [
+        "NEG-002",
+        "NEG-007"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-005",
+        "P2-KCF-007",
+        "P2-KCF-008"
+      ],
+      "description": "Each escalation binds one exact work lifecycle epoch, accountable resolution owner, designated adjudicator, timeout policy, finite resolution budget, deadline, causal path, unresolved question, and evidence.",
+      "fixtureIds": [
+        "ESCALATION-EXACT-ADJUDICATOR",
+        "ESCALATION-WRONG-ADJUDICATOR",
+        "ESCALATION-STALE-LIFECYCLE",
+        "ESCALATION-ROUND-EXHAUSTED",
+        "ESCALATION-ADJUDICATOR-DEADLINE",
+        "ESCALATION-POLICY-TIMEOUT"
+      ],
+      "invariantId": "INV-018-EXACT-BOUNDED-ESCALATION",
+      "negativeRequirementIds": [
+        "NEG-001",
+        "NEG-002",
+        "NEG-004"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-005",
+        "P2-KCF-007"
+      ],
+      "description": "An escalation routes once, cannot bounce or reopen, and terminates through the exact adjudicator or exact timeout policy with one stable accepted outcome.",
+      "fixtureIds": [
+        "ESCALATION-ROUTE-ONCE",
+        "ESCALATION-NO-REROUTE",
+        "ESCALATION-TERMINAL",
+        "ESCALATION-TIMEOUT-BEFORE-DEADLINE",
+        "ESCALATION-TIMEOUT-OUTCOME"
+      ],
+      "invariantId": "INV-019-ONE-WAY-TERMINAL-ESCALATION",
+      "negativeRequirementIds": [
+        "NEG-001",
+        "NEG-002",
+        "NEG-004"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P1B-V3-INTERNAL-RELEASE",
+        "P2-KCF-012"
+      ],
+      "description": "External release execution is authorized only from an exact, durably persisted, author-approved plan whose repository, base, ordered changes, heads, policy, toolchain, contract, profiles, and synthesized tree match the qualified plan.",
+      "fixtureIds": [
+        "RELEASE-EXACT-AUTHOR-APPROVAL",
+        "RELEASE-AUTHOR-APPROVAL-MISMATCH",
+        "RELEASE-EXACT-QUALIFICATION",
+        "RELEASE-CHANGED-PLAN",
+        "RELEASE-CHANGED-BASE",
+        "RELEASE-CHANGED-HEAD",
+        "RELEASE-FIRST-ORDERED-REQUEST",
+        "RELEASE-WRONG-ORDER",
+        "RELEASE-EXECUTE-BEFORE-QUALIFICATION"
+      ],
+      "invariantId": "INV-020-FROZEN-RELEASE-PLAN",
+      "negativeRequirementIds": [
+        "NEG-012"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P1B-V3-INTERNAL-RELEASE",
+        "P2-KCF-012"
+      ],
+      "description": "Every external attempt and outcome is durably recorded; UNKNOWN remains unresolved, prohibits retry, and can advance only through exact provider reconciliation that supersedes the recorded uncertain result.",
+      "fixtureIds": [
+        "RELEASE-IDEMPOTENCY-DUPLICATE-AND-CONFLICT",
+        "RELEASE-CONCURRENT-WORKER",
+        "RELEASE-BOUNDED-RETRY",
+        "RELEASE-RETRY-BUDGET-EXHAUSTED",
+        "RELEASE-UNKNOWN-RESULT",
+        "RELEASE-CLEAN-MERGE",
+        "RELEASE-ALREADY-MERGED",
+        "RELEASE-GENUINE-FAILURE-RETRYABLE",
+        "RELEASE-GENUINE-FAILURE-EXHAUSTED",
+        "RELEASE-NO-RETRY-WHILE-UNKNOWN",
+        "RELEASE-EXACT-RECONCILIATION",
+        "RELEASE-PROVIDER-UNAVAILABLE",
+        "RELEASE-WRONG-SUPERSESSION"
+      ],
+      "invariantId": "INV-021-DURABLE-RELEASE-INTENT-RECONCILIATION",
+      "negativeRequirementIds": [
+        "NEG-012"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P1B-V3-INTERNAL-RELEASE",
+        "P2-KCF-012"
+      ],
+      "description": "A code story is eligible for acceptance only after every ordered merge is verified and the provider tree equals the qualified tree; partial, ambiguous, mismatched, and terminal release states cannot be silently accepted or reopened.",
+      "fixtureIds": [
+        "RELEASE-PARTIAL-FINALIZE",
+        "RELEASE-TREE-MISMATCH",
+        "RELEASE-VERIFIED-FINALIZE",
+        "RELEASE-TERMINAL-IMMUTABLE",
+        "RELEASE-NO-CODE-FINALIZE",
+        "CAT-020-STORY-REQUEST-ACCEPTANCE-VALID"
+      ],
+      "invariantId": "INV-022-VERIFIED-RELEASE-ACCEPTANCE",
+      "negativeRequirementIds": [
+        "NEG-012"
+      ]
+    },
+    {
+      "decisionIds": [
+        "MC-DEC-002",
+        "MC-DEC-008"
+      ],
+      "description": "A live model assignment requires an exact non-stale work profile bound to task lifecycle and semantic scope; routine aggregate revisions neither stale nor refresh it.",
+      "fixtureIds": [
+        "MC-SCOPE-BINDING-EXACT",
+        "MC-SCOPE-BINDING-STALE",
+        "MC-ROUTINE-REVISION-PRESERVES-PROFILE",
+        "CAT-037-WORK-PROFILE-BIND-VALID",
+        "CAT-037-WORK-PROFILE-BIND-INVALID"
+      ],
+      "invariantId": "INV-023-SCOPE-BOUND-WORK-PROFILE",
+      "negativeRequirementIds": []
+    },
+    {
+      "decisionIds": [
+        "MC-DEC-001",
+        "MC-DEC-006",
+        "MC-DEC-007",
+        "MC-DEC-008"
+      ],
+      "description": "Live assignment is authorized only for an exact passing, non-revoked profile satisfying the required route and every hard constraint; no downgrade or unexplained eligibility Boolean has authority.",
+      "fixtureIds": [
+        "MC-ASSIGNMENT-EXACT-QUALIFICATION",
+        "MC-ASSIGNMENT-DOWNGRADE-REJECTED",
+        "MC-ASSIGNMENT-REVOKED-REJECTED",
+        "CAT-038-QUALIFIED-ASSIGNMENT-VALID",
+        "CAT-038-QUALIFIED-ASSIGNMENT-INVALID"
+      ],
+      "invariantId": "INV-024-QUALIFIED-ASSIGNMENT-FAILS-CLOSED",
+      "negativeRequirementIds": []
+    },
+    {
+      "decisionIds": [
+        "MC-DEC-003",
+        "MC-DEC-008"
+      ],
+      "description": "Completion finalization proves the frozen candidate, work profile, gates, and every required independence dimension; missing topology is inconclusive rather than PASS.",
+      "fixtureIds": [
+        "MC-VERIFICATION-TOPOLOGY-EXACT",
+        "MC-VERIFICATION-TOPOLOGY-MISSING",
+        "CAT-024-COMPLETION-REVIEW-OPEN-VALID",
+        "CAT-025-COMPLETION-REVIEW-RECORD-RESULT-VALID",
+        "CAT-027-COMPLETION-REVIEW-FINALIZE-VALID"
+      ],
+      "invariantId": "INV-025-EXACT-VERIFICATION-TOPOLOGY",
+      "negativeRequirementIds": []
+    },
+    {
+      "decisionIds": [
+        "MC-DEC-005",
+        "MC-DEC-008"
+      ],
+      "description": "A frozen variant group accepts only immutable independent submissions and selects exactly one submitted candidate only after non-conflicting comparison; material disagreement escalates and patches are never automatically blended.",
+      "fixtureIds": [
+        "MC-VARIANT-MATERIAL-DISAGREEMENT-ESCALATES",
+        "MC-VARIANT-MATERIAL-DISAGREEMENT-NO-SELECTION",
+        "MC-VARIANT-UNSUBMITTED-CANDIDATE-REJECTED",
+        "CAT-039-VARIANT-GROUP-OPEN-INVALID",
+        "CAT-039-VARIANT-GROUP-OPEN-VALID",
+        "CAT-040-VARIANT-CANDIDATE-INVALID",
+        "CAT-040-VARIANT-CANDIDATE-VALID",
+        "CAT-041-VARIANT-COMPARISON-INVALID",
+        "CAT-041-VARIANT-COMPARISON-VALID",
+        "CAT-042-VARIANT-SELECTION-INVALID",
+        "CAT-042-VARIANT-SELECTION-VALID"
+      ],
+      "invariantId": "INV-026-VARIANT-ISOLATION-AND-SINGLE-SELECTION",
+      "negativeRequirementIds": []
+    },
+    {
+      "decisionIds": [
+        "MC-DEC-004",
+        "MC-DEC-007",
+        "MC-DEC-008"
+      ],
+      "description": "Promotion and escalation use the approved typed trigger vocabulary, exact evidence, finite budgets, and a new fenced execution or successor; confidence and provider outage cannot authorize downgrade.",
+      "fixtureIds": [
+        "MC-ASSIGNMENT-DOWNGRADE-REJECTED",
+        "MC-VARIANT-MATERIAL-DISAGREEMENT-ESCALATES"
+      ],
+      "invariantId": "INV-027-EVIDENCE-DRIVEN-PROMOTION",
+      "negativeRequirementIds": []
+    },
+    {
+      "decisionIds": [
+        "OP-DEC-001",
+        "OP-DEC-003"
+      ],
+      "description": "Human principal, operator actor, and control surface retain distinct identities; no adapter or actor may synthesize or impersonate another principal kind.",
+      "fixtureIds": [
+        "OP-HUMAN-ATTRIBUTION-PRESERVED",
+        "OP-ACTOR-CANNOT-IMPERSONATE-HUMAN",
+        "OP-CONTROL-SURFACE-IS-NOT-PRINCIPAL",
+        "CAT-043-OPERATOR-ROLE-BIND-VALID",
+        "CAT-043-OPERATOR-ROLE-BIND-INVALID"
+      ],
+      "invariantId": "INV-028-OPERATOR-IDENTITY-SEPARATION",
+      "negativeRequirementIds": []
+    },
+    {
+      "decisionIds": [
+        "OP-DEC-002",
+        "OP-DEC-003",
+        "OP-DEC-004"
+      ],
+      "description": "The operator role grants no intrinsic authority; only an explicitly authorized current actor execution may submit actor-admitted commands, and restart preserves FQN while fencing prior output.",
+      "fixtureIds": [
+        "OP-ACTOR-EXPLICIT-AUTHORITY",
+        "OP-ROLE-NAME-NO-AUTHORITY",
+        "OP-STALE-EXECUTION-FENCED"
+      ],
+      "invariantId": "INV-029-OPERATOR-EXACT-AUTHORITY-AND-FENCING",
+      "negativeRequirementIds": []
+    },
+    {
+      "decisionIds": [
+        "OP-DEC-005"
+      ],
+      "description": "HUMAN_REQUIRED targets an exact authenticated human principal or authorized human-selection policy; operator delivery and presentation do not resolve it.",
+      "fixtureIds": [
+        "OP-HUMAN-REQUIRED-EXACT-HUMAN",
+        "OP-HUMAN-REQUIRED-NOT-OPERATOR-ACTOR"
+      ],
+      "invariantId": "INV-030-HUMAN-REQUIRED-EXACT-HUMAN",
+      "negativeRequirementIds": []
+    },
+    {
+      "decisionIds": [
+        "HC-DEC-002",
+        "HC-DEC-004"
+      ],
+      "description": "Planned quiescence and unexpected outage advance a monotonic power epoch, close admission, and prevent prior-epoch dispatch or results from acquiring organizational authority.",
+      "fixtureIds": [
+        "HC-PLANNED-QUIESCENCE",
+        "HC-QUIESCENCE-EPOCH-MUST-INCREMENT",
+        "HC-ADMISSION-CLOSED-DURING-QUIESCENCE",
+        "HC-OLD-EPOCH-RESULT-QUARANTINED",
+        "HC-UNEXPECTED-OUTAGE-FENCES",
+        "CAT-045-QUIESCENCE-REQUEST-VALID",
+        "CAT-045-QUIESCENCE-REQUEST-INVALID",
+        "CAT-047-UNEXPECTED-OUTAGE-VALID",
+        "CAT-047-UNEXPECTED-OUTAGE-INVALID"
+      ],
+      "invariantId": "INV-031-POWER-EPOCH-ADMISSION-FENCE",
+      "negativeRequirementIds": []
+    },
+    {
+      "decisionIds": [
+        "HC-DEC-002",
+        "HC-DEC-003"
+      ],
+      "description": "Every in-flight execution receives a preregistered bounded suspension disposition and an observed outcome; cancellation is never inferred and detached or unknown work remains unresolved.",
+      "fixtureIds": [
+        "HC-SUSPEND-REQUIRES-COMPLETE-INVENTORY",
+        "HC-SUSPEND-WITH-RECORDED-UNKNOWN",
+        "CAT-046-SUSPENDED-RECORD-VALID",
+        "CAT-046-SUSPENDED-RECORD-INVALID"
+      ],
+      "invariantId": "INV-032-EXPLICIT-SUSPENSION-DISPOSITION",
+      "negativeRequirementIds": []
+    },
+    {
+      "decisionIds": [
+        "HC-DEC-004",
+        "HC-DEC-005"
+      ],
+      "description": "Suspended or unexpectedly interrupted work enters RECONCILING with admission closed and returns ACTIVE only after exact execution, provider, effect, outbox, change-stream, service-health, authority, and power-epoch reconciliation.",
+      "fixtureIds": [
+        "HC-NO-DIRECT-SUSPENDED-TO-ACTIVE",
+        "HC-BEGIN-RECONCILIATION",
+        "HC-RESUME-REQUIRES-EXACT-RECONCILIATION",
+        "HC-RESUME-AFTER-EXACT-RECONCILIATION",
+        "CAT-048-RECONCILIATION-BEGIN-VALID",
+        "CAT-048-RECONCILIATION-BEGIN-INVALID",
+        "CAT-049-RESUME-VALID",
+        "CAT-049-RESUME-INVALID"
+      ],
+      "invariantId": "INV-033-RECONCILE-BEFORE-RESUME",
+      "negativeRequirementIds": []
+    },
+    {
+      "decisionIds": [
+        "HC-DEC-001"
+      ],
+      "description": "CONTINUOUS is valid only while required local services and host leases are observably healthy; lid state, remote inference, or a power utility is not proof of local continuity.",
+      "fixtureIds": [
+        "HC-CONTINUOUS-POSTURE-REQUIRES-HEALTH",
+        "CAT-044-CONTINUITY-CONFIGURE-VALID",
+        "CAT-044-CONTINUITY-CONFIGURE-INVALID"
+      ],
+      "invariantId": "INV-034-CONTINUOUS-POSTURE-IS-OBSERVED",
+      "negativeRequirementIds": []
+    },
+    {
+      "decisionIds": [
+        "HP-DEC-001"
+      ],
+      "description": "Humans sharing a role remain distinct exact principals, and a role label grants only the command, subject, validity, and policy scope recorded in its active binding.",
+      "fixtureIds": [
+        "HP-DISTINCT-HUMANS-SAME-ROLE",
+        "HP-ROLE-LABEL-NO-INTRINSIC-AUTHORITY",
+        "HP-SCOPED-HUMAN-AUTHORITY",
+        "HP-EXPIRED-ROLE-REJECTED",
+        "HP-REVOKED-HUMAN-REJECTED",
+        "CAT-050-HUMAN-PARTICIPANT-BIND-VALID",
+        "CAT-050-HUMAN-PARTICIPANT-BIND-INVALID",
+        "CAT-051-HUMAN-PARTICIPANT-REVOKE-VALID",
+        "CAT-051-HUMAN-PARTICIPANT-REVOKE-INVALID"
+      ],
+      "invariantId": "INV-035-DISTINCT-HUMAN-IDENTITY-AND-SCOPED-ROLE",
+      "negativeRequirementIds": []
+    },
+    {
+      "decisionIds": [
+        "HP-DEC-002"
+      ],
+      "description": "A channel or credential identity becomes HUMAN authority only through an exact active participant authentication binding with sufficient assurance; delivery references active bindings and one-time capability consumption is atomic with accepted response commit.",
+      "fixtureIds": [
+        "HP-AUTHENTICATION-BINDING-EXACT",
+        "HP-CHANNEL-IDENTITY-NOT-HUMAN",
+        "HP-DELIVERY-BINDING-REFERENCES-ACTIVE-AUTH",
+        "HP-DELIVERY-BINDING-UNKNOWN-AUTH-REJECTED",
+        "HI-RESPONSE-CAPABILITY-CONSUMED-AFTER-COMMIT",
+        "HI-FAILED-COMMIT-PRESERVES-RETRY",
+        "CAT-050-HUMAN-PARTICIPANT-BIND-VALID"
+      ],
+      "invariantId": "INV-036-AUTHENTICATED-HUMAN-BINDING",
+      "negativeRequirementIds": []
+    },
+    {
+      "decisionIds": [
+        "HP-DEC-003"
+      ],
+      "description": "Every human question binds an immutable question revision and response specification to exact work, origin identity, recipients, purpose, effect, response policy, deadline, confidentiality, and causal lineage without mixing human and actor execution identity.",
+      "fixtureIds": [
+        "HI-HUMAN-ORIGIN-HAS-NO-ACTOR-EXECUTION",
+        "HI-HUMAN-ORIGIN-CANNOT-BORROW-ACTOR",
+        "HI-SELECTED-HUMAN-RESPONSE",
+        "HI-UNSELECTED-HUMAN-REJECTED",
+        "HI-STALE-QUESTION-REJECTED",
+        "CAT-052-HUMAN-INTERACTION-OPEN-VALID",
+        "CAT-052-HUMAN-INTERACTION-OPEN-INVALID"
+      ],
+      "invariantId": "INV-037-DIRECTED-FINITE-HUMAN-INTERACTION",
+      "negativeRequirementIds": []
+    },
+    {
+      "decisionIds": [
+        "HP-DEC-004"
+      ],
+      "description": "Operator or adapter presentation retains canonical and rendered identities plus presenter and delivery provenance; material divergence requires equivalence evidence or a new question revision, and delivery is never response or authorization.",
+      "fixtureIds": [
+        "HI-DELIVERY-IS-NOT-RESPONSE",
+        "HI-MATERIAL-RENDERING-CHANGE-REJECTED",
+        "HI-OPERATOR-RELAY-NOT-HUMAN-RESPONSE",
+        "CAT-053-HUMAN-DELIVERY-VALID",
+        "CAT-053-HUMAN-DELIVERY-INVALID"
+      ],
+      "invariantId": "INV-038-PRESENTATION-RETAINS-CANONICAL-QUESTION",
+      "negativeRequirementIds": []
+    },
+    {
+      "decisionIds": [
+        "HP-DEC-005"
+      ],
+      "description": "A response requires the exact selected active HUMAN with null actor execution, current question and profile, matching response specification, active authentication and delivery lineage, unique idempotent submission, and retained evidence.",
+      "fixtureIds": [
+        "HI-SELECTED-HUMAN-RESPONSE",
+        "HI-UNSELECTED-HUMAN-REJECTED",
+        "HI-STALE-QUESTION-REJECTED",
+        "HI-OPERATOR-RELAY-NOT-HUMAN-RESPONSE",
+        "HI-HUMAN-RESPONSE-CANNOT-CARRY-ACTOR",
+        "CAT-054-HUMAN-RESPONSE-VALID",
+        "CAT-054-HUMAN-RESPONSE-INVALID"
+      ],
+      "invariantId": "INV-039-EXACT-AUTHENTICATED-HUMAN-RESPONSE",
+      "negativeRequirementIds": []
+    },
+    {
+      "decisionIds": [
+        "HP-DEC-001",
+        "HP-DEC-003",
+        "HP-DEC-005"
+      ],
+      "description": "Response satisfaction counts distinct selected humans under EXACT_ONE, ANY_ONE, ALL, or QUORUM, while advice and evidence remain non-authoritative unless exact scoped command authorization independently admits the effect.",
+      "fixtureIds": [
+        "HI-ALL-REQUIRES-EVERY-DISTINCT-HUMAN",
+        "HI-QUORUM-SATISFIED-BY-DISTINCT-HUMANS",
+        "HI-ADVISORY-RESPONSE-CANNOT-AUTHORIZE",
+        "HI-AUTHORIZED-EFFECT-REQUIRES-SCOPE",
+        "CAT-055-HUMAN-INTERACTION-CLOSE-VALID",
+        "CAT-055-HUMAN-INTERACTION-CLOSE-INVALID"
+      ],
+      "invariantId": "INV-040-HUMAN-RESPONSE-POLICY-AND-EFFECT",
+      "negativeRequirementIds": []
+    },
+    {
+      "decisionIds": [
+        "HP-DEC-002",
+        "HP-DEC-004",
+        "HP-DEC-006"
+      ],
+      "description": "Delivery never exceeds route confidentiality, silence is not consent, expiry is explicit, and operator-relayed testimony remains actor evidence until separately authenticated by the human.",
+      "fixtureIds": [
+        "HP-CONFIDENTIALITY-CEILING-REJECTS",
+        "HI-SILENCE-IS-NOT-CONSENT",
+        "HI-OPERATOR-RELAY-NOT-HUMAN-RESPONSE",
+        "CAT-056-HUMAN-INTERACTION-EXPIRE-VALID",
+        "CAT-056-HUMAN-INTERACTION-EXPIRE-INVALID"
+      ],
+      "invariantId": "INV-041-HUMAN-CONFIDENTIALITY-TIMEOUT-AND-RELAY",
+      "negativeRequirementIds": []
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-039"
+      ],
+      "description": "Every model invocation consumes one graph-wide root budget unit; a missing or exhausted applicable budget fails closed.",
+      "fixtureIds": [
+        "P4-MISSING-BUDGET-FAILS-CLOSED",
+        "P4-UNCHANGED-CONDITION-REDISPATCH-REJECTED",
+        "P4-REPLAN-BUDGET-RESET-REJECTED",
+        "P4-PROJECTION-REBUILD-EQUIVALENT",
+        "CAT-059-PHASE4-VALID",
+        "CAT-064-PHASE4-INVALID"
+      ],
+      "invariantId": "INV-042-PHASE4-01",
+      "negativeRequirementIds": [
+        "P2-KCF-039-NEG-01"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-040"
+      ],
+      "description": "Only a single-use Teams work-invocation authorization can wake model-backed execution.",
+      "fixtureIds": [
+        "P4-DIRECT-AGENT-WAKEUP-REJECTED",
+        "P4-CHANGED-EVIDENCE-CONTINUATION-ACCEPTED",
+        "P4-PROMOTION-BUDGET-RESET-REJECTED",
+        "P4-PROJECTION-REBUILD-MISMATCH",
+        "CAT-059-PHASE4-INVALID",
+        "CAT-065-PHASE4-VALID"
+      ],
+      "invariantId": "INV-043-PHASE4-02",
+      "negativeRequirementIds": [
+        "P2-KCF-040-NEG-01"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-041"
+      ],
+      "description": "Invocation claim, start, terminal, cancellation, and expiry bind exact current task, lifecycle, assignment, actor, execution fence, model, runtime, and deadline identities.",
+      "fixtureIds": [
+        "P4-COOPTED-MESSAGE-WAKEUP-REJECTED",
+        "P4-RETRYABLE-TERMINAL-CONTINUATION-ACCEPTED",
+        "P4-REVIEW-BUDGET-RESET-REJECTED",
+        "P4-SMA-AUTHORITATIVE-TASK-WRITE-REJECTED",
+        "CAT-060-PHASE4-VALID",
+        "CAT-065-PHASE4-INVALID"
+      ],
+      "invariantId": "INV-044-PHASE4-03",
+      "negativeRequirementIds": [
+        "P2-KCF-041-NEG-01"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-042"
+      ],
+      "description": "Unchanged-condition continuation requires an accepted retryable predecessor and the next bounded retry ordinal; changed authoritative evidence may establish a new condition.",
+      "fixtureIds": [
+        "P4-TASK-DISPATCH-NOT-EXECUTABLE",
+        "P4-NONRETRYABLE-CONTINUATION-REJECTED",
+        "P4-REPAIR-BUDGET-RESET-REJECTED",
+        "P4-SMA-ROUTING-WRITE-REJECTED",
+        "CAT-060-PHASE4-INVALID",
+        "CAT-066-PHASE4-VALID"
+      ],
+      "invariantId": "INV-045-PHASE4-04",
+      "negativeRequirementIds": [
+        "P2-KCF-042-NEG-01"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-043"
+      ],
+      "description": "Child creation, handoff, replanning, review, repair, promotion, restart, and actor/model replacement inherit and cannot increase the root invocation ceiling.",
+      "fixtureIds": [
+        "P4-STALE-TASK-REVISION-REJECTED",
+        "P4-PERMIT-FIRST-CLAIM-ACCEPTED",
+        "P4-ACTOR-REPLACEMENT-BUDGET-RESET-REJECTED",
+        "P4-OPENHANDS-LEASE-WRITE-REJECTED",
+        "CAT-061-PHASE4-VALID",
+        "CAT-066-PHASE4-INVALID"
+      ],
+      "invariantId": "INV-046-PHASE4-05",
+      "negativeRequirementIds": [
+        "P2-KCF-043-NEG-01"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-044"
+      ],
+      "description": "Task dispatch is an assignment fact and is not itself executable authority.",
+      "fixtureIds": [
+        "P4-STALE-LIFECYCLE-REJECTED",
+        "P4-PERMIT-REUSE-REJECTED",
+        "P4-MODEL-REPLACEMENT-BUDGET-RESET-REJECTED",
+        "P4-SMA-SEMANTIC-MEMORY-WRITE-ACCEPTED",
+        "CAT-061-PHASE4-INVALID",
+        "CAT-067-PHASE4-VALID"
+      ],
+      "invariantId": "INV-047-PHASE4-06",
+      "negativeRequirementIds": [
+        "P2-KCF-044-NEG-01"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-045"
+      ],
+      "description": "Teams alone owns task, story, budget, ownership, lease, routing, review, completion, and current operational state.",
+      "fixtureIds": [
+        "P4-STALE-FENCE-REJECTED",
+        "P4-CANCELLATION-REQUEST-NOT-TERMINAL",
+        "P4-RESTART-BUDGET-RESET-REJECTED",
+        "P4-TEAMS-OPERATIONAL-WRITE-ACCEPTED",
+        "CAT-062-PHASE4-VALID",
+        "CAT-067-PHASE4-INVALID"
+      ],
+      "invariantId": "INV-048-PHASE4-07",
+      "negativeRequirementIds": [
+        "P2-KCF-045-NEG-01"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-046"
+      ],
+      "description": "SMA owns semantic and task-local memory; SMA or OpenHands operational suggestions remain evidence until Teams accepts a command.",
+      "fixtureIds": [
+        "P4-WRONG-ACTOR-REJECTED",
+        "P4-CANCELLED-REQUIRES-TERMINAL-EVIDENCE",
+        "P4-EXPLICIT-BUDGET-AMENDMENT-ACCEPTED",
+        "CAT-057-PHASE4-VALID",
+        "CAT-062-PHASE4-INVALID"
+      ],
+      "invariantId": "INV-049-PHASE4-08",
+      "negativeRequirementIds": [
+        "P2-KCF-046-NEG-01"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-047"
+      ],
+      "description": "Task and story projections apply exact aggregate revisions idempotently and stop on gaps or conflicting revisions.",
+      "fixtureIds": [
+        "P4-WRONG-MODEL-REJECTED",
+        "P4-ROOT-BOUND-COMPUTED",
+        "P4-PROJECTION-DUPLICATE-IDEMPOTENT",
+        "CAT-057-PHASE4-INVALID",
+        "CAT-063-PHASE4-VALID"
+      ],
+      "invariantId": "INV-050-PHASE4-09",
+      "negativeRequirementIds": [
+        "P2-KCF-047-NEG-01"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-048"
+      ],
+      "description": "A clean projection rebuild must canonically equal the incremental projection before replacement.",
+      "fixtureIds": [
+        "P4-WRONG-RUNTIME-REJECTED",
+        "P4-CHILD-BUDGET-RESET-REJECTED",
+        "P4-PROJECTION-GAP-FAILS-CLOSED",
+        "CAT-058-PHASE4-VALID",
+        "CAT-063-PHASE4-INVALID"
+      ],
+      "invariantId": "INV-051-PHASE4-10",
+      "negativeRequirementIds": [
+        "P2-KCF-048-NEG-01"
+      ]
+    },
+    {
+      "decisionIds": [
+        "P2-KCF-049"
+      ],
+      "description": "Operational worktree, writable-path, and interface-constraint bindings are Teams task state tied to exact ownership and execution fencing.",
+      "fixtureIds": [
+        "P4-FIRST-INVOCATION-ACCEPTED",
+        "P4-HANDOFF-BUDGET-RESET-REJECTED",
+        "P4-PROJECTION-CONFLICT-FAILS-CLOSED",
+        "CAT-058-PHASE4-INVALID",
+        "CAT-064-PHASE4-VALID"
+      ],
+      "invariantId": "INV-052-PHASE4-11",
+      "negativeRequirementIds": [
+        "P2-KCF-049-NEG-01"
+      ]
+    }
+  ],
+  "schemaVersion": "1.7.0"
+}

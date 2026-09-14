@@ -1,0 +1,56 @@
+{
+  "schema_version": "2.0.0",
+  "role": "security",
+  "version": "2.0.1",
+  "capabilities": [
+    "authority-review",
+    "security-review"
+  ],
+  "subscriptions": [
+    {
+      "type": "tekroo.message.task.security-review-requested",
+      "purpose": "security-review"
+    }
+  ],
+  "permissions": [
+    "evidence.record",
+    "repository.read",
+    "security-check.execute",
+    "security.verdict-propose"
+  ],
+  "charter": {
+    "path": "ROLE.md",
+    "sha256": "cf925030a3abb97016413c45b12fc083e7d2d25a397c569f9ea7fd24210a159f",
+    "media_type": "text/markdown"
+  },
+  "handler_bindings": {
+    "tekroo.message.task.security-review-requested": {
+      "subscription_purpose": "security-review",
+      "message_purpose": "REQUEST",
+      "disposition": "MODEL_HANDLER",
+      "resource": {
+        "path": "handlers/task.security-review-requested/HANDLER.md",
+        "sha256": "9ac9eea0f1f60c6619f6fd4d4b87eb360aa0798570b2e4b7126ca6e56b14034a",
+        "media_type": "text/markdown"
+      },
+      "input_schema": {
+        "path": "handlers/task.security-review-requested/input.schema.json",
+        "sha256": "960e6113c1f72ef5672432a5f06eec244460bc3e6786b1c8e5fde201408249f0",
+        "media_type": "application/schema+json"
+      },
+      "result_schema": {
+        "path": "handlers/task.security-review-requested/result.schema.json",
+        "sha256": "96b9620ceb99e7911b6208b50b32e87c276906f9655f3fa43932618b826b79d9",
+        "media_type": "application/schema+json"
+      },
+      "allowed_results": [
+        "blocked",
+        "completed",
+        "failed",
+        "needs_decision"
+      ]
+    }
+  },
+  "publisher_key_id": "tekroo-message-handlers-qualification-20260913",
+  "signature": "KLmTNnD5qU2smBF/QcLMgjIGSq3g7T0uGinGCm813WFXtrWWFtYz5XHxTg+Gy4MrIR5peq07IIIhPDoPqSP2Cg=="
+}

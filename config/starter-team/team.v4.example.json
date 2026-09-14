@@ -1,0 +1,117 @@
+{
+  "schema_version": "1.0.0",
+  "team": "example",
+  "version": "2.0.0",
+  "roles": [
+    {
+      "role": "architect",
+      "bundle_path": "roles-v4/architect/role.json",
+      "bundle_digest": "f0e2e3b11a05c23b5bc27c06ddf7137aae5037cf381280b7fadb0f15af0a9090",
+      "publisher_key_id": "tekroo-message-handlers-20260913",
+      "initial_instances": 2,
+      "maximum_instances": 2,
+      "launch_mode": "ON_DEMAND",
+      "model_profile_digest": "1111111111111111111111111111111111111111111111111111111111111111",
+      "workspace_ids": [
+        "architect-1",
+        "architect-2"
+      ]
+    },
+    {
+      "role": "coder",
+      "bundle_path": "roles-v4/coder/role.json",
+      "bundle_digest": "d00760ef081413f2fe4019dde4fc2d5704c21b649c1484dba373c06cc60534e7",
+      "publisher_key_id": "tekroo-message-handlers-20260913",
+      "initial_instances": 1,
+      "maximum_instances": 4,
+      "launch_mode": "ON_DEMAND",
+      "model_profile_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+      "workspace_ids": [
+        "coder-1",
+        "coder-2",
+        "coder-3",
+        "coder-4"
+      ]
+    },
+    {
+      "role": "operator",
+      "bundle_path": "roles-v4/operator/role.json",
+      "bundle_digest": "e867ad12188be36f8d3d00a281ec18e2aa028512f44db45d82a77ea37a7589ab",
+      "publisher_key_id": "tekroo-message-handlers-20260913",
+      "initial_instances": 1,
+      "maximum_instances": 1,
+      "launch_mode": "MANUAL",
+      "model_profile_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+      "workspace_ids": [
+        "operator-1"
+      ]
+    },
+    {
+      "role": "product-owner",
+      "bundle_path": "roles-v4/product-owner/role.json",
+      "bundle_digest": "96dc130194634d2a8a72aad2667b7addd337b1656003a6a7631845b531d33e86",
+      "publisher_key_id": "tekroo-message-handlers-20260913",
+      "initial_instances": 1,
+      "maximum_instances": 1,
+      "launch_mode": "EAGER",
+      "model_profile_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+      "workspace_ids": [
+        "product-owner-1"
+      ]
+    },
+    {
+      "role": "project-manager",
+      "bundle_path": "roles-v4/project-manager/role.json",
+      "bundle_digest": "a0b607ffeb428a5f267aea94ee2751e58ea565b70dae01fc2103bf4cac2912b6",
+      "publisher_key_id": "tekroo-message-handlers-20260913",
+      "initial_instances": 1,
+      "maximum_instances": 1,
+      "launch_mode": "ON_DEMAND",
+      "model_profile_digest": "5555555555555555555555555555555555555555555555555555555555555555",
+      "workspace_ids": [
+        "project-manager-1"
+      ]
+    },
+    {
+      "role": "security",
+      "bundle_path": "roles-v4/security/role.json",
+      "bundle_digest": "c79a9eb0b32e953ec4fbfda566dd325a05cdf947fcc224a543178a5216e44431",
+      "publisher_key_id": "tekroo-message-handlers-qualification-20260913",
+      "initial_instances": 1,
+      "maximum_instances": 1,
+      "launch_mode": "ON_DEMAND",
+      "model_profile_digest": "6666666666666666666666666666666666666666666666666666666666666666",
+      "workspace_ids": [
+        "security-1"
+      ]
+    },
+    {
+      "role": "senior-coder",
+      "bundle_path": "roles-v4/senior-coder/role.json",
+      "bundle_digest": "20f125a6518c8540b5782ca7da2efbec2d82bb36054e04f8e570960ad7bbdd6f",
+      "publisher_key_id": "tekroo-message-handlers-20260913",
+      "initial_instances": 1,
+      "maximum_instances": 2,
+      "launch_mode": "ON_DEMAND",
+      "model_profile_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+      "workspace_ids": [
+        "senior-coder-1",
+        "senior-coder-2"
+      ]
+    },
+    {
+      "role": "tester",
+      "bundle_path": "roles-v4/tester/role.json",
+      "bundle_digest": "55d255cf7e47e5175ce83c418696940cfdf69e12de06147cb8c5323197ba8302",
+      "publisher_key_id": "tekroo-message-handlers-qualification-20260913",
+      "initial_instances": 1,
+      "maximum_instances": 2,
+      "launch_mode": "ON_DEMAND",
+      "model_profile_digest": "8888888888888888888888888888888888888888888888888888888888888888",
+      "workspace_ids": [
+        "tester-1",
+        "tester-2"
+      ]
+    }
+  ]
+}

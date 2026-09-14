@@ -46,6 +46,10 @@ func (purpose MessagePurpose) Valid() bool {
 	}
 }
 
+func ValidMessageType(value string) bool {
+	return messageTypePattern.MatchString(value)
+}
+
 type MessageWorkLink struct {
 	FeatureID          *kernel.UUIDv7 `json:"feature_id,omitempty"`
 	StoryID            *kernel.UUIDv7 `json:"story_id,omitempty"`
@@ -168,6 +172,7 @@ type OrganizationalMessageStore interface {
 	AcquireMessage(context.Context, kernel.ActorFQN, kernel.ExecutionTuple, time.Time, time.Duration, uint32) (MessageClaim, error)
 	RenewMessage(context.Context, kernel.UUIDv7, kernel.ActorFQN, kernel.ExecutionTuple, uint64, time.Time, time.Duration) error
 	ResolveMessage(context.Context, kernel.UUIDv7, kernel.ActorFQN, kernel.ExecutionTuple, uint64, time.Time, string, kernel.Digest) error
+	AdmitMessage(context.Context, kernel.UUIDv7, kernel.ActorFQN, kernel.ExecutionTuple, string, kernel.Digest) error
 	YieldMessage(context.Context, kernel.UUIDv7, kernel.ActorFQN, kernel.ExecutionTuple, uint64, time.Time) error
 	ReaddressMessage(context.Context, kernel.UUIDv7, kernel.ActorFQN, kernel.ExecutionTuple, kernel.ActorFQN, time.Time, uint32) (OrganizationalMessage, error)
 	SweepMessages(context.Context, time.Time, uint32) (released, dead int64, err error)
@@ -280,6 +285,23 @@ func (bus *MessageBus) Resolve(ctx context.Context, claim MessageClaim, now time
 		return ErrInvalidOrganizationalMessage
 	}
 	return bus.store.ResolveMessage(ctx, claim.Message.ID, claim.Holder, claim.Execution, claim.ClaimEpoch, now, resolution, evidence)
+}
+
+// Admit records that Teams converted one pending message into the exact work
+// invocation bound to evidence. It is distinct from a delivery claim: a role
+// process may observe a message while Teams remains the sole admission owner.
+func (bus *MessageBus) Admit(ctx context.Context, id kernel.UUIDv7, recipient kernel.ActorFQN, execution kernel.ExecutionTuple, evidence kernel.Digest) error {
+	if bus == nil || !id.Valid() || !recipient.Valid() || !execution.Valid() || !evidence.Valid() {
+		return ErrInvalidOrganizationalMessage
+	}
+	role, found, err := bus.roles.LoadRole(ctx, recipient)
+	if err != nil {
+		return err
+	}
+	if !found || role.Execution != execution || role.Status != RoleIdle {
+		return ErrStaleOrganizationalClaim
+	}
+	return bus.store.AdmitMessage(ctx, id, recipient, execution, "WORK_ADMITTED", evidence)
 }
 
 func (bus *MessageBus) Yield(ctx context.Context, claim MessageClaim, now time.Time) error {

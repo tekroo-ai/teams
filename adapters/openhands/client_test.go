@@ -128,6 +128,12 @@ func TestOpenHandsIterationLimitPreservesExplicitBoundsAndEncodesUnbounded(t *te
 
 func TestClientBindsCandidateIdentityIntoPromptAndRequiresReceiptEvidence(t *testing.T) {
 	brief, _ := openHandsTestBrief(t)
+	brief.ResultProtocol = &application.ExecutionResultProtocol{
+		SchemaVersion: "tekroo.validation-result/1.0.0",
+		Marker:        application.OrganizationalResultMarker,
+		Outcomes:      []string{"completed", "blocked", "failed", "inconclusive"},
+		Instruction:   "Return the organizational result.",
+	}
 	receiptDigest := digest('7')
 	evidence := kernel.EvidenceRef{EvidenceID: "00000000-0000-7000-8000-000000000299", SHA256: receiptDigest}
 	brief.Evidence = []kernel.EvidenceRef{evidence}
@@ -150,9 +156,19 @@ func TestClientBindsCandidateIdentityIntoPromptAndRequiresReceiptEvidence(t *tes
 	if err != nil {
 		t.Fatal(err)
 	}
-	var prompt map[string]any
-	if json.Unmarshal([]byte(prepared.prompt), &prompt) != nil || prompt["candidate"] == nil || prompt["candidate_result_requirement"] == nil {
+	var prompt struct {
+		Candidate                  *CandidateWorkspaceBinding           `json:"candidate"`
+		CandidateResultRequirement *candidateResultRequirement          `json:"candidate_result_requirement"`
+		ResultProtocol             *application.ExecutionResultProtocol `json:"result_protocol"`
+	}
+	if json.Unmarshal([]byte(prepared.prompt), &prompt) != nil || prompt.Candidate == nil || prompt.CandidateResultRequirement == nil || prompt.ResultProtocol == nil {
 		t.Fatalf("candidate prompt = %s", prepared.prompt)
+	}
+	if !candidateResultRequirementMatches(prompt.CandidateResultRequirement, candidate) {
+		t.Fatalf("candidate result requirement = %#v", prompt.CandidateResultRequirement)
+	}
+	if prompt.ResultProtocol.Instruction != candidateResultProtocolInstruction || !slices.Equal(prompt.ResultProtocol.Outcomes, []string{"completed", "blocked", "failed", "inconclusive"}) {
+		t.Fatalf("result protocol = %#v", prompt.ResultProtocol)
 	}
 	brief.Evidence = nil
 	brief.SemanticContext.Evidence = nil
@@ -160,6 +176,28 @@ func TestClientBindsCandidateIdentityIntoPromptAndRequiresReceiptEvidence(t *tes
 	hash = sha256.Sum256(encoded)
 	if _, err := client.prepare(context.Background(), brief, kernel.Digest(hex.EncodeToString(hash[:]))); err != ErrProtocol {
 		t.Fatalf("missing candidate evidence error = %v", err)
+	}
+}
+
+type staticEvidenceReader map[kernel.Digest][]byte
+
+func (reader staticEvidenceReader) Read(_ context.Context, digest kernel.Digest) ([]byte, error) {
+	content, found := reader[digest]
+	if !found {
+		return nil, os.ErrNotExist
+	}
+	return append([]byte(nil), content...), nil
+}
+
+func TestClientMaterializesOnlyDigestVerifiedTextEvidence(t *testing.T) {
+	content := []byte("TEKROO_ORGANIZATIONAL_RESULT:\n{\"outcome\":\"completed\"}")
+	hash := sha256.Sum256(content)
+	digest := kernel.Digest(hex.EncodeToString(hash[:]))
+	reference := kernel.EvidenceRef{EvidenceID: "00000000-0000-7000-8000-000000000297", SHA256: digest}
+	client := &Client{evidence: staticEvidenceReader{digest: content}}
+	materialized, err := client.promptEvidence(context.Background(), []kernel.EvidenceRef{reference})
+	if err != nil || len(materialized) != 1 || materialized[0].EvidenceID != reference.EvidenceID || materialized[0].SHA256 != digest || materialized[0].Content != string(content) {
+		t.Fatalf("materialized=%#v err=%v", materialized, err)
 	}
 }
 
@@ -350,6 +388,14 @@ func TestClientCreatesCleanConversationForExplicitRecovery(t *testing.T) {
 	brief.WorkProfile.ProfileRevision = 2
 	brief.WorkProfile.SupersedesProfileID = &priorProfileID
 	brief.SemanticContext.WorkProfile = brief.WorkProfile.Binding()
+	recoveryEvidence := kernel.EvidenceRef{EvidenceID: "00000000-0000-7000-8000-000000000212", SHA256: digest('6')}
+	brief.RecoveryDirective = &application.ExecutionRecoveryDirective{
+		SourceEventID: "00000000-0000-7000-8000-000000000213",
+		Reason:        "Run the independently verified gates and finish; the predecessor failure is already repaired.",
+		Evidence:      []kernel.EvidenceRef{recoveryEvidence},
+	}
+	brief.Evidence = append(brief.Evidence, recoveryEvidence)
+	brief.SemanticContext.Evidence = append(brief.SemanticContext.Evidence, recoveryEvidence)
 	encoded := mustJSON(brief)
 	hash := sha256.Sum256(encoded)
 	digest := kernel.Digest(hex.EncodeToString(hash[:]))
@@ -368,6 +414,15 @@ func TestClientCreatesCleanConversationForExplicitRecovery(t *testing.T) {
 	}
 	if state.createCalls != 1 || state.forkCalls != 0 || state.priorGets < 1 || state.submitCalls != 1 || !strings.Contains(state.submittedPrompt, `"recovery_checkpoint"`) {
 		t.Fatalf("create=%d fork=%d prior_get=%d submit=%d", state.createCalls, state.forkCalls, state.priorGets, state.submitCalls)
+	}
+	var submitted struct {
+		RecoveryCheckpoint progressCheckpoint `json:"recovery_checkpoint"`
+	}
+	if err := json.Unmarshal([]byte(state.submittedPrompt), &submitted); err != nil {
+		t.Fatal(err)
+	}
+	if submitted.RecoveryCheckpoint.NextAction != brief.RecoveryDirective.Reason || !strings.Contains(submitted.RecoveryCheckpoint.ContinuationRule, "recovery_directive.reason first") {
+		t.Fatalf("recovery checkpoint retained stale precedence: %#v", submitted.RecoveryCheckpoint)
 	}
 }
 
@@ -403,7 +458,7 @@ func TestExecutionPromptIndexAcceptsCheckpointSerializationEvolutionWithoutWeake
 		}
 		envelope["recovery_checkpoint"] = checkpoint
 		envelope["candidate"] = candidate
-		envelope["candidate_result_requirement"] = candidateResultRequirement{CandidateID: candidate.CandidateID, CandidateReceiptSHA256: candidate.ReceiptSHA256, Instruction: candidateResultRequirementInstruction}
+		envelope["candidate_result_requirement"] = newCandidateResultRequirement(&candidate)
 		envelope["result_protocol"].(map[string]any)["instruction"] = candidateResultProtocolInstruction
 		if mutate != nil {
 			mutate(envelope)
@@ -432,7 +487,9 @@ func TestExecutionPromptIndexAcceptsCheckpointSerializationEvolutionWithoutWeake
 			envelope["candidate"] = mutated
 		},
 		"mutated requirement": func(envelope map[string]any) {
-			envelope["candidate_result_requirement"] = candidateResultRequirement{CandidateID: candidate.CandidateID, CandidateReceiptSHA256: digest('0'), Instruction: candidateResultRequirementInstruction}
+			wrong := *candidate
+			wrong.ReceiptSHA256 = digest('0')
+			envelope["candidate_result_requirement"] = newCandidateResultRequirement(&wrong)
 		},
 		"mutated recovery lineage": func(envelope map[string]any) {
 			mutated := checkpoint
@@ -1036,6 +1093,29 @@ func TestProgressCheckpointRecordsActionOutcomesAndPaths(t *testing.T) {
 	checkpoint := buildProgressCheckpoint(brief, events, -1)
 	if checkpoint.SchemaVersion != "tekroo.teams.execution-progress-checkpoint/1.2.0" || checkpoint.AuthoritativeExecution.ExecutionBriefSHA256 != requestDigest || !reflect.DeepEqual(checkpoint.AuthoritativeExecution.Task, brief.Task) || checkpoint.AuthoritativeExecution.ActorFQN != brief.ActorFQN || checkpoint.AuthoritativeExecution.RoleGrounding.RoleFQRN != brief.RoleGrounding.RoleFQRN || checkpoint.AuthoritativeExecution.Scope.WorkspaceID != brief.Scope.WorkspaceID || len(checkpoint.Actions) != 3 || checkpoint.Actions[0].Outcome != "FAILED" || checkpoint.Actions[1].Outcome != "TIMED_OUT" || checkpoint.Actions[2].Outcome != "SUCCEEDED" || checkpoint.Actions[2].ObservationExcerpt == "" || len(checkpoint.InspectedPaths) != 1 || checkpoint.InspectedPaths[0] != "/workspace/b.go" || !checkpoint.SourceJournalSHA256.Valid() || checkpoint.NextAction == "" {
 		t.Fatalf("checkpoint = %#v", checkpoint)
+	}
+}
+
+func TestProgressCheckpointRetainsExactMessageHandlerAuthority(t *testing.T) {
+	brief, _ := openHandsTestBrief(t)
+	messageID := kernel.UUIDv7("00000000-0000-7000-8000-000000000810")
+	brief.MessageHandler = &application.MessageHandlerGrounding{
+		MessageID: messageID, MessageType: "tekroo.message.task.assigned", MessagePurpose: "HANDOFF",
+		SubscriptionPurpose: "implementation", CharterDigest: digest('a'), HandlerDigest: digest('b'),
+		Instructions: "Implement the admitted task.", InputSchemaDigest: digest('c'), InputSchema: json.RawMessage(`{"type":"object"}`),
+		ResultSchemaDigest: digest('d'), ResultSchema: json.RawMessage(`{"type":"object"}`),
+		AllowedResults: []string{"completed"},
+	}
+	brief.AdmittedMessage = &application.AdmittedMessage{ID: messageID, Type: "tekroo.message.task.assigned", Purpose: "HANDOFF", Body: json.RawMessage(`{"task":"bounded"}`)}
+
+	checkpoint := buildProgressCheckpoint(brief, nil, -1)
+	if !reflect.DeepEqual(checkpoint.AuthoritativeExecution.MessageHandler, brief.MessageHandler) || !reflect.DeepEqual(checkpoint.AuthoritativeExecution.AdmittedMessage, brief.AdmittedMessage) {
+		t.Fatalf("checkpoint lost handler authority: %#v", checkpoint.AuthoritativeExecution)
+	}
+	brief.MessageHandler.Instructions = "mutated"
+	brief.AdmittedMessage.Body[0] = '['
+	if checkpoint.AuthoritativeExecution.MessageHandler.Instructions != "Implement the admitted task." || string(checkpoint.AuthoritativeExecution.AdmittedMessage.Body) != `{"task":"bounded"}` {
+		t.Fatal("checkpoint handler authority aliases mutable execution input")
 	}
 }
 
@@ -1785,6 +1865,37 @@ func TestClientCorrectsOneCompoundShellActionInsideTheInvocation(t *testing.T) {
 	}
 }
 
+func TestClientMarksPostCheckpointCorrectionFailureRetryable(t *testing.T) {
+	brief, _ := openHandsTestBrief(t)
+	brief.Purpose = kernel.PurposeValidation
+	brief.RoleGrounding.Permissions = []string{"repository.read"}
+	encoded := mustJSON(brief)
+	hash := sha256.Sum256(encoded)
+	digest := kernel.Digest(hex.EncodeToString(hash[:]))
+	checkpoint := progressCheckpoint{
+		SchemaVersion:       "tekroo.teams.execution-progress-checkpoint/1.2.0",
+		SourceJournalSHA256: kernel.Digest(strings.Repeat("a", 64)),
+		NextAction:          "Evaluate retained evidence and submit the required result through the finish tool.",
+	}
+	events := []map[string]any{
+		event("evt-user", "MessageEvent", "user", string(encoded)),
+		event("checkpoint", "MessageEvent", "user", compactionCheckpointPrefix+"1\nrestored\n"+string(mustJSON(checkpoint))),
+		event("correction", "MessageEvent", "user", checkpointCompletionCorrectionPrefix+"excess-read"),
+		actionEvent("post-correction-test", "terminal", "go test ./organization"),
+		observationEvent("post-correction-result", "terminal", false, 0),
+	}
+	workspace := filepath.Join(t.TempDir(), "workspace")
+	state := &progressGuardServerState{prompt: string(encoded), workspace: workspace, events: events}
+	server := httptest.NewServer(http.HandlerFunc(state.serveHTTP))
+	defer server.Close()
+	client := newOpenHandsTestClient(t, server.URL, workspace, brief)
+
+	observation, err := client.Inspect(context.Background(), brief, string(brief.InvocationID), digest)
+	if err != nil || observation.State != application.ExternalFailed || !observation.Retryable || !strings.Contains(string(observation.Output), "REPEATED_CHECKPOINT_COMPLETION_VIOLATION") {
+		t.Fatalf("observation=%#v err=%v", observation, err)
+	}
+}
+
 func TestClientCorrectsLaterShellDisciplineIncidentAfterCompliantProgress(t *testing.T) {
 	brief, digest := openHandsTestBrief(t)
 	workspace := filepath.Join(t.TempDir(), "workspace")
@@ -2510,6 +2621,14 @@ func TestRoleToolPolicyEnforcesSignedRepositoryPermissions(t *testing.T) {
 	}
 
 	readOnly := application.RoleExecutionGrounding{Permissions: []string{"repository.read", "test.execute"}}
+	branchInspection := append(append([]rawEvent(nil), terminalRead...), rawEvent{ID: "branch", Kind: "ActionEvent", Source: "agent", ToolName: "terminal", ActionCommand: "git branch --show-current"})
+	if violation, reason, found := roleToolPolicyViolation(readOnly, branchInspection, 0); found {
+		t.Fatalf("read-only branch inspection violation=%+v reason=%q", violation, reason)
+	}
+	branchCreation := append(append([]rawEvent(nil), terminalRead...), rawEvent{ID: "branch-create", Kind: "ActionEvent", Source: "agent", ToolName: "terminal", ActionCommand: "git branch feature/new"})
+	if violation, reason, found := roleToolPolicyViolation(readOnly, branchCreation, 0); !found || violation.ID != "branch-create" || reason != "ROLE_REPOSITORY_MUTATION_NOT_AUTHORIZED" {
+		t.Fatalf("branch creation violation=%+v reason=%q found=%t", violation, reason, found)
+	}
 	mutation := append(append([]rawEvent(nil), terminalRead...), rawEvent{ID: "edit", Kind: "ActionEvent", Source: "agent", ToolName: "file_editor", ActionCommand: "str_replace", ActionPath: "organization/host.go"})
 	if violation, reason, found := roleToolPolicyViolation(readOnly, mutation, 0); !found || violation.ID != "edit" || reason != "ROLE_REPOSITORY_MUTATION_NOT_AUTHORIZED" {
 		t.Fatalf("read-only violation=%+v reason=%q found=%t", violation, reason, found)

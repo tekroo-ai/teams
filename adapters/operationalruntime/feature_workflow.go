@@ -197,6 +197,15 @@ func (service *ProductionService) bindCurrentFeatureWorkflowStage(ctx context.Co
 	if service == nil || service.WorkflowLibrary == nil {
 		return nil
 	}
+	claim, found, err := service.MessageBus.Read(ctx, feature.LastMessageID)
+	if err != nil || !found {
+		return errors.Join(organization.ErrOrganizationalMessageNotFound, err)
+	}
+	// A stage message may already be admitted or executing. Its durable
+	// workflow coordinates are immutable, so there is nothing to repair.
+	if claim.Message.Work.WorkflowInstanceID != nil {
+		return nil
+	}
 	stageID, ok := workflowStageForFeatureStatus(feature.Status)
 	if !ok {
 		return nil

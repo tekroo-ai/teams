@@ -1,0 +1,102 @@
+{
+  "$id": "tekroo.kernel.contracts/0.12.0/schemas/admission-result.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "const": "ADMITTED"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "reason_code": {
+            "const": "ADMITTED"
+          }
+        },
+        "required": [
+          "authorized_invocation_id"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "const": "REJECTED"
+          }
+        }
+      },
+      "then": {
+        "not": {
+          "required": [
+            "authorized_invocation_id"
+          ]
+        }
+      }
+    }
+  ],
+  "properties": {
+    "authorized_invocation_id": {
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "type": "string"
+    },
+    "node_id": {
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "type": "string"
+    },
+    "outcome": {
+      "enum": [
+        "ADMITTED",
+        "REJECTED"
+      ]
+    },
+    "proposal_id": {
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "type": "string"
+    },
+    "reason_code": {
+      "enum": [
+        "ADMITTED",
+        "UNDECLARED_TRANSITION",
+        "PREDECESSOR_INCOMPLETE",
+        "DUPLICATE_NODE",
+        "CAUSATION_INVALID",
+        "ACTOR_INELIGIBLE",
+        "BUDGET_EXHAUSTED",
+        "NO_PROGRESS",
+        "WORKFLOW_TERMINAL"
+      ]
+    },
+    "recorded_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "recorded_event_id": {
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "workflow_instance_id": {
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "proposal_id",
+    "workflow_instance_id",
+    "node_id",
+    "outcome",
+    "reason_code",
+    "recorded_event_id",
+    "recorded_at"
+  ],
+  "title": "Tekroo deterministic work-admission result",
+  "type": "object"
+}

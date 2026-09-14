@@ -380,6 +380,102 @@ func TestOperationalCoordinatorFailsClosedBeforeProviderOnStaleFence(t *testing.
 	}
 }
 
+func TestOperationalCoordinatorBindsExactMessageHandlerBeforeProvider(t *testing.T) {
+	runtime := newOperationalRuntime(t)
+	charter := testRoleGrounding(runtime.context.Invocation.ActorFQN).Instructions
+	handlerInstructions := "Implement only the admitted task and return the declared result."
+	inputSchema := json.RawMessage(`{"type":"object"}`)
+	resultSchema := json.RawMessage(`{"type":"object","required":["outcome"]}`)
+	binding := kernel.HandlerDispatchBinding{
+		MessageID: testUUID(880), MessageType: "tekroo.message.task.assigned", MessagePurpose: "HANDOFF",
+		MessageBodyDigest:   contentDigest([]byte(`{"task":"implement"}`)),
+		SubscriptionPurpose: "implementation", RoleBundleDigest: testDigest('b'),
+		CharterDigest: contentDigest([]byte(charter)), HandlerDigest: contentDigest([]byte(handlerInstructions)),
+		InputSchemaDigest: contentDigest(inputSchema), ResultSchemaDigest: contentDigest(resultSchema),
+		AllowedResults:          []string{"blocked", "completed", "failed", "needs_decision"},
+		AllowedMessageProposals: []string{"tekroo.message.task.blocked", "tekroo.message.task.completed"},
+	}
+	runtime.context.Invocation.HandlerDispatch = &binding
+	runtime.context.AdmittedMessage = &AdmittedMessage{ID: binding.MessageID, Type: binding.MessageType, Purpose: binding.MessagePurpose, Body: json.RawMessage(`{"task":"implement"}`)}
+	runtime.handlerGrounding = &MessageHandlerGrounding{
+		MessageID: binding.MessageID, MessageType: binding.MessageType, MessagePurpose: binding.MessagePurpose,
+		SubscriptionPurpose: binding.SubscriptionPurpose, CharterDigest: binding.CharterDigest,
+		HandlerDigest: binding.HandlerDigest, Instructions: handlerInstructions,
+		InputSchemaDigest: binding.InputSchemaDigest, InputSchema: inputSchema,
+		ResultSchemaDigest: binding.ResultSchemaDigest, ResultSchema: resultSchema,
+		AllowedResults: append([]string(nil), binding.AllowedResults...), AllowedMessageProposals: append([]string(nil), binding.AllowedMessageProposals...),
+	}
+	coordinator := newTestOperationalCoordinator(t, runtime)
+	result, err := coordinator.Process(context.Background(), runtime.intent)
+	if err != nil || result.State != kernel.InvocationStarted || runtime.startCalls != 1 || runtime.lastBrief.MessageHandler == nil || runtime.lastBrief.MessageHandler.HandlerDigest != binding.HandlerDigest {
+		t.Fatalf("result=%#v err=%v starts=%d handler=%#v", result, err, runtime.startCalls, runtime.lastBrief.MessageHandler)
+	}
+}
+
+func TestOperationalCoordinatorRejectsSubstitutedHandlerBeforeProvider(t *testing.T) {
+	runtime := newOperationalRuntime(t)
+	charter := testRoleGrounding(runtime.context.Invocation.ActorFQN).Instructions
+	handlerInstructions := "Implement only the admitted task."
+	inputSchema := json.RawMessage(`{"type":"object"}`)
+	resultSchema := json.RawMessage(`{"type":"object"}`)
+	binding := kernel.HandlerDispatchBinding{
+		MessageID: testUUID(881), MessageType: "tekroo.message.task.assigned", MessagePurpose: "HANDOFF",
+		MessageBodyDigest:   contentDigest([]byte(`{"task":"implement"}`)),
+		SubscriptionPurpose: "implementation", RoleBundleDigest: testDigest('b'),
+		CharterDigest: contentDigest([]byte(charter)), HandlerDigest: contentDigest([]byte(handlerInstructions)),
+		InputSchemaDigest: contentDigest(inputSchema), ResultSchemaDigest: contentDigest(resultSchema),
+		AllowedResults: []string{"completed"}, AllowedMessageProposals: []string{},
+	}
+	runtime.context.Invocation.HandlerDispatch = &binding
+	runtime.context.AdmittedMessage = &AdmittedMessage{ID: binding.MessageID, Type: binding.MessageType, Purpose: binding.MessagePurpose, Body: json.RawMessage(`{"task":"implement"}`)}
+	runtime.handlerGrounding = &MessageHandlerGrounding{
+		MessageID: binding.MessageID, MessageType: binding.MessageType, MessagePurpose: binding.MessagePurpose,
+		SubscriptionPurpose: binding.SubscriptionPurpose, CharterDigest: binding.CharterDigest,
+		HandlerDigest: testDigest('0'), Instructions: handlerInstructions,
+		InputSchemaDigest: binding.InputSchemaDigest, InputSchema: inputSchema,
+		ResultSchemaDigest: binding.ResultSchemaDigest, ResultSchema: resultSchema,
+		AllowedResults: []string{"completed"}, AllowedMessageProposals: []string{},
+	}
+	coordinator := newTestOperationalCoordinator(t, runtime)
+	result, err := coordinator.Process(context.Background(), runtime.intent)
+	if err != nil || result.State != kernel.InvocationStartFailed || runtime.startCalls != 0 {
+		t.Fatalf("result=%#v err=%v starts=%d", result, err, runtime.startCalls)
+	}
+}
+
+func TestOperationalCoordinatorRecordsInvalidHandlerResultAsRetryableFailure(t *testing.T) {
+	runtime := newOperationalRuntime(t)
+	charter := testRoleGrounding(runtime.context.Invocation.ActorFQN).Instructions
+	handlerInstructions := "Implement only the admitted task."
+	inputSchema := json.RawMessage(`{"type":"object","required":["task"]}`)
+	resultSchema := json.RawMessage(`{"type":"object","additionalProperties":false,"required":["outcome","message_proposals"],"properties":{"outcome":{"type":"string"},"message_proposals":{"type":"array"}}}`)
+	binding := kernel.HandlerDispatchBinding{
+		MessageID: testUUID(882), MessageType: "tekroo.message.task.assigned", MessagePurpose: "HANDOFF",
+		MessageBodyDigest:   contentDigest([]byte(`{"task":"implement"}`)),
+		SubscriptionPurpose: "implementation", RoleBundleDigest: testDigest('b'),
+		CharterDigest: contentDigest([]byte(charter)), HandlerDigest: contentDigest([]byte(handlerInstructions)),
+		InputSchemaDigest: contentDigest(inputSchema), ResultSchemaDigest: contentDigest(resultSchema),
+		AllowedResults: []string{"completed"}, AllowedMessageProposals: []string{},
+	}
+	runtime.context.Invocation.HandlerDispatch = &binding
+	runtime.context.AdmittedMessage = &AdmittedMessage{ID: binding.MessageID, Type: binding.MessageType, Purpose: binding.MessagePurpose, Body: json.RawMessage(`{"task":"implement"}`)}
+	runtime.handlerGrounding = &MessageHandlerGrounding{
+		MessageID: binding.MessageID, MessageType: binding.MessageType, MessagePurpose: binding.MessagePurpose,
+		SubscriptionPurpose: binding.SubscriptionPurpose, CharterDigest: binding.CharterDigest,
+		HandlerDigest: binding.HandlerDigest, Instructions: handlerInstructions,
+		InputSchemaDigest: binding.InputSchemaDigest, InputSchema: inputSchema,
+		ResultSchemaDigest: binding.ResultSchemaDigest, ResultSchema: resultSchema,
+		AllowedResults: []string{"completed"}, AllowedMessageProposals: []string{},
+	}
+	runtime.startState = ExternalSucceeded
+	runtime.startOutput = []byte("not the declared result")
+	coordinator := newTestOperationalCoordinator(t, runtime)
+	result, err := coordinator.Process(context.Background(), runtime.intent)
+	if err != nil || result.State != kernel.InvocationFailed || runtime.context.Invocation.Retryable == nil || !*runtime.context.Invocation.Retryable {
+		t.Fatalf("result=%#v err=%v retryable=%v", result, err, runtime.context.Invocation.Retryable)
+	}
+}
+
 func TestOperationalCoordinatorExpiresUnclaimedInvocationWithoutProviderCall(t *testing.T) {
 	runtime := newOperationalRuntime(t)
 	runtime.clock.current = runtime.context.Invocation.DeadlineAt.Add(time.Second)
@@ -520,6 +616,7 @@ type operationalRuntime struct {
 	evidenceCalls      int
 	lastBrief          ExecutionBrief
 	roleInstructions   string
+	handlerGrounding   *MessageHandlerGrounding
 	deadlineExtension  time.Duration
 	lastTerminalOutput []byte
 }
@@ -637,6 +734,14 @@ func (runtime *operationalRuntime) ResolveRoleGrounding(_ context.Context, actor
 		grounding.Instructions = runtime.roleInstructions
 	}
 	return grounding, nil
+}
+
+func (runtime *operationalRuntime) ResolveRoleHandlerGrounding(_ context.Context, actor kernel.ActorFQN, binding kernel.HandlerDispatchBinding) (RoleExecutionGrounding, MessageHandlerGrounding, error) {
+	grounding, err := runtime.ResolveRoleGrounding(context.Background(), actor)
+	if err != nil || runtime.handlerGrounding == nil {
+		return RoleExecutionGrounding{}, MessageHandlerGrounding{}, ErrInvalidOperationalExecution
+	}
+	return grounding, *cloneMessageHandlerGrounding(runtime.handlerGrounding), nil
 }
 
 func (runtime *operationalRuntime) LoadOperationalExecution(_ context.Context, invocationID kernel.UUIDv7) (OperationalExecutionContext, error) {

@@ -1,0 +1,21 @@
+{
+  "schema_version": "1.0.0",
+  "team": "editorial",
+  "version": "2.0.0",
+  "roles": [
+    {
+      "role": "editor",
+      "bundle_path": "roles-v4/editor/role.json",
+      "bundle_digest": "f9af89593027fb40bf57864ca10121069da64135f9a44c6be38caaa0c80aef1d",
+      "publisher_key_id": "tekroo-message-handlers-editorial-20260913",
+      "initial_instances": 1,
+      "maximum_instances": 2,
+      "launch_mode": "ON_DEMAND",
+      "model_profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "workspace_ids": [
+        "editor-1",
+        "editor-2"
+      ]
+    }
+  ]
+}

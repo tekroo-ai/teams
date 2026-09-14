@@ -1,6 +1,7 @@
 package operationalruntime
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -11,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/tekroo-ai/teams/application"
 	"github.com/tekroo-ai/teams/kernel"
 	"github.com/tekroo-ai/teams/organization"
 )
@@ -155,9 +157,13 @@ func (service *ProductionService) preparePlannedTasks(ctx context.Context, featu
 		return err
 	}
 	deadline = budget.DeadlineAt
+	if err := service.ensurePlannedTaskMessages(ctx, feature, plan, taskEvents, planDigest, deadline); err != nil {
+		return err
+	}
 
 	for _, item := range plan.Tasks {
-		taskState, _, taskFound, err := service.Store.ReadAggregateHead(ctx, kernel.AggregateRef{Kind: kernel.AggregateTask, ID: item.ID})
+		taskRef := kernel.AggregateRef{Kind: kernel.AggregateTask, ID: item.ID}
+		taskState, taskHead, taskFound, err := service.Store.ReadAggregateHead(ctx, taskRef)
 		if err != nil || !taskFound || taskState.LifecycleEpoch == 0 || taskState.ScopeRevision == 0 || taskState.Phase == kernel.PhaseClosed || taskState.Condition == kernel.ConditionBlocked {
 			return errors.Join(organization.ErrInvalidFeature, err)
 		}
@@ -182,10 +188,22 @@ func (service *ProductionService) preparePlannedTasks(ctx context.Context, featu
 			return err
 		}
 		profile := service.workProfile(feature, item, taskState.LifecycleEpoch, taskState.ScopeRevision, evidenceID, deadline)
-		tracked := &trackedTask{plan: item, revision: 1, last: taskEvents[item.ID], profile: profile, owner: owner}
-		profileKey := fmt.Sprintf("profile-policy-%d-%s", profile.ClassificationPolicyRevision, profile.ProfileDigest)
-		if err := service.applyTaskCommand(ctx, feature, tracked, "tekroo.command.task.bind-work-profile", kernel.SchemaVersion, service.policyAuthority, profile, evidenceRefs, nil, profileKey); err != nil {
+		tracked := &trackedTask{plan: item, revision: taskState.Revision, last: taskHead, profile: profile, owner: owner}
+		snapshot, err := service.Store.LoadDecision(ctx, kernel.KernelCommand{Target: taskRef})
+		if err != nil {
 			return err
+		}
+		if existing, found := snapshot.WorkProfiles[taskRef]; found {
+			existingJSON, existingErr := json.Marshal(existing.Profile)
+			profileJSON, profileErr := json.Marshal(profile)
+			if !existing.Valid() || existingErr != nil || profileErr != nil || !bytes.Equal(existingJSON, profileJSON) {
+				return organization.ErrInvalidFeature
+			}
+		} else {
+			profileKey := fmt.Sprintf("profile-policy-%d-%s", profile.ClassificationPolicyRevision, profile.ProfileDigest)
+			if err := service.applyTaskCommand(ctx, feature, tracked, "tekroo.command.task.bind-work-profile", kernel.SchemaVersion, service.policyAuthority, profile, evidenceRefs, nil, profileKey); err != nil {
+				return err
+			}
 		}
 		// Admission persists every task and its immutable work profile first.
 		// Reconciliation subsequently activates ready DAG nodes one at a time,
@@ -491,7 +509,11 @@ func (service *ProductionService) authorizeTaskInvocationWithConditionPolicyAndI
 		retryID = &value
 		retryOrdinal = prior.RetryOrdinal + 1
 	}
-	payload, err := json.Marshal(map[string]any{
+	handlerDispatch, err := service.handlerDispatchForCurrentMessage(ctx, feature, task)
+	if err != nil {
+		return err
+	}
+	payloadValue := map[string]any{
 		"invocation_id": invocationID, "task_id": task.plan.ID, "budget_account_id": feature.BudgetAccountID,
 		"expected_budget_revision": budgetRevision, "expected_task_revision": task.revision,
 		"lifecycle_epoch": task.profile.LifecycleEpoch, "scope_revision": task.profile.ScopeRevision, "parent_event_id": task.last,
@@ -504,7 +526,11 @@ func (service *ProductionService) authorizeTaskInvocationWithConditionPolicyAndI
 		"model_profile_digest": profile.ModelProfileDigest, "runtime_identity_digest": profile.RuntimeIdentityDigest,
 		"workspace_id": workspace.WorkspaceID, "deadline_at": task.profile.Budgets.DeadlineAt,
 		"idempotency_key": idempotencyKey, "admission_policy_revision": account.PolicyRevision, "admission_policy_digest": account.PolicyDigest,
-	})
+	}
+	if handlerDispatch != nil {
+		payloadValue["handler_dispatch"] = handlerDispatch
+	}
+	payload, err := json.Marshal(payloadValue)
 	if err != nil {
 		return err
 	}
@@ -529,8 +555,144 @@ func (service *ProductionService) authorizeTaskInvocationWithConditionPolicyAndI
 	if receipt.OutcomeCode != kernel.OutcomeApplied && receipt.OutcomeCode != kernel.OutcomeNoChange {
 		return fmt.Errorf("%s rejected: %s", command.CommandType, receipt.ReasonCode)
 	}
+	if handlerDispatch != nil && featurePlanContainsTask(feature.Plan, task.plan.ID) {
+		if err := service.ensureTaskMessageAdmitted(ctx, handlerDispatch.MessageID, task.owner.ActorFQN, task.owner.Execution, receipt.ProvenanceDigest); err != nil {
+			return fmt.Errorf("admit organizational message %s: %w", handlerDispatch.MessageID, err)
+		}
+	}
 	invocationCreated = receipt.OutcomeCode == kernel.OutcomeApplied
 	return nil
+}
+
+// ensureTaskMessageAdmitted converts a task-level handoff exactly once. Later
+// bounded attempts retain that admitted message as immutable task context;
+// their separate authority is the recorded predecessor invocation and changed
+// condition evidence, not another delivery-state transition.
+func (service *ProductionService) ensureTaskMessageAdmitted(ctx context.Context, id kernel.UUIDv7, recipient kernel.ActorFQN, execution kernel.ExecutionTuple, evidence kernel.Digest) error {
+	claim, found, err := service.MessageBus.Read(ctx, id)
+	if err != nil {
+		return err
+	}
+	if !found || claim.Message.Recipient != recipient {
+		return organization.ErrOrganizationalMessageConflict
+	}
+	if claim.State == organization.MessageResolved && claim.Resolution == "WORK_ADMITTED" {
+		return nil
+	}
+	if claim.State != organization.MessagePending {
+		return organization.ErrOrganizationalMessageConflict
+	}
+	return service.MessageBus.Admit(ctx, id, recipient, execution, evidence)
+}
+
+func (service *ProductionService) handlerDispatchForCurrentMessage(ctx context.Context, feature organization.FeatureRequest, task *trackedTask) (*kernel.HandlerDispatchBinding, error) {
+	if service == nil || task == nil || service.roleGrounding == nil || !service.roleGrounding.requiresMessageHandler(task.owner.ActorFQN) {
+		return nil, nil
+	}
+	messageID := feature.LastMessageID
+	if featurePlanContainsTask(feature.Plan, task.plan.ID) {
+		messageID = plannedTaskMessageID(feature.ID, task.plan.ID)
+	}
+	claim, found, err := service.MessageBus.Read(ctx, messageID)
+	if err != nil {
+		return nil, fmt.Errorf("read organizational message %s: %w", messageID, errors.Join(application.ErrInvalidOperationalExecution, err))
+	}
+	if !found {
+		return nil, fmt.Errorf("organizational message %s not found: %w", messageID, application.ErrInvalidOperationalExecution)
+	}
+	if claim.Message.Recipient != task.owner.ActorFQN {
+		return nil, fmt.Errorf("organizational message %s recipient %s does not match task owner %s: %w", messageID, claim.Message.Recipient, task.owner.ActorFQN, application.ErrInvalidOperationalExecution)
+	}
+	binding, err := service.roleGrounding.bindMessageHandler(task.owner.ActorFQN, claim.Message)
+	if err != nil {
+		return nil, fmt.Errorf("bind organizational message %s for %s: %w", messageID, task.owner.ActorFQN, err)
+	}
+	return binding, nil
+}
+
+func (service *ProductionService) ensurePlannedTaskMessages(ctx context.Context, feature organization.FeatureRequest, plan organization.FeaturePlan, taskEvents map[kernel.UUIDv7]kernel.UUIDv7, planDigest kernel.Digest, deadline time.Time) error {
+	if service == nil || service.MessageBus == nil || service.roleGrounding == nil {
+		return application.ErrInvalidConfiguration
+	}
+	for _, task := range plan.Tasks {
+		if !service.roleGrounding.requiresMessageHandler(task.Owner) {
+			continue
+		}
+		route, found := service.planning.TaskMessageRoutes[task.Purpose]
+		if !found || !organization.ValidMessageType(route.MessageType) || !route.MessagePurpose.Valid() {
+			return fmt.Errorf("no configured message route for %s: %w", task.Purpose, application.ErrInvalidConfiguration)
+		}
+		if plan.PreparedBy == task.Owner || !deadline.After(plan.CreatedAt) {
+			return organization.ErrInvalidFeature
+		}
+		dependencies := make([]kernel.UUIDv7, 0, len(task.DependsOn))
+		for _, dependency := range task.DependsOn {
+			eventID, exists := taskEvents[dependency]
+			if !exists || !eventID.Valid() {
+				return organization.ErrInvalidFeature
+			}
+			dependencies = append(dependencies, eventID)
+		}
+		body, err := json.Marshal(struct {
+			SchemaVersion      string                   `json:"schema_version"`
+			PlanVersion        uint64                   `json:"plan_version"`
+			Task               organization.PlannedTask `json:"task"`
+			DependencyEventIDs []kernel.UUIDv7          `json:"dependency_event_ids"`
+		}{"1.0.0", plan.Version, task, dependencies})
+		if err != nil {
+			return err
+		}
+		messageID := plannedTaskMessageID(feature.ID, task.ID)
+		message := organization.OrganizationalMessage{
+			SchemaVersion: organization.OrganizationalMessageSchemaVersion,
+			ID:            messageID, Type: route.MessageType, Purpose: route.MessagePurpose,
+			Sender: plan.PreparedBy, SenderExecution: plan.PreparedExecution, Recipient: task.Owner,
+			CorrelationID: messageID,
+			Work:          organization.MessageWorkLink{FeatureID: cloneKernelUUID(feature.ID), StoryID: cloneKernelUUID(task.StoryID), TaskID: cloneKernelUUID(task.ID), DAGNodeID: task.ID},
+			Flow:          organization.MessageFlow{ThreadID: messageID, StepID: task.ID, Hop: 1, MaximumHops: 1, BudgetAccountID: feature.BudgetAccountID, LifecycleEpoch: feature.LifecycleEpoch, ScopeRevision: feature.ScopeRevision, ProgressDigest: digestBytes(append([]byte(string(planDigest)+"\x00"), body...))},
+			Body:          body, CreatedAt: plan.CreatedAt, ExpiresAt: deadline,
+		}
+		if message.Validate() != nil {
+			return organization.ErrInvalidFeature
+		}
+		prior, exists, err := service.MessageBus.Read(ctx, messageID)
+		if err != nil {
+			return err
+		}
+		if exists {
+			left, leftErr := json.Marshal(prior.Message)
+			right, rightErr := json.Marshal(message)
+			if leftErr != nil || rightErr != nil || !bytes.Equal(left, right) {
+				return organization.ErrOrganizationalMessageConflict
+			}
+			continue
+		}
+		if err := service.MessageBus.Send(ctx, message); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func plannedTaskMessageID(featureID, taskID kernel.UUIDv7) kernel.UUIDv7 {
+	return deterministicOperationalUUID("planned-task-message", string(featureID), string(taskID))
+}
+
+func featurePlanContainsTask(plan *organization.FeaturePlan, taskID kernel.UUIDv7) bool {
+	if plan == nil {
+		return false
+	}
+	for _, task := range plan.Tasks {
+		if task.ID == taskID {
+			return true
+		}
+	}
+	return false
+}
+
+func cloneKernelUUID(value kernel.UUIDv7) *kernel.UUIDv7 {
+	copy := value
+	return &copy
 }
 
 // A repair is a new purpose within the already classified task, not a new
@@ -818,7 +980,11 @@ func (service *ProductionService) submitDeterministicCommand(ctx context.Context
 }
 
 func (service *ProductionService) submitDeterministicCommandAtLifecycle(ctx context.Context, feature organization.FeatureRequest, commandType, version string, kind kernel.AggregateKind, id kernel.UUIDv7, authority kernel.PrincipalRef, revision, lifecycleEpoch uint64, payload []byte, parents []kernel.DagParent, evidence []kernel.EvidenceRef, key string, preconditions ...kernel.AggregatePrecondition) (kernel.CommandReceipt, error) {
-	command := kernel.KernelCommand{ContractManifest: kernel.ContractIdentity, CommandID: deterministicOperationalUUID("command", string(feature.ID), commandType, string(id), key), CommandType: commandType, CommandVersion: version, Target: kernel.AggregateRef{Kind: kind, ID: id}, Authority: authority, ExpectedRevision: expectedRevision(revision), ExpectedLifecycleEpoch: expectedLifecycleEpoch(kind, revision, lifecycleEpoch), Preconditions: append([]kernel.AggregatePrecondition(nil), preconditions...), ExpectedPolicyRevision: service.provenance.PolicyRevision, ExpectedCatalogueRevision: kernel.CatalogueRevision, IdempotencyKey: "feature:" + string(feature.ID) + ":" + key, CorrelationID: feature.ID, Causation: append([]kernel.DagParent(nil), parents...), Payload: append([]byte(nil), payload...), EvidenceRefs: append([]kernel.EvidenceRef(nil), evidence...)}
+	idempotencyKey := featureCommandIdempotencyKey(feature, key)
+	command := kernel.KernelCommand{ContractManifest: kernel.ContractIdentity, CommandID: deterministicFeatureCommandID(feature, commandType, id, key), CommandType: commandType, CommandVersion: version, Target: kernel.AggregateRef{Kind: kind, ID: id}, Authority: authority, ExpectedRevision: expectedRevision(revision), ExpectedLifecycleEpoch: expectedLifecycleEpoch(kind, revision, lifecycleEpoch), Preconditions: append([]kernel.AggregatePrecondition(nil), preconditions...), ExpectedPolicyRevision: service.provenance.PolicyRevision, ExpectedCatalogueRevision: kernel.CatalogueRevision, IdempotencyKey: idempotencyKey, CorrelationID: feature.ID, Causation: append([]kernel.DagParent(nil), parents...), Payload: append([]byte(nil), payload...), EvidenceRefs: append([]kernel.EvidenceRef(nil), evidence...)}
+	if err := kernel.ValidateEnvelope(command); err != nil {
+		return kernel.CommandReceipt{}, fmt.Errorf("invalid command envelope: %w", err)
+	}
 	if _, err := service.Runtime.catalogue.ResolveCommand(command.CommandType, command.CommandVersion, command.Target.Kind, command.Payload); err != nil {
 		return kernel.CommandReceipt{}, fmt.Errorf("%s payload: %w", commandType, err)
 	}
@@ -830,6 +996,31 @@ func (service *ProductionService) submitDeterministicCommandAtLifecycle(ctx cont
 		return receipt, fmt.Errorf("%s rejected: %s", commandType, receipt.ReasonCode)
 	}
 	return receipt, nil
+}
+
+func featureCommandIdempotencyKey(feature organization.FeatureRequest, key string) string {
+	idempotencyKey := "feature:" + string(feature.ID) + ":" + key
+	if len(idempotencyKey) <= 256 {
+		return idempotencyKey
+	}
+	// Command keys retain the descriptive form for ordinary operations. Long
+	// recovery lineage keys are reduced deterministically so they remain valid
+	// envelope identities rather than turning a recoverable task failure into
+	// an INVALID_ENVELOPE loop.
+	return "feature:" + string(feature.ID) + ":sha256:" + string(digestBytes([]byte(key)))
+}
+
+func deterministicFeatureCommandID(feature organization.FeatureRequest, commandType string, id kernel.UUIDv7, key string) kernel.UUIDv7 {
+	idempotencyKey := featureCommandIdempotencyKey(feature, key)
+	// Preserve the established command identity for ordinary keys. Only keys
+	// that must be compacted to satisfy the envelope limit use the compacted
+	// form in their command identity, so historical replay receipts continue to
+	// resolve to the command that created them.
+	identityKey := key
+	if idempotencyKey != "feature:"+string(feature.ID)+":"+key {
+		identityKey = idempotencyKey
+	}
+	return deterministicOperationalUUID("command", string(feature.ID), commandType, string(id), identityKey)
 }
 
 func (service *ProductionService) submitDeterministicActorCommand(ctx context.Context, feature organization.FeatureRequest, commandType string, id kernel.UUIDv7, authority kernel.PrincipalRef, actor kernel.ActorFQN, execution kernel.ExecutionTuple, revision, lifecycleEpoch uint64, payload []byte, parents []kernel.DagParent, key string) (kernel.CommandReceipt, error) {

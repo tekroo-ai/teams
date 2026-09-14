@@ -351,6 +351,62 @@ func (s WorkInvocationState) Terminal() bool {
 	return s == InvocationStartFailed || s == InvocationSucceeded || s == InvocationFailed || s == InvocationTimedOut || s == InvocationCancelled || s == InvocationExpired
 }
 
+// HandlerDispatchBinding is the immutable organizational-message and role
+// package identity authorized for one invocation. It contains identities, not
+// handler content: an execution adapter must reload the signed resources and
+// prove every digest before it may call a model.
+type HandlerDispatchBinding struct {
+	MessageID               UUIDv7   `json:"message_id"`
+	MessageType             string   `json:"message_type"`
+	MessagePurpose          string   `json:"message_purpose"`
+	MessageBodyDigest       Digest   `json:"message_body_digest"`
+	SubscriptionPurpose     string   `json:"subscription_purpose"`
+	RoleBundleDigest        Digest   `json:"role_bundle_digest"`
+	CharterDigest           Digest   `json:"charter_digest"`
+	HandlerDigest           Digest   `json:"handler_digest"`
+	InputSchemaDigest       Digest   `json:"input_schema_digest"`
+	ResultSchemaDigest      Digest   `json:"result_schema_digest"`
+	AllowedResults          []string `json:"allowed_results"`
+	AllowedMessageProposals []string `json:"allowed_message_proposals"`
+}
+
+func (binding HandlerDispatchBinding) Valid() bool {
+	if !binding.MessageID.Valid() || len(binding.MessageType) <= len("tekroo.message.") || len(binding.MessageType) > 256 || binding.MessageType[:len("tekroo.message.")] != "tekroo.message." || !binding.MessageBodyDigest.Valid() || binding.SubscriptionPurpose == "" || len(binding.SubscriptionPurpose) > 128 || !binding.RoleBundleDigest.Valid() || !binding.CharterDigest.Valid() || !binding.HandlerDigest.Valid() || !binding.InputSchemaDigest.Valid() || !binding.ResultSchemaDigest.Valid() || !validUniqueStrings(binding.AllowedResults, 1, 16) || !validUniqueStrings(binding.AllowedMessageProposals, 0, 64) {
+		return false
+	}
+	switch binding.MessagePurpose {
+	case "REQUEST", "HANDOFF", "EVIDENCE", "RESPONSE", "NOTIFICATION":
+		return true
+	default:
+		return false
+	}
+}
+
+func (binding HandlerDispatchBinding) Clone() HandlerDispatchBinding {
+	results := make([]string, len(binding.AllowedResults))
+	copy(results, binding.AllowedResults)
+	binding.AllowedResults = results
+	proposals := make([]string, len(binding.AllowedMessageProposals))
+	copy(proposals, binding.AllowedMessageProposals)
+	binding.AllowedMessageProposals = proposals
+	return binding
+}
+
+func cloneHandlerDispatchBinding(binding *HandlerDispatchBinding) *HandlerDispatchBinding {
+	if binding == nil {
+		return nil
+	}
+	copy := binding.Clone()
+	return &copy
+}
+
+func sameHandlerDispatchBinding(left, right *HandlerDispatchBinding) bool {
+	if left == nil || right == nil {
+		return left == nil && right == nil
+	}
+	return left.MessageID == right.MessageID && left.MessageType == right.MessageType && left.MessagePurpose == right.MessagePurpose && left.MessageBodyDigest == right.MessageBodyDigest && left.SubscriptionPurpose == right.SubscriptionPurpose && left.RoleBundleDigest == right.RoleBundleDigest && left.CharterDigest == right.CharterDigest && left.HandlerDigest == right.HandlerDigest && left.InputSchemaDigest == right.InputSchemaDigest && left.ResultSchemaDigest == right.ResultSchemaDigest && equalStrings(left.AllowedResults, right.AllowedResults) && equalStrings(left.AllowedMessageProposals, right.AllowedMessageProposals)
+}
+
 type WorkInvocation struct {
 	ID                      UUIDv7
 	Revision                uint64
@@ -374,6 +430,7 @@ type WorkInvocation struct {
 	AllowedTerminalOutcomes []WorkInvocationState
 	ToolPolicyDigest        Digest
 	EffectPolicyDigest      Digest
+	HandlerDispatch         *HandlerDispatchBinding
 	ActorFQN                ActorFQN
 	Execution               ExecutionTuple
 	ModelProfileDigest      Digest
@@ -409,6 +466,7 @@ func (i WorkInvocation) Clone() WorkInvocation {
 	copy := i
 	copy.AllowedTerminalOutcomes = append([]WorkInvocationState(nil), i.AllowedTerminalOutcomes...)
 	copy.TerminalEvidenceIDs = append([]UUIDv7(nil), i.TerminalEvidenceIDs...)
+	copy.HandlerDispatch = cloneHandlerDispatchBinding(i.HandlerDispatch)
 	if i.RetryOfInvocationID != nil {
 		value := *i.RetryOfInvocationID
 		copy.RetryOfInvocationID = &value
@@ -457,7 +515,7 @@ func (i WorkInvocation) Clone() WorkInvocation {
 }
 
 func (i WorkInvocation) Valid() bool {
-	if !i.ID.Valid() || i.Revision == 0 || !i.AuthorizationEventID.Valid() || !i.ParentEventID.Valid() || !i.TaskID.Valid() || !i.BudgetAccountID.Valid() || i.LifecycleEpoch == 0 || i.ScopeRevision == 0 || i.TaskRevision == 0 || !i.WorkProfile.Valid() || !i.QualifiedAssignmentID.Valid() || !i.Purpose.Valid() || i.AttemptFamily == "" || i.AttemptOrdinal == 0 || !i.ConditionDigest.Valid() || !i.OutputPredicateDigest.Valid() || !i.ActorFQN.Valid() || !i.Execution.Valid() || !i.ModelProfileDigest.Valid() || !i.RuntimeIdentityDigest.Valid() || i.WorkspaceID == "" || i.DeadlineAt.IsZero() || i.IdempotencyKey == "" || i.AdmissionPolicyRevision == 0 || !i.AdmissionPolicyDigest.Valid() || i.GlobalDebitOrdinal == 0 || i.PurposeDebitOrdinal == 0 || !i.LastEventID.Valid() || len(i.AllowedTerminalOutcomes) == 0 || !i.ToolPolicyDigest.Valid() || !i.EffectPolicyDigest.Valid() {
+	if !i.ID.Valid() || i.Revision == 0 || !i.AuthorizationEventID.Valid() || !i.ParentEventID.Valid() || !i.TaskID.Valid() || !i.BudgetAccountID.Valid() || i.LifecycleEpoch == 0 || i.ScopeRevision == 0 || i.TaskRevision == 0 || !i.WorkProfile.Valid() || !i.QualifiedAssignmentID.Valid() || !i.Purpose.Valid() || i.AttemptFamily == "" || i.AttemptOrdinal == 0 || !i.ConditionDigest.Valid() || !i.OutputPredicateDigest.Valid() || !i.ActorFQN.Valid() || !i.Execution.Valid() || !i.ModelProfileDigest.Valid() || !i.RuntimeIdentityDigest.Valid() || i.WorkspaceID == "" || i.DeadlineAt.IsZero() || i.IdempotencyKey == "" || i.AdmissionPolicyRevision == 0 || !i.AdmissionPolicyDigest.Valid() || i.GlobalDebitOrdinal == 0 || i.PurposeDebitOrdinal == 0 || !i.LastEventID.Valid() || len(i.AllowedTerminalOutcomes) == 0 || !i.ToolPolicyDigest.Valid() || !i.EffectPolicyDigest.Valid() || i.HandlerDispatch != nil && !i.HandlerDispatch.Valid() {
 		return false
 	}
 	if i.RetryOfInvocationID == nil && i.RetryOrdinal != 0 || i.RetryOfInvocationID != nil && (!i.RetryOfInvocationID.Valid() || i.RetryOrdinal == 0) {
@@ -467,45 +525,46 @@ func (i WorkInvocation) Valid() bool {
 }
 
 type invocationAuthorizationPayload struct {
-	InvocationID            UUIDv7                `json:"invocation_id"`
-	TaskID                  UUIDv7                `json:"task_id"`
-	BudgetAccountID         UUIDv7                `json:"budget_account_id"`
-	ExpectedBudgetRevision  uint64                `json:"expected_budget_revision"`
-	ExpectedTaskRevision    uint64                `json:"expected_task_revision"`
-	LifecycleEpoch          uint64                `json:"lifecycle_epoch"`
-	ScopeRevision           uint64                `json:"scope_revision"`
-	ParentEventID           UUIDv7                `json:"parent_event_id"`
-	WorkProfile             WorkProfileBinding    `json:"work_profile"`
-	QualifiedAssignmentID   UUIDv7                `json:"qualified_assignment_id"`
-	Purpose                 WorkPurpose           `json:"purpose"`
-	AttemptFamily           string                `json:"attempt_family"`
-	AttemptOrdinal          uint64                `json:"attempt_ordinal"`
-	ConditionDigest         Digest                `json:"condition_digest"`
-	RetryOfInvocationID     *UUIDv7               `json:"retry_of_invocation_id"`
-	RetryOrdinal            uint64                `json:"retry_ordinal"`
-	OutputPredicateDigest   Digest                `json:"output_predicate_digest"`
-	AllowedTerminalOutcomes []WorkInvocationState `json:"allowed_terminal_outcomes"`
-	ToolPolicyDigest        Digest                `json:"tool_policy_digest"`
-	EffectPolicyDigest      Digest                `json:"effect_policy_digest"`
-	ActorFQN                ActorFQN              `json:"actor_fqn"`
-	ExecutionID             UUIDv7                `json:"execution_id"`
-	FencingEpoch            uint64                `json:"fencing_epoch"`
-	ModelProfileDigest      Digest                `json:"model_profile_digest"`
-	RuntimeIdentityDigest   Digest                `json:"runtime_identity_digest"`
-	WorkspaceID             string                `json:"workspace_id"`
-	DeadlineAt              time.Time             `json:"deadline_at"`
-	IdempotencyKey          string                `json:"idempotency_key"`
-	AdmissionPolicyRevision uint64                `json:"admission_policy_revision"`
-	AdmissionPolicyDigest   Digest                `json:"admission_policy_digest"`
-	GlobalDebitOrdinal      uint64                `json:"global_debit_ordinal,omitempty"`
-	PurposeDebitOrdinal     uint64                `json:"purpose_debit_ordinal,omitempty"`
-	RemainingGlobalBudget   uint64                `json:"remaining_global_budget,omitempty"`
-	RemainingPurposeBudget  uint64                `json:"remaining_purpose_budget,omitempty"`
+	InvocationID            UUIDv7                  `json:"invocation_id"`
+	TaskID                  UUIDv7                  `json:"task_id"`
+	BudgetAccountID         UUIDv7                  `json:"budget_account_id"`
+	ExpectedBudgetRevision  uint64                  `json:"expected_budget_revision"`
+	ExpectedTaskRevision    uint64                  `json:"expected_task_revision"`
+	LifecycleEpoch          uint64                  `json:"lifecycle_epoch"`
+	ScopeRevision           uint64                  `json:"scope_revision"`
+	ParentEventID           UUIDv7                  `json:"parent_event_id"`
+	WorkProfile             WorkProfileBinding      `json:"work_profile"`
+	QualifiedAssignmentID   UUIDv7                  `json:"qualified_assignment_id"`
+	Purpose                 WorkPurpose             `json:"purpose"`
+	AttemptFamily           string                  `json:"attempt_family"`
+	AttemptOrdinal          uint64                  `json:"attempt_ordinal"`
+	ConditionDigest         Digest                  `json:"condition_digest"`
+	RetryOfInvocationID     *UUIDv7                 `json:"retry_of_invocation_id"`
+	RetryOrdinal            uint64                  `json:"retry_ordinal"`
+	OutputPredicateDigest   Digest                  `json:"output_predicate_digest"`
+	AllowedTerminalOutcomes []WorkInvocationState   `json:"allowed_terminal_outcomes"`
+	ToolPolicyDigest        Digest                  `json:"tool_policy_digest"`
+	EffectPolicyDigest      Digest                  `json:"effect_policy_digest"`
+	HandlerDispatch         *HandlerDispatchBinding `json:"handler_dispatch,omitempty"`
+	ActorFQN                ActorFQN                `json:"actor_fqn"`
+	ExecutionID             UUIDv7                  `json:"execution_id"`
+	FencingEpoch            uint64                  `json:"fencing_epoch"`
+	ModelProfileDigest      Digest                  `json:"model_profile_digest"`
+	RuntimeIdentityDigest   Digest                  `json:"runtime_identity_digest"`
+	WorkspaceID             string                  `json:"workspace_id"`
+	DeadlineAt              time.Time               `json:"deadline_at"`
+	IdempotencyKey          string                  `json:"idempotency_key"`
+	AdmissionPolicyRevision uint64                  `json:"admission_policy_revision"`
+	AdmissionPolicyDigest   Digest                  `json:"admission_policy_digest"`
+	GlobalDebitOrdinal      uint64                  `json:"global_debit_ordinal,omitempty"`
+	PurposeDebitOrdinal     uint64                  `json:"purpose_debit_ordinal,omitempty"`
+	RemainingGlobalBudget   uint64                  `json:"remaining_global_budget,omitempty"`
+	RemainingPurposeBudget  uint64                  `json:"remaining_purpose_budget,omitempty"`
 }
 
 func parseInvocationAuthorization(payload []byte) (invocationAuthorizationPayload, error) {
 	var value invocationAuthorizationPayload
-	if json.Unmarshal(payload, &value) != nil || !value.InvocationID.Valid() || !value.TaskID.Valid() || !value.BudgetAccountID.Valid() || value.ExpectedBudgetRevision == 0 || value.ExpectedTaskRevision == 0 || value.LifecycleEpoch == 0 || value.ScopeRevision == 0 || !value.ParentEventID.Valid() || !value.WorkProfile.Valid() || !value.QualifiedAssignmentID.Valid() || !value.Purpose.Valid() || value.AttemptFamily == "" || value.AttemptOrdinal == 0 || !value.ConditionDigest.Valid() || !value.OutputPredicateDigest.Valid() || !value.ActorFQN.Valid() || !value.ExecutionID.Valid() || value.FencingEpoch == 0 || !value.ModelProfileDigest.Valid() || !value.RuntimeIdentityDigest.Valid() || value.WorkspaceID == "" || value.DeadlineAt.IsZero() || value.IdempotencyKey == "" || value.AdmissionPolicyRevision == 0 || !value.AdmissionPolicyDigest.Valid() || len(value.AllowedTerminalOutcomes) == 0 || !value.ToolPolicyDigest.Valid() || !value.EffectPolicyDigest.Valid() {
+	if json.Unmarshal(payload, &value) != nil || !value.InvocationID.Valid() || !value.TaskID.Valid() || !value.BudgetAccountID.Valid() || value.ExpectedBudgetRevision == 0 || value.ExpectedTaskRevision == 0 || value.LifecycleEpoch == 0 || value.ScopeRevision == 0 || !value.ParentEventID.Valid() || !value.WorkProfile.Valid() || !value.QualifiedAssignmentID.Valid() || !value.Purpose.Valid() || value.AttemptFamily == "" || value.AttemptOrdinal == 0 || !value.ConditionDigest.Valid() || !value.OutputPredicateDigest.Valid() || !value.ActorFQN.Valid() || !value.ExecutionID.Valid() || value.FencingEpoch == 0 || !value.ModelProfileDigest.Valid() || !value.RuntimeIdentityDigest.Valid() || value.WorkspaceID == "" || value.DeadlineAt.IsZero() || value.IdempotencyKey == "" || value.AdmissionPolicyRevision == 0 || !value.AdmissionPolicyDigest.Valid() || len(value.AllowedTerminalOutcomes) == 0 || !value.ToolPolicyDigest.Valid() || !value.EffectPolicyDigest.Valid() || value.HandlerDispatch != nil && !value.HandlerDispatch.Valid() {
 		return invocationAuthorizationPayload{}, errors.New("invalid invocation authorization")
 	}
 	return value, nil
@@ -628,7 +687,8 @@ func PlanWorkInvocationAuthorization(payload []byte, task AggregateState, accoun
 		RetryOrdinal: value.RetryOrdinal, OutputPredicateDigest: value.OutputPredicateDigest,
 		AllowedTerminalOutcomes: append([]WorkInvocationState(nil), value.AllowedTerminalOutcomes...),
 		ToolPolicyDigest:        value.ToolPolicyDigest, EffectPolicyDigest: value.EffectPolicyDigest,
-		ActorFQN: value.ActorFQN, Execution: execution, ModelProfileDigest: value.ModelProfileDigest,
+		HandlerDispatch: cloneHandlerDispatchBinding(value.HandlerDispatch),
+		ActorFQN:        value.ActorFQN, Execution: execution, ModelProfileDigest: value.ModelProfileDigest,
 		RuntimeIdentityDigest: value.RuntimeIdentityDigest, WorkspaceID: value.WorkspaceID,
 		DeadlineAt: value.DeadlineAt, IdempotencyKey: value.IdempotencyKey,
 		AdmissionPolicyRevision: value.AdmissionPolicyRevision, AdmissionPolicyDigest: value.AdmissionPolicyDigest,
@@ -654,7 +714,7 @@ func validChangedConditionContinuation(value invocationAuthorizationPayload, pro
 	if value.RetryOfInvocationID == nil || value.RetryOrdinal == 0 || profile.SupersedesProfileID == nil {
 		return false
 	}
-	if !prior.Valid() || *value.RetryOfInvocationID != prior.ID || prior.TaskID != value.TaskID || prior.Purpose != value.Purpose || value.AttemptOrdinal != prior.AttemptOrdinal+1 || value.RetryOrdinal != prior.RetryOrdinal+1 || value.ConditionDigest == prior.ConditionDigest || profile.ProfileRevision <= prior.WorkProfile.ProfileRevision || value.WorkProfile != profile.Binding() || !value.DeadlineAt.After(prior.DeadlineAt) || !profile.Budgets.DeadlineAt.Equal(value.DeadlineAt) || account.PolicyRevision <= prior.AdmissionPolicyRevision || len(prior.TerminalEvidenceIDs) == 0 {
+	if !prior.Valid() || *value.RetryOfInvocationID != prior.ID || prior.TaskID != value.TaskID || prior.Purpose != value.Purpose || !sameHandlerDispatchBinding(value.HandlerDispatch, prior.HandlerDispatch) || value.AttemptOrdinal != prior.AttemptOrdinal+1 || value.RetryOrdinal != prior.RetryOrdinal+1 || value.ConditionDigest == prior.ConditionDigest || profile.ProfileRevision <= prior.WorkProfile.ProfileRevision || value.WorkProfile != profile.Binding() || !value.DeadlineAt.After(prior.DeadlineAt) || !profile.Budgets.DeadlineAt.Equal(value.DeadlineAt) || account.PolicyRevision <= prior.AdmissionPolicyRevision || len(prior.TerminalEvidenceIDs) == 0 {
 		return false
 	}
 	recoverable := prior.State == InvocationTimedOut ||
@@ -684,7 +744,7 @@ func validCandidateRevalidation(value invocationAuthorizationPayload, prior Work
 	if value.Purpose != PurposeHandoff && value.Purpose != PurposeValidation && value.Purpose != PurposeReview && value.Purpose != PurposeRepair && value.Purpose != PurposeReplan && value.Purpose != PurposePromotion {
 		return false
 	}
-	return value.RetryOfInvocationID != nil && *value.RetryOfInvocationID == prior.ID && value.RetryOrdinal == prior.RetryOrdinal+1 && value.AttemptOrdinal == prior.AttemptOrdinal+1 && prior.State == InvocationSucceeded && value.ConditionDigest != prior.ConditionDigest
+	return value.RetryOfInvocationID != nil && *value.RetryOfInvocationID == prior.ID && sameHandlerDispatchBinding(value.HandlerDispatch, prior.HandlerDispatch) && value.RetryOrdinal == prior.RetryOrdinal+1 && value.AttemptOrdinal == prior.AttemptOrdinal+1 && prior.State == InvocationSucceeded && value.ConditionDigest != prior.ConditionDigest
 }
 
 func WorkInvocationFromAuthorizedEvent(event DomainEvent) (WorkInvocation, error) {
@@ -703,7 +763,8 @@ func WorkInvocationFromAuthorizedEvent(event DomainEvent) (WorkInvocation, error
 		RetryOrdinal: value.RetryOrdinal, OutputPredicateDigest: value.OutputPredicateDigest,
 		AllowedTerminalOutcomes: append([]WorkInvocationState(nil), value.AllowedTerminalOutcomes...),
 		ToolPolicyDigest:        value.ToolPolicyDigest, EffectPolicyDigest: value.EffectPolicyDigest,
-		ActorFQN: value.ActorFQN, Execution: ExecutionTuple{ExecutionID: value.ExecutionID, FencingEpoch: value.FencingEpoch},
+		HandlerDispatch: cloneHandlerDispatchBinding(value.HandlerDispatch),
+		ActorFQN:        value.ActorFQN, Execution: ExecutionTuple{ExecutionID: value.ExecutionID, FencingEpoch: value.FencingEpoch},
 		ModelProfileDigest: value.ModelProfileDigest, RuntimeIdentityDigest: value.RuntimeIdentityDigest,
 		WorkspaceID: value.WorkspaceID, DeadlineAt: value.DeadlineAt, IdempotencyKey: value.IdempotencyKey,
 		AdmissionPolicyRevision: value.AdmissionPolicyRevision, AdmissionPolicyDigest: value.AdmissionPolicyDigest,

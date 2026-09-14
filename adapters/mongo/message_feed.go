@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"strconv"
+	"time"
 
 	"github.com/tekroo-ai/teams/kernel"
 	"github.com/tekroo-ai/teams/organization"
@@ -37,7 +38,11 @@ func (s *Store) OpenOrganizationalMessageFeed(ctx context.Context, consumerID st
 		return nil, organization.ErrInvalidOrganizationalMessage
 	}
 	checkpointID := "organizational-message:" + consumerID + ":" + string(recipient)
-	streamOptions := options.ChangeStream().SetFullDocument(options.UpdateLookup).SetMaxAwaitTime(intentFeedMaxAwait)
+	maxAwait := s.organizationalMessageMaxAwait
+	if maxAwait <= 0 {
+		maxAwait = time.Minute
+	}
+	streamOptions := options.ChangeStream().SetFullDocument(options.UpdateLookup).SetMaxAwaitTime(maxAwait)
 	var checkpoint valueDocument
 	err := s.db.Collection("consumer_checkpoints").FindOne(ctx, bson.D{{Key: "_id", Value: checkpointID}}).Decode(&checkpoint)
 	usedCheckpoint := false
@@ -54,7 +59,7 @@ func (s *Store) OpenOrganizationalMessageFeed(ctx context.Context, consumerID st
 		if _, deleteErr := s.db.Collection("consumer_checkpoints").DeleteOne(ctx, bson.D{{Key: "_id", Value: checkpointID}}); deleteErr != nil {
 			return nil, deleteErr
 		}
-		stream, err = s.db.Collection("organizational_messages").Watch(ctx, pipeline, options.ChangeStream().SetFullDocument(options.UpdateLookup).SetMaxAwaitTime(intentFeedMaxAwait))
+		stream, err = s.db.Collection("organizational_messages").Watch(ctx, pipeline, options.ChangeStream().SetFullDocument(options.UpdateLookup).SetMaxAwaitTime(maxAwait))
 		resynchronized = true
 	}
 	if err != nil {

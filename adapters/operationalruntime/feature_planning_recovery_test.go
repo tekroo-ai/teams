@@ -657,6 +657,10 @@ func TestValidatorConditionMatchesAcrossMaintenanceOnlyProfileSuccessors(t *test
 	prior.WorkProfile.ProfileID = priorProfileID
 	prior.WorkProfile.ProfileRevision = 1
 	prior.WorkProfile.ProfileDigest = repeatedDigest('b')
+	prior.ConditionDigest, err = taskInvocationConditionDigest(prior.WorkProfile.ProfileDigest, criteriaDigest, baseConditions)
+	if err != nil {
+		t.Fatal(err)
+	}
 	priorOutput := repeatedDigest('c')
 	prior.OutputDigest = &priorOutput
 	current.RetryOfInvocationID = &prior.ID
@@ -717,6 +721,8 @@ func TestValidatorConditionMatchesSuccessfulOperatorRevalidationLineage(t *testi
 	prior.AttemptOrdinal = 1
 	prior.RetryOrdinal = 0
 	prior.WorkProfile.ProfileID = priorProfileID
+	prior.WorkProfile.ProfileDigest = profileDigest
+	prior.ConditionDigest = baseDigest
 	prior.OutputDigest = &priorOutput
 	current := prior.Clone()
 	current.ID = "00000000-0000-7000-8000-000000000344"
@@ -744,12 +750,24 @@ func TestValidatorConditionMatchesSuccessfulOperatorRevalidationLineage(t *testi
 	if !validatorConditionMatches(snapshot, taskID, current, profileDigest, criteriaDigest, baseConditions, baseDigest) {
 		t.Fatal("successful operator revalidation lineage was not recognized")
 	}
+	changedConditions := []kernel.Digest{repeatedDigest('7')}
+	changedBaseDigest, err := taskInvocationConditionDigest(profileDigest, criteriaDigest, changedConditions)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if validatorConditionMatches(snapshot, taskID, current, profileDigest, criteriaDigest, changedConditions, changedBaseDigest) {
+		t.Fatal("operator revalidation masked a changed candidate")
+	}
 
+	mutatedPrior := prior.Clone()
+	mutatedPrior.ConditionDigest = repeatedDigest('8')
 	mutated := current.Clone()
-	mutated.ConditionDigest = prior.ConditionDigest
+	mutated.ConditionDigest = mutatedPrior.ConditionDigest
+	snapshot.WorkInvocations = map[kernel.AggregateRef]kernel.WorkInvocation{mutatedPrior.Ref(): mutatedPrior, mutated.Ref(): mutated}
 	if validatorConditionMatches(snapshot, taskID, mutated, profileDigest, criteriaDigest, baseConditions, baseDigest) {
 		t.Fatal("unchanged predecessor condition matched operator revalidation")
 	}
+	snapshot.WorkInvocations = map[kernel.AggregateRef]kernel.WorkInvocation{prior.Ref(): prior, current.Ref(): current}
 	wrongProfileID := kernel.UUIDv7("00000000-0000-7000-8000-000000000345")
 	snapshot.WorkProfiles[kernel.AggregateRef{Kind: kernel.AggregateTask, ID: taskID}] = kernel.WorkProfileSnapshot{Profile: kernel.WorkRiskProfile{
 		TaskID: taskID, ProfileID: currentProfileID, ProfileRevision: 2, ProfileDigest: profileDigest,

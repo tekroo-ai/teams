@@ -20,6 +20,33 @@ type taskValidatorResult struct {
 	Result     structuredValidationResult
 }
 
+// completionReviewResultPayload is the operational writer's typed view of
+// the kernel completion-review result contract. Keeping this shape explicit
+// prevents a reviewer finding from drifting beyond the catalogue schema.
+type completionReviewResultPayload struct {
+	ReviewID                    kernel.UUIDv7                    `json:"review_id"`
+	BranchID                    string                           `json:"branch_id"`
+	BranchPolicyRevision        uint64                           `json:"branch_policy_revision"`
+	SourceRole                  string                           `json:"source_role"`
+	Round                       uint64                           `json:"round"`
+	Result                      string                           `json:"result"`
+	Reasons                     []string                         `json:"reasons"`
+	EvidenceIDs                 []kernel.UUIDv7                  `json:"evidence_ids"`
+	Findings                    []completionReviewFindingPayload `json:"findings"`
+	SupersedesResultEventIDs    []kernel.UUIDv7                  `json:"supersedes_result_event_ids"`
+	ChangedConditionEvidenceIDs []kernel.UUIDv7                  `json:"changed_condition_evidence_ids"`
+	CandidateArtifactDigest     kernel.Digest                    `json:"candidate_artifact_digest"`
+	IndependenceReceipt         kernel.IndependenceReceipt       `json:"independence_receipt"`
+}
+
+type completionReviewFindingPayload struct {
+	FindingID      kernel.UUIDv7   `json:"finding_id"`
+	FindingKey     kernel.Digest   `json:"finding_key"`
+	Classification string          `json:"classification"`
+	Summary        string          `json:"summary"`
+	EvidenceIDs    []kernel.UUIDv7 `json:"evidence_ids"`
+}
+
 const (
 	invalidStructuredOutputReason = "task returned an invalid structured result; a changed-condition recovery is required"
 	invalidStructuredReviewPolicy = "operator-or-product-owner-must-amend-scope-or-cancel"
@@ -451,7 +478,7 @@ func isExactRecoverableStructuredDecisionBlock(event kernel.DomainEvent, task or
 	if json.Unmarshal(event.Payload, &payload) != nil {
 		return false
 	}
-	recoverableReason := payload.Reason == invalidStructuredOutputReason || strings.HasPrefix(payload.Reason, "whole-feature validation did not pass:")
+	recoverableReason := payload.Reason == invalidStructuredOutputReason || strings.HasPrefix(payload.Reason, "whole-feature validation did not pass:") || strings.HasPrefix(payload.Reason, "product acceptance did not pass:")
 	return len(payload.BlockerRefs) == 1 && payload.BlockerRefs[0] == "teams://work-invocation/"+string(invocation.ID) && recoverableReason && payload.ReviewPolicy == invalidStructuredReviewPolicy
 }
 
@@ -499,7 +526,8 @@ func validatorConditionMatches(snapshot kernel.Snapshot, taskID kernel.UUIDv7, i
 			invocationProfile.SupersedesProfileID != nil &&
 			*invocationProfile.SupersedesProfileID == prior.WorkProfile.ProfileID &&
 			invocation.ConditionDigest != invocationBaseDigest &&
-			invocation.ConditionDigest != prior.ConditionDigest
+			invocation.ConditionDigest != prior.ConditionDigest &&
+			validatorRecoveryLineageBindsCandidate(snapshot, taskID, prior, criteriaDigest, baseConditions)
 	}
 	// A terminal runtime recovery is authorized under a successor work profile
 	// using the exact candidate conditions plus an operator-supplied recovery
@@ -509,6 +537,41 @@ func validatorConditionMatches(snapshot kernel.Snapshot, taskID kernel.UUIDv7, i
 	// changed condition; candidate identity is independently verified from the
 	// immutable workspace receipt before this result can complete any task.
 	return recoverableTaskTerminal(prior) && invocation.ConditionDigest != invocationBaseDigest
+}
+
+// An operator-revalidation condition includes a private recovery digest, so it
+// cannot be reconstructed from the folded snapshot. Its retry ancestry can,
+// however, prove which candidate it reviewed: the lineage must terminate at a
+// validator invocation whose ordinary condition exactly binds the current
+// dependency outputs. This preserves same-candidate recovery without allowing
+// the opaque recovery condition to mask a later implementation repair.
+func validatorRecoveryLineageBindsCandidate(snapshot kernel.Snapshot, taskID kernel.UUIDv7, invocation kernel.WorkInvocation, criteriaDigest kernel.Digest, baseConditions []kernel.Digest) bool {
+	seen := make(map[kernel.UUIDv7]struct{})
+	for depth := 0; depth < 16; depth++ {
+		if invocation.ID == "" || invocation.TaskID != taskID || invocation.Purpose != kernel.PurposeValidation && invocation.Purpose != kernel.PurposeReview {
+			return false
+		}
+		if _, duplicate := seen[invocation.ID]; duplicate {
+			return false
+		}
+		seen[invocation.ID] = struct{}{}
+		base, err := taskInvocationConditionDigest(invocation.WorkProfile.ProfileDigest, criteriaDigest, baseConditions)
+		if err != nil {
+			return false
+		}
+		if invocation.ConditionDigest == base {
+			return true
+		}
+		if invocation.RetryOfInvocationID == nil || invocation.RetryOrdinal == 0 {
+			return false
+		}
+		prior, found := snapshot.WorkInvocations[kernel.AggregateRef{Kind: kernel.AggregateWorkInvocation, ID: *invocation.RetryOfInvocationID}]
+		if !found || prior.TaskID != taskID || prior.Purpose != invocation.Purpose || prior.AttemptOrdinal+1 != invocation.AttemptOrdinal || prior.RetryOrdinal+1 != invocation.RetryOrdinal {
+			return false
+		}
+		invocation = prior
+	}
+	return false
 }
 
 func workProfileBindingCurrentOrMaintenanceSuccessor(snapshot kernel.Snapshot, taskID kernel.UUIDv7, binding kernel.WorkProfileBinding, currentDigest kernel.Digest) bool {
@@ -590,9 +653,9 @@ func (service *ProductionService) authorizeRepairAfterFailedReview(ctx context.C
 	if nextRound > uint64(target.ReviewRoundLimit) {
 		reviewID := deterministicOperationalUUID("completion-review", string(feature.ID), string(target.ID), string(*implementer.OutputDigest))
 		_, reviewHead, reviewFound, reviewErr := service.Store.ReadAggregateHead(ctx, kernel.AggregateRef{Kind: kernel.AggregateCompletionReview, ID: reviewID})
-		owner, active, ownerErr := service.RoleHost.Status(ctx, target.Owner)
+		owner, ownerErr := service.StartRole(ctx, target.Owner)
 		evidence, evidenceErr := evidenceForInvocations(snapshot, append([]kernel.WorkInvocation{implementer}, validatorInvocations(validators)...)...)
-		if reviewErr != nil || !reviewFound || ownerErr != nil || !active || evidenceErr != nil {
+		if reviewErr != nil || !reviewFound || ownerErr != nil || evidenceErr != nil {
 			return false, errors.Join(organization.ErrInvalidFeature, reviewErr, ownerErr, evidenceErr)
 		}
 		payload, _ := json.Marshal(map[string]any{"blocker_refs": []string{"teams://completion-review/" + string(reviewID)}, "reason": "independent validation still fails after the authorized repair rounds", "review_policy": "operator-or-product-owner-must-amend-scope-or-cancel"})
@@ -600,10 +663,10 @@ func (service *ProductionService) authorizeRepairAfterFailedReview(ctx context.C
 		return err == nil, err
 	}
 	profileConfig, configured := service.profilesByModel[target.ModelProfile]
-	owner, active, ownerErr := service.RoleHost.Status(ctx, target.Owner)
+	owner, ownerErr := service.StartRole(ctx, target.Owner)
 	workspace, workspaceErr := service.workspaceForExistingTask(ctx, target, owner, snapshot)
 	budget := snapshot.WorkBudgetAccounts[kernel.AggregateRef{Kind: kernel.AggregateWorkBudget, ID: feature.BudgetAccountID}]
-	if !configured || !profileConfig.qualifiedFor(target.DecisionRoute, workKindForPurpose(target.Purpose, target.Risk), service.clock.Now().UTC()) || ownerErr != nil || !active || owner.Status != organization.RoleIdle || workspaceErr != nil || !budget.Valid() {
+	if !configured || !profileConfig.qualifiedFor(target.DecisionRoute, workKindForPurpose(target.Purpose, target.Risk), service.clock.Now().UTC()) || ownerErr != nil || owner.Status != organization.RoleIdle || workspaceErr != nil || !budget.Valid() {
 		return false, errors.Join(organization.ErrRoleNotRunning, ownerErr, workspaceErr)
 	}
 	tracked := &trackedTask{plan: target, revision: state.Revision, last: head, profile: profileSnapshot.Profile, owner: owner}
@@ -645,6 +708,20 @@ func (service *ProductionService) finalizeTaskReview(ctx context.Context, featur
 	// candidate is independently verified above; the review subject remains the
 	// implementer's immutable output to which those invocations were bound.
 	candidateArtifact := *implementer.OutputDigest
+	if failedReview, failed := finalizedFailedTaskReview(snapshot, target, profileSnapshot.Profile, candidateArtifact, validators, service.planning.PolicyRevision); failed {
+		return failedReview.Finalization.TerminalStatus, nil
+	}
+	// A failed branch may open a review before later validators finish. Once it
+	// exists, its branch set is immutable: recovery must resume exactly that
+	// review rather than retroactively expanding it with later evidence.
+	activeReview, active := activeCompletionReview(snapshot, kernel.AggregateRef{Kind: kernel.AggregateTask, ID: target.ID}, profileSnapshot.Profile.LifecycleEpoch, candidateArtifact)
+	if active {
+		var selectionErr error
+		validators, selectionErr = validatorsBoundToCompletionReview(activeReview, validators)
+		if selectionErr != nil {
+			return "", fmt.Errorf("select active completion-review %s validators: %w", activeReview.ReviewID, selectionErr)
+		}
+	}
 	if completedReview, found := reusableFinalizedTaskReview(snapshot, target, profileSnapshot.Profile, candidateArtifact, validators, service.planning.PolicyRevision); found {
 		return service.completeTaskFromFinalizedReview(ctx, feature, target, state, candidateArtifact, evidence, completedReview)
 	}
@@ -653,9 +730,29 @@ func (service *ProductionService) finalizeTaskReview(ctx context.Context, featur
 	if err != nil {
 		return "", err
 	}
-	evidence, reviewID, err := service.prepareCompletionReview(ctx, feature, kernel.AggregateRef{Kind: kernel.AggregateTask, ID: target.ID}, candidateArtifact, "completion-review-v3", []string{string(feature.ID), string(target.ID)}, snapshot, evidence)
-	if err != nil {
-		return "", err
+	var reviewID kernel.UUIDv7
+	if active {
+		reviewID = activeReview.ReviewID
+		reviewEvidenceIDs, evidenceErr := completionReviewInputEvidenceIDs(activeReview)
+		if evidenceErr != nil {
+			return "", fmt.Errorf("read active completion-review %s input evidence ids: %w", reviewID, evidenceErr)
+		}
+		// The active review owns the evidence set that its branches were bound
+		// to. Reload that aggregate rather than assuming the task projection
+		// contains every review-scoped evidence record after a restart.
+		reviewSnapshot, loadErr := service.Store.LoadDecision(ctx, kernel.KernelCommand{Target: kernel.AggregateRef{Kind: kernel.AggregateCompletionReview, ID: reviewID}})
+		if loadErr != nil {
+			return "", fmt.Errorf("load active completion-review %s decision state: %w", reviewID, loadErr)
+		}
+		evidence, evidenceErr = evidenceRefsForIDs(reviewSnapshot, reviewEvidenceIDs)
+		if evidenceErr != nil {
+			return "", fmt.Errorf("load active completion-review %s input evidence: %w", reviewID, evidenceErr)
+		}
+	} else {
+		evidence, reviewID, err = service.prepareCompletionReview(ctx, feature, kernel.AggregateRef{Kind: kernel.AggregateTask, ID: target.ID}, candidateArtifact, "completion-review-v3", []string{string(feature.ID), string(target.ID)}, snapshot, evidence)
+		if err != nil {
+			return "", err
+		}
 	}
 	branchSpecs := make([]map[string]any, len(validators))
 	parents := []kernel.DagParent{{ParentEventID: implementer.LastEventID, EdgeKind: kernel.EdgeCausal}}
@@ -678,7 +775,7 @@ func (service *ProductionService) finalizeTaskReview(ctx context.Context, featur
 	})
 	implementerIdentity, err := service.workExecutionIdentity(ctx, implementer)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("resolve implementer %s execution identity: %w", target.ID, err)
 	}
 	evidenceSet, _ := json.Marshal(evidence)
 	evidenceSetDigest := digestBytes(evidenceSet)
@@ -699,20 +796,26 @@ func (service *ProductionService) finalizeTaskReview(ctx context.Context, featur
 	var priorEvent kernel.UUIDv7
 	var reviewRevision uint64
 	if reviewExists {
-		if review.ReviewID != reviewID || review.Subject != (kernel.AggregateRef{Kind: kernel.AggregateTask, ID: target.ID}) || review.LifecycleEpoch != profileSnapshot.Profile.LifecycleEpoch || review.CandidateArtifactDigest != candidateArtifact || review.BranchPolicyRevision != service.planning.PolicyRevision || len(review.RequiredBranchIDs) != len(validators) {
-			return "", organization.ErrInvalidFeature
+		if review.ReviewID != reviewID {
+			return "", fmt.Errorf("active completion-review %s identity mismatch: %w", reviewID, organization.ErrInvalidFeature)
+		}
+		if review.Subject != (kernel.AggregateRef{Kind: kernel.AggregateTask, ID: target.ID}) || review.LifecycleEpoch != profileSnapshot.Profile.LifecycleEpoch {
+			return "", fmt.Errorf("active completion-review %s subject or lifecycle mismatch: %w", reviewID, organization.ErrInvalidFeature)
+		}
+		if review.CandidateArtifactDigest != candidateArtifact || review.BranchPolicyRevision != service.planning.PolicyRevision || len(review.RequiredBranchIDs) != len(validators) {
+			return "", fmt.Errorf("active completion-review %s candidate, policy, or branch-set mismatch: %w", reviewID, organization.ErrInvalidFeature)
 		}
 		for _, validator := range validators {
 			branchID := "validator-" + string(validator.Task.ID)
 			branch, found := review.Branches[branchID]
 			if !found || branch.Validator != (kernel.PrincipalRef{Kind: kernel.PrincipalActor, ID: string(validator.Invocation.ActorFQN)}) {
-				return "", organization.ErrInvalidFeature
+				return "", fmt.Errorf("active completion-review %s branch %s identity mismatch: %w", reviewID, branchID, organization.ErrInvalidFeature)
 			}
 		}
 		var headFound bool
 		reviewRevision, priorEvent, headFound, err = service.Store.ReadAggregateRevisionHead(ctx, reviewRef)
 		if err != nil || !headFound || reviewRevision != review.ReviewRevision {
-			return "", errors.Join(organization.ErrInvalidFeature, err)
+			return "", fmt.Errorf("active completion-review %s revision head mismatch: %w", reviewID, errors.Join(organization.ErrInvalidFeature, err))
 		}
 	} else {
 		opened, openErr := service.submitDeterministicCommand(ctx, feature, "tekroo.command.completion-review.open", kernel.SchemaVersion, kernel.AggregateCompletionReview, reviewID, service.policyAuthority, 0, openPayload, parents, evidence, fmt.Sprintf("review-open-v3-%s-%s-%s-policy-%d", target.ID, candidateArtifact, evidenceSetDigest, service.provenance.PolicyRevision), kernel.AggregatePrecondition{Aggregate: kernel.AggregateRef{Kind: kernel.AggregateTask, ID: target.ID}, Expected: kernel.NewExpectedRevision(state.Revision)})
@@ -742,17 +845,12 @@ func (service *ProductionService) finalizeTaskReview(ctx context.Context, featur
 		}
 		identity, identityErr := service.workExecutionIdentity(ctx, validator.Invocation)
 		if identityErr != nil {
-			return "", identityErr
+			return "", fmt.Errorf("resolve validator %s execution identity: %w", validator.Task.ID, identityErr)
 		}
-		comparison, _ := json.Marshal(map[string]any{"implementer": implementerIdentity, "validator": identity})
-		resultPayload, _ := json.Marshal(map[string]any{
-			"review_id": reviewID, "branch_id": branchID, "branch_policy_revision": service.planning.PolicyRevision,
-			"source_role": "VALIDATOR", "round": uint64(1), "result": validator.Result.Outcome, "reasons": validator.Result.Reasons,
-			"evidence_ids": evidenceIDs(evidence), "findings": reviewFindings(feature, target.ID, branchID, validator.Result, evidenceIDs(evidence)),
-			"supersedes_result_event_ids": []kernel.UUIDv7{}, "changed_condition_evidence_ids": []kernel.UUIDv7{},
-			"candidate_artifact_digest": candidateArtifact,
-			"independence_receipt":      map[string]any{"proven_dimensions": profileSnapshot.Profile.RequiredIndependenceDimensions, "identity_comparison_digest": digestBytes(comparison), "method_ids": []string{"openhands-independent-validation"}, "evidence_ids": evidenceIDs(evidence)},
-		})
+		resultPayload, payloadErr := service.buildCompletionReviewResultPayload(feature, target, reviewID, branchID, profileSnapshot.Profile, implementerIdentity, identity, validator.Result, candidateArtifact, evidence)
+		if payloadErr != nil {
+			return "", fmt.Errorf("build completion-review result for validator %s: %w", validator.Task.ID, payloadErr)
+		}
 		recorded, recordErr := service.submitDeterministicReviewResult(ctx, feature, reviewID, reviewRevision, validator.Invocation, resultPayload, priorEvent, evidence, "review-result-"+string(target.ID)+"-"+string(validator.Task.ID)+"-"+string(candidateArtifact))
 		if recordErr != nil {
 			return "", recordErr
@@ -1084,11 +1182,190 @@ func evidenceIDs(values []kernel.EvidenceRef) []kernel.UUIDv7 {
 	return result
 }
 
-func reviewFindings(feature organization.FeatureRequest, targetID kernel.UUIDv7, branchID string, result structuredValidationResult, evidence []kernel.UUIDv7) []map[string]any {
-	if result.Outcome == "PASS" {
-		return []map[string]any{}
+// activeCompletionReview finds the one unfinished review for the immutable
+// task candidate. Reconciliation resumes this record instead of trying to
+// open a second review after an interruption between review open and result
+// recording.
+func activeCompletionReview(snapshot kernel.Snapshot, subject kernel.AggregateRef, lifecycleEpoch uint64, candidate kernel.Digest) (kernel.CompletionReviewSnapshot, bool) {
+	var active kernel.CompletionReviewSnapshot
+	found := false
+	for _, review := range snapshot.Reviews {
+		if review.Subject != subject || review.LifecycleEpoch != lifecycleEpoch || review.CandidateArtifactDigest != candidate || review.Finalization != nil {
+			continue
+		}
+		if found {
+			return kernel.CompletionReviewSnapshot{}, false
+		}
+		active = review
+		found = true
 	}
-	summary := strings.Join(result.Reasons, "; ")
-	key := digestBytes([]byte(string(targetID) + "\x00" + branchID + "\x00" + summary))
-	return []map[string]any{{"finding_id": deterministicOperationalUUID("review-finding", string(feature.ID), string(targetID), branchID, string(key)), "finding_key": key, "classification": "DEFECT", "summary": summary, "evidence_ids": evidence}}
+	return active, found
+}
+
+func validatorsBoundToCompletionReview(review kernel.CompletionReviewSnapshot, candidates []taskValidatorResult) ([]taskValidatorResult, error) {
+	if len(review.RequiredBranchIDs) == 0 {
+		return nil, organization.ErrInvalidFeature
+	}
+	byBranch := make(map[string]taskValidatorResult, len(candidates))
+	for _, candidate := range candidates {
+		branchID := "validator-" + string(candidate.Task.ID)
+		if _, duplicate := byBranch[branchID]; duplicate {
+			return nil, organization.ErrInvalidFeature
+		}
+		byBranch[branchID] = candidate
+	}
+	selected := make([]taskValidatorResult, 0, len(review.RequiredBranchIDs))
+	for _, branchID := range review.RequiredBranchIDs {
+		candidate, found := byBranch[branchID]
+		branch, bound := review.Branches[branchID]
+		if !found || !bound || branch.Validator != (kernel.PrincipalRef{Kind: kernel.PrincipalActor, ID: string(candidate.Invocation.ActorFQN)}) {
+			return nil, organization.ErrInvalidFeature
+		}
+		selected = append(selected, candidate)
+	}
+	return selected, nil
+}
+
+// finalizedFailedTaskReview preserves fail-fast semantics. A finalized failure
+// is already sufficient evidence to repair the immutable candidate; later
+// validators must not cause a second review to be opened for that candidate.
+func finalizedFailedTaskReview(snapshot kernel.Snapshot, target organization.PlannedTask, profile kernel.WorkRiskProfile, candidate kernel.Digest, validators []taskValidatorResult, branchPolicyRevision uint64) (kernel.CompletionReviewSnapshot, bool) {
+	byBranch := make(map[string]taskValidatorResult, len(validators))
+	for _, validator := range validators {
+		byBranch["validator-"+string(validator.Task.ID)] = validator
+	}
+	reviewIDs := make([]kernel.UUIDv7, 0, len(snapshot.Reviews))
+	for ref := range snapshot.Reviews {
+		if ref.Kind == kernel.AggregateCompletionReview {
+			reviewIDs = append(reviewIDs, ref.ID)
+		}
+	}
+	sort.Slice(reviewIDs, func(left, right int) bool { return reviewIDs[left] < reviewIDs[right] })
+	for _, reviewID := range reviewIDs {
+		review := snapshot.Reviews[kernel.AggregateRef{Kind: kernel.AggregateCompletionReview, ID: reviewID}]
+		if review.Subject != (kernel.AggregateRef{Kind: kernel.AggregateTask, ID: target.ID}) ||
+			review.LifecycleEpoch != profile.LifecycleEpoch ||
+			review.ScopeRevision != profile.ScopeRevision ||
+			review.BranchPolicyRevision != branchPolicyRevision ||
+			review.CandidateArtifactDigest != candidate ||
+			review.VerificationTopologyDigest != profile.VerificationTopologyDigest ||
+			review.Finalization == nil || review.Finalization.TerminalStatus == "PASS" ||
+			review.Finalization.ReviewRevision != review.ReviewRevision {
+			continue
+		}
+		matches := true
+		for _, branchID := range review.RequiredBranchIDs {
+			validator, present := byBranch[branchID]
+			branch, branchPresent := review.Branches[branchID]
+			result, resultPresent := review.ResultRecords[branchID]
+			if !present || !branchPresent || !resultPresent || branch.Validator != (kernel.PrincipalRef{Kind: kernel.PrincipalActor, ID: string(validator.Invocation.ActorFQN)}) || result.Result != validator.Result.Outcome {
+				matches = false
+				break
+			}
+		}
+		if matches {
+			return review, true
+		}
+	}
+	return kernel.CompletionReviewSnapshot{}, false
+}
+
+func completionReviewInputEvidenceIDs(review kernel.CompletionReviewSnapshot) ([]kernel.UUIDv7, error) {
+	if len(review.RequiredBranchIDs) == 0 {
+		return nil, organization.ErrInvalidFeature
+	}
+	branch, found := review.Branches[review.RequiredBranchIDs[0]]
+	if !found || len(branch.InputEvidenceIDs) == 0 {
+		return nil, organization.ErrInvalidFeature
+	}
+	ids := append([]kernel.UUIDv7(nil), branch.InputEvidenceIDs...)
+	for _, branchID := range review.RequiredBranchIDs[1:] {
+		candidate, present := review.Branches[branchID]
+		if !present || !sameUUIDSet(ids, candidate.InputEvidenceIDs) {
+			return nil, organization.ErrInvalidFeature
+		}
+	}
+	return ids, nil
+}
+
+func sameUUIDSet(left, right []kernel.UUIDv7) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	values := make(map[kernel.UUIDv7]struct{}, len(left))
+	for _, value := range left {
+		values[value] = struct{}{}
+	}
+	if len(values) != len(left) {
+		return false
+	}
+	for _, value := range right {
+		if _, found := values[value]; !found {
+			return false
+		}
+	}
+	return true
+}
+
+func (service *ProductionService) buildCompletionReviewResultPayload(feature organization.FeatureRequest, target organization.PlannedTask, reviewID kernel.UUIDv7, branchID string, profile kernel.WorkRiskProfile, implementer, validator kernel.WorkExecutionIdentity, result structuredValidationResult, candidate kernel.Digest, evidence []kernel.EvidenceRef) ([]byte, error) {
+	if !reviewID.Valid() || branchID == "" || !profile.Valid() || !implementer.Valid() || !validator.Valid() || !candidate.Valid() {
+		return nil, organization.ErrInvalidFeature
+	}
+	comparison, err := json.Marshal(map[string]any{"implementer": implementer, "validator": validator})
+	if err != nil {
+		return nil, err
+	}
+	evidenceIDs := evidenceIDs(evidence)
+	payload := completionReviewResultPayload{
+		ReviewID:                    reviewID,
+		BranchID:                    branchID,
+		BranchPolicyRevision:        service.planning.PolicyRevision,
+		SourceRole:                  "VALIDATOR",
+		Round:                       1,
+		Result:                      result.Outcome,
+		Reasons:                     append([]string(nil), result.Reasons...),
+		EvidenceIDs:                 evidenceIDs,
+		Findings:                    reviewFindings(feature, target.ID, branchID, result, evidenceIDs),
+		SupersedesResultEventIDs:    []kernel.UUIDv7{},
+		ChangedConditionEvidenceIDs: []kernel.UUIDv7{},
+		CandidateArtifactDigest:     candidate,
+		IndependenceReceipt: kernel.IndependenceReceipt{
+			ProvenDimensions:         append([]kernel.IndependenceDimension(nil), profile.RequiredIndependenceDimensions...),
+			IdentityComparisonDigest: digestBytes(comparison),
+			MethodIDs:                []string{"openhands-independent-validation"},
+			EvidenceIDs:              append([]kernel.UUIDv7(nil), evidenceIDs...),
+		},
+	}
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+	if _, _, _, err := kernel.ReviewBranchResultFromPayload(encoded); err != nil {
+		return nil, fmt.Errorf("kernel completion-review result contract: %w", err)
+	}
+	if _, err := service.Runtime.catalogue.ResolveCommand("tekroo.command.completion-review.record-result", kernel.SchemaVersion, kernel.AggregateCompletionReview, encoded); err != nil {
+		return nil, fmt.Errorf("catalogue completion-review result contract: %w", err)
+	}
+	return encoded, nil
+}
+
+func reviewFindings(feature organization.FeatureRequest, targetID kernel.UUIDv7, branchID string, result structuredValidationResult, evidence []kernel.UUIDv7) []completionReviewFindingPayload {
+	if result.Outcome == "PASS" {
+		return []completionReviewFindingPayload{}
+	}
+	// The catalogue permits a finding summary of at most 4 KiB. Each structured
+	// review reason already has that bound, but joining every reason into one
+	// finding did not. Preserve every distinct reason as its own stable finding.
+	findings := make([]completionReviewFindingPayload, 0, len(result.Reasons))
+	for _, summary := range result.Reasons {
+		key := digestBytes([]byte(string(targetID) + "\x00" + branchID + "\x00" + summary))
+		findings = append(findings, completionReviewFindingPayload{
+			FindingID:      deterministicOperationalUUID("review-finding", string(feature.ID), string(targetID), branchID, string(key)),
+			FindingKey:     key,
+			Classification: "DEFECT",
+			Summary:        summary,
+			EvidenceIDs:    append([]kernel.UUIDv7(nil), evidence...),
+		})
+	}
+	return findings
 }

@@ -1,0 +1,213 @@
+{
+  "$id": "https://contracts.tekroo.ai/tekroo.kernel.contracts/0.12.0/schemas/work-budget-account.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "deadline_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "id": {
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "type": "string"
+    },
+    "kind": {
+      "const": "work-budget-account"
+    },
+    "last_event_id": {
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "type": "string"
+    },
+    "lifecycle_epoch": {
+      "maximum": 1000000,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "model_invocation_limit": {
+      "maximum": 1000,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "model_invocations_used": {
+      "maximum": 1000,
+      "minimum": 0,
+      "type": "integer"
+    },
+    "policy_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "policy_revision": {
+      "maximum": 1000000,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "purpose_limits": {
+      "additionalProperties": false,
+      "properties": {
+        "ESCALATION": {
+          "maximum": 1000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "HANDOFF": {
+          "maximum": 1000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "IMPLEMENTATION": {
+          "maximum": 1000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "INVESTIGATION": {
+          "maximum": 1000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "PROMOTION": {
+          "maximum": 1000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "REPAIR": {
+          "maximum": 1000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "REPLAN": {
+          "maximum": 1000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "REVIEW": {
+          "maximum": 1000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "VALIDATION": {
+          "maximum": 1000,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "INVESTIGATION",
+        "IMPLEMENTATION",
+        "VALIDATION",
+        "REVIEW",
+        "REPAIR",
+        "HANDOFF",
+        "REPLAN",
+        "PROMOTION",
+        "ESCALATION"
+      ],
+      "type": "object"
+    },
+    "purpose_used": {
+      "additionalProperties": false,
+      "properties": {
+        "ESCALATION": {
+          "maximum": 1000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "HANDOFF": {
+          "maximum": 1000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "IMPLEMENTATION": {
+          "maximum": 1000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "INVESTIGATION": {
+          "maximum": 1000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "PROMOTION": {
+          "maximum": 1000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "REPAIR": {
+          "maximum": 1000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "REPLAN": {
+          "maximum": 1000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "REVIEW": {
+          "maximum": 1000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "VALIDATION": {
+          "maximum": 1000,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "INVESTIGATION",
+        "IMPLEMENTATION",
+        "VALIDATION",
+        "REVIEW",
+        "REPAIR",
+        "HANDOFF",
+        "REPLAN",
+        "PROMOTION",
+        "ESCALATION"
+      ],
+      "type": "object"
+    },
+    "revision": {
+      "maximum": 1000000,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "root_work": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "story",
+            "task"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "id",
+    "kind",
+    "revision",
+    "root_work",
+    "lifecycle_epoch",
+    "policy_revision",
+    "policy_digest",
+    "model_invocation_limit",
+    "model_invocations_used",
+    "purpose_limits",
+    "purpose_used",
+    "deadline_at",
+    "last_event_id"
+  ],
+  "title": "Teams work budget account",
+  "type": "object"
+}

@@ -5,7 +5,9 @@ package operationalruntime
 import (
 	"context"
 	"crypto/ed25519"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -69,7 +71,7 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 	}
 	defer closeRuntimeStore(t, store)
 
-	catalogue, err := contract.Load(os.DirFS(filepath.Join("..", "..")), "CONTRACTS/tekroo.kernel.contracts/0.11.0")
+	catalogue, err := contract.Load(os.DirFS(filepath.Join("..", "..")), "CONTRACTS/tekroo.kernel.contracts/0.12.0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,11 +124,16 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	team := loadStarterTeam(t)
+	roleGrounding, err := newBoundRoleGroundingResolver(team)
+	if err != nil {
+		t.Fatal(err)
+	}
 	runtime, err := New(contextWithTimeout(t), Config{
 		Store: store, Catalogue: catalogue, Clock: clock, IDs: ids,
 		OpenHandsBaseURL: server.URL, OpenHandsSessionAPIKey: "step7-session-key",
 		HTTPClient: &http.Client{Timeout: time.Second}, WorkspaceBindings: workspaceBindings, WorkspaceResolver: workspaceResolver,
-		ExecutionProfiles: executionProfiles, RoleGrounding: testRoleGroundingResolver{}, OpenHandsPollInterval: time.Millisecond,
+		ExecutionProfiles: executionProfiles, RoleGrounding: roleGrounding, OpenHandsPollInterval: time.Millisecond,
 		OpenHandsMaximumPages: 8, OpenHandsMaximumEvidence: 1 << 20, EvidenceRoot: evidenceRoot,
 		ExecutionPolicy: application.OperationalExecutionPolicy{OperationTimeout: time.Second, MaximumBriefBytes: 1 << 20, ConsumerID: "phase6-admission", PolicyRevision: 1, ServiceAuthority: kernel.PrincipalRef{Kind: kernel.PrincipalService, ID: "teams-operational-runtime"}, ExpiryAuthority: kernel.PrincipalRef{Kind: kernel.PrincipalPolicy, ID: "teams-admission-policy"}, Provenance: provenance},
 		EvidencePolicy:  application.CommandEvidenceRecorderPolicy{PolicyRevision: 1, Authority: kernel.PrincipalRef{Kind: kernel.PrincipalService, ID: "teams-operational-runtime"}, Provenance: provenance, ProducingVersion: "phase6", RetentionPolicy: "phase6"},
@@ -137,7 +144,6 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 	}
 	defer runtime.Close(contextWithTimeout(t))
 
-	team := loadStarterTeam(t)
 	roleRuntime, err := organization.NewInProcessRuntime(organization.RoleWorkerFunc(func(ctx context.Context, _ organization.StartRoleRequest) error {
 		<-ctx.Done()
 		return ctx.Err()
@@ -159,7 +165,15 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 		requestTimeout:   time.Second,
 		planningDeadline: 2 * time.Hour,
 		recoveryTimeout:  time.Second, messageMaximumAttempts: 3,
-		planning:        ProductionPlanning{PolicyRevision: 1, ClassificationPolicyDigest: digestByte('8'), PromotionPolicyDigest: digestByte('6'), VerificationTopologyDigest: digestByte('d'), SelectionPolicyDigest: digestByte('9'), BudgetPolicyDigest: digestByte('b'), RequiredGateIDs: []string{"git-clean"}, CandidateGates: candidateGates, Deadline: "2h"},
+		planning: ProductionPlanning{PolicyRevision: 1, ClassificationPolicyDigest: digestByte('8'), PromotionPolicyDigest: digestByte('6'), VerificationTopologyDigest: digestByte('d'), SelectionPolicyDigest: digestByte('9'), BudgetPolicyDigest: digestByte('b'), RequiredGateIDs: []string{"git-clean"}, CandidateGates: candidateGates, TaskMessageRoutes: map[kernel.WorkPurpose]ProductionTaskMessageRoute{
+			kernel.PurposeEscalation:     {MessageType: "tekroo.message.task.escalated", MessagePurpose: organization.PurposeHandoff},
+			kernel.PurposeHandoff:        {MessageType: "tekroo.message.task.assigned", MessagePurpose: organization.PurposeHandoff},
+			kernel.PurposeImplementation: {MessageType: "tekroo.message.task.assigned", MessagePurpose: organization.PurposeHandoff},
+			kernel.PurposePromotion:      {MessageType: "tekroo.message.release.ready", MessagePurpose: organization.PurposeRequest},
+			kernel.PurposeValidation:     {MessageType: "tekroo.message.task.review-requested", MessagePurpose: organization.PurposeRequest},
+			kernel.PurposeReview:         {MessageType: "tekroo.message.task.security-review-requested", MessagePurpose: organization.PurposeRequest},
+			kernel.PurposeRepair:         {MessageType: "tekroo.message.task.assigned", MessagePurpose: organization.PurposeHandoff},
+		}, Deadline: "2h"},
 		profilesByModel: productionProfiles,
 		workspacesByID: map[string]ProductionWorkspace{
 			"coder-1":           {WorkspaceID: "coder-1", WorktreeID: "worktree-coder-1", WorkingDirectory: workspace, Branch: "source", BaselineSHA: baseline, WritablePaths: []string{"."}},
@@ -178,6 +192,7 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 		serviceAuthority:  kernel.PrincipalRef{Kind: kernel.PrincipalService, ID: "teams-operational-runtime"},
 		policyAuthority:   kernel.PrincipalRef{Kind: kernel.PrincipalPolicy, ID: "teams-admission-policy"},
 		operatorIdentity:  protocol.AuthenticatedContext{Principal: kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "principal"}},
+		roleGrounding:     roleGrounding,
 	}
 	features, err := organization.NewFeatureCoordinator(store, roleHost, service, clock, ids)
 	if err != nil {
@@ -196,14 +211,19 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 		InitialMessageID: kernel.UUIDv7("00000000-0000-7000-8000-000000006014"), LastMessageID: kernel.UUIDv7("00000000-0000-7000-8000-000000006015"), LastStepID: kernel.UUIDv7("00000000-0000-7000-8000-000000006016"), LastHop: 3,
 		BudgetAccountID: kernel.UUIDv7("00000000-0000-7000-8000-000000006011"), LifecycleEpoch: 1, ScopeRevision: 1, CreatedAt: now.Add(-time.Minute), UpdatedAt: now,
 	}
+	planAuthor, err := roleHost.EnsureStarted(contextWithTimeout(t), "example::architect-1")
+	if err != nil {
+		t.Fatal(err)
+	}
 	plan := organization.FeaturePlan{
-		Version: 1, CreatedAt: now, PreparedBy: "example::architect-1", PreparedExecution: kernel.ExecutionTuple{ExecutionID: kernel.UUIDv7("00000000-0000-7000-8000-000000006017"), FencingEpoch: 1}, Architecture: "One bounded implementation task.",
+		Version: 1, CreatedAt: now, PreparedBy: planAuthor.ActorFQN, PreparedExecution: planAuthor.Execution, Architecture: "One bounded implementation task.",
 		Stories: []organization.PlannedStory{{ID: kernel.UUIDv7("00000000-0000-7000-8000-000000006012"), Title: "Executable story", Description: "Materialize an admitted task.", AcceptanceCriteria: []string{"root task is active"}, Priority: organization.PriorityHigh}},
 		Tasks: []organization.PlannedTask{
 			{ID: kernel.UUIDv7("00000000-0000-7000-8000-000000006013"), StoryID: kernel.UUIDv7("00000000-0000-7000-8000-000000006012"), Title: "Implement", Description: "Implement the accepted change.", AcceptanceCriteria: []string{"go test passes"}, Owner: "example::coder-1", ModelProfile: modelDigest, DecisionRoute: kernel.RouteBoundedExecution, Purpose: kernel.PurposeImplementation, Complexity: 3, Risk: organization.RiskLow, CriticalPath: true, AttemptLimit: 2, ReviewRoundLimit: 1},
-			{ID: kernel.UUIDv7("00000000-0000-7000-8000-000000006018"), StoryID: kernel.UUIDv7("00000000-0000-7000-8000-000000006012"), Title: "Validate", Description: "Independently validate the accepted change.", AcceptanceCriteria: []string{"validation passes"}, DependsOn: []kernel.UUIDv7{kernel.UUIDv7("00000000-0000-7000-8000-000000006013")}, Validates: []kernel.UUIDv7{kernel.UUIDv7("00000000-0000-7000-8000-000000006013")}, Owner: "example::coder-2", ModelProfile: modelDigest, DecisionRoute: kernel.RouteBoundedExecution, Purpose: kernel.PurposeValidation, Complexity: 2, Risk: organization.RiskLow, CriticalPath: true, AttemptLimit: 2, ReviewRoundLimit: 1},
+			{ID: kernel.UUIDv7("00000000-0000-7000-8000-000000006018"), StoryID: kernel.UUIDv7("00000000-0000-7000-8000-000000006012"), Title: "Validate", Description: "Independently validate the accepted change.", AcceptanceCriteria: []string{"validation passes"}, DependsOn: []kernel.UUIDv7{kernel.UUIDv7("00000000-0000-7000-8000-000000006013")}, Validates: []kernel.UUIDv7{kernel.UUIDv7("00000000-0000-7000-8000-000000006013")}, Owner: "example::tester-1", ModelProfile: digestByte('8'), DecisionRoute: kernel.RouteBoundedExecution, Purpose: kernel.PurposeValidation, Complexity: 2, Risk: organization.RiskLow, CriticalPath: true, AttemptLimit: 2, ReviewRoundLimit: 1},
 		},
 	}
+	feature.Plan = &plan
 	runContext, cancelRun := context.WithCancel(context.Background())
 	runResult := make(chan error, 1)
 	go func() { runResult <- runtime.Run(runContext) }()
@@ -825,8 +845,12 @@ func exerciseParallelDAGAdmission(t *testing.T, service *ProductionService, stor
 		InitialMessageID: kernel.UUIDv7("00000000-0000-7000-8000-000000006027"), LastMessageID: kernel.UUIDv7("00000000-0000-7000-8000-000000006028"), LastStepID: kernel.UUIDv7("00000000-0000-7000-8000-000000006029"), LastHop: 3,
 		BudgetAccountID: kernel.UUIDv7("00000000-0000-7000-8000-000000006021"), LifecycleEpoch: 1, ScopeRevision: 1, CreatedAt: now.Add(-time.Minute), UpdatedAt: now,
 	}
+	planAuthor, err := service.RoleHost.EnsureStarted(contextWithTimeout(t), "example::architect-1")
+	if err != nil {
+		t.Fatal(err)
+	}
 	plan := organization.FeaturePlan{
-		Version: 1, CreatedAt: now, PreparedBy: "example::architect-1", PreparedExecution: kernel.ExecutionTuple{ExecutionID: kernel.UUIDv7("00000000-0000-7000-8000-000000006030"), FencingEpoch: 1}, Architecture: "Two independent roots followed by independent validation.",
+		Version: 1, CreatedAt: now, PreparedBy: planAuthor.ActorFQN, PreparedExecution: planAuthor.Execution, Architecture: "Two independent roots followed by independent validation.",
 		Stories: []organization.PlannedStory{{ID: storyID, Title: "Parallel work", Description: "Execute both independent changes.", AcceptanceCriteria: []string{"both changes work"}, Priority: organization.PriorityHigh}},
 		Tasks: []organization.PlannedTask{
 			{ID: firstID, StoryID: storyID, Title: "First root", Description: "Implement the first independent change.", AcceptanceCriteria: []string{"first change works"}, Owner: "example::coder-1", ModelProfile: coderModel, DecisionRoute: kernel.RouteBoundedExecution, Purpose: kernel.PurposeImplementation, Complexity: 3, Risk: organization.RiskLow, CriticalPath: true, AttemptLimit: 2, ReviewRoundLimit: 1},
@@ -835,6 +859,7 @@ func exerciseParallelDAGAdmission(t *testing.T, service *ProductionService, stor
 			{ID: secondValidationID, StoryID: storyID, Title: "Validate second", Description: "Validate the second independent change.", AcceptanceCriteria: []string{"second change passes"}, DependsOn: []kernel.UUIDv7{secondID}, Validates: []kernel.UUIDv7{secondID}, Owner: "example::tester-2", ModelProfile: testerModel, DecisionRoute: kernel.RouteBoundedExecution, Purpose: kernel.PurposeValidation, Complexity: 3, Risk: organization.RiskLow, CriticalPath: true, AttemptLimit: 2, ReviewRoundLimit: 1},
 		},
 	}
+	feature.Plan = &plan
 	if err := service.MaterializeFeaturePlan(contextWithTimeout(t), feature, plan); err != nil {
 		t.Fatal(err)
 	}
@@ -1152,11 +1177,16 @@ func waitForPlanningInvocationState(t *testing.T, service *ProductionService, st
 
 func loadStarterTeam(t *testing.T) organization.LoadedTeam {
 	t.Helper()
-	manifestPath, err := filepath.Abs(filepath.Join("..", "..", "config", "starter-team", "team.example.json"))
+	manifestPath, err := filepath.Abs(filepath.Join("..", "..", "config", "starter-team", "team.v4.example.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	publicRaw, err := os.ReadFile(filepath.Join(filepath.Dir(manifestPath), "publisher.pub"))
+	manifestRaw, err := os.ReadFile(manifestPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifestHash := sha256.Sum256(manifestRaw)
+	publicRaw, err := os.ReadFile(filepath.Join(filepath.Dir(manifestPath), "message-handler-publisher.pub"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1164,15 +1194,15 @@ func loadStarterTeam(t *testing.T) organization.LoadedTeam {
 	if err != nil {
 		t.Fatal(err)
 	}
-	groundingRaw, err := os.ReadFile(filepath.Join(filepath.Dir(manifestPath), "role-grounding-publisher.pub"))
+	qualificationRaw, err := os.ReadFile(filepath.Join(filepath.Dir(manifestPath), "message-handler-publisher-qualification.pub"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	groundingKey, err := base64.StdEncoding.Strict().DecodeString(strings.TrimSpace(string(groundingRaw)))
+	qualificationKey, err := base64.StdEncoding.Strict().DecodeString(strings.TrimSpace(string(qualificationRaw)))
 	if err != nil {
 		t.Fatal(err)
 	}
-	team, err := organization.LoadTeamManifest(manifestPath, kernel.Digest("3478f27988da4f7c022df0ca7145af88b8e8cc1eb6fd446402ff69b33519c693"), map[string]ed25519.PublicKey{"tekroo-phase6-bootstrap": publicKey, "tekroo-role-grounding-20260901": groundingKey})
+	team, err := organization.LoadTeamManifest(manifestPath, kernel.Digest(hex.EncodeToString(manifestHash[:])), map[string]ed25519.PublicKey{"tekroo-message-handlers-20260913": publicKey, "tekroo-message-handlers-qualification-20260913": qualificationKey})
 	if err != nil {
 		t.Fatal(err)
 	}

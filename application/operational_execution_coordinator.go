@@ -55,6 +55,17 @@ func NewOperationalExecutionCoordinator(reader OperationalExecutionReader, comma
 }
 
 func (coordinator *OperationalExecutionCoordinator) buildBrief(ctx context.Context, current OperationalExecutionContext) (ExecutionBrief, kernel.Digest, error) {
+	if current.Invocation.HandlerDispatch != nil {
+		resolver, ok := coordinator.roles.(RoleHandlerGroundingResolver)
+		if !ok {
+			return ExecutionBrief{}, "", ErrInvalidOperationalExecution
+		}
+		grounding, handler, err := resolver.ResolveRoleHandlerGrounding(ctx, current.Invocation.ActorFQN, current.Invocation.HandlerDispatch.Clone())
+		if err != nil {
+			return ExecutionBrief{}, "", err
+		}
+		return BuildExecutionBriefWithHandler(current, grounding, &handler, coordinator.policy.MaximumBriefBytes)
+	}
 	grounding, err := coordinator.roles.ResolveRoleGrounding(ctx, current.Invocation.ActorFQN)
 	if err != nil {
 		return ExecutionBrief{}, "", err
@@ -140,6 +151,7 @@ func (coordinator *OperationalExecutionCoordinator) Process(ctx context.Context,
 				if observation.ConversationID == "" {
 					return result, ErrExternalOutcomeUnknown
 				}
+				observation = validateHandlerObservation(brief, observation)
 				receipt, commandErr := coordinator.recordStarted(ctx, invocation, observation)
 				result.Receipt = &receipt
 				if commandErr != nil {
@@ -199,6 +211,7 @@ func (coordinator *OperationalExecutionCoordinator) Process(ctx context.Context,
 			if observation.State == ExternalRunning {
 				return result, nil
 			}
+			observation = validateHandlerObservation(brief, observation)
 			outcome := terminalOutcome(observation.State)
 			if deadlineExceeded && observation.State == ExternalCancelled {
 				// A successful provider cancellation proves that the in-flight work
@@ -214,6 +227,17 @@ func (coordinator *OperationalExecutionCoordinator) Process(ctx context.Context,
 		}
 	}
 	return OperationalExecutionResult{InvocationID: current.Invocation.ID, State: current.Invocation.State}, ErrInvalidOperationalExecution
+}
+
+func validateHandlerObservation(brief ExecutionBrief, observation ExternalExecutionObservation) ExternalExecutionObservation {
+	if brief.MessageHandler == nil || observation.State != ExternalSucceeded {
+		return observation
+	}
+	if _, err := ValidateRoleHandlerResult(*brief.MessageHandler, observation.Output); err != nil {
+		observation.State = ExternalFailed
+		observation.Retryable = true
+	}
+	return observation
 }
 
 func (coordinator *OperationalExecutionCoordinator) effectiveDeadline(ctx context.Context, invocation kernel.WorkInvocation) (time.Time, error) {

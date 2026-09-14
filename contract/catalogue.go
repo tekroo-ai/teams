@@ -49,6 +49,13 @@ type Catalogue struct {
 }
 
 func Load(fsys fs.FS, packageRoot string) (*Catalogue, error) {
+	return LoadExpected(fsys, packageRoot, kernel.ContractIdentity, kernel.CatalogueRevision)
+}
+
+// LoadExpected loads a specific contract package without changing the
+// process-wide accepted contract identity. It is used to qualify a successor
+// package before that package is accepted for production use.
+func LoadExpected(fsys fs.FS, packageRoot, expectedIdentity string, expectedRevision uint64) (*Catalogue, error) {
 	catalogueBytes, err := fs.ReadFile(fsys, packageRoot+"/catalogue/kernel-catalogue.json")
 	if err != nil {
 		return nil, fmt.Errorf("read catalogue: %w", err)
@@ -62,10 +69,10 @@ func Load(fsys fs.FS, packageRoot string) (*Catalogue, error) {
 	if err := decodeJSON(catalogueBytes, &document); err != nil {
 		return nil, fmt.Errorf("decode catalogue: %w", err)
 	}
-	if document.ContractIdentity != kernel.ContractIdentity {
+	if document.ContractIdentity != expectedIdentity {
 		return nil, fmt.Errorf("unexpected contract identity %q", document.ContractIdentity)
 	}
-	if document.Revision != kernel.CatalogueRevision {
+	if document.Revision != expectedRevision {
 		return nil, fmt.Errorf("unexpected catalogue revision %d", document.Revision)
 	}
 	var payloads payloadDocument
@@ -120,7 +127,7 @@ func (c *Catalogue) ResolveCommand(commandType, version string, target kernel.Ag
 	if err := decodeJSON(payload, &value); err != nil {
 		return kernel.CommandDefinition{}, fmt.Errorf("%w: %w: malformed JSON", ErrInvalidCommand, kernel.ErrInvalidPayload)
 	}
-	if err := validateValue(value, rule); err != nil {
+	if err := validateValue(value, rule, c.payloadDefs); err != nil {
 		return kernel.CommandDefinition{}, fmt.Errorf("%w: %w: %v", ErrInvalidCommand, kernel.ErrInvalidPayload, err)
 	}
 	return kernel.CommandDefinition{
@@ -154,7 +161,7 @@ func (c *Catalogue) ResolveEvent(eventType, version string, target kernel.Aggreg
 	if err := decodeJSON(payload, &value); err != nil {
 		return kernel.EventDefinition{}, fmt.Errorf("%w: malformed JSON", kernel.ErrInvalidPayload)
 	}
-	if err := validateValue(value, c.payloadDefs[definitionName]); err != nil {
+	if err := validateValue(value, c.payloadDefs[definitionName], c.payloadDefs); err != nil {
 		return kernel.EventDefinition{}, fmt.Errorf("%w: %v", kernel.ErrInvalidPayload, err)
 	}
 	return kernel.EventDefinition{TypeID: entry.TypeID, Version: entry.Version, TargetKinds: append([]kernel.AggregateKind(nil), entry.TargetKinds...)}, nil
@@ -173,7 +180,7 @@ func (c *Catalogue) ValidateFixtureCommand(commandType string, payload json.RawM
 	if err := decodeJSON(payload, &value); err != nil {
 		return nil, fmt.Errorf("%w: malformed payload", ErrInvalidCommand)
 	}
-	if err := validateValue(value, c.payloadDefs[definitionName]); err != nil {
+	if err := validateValue(value, c.payloadDefs[definitionName], c.payloadDefs); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrInvalidCommand, err)
 	}
 	return append([]string(nil), entry.Emits...), nil
@@ -204,12 +211,27 @@ func containsTarget(values []kernel.AggregateKind, target kernel.AggregateKind) 
 	return false
 }
 
-func validateValue(value any, rule map[string]any) error {
+func validateValue(value any, rule map[string]any, definitions map[string]map[string]any) error {
+	return validateValueAtDepth(value, rule, definitions, 0)
+}
+
+func validateValueAtDepth(value any, rule map[string]any, definitions map[string]map[string]any, depth int) error {
+	if depth > 64 {
+		return errors.New("schema reference depth exceeded")
+	}
+	if reference, ok := rule["$ref"].(string); ok {
+		name, local := strings.CutPrefix(reference, "#/$defs/")
+		definition, found := definitions[name]
+		if !local || !found {
+			return errors.New("unresolved schema reference")
+		}
+		return validateValueAtDepth(value, definition, definitions, depth+1)
+	}
 	if alternatives, ok := rule["oneOf"].([]any); ok {
 		matches := 0
 		for _, alternative := range alternatives {
 			candidate, ok := alternative.(map[string]any)
-			if ok && validateValue(value, candidate) == nil {
+			if ok && validateValueAtDepth(value, candidate, definitions, depth+1) == nil {
 				matches++
 			}
 		}
@@ -221,7 +243,7 @@ func validateValue(value any, rule map[string]any) error {
 	if alternatives, ok := rule["anyOf"].([]any); ok {
 		for _, alternative := range alternatives {
 			candidate, ok := alternative.(map[string]any)
-			if ok && validateValue(value, candidate) == nil {
+			if ok && validateValueAtDepth(value, candidate, definitions, depth+1) == nil {
 				return nil
 			}
 		}
@@ -299,7 +321,7 @@ func validateValue(value any, rule map[string]any) error {
 		}
 		if itemRule, ok := rule["items"].(map[string]any); ok {
 			for _, item := range items {
-				if err := validateValue(item, itemRule); err != nil {
+				if err := validateValueAtDepth(item, itemRule, definitions, depth+1); err != nil {
 					return fmt.Errorf("invalid array item: %w", err)
 				}
 			}
@@ -345,7 +367,7 @@ func validateValue(value any, rule map[string]any) error {
 			item, present := object[name]
 			propertyRule, ok := property.(map[string]any)
 			if present && ok {
-				if err := validateValue(item, propertyRule); err != nil {
+				if err := validateValueAtDepth(item, propertyRule, definitions, depth+1); err != nil {
 					return fmt.Errorf("property %q: %w", name, err)
 				}
 			}

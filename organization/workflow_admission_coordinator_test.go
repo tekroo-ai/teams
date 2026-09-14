@@ -20,7 +20,7 @@ func TestNonSoftwareRoleAndWorkflowLoadThroughPublicConfiguration(t *testing.T) 
 		t.Fatal(err)
 	}
 	root := filepath.Dir(workingDirectory)
-	publicRaw, err := os.ReadFile(filepath.Join(root, "config", "editorial-team", "publisher.pub"))
+	publicRaw, err := os.ReadFile(filepath.Join(root, "config", "editorial-team", "message-handler-publisher.pub"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -28,7 +28,7 @@ func TestNonSoftwareRoleAndWorkflowLoadThroughPublicConfiguration(t *testing.T) 
 	if err != nil || len(publicKey) != ed25519.PublicKeySize {
 		t.Fatalf("public key err=%v", err)
 	}
-	team, err := LoadTeamManifest(filepath.Join(root, "config", "editorial-team", "team.example.json"), kernel.Digest("1a714f2719932aa422eaec72cd6bfe74d206ddd1e27a2d83a9cca3b42dbc9b1d"), map[string]ed25519.PublicKey{"tekroo-example-editorial-20260913": ed25519.PublicKey(publicKey)})
+	team, err := LoadTeamManifest(filepath.Join(root, "config", "editorial-team", "team.v4.example.json"), kernel.Digest("591dfeb73457df86eb125d1bb99c1ffc7fe9d87ba3812de1e947ae7366554bb5"), map[string]ed25519.PublicKey{"tekroo-message-handlers-editorial-20260913": ed25519.PublicKey(publicKey)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,7 +77,7 @@ func TestNonSoftwareRoleAndWorkflowLoadThroughPublicConfiguration(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	admission, handled, _, err := coordinator.Admit(context.Background(), bound)
+	admission, handled, _, err := coordinator.Admit(context.Background(), bound, execution)
 	if err != nil || !handled || admission.Outcome != kernel.WorkAdmitted || admission.AuthorizedInvocationID == nil {
 		t.Fatalf("admission=%+v handled=%t err=%v", admission, handled, err)
 	}
@@ -92,6 +92,43 @@ func TestNonSoftwareRoleAndWorkflowLoadThroughPublicConfiguration(t *testing.T) 
 	current, err = store.ApplyWorkflowTransition(context.Background(), definition, instance.InstanceID, kernel.WorkflowTransition{Revision: current.Revision + 1, EventID: testUUID(84), Kind: kernel.WorkflowTransitionComplete, NodeID: message.Work.DAGNodeID, InvocationID: *admission.AuthorizedInvocationID, ProgressDigest: testDigest('e'), EvidenceIDs: []kernel.UUIDv7{}, RecordedAt: now.Add(2 * time.Second)})
 	if err != nil || len(current.ReadyNodes()) != 1 || current.ReadyNodes()[0].StageID != "edit" {
 		t.Fatalf("current=%+v err=%v", current, err)
+	}
+}
+
+func TestNonSoftwareSuccessorRoleLoadsExactMessageHandlerFromSignedConfiguration(t *testing.T) {
+	workingDirectory, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := filepath.Dir(workingDirectory)
+	publicRaw, err := os.ReadFile(filepath.Join(root, "config", "editorial-team", "message-handler-publisher.pub"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	publicKey, err := base64.StdEncoding.Strict().DecodeString(strings.TrimSpace(string(publicRaw)))
+	if err != nil || len(publicKey) != ed25519.PublicKeySize {
+		t.Fatalf("public key err=%v", err)
+	}
+	team, err := LoadTeamManifest(filepath.Join(root, "config", "editorial-team", "team.v4.example.json"), kernel.Digest("591dfeb73457df86eb125d1bb99c1ffc7fe9d87ba3812de1e947ae7366554bb5"), map[string]ed25519.PublicKey{"tekroo-message-handlers-editorial-20260913": ed25519.PublicKey(publicKey)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resolver, err := NewRoleHandlerResolver(team)
+	if err != nil {
+		t.Fatal(err)
+	}
+	message := testMessage(90)
+	message.Type = "tekroo.message.content.requested"
+	message.Purpose = PurposeRequest
+	message.Sender = "editorial::operator-1"
+	message.Recipient = "editorial::editor-1"
+	message.SenderExecution = testExecution(91, 1)
+	dispatch, err := resolver.ResolveMessage(message.Recipient, message)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dispatch.RoleFQRN != "editor" || dispatch.Disposition != HandlerModel || dispatch.SubscriptionPurpose != "editorial-production" || dispatch.HandlerInstructions == "" || len(dispatch.InputSchema) == 0 || len(dispatch.ResultSchema) == 0 {
+		t.Fatalf("editor dispatch = %+v", dispatch)
 	}
 }
 
@@ -148,16 +185,18 @@ func TestWorkflowAdmissionCoordinatorConvertsOnlyLinkedWorkMessages(t *testing.T
 		t.Fatal(err)
 	}
 	execution := testExecution(15, 1)
-	actorSource := workflowActorSource{eligible: true, state: testRoleState(message.Recipient, execution)}
+	starting := testRoleState(message.Recipient, execution)
+	starting.Status = RoleStarting
+	actorSource := workflowActorSource{eligible: true, state: starting}
 	coordinator, err := NewWorkflowAdmissionCoordinator(store, library, actorSource, fake.NewClock(now), fake.NewIDSource(testUUID(16), testUUID(17), testUUID(18), testUUID(19)))
 	if err != nil {
 		t.Fatal(err)
 	}
-	result, handled, replayed, err := coordinator.Admit(context.Background(), message)
+	result, handled, replayed, err := coordinator.Admit(context.Background(), message, execution)
 	if err != nil || !handled || replayed || result.Outcome != kernel.WorkAdmitted || result.AuthorizedInvocationID == nil || *result.AuthorizedInvocationID != testUUID(18) {
 		t.Fatalf("result=%+v handled=%t replayed=%t err=%v", result, handled, replayed, err)
 	}
-	replayedResult, handled, replayed, err := coordinator.Admit(context.Background(), message)
+	replayedResult, handled, replayed, err := coordinator.Admit(context.Background(), message, execution)
 	if err != nil || !handled || !replayed || replayedResult.ProposalID != result.ProposalID {
 		t.Fatalf("replay=%+v handled=%t replayed=%t err=%v", replayedResult, handled, replayed, err)
 	}
@@ -172,7 +211,7 @@ func TestWorkflowAdmissionCoordinatorLeavesInformationDeliverable(t *testing.T) 
 	}
 	message := testMessage(60)
 	message.Purpose = PurposeEvidence
-	if _, handled, replayed, err := coordinator.Admit(context.Background(), message); err != nil || handled || replayed {
+	if _, handled, replayed, err := coordinator.Admit(context.Background(), message, kernel.ExecutionTuple{}); err != nil || handled || replayed {
 		t.Fatalf("handled=%t replayed=%t err=%v", handled, replayed, err)
 	}
 }
@@ -195,7 +234,7 @@ func TestWorkflowAdmissionCoordinatorHoldsUnboundWorkflowMessages(t *testing.T) 
 		t.Fatal(err)
 	}
 	trigger := testMessage(61)
-	if result, handled, replayed, admitErr := coordinator.Admit(context.Background(), trigger); admitErr != nil || !handled || replayed || result.Outcome != "" {
+	if result, handled, replayed, admitErr := coordinator.Admit(context.Background(), trigger, kernel.ExecutionTuple{}); admitErr != nil || !handled || replayed || result.Outcome != "" {
 		t.Fatalf("trigger result=%+v handled=%t replayed=%t err=%v", result, handled, replayed, admitErr)
 	}
 	instance, instanceErr := kernel.NewWorkflowInstance(definition, testUUID(62), kernel.AggregateRef{Kind: kernel.AggregateStory, ID: testUUID(63)}, trigger.Flow.BudgetAccountID, map[string]kernel.UUIDv7{"perform": testUUID(64)})
@@ -207,7 +246,7 @@ func TestWorkflowAdmissionCoordinatorHoldsUnboundWorkflowMessages(t *testing.T) 
 	}
 	followup := testMessage(65)
 	followup.Flow.BudgetAccountID = trigger.Flow.BudgetAccountID
-	if result, handled, replayed, admitErr := coordinator.Admit(context.Background(), followup); admitErr != nil || !handled || replayed || result.Outcome != "" {
+	if result, handled, replayed, admitErr := coordinator.Admit(context.Background(), followup, kernel.ExecutionTuple{}); admitErr != nil || !handled || replayed || result.Outcome != "" {
 		t.Fatalf("followup result=%+v handled=%t replayed=%t err=%v", result, handled, replayed, admitErr)
 	}
 }

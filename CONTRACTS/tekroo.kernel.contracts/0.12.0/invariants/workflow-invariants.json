@@ -1,0 +1,71 @@
+{
+  "contractIdentity": "tekroo.kernel.contracts/0.12.0",
+  "invariants": [
+    {
+      "invariantId": "P10-INV-001",
+      "statement": "Workflow definitions are content-addressed, versioned, acyclic, and contain no runtime-owned role semantics.",
+      "testIds": [
+        "P10-CAT-001-P",
+        "P10-CAT-001-N",
+        "P10-WF-007"
+      ]
+    },
+    {
+      "invariantId": "P10-INV-002",
+      "statement": "A message proposes work but only deterministic admission can authorize one exact workflow node and invocation.",
+      "testIds": [
+        "P10-CAT-002-P",
+        "P10-CAT-002-N",
+        "P10-WF-005"
+      ]
+    },
+    {
+      "invariantId": "P10-INV-003",
+      "statement": "Node identity and causal topology prevent cycles independently of role, actor, message type, thread, or recipient.",
+      "testIds": [
+        "P10-WF-003",
+        "P10-WF-004"
+      ]
+    },
+    {
+      "invariantId": "P10-INV-004",
+      "statement": "Repair and reconsideration use bounded successor nodes with changed-condition evidence and cannot reset the root budget.",
+      "testIds": [
+        "P10-WF-002",
+        "P10-CAT-002-N"
+      ]
+    },
+    {
+      "invariantId": "P10-INV-005",
+      "statement": "Stage results advance only the exact admitted node and preserve content-addressed evidence.",
+      "testIds": [
+        "P10-CAT-003-P",
+        "P10-CAT-003-N"
+      ]
+    },
+    {
+      "invariantId": "P10-INV-006",
+      "statement": "Durable checkpoints resume the failed or interrupted stage without repeating successful predecessors.",
+      "testIds": [
+        "P10-CAT-004-P",
+        "P10-CAT-004-N",
+        "P10-WF-006"
+      ]
+    },
+    {
+      "invariantId": "P10-INV-007",
+      "statement": "All dependency-ready nodes may run concurrently up to declared capacity; index or role order cannot add dependencies.",
+      "testIds": [
+        "P10-WF-001"
+      ]
+    },
+    {
+      "invariantId": "P10-INV-008",
+      "statement": "Validation reuses unchanged passing evidence and cannot exceed design-plus-implementation time without changed-condition evidence or explicit escalation.",
+      "testIds": [
+        "P10-WF-008"
+      ]
+    }
+  ],
+  "schemaVersion": "1.0.0"
+}

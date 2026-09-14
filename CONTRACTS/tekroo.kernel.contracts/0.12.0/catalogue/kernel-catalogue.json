@@ -1,0 +1,5815 @@
+{
+  "adoptedHistoricalAliases": [],
+  "contractIdentity": "tekroo.kernel.contracts/0.12.0",
+  "defaultRoutingMode": "KERNEL_DIRECT",
+  "entries": [
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "emits": [
+        "tekroo.event.completion-review.finalized"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_completion_review_finalize_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "completion-review"
+      ],
+      "typeId": "tekroo.command.completion-review.finalize",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "emits": [
+        "tekroo.event.completion-review.opened"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_completion_review_open_1_6_0",
+      "rootAllowed": true,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "completion-review"
+      ],
+      "typeId": "tekroo.command.completion-review.open",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "ACTOR",
+        "HUMAN",
+        "SERVICE",
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "emits": [
+        "tekroo.event.completion-review.result-recorded"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_completion_review_record_result_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "completion-review"
+      ],
+      "typeId": "tekroo.command.completion-review.record-result",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "emits": [
+        "tekroo.event.escalation.opened"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_escalation_open_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "escalation"
+      ],
+      "typeId": "tekroo.command.escalation.open",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "ACTOR",
+        "HUMAN",
+        "SERVICE",
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "emits": [
+        "tekroo.event.escalation.resolved"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_escalation_resolve_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "escalation"
+      ],
+      "typeId": "tekroo.command.escalation.resolve",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "ACTOR",
+        "HUMAN",
+        "SERVICE",
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "emits": [
+        "tekroo.event.evidence.registered"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_evidence_register_1_6_0",
+      "rootAllowed": true,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "evidence"
+      ],
+      "typeId": "tekroo.command.evidence.register",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "SERVICE",
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "emits": [
+        "tekroo.event.execution.registered"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_execution_register_1_6_0",
+      "rootAllowed": true,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "execution"
+      ],
+      "typeId": "tekroo.command.execution.register",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "SERVICE",
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "emits": [
+        "tekroo.event.execution.replaced"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_execution_replace_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "execution"
+      ],
+      "typeId": "tekroo.command.execution.replace",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "HUMAN",
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.6.0"
+        ],
+        "transforms": []
+      },
+      "emits": [
+        "tekroo.event.human-interaction.closed"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_human_interaction_close_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "human-interaction"
+      ],
+      "typeId": "tekroo.command.human-interaction.close",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.6.0"
+        ],
+        "transforms": []
+      },
+      "emits": [
+        "tekroo.event.human-interaction.expired"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_human_interaction_expire_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "human-interaction"
+      ],
+      "typeId": "tekroo.command.human-interaction.expire",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "ACTOR",
+        "HUMAN",
+        "POLICY",
+        "SERVICE"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.6.0"
+        ],
+        "transforms": []
+      },
+      "emits": [
+        "tekroo.event.human-interaction.opened"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_human_interaction_open_1_6_0",
+      "rootAllowed": true,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "human-interaction"
+      ],
+      "typeId": "tekroo.command.human-interaction.open",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "SERVICE"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.6.0"
+        ],
+        "transforms": []
+      },
+      "emits": [
+        "tekroo.event.human-interaction.delivery-recorded"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_human_interaction_record_delivery_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "human-interaction"
+      ],
+      "typeId": "tekroo.command.human-interaction.record-delivery",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "HUMAN"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.6.0"
+        ],
+        "transforms": []
+      },
+      "emits": [
+        "tekroo.event.human-interaction.response-recorded"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_human_interaction_respond_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "human-interaction"
+      ],
+      "typeId": "tekroo.command.human-interaction.respond",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "HUMAN",
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.6.0"
+        ],
+        "transforms": []
+      },
+      "emits": [
+        "tekroo.event.human-participant.profile-bound"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_human_participant_bind_profile_1_6_0",
+      "rootAllowed": true,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "human-participant"
+      ],
+      "typeId": "tekroo.command.human-participant.bind-profile",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "HUMAN",
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.6.0"
+        ],
+        "transforms": []
+      },
+      "emits": [
+        "tekroo.event.human-participant.revoked"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_human_participant_revoke_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "human-participant"
+      ],
+      "typeId": "tekroo.command.human-participant.revoke",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "SERVICE",
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.7.0"
+        ],
+        "transforms": []
+      },
+      "emits": [
+        "tekroo.event.projection.fault-recorded"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_projection_record_fault_1_7_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "system"
+      ],
+      "typeId": "tekroo.command.projection.record-fault",
+      "version": "1.7.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "HUMAN",
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "emits": [
+        "tekroo.event.record.corrected"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_record_correct_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "story",
+        "task",
+        "evidence",
+        "system"
+      ],
+      "typeId": "tekroo.command.record.correct",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "emits": [
+        "tekroo.event.release-plan.created"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_release_plan_create_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "release-plan"
+      ],
+      "typeId": "tekroo.command.release-plan.create",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "emits": [
+        "tekroo.event.release-plan.finalized"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_release_plan_finalize_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "release-plan"
+      ],
+      "typeId": "tekroo.command.release-plan.finalize",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "POLICY",
+        "SERVICE"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "emits": [
+        "tekroo.event.release-plan.qualification-recorded"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_release_plan_record_qualification_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "release-plan"
+      ],
+      "typeId": "tekroo.command.release-plan.record-qualification",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "POLICY",
+        "SERVICE"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "emits": [
+        "tekroo.event.release-plan.reconciliation-recorded"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_release_plan_record_reconciliation_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "release-plan"
+      ],
+      "typeId": "tekroo.command.release-plan.record-reconciliation",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "SERVICE"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "emits": [
+        "tekroo.event.release-plan.result-recorded"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_release_plan_record_result_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "release-plan"
+      ],
+      "typeId": "tekroo.command.release-plan.record-result",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "emits": [
+        "tekroo.event.release-plan.execution-requested"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_release_plan_request_execution_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "release-plan"
+      ],
+      "typeId": "tekroo.command.release-plan.request-execution",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "ACTOR",
+        "HUMAN",
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "emits": [
+        "tekroo.event.story.activated"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_story_activate_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "story"
+      ],
+      "typeId": "tekroo.command.story.activate",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "ACTOR",
+        "HUMAN"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "emits": [
+        "tekroo.event.story.release-approved"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_story_approve_release_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "story"
+      ],
+      "typeId": "tekroo.command.story.approve-release",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "HUMAN",
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "emits": [
+        "tekroo.event.story.authorized"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_story_authorize_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "story"
+      ],
+      "typeId": "tekroo.command.story.authorize",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "ACTOR",
+        "HUMAN",
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "emits": [
+        "tekroo.event.story.planning-started"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_story_begin_planning_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "story"
+      ],
+      "typeId": "tekroo.command.story.begin-planning",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "ACTOR",
+        "HUMAN",
+        "SERVICE"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "emits": [
+        "tekroo.event.story.created"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_story_create_1_6_0",
+      "rootAllowed": true,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "story"
+      ],
+      "typeId": "tekroo.command.story.create",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "HUMAN",
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "emits": [
+        "tekroo.event.story.accepted"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_story_request_acceptance_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "story"
+      ],
+      "typeId": "tekroo.command.story.request-acceptance",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "ACTOR",
+        "HUMAN",
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "emits": [
+        "tekroo.event.story.completed"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_story_request_completion_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "story"
+      ],
+      "typeId": "tekroo.command.story.request-completion",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "HUMAN",
+        "POLICY",
+        "SERVICE"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.6.0"
+        ],
+        "transforms": []
+      },
+      "emits": [
+        "tekroo.event.system.reconciliation-started"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_system_begin_reconciliation_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "system"
+      ],
+      "typeId": "tekroo.command.system.begin-reconciliation",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "HUMAN",
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.6.0"
+        ],
+        "transforms": []
+      },
+      "emits": [
+        "tekroo.event.system.operator-role-bound"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_system_bind_operator_role_1_6_0",
+      "rootAllowed": true,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "system"
+      ],
+      "typeId": "tekroo.command.system.bind-operator-role",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "HUMAN",
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.6.0"
+        ],
+        "transforms": []
+      },
+      "emits": [
+        "tekroo.event.system.continuity-configured"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_system_configure_continuity_1_6_0",
+      "rootAllowed": true,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "system"
+      ],
+      "typeId": "tekroo.command.system.configure-continuity",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "POLICY",
+        "SERVICE"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.6.0"
+        ],
+        "transforms": []
+      },
+      "emits": [
+        "tekroo.event.system.suspended"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_system_record_suspended_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "system"
+      ],
+      "typeId": "tekroo.command.system.record-suspended",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "POLICY",
+        "SERVICE"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.6.0"
+        ],
+        "transforms": []
+      },
+      "emits": [
+        "tekroo.event.system.unexpected-outage-recorded"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_system_record_unexpected_outage_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "system"
+      ],
+      "typeId": "tekroo.command.system.record-unexpected-outage",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "HUMAN",
+        "POLICY",
+        "SERVICE"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.6.0"
+        ],
+        "transforms": []
+      },
+      "emits": [
+        "tekroo.event.system.quiescence-requested"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_system_request_quiescence_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "system"
+      ],
+      "typeId": "tekroo.command.system.request-quiescence",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "HUMAN",
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.6.0"
+        ],
+        "transforms": []
+      },
+      "emits": [
+        "tekroo.event.system.resumed"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_system_resume_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "system"
+      ],
+      "typeId": "tekroo.command.system.resume",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "ACTOR"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "emits": [
+        "tekroo.event.task.ownership-acquired"
+      ],
+      "executionRequired": true,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_task_acquire_ownership_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "task"
+      ],
+      "typeId": "tekroo.command.task.acquire-ownership",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "ACTOR"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "emits": [
+        "tekroo.event.task.activated"
+      ],
+      "executionRequired": true,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_task_activate_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "task"
+      ],
+      "typeId": "tekroo.command.task.activate",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "emits": [
+        "tekroo.event.task.qualified-assignment-authorized"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_task_authorize_qualified_assignment_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "task"
+      ],
+      "typeId": "tekroo.command.task.authorize-qualified-assignment",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "HUMAN",
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.7.0"
+        ],
+        "transforms": []
+      },
+      "emits": [
+        "tekroo.event.task.operational-scope-bound"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_task_bind_operational_scope_1_7_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "task"
+      ],
+      "typeId": "tekroo.command.task.bind-operational-scope",
+      "version": "1.7.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "HUMAN",
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.7.0"
+        ],
+        "transforms": []
+      },
+      "emits": [
+        "tekroo.event.task.work-budget-bound"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_task_bind_work_budget_1_7_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "task"
+      ],
+      "typeId": "tekroo.command.task.bind-work-budget",
+      "version": "1.7.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "POLICY",
+        "HUMAN"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "emits": [
+        "tekroo.event.task.work-profile-bound"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_task_bind_work_profile_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "task"
+      ],
+      "typeId": "tekroo.command.task.bind-work-profile",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "ACTOR",
+        "HUMAN",
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "emits": [
+        "tekroo.event.task.created"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_task_create_1_6_0",
+      "rootAllowed": true,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "task"
+      ],
+      "typeId": "tekroo.command.task.create",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "ACTOR",
+        "HUMAN",
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "emits": [
+        "tekroo.event.task.dispatched"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_task_dispatch_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "task"
+      ],
+      "typeId": "tekroo.command.task.dispatch",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "HUMAN",
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "emits": [
+        "tekroo.event.task.force-reassigned"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_task_force_reassign_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "task"
+      ],
+      "typeId": "tekroo.command.task.force-reassign",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "ACTOR",
+        "HUMAN",
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "emits": [
+        "tekroo.event.task.handed-off"
+      ],
+      "executionRequired": true,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_task_handoff_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "task"
+      ],
+      "typeId": "tekroo.command.task.handoff",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "emits": [
+        "tekroo.event.task.readied"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_task_mark_ready_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "task"
+      ],
+      "typeId": "tekroo.command.task.mark-ready",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "ACTOR",
+        "HUMAN",
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "emits": [
+        "tekroo.event.task.ownership-released"
+      ],
+      "executionRequired": true,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_task_release_ownership_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "task"
+      ],
+      "typeId": "tekroo.command.task.release-ownership",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "ACTOR",
+        "HUMAN",
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "emits": [
+        "tekroo.event.task.completed"
+      ],
+      "executionRequired": true,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_task_request_completion_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "task"
+      ],
+      "typeId": "tekroo.command.task.request-completion",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "emits": [
+        "tekroo.event.variant-group.opened"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_variant_group_open_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "variant-group"
+      ],
+      "typeId": "tekroo.command.variant-group.open",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "ACTOR",
+        "HUMAN",
+        "SERVICE"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "emits": [
+        "tekroo.event.variant-group.comparison-recorded"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_variant_group_record_comparison_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "variant-group"
+      ],
+      "typeId": "tekroo.command.variant-group.record-comparison",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "POLICY",
+        "HUMAN"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "emits": [
+        "tekroo.event.variant-group.selected"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_variant_group_select_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "variant-group"
+      ],
+      "typeId": "tekroo.command.variant-group.select",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "ACTOR",
+        "SERVICE"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "emits": [
+        "tekroo.event.variant-group.candidate-submitted"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_variant_group_submit_candidate_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "variant-group"
+      ],
+      "typeId": "tekroo.command.variant-group.submit-candidate",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "HUMAN",
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.7.0"
+        ],
+        "transforms": []
+      },
+      "emits": [
+        "tekroo.event.work-budget.amended"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_work_budget_amend_1_7_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "work-budget-account"
+      ],
+      "typeId": "tekroo.command.work-budget.amend",
+      "version": "1.7.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "HUMAN",
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.7.0"
+        ],
+        "transforms": []
+      },
+      "emits": [
+        "tekroo.event.work-budget.created"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_work_budget_create_1_7_0",
+      "rootAllowed": true,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "work-budget-account"
+      ],
+      "typeId": "tekroo.command.work-budget.create",
+      "version": "1.7.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.7.0"
+        ],
+        "transforms": []
+      },
+      "emits": [
+        "tekroo.event.work-invocation.authorized"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_work_invocation_authorize_1_7_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "work-invocation"
+      ],
+      "typeId": "tekroo.command.work-invocation.authorize",
+      "version": "1.7.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "SERVICE",
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.7.0"
+        ],
+        "transforms": []
+      },
+      "emits": [
+        "tekroo.event.work-invocation.claimed"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_work_invocation_claim_1_7_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "work-invocation"
+      ],
+      "typeId": "tekroo.command.work-invocation.claim",
+      "version": "1.7.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.7.0"
+        ],
+        "transforms": []
+      },
+      "emits": [
+        "tekroo.event.work-invocation.expired"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_work_invocation_expire_1_7_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "work-invocation"
+      ],
+      "typeId": "tekroo.command.work-invocation.expire",
+      "version": "1.7.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "SERVICE",
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.7.0"
+        ],
+        "transforms": []
+      },
+      "emits": [
+        "tekroo.event.work-invocation.started"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_work_invocation_record_started_1_7_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "work-invocation"
+      ],
+      "typeId": "tekroo.command.work-invocation.record-started",
+      "version": "1.7.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "SERVICE",
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.7.0"
+        ],
+        "transforms": []
+      },
+      "emits": [
+        "tekroo.event.work-invocation.terminal-recorded"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_work_invocation_record_terminal_1_7_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "work-invocation"
+      ],
+      "typeId": "tekroo.command.work-invocation.record-terminal",
+      "version": "1.7.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "HUMAN",
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.7.0"
+        ],
+        "transforms": []
+      },
+      "emits": [
+        "tekroo.event.work-invocation.cancellation-requested"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_work_invocation_request_cancellation_1_7_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "work-invocation"
+      ],
+      "typeId": "tekroo.command.work-invocation.request-cancellation",
+      "version": "1.7.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "ACTOR",
+        "HUMAN",
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "emits": [
+        "tekroo.event.work.blocked"
+      ],
+      "executionRequired": true,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_work_block_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "story",
+        "task"
+      ],
+      "typeId": "tekroo.command.work.block",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "HUMAN",
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "emits": [
+        "tekroo.event.work.closed"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_work_close_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "story",
+        "task"
+      ],
+      "typeId": "tekroo.command.work.close",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "HUMAN",
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "emits": [
+        "tekroo.event.work.successor-created"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_work_create_successor_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "story",
+        "task"
+      ],
+      "typeId": "tekroo.command.work.create-successor",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "HUMAN",
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "emits": [
+        "tekroo.event.work.reopened"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_work_reopen_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "story",
+        "task"
+      ],
+      "typeId": "tekroo.command.work.reopen",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "ACTOR",
+        "HUMAN",
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "emits": [
+        "tekroo.event.work.unblocked"
+      ],
+      "executionRequired": true,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_work_unblock_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "story",
+        "task"
+      ],
+      "typeId": "tekroo.command.work.unblock",
+      "version": "1.6.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "HUMAN",
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.0.0"
+        ],
+        "transforms": []
+      },
+      "emits": [
+        "tekroo.event.workflow.created"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_workflow_create_1_0_0",
+      "rootAllowed": true,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "workflow-instance"
+      ],
+      "typeId": "tekroo.command.workflow.create",
+      "version": "1.0.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "ACTOR",
+        "SERVICE",
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.0.0"
+        ],
+        "transforms": []
+      },
+      "emits": [
+        "tekroo.event.workflow.work-admitted",
+        "tekroo.event.workflow.work-rejected"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_workflow_propose_work_1_0_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "workflow-instance"
+      ],
+      "typeId": "tekroo.command.workflow.propose-work",
+      "version": "1.0.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "ACTOR",
+        "SERVICE",
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.0.0"
+        ],
+        "transforms": []
+      },
+      "emits": [
+        "tekroo.event.workflow.checkpoint-recorded"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_workflow_record_checkpoint_1_0_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "workflow-instance"
+      ],
+      "typeId": "tekroo.command.workflow.record-checkpoint",
+      "version": "1.0.0"
+    },
+    {
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [
+        "ACTOR",
+        "SERVICE",
+        "POLICY"
+      ],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.0.0"
+        ],
+        "transforms": []
+      },
+      "emits": [
+        "tekroo.event.workflow.stage-result-recorded"
+      ],
+      "executionRequired": false,
+      "kind": "COMMAND",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_command_workflow_record_stage_result_1_0_0",
+      "rootAllowed": false,
+      "routingMode": "KERNEL_DIRECT",
+      "targetKinds": [
+        "workflow-instance"
+      ],
+      "typeId": "tekroo.command.workflow.record-stage-result",
+      "version": "1.0.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.completion-review.finalize"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_completion_review_finalized_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "completion-review"
+      ],
+      "typeId": "tekroo.event.completion-review.finalized",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.completion-review.open"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_completion_review_opened_1_6_0",
+      "rootAllowed": true,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "completion-review"
+      ],
+      "typeId": "tekroo.event.completion-review.opened",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.completion-review.record-result"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_completion_review_result_recorded_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "completion-review"
+      ],
+      "typeId": "tekroo.event.completion-review.result-recorded",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.escalation.open"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_escalation_opened_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "escalation"
+      ],
+      "typeId": "tekroo.event.escalation.opened",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.escalation.resolve"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_escalation_resolved_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "escalation"
+      ],
+      "typeId": "tekroo.event.escalation.resolved",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.evidence.register"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_evidence_registered_1_6_0",
+      "rootAllowed": true,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "evidence"
+      ],
+      "typeId": "tekroo.event.evidence.registered",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.execution.register"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_execution_registered_1_6_0",
+      "rootAllowed": true,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "execution"
+      ],
+      "typeId": "tekroo.event.execution.registered",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.execution.replace"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_execution_replaced_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "execution"
+      ],
+      "typeId": "tekroo.event.execution.replaced",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.human-interaction.close"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.6.0"
+        ],
+        "transforms": []
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_human_interaction_closed_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "human-interaction"
+      ],
+      "typeId": "tekroo.event.human-interaction.closed",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.human-interaction.record-delivery"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.6.0"
+        ],
+        "transforms": []
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_human_interaction_delivery_recorded_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "human-interaction"
+      ],
+      "typeId": "tekroo.event.human-interaction.delivery-recorded",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.human-interaction.expire"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.6.0"
+        ],
+        "transforms": []
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_human_interaction_expired_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "human-interaction"
+      ],
+      "typeId": "tekroo.event.human-interaction.expired",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.human-interaction.open"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.6.0"
+        ],
+        "transforms": []
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_human_interaction_opened_1_6_0",
+      "rootAllowed": true,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "human-interaction"
+      ],
+      "typeId": "tekroo.event.human-interaction.opened",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.human-interaction.respond"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.6.0"
+        ],
+        "transforms": []
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_human_interaction_response_recorded_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "human-interaction"
+      ],
+      "typeId": "tekroo.event.human-interaction.response-recorded",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.human-participant.bind-profile"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.6.0"
+        ],
+        "transforms": []
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_human_participant_profile_bound_1_6_0",
+      "rootAllowed": true,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "human-participant"
+      ],
+      "typeId": "tekroo.event.human-participant.profile-bound",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.human-participant.revoke"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.6.0"
+        ],
+        "transforms": []
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_human_participant_revoked_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "human-participant"
+      ],
+      "typeId": "tekroo.event.human-participant.revoked",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.projection.record-fault"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.7.0"
+        ],
+        "transforms": []
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_projection_fault_recorded_1_7_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "system"
+      ],
+      "typeId": "tekroo.event.projection.fault-recorded",
+      "version": "1.7.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.record.correct"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_record_corrected_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "story",
+        "task",
+        "evidence",
+        "system"
+      ],
+      "typeId": "tekroo.event.record.corrected",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.release-plan.create"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_release_plan_created_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "release-plan"
+      ],
+      "typeId": "tekroo.event.release-plan.created",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.release-plan.request-execution"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_release_plan_execution_requested_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "release-plan"
+      ],
+      "typeId": "tekroo.event.release-plan.execution-requested",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.release-plan.finalize"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_release_plan_finalized_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "release-plan"
+      ],
+      "typeId": "tekroo.event.release-plan.finalized",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.release-plan.record-qualification"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_release_plan_qualification_recorded_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "release-plan"
+      ],
+      "typeId": "tekroo.event.release-plan.qualification-recorded",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.release-plan.record-reconciliation"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_release_plan_reconciliation_recorded_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "release-plan"
+      ],
+      "typeId": "tekroo.event.release-plan.reconciliation-recorded",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.release-plan.record-result"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_release_plan_result_recorded_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "release-plan"
+      ],
+      "typeId": "tekroo.event.release-plan.result-recorded",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.story.request-acceptance"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_story_accepted_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "story"
+      ],
+      "typeId": "tekroo.event.story.accepted",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.story.activate"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_story_activated_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "story"
+      ],
+      "typeId": "tekroo.event.story.activated",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.story.authorize"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_story_authorized_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "story"
+      ],
+      "typeId": "tekroo.event.story.authorized",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.story.request-completion"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_story_completed_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "story"
+      ],
+      "typeId": "tekroo.event.story.completed",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.story.create"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_story_created_1_6_0",
+      "rootAllowed": true,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "story"
+      ],
+      "typeId": "tekroo.event.story.created",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.story.begin-planning"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_story_planning_started_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "story"
+      ],
+      "typeId": "tekroo.event.story.planning-started",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.story.approve-release"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_story_release_approved_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "story"
+      ],
+      "typeId": "tekroo.event.story.release-approved",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.system.configure-continuity"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.6.0"
+        ],
+        "transforms": []
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_system_continuity_configured_1_6_0",
+      "rootAllowed": true,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "system"
+      ],
+      "typeId": "tekroo.event.system.continuity-configured",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.system.bind-operator-role"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.6.0"
+        ],
+        "transforms": []
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_system_operator_role_bound_1_6_0",
+      "rootAllowed": true,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "system"
+      ],
+      "typeId": "tekroo.event.system.operator-role-bound",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.system.request-quiescence"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.6.0"
+        ],
+        "transforms": []
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_system_quiescence_requested_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "system"
+      ],
+      "typeId": "tekroo.event.system.quiescence-requested",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.system.begin-reconciliation"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.6.0"
+        ],
+        "transforms": []
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_system_reconciliation_started_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "system"
+      ],
+      "typeId": "tekroo.event.system.reconciliation-started",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.system.resume"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.6.0"
+        ],
+        "transforms": []
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_system_resumed_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "system"
+      ],
+      "typeId": "tekroo.event.system.resumed",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.system.record-suspended"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.6.0"
+        ],
+        "transforms": []
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_system_suspended_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "system"
+      ],
+      "typeId": "tekroo.event.system.suspended",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.system.record-unexpected-outage"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.6.0"
+        ],
+        "transforms": []
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_system_unexpected_outage_recorded_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "system"
+      ],
+      "typeId": "tekroo.event.system.unexpected-outage-recorded",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.task.activate"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_task_activated_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "task"
+      ],
+      "typeId": "tekroo.event.task.activated",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.task.request-completion"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_task_completed_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "task"
+      ],
+      "typeId": "tekroo.event.task.completed",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.task.create"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_task_created_1_6_0",
+      "rootAllowed": true,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "task"
+      ],
+      "typeId": "tekroo.event.task.created",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.task.dispatch"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_task_dispatched_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "task"
+      ],
+      "typeId": "tekroo.event.task.dispatched",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.task.force-reassign"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_task_force_reassigned_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "task"
+      ],
+      "typeId": "tekroo.event.task.force-reassigned",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.task.handoff"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_task_handed_off_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "task"
+      ],
+      "typeId": "tekroo.event.task.handed-off",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.task.bind-operational-scope"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.7.0"
+        ],
+        "transforms": []
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_task_operational_scope_bound_1_7_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "task"
+      ],
+      "typeId": "tekroo.event.task.operational-scope-bound",
+      "version": "1.7.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.task.acquire-ownership"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_task_ownership_acquired_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "task"
+      ],
+      "typeId": "tekroo.event.task.ownership-acquired",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.task.release-ownership"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_task_ownership_released_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "task"
+      ],
+      "typeId": "tekroo.event.task.ownership-released",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.task.authorize-qualified-assignment"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_task_qualified_assignment_authorized_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "task"
+      ],
+      "typeId": "tekroo.event.task.qualified-assignment-authorized",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.task.mark-ready"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_task_readied_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "task"
+      ],
+      "typeId": "tekroo.event.task.readied",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.task.bind-work-budget"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.7.0"
+        ],
+        "transforms": []
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_task_work_budget_bound_1_7_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "task"
+      ],
+      "typeId": "tekroo.event.task.work-budget-bound",
+      "version": "1.7.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.task.bind-work-profile"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_task_work_profile_bound_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "task"
+      ],
+      "typeId": "tekroo.event.task.work-profile-bound",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.variant-group.submit-candidate"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_variant_group_candidate_submitted_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "variant-group"
+      ],
+      "typeId": "tekroo.event.variant-group.candidate-submitted",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.variant-group.record-comparison"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_variant_group_comparison_recorded_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "variant-group"
+      ],
+      "typeId": "tekroo.event.variant-group.comparison-recorded",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.variant-group.open"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_variant_group_opened_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "variant-group"
+      ],
+      "typeId": "tekroo.event.variant-group.opened",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.variant-group.select"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_variant_group_selected_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "variant-group"
+      ],
+      "typeId": "tekroo.event.variant-group.selected",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.work-budget.amend"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.7.0"
+        ],
+        "transforms": []
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_work_budget_amended_1_7_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "work-budget-account"
+      ],
+      "typeId": "tekroo.event.work-budget.amended",
+      "version": "1.7.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.work-budget.create"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.7.0"
+        ],
+        "transforms": []
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_work_budget_created_1_7_0",
+      "rootAllowed": true,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "work-budget-account"
+      ],
+      "typeId": "tekroo.event.work-budget.created",
+      "version": "1.7.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.work-invocation.authorize"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.7.0"
+        ],
+        "transforms": []
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_work_invocation_authorized_1_7_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "work-invocation"
+      ],
+      "typeId": "tekroo.event.work-invocation.authorized",
+      "version": "1.7.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.work-invocation.request-cancellation"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.7.0"
+        ],
+        "transforms": []
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_work_invocation_cancellation_requested_1_7_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "work-invocation"
+      ],
+      "typeId": "tekroo.event.work-invocation.cancellation-requested",
+      "version": "1.7.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.work-invocation.claim"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.7.0"
+        ],
+        "transforms": []
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_work_invocation_claimed_1_7_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "work-invocation"
+      ],
+      "typeId": "tekroo.event.work-invocation.claimed",
+      "version": "1.7.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.work-invocation.expire"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.7.0"
+        ],
+        "transforms": []
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_work_invocation_expired_1_7_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "work-invocation"
+      ],
+      "typeId": "tekroo.event.work-invocation.expired",
+      "version": "1.7.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.work-invocation.record-started"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.7.0"
+        ],
+        "transforms": []
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_work_invocation_started_1_7_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "work-invocation"
+      ],
+      "typeId": "tekroo.event.work-invocation.started",
+      "version": "1.7.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.work-invocation.record-terminal"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.7.0"
+        ],
+        "transforms": []
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_work_invocation_terminal_recorded_1_7_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "work-invocation"
+      ],
+      "typeId": "tekroo.event.work-invocation.terminal-recorded",
+      "version": "1.7.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.work.block"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_work_blocked_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "story",
+        "task"
+      ],
+      "typeId": "tekroo.event.work.blocked",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.work.close"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_work_closed_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "story",
+        "task"
+      ],
+      "typeId": "tekroo.event.work.closed",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.work.reopen"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_work_reopened_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "story",
+        "task"
+      ],
+      "typeId": "tekroo.event.work.reopened",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.work.create-successor"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_work_successor_created_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "story",
+        "task"
+      ],
+      "typeId": "tekroo.event.work.successor-created",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.work.unblock"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.4.0",
+          "1.5.0",
+          "1.6.0"
+        ],
+        "transforms": [
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.4.0",
+            "targetVersion": "1.5.0"
+          },
+          {
+            "mode": "IDENTITY",
+            "sourceVersion": "1.5.0",
+            "targetVersion": "1.6.0"
+          }
+        ]
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_work_unblocked_1_6_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "story",
+        "task"
+      ],
+      "typeId": "tekroo.event.work.unblocked",
+      "version": "1.6.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.workflow.record-checkpoint"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.0.0"
+        ],
+        "transforms": []
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_workflow_checkpoint_recorded_1_0_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "workflow-instance"
+      ],
+      "typeId": "tekroo.event.workflow.checkpoint-recorded",
+      "version": "1.0.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.workflow.create"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.0.0"
+        ],
+        "transforms": []
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_workflow_created_1_0_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "workflow-instance"
+      ],
+      "typeId": "tekroo.event.workflow.created",
+      "version": "1.0.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.workflow.record-stage-result"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.0.0"
+        ],
+        "transforms": []
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_workflow_stage_result_recorded_1_0_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "workflow-instance"
+      ],
+      "typeId": "tekroo.event.workflow.stage-result-recorded",
+      "version": "1.0.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.workflow.propose-work"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.0.0"
+        ],
+        "transforms": []
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_workflow_work_admitted_1_0_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "workflow-instance"
+      ],
+      "typeId": "tekroo.event.workflow.work-admitted",
+      "version": "1.0.0"
+    },
+    {
+      "acceptedCommandTypes": [
+        "tekroo.command.workflow.propose-work"
+      ],
+      "aliases": [],
+      "allowedParentEdges": [
+        "CAUSAL",
+        "RESPONSE",
+        "RETRY",
+        "DERIVATION",
+        "SUPERSESSION"
+      ],
+      "authorityKinds": [],
+      "compatibility": {
+        "acceptedSourceVersions": [
+          "1.0.0"
+        ],
+        "transforms": []
+      },
+      "executionRequired": false,
+      "kind": "EVENT",
+      "lifecycle": "ACTIVE",
+      "owner": "tekroo-kernel",
+      "payloadSchema": "schemas/payloads.schema.json#/$defs/tekroo_event_workflow_work_rejected_1_0_0",
+      "rootAllowed": false,
+      "routingMode": "COMMITTED_EVENT",
+      "targetKinds": [
+        "workflow-instance"
+      ],
+      "typeId": "tekroo.event.workflow.work-rejected",
+      "version": "1.0.0"
+    }
+  ],
+  "explicitlyUnadoptedHistoricalTypes": [
+    "tekroo-agent-chat",
+    "tekroo-agent-ping",
+    "tekroo-agent-pong"
+  ],
+  "revision": 8,
+  "schemaVersion": "1.7.0",
+  "status": "FROZEN_CANDIDATE",
+  "unknownCommandBehavior": "PRESERVE_AND_REJECT_WITHOUT_TARGET_EFFECT",
+  "unknownEventReplayBehavior": "PRESERVE_QUARANTINE_AND_STOP"
+}

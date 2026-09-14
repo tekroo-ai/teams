@@ -91,6 +91,7 @@ func (s TaskExecutionSpecification) Valid() bool {
 
 type OperationalExecutionContext struct {
 	Invocation             kernel.WorkInvocation
+	AdmittedMessage        *AdmittedMessage
 	RetryOfConversationID  *string
 	Task                   kernel.AggregateState
 	Budget                 kernel.WorkBudgetAccount
@@ -147,7 +148,8 @@ type OperationalDeadlineExtensionReader interface {
 func (c OperationalExecutionContext) Validate(now time.Time) error {
 	invocation := c.Invocation
 	invalidRetryContext := invocation.RetryOfInvocationID == nil && c.RetryOfConversationID != nil || invocation.RetryOfInvocationID != nil && c.RetryOfConversationID != nil && *c.RetryOfConversationID != string(*invocation.RetryOfInvocationID)
-	if !invocation.Valid() || invalidRetryContext || c.Task.Kind != kernel.AggregateTask || c.Task.ID != invocation.TaskID || c.Task.Revision != invocation.TaskRevision || c.Task.LifecycleEpoch != invocation.LifecycleEpoch || c.Task.ScopeRevision != invocation.ScopeRevision || c.Task.Phase != kernel.PhaseActive || c.Task.Condition != kernel.ConditionRunnable || !c.AuthorizationEventSeen || !c.ParentEventSeen {
+	invalidAdmittedMessage := invocation.HandlerDispatch == nil && c.AdmittedMessage != nil || invocation.HandlerDispatch != nil && (c.AdmittedMessage == nil || !c.AdmittedMessage.Valid(*invocation.HandlerDispatch))
+	if !invocation.Valid() || invalidRetryContext || invalidAdmittedMessage || c.Task.Kind != kernel.AggregateTask || c.Task.ID != invocation.TaskID || c.Task.Revision != invocation.TaskRevision || c.Task.LifecycleEpoch != invocation.LifecycleEpoch || c.Task.ScopeRevision != invocation.ScopeRevision || c.Task.Phase != kernel.PhaseActive || c.Task.Condition != kernel.ConditionRunnable || !c.AuthorizationEventSeen || !c.ParentEventSeen {
 		return ErrStaleWorkInvocation
 	}
 	if !c.Budget.Valid() || c.Budget.ID != invocation.BudgetAccountID || c.Budget.PolicyRevision != invocation.AdmissionPolicyRevision || c.Budget.PolicyDigest != invocation.AdmissionPolicyDigest || c.Budget.ModelInvocationsUsed < invocation.GlobalDebitOrdinal || c.Budget.PurposeUsed[invocation.Purpose] < invocation.PurposeDebitOrdinal || !now.Before(c.Budget.DeadlineAt) || !now.Before(invocation.DeadlineAt) {
@@ -214,6 +216,8 @@ type ExecutionBrief struct {
 	DecisionRoute          kernel.DecisionRoute        `json:"decision_route"`
 	ActorFQN               kernel.ActorFQN             `json:"actor_fqn"`
 	RoleGrounding          RoleExecutionGrounding      `json:"role_grounding"`
+	MessageHandler         *MessageHandlerGrounding    `json:"message_handler,omitempty"`
+	AdmittedMessage        *AdmittedMessage            `json:"admitted_message,omitempty"`
 	Execution              kernel.ExecutionTuple       `json:"execution"`
 	ModelProfileDigest     kernel.Digest               `json:"model_profile_digest"`
 	RuntimeIdentityDigest  kernel.Digest               `json:"runtime_identity_digest"`
@@ -261,6 +265,60 @@ func (grounding RoleExecutionGrounding) Valid(actor kernel.ActorFQN) bool {
 
 type RoleGroundingResolver interface {
 	ResolveRoleGrounding(context.Context, kernel.ActorFQN) (RoleExecutionGrounding, error)
+}
+
+// MessageHandlerGrounding contains only the handler selected by the admitted
+// organizational message. Unrelated handlers never enter the model context.
+type MessageHandlerGrounding struct {
+	MessageID               kernel.UUIDv7   `json:"message_id"`
+	MessageType             string          `json:"message_type"`
+	MessagePurpose          string          `json:"message_purpose"`
+	SubscriptionPurpose     string          `json:"subscription_purpose"`
+	CharterDigest           kernel.Digest   `json:"charter_digest"`
+	HandlerDigest           kernel.Digest   `json:"handler_digest"`
+	Instructions            string          `json:"instructions"`
+	InputSchemaDigest       kernel.Digest   `json:"input_schema_digest"`
+	InputSchema             json.RawMessage `json:"input_schema"`
+	ResultSchemaDigest      kernel.Digest   `json:"result_schema_digest"`
+	ResultSchema            json.RawMessage `json:"result_schema"`
+	AllowedResults          []string        `json:"allowed_results"`
+	AllowedMessageProposals []string        `json:"allowed_message_proposals"`
+}
+
+type AdmittedMessage struct {
+	ID      kernel.UUIDv7   `json:"id"`
+	Type    string          `json:"type"`
+	Purpose string          `json:"purpose"`
+	Body    json.RawMessage `json:"body"`
+}
+
+func (message AdmittedMessage) Valid(binding kernel.HandlerDispatchBinding) bool {
+	return message.ID == binding.MessageID && message.Type == binding.MessageType && message.Purpose == binding.MessagePurpose && len(message.Body) > 0 && contentDigest(message.Body) == binding.MessageBodyDigest
+}
+
+func cloneAdmittedMessage(message *AdmittedMessage) *AdmittedMessage {
+	if message == nil {
+		return nil
+	}
+	copy := *message
+	copy.Body = append(json.RawMessage(nil), message.Body...)
+	return &copy
+}
+
+func (grounding MessageHandlerGrounding) Valid(binding kernel.HandlerDispatchBinding, charter string) bool {
+	if !binding.Valid() || grounding.MessageID != binding.MessageID || grounding.MessageType != binding.MessageType || grounding.MessagePurpose != binding.MessagePurpose || grounding.SubscriptionPurpose != binding.SubscriptionPurpose || grounding.CharterDigest != binding.CharterDigest || grounding.HandlerDigest != binding.HandlerDigest || grounding.InputSchemaDigest != binding.InputSchemaDigest || grounding.ResultSchemaDigest != binding.ResultSchemaDigest || !slices.Equal(grounding.AllowedResults, binding.AllowedResults) || !slices.Equal(grounding.AllowedMessageProposals, binding.AllowedMessageProposals) || strings.TrimSpace(grounding.Instructions) == "" || len(grounding.Instructions) > 1<<20 || len(grounding.InputSchema) == 0 || len(grounding.ResultSchema) == 0 {
+		return false
+	}
+	return contentDigest([]byte(charter)) == grounding.CharterDigest && contentDigest([]byte(grounding.Instructions)) == grounding.HandlerDigest && contentDigest(grounding.InputSchema) == grounding.InputSchemaDigest && contentDigest(grounding.ResultSchema) == grounding.ResultSchemaDigest
+}
+
+type RoleHandlerGroundingResolver interface {
+	ResolveRoleHandlerGrounding(context.Context, kernel.ActorFQN, kernel.HandlerDispatchBinding) (RoleExecutionGrounding, MessageHandlerGrounding, error)
+}
+
+func contentDigest(content []byte) kernel.Digest {
+	digest := sha256.Sum256(content)
+	return kernel.Digest(hex.EncodeToString(digest[:]))
 }
 
 type ExecutionResultProtocol struct {
@@ -479,12 +537,24 @@ func cloneString(value *string) *string {
 }
 
 func BuildExecutionBrief(current OperationalExecutionContext, grounding RoleExecutionGrounding, maximumBytes int) (ExecutionBrief, kernel.Digest, error) {
+	return BuildExecutionBriefWithHandler(current, grounding, nil, maximumBytes)
+}
+
+func BuildExecutionBriefWithHandler(current OperationalExecutionContext, grounding RoleExecutionGrounding, handler *MessageHandlerGrounding, maximumBytes int) (ExecutionBrief, kernel.Digest, error) {
 	if maximumBytes <= 0 || maximumBytes > 1<<20 {
 		return ExecutionBrief{}, "", ErrInvalidOperationalExecution
 	}
 	invocation := current.Invocation
 	if !grounding.Valid(invocation.ActorFQN) {
 		return ExecutionBrief{}, "", ErrInvalidOperationalExecution
+	}
+	if invocation.HandlerDispatch == nil && (handler != nil || current.AdmittedMessage != nil) || invocation.HandlerDispatch != nil && (handler == nil || current.AdmittedMessage == nil || !current.AdmittedMessage.Valid(*invocation.HandlerDispatch) || grounding.BundleDigest != invocation.HandlerDispatch.RoleBundleDigest || !handler.Valid(*invocation.HandlerDispatch, grounding.Instructions)) {
+		return ExecutionBrief{}, "", ErrInvalidOperationalExecution
+	}
+	if handler != nil {
+		if err := ValidateRoleHandlerInput(*handler, *current.AdmittedMessage); err != nil {
+			return ExecutionBrief{}, "", err
+		}
 	}
 	evidence := append([]kernel.EvidenceRef(nil), current.Evidence...)
 	sort.Slice(evidence, func(left, right int) bool { return evidence[left].EvidenceID < evidence[right].EvidenceID })
@@ -499,8 +569,10 @@ func BuildExecutionBrief(current OperationalExecutionContext, grounding RoleExec
 		ToolPolicyDigest: invocation.ToolPolicyDigest, EffectPolicyDigest: invocation.EffectPolicyDigest,
 		WorkProfile: current.Profile.Profile.Clone(), AssignmentID: invocation.QualifiedAssignmentID,
 		DecisionRoute: current.Assignment.SelectedDecisionRoute, ActorFQN: invocation.ActorFQN,
-		RoleGrounding: grounding,
-		Execution:     invocation.Execution, ModelProfileDigest: invocation.ModelProfileDigest,
+		RoleGrounding:   grounding,
+		MessageHandler:  cloneMessageHandlerGrounding(handler),
+		AdmittedMessage: cloneAdmittedMessage(current.AdmittedMessage),
+		Execution:       invocation.Execution, ModelProfileDigest: invocation.ModelProfileDigest,
 		RuntimeIdentityDigest: invocation.RuntimeIdentityDigest, Scope: current.Scope.Clone(),
 		Evidence: evidence, RemainingGlobalBudget: invocation.RemainingGlobalBudget,
 		RemainingPurposeBudget: invocation.RemainingPurposeBudget, DeadlineAt: invocation.DeadlineAt,
@@ -552,7 +624,13 @@ func BuildExecutionBrief(current OperationalExecutionContext, grounding RoleExec
 			}
 		}
 	}
-	if invocation.Purpose == kernel.PurposeValidation {
+	if handler != nil {
+		brief.ResultProtocol = &ExecutionResultProtocol{
+			SchemaVersion: "1.0.0", Marker: OrganizationalResultMarker,
+			Outcomes:    append([]string(nil), handler.AllowedResults...),
+			Instruction: "The OpenHands finish tool message is the result consumed by Teams. Set finish.message to the marker on its own line followed by exactly one JSON object conforming to message_handler.result_schema. Put any task-specific structured result required by the admitted work inside work_product, not beside the envelope. Return only results and message proposals allowed by the selected handler. Teams validates the result and remains the sole authority that records state changes or dispatches successor work.",
+		}
+	} else if invocation.Purpose == kernel.PurposeValidation {
 		brief.ExecutionGuidance = append(brief.ExecutionGuidance, validationExecutionGuidance...)
 		brief.ResultProtocol = &ExecutionResultProtocol{
 			SchemaVersion: "1.0.0", Marker: ValidationResultMarker,
@@ -589,6 +667,18 @@ func BuildExecutionBrief(current OperationalExecutionContext, grounding RoleExec
 	}
 	digest := sha256.Sum256(encoded)
 	return brief, kernel.Digest(hex.EncodeToString(digest[:])), nil
+}
+
+func cloneMessageHandlerGrounding(handler *MessageHandlerGrounding) *MessageHandlerGrounding {
+	if handler == nil {
+		return nil
+	}
+	copy := *handler
+	copy.InputSchema = append(json.RawMessage(nil), handler.InputSchema...)
+	copy.ResultSchema = append(json.RawMessage(nil), handler.ResultSchema...)
+	copy.AllowedResults = append([]string(nil), handler.AllowedResults...)
+	copy.AllowedMessageProposals = append([]string(nil), handler.AllowedMessageProposals...)
+	return &copy
 }
 
 type ExternalExecutionState string

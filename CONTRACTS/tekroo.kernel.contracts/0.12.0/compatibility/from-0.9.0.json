@@ -1,0 +1,26 @@
+{
+  "additions": [
+    "exact revisioned aliases",
+    "Ed25519 peer trust grants",
+    "exact signed cross-team routes",
+    "replay-safe ingress receipts",
+    "dedicated federation transport"
+  ],
+  "compatibility": "ADDITIVE",
+  "contractName": "tekroo.kernel.contracts",
+  "contractVersion": "0.10.0",
+  "directions": {
+    "adapter": "NOT_REQUIRED",
+    "reader": "COMPATIBLE",
+    "writer": "SUCCESSOR_IDENTITY_REQUIRED"
+  },
+  "predecessor": {
+    "contractName": "tekroo.kernel.contracts",
+    "contractVersion": "0.9.0",
+    "manifestSha256": "dade26b7f02164b7d366735a15bd0e4253ac6796c6120bed0c5f02fda1bbeb9c"
+  },
+  "preserved": [
+    "all 0.9.0 organizational runtime, DAG, budget, execution, evidence, human, operator, and SMA boundaries"
+  ],
+  "schemaVersion": "1.0.0"
+}

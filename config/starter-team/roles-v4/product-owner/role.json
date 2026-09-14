@@ -1,0 +1,86 @@
+{
+  "schema_version": "2.0.0",
+  "role": "product-owner",
+  "version": "2.0.0",
+  "capabilities": [
+    "acceptance",
+    "feature-intake",
+    "requirements"
+  ],
+  "subscriptions": [
+    {
+      "type": "tekroo.message.feature.submitted",
+      "purpose": "feature-intake"
+    },
+    {
+      "type": "tekroo.message.release.ready",
+      "purpose": "product-acceptance"
+    }
+  ],
+  "permissions": [
+    "evidence.record",
+    "feature.refine-propose",
+    "release.accept-propose"
+  ],
+  "charter": {
+    "path": "ROLE.md",
+    "sha256": "a5e05c447b1450631cc45bc4a2d9f98cae95f3159c70c37e0fd447c628305c77",
+    "media_type": "text/markdown"
+  },
+  "handler_bindings": {
+    "tekroo.message.feature.submitted": {
+      "subscription_purpose": "feature-intake",
+      "message_purpose": "REQUEST",
+      "disposition": "MODEL_HANDLER",
+      "resource": {
+        "path": "handlers/feature.submitted/HANDLER.md",
+        "sha256": "3228d8200847987a21dbeb652ceba740cdc26569b358522f82b66b0a538200a9",
+        "media_type": "text/markdown"
+      },
+      "input_schema": {
+        "path": "handlers/feature.submitted/input.schema.json",
+        "sha256": "960e6113c1f72ef5672432a5f06eec244460bc3e6786b1c8e5fde201408249f0",
+        "media_type": "application/schema+json"
+      },
+      "result_schema": {
+        "path": "handlers/feature.submitted/result.schema.json",
+        "sha256": "96b9620ceb99e7911b6208b50b32e87c276906f9655f3fa43932618b826b79d9",
+        "media_type": "application/schema+json"
+      },
+      "allowed_results": [
+        "blocked",
+        "completed",
+        "failed",
+        "needs_decision"
+      ]
+    },
+    "tekroo.message.release.ready": {
+      "subscription_purpose": "product-acceptance",
+      "message_purpose": "REQUEST",
+      "disposition": "MODEL_HANDLER",
+      "resource": {
+        "path": "handlers/release.ready/HANDLER.md",
+        "sha256": "5e215246539cddda3038018ad44999c438b37d8a389e128490a7616328f69589",
+        "media_type": "text/markdown"
+      },
+      "input_schema": {
+        "path": "handlers/release.ready/input.schema.json",
+        "sha256": "960e6113c1f72ef5672432a5f06eec244460bc3e6786b1c8e5fde201408249f0",
+        "media_type": "application/schema+json"
+      },
+      "result_schema": {
+        "path": "handlers/release.ready/result.schema.json",
+        "sha256": "96b9620ceb99e7911b6208b50b32e87c276906f9655f3fa43932618b826b79d9",
+        "media_type": "application/schema+json"
+      },
+      "allowed_results": [
+        "blocked",
+        "completed",
+        "failed",
+        "needs_decision"
+      ]
+    }
+  },
+  "publisher_key_id": "tekroo-message-handlers-20260913",
+  "signature": "12A4VCXGdfp5KmQu/NVUOiOG3VoIKdeSVWcItVjMJ39ifvmmm+9yiZYjoykzuPcWW6ZyiEZjD1gkJzOv5gWwDQ=="
+}

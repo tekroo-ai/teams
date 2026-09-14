@@ -1,0 +1,604 @@
+{
+  "authority": {
+    "decisionAuthority": "Principal",
+    "implementationAuthority": "PENDING_CANDIDATE_ACCEPTANCE",
+    "productionAuthority": "NONE"
+  },
+  "canonicalization": {
+    "byteDigest": "SHA-256",
+    "byteOrderMark": false,
+    "jsonSemanticCanonicalization": "RFC-8785-compatible sorted-key canonical JSON",
+    "lineEnding": "LF",
+    "manifestDigest": "detached manifest.sha256",
+    "textEncoding": "UTF-8"
+  },
+  "contract": {
+    "name": "tekroo.kernel.contracts",
+    "status": "FROZEN_CANDIDATE",
+    "version": "0.12.0"
+  },
+  "counts": {
+    "catalogueEntries": 143,
+    "commandTypes": 71,
+    "eventTypes": 72,
+    "fixtures": 350,
+    "invariants": 82,
+    "schemas": 23,
+    "traceabilityRequirements": 229
+  },
+  "files": [
+    {
+      "bytes": 146083,
+      "canonicalJsonSha256": "42d4ab763ee100dca6a8f8ded93aaf200ddfa430b2702fdf6ad7dd7d1f2ad2a3",
+      "dependencies": [
+        "schemas/payloads.schema.json"
+      ],
+      "mediaType": "application/json",
+      "path": "catalogue/kernel-catalogue.json",
+      "role": "catalogue",
+      "sha256": "51ce238c315a4342acc1eba737d066c03457e71653f993003aa607583933d66e"
+    },
+    {
+      "bytes": 905,
+      "canonicalJsonSha256": "bc75501c5baefbc9624734169d2279bba7d51aa55810b63b254cd58531bc5bf1",
+      "dependencies": [
+        "CONTRACTS/tekroo.kernel.contracts/0.10.0/manifest.json"
+      ],
+      "mediaType": "application/json",
+      "path": "compatibility/from-0.10.0.json",
+      "role": "compatibility",
+      "sha256": "4064f4da816e01bb1c0223e94093d757dbab3923d328f4ec6a743e88f609a4e1"
+    },
+    {
+      "bytes": 816,
+      "canonicalJsonSha256": "7c808b3be0c6c0f790660c7ec601a14bd00322717a02360c597d2fd54ebc41ad",
+      "dependencies": [
+        "CONTRACTS/tekroo.kernel.contracts/0.11.0/manifest.json"
+      ],
+      "mediaType": "application/json",
+      "path": "compatibility/from-0.11.0.json",
+      "role": "compatibility",
+      "sha256": "ff6eb85444cefaa35d4a4a13329c9458898266b85e13325d0a09cdb7f4cc6222"
+    },
+    {
+      "bytes": 14507,
+      "canonicalJsonSha256": "e864d5cb35b9ca7633eb62c8f1fc009973519d3efb46066819aa52f234215e35",
+      "dependencies": [
+        "CONTRACTS/tekroo.kernel.contracts/0.8.0/manifest.json"
+      ],
+      "mediaType": "application/json",
+      "path": "compatibility/from-0.7.0.json",
+      "role": "compatibility",
+      "sha256": "250c5194d2a2d78ea74b114c9ce94d1020a976df88312d29486f7f58bb4c340e"
+    },
+    {
+      "bytes": 818,
+      "canonicalJsonSha256": "07e1e2a69c933183b9f4d1715d6e651004f3f9ee1a7bbda04b1205657156c51a",
+      "dependencies": [],
+      "mediaType": "application/json",
+      "path": "compatibility/from-0.8.0.json",
+      "role": "compatibility",
+      "sha256": "50060669749c6b7dd303dd9501521a15b5c8ae143e49bbc0615a4f8d44bb620f"
+    },
+    {
+      "bytes": 786,
+      "canonicalJsonSha256": "5c87beddfa9f1a4df6e2fdadb820f864277d686935b985ed5c13bce6f50c88be",
+      "dependencies": [],
+      "mediaType": "application/json",
+      "path": "compatibility/from-0.9.0.json",
+      "role": "compatibility",
+      "sha256": "453b0fd4896dec4aa436acbc81975888b2fb5fc183b77cc538c752a981c5366a"
+    },
+    {
+      "bytes": 173318,
+      "canonicalJsonSha256": "f2c6c86aa1e6a01608f8eb4063826dc368c43b08ee8f9e4d3cae1c5ac9bd7038",
+      "dependencies": [
+        "catalogue/kernel-catalogue.json",
+        "schemas/conformance-fixture.schema.json",
+        "schemas/payloads.schema.json"
+      ],
+      "mediaType": "application/json",
+      "path": "fixtures/catalogue-coverage.json",
+      "role": "fixtures",
+      "sha256": "e1a730afce14944df0e6767f2a5ea46ff508ef22e7bce8a7ebcdcf3ddba1f016"
+    },
+    {
+      "bytes": 3288,
+      "canonicalJsonSha256": "2969e9643b078893dfd6c6376e7838d6149e9dc1bb9c839c109e209cddb8bf9b",
+      "dependencies": [],
+      "mediaType": "application/json",
+      "path": "fixtures/federation.json",
+      "role": "federation-fixtures",
+      "sha256": "ff7049b7623e0acae67aa2914eaedcfa4cfb42bdb4365d12fded08e25337ef3a"
+    },
+    {
+      "bytes": 161637,
+      "canonicalJsonSha256": "3f205ada72fd00adcbe70ee8c89f02316d971b6f2ad15f921ffbef1180ad0a3b",
+      "dependencies": [
+        "catalogue/kernel-catalogue.json",
+        "schemas/conformance-fixture.schema.json",
+        "schemas/payloads.schema.json"
+      ],
+      "mediaType": "application/json",
+      "path": "fixtures/model-and-invariant-scenarios.json",
+      "role": "fixtures",
+      "sha256": "44e3dbd4e81711a486050a41d1fb9f1ea1f0d0a25a2621583b5878d53efc9fbb"
+    },
+    {
+      "bytes": 2637,
+      "canonicalJsonSha256": "f3002c1aa24f831763dff4350cbdf4360313fc2c8fd68b9824cf9dd98cc1365e",
+      "dependencies": [],
+      "mediaType": "application/json",
+      "path": "fixtures/organization-runtime.json",
+      "role": "organization-fixtures",
+      "sha256": "8e8a59c2130a56255fee0436985034d1a289e9e4ba5243ae3d749bf85370d762"
+    },
+    {
+      "bytes": 3766,
+      "canonicalJsonSha256": "ab95121ea6ebe618b81d64cc3deb6f71e77c1ea4de0622807a806d46b294f234",
+      "dependencies": [
+        "schemas/organization-runtime.schema.json"
+      ],
+      "mediaType": "application/json",
+      "path": "fixtures/role-handler-runtime.json",
+      "role": "fixtures",
+      "sha256": "19f54730ecdc873a5b9a0670e0c124f578824a072080e188fe5d1e8c603c0435"
+    },
+    {
+      "bytes": 6702,
+      "canonicalJsonSha256": "2ab744cd19dbb4fd83a2a654459f8f6ab9b5115442577b91f980919f2cf94a35",
+      "dependencies": [
+        "catalogue/kernel-catalogue.json"
+      ],
+      "mediaType": "application/json",
+      "path": "fixtures/workflow-runtime.json",
+      "role": "fixtures",
+      "sha256": "e603c4bef29b939470e66362c2f15c88d0740309ef2e6b78f183d1172d4ef472"
+    },
+    {
+      "bytes": 1849,
+      "canonicalJsonSha256": "6f5847ada8e5903b597d9eef74af5e5b63277de159d4a38c02c3b837d1e8ed10",
+      "dependencies": [],
+      "mediaType": "application/json",
+      "path": "invariants/federation-invariants.json",
+      "role": "federation-invariants",
+      "sha256": "78e0cd864d2ea1d816735e6d38668921b88a76307a183d68eefcd2192584553c"
+    },
+    {
+      "bytes": 31237,
+      "canonicalJsonSha256": "0468145d7653e0ecc066765b7fc704fe277df475e96972e6e51963fbaccbd925",
+      "dependencies": [
+        "fixtures/catalogue-coverage.json",
+        "fixtures/model-and-invariant-scenarios.json"
+      ],
+      "mediaType": "application/json",
+      "path": "invariants/invariants.json",
+      "role": "invariants",
+      "sha256": "eaeaaffbcf6b1a292f5808318547d7bdf41e9da4ce8ab9942a43881ce6477b81"
+    },
+    {
+      "bytes": 1670,
+      "canonicalJsonSha256": "a80b797a6b697a8ad650a10a20c067cb4bcb8d4d5c7058495945c7632f2c9204",
+      "dependencies": [],
+      "mediaType": "application/json",
+      "path": "invariants/organization-invariants.json",
+      "role": "organization-invariants",
+      "sha256": "fb995a3f73c1b658ad773a68af810e58d5f3e8c9dab47e55f5b3440bc5d39f7a"
+    },
+    {
+      "bytes": 1585,
+      "canonicalJsonSha256": "c9583f80fd7e6bbf75d3710bdf1a538a822ac04934c5f198c9ddf9704bb4e12b",
+      "dependencies": [
+        "fixtures/role-handler-runtime.json"
+      ],
+      "mediaType": "application/json",
+      "path": "invariants/role-handler-invariants.json",
+      "role": "role-handler-invariants",
+      "sha256": "2129918bce0b7e2d6d7d9d128d3e39911bd0af885b455c4671e2e1071c0512f0"
+    },
+    {
+      "bytes": 2208,
+      "canonicalJsonSha256": "09d943604f3461bd36c0267bed45c874a6e8ad0db7fa19273ff7c49e572ee275",
+      "dependencies": [
+        "fixtures/workflow-runtime.json"
+      ],
+      "mediaType": "application/json",
+      "path": "invariants/workflow-invariants.json",
+      "role": "workflow-invariants",
+      "sha256": "df8a150f898ecce81006f0b7350bd6f9b6d2c32a48be0739d0978a5ec02451ef"
+    },
+    {
+      "bytes": 995,
+      "canonicalJsonSha256": "cd33c2870906a783905ac45dd9279c1cb49bf2b244286954fd37ff13f17d241f",
+      "dependencies": [],
+      "mediaType": "application/json",
+      "path": "runner/protocol.json",
+      "role": "runner-protocol",
+      "sha256": "623c0e03aa5f28a4a7d12d792905dd08b1d56e00be5bb41eff4efa22b51e4ff0"
+    },
+    {
+      "bytes": 46183,
+      "canonicalJsonSha256": null,
+      "dependencies": [
+        "catalogue/kernel-catalogue.json",
+        "schemas/payloads.schema.json",
+        "fixtures/catalogue-coverage.json",
+        "fixtures/model-and-invariant-scenarios.json"
+      ],
+      "mediaType": "text/javascript",
+      "path": "runner/reference-runner.mjs",
+      "role": "runner-tool",
+      "sha256": "172898484bb2905b3f88d9897e8674aa83395dfa5408c028c26ba73c213c377a"
+    },
+    {
+      "bytes": 13324,
+      "canonicalJsonSha256": null,
+      "dependencies": [
+        "catalogue/kernel-catalogue.json",
+        "schemas/payloads.schema.json",
+        "invariants/invariants.json",
+        "traceability/traceability.json",
+        "compatibility/from-0.8.0.json",
+        "runner/protocol.json"
+      ],
+      "mediaType": "text/javascript",
+      "path": "runner/validate-package.mjs",
+      "role": "runner-tool",
+      "sha256": "b1a1fc3d7e51f7f004a80427dd28644059e79863040b762a75563ede45a55f88"
+    },
+    {
+      "bytes": 2325,
+      "canonicalJsonSha256": "b593daef808c827194aba91c9d61149600c545bd527547bb54e52b68999e91ed",
+      "dependencies": [],
+      "mediaType": "application/json",
+      "path": "schemas/admission-result.schema.json",
+      "role": "workflow-schemas",
+      "sha256": "843bd9e7964f8911c1615e027c1fef40dab9ef5e199d43b76d3ff7b409e7af3c"
+    },
+    {
+      "bytes": 11641,
+      "canonicalJsonSha256": "b6ffcf8bcad6600f8eacb5bbd9b577fd0c93ab4f6f7caf8b53079d98e81d1708",
+      "dependencies": [
+        "schemas/core.schema.json"
+      ],
+      "mediaType": "application/json",
+      "path": "schemas/aggregate-state.schema.json",
+      "role": "schemas",
+      "sha256": "93e0b687e719e43446699434664709540338795975779ca19ab4fcbc537179d1"
+    },
+    {
+      "bytes": 1865,
+      "canonicalJsonSha256": "adefcc39dd8b8d0c6fc50f5bc099b8c5caba4b64c1d4b0ee575161d30ed191c5",
+      "dependencies": [
+        "schemas/core.schema.json"
+      ],
+      "mediaType": "application/json",
+      "path": "schemas/command-receipt.schema.json",
+      "role": "schemas",
+      "sha256": "c780ef9f8fb545712d2b6664983adbf825536cca2fe290af45b89edb59ccc36f"
+    },
+    {
+      "bytes": 1732,
+      "canonicalJsonSha256": "e9af4817eb8b1ad336f2154593f1a90d2f97eed0c65644696c157ff13f64e15e",
+      "dependencies": [
+        "schemas/core.schema.json"
+      ],
+      "mediaType": "application/json",
+      "path": "schemas/conformance-fixture.schema.json",
+      "role": "schemas",
+      "sha256": "4136695d0c88bae94eb602a06cdb6be54d5e41acaa58586f43e54aa23beb6ee4"
+    },
+    {
+      "bytes": 1007,
+      "canonicalJsonSha256": "1663a25ab332b72e6d6a744e6a02a46b185d35de100f64f5dc44716c67823fde",
+      "dependencies": [
+        "schemas/core.schema.json"
+      ],
+      "mediaType": "application/json",
+      "path": "schemas/conformance-report.schema.json",
+      "role": "schemas",
+      "sha256": "5d08b0e2651b83caeaccc720b827e3ac69c7338284698307160ac790337c38fb"
+    },
+    {
+      "bytes": 3517,
+      "canonicalJsonSha256": "729f488b3836087a781f6b809f6058dbd6ab427baca2b318d22de7fb9efab923",
+      "dependencies": [],
+      "mediaType": "application/json",
+      "path": "schemas/core.schema.json",
+      "role": "schemas",
+      "sha256": "ecf98f1ec256ddc3752d39c46a748d453568c4d2f7b9c5df2fff29436da49c7a"
+    },
+    {
+      "bytes": 2053,
+      "canonicalJsonSha256": "fb9ba5647e49d3b94b07359881424255b237314844467a6559778dd0977cbe75",
+      "dependencies": [
+        "schemas/core.schema.json"
+      ],
+      "mediaType": "application/json",
+      "path": "schemas/domain-event.schema.json",
+      "role": "schemas",
+      "sha256": "0d01821d461c6f9b0a3a4582431bafb4fa703f024c5d16411666fdf8610c67df"
+    },
+    {
+      "bytes": 4268,
+      "canonicalJsonSha256": "5d7858c8b573934e187539fed5adee57f895a737e091bd3370d681323d5d97ce",
+      "dependencies": [
+        "schemas/core.schema.json"
+      ],
+      "mediaType": "application/json",
+      "path": "schemas/evidence-record.schema.json",
+      "role": "schemas",
+      "sha256": "32870436716a0478ebc760b6a4a5ad6bc13a1f51e490ce526e13bc006dc3f4a1"
+    },
+    {
+      "bytes": 9276,
+      "canonicalJsonSha256": "0ab48568293c33e60c0dae51ab2d95663103011bd416bb9bd08ab8be496655bb",
+      "dependencies": [],
+      "mediaType": "application/json",
+      "path": "schemas/federation.schema.json",
+      "role": "federation-schemas",
+      "sha256": "9527a4968799717c247708f8b2b46151d167554e883b81820ecf815d650296c4"
+    },
+    {
+      "bytes": 3407,
+      "canonicalJsonSha256": "aa0aa0813bdbeb083b76b1fe9eeff1c23461b6d970e7d3cf7bf0e8eb58bd7faf",
+      "dependencies": [
+        "schemas/core.schema.json"
+      ],
+      "mediaType": "application/json",
+      "path": "schemas/human-interaction-state.schema.json",
+      "role": "schemas",
+      "sha256": "855655fc6424fa49707ed29c336f0c56475c6553f93c21000d77e09bacf87f97"
+    },
+    {
+      "bytes": 9487,
+      "canonicalJsonSha256": "9ea15ed2a1f6c431d57d065e50604b596fb4e2ec0403801faafb691a89417322",
+      "dependencies": [
+        "schemas/core.schema.json"
+      ],
+      "mediaType": "application/json",
+      "path": "schemas/human-participant-profile.schema.json",
+      "role": "schemas",
+      "sha256": "bfcd39b74dc71c4b81cb16f6d35f517de4f55209c5af11ec7f3b3f8a5a614543"
+    },
+    {
+      "bytes": 2909,
+      "canonicalJsonSha256": "1175980655e237fff990e7a850759a20be620d897a567fa7f112beb909d9a2eb",
+      "dependencies": [
+        "schemas/core.schema.json"
+      ],
+      "mediaType": "application/json",
+      "path": "schemas/kernel-command.schema.json",
+      "role": "schemas",
+      "sha256": "38124dcb6872ce07ca91790fbaded980ce1ffc6fd1ed8fb024dc440b748320c1"
+    },
+    {
+      "bytes": 30982,
+      "canonicalJsonSha256": "b6fa31f863d1a7ddf65cc9da07ee0053bf50d1120f6195614529da9bdbc4f35d",
+      "dependencies": [
+        "schemas/core.schema.json"
+      ],
+      "mediaType": "application/json",
+      "path": "schemas/operational-projection.schema.json",
+      "role": "schemas",
+      "sha256": "94af732a66250bf91fc37d391a2acefb87577581e7d98f78142cd03058c8db23"
+    },
+    {
+      "bytes": 3238,
+      "canonicalJsonSha256": "b91a4408ff41b116582c828787ecdfab66eaefcc2682c1388ea86f53792498c4",
+      "dependencies": [
+        "schemas/core.schema.json"
+      ],
+      "mediaType": "application/json",
+      "path": "schemas/operator-role-profile.schema.json",
+      "role": "schemas",
+      "sha256": "6cb228f2b5dd702ae2d533676b8eb7ef777b90446db9f91a9bec4c0b62431038"
+    },
+    {
+      "bytes": 22216,
+      "canonicalJsonSha256": "1ae2c5daf5309dea6ac2e7aa088571d7f0cd6357311151bff1fa888bbaf79a20",
+      "dependencies": [],
+      "mediaType": "application/json",
+      "path": "schemas/organization-runtime.schema.json",
+      "role": "organization-schemas",
+      "sha256": "e435d95e1095e7e07516eba91671d6acde503fec7f9a795862bd7529a7e126be"
+    },
+    {
+      "bytes": 425224,
+      "canonicalJsonSha256": "60b6cab07f134368e68c5aad0502bed4ed351b9a18734bab20c618772a4209e3",
+      "dependencies": [
+        "schemas/core.schema.json",
+        "schemas/workflow-definition.schema.json",
+        "schemas/work-proposal.schema.json",
+        "schemas/admission-result.schema.json"
+      ],
+      "mediaType": "application/json",
+      "path": "schemas/payloads.schema.json",
+      "role": "schemas",
+      "sha256": "82d0f97b4c7efdab17e43eab18d7450e645ad1f0f427f9c3c6dae5631a22b27b"
+    },
+    {
+      "bytes": 2814,
+      "canonicalJsonSha256": "96962465ea662e1dec2d994bfdfc267cf32912daab11e969a7a4cf0aa764c0b2",
+      "dependencies": [
+        "schemas/core.schema.json"
+      ],
+      "mediaType": "application/json",
+      "path": "schemas/team-continuity-state.schema.json",
+      "role": "schemas",
+      "sha256": "3f91b408e8b77f6cfaab3506d1ef2d5c022dbf6a6644002955c8ced79de8e9fa"
+    },
+    {
+      "bytes": 4745,
+      "canonicalJsonSha256": "df20b51d26aa0700c1e33a388e0cbdea09bbeef6729fe65601662fee45310cda",
+      "dependencies": [
+        "schemas/core.schema.json"
+      ],
+      "mediaType": "application/json",
+      "path": "schemas/work-budget-account.schema.json",
+      "role": "schemas",
+      "sha256": "0bebe8cadf9403e8cbf4e816d94572cc699f3df4901d0dd8ab6f45c99713ab99"
+    },
+    {
+      "bytes": 9829,
+      "canonicalJsonSha256": "8a7b503d917c18a8d08529560440ca44faf826bf45b1beaa68b00735636e71f6",
+      "dependencies": [
+        "schemas/core.schema.json"
+      ],
+      "mediaType": "application/json",
+      "path": "schemas/work-invocation.schema.json",
+      "role": "schemas",
+      "sha256": "51050972f2c142161f5e64679a7ab907ed6a57bf618c723dc14f4d709d309fcb"
+    },
+    {
+      "bytes": 6174,
+      "canonicalJsonSha256": "d620365668e6118045e5dc265e1c3cad6471ffbc6d6bcba19ed3be31ac227079",
+      "dependencies": [
+        "schemas/core.schema.json"
+      ],
+      "mediaType": "application/json",
+      "path": "schemas/work-profile.schema.json",
+      "role": "schemas",
+      "sha256": "0683576c765b2ca62041b447d448c26532ac6f9dedccb7bee1ca9816cb7b9034"
+    },
+    {
+      "bytes": 2271,
+      "canonicalJsonSha256": "73602795d776f7e7d157862813e56646895a133a9ab4d06b5ed10b197172d52d",
+      "dependencies": [
+        "schemas/core.schema.json"
+      ],
+      "mediaType": "application/json",
+      "path": "schemas/work-proposal.schema.json",
+      "role": "workflow-schemas",
+      "sha256": "209be69c1142ec7ddfa9a08a72eb106230c4a1156f5562a7f1c03f2eba21e423"
+    },
+    {
+      "bytes": 6287,
+      "canonicalJsonSha256": "8fb39ed6fc125ed2b5b74760d7ef7724a0c23173cde43152aa08ce57ffcd927e",
+      "dependencies": [],
+      "mediaType": "application/json",
+      "path": "schemas/workflow-definition.schema.json",
+      "role": "workflow-schemas",
+      "sha256": "119964a1bf85e193f8cb7798af1fa17d1cfdeec2f5c0c9e0b0410ec26d9df7b8"
+    },
+    {
+      "bytes": 5337,
+      "canonicalJsonSha256": "653b8f81120d5a43f84f471c29c0738c93b2511713f0dac1a062cd38d0ffc350",
+      "dependencies": [
+        "schemas/core.schema.json"
+      ],
+      "mediaType": "application/json",
+      "path": "schemas/workflow-instance.schema.json",
+      "role": "workflow-schemas",
+      "sha256": "123f6ad2bfb3b41a337fcedb372650519da93ff55c8521bbc8d74f6b4be559d1"
+    },
+    {
+      "bytes": 2075,
+      "canonicalJsonSha256": "c37a44201b2acdb949fbfc375ee4e668028ef4ba3dc2c5fb1907adb807e0593c",
+      "dependencies": [],
+      "mediaType": "application/json",
+      "path": "traceability/federation-traceability.json",
+      "role": "federation-traceability",
+      "sha256": "f44e8f264ca2b914befb389e7ec674559261ebb2f0211aac8f66e9daded6000c"
+    },
+    {
+      "bytes": 1896,
+      "canonicalJsonSha256": "12b2e502cda3bbeb91df3622ca6f457d8f420cfbd3748acae23b135e7844aa26",
+      "dependencies": [],
+      "mediaType": "application/json",
+      "path": "traceability/organization-traceability.json",
+      "role": "organization-traceability",
+      "sha256": "fc2a69a182790a71343a29d394270f7e536c8c32beb263386e68af8b657938dd"
+    },
+    {
+      "bytes": 1755,
+      "canonicalJsonSha256": "6076eb72d4e06450b1fe8c36f570ffebee2ebe9b3e0275a4cfaeb90c39cd9c8d",
+      "dependencies": [
+        "fixtures/role-handler-runtime.json",
+        "invariants/role-handler-invariants.json"
+      ],
+      "mediaType": "application/json",
+      "path": "traceability/role-handler-traceability.json",
+      "role": "role-handler-traceability",
+      "sha256": "1f18d1b3601cb48f6a03c30969cc71555f9b9e8a939500d4ca52099f24dfaee2"
+    },
+    {
+      "bytes": 170167,
+      "canonicalJsonSha256": "9a7a5018868de588c4bdfda3a8e2a92ff8c82f853f613319ab2299ffe41b626c",
+      "dependencies": [
+        "invariants/invariants.json",
+        "fixtures/catalogue-coverage.json",
+        "fixtures/model-and-invariant-scenarios.json"
+      ],
+      "mediaType": "application/json",
+      "path": "traceability/traceability.json",
+      "role": "traceability",
+      "sha256": "480b9cc2974398c1d6a06715429af8c28222802bb10002a5c9885881cdac1bea"
+    },
+    {
+      "bytes": 2446,
+      "canonicalJsonSha256": "243f94314d8126d59e9d61e1aaf06f3621c946f636cc691fd808278e751a5d2f",
+      "dependencies": [
+        "fixtures/workflow-runtime.json",
+        "invariants/workflow-invariants.json"
+      ],
+      "mediaType": "application/json",
+      "path": "traceability/workflow-traceability.json",
+      "role": "workflow-traceability",
+      "sha256": "41638fae7a63bc37cf3c1263973d8c488a3a325b29996706517030c7eb3ae2c6"
+    }
+  ],
+  "generatedAt": "2026-09-13T00:00:00Z",
+  "inventoryBoundary": "files lists every payload asset; manifest.json is identified by detached manifest.sha256 and manifest.sha256 is not self-listed.",
+  "knownLimitations": [
+    "Contract structure does not by itself qualify the Go implementation or a deployment.",
+    "V3 data migration and unrestricted agent-to-agent conversation are not authorized."
+  ],
+  "profiles": [
+    {
+      "authorization": "PHASE_4_STEP_2_AUTHORIZATION",
+      "currentStatus": "READY_TO_RUN",
+      "name": "contract-structure",
+      "required": true
+    },
+    {
+      "authorization": "AFTER_PRINCIPAL_CANDIDATE_ACCEPTANCE",
+      "currentStatus": "NOT_RUN",
+      "name": "core-hermetic",
+      "required": true
+    },
+    {
+      "authorization": "AFTER_PRINCIPAL_CANDIDATE_ACCEPTANCE",
+      "currentStatus": "NOT_RUN",
+      "name": "mongo-integration",
+      "required": true
+    },
+    {
+      "authorization": "AFTER_PRINCIPAL_CANDIDATE_ACCEPTANCE",
+      "currentStatus": "NOT_RUN",
+      "name": "synthesized-merge",
+      "required": true
+    },
+    {
+      "authorization": "AFTER_PRINCIPAL_CANDIDATE_ACCEPTANCE",
+      "currentStatus": "NOT_RUN",
+      "name": "provider-e2e",
+      "required": false
+    }
+  ],
+  "schemaVersion": "1.7.0",
+  "sourceLineage": [
+    {
+      "path": "CONTRACTS/tekroo.kernel.contracts/0.11.0/manifest.json",
+      "sha256": "85306c8edc703e85df502280642ef30161e16b8e82ff48f568c5a5c6d421f12d"
+    },
+    {
+      "path": "docs/architecture/131-phase-10-message-handler-runtime-plan.md",
+      "sha256": "10555e6eef20bd482791b639ca56b847d1bd0e043328096039aa35265ee78236"
+    },
+    {
+      "path": "scripts/generate_phase10_contract_0_12.mjs",
+      "sha256": "8ac1d786b7f39d81d308f93c2355c965c6324dd69f055ff87e725a251e043b33"
+    }
+  ]
+}

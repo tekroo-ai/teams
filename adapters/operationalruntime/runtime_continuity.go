@@ -133,10 +133,23 @@ func (service *ProductionService) reconcileFeatureRuntimeSuspension(ctx context.
 	// policy. A policy successor must not make the same host-suspension interval
 	// eligible for a second deadline allowance.
 	key := "runtime-suspension-" + string(window.ID)
-	commandID := deterministicOperationalUUID("command", string(feature.ID), "tekroo.command.work-budget.amend", string(account.ID), key)
+	commandID := deterministicFeatureCommandID(feature, "tekroo.command.work-budget.amend", account.ID, key)
 	receipt, attempted, err := service.Store.ReadCommandReceipt(ctx, commandID)
 	if err != nil {
 		return err
+	}
+	if !attempted {
+		// A short-lived recovery build derived every command ID from the
+		// normalized idempotency value. Recognize that transitional identity so
+		// its already-applied suspension amendment is replayed, not submitted
+		// again with a conflicting idempotency key.
+		legacyID := deterministicOperationalUUID("command", string(feature.ID), "tekroo.command.work-budget.amend", string(account.ID), featureCommandIdempotencyKey(feature, key))
+		if legacyID != commandID {
+			receipt, attempted, err = service.Store.ReadCommandReceipt(ctx, legacyID)
+			if err != nil {
+				return err
+			}
+		}
 	}
 	var targetDeadline time.Time
 	var evidence []kernel.EvidenceRef

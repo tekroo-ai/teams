@@ -1,0 +1,909 @@
+{
+  "$defs": {
+    "executionTuple": {
+      "additionalProperties": false,
+      "properties": {
+        "execution_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "fencing_epoch": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "execution_id",
+        "fencing_epoch"
+      ],
+      "type": "object"
+    },
+    "featureRequestInput": {
+      "properties": {
+        "acceptance_criteria": {
+          "items": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "constraints": {
+          "items": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 64,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "description": {
+          "maxLength": 65536,
+          "minLength": 1,
+          "type": "string"
+        },
+        "idempotency_key": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        },
+        "maximum_hops": {
+          "maximum": 64,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "maximum_stories": {
+          "maximum": 64,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "maximum_tasks": {
+          "maximum": 256,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "priority": {
+          "enum": [
+            "LOW",
+            "NORMAL",
+            "HIGH",
+            "CRITICAL"
+          ]
+        },
+        "repository": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        },
+        "team": {
+          "maxLength": 64,
+          "minLength": 1,
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 512,
+          "minLength": 1,
+          "type": "string"
+        },
+        "workspace_id": {
+          "maxLength": 1024,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "idempotency_key",
+        "team",
+        "title",
+        "description",
+        "acceptance_criteria",
+        "priority",
+        "repository",
+        "workspace_id",
+        "maximum_stories",
+        "maximum_tasks",
+        "maximum_hops"
+      ],
+      "type": "object"
+    },
+    "humanNotification": {
+      "additionalProperties": false,
+      "properties": {
+        "created_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "delivery_event_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "delivery_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "interaction_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "question": {
+          "maxLength": 65536,
+          "minLength": 1,
+          "type": "string"
+        },
+        "recipient": {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "maxLength": 256,
+              "minLength": 1,
+              "type": "string"
+            },
+            "kind": {
+              "enum": [
+                "HUMAN",
+                "ACTOR",
+                "SERVICE",
+                "POLICY"
+              ]
+            }
+          },
+          "required": [
+            "kind",
+            "id"
+          ],
+          "type": "object"
+        },
+        "response": {
+          "maxLength": 65536,
+          "type": "string"
+        },
+        "response_event_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "response_specification": {
+          "maxLength": 16384,
+          "minLength": 1,
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "1.0.0"
+        },
+        "state": {
+          "enum": [
+            "COLLECTING",
+            "CLOSED",
+            "TIMED_OUT"
+          ]
+        },
+        "subject_task_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "updated_at": {
+          "format": "date-time",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "interaction_id",
+        "subject_task_id",
+        "recipient",
+        "question",
+        "response_specification",
+        "delivery_id",
+        "delivery_event_id",
+        "state",
+        "created_at",
+        "updated_at"
+      ],
+      "type": "object"
+    },
+    "messageFlow": {
+      "additionalProperties": false,
+      "properties": {
+        "budget_account_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "hop": {
+          "maximum": 64,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "lifecycle_epoch": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "maximum_hops": {
+          "maximum": 64,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "parent_step_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "progress_digest": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "scope_revision": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "step_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "thread_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "thread_id",
+        "step_id",
+        "hop",
+        "maximum_hops",
+        "budget_account_id",
+        "lifecycle_epoch",
+        "scope_revision",
+        "progress_digest"
+      ],
+      "type": "object"
+    },
+    "organizationalMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "body": {
+          "minProperties": 1,
+          "type": "object"
+        },
+        "causation_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "correlation_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "created_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "expires_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "fanout_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "flow": {
+          "$ref": "#/$defs/messageFlow"
+        },
+        "id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "purpose": {
+          "enum": [
+            "REQUEST",
+            "HANDOFF",
+            "EVIDENCE",
+            "RESPONSE",
+            "NOTIFICATION"
+          ]
+        },
+        "readdress_history": {
+          "items": {
+            "type": "object"
+          },
+          "maxItems": 8,
+          "type": "array"
+        },
+        "recipient": {
+          "pattern": "^(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])::(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])-[1-9][0-9]{0,19}$",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "1.0.0"
+        },
+        "sender": {
+          "pattern": "^(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])::(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])-[1-9][0-9]{0,19}$",
+          "type": "string"
+        },
+        "sender_execution": {
+          "$ref": "#/$defs/executionTuple"
+        },
+        "type": {
+          "pattern": "^tekroo\\.message\\.[a-z0-9]+(?:[.-][a-z0-9]+)*$",
+          "type": "string"
+        },
+        "work": {
+          "additionalProperties": false,
+          "properties": {
+            "dag_node_id": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            },
+            "feature_id": {
+              "anyOf": [
+                {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "story_id": {
+              "anyOf": [
+                {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "task_id": {
+              "anyOf": [
+                {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "dag_node_id"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "schema_version",
+        "id",
+        "type",
+        "purpose",
+        "sender",
+        "sender_execution",
+        "recipient",
+        "correlation_id",
+        "work",
+        "flow",
+        "body",
+        "created_at",
+        "expires_at"
+      ],
+      "type": "object"
+    },
+    "roleBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "bundle_digest": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "bundle_path": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        },
+        "initial_instances": {
+          "maximum": 64,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "launch_mode": {
+          "enum": [
+            "EAGER",
+            "ON_DEMAND",
+            "MANUAL"
+          ]
+        },
+        "maximum_instances": {
+          "maximum": 64,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "model_profile_digest": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "publisher_key_id": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        },
+        "role": {
+          "maxLength": 64,
+          "minLength": 1,
+          "type": "string"
+        },
+        "workspace_ids": {
+          "items": {
+            "maxLength": 1024,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "role",
+        "bundle_path",
+        "bundle_digest",
+        "publisher_key_id",
+        "initial_instances",
+        "maximum_instances",
+        "launch_mode",
+        "model_profile_digest",
+        "workspace_ids"
+      ],
+      "type": "object"
+    },
+    "roleBundle": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/roleBundleV1"
+        },
+        {
+          "$ref": "#/$defs/roleBundleV2"
+        }
+      ]
+    },
+    "roleBundleV1": {
+      "additionalProperties": false,
+      "properties": {
+        "capabilities": {
+          "items": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 128,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "handlers": {
+          "additionalProperties": {
+            "maxLength": 65536,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxProperties": 256,
+          "type": "object"
+        },
+        "instructions": {
+          "maxLength": 1048576,
+          "minLength": 1,
+          "type": "string"
+        },
+        "permissions": {
+          "items": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 128,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "publisher_key_id": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        },
+        "role": {
+          "maxLength": 64,
+          "minLength": 1,
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "1.0.0"
+        },
+        "signature": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        },
+        "subscriptions": {
+          "items": {
+            "$ref": "#/$defs/subscription"
+          },
+          "maxItems": 256,
+          "type": "array"
+        },
+        "version": {
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "role",
+        "version",
+        "capabilities",
+        "subscriptions",
+        "permissions",
+        "instructions",
+        "handlers",
+        "publisher_key_id",
+        "signature"
+      ],
+      "type": "object"
+    },
+    "roleBundleV2": {
+      "additionalProperties": false,
+      "properties": {
+        "capabilities": {
+          "items": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 128,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "charter": {
+          "$ref": "#/$defs/roleResource"
+        },
+        "handler_bindings": {
+          "additionalProperties": {
+            "$ref": "#/$defs/roleHandler"
+          },
+          "maxProperties": 256,
+          "minProperties": 1,
+          "propertyNames": {
+            "maxLength": 256,
+            "pattern": "^tekroo\\.message\\.[a-z0-9]+(?:[.-][a-z0-9]+)*$",
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "permissions": {
+          "items": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 128,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "publisher_key_id": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        },
+        "role": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])$",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "2.0.0"
+        },
+        "signature": {
+          "maxLength": 4096,
+          "minLength": 1,
+          "type": "string"
+        },
+        "subscriptions": {
+          "items": {
+            "$ref": "#/$defs/subscription"
+          },
+          "maxItems": 256,
+          "type": "array"
+        },
+        "version": {
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "role",
+        "version",
+        "capabilities",
+        "subscriptions",
+        "permissions",
+        "charter",
+        "handler_bindings",
+        "publisher_key_id",
+        "signature"
+      ],
+      "type": "object"
+    },
+    "roleHandler": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "disposition": {
+                "const": "MODEL_HANDLER"
+              }
+            },
+            "required": [
+              "disposition"
+            ]
+          },
+          "then": {
+            "not": {
+              "required": [
+                "deterministic_operation"
+              ]
+            },
+            "required": [
+              "resource",
+              "input_schema",
+              "result_schema"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "disposition": {
+                "const": "DETERMINISTIC_HANDLER"
+              }
+            },
+            "required": [
+              "disposition"
+            ]
+          },
+          "then": {
+            "not": {
+              "required": [
+                "resource"
+              ]
+            },
+            "required": [
+              "input_schema",
+              "result_schema",
+              "deterministic_operation"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "disposition": {
+                "const": "OBSERVE_ONLY"
+              }
+            },
+            "required": [
+              "disposition"
+            ]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "resource"
+                  ]
+                },
+                {
+                  "required": [
+                    "input_schema"
+                  ]
+                },
+                {
+                  "required": [
+                    "result_schema"
+                  ]
+                },
+                {
+                  "required": [
+                    "deterministic_operation"
+                  ]
+                }
+              ]
+            },
+            "properties": {
+              "allowed_message_proposals": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "allowed_message_proposals": {
+          "items": {
+            "maxLength": 256,
+            "pattern": "^tekroo\\.message\\.[a-z0-9]+(?:[.-][a-z0-9]+)*$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "allowed_results": {
+          "items": {
+            "enum": [
+              "blocked",
+              "completed",
+              "failed",
+              "needs_decision"
+            ]
+          },
+          "maxItems": 16,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "deterministic_operation": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        },
+        "disposition": {
+          "enum": [
+            "MODEL_HANDLER",
+            "DETERMINISTIC_HANDLER",
+            "OBSERVE_ONLY"
+          ]
+        },
+        "input_schema": {
+          "$ref": "#/$defs/roleResource"
+        },
+        "message_purpose": {
+          "enum": [
+            "REQUEST",
+            "HANDOFF",
+            "EVIDENCE",
+            "RESPONSE",
+            "NOTIFICATION"
+          ]
+        },
+        "resource": {
+          "$ref": "#/$defs/roleResource"
+        },
+        "result_schema": {
+          "$ref": "#/$defs/roleResource"
+        },
+        "subscription_purpose": {
+          "maxLength": 128,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "subscription_purpose",
+        "message_purpose",
+        "disposition",
+        "allowed_results",
+        "allowed_message_proposals"
+      ],
+      "type": "object"
+    },
+    "roleResource": {
+      "additionalProperties": false,
+      "properties": {
+        "media_type": {
+          "enum": [
+            "text/markdown",
+            "application/schema+json"
+          ]
+        },
+        "path": {
+          "maxLength": 1024,
+          "minLength": 1,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!\\.$).+$",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "media_type"
+      ],
+      "type": "object"
+    },
+    "subscription": {
+      "additionalProperties": false,
+      "properties": {
+        "purpose": {
+          "maxLength": 128,
+          "minLength": 1,
+          "type": "string"
+        },
+        "type": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "purpose"
+      ],
+      "type": "object"
+    },
+    "teamManifest": {
+      "additionalProperties": false,
+      "properties": {
+        "roles": {
+          "items": {
+            "$ref": "#/$defs/roleBinding"
+          },
+          "maxItems": 128,
+          "minItems": 1,
+          "type": "array"
+        },
+        "schema_version": {
+          "const": "1.0.0"
+        },
+        "team": {
+          "maxLength": 64,
+          "minLength": 1,
+          "type": "string"
+        },
+        "version": {
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "team",
+        "version",
+        "roles"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "tekroo.kernel.contracts/0.12.0/schemas/organization-runtime.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Tekroo Teams organizational runtime contract"
+}

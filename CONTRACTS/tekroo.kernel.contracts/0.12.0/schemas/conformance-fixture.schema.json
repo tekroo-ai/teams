@@ -1,0 +1,74 @@
+{
+  "$id": "https://contracts.tekroo.ai/tekroo.kernel.contracts/0.12.0/schemas/conformance-fixture.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "classification": {
+      "enum": [
+        "NORMATIVE_EXAMPLE",
+        "BOUNDARY_NEGATIVE",
+        "REGRESSION_RECEIPT",
+        "GENERATED_COUNTEREXAMPLE",
+        "FAULT_INJECTION"
+      ]
+    },
+    "fixtureId": {
+      "pattern": "^[A-Z0-9][A-Z0-9._-]+$",
+      "type": "string"
+    },
+    "given": {
+      "type": "object"
+    },
+    "kind": {
+      "enum": [
+        "AUTHORITY_BOUNDARY_MODEL",
+        "BOUNDED_REVIEW_MODEL",
+        "CATALOGUE_COMMAND",
+        "COMPATIBILITY_MODEL",
+        "DAG_MODEL",
+        "ESCALATION_MODEL",
+        "HUMAN_INTERACTION_MODEL",
+        "HUMAN_PARTICIPANT_MODEL",
+        "IDEMPOTENCY_MODEL",
+        "IDENTITY_MODEL",
+        "INVOCATION_ADMISSION_MODEL",
+        "MODEL_CAPABILITY_POLICY_MODEL",
+        "OPERATOR_SEPARATION_MODEL",
+        "PRECONDITION_MODEL",
+        "PROJECTION_MODEL",
+        "RELEASE_MODEL",
+        "REVIEW_JOIN_MODEL",
+        "STATE_MODEL",
+        "SUCCESSOR_SET_MODEL",
+        "TEAM_CONTINUITY_MODEL",
+        "WORK_BUDGET_MODEL"
+      ]
+    },
+    "sourceDecisionIds": {
+      "items": {
+        "pattern": "^P2-KCF-[0-9]{3}$",
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "then": {
+      "type": "object"
+    },
+    "when": {
+      "type": "object"
+    }
+  },
+  "required": [
+    "fixtureId",
+    "kind",
+    "classification",
+    "sourceDecisionIds",
+    "given",
+    "when",
+    "then"
+  ],
+  "title": "Conformance fixture",
+  "type": "object"
+}

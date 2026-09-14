@@ -22,8 +22,10 @@ import (
 const (
 	TeamManifestSchemaVersion = "1.0.0"
 	RoleBundleSchemaVersion   = "1.0.0"
+	RolePackageSchemaVersion  = "2.0.0"
 	maximumManifestBytes      = 1 << 20
 	maximumBundleBytes        = 4 << 20
+	maximumRoleResourceBytes  = 1 << 20
 )
 
 var (
@@ -59,28 +61,32 @@ type Subscription struct {
 }
 
 type RoleBundle struct {
-	SchemaVersion  string            `json:"schema_version"`
-	Role           string            `json:"role"`
-	Version        string            `json:"version"`
-	Capabilities   []string          `json:"capabilities"`
-	Subscriptions  []Subscription    `json:"subscriptions"`
-	Permissions    []string          `json:"permissions"`
-	Instructions   string            `json:"instructions"`
-	Handlers       map[string]string `json:"handlers"`
-	PublisherKeyID string            `json:"publisher_key_id"`
-	Signature      string            `json:"signature"`
+	SchemaVersion   string                        `json:"schema_version"`
+	Role            string                        `json:"role"`
+	Version         string                        `json:"version"`
+	Capabilities    []string                      `json:"capabilities"`
+	Subscriptions   []Subscription                `json:"subscriptions"`
+	Permissions     []string                      `json:"permissions"`
+	Instructions    string                        `json:"instructions,omitempty"`
+	Handlers        map[string]string             `json:"handlers,omitempty"`
+	Charter         *RoleResource                 `json:"charter,omitempty"`
+	HandlerBindings map[string]RoleHandlerBinding `json:"handler_bindings,omitempty"`
+	PublisherKeyID  string                        `json:"publisher_key_id"`
+	Signature       string                        `json:"signature"`
 }
 
 type unsignedRoleBundle struct {
-	SchemaVersion  string            `json:"schema_version"`
-	Role           string            `json:"role"`
-	Version        string            `json:"version"`
-	Capabilities   []string          `json:"capabilities"`
-	Subscriptions  []Subscription    `json:"subscriptions"`
-	Permissions    []string          `json:"permissions"`
-	Instructions   string            `json:"instructions"`
-	Handlers       map[string]string `json:"handlers"`
-	PublisherKeyID string            `json:"publisher_key_id"`
+	SchemaVersion   string                        `json:"schema_version"`
+	Role            string                        `json:"role"`
+	Version         string                        `json:"version"`
+	Capabilities    []string                      `json:"capabilities"`
+	Subscriptions   []Subscription                `json:"subscriptions"`
+	Permissions     []string                      `json:"permissions"`
+	Instructions    string                        `json:"instructions,omitempty"`
+	Handlers        map[string]string             `json:"handlers,omitempty"`
+	Charter         *RoleResource                 `json:"charter,omitempty"`
+	HandlerBindings map[string]RoleHandlerBinding `json:"handler_bindings,omitempty"`
+	PublisherKeyID  string                        `json:"publisher_key_id"`
 }
 
 func (bundle RoleBundle) unsigned() unsignedRoleBundle {
@@ -88,7 +94,8 @@ func (bundle RoleBundle) unsigned() unsignedRoleBundle {
 		SchemaVersion: bundle.SchemaVersion, Role: bundle.Role, Version: bundle.Version,
 		Capabilities: slices.Clone(bundle.Capabilities), Subscriptions: slices.Clone(bundle.Subscriptions),
 		Permissions: slices.Clone(bundle.Permissions), Instructions: bundle.Instructions,
-		Handlers: cloneMap(bundle.Handlers), PublisherKeyID: bundle.PublisherKeyID,
+		Handlers: cloneMap(bundle.Handlers), Charter: cloneRoleResource(bundle.Charter),
+		HandlerBindings: cloneHandlerBindings(bundle.HandlerBindings), PublisherKeyID: bundle.PublisherKeyID,
 	}
 }
 
@@ -102,13 +109,13 @@ func (bundle RoleBundle) ContentDigest() (kernel.Digest, error) {
 }
 
 func (bundle RoleBundle) Validate() error {
-	if bundle.SchemaVersion != RoleBundleSchemaVersion || !validRoleName(bundle.Role) || !versionPattern.MatchString(bundle.Version) || bundle.PublisherKeyID == "" || len(bundle.PublisherKeyID) > 256 || len(bundle.Instructions) == 0 || len(bundle.Instructions) > 1<<20 || len(bundle.Signature) == 0 {
+	if bundle.SchemaVersion != RoleBundleSchemaVersion && bundle.SchemaVersion != RolePackageSchemaVersion || !validRoleName(bundle.Role) || !versionPattern.MatchString(bundle.Version) || bundle.PublisherKeyID == "" || len(bundle.PublisherKeyID) > 256 || len(bundle.Signature) == 0 {
 		return ErrInvalidRoleBundle
 	}
 	if !sortedUniqueNonempty(bundle.Capabilities, 128, 256) || !sortedUniqueNonempty(bundle.Permissions, 128, 256) {
 		return ErrInvalidRoleBundle
 	}
-	if len(bundle.Subscriptions) > 256 || len(bundle.Handlers) > 256 {
+	if len(bundle.Subscriptions) > 256 || len(bundle.Handlers) > 256 || len(bundle.HandlerBindings) > 256 {
 		return ErrInvalidRoleBundle
 	}
 	previous := ""
@@ -119,8 +126,38 @@ func (bundle RoleBundle) Validate() error {
 		}
 		previous = key
 	}
+	if bundle.SchemaVersion == RoleBundleSchemaVersion {
+		return validateLegacyRoleBundle(bundle)
+	}
+	return validateRolePackage(bundle)
+}
+
+func validateLegacyRoleBundle(bundle RoleBundle) error {
+	if len(bundle.Instructions) == 0 || len(bundle.Instructions) > 1<<20 || bundle.Charter != nil || len(bundle.HandlerBindings) != 0 {
+		return ErrInvalidRoleBundle
+	}
 	for messageType, handler := range bundle.Handlers {
 		if messageType == "" || len(messageType) > 256 || handler == "" || len(handler) > 65536 {
+			return ErrInvalidRoleBundle
+		}
+	}
+	return nil
+}
+
+func validateRolePackage(bundle RoleBundle) error {
+	if bundle.Instructions != "" || len(bundle.Handlers) != 0 || bundle.Charter == nil || !bundle.Charter.Valid("text/markdown") || len(bundle.HandlerBindings) != len(bundle.Subscriptions) {
+		return ErrInvalidRoleBundle
+	}
+	subscriptions := make(map[string]string, len(bundle.Subscriptions))
+	for _, subscription := range bundle.Subscriptions {
+		if _, duplicate := subscriptions[subscription.Type]; duplicate {
+			return ErrInvalidRoleBundle
+		}
+		subscriptions[subscription.Type] = subscription.Purpose
+	}
+	for messageType, binding := range bundle.HandlerBindings {
+		purpose, found := subscriptions[messageType]
+		if !found || binding.SubscriptionPurpose != purpose || binding.Validate() != nil {
 			return ErrInvalidRoleBundle
 		}
 	}
@@ -168,6 +205,7 @@ func (manifest TeamManifest) Validate() error {
 type LoadedRole struct {
 	Binding RoleBinding
 	Bundle  RoleBundle
+	Package *LoadedRolePackage
 }
 
 type LoadedTeam struct {
@@ -201,7 +239,15 @@ func LoadTeamManifest(path string, expectedDigest kernel.Digest, trustedKeys map
 		if err != nil || bundle.Role != binding.Role {
 			return LoadedTeam{}, fmt.Errorf("%w: role %s: %v", ErrInvalidTeamManifest, binding.Role, err)
 		}
-		loaded.Roles = append(loaded.Roles, LoadedRole{Binding: binding, Bundle: bundle})
+		var rolePackage *LoadedRolePackage
+		if bundle.SchemaVersion == RolePackageSchemaVersion {
+			loadedPackage, loadErr := LoadRolePackage(bundlePath, bundle)
+			if loadErr != nil {
+				return LoadedTeam{}, fmt.Errorf("%w: role %s: %v", ErrInvalidTeamManifest, binding.Role, loadErr)
+			}
+			rolePackage = &loadedPackage
+		}
+		loaded.Roles = append(loaded.Roles, LoadedRole{Binding: binding, Bundle: bundle, Package: rolePackage})
 	}
 	return loaded, nil
 }

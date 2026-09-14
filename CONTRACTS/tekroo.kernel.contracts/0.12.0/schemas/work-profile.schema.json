@@ -1,0 +1,273 @@
+{
+  "$id": "https://contracts.tekroo.ai/tekroo.kernel.contracts/0.12.0/schemas/work-profile.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "acceptance_criteria_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "ambiguity": {
+      "enum": [
+        "LOW",
+        "MEDIUM",
+        "HIGH",
+        "UNKNOWN"
+      ],
+      "type": "string"
+    },
+    "blast_radius": {
+      "enum": [
+        "LOCAL",
+        "MULTI_COMPONENT",
+        "ARCHITECTURAL",
+        "EXTERNAL_EFFECT",
+        "UNKNOWN"
+      ],
+      "type": "string"
+    },
+    "budgets": {
+      "additionalProperties": false,
+      "properties": {
+        "attempt_limit": {
+          "maximum": 1000,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "deadline_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "escalation_limit": {
+          "maximum": 1000,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "promotion_limit": {
+          "maximum": 1000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "review_round_limit": {
+          "maximum": 1000,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "attempt_limit",
+        "review_round_limit",
+        "promotion_limit",
+        "escalation_limit",
+        "deadline_at"
+      ],
+      "type": "object"
+    },
+    "classification_authority": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 256,
+          "minLength": 1,
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "ACTOR",
+            "HUMAN",
+            "SERVICE",
+            "POLICY"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id"
+      ],
+      "type": "object"
+    },
+    "classification_evidence_ids": {
+      "items": {
+        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+        "type": "string"
+      },
+      "maxItems": 64,
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "classification_policy_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "classification_policy_revision": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "implementation_variant_count": {
+      "maximum": 32,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "lifecycle_epoch": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "minimum_decision_route": {
+      "enum": [
+        "DETERMINISTIC",
+        "BOUNDED_EXECUTION",
+        "COMPLEX_REASONING",
+        "NOVEL_REASONING",
+        "HUMAN_REQUIRED"
+      ],
+      "type": "string"
+    },
+    "novelty": {
+      "enum": [
+        "ROUTINE",
+        "UNFAMILIAR",
+        "NOVEL",
+        "UNKNOWN"
+      ],
+      "type": "string"
+    },
+    "profile_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "profile_id": {
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "type": "string"
+    },
+    "profile_revision": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "promotion_policy_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "promotion_policy_revision": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "required_deterministic_gate_ids": {
+      "items": {
+        "maxLength": 4096,
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxItems": 64,
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "required_independence_dimensions": {
+      "items": {
+        "enum": [
+          "PRINCIPAL",
+          "ACTOR",
+          "EXECUTION",
+          "CONTEXT",
+          "WORKSPACE",
+          "MODEL_PROFILE",
+          "PROVIDER",
+          "METHOD",
+          "HUMAN"
+        ],
+        "type": "string"
+      },
+      "maxItems": 9,
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "required_validation_branches": {
+      "maximum": 32,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "scope_revision": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "security_sensitivity": {
+      "enum": [
+        "ORDINARY",
+        "SENSITIVE",
+        "CRITICAL",
+        "UNKNOWN"
+      ],
+      "type": "string"
+    },
+    "supersedes_profile_id": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "task_id": {
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "type": "string"
+    },
+    "valid_candidate_quorum": {
+      "maximum": 32,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "verification_topology_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "work_kind": {
+      "enum": [
+        "INVESTIGATION",
+        "DESIGN",
+        "IMPLEMENTATION",
+        "DEBUGGING",
+        "VALIDATION",
+        "SECURITY_REVIEW",
+        "RELEASE"
+      ],
+      "type": "string"
+    }
+  },
+  "required": [
+    "task_id",
+    "profile_id",
+    "profile_revision",
+    "profile_digest",
+    "lifecycle_epoch",
+    "scope_revision",
+    "work_kind",
+    "ambiguity",
+    "novelty",
+    "blast_radius",
+    "security_sensitivity",
+    "minimum_decision_route",
+    "acceptance_criteria_digest",
+    "required_deterministic_gate_ids",
+    "required_validation_branches",
+    "required_independence_dimensions",
+    "implementation_variant_count",
+    "valid_candidate_quorum",
+    "verification_topology_digest",
+    "classification_policy_revision",
+    "classification_policy_digest",
+    "promotion_policy_revision",
+    "promotion_policy_digest",
+    "budgets",
+    "classification_authority",
+    "classification_evidence_ids",
+    "supersedes_profile_id"
+  ],
+  "title": "Content-addressed task work-risk profile",
+  "type": "object"
+}

@@ -208,6 +208,9 @@ func decodeOrganizationalStageResult(output []byte, target any) error {
 		return errInvalidValidationResult
 	}
 	payload := bytes.TrimSpace(output[index+len(marker):])
+	if workProduct, wrapped := roleHandlerWorkProduct(output); wrapped {
+		payload = workProduct
+	}
 	decoder := json.NewDecoder(bytes.NewReader(payload))
 	decoder.DisallowUnknownFields()
 	if decoder.Decode(target) != nil {

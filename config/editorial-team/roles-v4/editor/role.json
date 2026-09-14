@@ -1,0 +1,54 @@
+{
+  "schema_version": "2.0.0",
+  "role": "editor",
+  "version": "2.0.0",
+  "capabilities": [
+    "content-editing",
+    "content-planning"
+  ],
+  "subscriptions": [
+    {
+      "type": "tekroo.message.content.requested",
+      "purpose": "editorial-production"
+    }
+  ],
+  "permissions": [
+    "artifact.read",
+    "artifact.write"
+  ],
+  "charter": {
+    "path": "ROLE.md",
+    "sha256": "01b698d4cb00286b4e558c5b278a58761c4d6bf189e5fb10008d7bb1af6517c8",
+    "media_type": "text/markdown"
+  },
+  "handler_bindings": {
+    "tekroo.message.content.requested": {
+      "subscription_purpose": "editorial-production",
+      "message_purpose": "REQUEST",
+      "disposition": "MODEL_HANDLER",
+      "resource": {
+        "path": "handlers/content.requested/HANDLER.md",
+        "sha256": "58b5c553e38b845ac9868e9b8323b070502a0b917c9ec4cfef2d70a2dc2aef73",
+        "media_type": "text/markdown"
+      },
+      "input_schema": {
+        "path": "handlers/content.requested/input.schema.json",
+        "sha256": "960e6113c1f72ef5672432a5f06eec244460bc3e6786b1c8e5fde201408249f0",
+        "media_type": "application/schema+json"
+      },
+      "result_schema": {
+        "path": "handlers/content.requested/result.schema.json",
+        "sha256": "8fe8fae8e37bcb50ecf6bb93aa1fdac8c44e3a56c889eba04080a1b3e6cd3ae5",
+        "media_type": "application/schema+json"
+      },
+      "allowed_results": [
+        "blocked",
+        "completed",
+        "failed",
+        "needs_decision"
+      ]
+    }
+  },
+  "publisher_key_id": "tekroo-message-handlers-editorial-20260913",
+  "signature": "OUBCsqA4TwDeK5MgHzszLcPwV96MHOcDsNJsOGqft01/97991VnvhzxWmDHo0ksL4L1IX6i7rhZoeGp8joUYDw=="
+}

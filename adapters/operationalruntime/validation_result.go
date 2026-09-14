@@ -27,6 +27,9 @@ type structuredValidationResult struct {
 }
 
 func parseStructuredValidationResult(output []byte) (structuredValidationResult, error) {
+	if workProduct, wrapped := roleHandlerWorkProduct(output); wrapped {
+		output = append(append([]byte(application.ValidationResultMarker+"\n"), workProduct...), '\n')
+	}
 	marker := []byte(application.ValidationResultMarker)
 	index := bytes.LastIndex(output, marker)
 	if index < 0 || bytes.Count(output, marker) != 1 {

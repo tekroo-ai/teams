@@ -9,6 +9,14 @@ This is an implementation plan. Except for one consolidated successor contract,
 every step must produce working code and tests. It must not become another chain
 of documentation-only gates.
 
+## Mandatory companion amendment
+
+The role-charter, per-message handler, structural anti-conversation-loop, and
+change-stream idle-wait work is specified in
+`131-phase-10-message-handler-runtime-plan.md`. That plan is part of Phase 10,
+not optional follow-up work. Steps 9 and 10 below must not be accepted until its
+completion definition is satisfied.
+
 ## 1. Outcome
 
 Teams will combine the useful behavior of the v3 message-passing organization

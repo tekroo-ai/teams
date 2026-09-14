@@ -40,23 +40,45 @@ func TestTerminationReasonGlitchClassification(t *testing.T) {
 	retryable := failed
 	yes := true
 	retryable.Retryable = &yes
-	if glitchTerminatedTaskEligible(validator, kernel.AggregateState{Phase: kernel.PhaseActive}, retryable) {
-		t.Error("kernel-flagged retryable terminations belong to ordinary admission")
+	if !glitchTerminatedTaskEligible(validator, kernel.AggregateState{Phase: kernel.PhaseActive}, retryable) {
+		t.Error("kernel-flagged retryable terminations must receive a successor attempt")
 	}
 	if !glitchTerminatedTaskEligible(organization.PlannedTask{Purpose: kernel.PurposeImplementation, AttemptLimit: 3}, kernel.AggregateState{Phase: kernel.PhaseActive}, failed) {
 		t.Error("eligibility is set by the verdict-less reason class and attempt bound, not by purpose")
 	}
 }
 
-func TestAutomaticGlitchRecoveryDeadlineIsDeterministicStrictSuccessor(t *testing.T) {
-	budget := time.Date(2026, time.September, 13, 5, 47, 36, 0, time.UTC)
+func TestFailedTaskDispositionRecoversOrEscalatesEveryFailedInvocation(t *testing.T) {
+	task := organization.PlannedTask{Purpose: kernel.PurposeImplementation, AttemptLimit: 2}
+	digest := kernel.Digest("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+	failed := kernel.WorkInvocation{State: kernel.InvocationFailed, AttemptOrdinal: 1, OutputDigest: &digest}
+	state := kernel.AggregateState{Phase: kernel.PhaseActive, Condition: kernel.ConditionRunnable}
 
-	if got, want := automaticGlitchRecoveryDeadline(budget, budget), budget.Add(time.Nanosecond); !got.Equal(want) {
-		t.Fatalf("equal deadlines: got %s want %s", got, want)
+	if got := classifyFailedTaskDisposition(task, state, failed, []byte(`{"reason":"REPEATED_CAPABILITY_MISMATCH_REPOSITORY_NO_PROGRESS","command":"sed -n '61,65p' organization/agent_name_resolver.go"}`), false); got != failedTaskRecover {
+		t.Fatalf("no-progress failure disposition = %d, want recovery", got)
 	}
-	invocation := budget.Add(time.Second)
-	if got, want := automaticGlitchRecoveryDeadline(budget, invocation), invocation.Add(time.Nanosecond); !got.Equal(want) {
-		t.Fatalf("later invocation deadline: got %s want %s", got, want)
+	if got := classifyFailedTaskDisposition(task, state, failed, []byte(`{"reason":"WORKSPACE_WRITE_OUTSIDE_AUTHORIZED_SCOPE","command":"rm -rf /"}`), false); got != failedTaskEscalate {
+		t.Fatalf("unsafe failure disposition = %d, want escalation", got)
+	}
+	if got := classifyFailedTaskDisposition(task, state, failed, []byte(`{"reason":"REPEATED_CAPABILITY_MISMATCH_REPOSITORY_NO_PROGRESS"}`), true); got != failedTaskEscalate {
+		t.Fatalf("identical repeated failure disposition = %d, want escalation", got)
+	}
+	exhausted := failed
+	exhausted.AttemptOrdinal = 2
+	if got := classifyFailedTaskDisposition(task, state, exhausted, []byte(`{"reason":"REPEATED_CAPABILITY_MISMATCH_REPOSITORY_NO_PROGRESS"}`), false); got != failedTaskEscalate {
+		t.Fatalf("exhausted failure disposition = %d, want escalation", got)
+	}
+}
+
+func TestAutomaticGlitchRecoveryDeadlineIsDeterministicStrictSuccessor(t *testing.T) {
+	deadline := time.Date(2026, time.September, 13, 5, 47, 36, 0, time.UTC)
+
+	if got, want := automaticGlitchRecoveryDeadline(deadline), deadline.Add(time.Nanosecond); !got.Equal(want) {
+		t.Fatalf("terminal deadline: got %s want %s", got, want)
+	}
+	later := deadline.Add(time.Second)
+	if got, want := automaticGlitchRecoveryDeadline(later), later.Add(time.Nanosecond); !got.Equal(want) {
+		t.Fatalf("later terminal deadline: got %s want %s", got, want)
 	}
 }
 

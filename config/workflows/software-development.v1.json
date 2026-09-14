@@ -1,8 +1,8 @@
 {
   "schema_version": "1.0.0",
   "name": "software-development",
-  "version": "1.0.0",
-  "content_digest": "c66b63320ad59d42241a292b1684436ba8f286f7312056fd4abd90fc95facb9f",
+  "version": "1.2.0",
+  "content_digest": "1624fb8ba139c3c1e1ebe880cf79cfa1f9edd025b946f9676a2c3f3ab9ea3967",
   "trigger_types": [
     "tekroo.message.feature.submitted"
   ],
@@ -22,7 +22,7 @@
       "allowed_outgoing_purposes": ["HANDOFF"],
       "target_selection": "CAPABILITY",
       "validation_policy": "DETERMINISTIC_ONLY",
-      "completion_condition": "Return exactly TEKROO_ORGANIZATIONAL_RESULT followed by one JSON object containing only schema_version=1.0.0, result_type=FEATURE_REFINEMENT, acceptance_criteria_disposition=PRESERVE_SUBMITTED, clarification_questions (an empty array when none), and priority (LOW, NORMAL, HIGH, or CRITICAL). The refinement preserves submitted acceptance criteria and makes material ambiguity explicit."
+      "completion_condition": "The task-specific work_product contains only schema_version=1.0.0, result_type=FEATURE_REFINEMENT, acceptance_criteria_disposition=PRESERVE_SUBMITTED, clarification_questions (an empty array when none), and priority (LOW, NORMAL, HIGH, or CRITICAL). It preserves submitted acceptance criteria and makes material ambiguity explicit. Follow the selected handler's result protocol for the outer envelope."
     },
     {
       "stage_id": "specify",
@@ -39,7 +39,7 @@
       "allowed_outgoing_purposes": ["HANDOFF"],
       "target_selection": "CAPABILITY",
       "validation_policy": "DETERMINISTIC_ONLY",
-      "completion_condition": "Return exactly TEKROO_ORGANIZATIONAL_RESULT followed by one JSON object containing only schema_version=1.0.0, result_type=FEATURE_SPECIFICATION, stories [{title, description, acceptance_criteria, priority}], and design_constraints. Priority is LOW, NORMAL, HIGH, or CRITICAL. The smallest finite set of independently useful stories covers every submitted acceptance criterion."
+      "completion_condition": "The task-specific work_product contains only schema_version=1.0.0, result_type=FEATURE_SPECIFICATION, stories [{title, description, acceptance_criteria, priority}], and design_constraints. Priority is LOW, NORMAL, HIGH, or CRITICAL. The smallest finite set of independently useful stories covers every submitted acceptance criterion, and every submitted acceptance criterion appears verbatim in at least one story. Follow the selected handler's result protocol for the outer envelope."
     },
     {
       "stage_id": "design",
@@ -59,7 +59,7 @@
       "allowed_outgoing_purposes": ["HANDOFF"],
       "target_selection": "CAPABILITY",
       "validation_policy": "DETERMINISTIC_ONLY",
-      "completion_condition": "Return exactly TEKROO_ORGANIZATIONAL_RESULT followed by one JSON object containing only schema_version=1.0.0, result_type=FEATURE_PLAN, architecture, design_decisions, assumptions, and tasks. Each task contains only story_index, title, description, acceptance_criteria, backward depends_on indexes, empty validates, purpose=IMPLEMENTATION, complexity, risk, critical_path, attempt_limit, and review_round_limit. The plan is repository-grounded, acyclic, uses true dependencies, preserves layer ownership, and contains only work needed for the accepted feature."
+      "completion_condition": "The task-specific work_product contains only schema_version=1.0.0, result_type=FEATURE_PLAN, architecture, design_decisions, assumptions, and tasks. Each task contains only story_index, title, description, acceptance_criteria, backward depends_on indexes, empty validates, purpose=IMPLEMENTATION, complexity, risk, critical_path, attempt_limit, and review_round_limit. The plan is repository-grounded, acyclic, uses true dependencies, preserves layer ownership, and contains only work needed for the accepted feature. Follow the selected handler's result protocol for the outer envelope."
     }
   ],
   "root_budgets": {

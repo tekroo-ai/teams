@@ -1,0 +1,55 @@
+{
+  "schema_version": "2.0.0",
+  "role": "operator",
+  "version": "2.0.0",
+  "capabilities": [
+    "human-relay",
+    "operator-control"
+  ],
+  "subscriptions": [
+    {
+      "type": "tekroo.message.human.response",
+      "purpose": "operator-relay"
+    }
+  ],
+  "permissions": [
+    "human.response-relay",
+    "role.control",
+    "workflow.submit"
+  ],
+  "charter": {
+    "path": "ROLE.md",
+    "sha256": "bdb72704947837bb5e3e886d8dded6ea3bf90ed2ac538592a8d924f2b4fe59e6",
+    "media_type": "text/markdown"
+  },
+  "handler_bindings": {
+    "tekroo.message.human.response": {
+      "subscription_purpose": "operator-relay",
+      "message_purpose": "RESPONSE",
+      "disposition": "MODEL_HANDLER",
+      "resource": {
+        "path": "handlers/human.response/HANDLER.md",
+        "sha256": "7adafec7c88670c8c07334586dc00747f1be671562041c1833988f037515c092",
+        "media_type": "text/markdown"
+      },
+      "input_schema": {
+        "path": "handlers/human.response/input.schema.json",
+        "sha256": "960e6113c1f72ef5672432a5f06eec244460bc3e6786b1c8e5fde201408249f0",
+        "media_type": "application/schema+json"
+      },
+      "result_schema": {
+        "path": "handlers/human.response/result.schema.json",
+        "sha256": "96b9620ceb99e7911b6208b50b32e87c276906f9655f3fa43932618b826b79d9",
+        "media_type": "application/schema+json"
+      },
+      "allowed_results": [
+        "blocked",
+        "completed",
+        "failed",
+        "needs_decision"
+      ]
+    }
+  },
+  "publisher_key_id": "tekroo-message-handlers-20260913",
+  "signature": "SJXVMd3+KquXPzh71J6krw5e+jqzCQ/CZSea+9WawW2ttuzBHpZ1QKpUcdqvukUaUDmzyGdH6RZJbH84R5ppAQ=="
+}

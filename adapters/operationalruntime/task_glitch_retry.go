@@ -22,6 +22,10 @@ import (
 var autoGlitchTerminationReasons = map[string]bool{
 	"ROLE_REPOSITORY_MUTATION_NOT_AUTHORIZED":         true,
 	"WORK_PURPOSE_REPOSITORY_MUTATION_NOT_AUTHORIZED": true,
+	// A repeated repository inspection is an agent-control failure, not a
+	// verdict about the assigned work. A fresh evidence-bound continuation gets
+	// one bounded recovery attempt; an identical successor is escalated below.
+	"REPEATED_CAPABILITY_MISMATCH_REPOSITORY_NO_PROGRESS": true,
 }
 
 type workTerminationReason struct {
@@ -38,11 +42,31 @@ func glitchTerminatedTaskEligible(task organization.PlannedTask, state kernel.Ag
 	if invocation.AttemptOrdinal >= uint64(task.AttemptLimit) {
 		return false
 	}
-	if invocation.Retryable != nil && *invocation.Retryable {
-		// The kernel already marked this retryable; ordinary admission owns it.
-		return false
-	}
 	return invocation.OutputDigest != nil
+}
+
+type failedTaskDisposition uint8
+
+const (
+	failedTaskNoAction failedTaskDisposition = iota
+	failedTaskRecover
+	failedTaskEscalate
+)
+
+// classifyFailedTaskDisposition ensures that a terminal invocation does not
+// silently abandon its task. It either gets one evidence-bound continuation or
+// the task is durably blocked for operator escalation.
+func classifyFailedTaskDisposition(task organization.PlannedTask, state kernel.AggregateState, invocation kernel.WorkInvocation, output []byte, repeated bool) failedTaskDisposition {
+	if state.Phase == kernel.PhaseCompleted || invocation.State != kernel.InvocationFailed || invocation.OutputDigest == nil {
+		return failedTaskNoAction
+	}
+	if invocation.AttemptOrdinal >= uint64(task.AttemptLimit) || repeated {
+		return failedTaskEscalate
+	}
+	if invocation.Retryable != nil && *invocation.Retryable || terminationReasonIsAutoRetryableGlitch(output) {
+		return failedTaskRecover
+	}
+	return failedTaskEscalate
 }
 
 // terminationReasonIsAutoRetryableGlitch classifies the recorded terminal
@@ -69,25 +93,16 @@ func (service *ProductionService) reconcileGlitchTerminatedTasks(ctx context.Con
 			continue
 		}
 		invocation, present := invocations[task.ID]
-		if !present || !glitchTerminatedTaskEligible(task, state, invocation) {
+		if !present || invocation.State != kernel.InvocationFailed || invocation.OutputDigest == nil {
 			continue
 		}
 		snapshot, err := service.Store.LoadDecision(ctx, kernel.KernelCommand{Target: kernel.AggregateRef{Kind: kernel.AggregateTask, ID: task.ID}})
 		if err != nil {
 			return false, err
 		}
-		// A byte-identical terminal result is an unchanged condition, not a new
-		// recovery opportunity. Leave it for explicit diagnosis instead of
-		// spending another model invocation on the same failure.
-		if repeatedTerminalOutput(snapshot, invocation) {
-			continue
-		}
 		output, err := service.Runtime.ReadExecutionOutput(ctx, *invocation.OutputDigest)
 		if err != nil {
 			return false, fmt.Errorf("read terminal output for task %s: %w", task.ID, err)
-		}
-		if !terminationReasonIsAutoRetryableGlitch(output) {
-			continue
 		}
 		evidence, err := evidenceRefsForIDs(snapshot, invocation.TerminalEvidenceIDs)
 		if err != nil {
@@ -96,19 +111,42 @@ func (service *ProductionService) reconcileGlitchTerminatedTasks(ctx context.Con
 		if len(evidence) == 0 {
 			return false, fmt.Errorf("%w: glitch termination for task %s recorded no evidence", organization.ErrInvalidFeature, task.ID)
 		}
-		// The recovery deadline must be derived from durable state, not from the
-		// reconciler clock: commands use deterministic IDs over the request, so a
-		// per-pass deadline change turns an interrupted retry into a permanent
-		// COMMAND_ID_REUSE conflict. Original invocations normally consume the
-		// account's exact deadline, while recovery requires a strict successor.
-		// Advance that durable maximum by the smallest representable duration.
+		disposition := classifyFailedTaskDisposition(task, state, invocation, output, repeatedTerminalOutput(snapshot, invocation))
+		if disposition == failedTaskNoAction {
+			continue
+		}
+		if disposition == failedTaskEscalate {
+			if state.Condition == kernel.ConditionBlocked {
+				continue
+			}
+			payload, marshalErr := json.Marshal(map[string]any{
+				"blocker_refs": []string{"teams://work-invocation/" + string(invocation.ID)},
+				"reason":       "task invocation failed without an admissible automatic recovery; operator escalation is required",
+			})
+			if marshalErr != nil {
+				return false, marshalErr
+			}
+			key := "failed-task-escalation-" + string(task.ID) + "-" + string(invocation.ID)
+			_, err = service.submitDeterministicActorTargetCommand(ctx, feature, "tekroo.command.work.block", kernel.AggregateTask, task.ID, service.policyAuthority, invocation.ActorFQN, invocation.Execution, state.Revision, state.LifecycleEpoch, payload, []kernel.DagParent{{ParentEventID: invocation.LastEventID, EdgeKind: kernel.EdgeResponse}}, evidence, key)
+			if err != nil {
+				return false, fmt.Errorf("escalate failed task %s invocation %s: %w", task.ID, invocation.ID, err)
+			}
+			return true, nil
+		}
+		// The recovery deadline must be derived from the terminal invocation, not
+		// the current shared-budget deadline or reconciler clock. The recovery
+		// command has a deterministic idempotency key; changing its request as a
+		// different task advances the shared account turns an interrupted recovery
+		// into COMMAND_ID_REUSE. A strict successor of the terminal deadline is
+		// stable across every reconciliation pass, and an already-extended shared
+		// account is reused by RetryFailedTask.
 		budgetRef := kernel.AggregateRef{Kind: kernel.AggregateWorkBudget, ID: feature.BudgetAccountID}
 		budget, budgetFound := snapshot.WorkBudgetAccounts[budgetRef]
 		now := service.clock.Now().UTC()
 		if !budgetFound || !budget.Valid() {
 			continue
 		}
-		deadline := automaticGlitchRecoveryDeadline(budget.DeadlineAt, invocation.DeadlineAt)
+		deadline := automaticGlitchRecoveryDeadline(invocation.DeadlineAt)
 		if !deadline.After(now) || deadline.After(now.Add(service.planningDeadline)) {
 			continue
 		}
@@ -142,11 +180,8 @@ func repeatedTerminalOutput(snapshot kernel.Snapshot, current kernel.WorkInvocat
 	return false
 }
 
-func automaticGlitchRecoveryDeadline(budgetDeadline, invocationDeadline time.Time) time.Time {
-	if invocationDeadline.After(budgetDeadline) {
-		return invocationDeadline.Add(time.Nanosecond)
-	}
-	return budgetDeadline.Add(time.Nanosecond)
+func automaticGlitchRecoveryDeadline(invocationDeadline time.Time) time.Time {
+	return invocationDeadline.Add(time.Nanosecond)
 }
 
 func workTerminationReasonLine(output []byte) string {

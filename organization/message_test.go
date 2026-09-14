@@ -115,6 +115,43 @@ func TestMessageBusRejectsStaleRoleExecutionBeforeClaim(t *testing.T) {
 	}
 }
 
+func TestMessageBusAdmitResolvesPendingMessageIdempotently(t *testing.T) {
+	roles := NewMemoryRoleStore()
+	senderExecution := testExecution(2, 1)
+	recipientExecution := testExecution(5, 1)
+	for _, state := range []RoleInstanceState{
+		testRoleState("teams::architect-1", senderExecution),
+		testRoleState("teams::coder-1", recipientExecution),
+	} {
+		if err := roles.CompareAndSwapRole(context.Background(), 0, state); err != nil {
+			t.Fatal(err)
+		}
+	}
+	store := NewMemoryOrganizationalMessageStore()
+	bus, err := NewMessageBus(store, roles)
+	if err != nil {
+		t.Fatal(err)
+	}
+	message := testMessage(0)
+	if err := bus.Send(context.Background(), message); err != nil {
+		t.Fatal(err)
+	}
+	evidence := testDigest('e')
+	if err := bus.Admit(context.Background(), message.ID, message.Recipient, recipientExecution, evidence); err != nil {
+		t.Fatal(err)
+	}
+	if err := bus.Admit(context.Background(), message.ID, message.Recipient, recipientExecution, evidence); err != nil {
+		t.Fatalf("identical admission was not idempotent: %v", err)
+	}
+	claim, found, err := bus.Read(context.Background(), message.ID)
+	if err != nil || !found || claim.State != MessageResolved || claim.Resolution != "WORK_ADMITTED" || claim.Evidence != evidence {
+		t.Fatalf("admitted claim = %+v found=%v err=%v", claim, found, err)
+	}
+	if err := bus.Admit(context.Background(), message.ID, message.Recipient, recipientExecution, testDigest('f')); !errors.Is(err, ErrOrganizationalMessageConflict) {
+		t.Fatalf("different admission evidence error = %v", err)
+	}
+}
+
 func TestMessageBusRejectsSpoofedOrStaleSenderExecution(t *testing.T) {
 	roles := NewMemoryRoleStore()
 	if err := roles.CompareAndSwapRole(context.Background(), 0, testRoleState("teams::architect-1", testExecution(2, 1))); err != nil {

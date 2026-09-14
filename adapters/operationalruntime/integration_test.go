@@ -52,7 +52,7 @@ func TestAssembledRuntimeExecutesIndependentAuthorizedTasksConcurrentlyAndBuilds
 	}
 	defer closeRuntimeStore(t, store)
 
-	catalogue, err := contract.Load(os.DirFS(filepath.Join("..", "..")), "CONTRACTS/tekroo.kernel.contracts/0.11.0")
+	catalogue, err := contract.Load(os.DirFS(filepath.Join("..", "..")), "CONTRACTS/tekroo.kernel.contracts/0.12.0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -674,6 +674,7 @@ func (server *integratedOpenHands) serveHTTP(writer http.ResponseWriter, request
 						map[string]any{"id": "source-view-result-" + conversationID, "kind": "ObservationEvent", "source": "environment", "tool_name": "repository_view", "tool_call_id": "source-view", "observation": map[string]any{"kind": "FileEditorObservation", "content": []map[string]any{{"type": "text", "text": "package organization"}}, "is_error": false}},
 					)
 				}
+				agentText = integratedRoleHandlerResponse(brief, conversation.prompt, agentText)
 				conversation.response = agentText
 				items = append(items, map[string]any{"id": "agent-" + conversationID, "kind": "MessageEvent", "source": "agent", "timestamp": conversation.createdAt.Add(time.Millisecond), "llm_message": map[string]any{"content": []map[string]any{{"type": "text", "text": agentText}}}})
 			}
@@ -682,6 +683,45 @@ func (server *integratedOpenHands) serveHTTP(writer http.ResponseWriter, request
 		return
 	}
 	writer.WriteHeader(http.StatusNotFound)
+}
+
+func integratedRoleHandlerResponse(brief application.ExecutionBrief, prompt, response string) string {
+	if brief.MessageHandler == nil {
+		return response
+	}
+	workProduct := json.RawMessage(`{}`)
+	for _, marker := range []string{application.OrganizationalResultMarker, application.ValidationResultMarker} {
+		if index := strings.LastIndex(response, marker); index >= 0 {
+			candidate := json.RawMessage(strings.TrimSpace(response[index+len(marker):]))
+			if !json.Valid(candidate) {
+				return response
+			}
+			workProduct = candidate
+			break
+		}
+	}
+	if string(workProduct) == `{}` && (brief.Purpose == kernel.PurposeValidation || brief.Purpose == kernel.PurposeReview || brief.Purpose == kernel.PurposePromotion) {
+		result := map[string]any{"schema_version": "1.0.0", "outcome": "PASS", "reasons": []string{"repository checks passed"}}
+		var envelope struct {
+			CandidateResultRequirement struct {
+				CandidateID            kernel.UUIDv7 `json:"candidate_id"`
+				CandidateReceiptSHA256 kernel.Digest `json:"candidate_receipt_sha256"`
+			} `json:"candidate_result_requirement"`
+		}
+		if json.Unmarshal([]byte(prompt), &envelope) == nil && envelope.CandidateResultRequirement.CandidateID.Valid() && envelope.CandidateResultRequirement.CandidateReceiptSHA256.Valid() {
+			result["candidate_id"] = envelope.CandidateResultRequirement.CandidateID
+			result["candidate_receipt_sha256"] = envelope.CandidateResultRequirement.CandidateReceiptSHA256
+		}
+		workProduct, _ = json.Marshal(result)
+	}
+	payload, err := json.Marshal(map[string]any{
+		"schema_version": "1.0.0", "outcome": "completed", "summary": "completed assigned work",
+		"evidence": []string{}, "message_proposals": []any{}, "work_product": workProduct,
+	})
+	if err != nil {
+		return response
+	}
+	return application.OrganizationalResultMarker + "\n" + string(payload)
 }
 
 func integratedArchitecturePlanDigest(description string) kernel.Digest {

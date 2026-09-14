@@ -59,7 +59,7 @@ func (e Evaluator) Evaluate(command KernelCommand, snapshot Snapshot, context De
 	if err != nil {
 		return Decision{}, fmt.Errorf("fingerprint idempotency scope: %w", err)
 	}
-	if err := validateEnvelope(command); err != nil {
+	if err := ValidateEnvelope(command); err != nil {
 		return rejectedDecision(command, context, fingerprint, OutcomeRejectedInvalid, reasonInvalidEnvelope), nil
 	}
 	definition, err := e.Catalogue.ResolveCommand(command.CommandType, command.CommandVersion, command.Target.Kind, command.Payload)
@@ -312,7 +312,10 @@ func executionRegistryExpectation(command KernelCommand) (ActorFQN, ExecutionTup
 	return actor, ExecutionTuple{ExecutionID: priorID, FencingEpoch: uint64(newEpoch - 1)}, false, true
 }
 
-func validateEnvelope(command KernelCommand) error {
+// ValidateEnvelope checks command shape before the command enters evaluation.
+// Callers that construct commands outside the kernel use it to surface the
+// specific malformed field instead of receiving only INVALID_ENVELOPE.
+func ValidateEnvelope(command KernelCommand) error {
 	if command.ContractManifest != ContractIdentity || command.CommandType == "" || command.CommandVersion == "" {
 		return errors.New("contract or command identity mismatch")
 	}

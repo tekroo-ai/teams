@@ -17,7 +17,9 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/tekroo-ai/teams/application"
 	"github.com/tekroo-ai/teams/kernel"
@@ -31,9 +33,10 @@ var (
 
 const (
 	qualifiedCondenserMaximumEvents       = 80
+	maximumPromptEvidenceBytes            = 256 << 10
 	pauseAfterCondensationTag             = "tekroopauseaftercondensation"
-	candidateResultRequirementInstruction = "Return both exact values in the structured validation result. A different or missing value is invalid."
-	candidateResultProtocolInstruction    = "The OpenHands finish tool message is the result consumed by Teams. Set finish.message to the marker on its own line followed by exactly one JSON object containing schema_version, outcome, non-empty reasons, candidate_id, and candidate_receipt_sha256. Copy both candidate identity values exactly from candidate_result_requirement. Do not summarize or paraphrase the result in finish.message. Teams rejects missing, malformed, or mismatched results."
+	candidateResultRequirementInstruction = "Put exactly one object conforming to result_schema in the outer organizational result's work_product field. Copy both candidate identity values exactly."
+	candidateResultProtocolInstruction    = "The OpenHands finish tool message is consumed by Teams. Set finish.message to the marker followed by one outer object conforming to message_handler.result_schema. Put the validation verdict only in work_product, which MUST conform exactly to candidate_result_requirement.result_schema. Outer outcome describes execution completion and uses the message-handler values; work_product.outcome is the validation verdict and uses PASS, FAIL, BLOCKED, or INCONCLUSIVE. Do not flatten, merge, or rename fields from either schema."
 	teamsRoleExecutionSystemPrompt        = `You execute one authorized Tekroo Teams work invocation.
 
 The user message is the authoritative JSON execution brief. The role_grounding object identifies the running actor by FQN and the signed role bundle by FQRN. Perform only that role, within its stated instructions, capabilities, permissions, task scope, and acceptance criteria. Use only the tools exposed for this invocation. For repository work, read AGENTS.md and only the source and tests relevant to the assigned result; do not tour the repository or inspect accepted contract packages unless the task explicitly requires contract analysis. Never delegate, contact another agent, invent operational identities, or perform unrequested external, deployment, Git publishing, or lifecycle actions.
@@ -70,9 +73,41 @@ type CandidateWorkspaceBinding struct {
 }
 
 type candidateResultRequirement struct {
-	CandidateID            string        `json:"candidate_id"`
-	CandidateReceiptSHA256 kernel.Digest `json:"candidate_receipt_sha256"`
-	Instruction            string        `json:"instruction"`
+	CandidateID            string         `json:"candidate_id"`
+	CandidateReceiptSHA256 kernel.Digest  `json:"candidate_receipt_sha256"`
+	Instruction            string         `json:"instruction"`
+	ResultSchema           map[string]any `json:"result_schema"`
+}
+
+func newCandidateResultRequirement(candidate *CandidateWorkspaceBinding) candidateResultRequirement {
+	return candidateResultRequirement{
+		CandidateID:            candidate.CandidateID,
+		CandidateReceiptSHA256: candidate.ReceiptSHA256,
+		Instruction:            candidateResultRequirementInstruction,
+		ResultSchema: map[string]any{
+			"$schema":              "https://json-schema.org/draft/2020-12/schema",
+			"type":                 "object",
+			"additionalProperties": false,
+			"required":             []string{"schema_version", "outcome", "reasons", "candidate_id", "candidate_receipt_sha256"},
+			"properties": map[string]any{
+				"schema_version":           map[string]any{"const": "1.0.0"},
+				"outcome":                  map[string]any{"enum": []string{"PASS", "FAIL", "BLOCKED", "INCONCLUSIVE"}},
+				"reasons":                  map[string]any{"type": "array", "minItems": 1, "maxItems": 64, "items": map[string]any{"type": "string", "minLength": 1, "maxLength": 4096}},
+				"candidate_id":             map[string]any{"const": candidate.CandidateID},
+				"candidate_receipt_sha256": map[string]any{"const": string(candidate.ReceiptSHA256)},
+				"test_evidence":            map[string]any{"type": "array", "maxItems": 256, "items": map[string]any{"type": "string", "minLength": 1, "maxLength": 4096}},
+			},
+		},
+	}
+}
+
+func candidateResultRequirementMatches(observed *candidateResultRequirement, candidate *CandidateWorkspaceBinding) bool {
+	if observed == nil || candidate == nil {
+		return false
+	}
+	observedJSON, observedErr := json.Marshal(observed)
+	expectedJSON, expectedErr := json.Marshal(newCandidateResultRequirement(candidate))
+	return observedErr == nil && expectedErr == nil && bytes.Equal(observedJSON, expectedJSON)
 }
 
 type WorkspaceResolver interface {
@@ -548,12 +583,23 @@ type ExecutionProfileResolver interface {
 	ResolveExecutionProfile(context.Context, kernel.Digest, kernel.Digest, kernel.Digest, kernel.Digest) (ExecutionProfile, error)
 }
 
+type EvidenceReader interface {
+	Read(context.Context, kernel.Digest) ([]byte, error)
+}
+
+type promptEvidenceMaterialization struct {
+	EvidenceID kernel.UUIDv7 `json:"evidence_id"`
+	SHA256     kernel.Digest `json:"sha256"`
+	Content    string        `json:"content"`
+}
+
 type Config struct {
 	BaseURL              string
 	SessionAPIKey        string
 	HTTPClient           *http.Client
 	Workspaces           WorkspaceResolver
 	Profiles             ExecutionProfileResolver
+	Evidence             EvidenceReader
 	PollInterval         time.Duration
 	MaximumPages         uint32
 	MaximumEvidenceBytes int
@@ -565,9 +611,17 @@ type Client struct {
 	http                 *http.Client
 	workspaces           WorkspaceResolver
 	profiles             ExecutionProfileResolver
+	evidence             EvidenceReader
 	pollInterval         time.Duration
 	maximumPages         uint32
 	maximumEvidenceBytes int
+	eventsMu             sync.Mutex
+	eventsCache          map[string]cachedConversationEvents
+}
+
+type cachedConversationEvents struct {
+	leafID string
+	events []rawEvent
 }
 
 func NewClient(config Config) (*Client, error) {
@@ -576,7 +630,34 @@ func NewClient(config Config) (*Client, error) {
 		return nil, ErrInvalidConfiguration
 	}
 	base.Path = ""
-	return &Client{baseURL: base, sessionAPIKey: config.SessionAPIKey, http: config.HTTPClient, workspaces: config.Workspaces, profiles: config.Profiles, pollInterval: config.PollInterval, maximumPages: config.MaximumPages, maximumEvidenceBytes: config.MaximumEvidenceBytes}, nil
+	return &Client{baseURL: base, sessionAPIKey: config.SessionAPIKey, http: config.HTTPClient, workspaces: config.Workspaces, profiles: config.Profiles, evidence: config.Evidence, pollInterval: config.PollInterval, maximumPages: config.MaximumPages, maximumEvidenceBytes: config.MaximumEvidenceBytes, eventsCache: make(map[string]cachedConversationEvents)}, nil
+}
+
+func (client *Client) promptEvidence(ctx context.Context, references []kernel.EvidenceRef) ([]promptEvidenceMaterialization, error) {
+	if client == nil || client.evidence == nil {
+		return nil, nil
+	}
+	remaining := maximumPromptEvidenceBytes
+	materialized := make([]promptEvidenceMaterialization, 0, len(references))
+	for _, reference := range references {
+		content, err := client.evidence.Read(ctx, reference.SHA256)
+		if errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		digest := sha256.Sum256(content)
+		if kernel.Digest(hex.EncodeToString(digest[:])) != reference.SHA256 {
+			return nil, ErrProtocol
+		}
+		if len(content) == 0 || len(content) > remaining || !utf8.Valid(content) {
+			continue
+		}
+		materialized = append(materialized, promptEvidenceMaterialization{EvidenceID: reference.EvidenceID, SHA256: reference.SHA256, Content: string(content)})
+		remaining -= len(content)
+	}
+	return materialized, nil
 }
 
 func (client *Client) Start(ctx context.Context, brief application.ExecutionBrief, requestDigest kernel.Digest) (application.ExternalExecutionObservation, error) {
@@ -609,7 +690,7 @@ func (client *Client) Start(ctx context.Context, brief application.ExecutionBrie
 	if status != http.StatusOK || !conversationMatches(info, conversationID, prepared.workspace.WorkingDirectory, requestDigest) || !conversationAgentMatches(info, prepared.profile.AgentSettings) {
 		return application.ExternalExecutionObservation{}, ErrProtocol
 	}
-	events, err := client.events(ctx, conversationID)
+	events, err := client.eventsAtLeaf(ctx, conversationID, info.LeafEventID)
 	if err != nil {
 		return application.ExternalExecutionObservation{}, err
 	}
@@ -707,7 +788,7 @@ func (client *Client) ReconcileStart(ctx context.Context, brief application.Exec
 	if status != http.StatusOK || !conversationMatches(info, conversationID, prepared.workspace.WorkingDirectory, requestDigest) || !conversationAgentMatches(info, prepared.profile.AgentSettings) {
 		return application.ExternalExecutionObservation{}, ErrProtocol
 	}
-	events, err := client.events(ctx, conversationID)
+	events, err := client.eventsAtLeaf(ctx, conversationID, info.LeafEventID)
 	if err != nil {
 		return application.ExternalExecutionObservation{}, err
 	}
@@ -726,7 +807,7 @@ func (client *Client) Inspect(ctx context.Context, brief application.ExecutionBr
 	if err != nil || status != http.StatusOK || !conversationMatches(info, conversationID, prepared.workspace.WorkingDirectory, requestDigest) || !conversationAgentMatches(info, prepared.profile.AgentSettings) {
 		return application.ExternalExecutionObservation{}, ErrProtocol
 	}
-	events, err := client.events(ctx, conversationID)
+	events, err := client.eventsAtLeaf(ctx, conversationID, info.LeafEventID)
 	if err != nil || executionPromptIndex(events, prepared, brief, requestDigest) < 0 {
 		return application.ExternalExecutionObservation{}, ErrProtocol
 	}
@@ -2358,7 +2439,11 @@ func (client *Client) correctWorkPurposeMutationViolation(ctx context.Context, b
 
 func (client *Client) correctCheckpointCompletionViolation(ctx context.Context, brief application.ExecutionBrief, requestDigest kernel.Digest, info conversationInfo, events []rawEvent, violation rawEvent, repeated bool) (application.ExternalExecutionObservation, error) {
 	if repeated {
-		return client.failForExecutionPolicyViolation(ctx, brief, requestDigest, info, events, "REPEATED_CHECKPOINT_COMPLETION_VIOLATION", describeAction(violation), false)
+		// Additional repository work after the result-boundary correction is a
+		// failed execution, but it is not an unsafe or irreparable product
+		// mutation. Preserve the failure evidence and permit one bounded successor
+		// invocation to finish from the retained checkpoint.
+		return client.failForExecutionPolicyViolation(ctx, brief, requestDigest, info, events, "REPEATED_CHECKPOINT_COMPLETION_VIOLATION", describeAction(violation), true)
 	}
 	conversationID := string(brief.InvocationID)
 	if executionStillActive(info.ExecutionStatus) {
@@ -2552,6 +2637,8 @@ type checkpointExecutionAuthority struct {
 	Purpose              kernel.WorkPurpose                     `json:"purpose"`
 	ActorFQN             kernel.ActorFQN                        `json:"actor_fqn"`
 	RoleGrounding        application.RoleExecutionGrounding     `json:"role_grounding"`
+	MessageHandler       *application.MessageHandlerGrounding   `json:"message_handler,omitempty"`
+	AdmittedMessage      *application.AdmittedMessage           `json:"admitted_message,omitempty"`
 	Scope                kernel.TaskOperationalScope            `json:"scope"`
 	CoordinationRule     string                                 `json:"coordination_rule"`
 	ExecutionGuidance    []string                               `json:"execution_guidance"`
@@ -2580,12 +2667,21 @@ func (client *Client) recoveryCheckpoint(ctx context.Context, brief application.
 	if err != nil || status != http.StatusOK || info.ID != priorID || info.Workspace.Kind != "LocalWorkspace" || !recoveryWorkspaceMatches(info.Workspace.WorkingDir, workspace, brief.Task.TaskID) || info.Tags["tekrooinvocation"] != priorID || !kernel.Digest(info.Tags["tekroorequest"]).Valid() || executionStillActive(info.ExecutionStatus) {
 		return progressCheckpoint{}, errors.Join(ErrProtocol, err)
 	}
-	events, err := client.events(ctx, priorID)
+	events, err := client.eventsAtLeaf(ctx, priorID, info.LeafEventID)
 	if err != nil {
 		return progressCheckpoint{}, err
 	}
 	checkpoint := buildProgressCheckpoint(brief, events, -1)
 	checkpoint.PriorInvocationID = brief.RetryOfInvocationID
+	// An accepted recovery directive describes the current corrective action.
+	// The predecessor journal remains evidence, but its derived next action may
+	// refer to a failure that the operator has already repaired in the preserved
+	// workspace. Never present that stale action as canonical beside a newer,
+	// evidence-bound directive.
+	if brief.RecoveryDirective != nil && brief.RecoveryDirective.Valid() {
+		checkpoint.NextAction = strings.TrimSpace(brief.RecoveryDirective.Reason)
+		checkpoint.ContinuationRule = "Treat authoritative_execution and recovery_directive as canonical. Perform recovery_directive.reason first. Use checkpoint actions and validations as historical evidence; do not repeat or repair a predecessor failure that the recovery directive says is already resolved."
+	}
 	return checkpoint, nil
 }
 
@@ -2881,11 +2977,34 @@ func checkpointAuthority(brief application.ExecutionBrief) checkpointExecutionAu
 		Purpose:              brief.Purpose,
 		ActorFQN:             brief.ActorFQN,
 		RoleGrounding:        brief.RoleGrounding,
+		MessageHandler:       cloneCheckpointMessageHandler(brief.MessageHandler),
+		AdmittedMessage:      cloneCheckpointAdmittedMessage(brief.AdmittedMessage),
 		Scope:                brief.Scope,
 		CoordinationRule:     brief.CoordinationRule,
 		ExecutionGuidance:    append([]string(nil), brief.ExecutionGuidance...),
 		ResultProtocol:       brief.ResultProtocol,
 	}
+}
+
+func cloneCheckpointMessageHandler(handler *application.MessageHandlerGrounding) *application.MessageHandlerGrounding {
+	if handler == nil {
+		return nil
+	}
+	clone := *handler
+	clone.InputSchema = append(json.RawMessage(nil), handler.InputSchema...)
+	clone.ResultSchema = append(json.RawMessage(nil), handler.ResultSchema...)
+	clone.AllowedResults = append([]string(nil), handler.AllowedResults...)
+	clone.AllowedMessageProposals = append([]string(nil), handler.AllowedMessageProposals...)
+	return &clone
+}
+
+func cloneCheckpointAdmittedMessage(message *application.AdmittedMessage) *application.AdmittedMessage {
+	if message == nil {
+		return nil
+	}
+	clone := *message
+	clone.Body = append(json.RawMessage(nil), message.Body...)
+	return &clone
 }
 
 func checkpointNextAction(brief application.ExecutionBrief, actions []checkpointAction, changed map[string]struct{}, validations []checkpointAction) string {
@@ -3120,13 +3239,18 @@ func (client *Client) prepare(ctx context.Context, brief application.ExecutionBr
 				return preparedExecution{}, ErrProtocol
 			}
 			envelope["candidate"] = workspace.Candidate
-			envelope["candidate_result_requirement"] = candidateResultRequirement{
-				CandidateID:            workspace.Candidate.CandidateID,
-				CandidateReceiptSHA256: workspace.Candidate.ReceiptSHA256,
-				Instruction:            candidateResultRequirementInstruction,
-			}
+			envelope["candidate_result_requirement"] = newCandidateResultRequirement(workspace.Candidate)
 			if protocol, ok := envelope["result_protocol"].(map[string]any); ok {
 				protocol["instruction"] = candidateResultProtocolInstruction
+			}
+		}
+		if brief.Purpose == kernel.PurposePromotion {
+			materialized, materializeErr := client.promptEvidence(ctx, brief.Evidence)
+			if materializeErr != nil {
+				return preparedExecution{}, errors.Join(ErrProtocol, materializeErr)
+			}
+			if len(materialized) > 0 {
+				envelope["evidence_materializations"] = materialized
 			}
 		}
 		prompt, err = json.Marshal(envelope)
@@ -3199,6 +3323,7 @@ func (client *Client) createConversation(ctx context.Context, brief application.
 
 type conversationInfo struct {
 	ID                       string `json:"id"`
+	LeafEventID              string `json:"leaf_event_id"`
 	ExecutionStatus          string `json:"execution_status"`
 	CreatedAt                string `json:"created_at"`
 	UpdatedAt                string `json:"updated_at"`
@@ -3391,6 +3516,30 @@ func (client *Client) events(ctx context.Context, conversationID string) ([]rawE
 	return nil, ErrProtocol
 }
 
+// eventsAtLeaf avoids downloading and decoding an unchanged conversation on
+// every execution poll. OpenHands changes leaf_event_id whenever the journal
+// advances, so new actions, observations, messages, and terminal results
+// invalidate the cache without a time-based visibility delay.
+func (client *Client) eventsAtLeaf(ctx context.Context, conversationID, leafID string) ([]rawEvent, error) {
+	if client == nil || conversationID == "" || leafID == "" {
+		return client.events(ctx, conversationID)
+	}
+	client.eventsMu.Lock()
+	entry, found := client.eventsCache[conversationID]
+	client.eventsMu.Unlock()
+	if found && entry.leafID == leafID {
+		return append([]rawEvent(nil), entry.events...), nil
+	}
+	events, err := client.events(ctx, conversationID)
+	if err != nil {
+		return nil, err
+	}
+	client.eventsMu.Lock()
+	client.eventsCache[conversationID] = cachedConversationEvents{leafID: leafID, events: append([]rawEvent(nil), events...)}
+	client.eventsMu.Unlock()
+	return events, nil
+}
+
 func decodeEvent(raw json.RawMessage) (rawEvent, error) {
 	var envelope struct {
 		ID         string `json:"id"`
@@ -3493,7 +3642,9 @@ func mutationAction(event rawEvent) bool {
 	executable := filepath.Base(strings.Trim(fields[0], "\"'"))
 	if len(fields) > 1 && executable == "git" {
 		switch fields[1] {
-		case "add", "am", "apply", "bisect", "branch", "checkout", "cherry-pick", "clean", "commit", "merge", "mv", "rebase", "reset", "restore", "revert", "rm", "stash", "switch", "tag", "update-ref":
+		case "branch":
+			return gitBranchMutation(fields[2:])
+		case "add", "am", "apply", "bisect", "checkout", "cherry-pick", "clean", "commit", "merge", "mv", "rebase", "reset", "restore", "revert", "rm", "stash", "switch", "tag", "update-ref":
 			return true
 		}
 	}
@@ -3537,6 +3688,45 @@ func mutationAction(event rawEvent) bool {
 		}
 	}
 	return writesThroughRedirection(command)
+}
+
+// gitBranchMutation separates the common inspection forms from operations
+// that create, rename, copy, or delete refs. An unrecognized form remains
+// conservatively classified as mutating.
+func gitBranchMutation(arguments []string) bool {
+	if len(arguments) == 0 {
+		return false
+	}
+	readOnly := map[string]struct{}{
+		"--show-current": {}, "--list": {}, "-l": {}, "--all": {}, "-a": {},
+		"--remotes": {}, "-r": {}, "--verbose": {}, "-v": {}, "-vv": {},
+		"--contains": {}, "--no-contains": {}, "--merged": {}, "--no-merged": {},
+		"--points-at": {}, "--format": {}, "--sort": {}, "--color": {}, "--no-color": {},
+		"--column": {}, "--no-column": {}, "--ignore-case": {}, "-i": {},
+	}
+	for _, argument := range arguments {
+		if _, found := readOnly[argument]; found || strings.HasPrefix(argument, "--format=") || strings.HasPrefix(argument, "--sort=") || strings.HasPrefix(argument, "--color=") || strings.HasPrefix(argument, "--column=") {
+			continue
+		}
+		if strings.HasPrefix(argument, "-") {
+			return true
+		}
+		// Values for filters and display options do not create a branch.
+		previous := arguments[0]
+		for index, candidate := range arguments {
+			if candidate == argument && index > 0 {
+				previous = arguments[index-1]
+				break
+			}
+		}
+		switch previous {
+		case "--contains", "--no-contains", "--merged", "--no-merged", "--points-at", "--format", "--sort", "--color", "--column":
+			continue
+		default:
+			return true
+		}
+	}
+	return false
 }
 
 // mutationTargetsOnlyScratch distinguishes agent-local temporary work from a
@@ -3699,6 +3889,9 @@ func (client *Client) observationAt(brief application.ExecutionBrief, requestDig
 			modelEvent = &copy
 		}
 	}
+	if state == application.ExternalSucceeded {
+		output = normalizedHandlerResultOutput(brief, output)
+	}
 	journalBytes, err := json.Marshal(journal)
 	if err != nil || len(journalBytes) > client.maximumEvidenceBytes || journalTime.IsZero() {
 		return application.ExternalExecutionObservation{}, ErrProtocol
@@ -3739,6 +3932,29 @@ func (client *Client) observationAt(brief application.ExecutionBrief, requestDig
 		EffectPolicyDigest: brief.EffectPolicyDigest, Retryable: retryable,
 		Evidence: evidence, Output: output,
 	}, nil
+}
+
+// normalizedHandlerResultOutput adapts a verbose OpenHands final response to
+// the strict Teams handler protocol only when the suffix beginning at the last
+// result marker independently validates against the bound handler schema. The
+// unmodified model event remains in MODEL_OUTPUT and event-journal evidence.
+func normalizedHandlerResultOutput(brief application.ExecutionBrief, output []byte) []byte {
+	if brief.MessageHandler == nil || len(output) == 0 {
+		return output
+	}
+	if _, err := application.ValidateRoleHandlerResult(*brief.MessageHandler, output); err == nil {
+		return output
+	}
+	marker := []byte(application.OrganizationalResultMarker)
+	index := bytes.LastIndex(output, marker)
+	if index < 0 {
+		return output
+	}
+	candidate := bytes.TrimSpace(output[index:])
+	if _, err := application.ValidateRoleHandlerResult(*brief.MessageHandler, candidate); err != nil {
+		return output
+	}
+	return append([]byte(nil), candidate...)
 }
 
 func eventEvidenceKind(event rawEvent) string {
@@ -3810,7 +4026,7 @@ func recoveryExecutionPromptMatches(prompt string, expectedCandidate *CandidateW
 		return false
 	}
 	if expectedCandidate != nil {
-		if !reflect.DeepEqual(*envelope.Candidate, *expectedCandidate) || envelope.CandidateResultRequirement == nil || envelope.CandidateResultRequirement.CandidateID != expectedCandidate.CandidateID || envelope.CandidateResultRequirement.CandidateReceiptSHA256 != expectedCandidate.ReceiptSHA256 || envelope.CandidateResultRequirement.Instruction != candidateResultRequirementInstruction || observedBrief.ResultProtocol == nil || observedBrief.ResultProtocol.Instruction != candidateResultProtocolInstruction {
+		if !reflect.DeepEqual(*envelope.Candidate, *expectedCandidate) || !candidateResultRequirementMatches(envelope.CandidateResultRequirement, expectedCandidate) || observedBrief.ResultProtocol == nil || observedBrief.ResultProtocol.Instruction != candidateResultProtocolInstruction {
 			return false
 		}
 	} else if envelope.CandidateResultRequirement != nil {

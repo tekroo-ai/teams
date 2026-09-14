@@ -192,6 +192,39 @@ func (store *MemoryOrganizationalMessageStore) ResolveMessage(ctx context.Contex
 	})
 }
 
+func (store *MemoryOrganizationalMessageStore) AdmitMessage(ctx context.Context, id kernel.UUIDv7, recipient kernel.ActorFQN, execution kernel.ExecutionTuple, resolution string, evidence kernel.Digest) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if !id.Valid() || !recipient.Valid() || !execution.Valid() || resolution == "" || !evidence.Valid() {
+		return ErrInvalidOrganizationalMessage
+	}
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	claim, found := store.messages[id]
+	if !found {
+		return ErrOrganizationalMessageNotFound
+	}
+	if claim.Message.Recipient != recipient {
+		return ErrOrganizationalMessageConflict
+	}
+	if claim.State == MessageResolved {
+		if claim.Resolution == resolution && claim.Evidence == evidence {
+			return nil
+		}
+		return ErrOrganizationalMessageConflict
+	}
+	if claim.State != MessagePending {
+		return ErrOrganizationalMessageConflict
+	}
+	claim.State = MessageResolved
+	claim.Resolution = resolution
+	claim.Evidence = evidence
+	claim.Execution = kernel.ExecutionTuple{}
+	store.messages[id] = claim
+	return nil
+}
+
 func (store *MemoryOrganizationalMessageStore) YieldMessage(ctx context.Context, id kernel.UUIDv7, holder kernel.ActorFQN, execution kernel.ExecutionTuple, epoch uint64, now time.Time) error {
 	return store.updateClaim(ctx, id, holder, execution, epoch, now, func(claim *MessageClaim) {
 		claim.State = MessagePending

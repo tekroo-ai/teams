@@ -57,7 +57,7 @@ func TestInitializeLocalDeploymentProducesValidatedIsolatedInstallation(t *testi
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Team != "teams" || result.WorkspaceCount != 14 || result.AutomaticStartup || result.ContractIdentity != "tekroo.kernel.contracts/0.11.0" || result.BranchPrefix != "tekroo-test/" || result.OpenHands != "http://127.0.0.1:18002" {
+	if result.Team != "teams" || result.WorkspaceCount != 14 || result.AutomaticStartup || result.ContractIdentity != "tekroo.kernel.contracts/0.12.0" || result.BranchPrefix != "tekroo-test/" || result.OpenHands != "http://127.0.0.1:18002" {
 		t.Fatalf("result = %#v", result)
 	}
 	config, err := operationalruntime.LoadProductionConfig(result.ConfigPath)
@@ -66,6 +66,9 @@ func TestInitializeLocalDeploymentProducesValidatedIsolatedInstallation(t *testi
 	}
 	if config.Mongo.Database != "teams_test_prod" || config.SMADatabaseIdentity != "sma_test" || config.OpenHands.BaseURL != "http://127.0.0.1:18002" || len(config.Workspaces) != 14 || len(config.Profiles) != 8 {
 		t.Fatalf("config = %#v", config)
+	}
+	if len(config.Organization.Publishers) != 2 || len(config.Planning.TaskMessageRoutes) != 6 || len(config.Organization.WorkflowDefinitions) != 1 || config.Organization.WorkflowDefinitions[0].DefinitionDigest != kernel.Digest(localSoftwareWorkflowDigest) || config.Mongo.MessageWaitTimeout != "1m" {
+		t.Fatalf("successor organizational-runtime activation is incomplete: publishers=%d routes=%d workflows=%#v message_wait=%q", len(config.Organization.Publishers), len(config.Planning.TaskMessageRoutes), config.Organization.WorkflowDefinitions, config.Mongo.MessageWaitTimeout)
 	}
 	if len(config.Planning.CandidateGates) != 1 || len(config.Planning.CandidateGates[0].Command) == 0 || !filepath.IsAbs(config.Planning.CandidateGates[0].Command[0]) || filepath.Base(config.Planning.CandidateGates[0].Command[0]) != "go" {
 		t.Fatalf("deterministic Go gate is not bound to an absolute toolchain path: %#v", config.Planning.CandidateGates)
@@ -252,7 +255,7 @@ func TestBindLocalProductionQualificationsRejectsMismatchedProfile(t *testing.T)
 	}
 	starterRoot := filepath.Join(sourceRoot, "config", "starter-team")
 	var manifest organization.TeamManifest
-	if err := readStrictJSON(filepath.Join(starterRoot, "team.example.json"), &manifest); err != nil {
+	if err := readStrictJSON(filepath.Join(starterRoot, "team.v4.example.json"), &manifest); err != nil {
 		t.Fatal(err)
 	}
 	profiles, err := localProductionProfiles(starterRoot, &manifest)
@@ -279,7 +282,7 @@ func writeLocalQualificationBundle(t *testing.T, sourceRoot, path string) {
 	t.Helper()
 	starterRoot := filepath.Join(sourceRoot, "config", "starter-team")
 	var manifest organization.TeamManifest
-	if err := readStrictJSON(filepath.Join(starterRoot, "team.example.json"), &manifest); err != nil {
+	if err := readStrictJSON(filepath.Join(starterRoot, "team.v4.example.json"), &manifest); err != nil {
 		t.Fatal(err)
 	}
 	profiles, err := localProductionProfiles(starterRoot, &manifest)

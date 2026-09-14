@@ -941,6 +941,14 @@ func (service *ProductionService) reuseFeatureValidationCandidateWorkspace(ctx c
 	if err != nil || receiptDigest != binding.Candidate.ReceiptSHA256 {
 		return ProductionWorkspace{}, nil, errors.Join(errInvalidCandidateWorkspace, err)
 	}
+	validator, found := latestTaskInvocation(snapshot.WorkInvocations, validatorTaskID)
+	if !found || validator.State != kernel.InvocationSucceeded || validator.OutputDigest == nil {
+		return ProductionWorkspace{}, nil, errInvalidCandidateWorkspace
+	}
+	validatorOutput, found := invocationOutputEvidence(snapshot, validator)
+	if !found {
+		return ProductionWorkspace{}, nil, errInvalidCandidateWorkspace
+	}
 	workspace, reused, reusedDigest, err := service.candidates.Reuse(ctx, feature, consumer, owner.WorkspaceID, receipt)
 	if err != nil {
 		return ProductionWorkspace{}, nil, err
@@ -950,11 +958,25 @@ func (service *ProductionService) reuseFeatureValidationCandidateWorkspace(ctx c
 		return ProductionWorkspace{}, nil, err
 	}
 	evidence := append([]kernel.EvidenceRef(nil), baseEvidence...)
+	evidence = append(evidence, validatorOutput)
 	evidence = append(evidence, kernel.EvidenceRef{EvidenceID: evidenceID, SHA256: reusedDigest})
 	slices.SortFunc(evidence, func(left, right kernel.EvidenceRef) int {
 		return strings.Compare(string(left.EvidenceID), string(right.EvidenceID))
 	})
 	return workspace, evidence, nil
+}
+
+func invocationOutputEvidence(snapshot kernel.Snapshot, invocation kernel.WorkInvocation) (kernel.EvidenceRef, bool) {
+	if invocation.OutputDigest == nil {
+		return kernel.EvidenceRef{}, false
+	}
+	for _, evidenceID := range invocation.TerminalEvidenceIDs {
+		metadata, found := snapshot.Evidence[evidenceID]
+		if found && metadata.Available && metadata.SHA256 == *invocation.OutputDigest {
+			return kernel.EvidenceRef{EvidenceID: evidenceID, SHA256: metadata.SHA256}, true
+		}
+	}
+	return kernel.EvidenceRef{}, false
 }
 
 // DependsOn identifies every implementation artifact a validator consumes;

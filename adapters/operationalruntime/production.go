@@ -32,8 +32,8 @@ import (
 )
 
 const (
-	ContractPackagePath = "CONTRACTS/tekroo.kernel.contracts/0.11.0"
-	ManifestSHA256      = kernel.Digest("85306c8edc703e85df502280642ef30161e16b8e82ff48f568c5a5c6d421f12d")
+	ContractPackagePath = "CONTRACTS/tekroo.kernel.contracts/0.12.0"
+	ManifestSHA256      = kernel.Digest("7622432bd06e6ba93174efa1a92d31cd56522654248a126c91023f42519ce5f3")
 	maximumConfigBytes  = 1 << 20
 )
 
@@ -92,6 +92,7 @@ type ProductionMongoConfig struct {
 	Database               string `json:"database"`
 	BacklogLimit           int64  `json:"backlog_limit"`
 	DeliveryPolicyRevision uint64 `json:"delivery_policy_revision"`
+	MessageWaitTimeout     string `json:"message_wait_timeout,omitempty"`
 }
 
 type ProductionOpenHandsConfig struct {
@@ -258,15 +259,21 @@ func sameWorkKinds(left, right []kernel.WorkKind) bool {
 }
 
 type ProductionPlanning struct {
-	PolicyRevision             uint64                    `json:"policy_revision"`
-	ClassificationPolicyDigest kernel.Digest             `json:"classification_policy_digest"`
-	PromotionPolicyDigest      kernel.Digest             `json:"promotion_policy_digest"`
-	VerificationTopologyDigest kernel.Digest             `json:"verification_topology_digest"`
-	SelectionPolicyDigest      kernel.Digest             `json:"selection_policy_digest"`
-	BudgetPolicyDigest         kernel.Digest             `json:"budget_policy_digest"`
-	RequiredGateIDs            []string                  `json:"required_gate_ids"`
-	CandidateGates             []ProductionCandidateGate `json:"candidate_gates,omitempty"`
-	Deadline                   string                    `json:"deadline"`
+	PolicyRevision             uint64                                            `json:"policy_revision"`
+	ClassificationPolicyDigest kernel.Digest                                     `json:"classification_policy_digest"`
+	PromotionPolicyDigest      kernel.Digest                                     `json:"promotion_policy_digest"`
+	VerificationTopologyDigest kernel.Digest                                     `json:"verification_topology_digest"`
+	SelectionPolicyDigest      kernel.Digest                                     `json:"selection_policy_digest"`
+	BudgetPolicyDigest         kernel.Digest                                     `json:"budget_policy_digest"`
+	RequiredGateIDs            []string                                          `json:"required_gate_ids"`
+	CandidateGates             []ProductionCandidateGate                         `json:"candidate_gates,omitempty"`
+	TaskMessageRoutes          map[kernel.WorkPurpose]ProductionTaskMessageRoute `json:"task_message_routes,omitempty"`
+	Deadline                   string                                            `json:"deadline"`
+}
+
+type ProductionTaskMessageRoute struct {
+	MessageType    string                      `json:"message_type"`
+	MessagePurpose organization.MessagePurpose `json:"message_purpose"`
 }
 
 // ProductionCandidateGate is a deterministic, non-interactive command that
@@ -351,6 +358,7 @@ type resolvedProductionConfig struct {
 	provenance            kernel.ProvenanceBasis
 	requestTimeout        time.Duration
 	pollInterval          time.Duration
+	messageWaitTimeout    time.Duration
 	operationTimeout      time.Duration
 	leaseDuration         time.Duration
 	reconciliation        time.Duration
@@ -437,7 +445,7 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 		return resolvedProductionConfig{}, invalidConfig("required identity, storage, workspace, or profile binding is missing")
 	}
 	if info, err := os.Stat(filepath.Join(config.ContractRoot, ContractPackagePath, "manifest.json")); err != nil || !info.Mode().IsRegular() {
-		return resolvedProductionConfig{}, invalidConfig("contract root does not contain contract 0.11.0")
+		return resolvedProductionConfig{}, invalidConfig("contract root does not contain contract 0.12.0")
 	}
 	if !loopbackHTTPURL(config.OpenHands.BaseURL) {
 		return resolvedProductionConfig{}, invalidConfig("OpenHands base URL must be an explicit loopback HTTP endpoint with no path")
@@ -483,6 +491,13 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 	pollInterval, err := positiveDuration("openhands.poll_interval", config.OpenHands.PollInterval)
 	if err != nil {
 		return resolvedProductionConfig{}, err
+	}
+	messageWaitTimeout := time.Minute
+	if config.Mongo.MessageWaitTimeout != "" {
+		messageWaitTimeout, err = positiveDuration("mongo.message_wait_timeout", config.Mongo.MessageWaitTimeout)
+		if err != nil {
+			return resolvedProductionConfig{}, err
+		}
 	}
 	operationTimeout, err := positiveDuration("execution.operation_timeout", config.Execution.OperationTimeout)
 	if err != nil {
@@ -559,6 +574,11 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 			return resolvedProductionConfig{}, invalidConfig("required candidate gate is not configured")
 		}
 		requiredGates[gateID] = struct{}{}
+	}
+	for purpose, route := range config.Planning.TaskMessageRoutes {
+		if !purpose.Valid() || !organization.ValidMessageType(route.MessageType) || !route.MessagePurpose.Valid() {
+			return resolvedProductionConfig{}, invalidConfig("task message route is invalid")
+		}
 	}
 	gitOperationTimeout := time.Duration(0)
 	if config.Git != nil {
@@ -721,7 +741,7 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 	if err := readStrictJSONFile(config.ProvenanceFile, &provenance); err != nil || !provenance.Valid() || provenance.PolicyDigest != policy.PolicyDigest || provenance.PolicyRevision != policy.Revision {
 		return resolvedProductionConfig{}, invalidConfig("provenance file is invalid or does not bind the authorization policy")
 	}
-	return resolvedProductionConfig{ProductionConfig: config, mongoURI: mongoURI, sessionAPIKey: sessionKey, operatorBearerToken: operatorToken, humanCredentials: humanCredentials, authorizationPolicy: policy, provenance: provenance, requestTimeout: requestTimeout, pollInterval: pollInterval, operationTimeout: operationTimeout, leaseDuration: leaseDuration, reconciliation: reconciliation, leaseOperationTimeout: leaseOperationTimeout, projectionInterval: projectionInterval, projectionTimeout: projectionTimeout, continuityHeartbeat: continuityHeartbeat, continuityThreshold: continuityThreshold, operatorTimeout: operatorTimeout, team: team, libraryTeams: libraryTeams, trustedRolePublishers: trustedKeys, workflowLibrary: workflowLibrary, roleReconciliation: roleReconciliation, planningDeadline: planningDeadline, gitOperationTimeout: gitOperationTimeout, federationRegistry: federationRegistry, federationPrivateKey: federationPrivateKey, federationTimeout: federationTimeout, federationFutureSkew: federationFutureSkew, federationTTL: federationTTL}, nil
+	return resolvedProductionConfig{ProductionConfig: config, mongoURI: mongoURI, sessionAPIKey: sessionKey, operatorBearerToken: operatorToken, humanCredentials: humanCredentials, authorizationPolicy: policy, provenance: provenance, requestTimeout: requestTimeout, pollInterval: pollInterval, messageWaitTimeout: messageWaitTimeout, operationTimeout: operationTimeout, leaseDuration: leaseDuration, reconciliation: reconciliation, leaseOperationTimeout: leaseOperationTimeout, projectionInterval: projectionInterval, projectionTimeout: projectionTimeout, continuityHeartbeat: continuityHeartbeat, continuityThreshold: continuityThreshold, operatorTimeout: operatorTimeout, team: team, libraryTeams: libraryTeams, trustedRolePublishers: trustedKeys, workflowLibrary: workflowLibrary, roleReconciliation: roleReconciliation, planningDeadline: planningDeadline, gitOperationTimeout: gitOperationTimeout, federationRegistry: federationRegistry, federationPrivateKey: federationPrivateKey, federationTimeout: federationTimeout, federationFutureSkew: federationFutureSkew, federationTTL: federationTTL}, nil
 }
 
 func loadedTeamHasActor(team organization.LoadedTeam, actor kernel.ActorFQN) bool {
@@ -753,6 +773,7 @@ type ProductionService struct {
 	Federation         *organization.FederationCoordinator
 	Features           *organization.FeatureCoordinator
 	Releases           *application.ReleaseCoordinator
+	roleGrounding      *boundRoleGroundingResolver
 
 	projectionInterval     time.Duration
 	projectionTimeout      time.Duration
@@ -765,6 +786,7 @@ type ProductionService struct {
 	recoveryDone           chan error
 	roleRecoveryDone       chan error
 	featureRecoveryDone    chan error
+	featureWake            chan struct{}
 	continuityDone         chan error
 	failures               chan error
 	provenance             kernel.ProvenanceBasis
@@ -820,7 +842,7 @@ func NewProductionService(ctx context.Context, config ProductionConfig) (*Produc
 	if info, err := os.Stat(config.EvidenceRoot); err != nil || !info.IsDir() {
 		return nil, invalidConfig("evidence root is not a directory")
 	}
-	store, err := mongo.Open(ctx, mongo.Config{URI: resolved.mongoURI, Database: config.Mongo.Database, ContractIdentity: kernel.ContractIdentity, ManifestSHA256: ManifestSHA256, MigrationLevel: 1, Policy: resolved.authorizationPolicy, BacklogLimit: config.Mongo.BacklogLimit, DeliveryPolicyRevision: config.Mongo.DeliveryPolicyRevision, DeploymentIdentity: config.DeploymentIdentity})
+	store, err := mongo.Open(ctx, mongo.Config{URI: resolved.mongoURI, Database: config.Mongo.Database, ContractIdentity: kernel.ContractIdentity, ManifestSHA256: ManifestSHA256, MigrationLevel: 1, Policy: resolved.authorizationPolicy, BacklogLimit: config.Mongo.BacklogLimit, DeliveryPolicyRevision: config.Mongo.DeliveryPolicyRevision, DeploymentIdentity: config.DeploymentIdentity, OrganizationalMessageMaxAwait: resolved.messageWaitTimeout})
 	if err != nil {
 		return nil, fmt.Errorf("open production MongoDB store: %w", err)
 	}
@@ -899,7 +921,8 @@ func NewProductionService(ctx context.Context, config ProductionConfig) (*Produc
 		_ = runtime.Close(context.WithoutCancel(ctx))
 		return fail(fmt.Errorf("create message bus: %w", err))
 	}
-	roleWorker := &organizationalRoleWorker{store: store, inbox: roleInbox, pollInterval: resolved.pollInterval, openTimeout: resolved.leaseOperationTimeout}
+	featureWake := make(chan struct{}, 1)
+	roleWorker := &organizationalRoleWorker{store: store, inbox: roleInbox, featureWake: featureWake, waitTimeout: resolved.messageWaitTimeout, openTimeout: resolved.leaseOperationTimeout}
 	roleRuntime, err := organization.NewInProcessRuntime(roleWorker)
 	if err != nil {
 		_ = runtime.Close(context.WithoutCancel(ctx))
@@ -933,7 +956,7 @@ func NewProductionService(ctx context.Context, config ProductionConfig) (*Produc
 	for key, value := range resolved.trustedRolePublishers {
 		trustedPublishers[key] = append(ed25519.PublicKey(nil), value...)
 	}
-	service := &ProductionService{Store: store, Runtime: runtime, Controller: controller, RoleHost: roleHost, RoleRuntime: roleRuntime, MessageBus: messageBus, RoleInbox: roleInbox, RoleLibrary: roleLibrary, WorkflowLibrary: resolved.workflowLibrary, projectionInterval: resolved.projectionInterval, projectionTimeout: resolved.projectionTimeout, recoveryInterval: resolved.reconciliation, recoveryTimeout: resolved.leaseOperationTimeout, recoveryAttempts: config.Worker.MaximumReconciliations, failures: make(chan error, 4), provenance: resolved.provenance, operatorToken: resolved.operatorBearerToken, operatorIdentity: protocol.AuthenticatedContext{Principal: config.Operator.Principal}, humanCredentials: append([]HumanTransportCredential(nil), resolved.humanCredentials...), operatorTimeout: resolved.operatorTimeout, operatorMaxBody: config.Operator.MaximumBodyBytes, roleReconciliation: resolved.roleReconciliation, roleMaximumRestarts: config.Organization.MaximumRestarts, messageMaximumAttempts: config.Organization.MaximumDeliveryAttempts, startPaused: config.Worker.StartPaused, suspendNewInvocations: config.Worker.SuspendNewInvocations, admissionLimitEnabled: config.Worker.NewInvocationAdmissionLimit > 0, admissionRemaining: config.Worker.NewInvocationAdmissionLimit, recoveryFaults: make(map[string]RecoveryFault), requestTimeout: resolved.requestTimeout, clock: clock, ids: ids, deploymentIdentity: config.DeploymentIdentity, continuityHeartbeat: resolved.continuityHeartbeat, continuityThreshold: resolved.continuityThreshold, planningDeadline: resolved.planningDeadline, planning: config.Planning, profilesByModel: profilesByModel, workspacesByID: workspacesByID, workspaceResolver: workspaceResolver, taskWorkspaces: taskWorkspaces, candidates: candidates, serviceAuthority: config.ServiceAuthority, policyAuthority: config.ExpiryAuthority, librarySources: librarySources, trustedRolePublishers: trustedPublishers}
+	service := &ProductionService{Store: store, Runtime: runtime, Controller: controller, RoleHost: roleHost, RoleRuntime: roleRuntime, MessageBus: messageBus, RoleInbox: roleInbox, RoleLibrary: roleLibrary, WorkflowLibrary: resolved.workflowLibrary, projectionInterval: resolved.projectionInterval, projectionTimeout: resolved.projectionTimeout, recoveryInterval: resolved.reconciliation, recoveryTimeout: resolved.leaseOperationTimeout, recoveryAttempts: config.Worker.MaximumReconciliations, failures: make(chan error, 4), featureWake: featureWake, provenance: resolved.provenance, operatorToken: resolved.operatorBearerToken, operatorIdentity: protocol.AuthenticatedContext{Principal: config.Operator.Principal}, humanCredentials: append([]HumanTransportCredential(nil), resolved.humanCredentials...), operatorTimeout: resolved.operatorTimeout, operatorMaxBody: config.Operator.MaximumBodyBytes, roleReconciliation: resolved.roleReconciliation, roleMaximumRestarts: config.Organization.MaximumRestarts, messageMaximumAttempts: config.Organization.MaximumDeliveryAttempts, startPaused: config.Worker.StartPaused, suspendNewInvocations: config.Worker.SuspendNewInvocations, admissionLimitEnabled: config.Worker.NewInvocationAdmissionLimit > 0, admissionRemaining: config.Worker.NewInvocationAdmissionLimit, recoveryFaults: make(map[string]RecoveryFault), requestTimeout: resolved.requestTimeout, clock: clock, ids: ids, deploymentIdentity: config.DeploymentIdentity, continuityHeartbeat: resolved.continuityHeartbeat, continuityThreshold: resolved.continuityThreshold, planningDeadline: resolved.planningDeadline, planning: config.Planning, profilesByModel: profilesByModel, workspacesByID: workspacesByID, workspaceResolver: workspaceResolver, taskWorkspaces: taskWorkspaces, candidates: candidates, serviceAuthority: config.ServiceAuthority, policyAuthority: config.ExpiryAuthority, librarySources: librarySources, trustedRolePublishers: trustedPublishers, roleGrounding: roleGrounding}
 	if config.Federation != nil {
 		federationIngress, ingressErr := organization.NewFederationIngress(resolved.federationRegistry, store, config.DeploymentIdentity, resolved.federationFutureSkew)
 		if ingressErr != nil {
@@ -1143,8 +1166,16 @@ func (service *ProductionService) ResumeRole(ctx context.Context, actor kernel.A
 }
 
 func (service *ProductionService) SendMessage(ctx context.Context, message organization.OrganizationalMessage) error {
-	if service == nil || service.MessageBus == nil {
+	if service == nil || service.MessageBus == nil || service.RoleHost == nil || service.roleGrounding == nil {
 		return application.ErrInvalidConfiguration
+	}
+	if _, err := service.roleGrounding.ResolveRoleGrounding(ctx, message.Recipient); err != nil {
+		return err
+	}
+	if service.roleGrounding.requiresMessageHandler(message.Recipient) {
+		if _, err := service.roleGrounding.bindMessageHandler(message.Recipient, message); err != nil {
+			return err
+		}
 	}
 	root, hasRoot := workflowRootFromMessage(message)
 	workflowTrigger := false
@@ -1161,17 +1192,40 @@ func (service *ProductionService) SendMessage(ctx context.Context, message organ
 	if err := service.MessageBus.Send(ctx, message); err != nil {
 		return err
 	}
-	if !workflowTrigger {
-		return nil
+	if workflowTrigger {
+		if err := service.bindTriggeredMessageWorkflow(ctx, message, root); err != nil {
+			return err
+		}
 	}
-	return service.bindTriggeredMessageWorkflow(ctx, message, root)
+	state, err := service.RoleHost.EnsureStarted(ctx, message.Recipient)
+	_, err = service.completeRoleStart(ctx, state, err)
+	return err
 }
 
 func (service *ProductionService) SendMessageFanout(ctx context.Context, messages []organization.OrganizationalMessage) error {
-	if service == nil || service.MessageBus == nil {
+	if service == nil || service.MessageBus == nil || service.RoleHost == nil || service.roleGrounding == nil {
 		return application.ErrInvalidConfiguration
 	}
-	return service.MessageBus.SendFanout(ctx, messages)
+	for _, message := range messages {
+		if _, err := service.roleGrounding.ResolveRoleGrounding(ctx, message.Recipient); err != nil {
+			return err
+		}
+		if service.roleGrounding.requiresMessageHandler(message.Recipient) {
+			if _, err := service.roleGrounding.bindMessageHandler(message.Recipient, message); err != nil {
+				return err
+			}
+		}
+	}
+	if err := service.MessageBus.SendFanout(ctx, messages); err != nil {
+		return err
+	}
+	for _, message := range messages {
+		state, err := service.RoleHost.EnsureStarted(ctx, message.Recipient)
+		if _, err = service.completeRoleStart(ctx, state, err); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 type FederationSnapshot struct {
@@ -1496,6 +1550,9 @@ func (service *ProductionService) runRoleRecovery(ctx context.Context) error {
 	for {
 		operationContext, cancel := context.WithTimeout(ctx, service.recoveryTimeout)
 		_, _, err := service.MessageBus.Sweep(operationContext, time.Now().UTC(), service.messageMaximumAttempts)
+		if err == nil {
+			err = service.ensurePendingMessageRecipientsStarted(operationContext)
+		}
 		var roster []organization.RoleInstanceState
 		if err == nil {
 			roster, err = service.RoleHost.Roster(operationContext)
@@ -1543,6 +1600,37 @@ func (service *ProductionService) runRoleRecovery(ctx context.Context) error {
 	}
 }
 
+// ensurePendingMessageRecipientsStarted restores the send-time auto-start
+// guarantee after a daemon restart. Durable pending messages are authoritative;
+// an idle workflow must not depend on an operator manually restarting its next
+// recipient.
+func (service *ProductionService) ensurePendingMessageRecipientsStarted(ctx context.Context) error {
+	pending, err := service.Store.ListMessageClaims(ctx, organization.MessagePending, 1000)
+	if err != nil {
+		return err
+	}
+	seen := make(map[kernel.ActorFQN]struct{}, len(pending))
+	for _, claim := range pending {
+		recipient := claim.Message.Recipient
+		if _, duplicate := seen[recipient]; duplicate {
+			continue
+		}
+		seen[recipient] = struct{}{}
+		state, found, statusErr := service.RoleHost.Status(ctx, recipient)
+		if statusErr != nil {
+			return statusErr
+		}
+		if found && state.Status != organization.RoleStopped {
+			continue
+		}
+		state, startErr := service.RoleHost.EnsureStarted(ctx, recipient)
+		if _, startErr = service.completeRoleStart(ctx, state, startErr); startErr != nil {
+			return startErr
+		}
+	}
+	return nil
+}
+
 // runFeatureRecovery is deliberately separate from role recovery. Feature
 // reconciliation may execute deterministic candidate gates whose configured
 // timeout is much longer than the short lease-operation timeout used for
@@ -1578,6 +1666,8 @@ func (service *ProductionService) runFeatureRecovery(ctx context.Context) error 
 		case <-ctx.Done():
 			timer.Stop()
 			return ctx.Err()
+		case <-service.featureWake:
+			timer.Stop()
 		case <-timer.C:
 		}
 	}

@@ -1,0 +1,54 @@
+{
+  "contractIdentity": "tekroo.kernel.contracts/0.12.0",
+  "invariants": [
+    {
+      "invariantId": "P10-RH-INV-001",
+      "statement": "Each subscribed message resolves to exactly one content-addressed per-role disposition before model execution.",
+      "testIds": [
+        "P10-RH-001",
+        "P10-RH-002",
+        "P10-RH-003",
+        "P10-RH-007"
+      ]
+    },
+    {
+      "invariantId": "P10-RH-INV-002",
+      "statement": "Role and handler resources remain bound across execution and compaction.",
+      "testIds": [
+        "P10-RH-003",
+        "P10-RH-006"
+      ]
+    },
+    {
+      "invariantId": "P10-RH-INV-003",
+      "statement": "Handler output proposes only transitions declared by the current acyclic workflow node.",
+      "testIds": [
+        "P10-RH-005"
+      ]
+    },
+    {
+      "invariantId": "P10-RH-INV-004",
+      "statement": "An idle change-stream timeout creates no organizational work and invokes no model.",
+      "testIds": [
+        "P10-RH-004"
+      ]
+    },
+    {
+      "invariantId": "P10-RH-INV-005",
+      "statement": "Changing message type, role, actor, alias, or thread cannot bypass node identity or root authority.",
+      "testIds": [
+        "P10-RH-005",
+        "P10-RH-008"
+      ]
+    },
+    {
+      "invariantId": "P10-RH-INV-006",
+      "statement": "Duplicate delivery creates at most one admission and one invocation, and legacy string handlers remain readable only through the bounded compatibility path.",
+      "testIds": [
+        "P10-RH-009",
+        "P10-RH-010"
+      ]
+    }
+  ],
+  "schemaVersion": "1.0.0"
+}

@@ -142,6 +142,21 @@ func TestWholeFeatureValidationRecognitionUsesCompleteDAGCoverage(t *testing.T) 
 	}
 }
 
+func TestInvocationOutputEvidenceSelectsExactTerminalOutput(t *testing.T) {
+	outputID := candidateTestUUID(916)
+	journalID := candidateTestUUID(917)
+	outputDigest := candidateTestDigest('a')
+	snapshot := kernel.Snapshot{Evidence: map[kernel.UUIDv7]kernel.EvidenceMetadata{
+		journalID: {SHA256: candidateTestDigest('b'), Available: true},
+		outputID:  {SHA256: outputDigest, Available: true},
+	}}
+	invocation := kernel.WorkInvocation{OutputDigest: &outputDigest, TerminalEvidenceIDs: []kernel.UUIDv7{journalID, outputID}}
+	reference, found := invocationOutputEvidence(snapshot, invocation)
+	if !found || reference.EvidenceID != outputID || reference.SHA256 != outputDigest {
+		t.Fatalf("output evidence=%#v found=%t", reference, found)
+	}
+}
+
 func TestCandidateWorkspaceRecoversWorkspaceCreatedBeforeReceipt(t *testing.T) {
 	source, baseline, _ := candidateRepository(t)
 	resolver, err := openhands.NewBoundWorkspaceResolver([]openhands.WorkspaceBinding{{WorkspaceID: "tester-1", WorktreeID: "tester-default", WorkingDirectory: t.TempDir()}})

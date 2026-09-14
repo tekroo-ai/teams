@@ -329,16 +329,16 @@ func (service *ProductionService) classifyTaskRecovery(ctx context.Context, task
 		return taskRecoveryOperatorRepair, nil
 	}
 	if task.Purpose == kernel.PurposePromotion {
-		// Only an unparseable promotion result is operator-recoverable: the
-		// exact-block check below excludes a recorded product decision
-		// ("promotion-not-pass"). Retrying cannot accept the feature, because the
-		// promotion agent must still return a passing structured acceptance.
+		// An explicit, evidence-bound operator recovery may re-run a promotion
+		// after its prerequisite evidence or execution substrate is repaired. It
+		// never accepts the feature: the product owner must still return a new,
+		// passing structured decision.
 		if invocation.State != kernel.InvocationSucceeded || invocation.OutputDigest == nil {
 			return 0, application.ErrInvalidOperationalExecution
 		}
 		if state.Condition == kernel.ConditionBlocked {
 			blocked, found, err := service.Store.ReadEvent(ctx, head)
-			if err != nil || !found || !isExactInvalidStructuredOutputBlock(blocked, task, invocation, service.policyAuthority) {
+			if err != nil || !found || !isExactRecoverableStructuredDecisionBlock(blocked, task, invocation, service.policyAuthority) {
 				return 0, errors.Join(application.ErrInvalidOperationalExecution, err)
 			}
 			return taskRecoveryInvalidStructuredOutput, nil
@@ -355,7 +355,7 @@ func (service *ProductionService) classifyTaskRecovery(ctx context.Context, task
 			return 0, errors.Join(application.ErrInvalidOperationalExecution, err)
 		}
 		blocked, found, err := service.Store.ReadEvent(ctx, unblock.Parents[0].ParentEventID)
-		if err != nil || !found || !isExactInvalidStructuredOutputBlock(blocked, task, invocation, service.policyAuthority) {
+		if err != nil || !found || !isExactRecoverableStructuredDecisionBlock(blocked, task, invocation, service.policyAuthority) {
 			return 0, errors.Join(application.ErrInvalidOperationalExecution, err)
 		}
 		return taskRecoveryInvalidStructuredOutput, nil

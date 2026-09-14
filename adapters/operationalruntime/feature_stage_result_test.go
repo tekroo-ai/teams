@@ -12,6 +12,15 @@ import (
 	"github.com/tekroo-ai/teams/organization"
 )
 
+func TestFeatureStageParserAcceptsValidatedHandlerEnvelope(t *testing.T) {
+	output := []byte(application.OrganizationalResultMarker + `
+{"schema_version":"1.0.0","outcome":"completed","summary":"refined","evidence":[],"message_proposals":[],"work_product":{"schema_version":"1.0.0","result_type":"FEATURE_REFINEMENT","acceptance_criteria_disposition":"PRESERVE_SUBMITTED","clarification_questions":[],"priority":"HIGH"}}`)
+	result, err := parseRefinementStageResult(output)
+	if err != nil || result.Priority != organization.PriorityHigh {
+		t.Fatalf("result=%#v err=%v", result, err)
+	}
+}
+
 func TestInvalidPlanningOutputBlockMatchingIsExact(t *testing.T) {
 	task := organization.PlannedTask{ID: "00000000-0000-7000-8000-000000000101"}
 	invocation := kernel.WorkInvocation{
@@ -99,6 +108,11 @@ func TestInvalidValidatorOutputBlockMatchingIsExact(t *testing.T) {
 	}
 	if isExactInvalidStructuredOutputBlock(failedDecision, task, invocation, authority) {
 		t.Fatal("material validator failure was misclassified as invalid structured output")
+	}
+	promotionDecision := event
+	promotionDecision.Payload = []byte(`{"blocker_refs":["teams://work-invocation/00000000-0000-7000-8000-000000000321"],"reason":"product acceptance did not pass: required validation evidence was unavailable","review_policy":"operator-or-product-owner-must-amend-scope-or-cancel"}`)
+	if !isExactRecoverableStructuredDecisionBlock(promotionDecision, task, invocation, authority) {
+		t.Fatal("blocked product decision was not recognized as operator-recoverable")
 	}
 
 	wrongInvocation := invocation

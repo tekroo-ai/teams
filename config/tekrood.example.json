@@ -4,7 +4,8 @@
     "uri_file": "/Users/you/.config/tekroo/teams/mongo-uri",
     "database": "tekroo_teams_v4",
     "backlog_limit": 10000,
-    "delivery_policy_revision": 1
+    "delivery_policy_revision": 1,
+    "message_wait_timeout": "1m"
   },
   "openhands": {
     "base_url": "http://127.0.0.1:8000",
@@ -96,7 +97,7 @@
     "workflow_definitions": [
       {
         "definition_file": "/Users/you/work/tekroo-ai/teams/config/workflows/software-development.v1.json",
-        "definition_digest": "0fad72aa1ffd2a5a671a610165d8686fa68331f8206627874bf6ce3628b4bfa6"
+        "definition_digest": "1624fb8ba139c3c1e1ebe880cf79cfa1f9edd025b946f9676a2c3f3ab9ea3967"
       }
     ],
     "reconciliation_interval": "5s",
@@ -117,6 +118,14 @@
     "selection_policy_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
     "budget_policy_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
     "required_gate_ids": ["go-test"],
+    "task_message_routes": {
+      "ESCALATION": {"message_type": "tekroo.message.task.escalated", "message_purpose": "HANDOFF"},
+      "IMPLEMENTATION": {"message_type": "tekroo.message.task.assigned", "message_purpose": "HANDOFF"},
+      "PROMOTION": {"message_type": "tekroo.message.release.ready", "message_purpose": "REQUEST"},
+      "REPAIR": {"message_type": "tekroo.message.task.assigned", "message_purpose": "HANDOFF"},
+      "REVIEW": {"message_type": "tekroo.message.task.security-review-requested", "message_purpose": "REQUEST"},
+      "VALIDATION": {"message_type": "tekroo.message.task.review-requested", "message_purpose": "REQUEST"}
+    },
     "deadline": "8h"
   }
 }

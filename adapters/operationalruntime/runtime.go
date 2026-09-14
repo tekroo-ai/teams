@@ -79,18 +79,18 @@ func New(ctx context.Context, config Config) (*Runtime, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create execution-profile resolver: %w", err)
 	}
+	blobs, err := filesystem.NewExecutionEvidenceStore(config.EvidenceRoot)
+	if err != nil {
+		return nil, fmt.Errorf("open execution-evidence store: %w", err)
+	}
 	client, err := openhands.NewClient(openhands.Config{
 		BaseURL: config.OpenHandsBaseURL, SessionAPIKey: config.OpenHandsSessionAPIKey,
-		HTTPClient: config.HTTPClient, Workspaces: workspaces, Profiles: profiles,
+		HTTPClient: config.HTTPClient, Workspaces: workspaces, Profiles: profiles, Evidence: blobs,
 		PollInterval: config.OpenHandsPollInterval, MaximumPages: config.OpenHandsMaximumPages,
 		MaximumEvidenceBytes: config.OpenHandsMaximumEvidence,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create OpenHands client: %w", err)
-	}
-	blobs, err := filesystem.NewExecutionEvidenceStore(config.EvidenceRoot)
-	if err != nil {
-		return nil, fmt.Errorf("open execution-evidence store: %w", err)
 	}
 	recorder, err := application.NewCommandEvidenceRecorder(handler, blobs, config.EvidencePolicy)
 	if err != nil {

@@ -1,0 +1,56 @@
+{
+  "schema_version": "2.0.0",
+  "role": "senior-coder",
+  "version": "2.0.0",
+  "capabilities": [
+    "complex-implementation",
+    "debugging",
+    "technical-review"
+  ],
+  "subscriptions": [
+    {
+      "type": "tekroo.message.task.escalated",
+      "purpose": "technical-escalation"
+    }
+  ],
+  "permissions": [
+    "evidence.record",
+    "repository.edit",
+    "task.complete-propose"
+  ],
+  "charter": {
+    "path": "ROLE.md",
+    "sha256": "96f9f52e200fde08628497502a1cc2d99f651f7fe8ece4f3c18cabb10ec7bf09",
+    "media_type": "text/markdown"
+  },
+  "handler_bindings": {
+    "tekroo.message.task.escalated": {
+      "subscription_purpose": "technical-escalation",
+      "message_purpose": "HANDOFF",
+      "disposition": "MODEL_HANDLER",
+      "resource": {
+        "path": "handlers/task.escalated/HANDLER.md",
+        "sha256": "1c0e8089a539eb846b96500a20b426a9bcac8e2651c79172876ce3441d463c1d",
+        "media_type": "text/markdown"
+      },
+      "input_schema": {
+        "path": "handlers/task.escalated/input.schema.json",
+        "sha256": "960e6113c1f72ef5672432a5f06eec244460bc3e6786b1c8e5fde201408249f0",
+        "media_type": "application/schema+json"
+      },
+      "result_schema": {
+        "path": "handlers/task.escalated/result.schema.json",
+        "sha256": "96b9620ceb99e7911b6208b50b32e87c276906f9655f3fa43932618b826b79d9",
+        "media_type": "application/schema+json"
+      },
+      "allowed_results": [
+        "blocked",
+        "completed",
+        "failed",
+        "needs_decision"
+      ]
+    }
+  },
+  "publisher_key_id": "tekroo-message-handlers-20260913",
+  "signature": "XJcGhHG7PP5NePBDUd/7PZmVRF/ceoxUJ5WaT6TXPrMCQbJXvjvGuMe/pXUWXnFH5HPbGRLLwW2MXjlLxX7xDA=="
+}

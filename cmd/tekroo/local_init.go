@@ -29,16 +29,17 @@ import (
 )
 
 const (
-	localModelIdentity        = "ddalcu--Qwen3.8-Flash-Next-MLX-Serve-mixed-4-8bit"
-	localBoundedModelEndpoint = "http://127.0.0.1:8800/v1"
-	localComplexModelEndpoint = "http://127.0.0.1:8800/v1"
-	localOpenHandsEndpoint    = "http://127.0.0.1:8000"
-	localDeploymentTeam       = "teams"
-	localDeploymentVersion    = "1.0.0"
-	localBootstrapPublisher   = "tekroo-phase6-bootstrap"
-	localGroundingPublisher   = "tekroo-role-grounding-20260901"
-	localBoundedOutputTokens  = 8192
-	localComplexOutputTokens  = 32768
+	localModelIdentity          = "ddalcu--Qwen3.8-Flash-Next-MLX-Serve-mixed-4-8bit"
+	localBoundedModelEndpoint   = "http://127.0.0.1:8800/v1"
+	localComplexModelEndpoint   = "http://127.0.0.1:8800/v1"
+	localOpenHandsEndpoint      = "http://127.0.0.1:18000"
+	localDeploymentTeam         = "teams"
+	localDeploymentVersion      = "1.0.0"
+	localHandlerPublisher       = "tekroo-message-handlers-20260913"
+	localQualificationPublisher = "tekroo-message-handlers-qualification-20260913"
+	localSoftwareWorkflowDigest = "1624fb8ba139c3c1e1ebe880cf79cfa1f9edd025b946f9676a2c3f3ab9ea3967"
+	localBoundedOutputTokens    = 8192
+	localComplexOutputTokens    = 32768
 	// Editing profiles receive a smaller per-decision ceiling than read-only
 	// complex reasoning profiles. Run 41 showed Qwen 3.8 repeating a completed
 	// implementation plan until the 32K ceiling without emitting an action.
@@ -166,16 +167,20 @@ func initializeLocalDeployment(ctx context.Context, options localInitOptions) (r
 		return result, err
 	}
 	starterRoot := filepath.Join(options.SourceRoot, "config", "starter-team")
-	manifestPath := filepath.Join(starterRoot, "team.example.json")
+	manifestPath := filepath.Join(starterRoot, "team.v4.example.json")
 	var manifest organization.TeamManifest
 	if err := readStrictJSON(manifestPath, &manifest); err != nil || manifest.Validate() != nil {
 		return result, errors.New("starter team manifest is invalid")
 	}
-	if err := requireRegularFile(filepath.Join(starterRoot, "publisher.pub"), false); err != nil {
+	if err := requireRegularFile(filepath.Join(starterRoot, "message-handler-publisher.pub"), false); err != nil {
 		return result, err
 	}
-	if err := requireRegularFile(filepath.Join(starterRoot, "role-grounding-publisher.pub"), false); err != nil {
+	if err := requireRegularFile(filepath.Join(starterRoot, "message-handler-publisher-qualification.pub"), false); err != nil {
 		return result, err
+	}
+	workflowSourcePath := filepath.Join(options.SourceRoot, "config", "workflows", "software-development.v1.json")
+	if _, err := organization.LoadWorkflowDefinition(workflowSourcePath, kernel.Digest(localSoftwareWorkflowDigest)); err != nil {
+		return result, fmt.Errorf("software-development workflow: %w", err)
 	}
 	if err := requireRegularFile(options.OpenHandsKeyFile, true); err != nil {
 		return result, fmt.Errorf("OpenHands key: %w", err)
@@ -219,13 +224,18 @@ func initializeLocalDeployment(ctx context.Context, options localInitOptions) (r
 	stateRoot := filepath.Join(options.Root, "state")
 	evidenceRoot := filepath.Join(options.Root, "data", "evidence")
 	worktreeRoot := filepath.Join(options.Root, "workspaces")
-	for _, directory := range []string{configRoot, stateRoot, evidenceRoot, worktreeRoot} {
+	workflowRoot := filepath.Join(configRoot, "workflows")
+	for _, directory := range []string{configRoot, stateRoot, evidenceRoot, worktreeRoot, workflowRoot} {
 		if err = os.MkdirAll(directory, 0o700); err != nil {
 			return result, err
 		}
 	}
 	deploymentTeamRoot := filepath.Join(configRoot, "starter-team")
 	if err = copyTree(starterRoot, deploymentTeamRoot); err != nil {
+		return result, err
+	}
+	workflowPath := filepath.Join(workflowRoot, "software-development.v1.json")
+	if err = copyFile(workflowSourcePath, workflowPath, 0o600); err != nil {
 		return result, err
 	}
 	manifest.Team = localDeploymentTeam
@@ -250,7 +260,7 @@ func initializeLocalDeployment(ctx context.Context, options localInitOptions) (r
 	if err = writeJSONFile(teamPath, manifest, 0o600); err != nil {
 		return result, err
 	}
-	_ = os.Remove(filepath.Join(deploymentTeamRoot, "team.example.json"))
+	_ = os.Remove(filepath.Join(deploymentTeamRoot, "team.v4.example.json"))
 	manifestDigest, err := fileDigest(teamPath)
 	if err != nil {
 		return result, err
@@ -316,7 +326,7 @@ func initializeLocalDeployment(ctx context.Context, options localInitOptions) (r
 	configPath := filepath.Join(configRoot, "tekrood.json")
 	config := operationalruntime.ProductionConfig{
 		ContractRoot:          options.SourceRoot,
-		Mongo:                 operationalruntime.ProductionMongoConfig{URIFile: mongoPath, Database: options.Database, BacklogLimit: 10000, DeliveryPolicyRevision: 1},
+		Mongo:                 operationalruntime.ProductionMongoConfig{URIFile: mongoPath, Database: options.Database, BacklogLimit: 10000, DeliveryPolicyRevision: 1, MessageWaitTimeout: "1m"},
 		OpenHands:             operationalruntime.ProductionOpenHandsConfig{BaseURL: options.OpenHandsBaseURL, SessionAPIKeyFile: options.OpenHandsKeyFile, RequestTimeout: "20m", PollInterval: "250ms", MaximumPages: 64, MaximumEvidenceBytes: 16 << 20},
 		Operator:              operationalruntime.ProductionOperatorConfig{Address: options.OperatorAddress, BearerTokenFile: operatorTokenPath, Principal: kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "principal"}, OperationTimeout: "30s", MaximumBodyBytes: 1 << 20},
 		TeamsDatabaseIdentity: options.Database, SMADatabaseIdentity: options.SMADatabase, DeploymentIdentity: kernel.Digest(deploymentIdentity),
@@ -328,9 +338,16 @@ func initializeLocalDeployment(ctx context.Context, options localInitOptions) (r
 		Worker:       operationalruntime.ProductionWorker{LeaseDuration: "90s", ReconciliationInterval: "250ms", MaximumReconciliations: 160, MaximumConcurrentInvocations: 8, LeaseOperationTimeout: "5s"},
 		Projection:   operationalruntime.ProductionProjection{Interval: "100ms", OperationTimeout: "5s"},
 		Continuity:   &operationalruntime.ProductionContinuity{HeartbeatInterval: "2s", SuspensionThreshold: "10s"},
-		Organization: operationalruntime.ProductionOrganization{ManifestFile: teamPath, ManifestDigest: manifestDigest, Publishers: []operationalruntime.ProductionPublisher{{KeyID: localBootstrapPublisher, PublicKeyFile: filepath.Join(deploymentTeamRoot, "publisher.pub")}, {KeyID: localGroundingPublisher, PublicKeyFile: filepath.Join(deploymentTeamRoot, "role-grounding-publisher.pub")}}, ReconciliationInterval: "1s", MaximumRestarts: 3, MaximumDeliveryAttempts: 3},
-		Planning:     operationalruntime.ProductionPlanning{PolicyRevision: 3, ClassificationPolicyDigest: labelDigest("classification-policy-v3"), PromotionPolicyDigest: labelDigest("promotion-policy-v3"), VerificationTopologyDigest: labelDigest("verification-topology-v3"), SelectionPolicyDigest: labelDigest("selection-policy-v3"), BudgetPolicyDigest: labelDigest("budget-policy-v3"), RequiredGateIDs: []string{"go-test"}, CandidateGates: []operationalruntime.ProductionCandidateGate{{GateID: "go-test", Command: []string{goBinary, "test", "./..."}, Timeout: "20m"}}, Deadline: "8h"},
-		Git:          &operationalruntime.ProductionGitConfig{Binary: "git", AllowedRoot: filepath.Dir(options.RepositoryRoot), OperationTimeout: "2m"},
+		Organization: operationalruntime.ProductionOrganization{ManifestFile: teamPath, ManifestDigest: manifestDigest, WorkflowDefinitions: []operationalruntime.ProductionWorkflowSource{{DefinitionFile: workflowPath, DefinitionDigest: kernel.Digest(localSoftwareWorkflowDigest)}}, Publishers: []operationalruntime.ProductionPublisher{{KeyID: localHandlerPublisher, PublicKeyFile: filepath.Join(deploymentTeamRoot, "message-handler-publisher.pub")}, {KeyID: localQualificationPublisher, PublicKeyFile: filepath.Join(deploymentTeamRoot, "message-handler-publisher-qualification.pub")}}, ReconciliationInterval: "1s", MaximumRestarts: 3, MaximumDeliveryAttempts: 3},
+		Planning: operationalruntime.ProductionPlanning{PolicyRevision: 3, ClassificationPolicyDigest: labelDigest("classification-policy-v3"), PromotionPolicyDigest: labelDigest("promotion-policy-v3"), VerificationTopologyDigest: labelDigest("verification-topology-v3"), SelectionPolicyDigest: labelDigest("selection-policy-v3"), BudgetPolicyDigest: labelDigest("budget-policy-v3"), RequiredGateIDs: []string{"go-test"}, CandidateGates: []operationalruntime.ProductionCandidateGate{{GateID: "go-test", Command: []string{goBinary, "test", "./..."}, Timeout: "20m"}}, TaskMessageRoutes: map[kernel.WorkPurpose]operationalruntime.ProductionTaskMessageRoute{
+			kernel.PurposeEscalation:     {MessageType: "tekroo.message.task.escalated", MessagePurpose: organization.PurposeHandoff},
+			kernel.PurposeImplementation: {MessageType: "tekroo.message.task.assigned", MessagePurpose: organization.PurposeHandoff},
+			kernel.PurposePromotion:      {MessageType: "tekroo.message.release.ready", MessagePurpose: organization.PurposeRequest},
+			kernel.PurposeRepair:         {MessageType: "tekroo.message.task.assigned", MessagePurpose: organization.PurposeHandoff},
+			kernel.PurposeReview:         {MessageType: "tekroo.message.task.security-review-requested", MessagePurpose: organization.PurposeRequest},
+			kernel.PurposeValidation:     {MessageType: "tekroo.message.task.review-requested", MessagePurpose: organization.PurposeRequest},
+		}, Deadline: "8h"},
+		Git: &operationalruntime.ProductionGitConfig{Binary: "git", AllowedRoot: filepath.Dir(options.RepositoryRoot), OperationTimeout: "2m"},
 	}
 	provenance, err := localProductionProvenance(options, config, policy, manifest, baseline, tree, qualificationBundleDigest)
 	if err != nil {

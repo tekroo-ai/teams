@@ -1,0 +1,436 @@
+{
+  "$defs": {
+    "handlerDispatchBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "allowed_message_proposals": {
+          "items": {
+            "maxLength": 256,
+            "pattern": "^tekroo\\.message\\.[a-z0-9]+(?:[.-][a-z0-9]+)*$",
+            "type": "string"
+          },
+          "maxItems": 64,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "allowed_results": {
+          "items": {
+            "enum": [
+              "blocked",
+              "completed",
+              "failed",
+              "needs_decision"
+            ]
+          },
+          "maxItems": 16,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "charter_digest": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "handler_digest": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "input_schema_digest": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "message_body_digest": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "message_id": {
+          "format": "uuid",
+          "type": "string"
+        },
+        "message_purpose": {
+          "enum": [
+            "REQUEST",
+            "HANDOFF",
+            "EVIDENCE",
+            "RESPONSE",
+            "NOTIFICATION"
+          ]
+        },
+        "message_type": {
+          "maxLength": 256,
+          "pattern": "^tekroo\\.message\\.[a-z0-9]+(?:[.-][a-z0-9]+)*$",
+          "type": "string"
+        },
+        "result_schema_digest": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "role_bundle_digest": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "subscription_purpose": {
+          "maxLength": 128,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "message_id",
+        "message_type",
+        "message_purpose",
+        "message_body_digest",
+        "subscription_purpose",
+        "role_bundle_digest",
+        "charter_digest",
+        "handler_digest",
+        "input_schema_digest",
+        "result_schema_digest",
+        "allowed_results",
+        "allowed_message_proposals"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://contracts.tekroo.ai/tekroo.kernel.contracts/0.12.0/schemas/work-invocation.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "actor_fqn": {
+      "pattern": "^(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])::(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])-[1-9][0-9]{0,19}$",
+      "type": "string"
+    },
+    "attempt_family": {
+      "maxLength": 128,
+      "minLength": 1,
+      "type": "string"
+    },
+    "attempt_ordinal": {
+      "maximum": 1000,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "budget_account_id": {
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "type": "string"
+    },
+    "cancellation_requested_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "claim_id": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "claimed_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "condition_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "conversation_id": {
+      "anyOf": [
+        {
+          "maxLength": 512,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "deadline_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "execution_id": {
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "type": "string"
+    },
+    "fencing_epoch": {
+      "maximum": 1000000,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "finished_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "global_debit_ordinal": {
+      "maximum": 1000,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "handler_dispatch": {
+      "$ref": "#/$defs/handlerDispatchBinding"
+    },
+    "id": {
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "type": "string"
+    },
+    "kind": {
+      "const": "work-invocation"
+    },
+    "last_event_id": {
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "type": "string"
+    },
+    "lifecycle_epoch": {
+      "maximum": 1000000,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "model_profile_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "output_digest": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "purpose": {
+      "enum": [
+        "INVESTIGATION",
+        "IMPLEMENTATION",
+        "VALIDATION",
+        "REVIEW",
+        "REPAIR",
+        "HANDOFF",
+        "REPLAN",
+        "PROMOTION",
+        "ESCALATION"
+      ],
+      "type": "string"
+    },
+    "purpose_debit_ordinal": {
+      "maximum": 1000,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "qualified_assignment_id": {
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "type": "string"
+    },
+    "remaining_global_budget": {
+      "maximum": 1000,
+      "minimum": 0,
+      "type": "integer"
+    },
+    "remaining_purpose_budget": {
+      "maximum": 1000,
+      "minimum": 0,
+      "type": "integer"
+    },
+    "request_digest": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "retryable": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "revision": {
+      "maximum": 1000000,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "runtime_identity_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "scope_revision": {
+      "maximum": 1000000,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "started_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "state": {
+      "enum": [
+        "AUTHORIZED",
+        "CLAIMED",
+        "STARTED",
+        "START_FAILED",
+        "SUCCEEDED",
+        "FAILED",
+        "TIMED_OUT",
+        "CANCELLED",
+        "EXPIRED"
+      ],
+      "type": "string"
+    },
+    "task_id": {
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "type": "string"
+    },
+    "task_revision": {
+      "maximum": 1000000,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "terminal_evidence_ids": {
+      "items": {
+        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+        "type": "string"
+      },
+      "maxItems": 64,
+      "minItems": 0,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "terminal_outcome": {
+      "anyOf": [
+        {
+          "enum": [
+            "SUCCEEDED",
+            "FAILED",
+            "TIMED_OUT",
+            "CANCELLED",
+            "START_FAILED"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "work_profile": {
+      "additionalProperties": false,
+      "properties": {
+        "lifecycle_epoch": {
+          "maximum": 1000000,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "profile_digest": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "profile_id": {
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        },
+        "profile_revision": {
+          "maximum": 1000000,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "scope_revision": {
+          "maximum": 1000000,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "profile_id",
+        "profile_revision",
+        "profile_digest",
+        "lifecycle_epoch",
+        "scope_revision"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "id",
+    "kind",
+    "revision",
+    "state",
+    "task_id",
+    "budget_account_id",
+    "lifecycle_epoch",
+    "scope_revision",
+    "task_revision",
+    "work_profile",
+    "qualified_assignment_id",
+    "purpose",
+    "attempt_family",
+    "attempt_ordinal",
+    "condition_digest",
+    "actor_fqn",
+    "execution_id",
+    "fencing_epoch",
+    "model_profile_digest",
+    "runtime_identity_digest",
+    "deadline_at",
+    "global_debit_ordinal",
+    "purpose_debit_ordinal",
+    "remaining_global_budget",
+    "remaining_purpose_budget",
+    "claim_id",
+    "claimed_at",
+    "conversation_id",
+    "request_digest",
+    "started_at",
+    "terminal_outcome",
+    "retryable",
+    "terminal_evidence_ids",
+    "output_digest",
+    "finished_at",
+    "cancellation_requested_at",
+    "last_event_id"
+  ],
+  "title": "Teams single-use work invocation",
+  "type": "object"
+}

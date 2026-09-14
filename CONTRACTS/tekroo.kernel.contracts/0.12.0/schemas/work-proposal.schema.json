@@ -1,0 +1,80 @@
+{
+  "$id": "tekroo.kernel.contracts/0.12.0/schemas/work-proposal.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "actor_fqn": {
+      "pattern": "^(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])::(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])-[1-9][0-9]{0,19}$",
+      "type": "string"
+    },
+    "budget_account_id": {
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "type": "string"
+    },
+    "causation_event_ids": {
+      "items": {
+        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+        "type": "string"
+      },
+      "maxItems": 64,
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "execution": {
+      "$ref": "core.schema.json#/$defs/ExecutionTuple"
+    },
+    "input_evidence_ids": {
+      "items": {
+        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+        "type": "string"
+      },
+      "maxItems": 1024,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "message_id": {
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "type": "string"
+    },
+    "node_id": {
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "type": "string"
+    },
+    "proposal_id": {
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "type": "string"
+    },
+    "proposed_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "stage_id": {
+      "pattern": "^[a-z0-9](?:[a-z0-9.-]{0,126}[a-z0-9])?$",
+      "type": "string"
+    },
+    "workflow_instance_id": {
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "proposal_id",
+    "message_id",
+    "workflow_instance_id",
+    "stage_id",
+    "node_id",
+    "actor_fqn",
+    "execution",
+    "budget_account_id",
+    "causation_event_ids",
+    "input_evidence_ids",
+    "proposed_at"
+  ],
+  "title": "Tekroo message-to-work proposal",
+  "type": "object"
+}

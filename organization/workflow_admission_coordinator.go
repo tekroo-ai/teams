@@ -32,7 +32,7 @@ func NewWorkflowAdmissionCoordinator(store WorkflowMessageAdmissionStore, librar
 // Admit handles only workflow-linked REQUEST and HANDOFF messages. A false
 // handled result means the message is informational or belongs to the legacy
 // compatibility path and must remain deliverable without creating work.
-func (coordinator *WorkflowAdmissionCoordinator) Admit(ctx context.Context, message OrganizationalMessage) (kernel.WorkAdmissionResult, bool, bool, error) {
+func (coordinator *WorkflowAdmissionCoordinator) Admit(ctx context.Context, message OrganizationalMessage, workerExecution kernel.ExecutionTuple) (kernel.WorkAdmissionResult, bool, bool, error) {
 	if coordinator == nil || message.Validate() != nil {
 		return kernel.WorkAdmissionResult{}, false, false, ErrWorkflowAdmissionUnavailable
 	}
@@ -75,7 +75,8 @@ func (coordinator *WorkflowAdmissionCoordinator) Admit(ctx context.Context, mess
 		return kernel.WorkAdmissionResult{}, true, false, ErrWorkflowAdmissionUnavailable
 	}
 	role, found, err := coordinator.actors.Status(ctx, message.Recipient)
-	if err != nil || !found || role.Status != RoleIdle || !role.Execution.Valid() {
+	roleReady := role.Status == RoleIdle || role.Status == RoleStarting
+	if err != nil || !found || !roleReady || !workerExecution.Valid() || role.Execution != workerExecution {
 		return kernel.WorkAdmissionResult{}, true, false, errors.Join(ErrWorkflowAdmissionUnavailable, err)
 	}
 	proposalID, err := coordinator.ids.Next()

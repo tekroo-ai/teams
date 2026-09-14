@@ -1,6 +1,7 @@
 package operationalruntime
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/json"
@@ -65,6 +66,12 @@ func (service *ProductionService) reconcileFeaturePlanning(ctx context.Context) 
 		}
 		var workflowAdmission kernel.WorkAdmissionResult
 		if service.WorkflowLibrary != nil {
+			// Message creation and workflow binding are separate durable writes for
+			// compatibility. Repair that binding before looking for admission so a
+			// transient interruption between the writes cannot strand the stage.
+			if err = service.bindCurrentFeatureWorkflowStage(ctx, feature); err != nil {
+				return fmt.Errorf("feature %s %s workflow binding: %w", feature.ID, stage, err)
+			}
 			var found bool
 			workflowAdmission, found, err = service.featureWorkflowAdmission(ctx, feature)
 			if err != nil {
@@ -663,7 +670,13 @@ func (service *ProductionService) ensureFeaturePlanningTaskForRound(ctx context.
 	}
 	profile := service.workProfile(feature, task, state.LifecycleEpoch, state.ScopeRevision, evidenceID, deadline)
 	tracked := &trackedTask{plan: task, revision: state.Revision, last: head, profile: profile, owner: owner}
-	if err := service.applyTaskCommand(ctx, feature, tracked, "tekroo.command.task.bind-work-profile", kernel.SchemaVersion, service.policyAuthority, profile, evidence, nil, "profile"); err != nil {
+	if existing, found := snapshot.WorkProfiles[kernel.AggregateRef{Kind: kernel.AggregateTask, ID: task.ID}]; found {
+		existingJSON, existingErr := json.Marshal(existing.Profile)
+		profileJSON, profileErr := json.Marshal(profile)
+		if !existing.Valid() || existingErr != nil || profileErr != nil || !bytes.Equal(existingJSON, profileJSON) {
+			return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, organization.ErrInvalidFeature
+		}
+	} else if err := service.applyTaskCommand(ctx, feature, tracked, "tekroo.command.task.bind-work-profile", kernel.SchemaVersion, service.policyAuthority, profile, evidence, nil, "profile"); err != nil {
 		return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, err
 	}
 	dependencyEvents := make([]kernel.UUIDv7, 0, len(dependsOn))

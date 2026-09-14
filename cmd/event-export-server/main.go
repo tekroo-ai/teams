@@ -20,7 +20,7 @@ import (
 	"github.com/tekroo-ai/teams/kernel"
 )
 
-const kernelManifestSHA256 = kernel.Digest("85306c8edc703e85df502280642ef30161e16b8e82ff48f568c5a5c6d421f12d")
+const kernelManifestSHA256 = kernel.Digest("7622432bd06e6ba93174efa1a92d31cd56522654248a126c91023f42519ce5f3")
 
 func main() {
 	if err := run(); err != nil {

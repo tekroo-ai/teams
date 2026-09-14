@@ -65,6 +65,21 @@ func TestFeatureRecoveryOperationContextUsesPlanningDeadline(t *testing.T) {
 	}
 }
 
+func TestFeatureRecoveryWakeCoalescesMessageBursts(t *testing.T) {
+	wake := make(chan struct{}, 1)
+	signalFeatureRecovery(wake)
+	signalFeatureRecovery(wake)
+	if len(wake) != 1 {
+		t.Fatalf("queued wakes = %d, want one coalesced signal", len(wake))
+	}
+	select {
+	case <-wake:
+	default:
+		t.Fatal("feature recovery was not signaled")
+	}
+	signalFeatureRecovery(nil)
+}
+
 func TestLoadProductionConfigRejectsQualificationForDifferentProfileRoute(t *testing.T) {
 	path, config := writeProductionFixture(t)
 	config.Profiles[0].DecisionRoute = kernel.RouteComplexReasoning
@@ -276,6 +291,31 @@ func TestLoadProductionConfigResolvesAndValidatesExactLocalBindings(t *testing.T
 	}
 	if observed.Mongo.Database != expected.Mongo.Database || observed.TeamsDatabaseIdentity != expected.TeamsDatabaseIdentity || observed.SMADatabaseIdentity != expected.SMADatabaseIdentity || len(observed.Workspaces) != 1 || !filepath.IsAbs(observed.Workspaces[0].WorkingDirectory) || !filepath.IsAbs(observed.OpenHands.SessionAPIKeyFile) || !filepath.IsAbs(observed.Organization.ManifestFile) || !filepath.IsAbs(observed.Organization.Publishers[0].PublicKeyFile) {
 		t.Fatalf("resolved config = %#v", observed)
+	}
+}
+
+func TestOrganizationalMessageWaitIsIndependentFromOpenHandsPolling(t *testing.T) {
+	path, config := writeProductionFixture(t)
+	loaded, err := LoadProductionConfig(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resolved, err := resolveProductionConfig(loaded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolved.messageWaitTimeout != time.Minute || resolved.messageWaitTimeout == resolved.pollInterval {
+		t.Fatalf("message wait=%s OpenHands poll=%s", resolved.messageWaitTimeout, resolved.pollInterval)
+	}
+	config.Mongo.MessageWaitTimeout = "45s"
+	writeJSON(t, path, config, 0o600)
+	loaded, err = LoadProductionConfig(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resolved, err = resolveProductionConfig(loaded)
+	if err != nil || resolved.messageWaitTimeout != 45*time.Second {
+		t.Fatalf("configured message wait=%s err=%v", resolved.messageWaitTimeout, err)
 	}
 }
 

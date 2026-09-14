@@ -195,6 +195,35 @@ func (s *Store) ResolveMessage(ctx context.Context, id kernel.UUIDv7, holder ker
 	return s.updateOrganizationalClaim(ctx, id, holder, execution, epoch, now, update)
 }
 
+func (s *Store) AdmitMessage(ctx context.Context, id kernel.UUIDv7, recipient kernel.ActorFQN, execution kernel.ExecutionTuple, resolution string, evidence kernel.Digest) error {
+	if err := requireDeadline(ctx); err != nil {
+		return err
+	}
+	if s == nil || s.db == nil || !id.Valid() || !recipient.Valid() || !execution.Valid() || resolution == "" || !evidence.Valid() {
+		return organization.ErrInvalidOrganizationalMessage
+	}
+	filter := bson.D{{Key: "_id", Value: string(id)}, {Key: "recipient", Value: string(recipient)}, {Key: "state", Value: organization.MessagePending}}
+	update := bson.D{{Key: "$set", Value: bson.D{{Key: "state", Value: organization.MessageResolved}, {Key: "resolution", Value: resolution}, {Key: "evidence_digest", Value: string(evidence)}}}}
+	result, err := s.db.Collection("organizational_messages").UpdateOne(ctx, filter, update)
+	if err != nil {
+		return err
+	}
+	if result.MatchedCount == 1 {
+		return nil
+	}
+	claim, found, readErr := s.ReadMessage(ctx, id)
+	if readErr != nil {
+		return readErr
+	}
+	if !found {
+		return organization.ErrOrganizationalMessageNotFound
+	}
+	if claim.Message.Recipient == recipient && claim.State == organization.MessageResolved && claim.Resolution == resolution && claim.Evidence == evidence {
+		return nil
+	}
+	return organization.ErrOrganizationalMessageConflict
+}
+
 func (s *Store) YieldMessage(ctx context.Context, id kernel.UUIDv7, holder kernel.ActorFQN, execution kernel.ExecutionTuple, epoch uint64, now time.Time) error {
 	update := bson.D{{Key: "$set", Value: bson.D{{Key: "state", Value: organization.MessagePending}}}, {Key: "$unset", Value: bson.D{{Key: "holder", Value: ""}, {Key: "execution_id", Value: ""}, {Key: "fencing_epoch", Value: ""}, {Key: "lease_until", Value: ""}}}}
 	return s.updateOrganizationalClaim(ctx, id, holder, execution, epoch, now, update)

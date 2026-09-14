@@ -31,15 +31,16 @@ var (
 )
 
 type Config struct {
-	URI                    string
-	Database               string
-	ContractIdentity       string
-	ManifestSHA256         kernel.Digest
-	MigrationLevel         uint64
-	Policy                 kernel.AuthorizationPolicy
-	BacklogLimit           int64
-	DeliveryPolicyRevision uint64
-	DeploymentIdentity     kernel.Digest
+	URI                           string
+	Database                      string
+	ContractIdentity              string
+	ManifestSHA256                kernel.Digest
+	MigrationLevel                uint64
+	Policy                        kernel.AuthorizationPolicy
+	BacklogLimit                  int64
+	DeliveryPolicyRevision        uint64
+	DeploymentIdentity            kernel.Digest
+	OrganizationalMessageMaxAwait time.Duration
 }
 
 type Store struct {
@@ -52,7 +53,8 @@ type Store struct {
 	fault     string
 	uncertain bool
 
-	backlogLimit int64
+	backlogLimit                  int64
+	organizationalMessageMaxAwait time.Duration
 }
 
 type aggregateDocument struct {
@@ -116,6 +118,9 @@ func Open(ctx context.Context, config Config) (*Store, error) {
 	if config.BacklogLimit <= 0 {
 		config.BacklogLimit = 10_000
 	}
+	if config.OrganizationalMessageMaxAwait <= 0 {
+		config.OrganizationalMessageMaxAwait = time.Minute
+	}
 	client, err := driver.Connect(options.Client().ApplyURI(config.URI).
 		SetReadConcern(readconcern.Majority()).
 		SetWriteConcern(writeconcern.Majority()).
@@ -123,7 +128,7 @@ func Open(ctx context.Context, config Config) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	store := &Store{client: client, db: client.Database(config.Database), owns: true, backlogLimit: config.BacklogLimit, deploymentIdentity: config.DeploymentIdentity}
+	store := &Store{client: client, db: client.Database(config.Database), owns: true, backlogLimit: config.BacklogLimit, deploymentIdentity: config.DeploymentIdentity, organizationalMessageMaxAwait: config.OrganizationalMessageMaxAwait}
 	if config.DeploymentIdentity != "" {
 		if err := store.validateDeploymentBeforeInitialization(ctx, config.DeploymentIdentity); err != nil {
 			_ = client.Disconnect(context.Background())

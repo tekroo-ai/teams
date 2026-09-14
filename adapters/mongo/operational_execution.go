@@ -103,13 +103,25 @@ func (s *Store) LoadOperationalExecution(ctx context.Context, invocationID kerne
 	if err != nil {
 		return application.OperationalExecutionContext{}, err
 	}
+	var admittedMessage *application.AdmittedMessage
+	if invocation.HandlerDispatch != nil {
+		claim, messageFound, messageErr := s.ReadMessage(ctx, invocation.HandlerDispatch.MessageID)
+		if messageErr != nil || !messageFound || claim.Message.Recipient != invocation.ActorFQN {
+			return application.OperationalExecutionContext{}, errors.Join(application.ErrInvalidOperationalExecution, messageErr)
+		}
+		candidate := application.AdmittedMessage{ID: claim.Message.ID, Type: claim.Message.Type, Purpose: string(claim.Message.Purpose), Body: append(json.RawMessage(nil), claim.Message.Body...)}
+		if !candidate.Valid(*invocation.HandlerDispatch) {
+			return application.OperationalExecutionContext{}, application.ErrInvalidOperationalExecution
+		}
+		admittedMessage = &candidate
+	}
 	_, authorizationSeen := snapshot.AcceptedEvents[invocation.AuthorizationEventID]
 	_, parentSeen := snapshot.AcceptedEvents[invocation.ParentEventID]
 	return application.OperationalExecutionContext{
 		Invocation: invocation.Clone(), Task: taskRelated.State.Clone(), Budget: budget.Clone(),
 		TaskBudget: taskBudget.Clone(), Scope: scope.Clone(), Profile: profile.Clone(),
 		Assignment: assignment.Clone(), CurrentExecution: execution,
-		Specification: specification, Evidence: evidence, RecoveryDirective: recoveryDirective, RetryOfConversationID: retryOfConversationID,
+		Specification: specification, Evidence: evidence, RecoveryDirective: recoveryDirective, RetryOfConversationID: retryOfConversationID, AdmittedMessage: admittedMessage,
 		AuthorizationEventSeen: authorizationSeen, ParentEventSeen: parentSeen,
 	}, nil
 }

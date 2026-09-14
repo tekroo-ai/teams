@@ -1,0 +1,171 @@
+{
+  "contractIdentity": "tekroo.kernel.contracts/0.12.0",
+  "fixtures": [
+    {
+      "fixtureId": "P10-RH-001",
+      "given": {
+        "bindings": [
+          {
+            "handler": "architecture-review",
+            "role": "architect"
+          },
+          {
+            "handler": "implementation-review",
+            "role": "coder"
+          }
+        ],
+        "messageType": "tekroo.message.review.requested"
+      },
+      "kind": "ROLE_HANDLER_MODEL",
+      "model": "PER_ROLE_DISPATCH",
+      "then": {
+        "expected": {
+          "distinctHandlers": true
+        }
+      }
+    },
+    {
+      "fixtureId": "P10-RH-002",
+      "given": {
+        "mapped": false,
+        "modelCalls": 0
+      },
+      "kind": "ROLE_HANDLER_MODEL",
+      "model": "UNMAPPED_MESSAGE",
+      "then": {
+        "expected": {
+          "admitted": false,
+          "modelCalls": 0
+        }
+      }
+    },
+    {
+      "fixtureId": "P10-RH-003",
+      "given": {
+        "declaredDigest": "a",
+        "modelCalls": 0,
+        "observedDigest": "b"
+      },
+      "kind": "ROLE_HANDLER_MODEL",
+      "model": "MUTATED_RESOURCE",
+      "then": {
+        "expected": {
+          "eligible": false,
+          "modelCalls": 0
+        }
+      }
+    },
+    {
+      "fixtureId": "P10-RH-004",
+      "given": {
+        "messages": 0,
+        "timeout": true
+      },
+      "kind": "ROLE_HANDLER_MODEL",
+      "model": "IDLE_TIMEOUT",
+      "then": {
+        "expected": {
+          "handlersRun": 0,
+          "messagesWritten": 0,
+          "modelCalls": 0
+        }
+      }
+    },
+    {
+      "fixtureId": "P10-RH-005",
+      "given": {
+        "changedMessageType": true,
+        "currentNode": "implementation",
+        "declaredSuccessors": [
+          "validation"
+        ],
+        "proposedNode": "design"
+      },
+      "kind": "ROLE_HANDLER_MODEL",
+      "model": "MESSAGE_SUBSTITUTION",
+      "then": {
+        "expected": {
+          "admitted": false,
+          "reason": "UNDECLARED_TRANSITION"
+        }
+      }
+    },
+    {
+      "fixtureId": "P10-RH-006",
+      "given": {
+        "charterDigest": "a",
+        "handlerDigest": "b"
+      },
+      "kind": "ROLE_HANDLER_MODEL",
+      "model": "COMPACTION_REBIND",
+      "then": {
+        "expected": {
+          "resumedCharterDigest": "a",
+          "resumedHandlerDigest": "b"
+        }
+      }
+    },
+    {
+      "fixtureId": "P10-RH-007",
+      "given": {
+        "matchingHandlers": 2,
+        "modelCalls": 0
+      },
+      "kind": "ROLE_HANDLER_MODEL",
+      "model": "AMBIGUOUS_HANDLER",
+      "then": {
+        "expected": {
+          "eligible": false,
+          "modelCalls": 0
+        }
+      }
+    },
+    {
+      "fixtureId": "P10-RH-008",
+      "given": {
+        "allowed": [
+          "tekroo.message.task.completed"
+        ],
+        "proposed": "tekroo.message.story.design-requested"
+      },
+      "kind": "ROLE_HANDLER_MODEL",
+      "model": "PROHIBITED_MESSAGE_PROPOSAL",
+      "then": {
+        "expected": {
+          "accepted": false,
+          "reason": "UNAUTHORIZED_MESSAGE_PROPOSAL"
+        }
+      }
+    },
+    {
+      "fixtureId": "P10-RH-009",
+      "given": {
+        "deliveries": 2,
+        "messageId": "same"
+      },
+      "kind": "ROLE_HANDLER_MODEL",
+      "model": "DUPLICATE_DELIVERY",
+      "then": {
+        "expected": {
+          "admissions": 1,
+          "invocations": 1
+        }
+      }
+    },
+    {
+      "fixtureId": "P10-RH-010",
+      "given": {
+        "handler": "implement-task",
+        "schemaVersion": "1.0.0"
+      },
+      "kind": "ROLE_HANDLER_MODEL",
+      "model": "LEGACY_STRING_HANDLERS",
+      "then": {
+        "expected": {
+          "acceptedThroughCompatibilityAdapter": true
+        }
+      }
+    }
+  ],
+  "schemaVersion": "1.0.0"
+}
