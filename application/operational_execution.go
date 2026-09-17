@@ -371,6 +371,19 @@ var editableExecutionGuidance = []string{
 	"Before reporting success, commit the intended changes and tests on the assigned branch and leave Git status clean. Validators receive only the committed candidate.",
 }
 
+// noRepositoryExecutionGuidance serves roles admitted without any repository
+// authority (for example planning roles qualified on a toolless surface). The
+// work profile still carries deterministic gate identifiers, but those gates
+// are executed by later repository-authorized tasks; without this scoping a
+// capable model correctly observes that it cannot inspect or run the gates and
+// honestly returns work.blocked, which then requires a human and deadlocks an
+// unattended run.
+var noRepositoryExecutionGuidance = []string{
+	"This invocation grants no repository tools. Every repository inspection, test, and deterministic gate listed in the work profile is executed by later tasks owned by repository-authorized roles; treat that list as a downstream obligation, not a requirement on this result.",
+	"Work only from the admitted request, this brief, and the task's acceptance criteria. Do not claim repository-grounded observations you cannot make, and do not block or request a decision because repository access is absent.",
+	"Return the required structured result through the finish tool.",
+}
+
 var readOnlyExecutionGuidance = []string{
 	"This task does not authorize repository edits. Do not edit repository files or create implementation artifacts.",
 	"Finish the assigned plan, review, or report from enough observed repository evidence to support it; if the relevant surfaces are exhausted and evidence remains insufficient, report the concrete blocker.",
@@ -610,10 +623,15 @@ func BuildExecutionBriefWithHandler(current OperationalExecutionContext, groundi
 			brief.ExecutionGuidance = append(brief.ExecutionGuidance, readOnlyExplicitRecoveryExecutionGuidance...)
 		}
 	} else {
-		if mutationAuthorized {
+		repositoryAuthorized := hasExecutionPermission(grounding.Permissions, "repository.read") ||
+			hasExecutionPermission(grounding.Permissions, "repository.edit")
+		switch {
+		case mutationAuthorized:
 			brief.ExecutionGuidance = append(brief.ExecutionGuidance, editableExecutionGuidance...)
-		} else {
+		case repositoryAuthorized:
 			brief.ExecutionGuidance = append(brief.ExecutionGuidance, readOnlyExecutionGuidance...)
+		default:
+			brief.ExecutionGuidance = append(brief.ExecutionGuidance, noRepositoryExecutionGuidance...)
 		}
 		if invocation.RetryOrdinal > 0 {
 			brief.ExecutionGuidance = append(brief.ExecutionGuidance, sharedRetainedRetryExecutionGuidance...)

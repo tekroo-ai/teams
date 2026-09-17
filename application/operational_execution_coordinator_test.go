@@ -206,6 +206,33 @@ func testExecutionRecoveryDirective() *ExecutionRecoveryDirective {
 	}
 }
 
+func TestToollessPlanningGuidanceScopesGatesAndForbidsFalseBlocking(t *testing.T) {
+	runtime := newOperationalRuntime(t)
+	actor := kernel.ActorFQN("teams::product-owner-1")
+	runtime.context.Invocation.ActorFQN = actor
+	runtime.context.Invocation.Purpose = kernel.PurposeHandoff
+	grounding := RoleExecutionGrounding{
+		ActorFQN: actor, RoleFQRN: kernel.RoleFQRN("product-owner"), BundleVersion: "1.1.0", BundleDigest: testDigest('b'),
+		Capabilities: []string{"feature-intake", "requirements"}, Permissions: []string{"evidence.record", "feature.refine-propose", "release.accept-propose"},
+		Instructions: "Preserve submitted requirements and return the refinement.",
+	}
+	brief, _, err := BuildExecutionBrief(runtime.context, grounding, 1<<20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	guidance := strings.Join(brief.ExecutionGuidance, "\n")
+	for _, required := range []string{"grants no repository tools", "downstream obligation, not a requirement", "do not block or request a decision because repository access is absent", "Return the required structured result through the finish tool"} {
+		if !strings.Contains(guidance, required) {
+			t.Fatalf("toolless guidance omitted %q: %v", required, brief.ExecutionGuidance)
+		}
+	}
+	for _, forbidden := range []string{"Inspect current interfaces", "Finish the assigned plan", "does not authorize repository edits"} {
+		if strings.Contains(guidance, forbidden) {
+			t.Fatalf("toolless guidance contains repository-assuming instruction %q: %v", forbidden, brief.ExecutionGuidance)
+		}
+	}
+}
+
 func TestReadOnlyRoleGuidanceNeverOrdersEditsAndAppliesToHandoffRetry(t *testing.T) {
 	runtime := newOperationalRuntime(t)
 	actor := kernel.ActorFQN("teams::architect-1")
