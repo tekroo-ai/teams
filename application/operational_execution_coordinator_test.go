@@ -226,7 +226,7 @@ func TestToollessPlanningGuidanceScopesGatesAndForbidsFalseBlocking(t *testing.T
 			t.Fatalf("toolless guidance omitted %q: %v", required, brief.ExecutionGuidance)
 		}
 	}
-	for _, forbidden := range []string{"Inspect current interfaces", "Finish the assigned plan", "does not authorize repository edits"} {
+	for _, forbidden := range []string{"Inspect current interfaces", "Finish the assigned plan", "does not authorize repository edits", "Read and follow AGENTS.md", "rg or rg --files", "exactly one shell command", "Read accepted CONTRACTS packages"} {
 		if strings.Contains(guidance, forbidden) {
 			t.Fatalf("toolless guidance contains repository-assuming instruction %q: %v", forbidden, brief.ExecutionGuidance)
 		}

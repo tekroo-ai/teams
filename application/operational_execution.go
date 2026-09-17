@@ -356,12 +356,19 @@ var semanticContextForbiddenEffects = []string{
 
 var sharedExecutionGuidance = []string{
 	"Before acting, inspect role_grounding: actor_fqn identifies this running instance, role_fqrn identifies its signed role bundle, and the bundle instructions, capabilities, and permissions define the role you must perform.",
+	"Stay inside the authorized workspace and task scope.",
+}
+
+// repositoryExecutionGuidance assumes terminal and file tools and is injected
+// only when the role grounding carries repository authority. A toolless role
+// that follows these sentences issues tool calls it does not have, and the
+// client tool guard hard-fails the invocation.
+var repositoryExecutionGuidance = []string{
 	"Read and follow AGENTS.md before taking repository actions.",
 	"Use rg or rg --files for repository discovery.",
 	"The authorized workspace is already the terminal working directory. Issue exactly one shell command per terminal action: do not use cd, &&, semicolons, pipes, command substitution, environment-variable expansion, or multiple commands separated by newlines.",
 	"Every inspection must resolve a concrete open question in the assigned task. When a search identifies the relevant implementation and tests, inspect those files and stop discovery; do not enumerate unrelated directories to prove absence.",
 	"Read accepted CONTRACTS packages only when they directly resolve an open question in the assigned task. Never modify accepted CONTRACTS packages.",
-	"Stay inside the authorized workspace and task scope.",
 }
 
 var editableExecutionGuidance = []string{
@@ -625,6 +632,9 @@ func BuildExecutionBriefWithHandler(current OperationalExecutionContext, groundi
 	} else {
 		repositoryAuthorized := hasExecutionPermission(grounding.Permissions, "repository.read") ||
 			hasExecutionPermission(grounding.Permissions, "repository.edit")
+		if repositoryAuthorized {
+			brief.ExecutionGuidance = append(brief.ExecutionGuidance, repositoryExecutionGuidance...)
+		}
 		switch {
 		case mutationAuthorized:
 			brief.ExecutionGuidance = append(brief.ExecutionGuidance, editableExecutionGuidance...)
