@@ -4,7 +4,7 @@
 
 - loopback MongoDB replica set on `127.0.0.1:27017`;
 - OpenHands Agent Canvas on `127.0.0.1:8000` with a nonempty session API key;
-- accepted model `ddalcu--Qwen3.8-27B-MLX-Serve-8bit` available through the
+- accepted model `ddalcu--Qwen3.8-Flash-Next-MLX-Serve-mixed-4-8bit` available through the
   configured OpenHands profile;
 - SMA retrieval bridge on `127.0.0.1:8130`; and
 - an accepted `tekroo.local-model-profile-qualifications/1.0.0` bundle for the
@@ -52,6 +52,13 @@ stale, revoked, failed, mismatched, or incomplete operational coverage. The
 daemon repeats the operational-coverage check before creating runtime state or
 connecting to MongoDB, so an unqualified deployment cannot report healthy and
 then fail on its first feature.
+
+Each role's OpenHands LLM policy lives in
+`config/starter-team/openhands-profiles/<role-fqrn>.json`. The generated initial
+system prompt begins with that role's authenticated `ROLE.md` charter, followed
+by the common Teams invocation protocol. Any change to the role LLM policy or
+system prompt changes the model-profile digest and therefore requires fresh
+qualification evidence for that exact profile.
 
 ## Dependency check
 

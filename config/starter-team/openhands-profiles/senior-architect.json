@@ -1,0 +1,9 @@
+{
+  "schema_version": "tekroo.local-role-llm-profile/1.0.0",
+  "role_fqrn": "senior-architect",
+  "decision_route": "COMPLEX_REASONING",
+  "reasoning_effort": "xhigh",
+  "maximum_output_tokens": 65536,
+  "enable_mtp": true,
+  "condenser_maximum_events": 80
+}

@@ -80,24 +80,35 @@ func TestInitializeLocalDeploymentProducesValidatedIsolatedInstallation(t *testi
 		if profile.RoleFQRN != "operator" && (profile.Qualification == nil || profile.QualificationCorpus == nil) {
 			t.Fatalf("local profile %s did not bind supplied qualification evidence", profile.RoleFQRN)
 		}
-		wantEndpoint := localBoundedModelEndpoint
-		wantRoute := kernel.RouteBoundedExecution
-		wantThinking := false
-		wantReasoningEffort := ""
-		wantReasoningBudgetTokens := uint32(0)
-		wantMaximumOutputTokens := uint32(localBoundedOutputTokens)
-		if profile.RoleFQRN == "architect" || profile.RoleFQRN == "security" || profile.RoleFQRN == "senior-coder" {
-			wantEndpoint = localComplexModelEndpoint
-			wantRoute = kernel.RouteComplexReasoning
-			wantThinking = true
-			wantReasoningEffort = localComplexReasoningEffort
-			wantMaximumOutputTokens = localComplexOutputTokens
-			if profile.RoleFQRN == "senior-coder" {
-				wantMaximumOutputTokens = localComplexEditingOutputTokens
-			}
+		wantProfiles := map[kernel.RoleFQRN]struct {
+			route               kernel.DecisionRoute
+			reasoningEffort     string
+			maximumOutputTokens uint32
+			maximumEvents       uint32
+		}{
+			"architect":       {kernel.RouteComplexReasoning, "medium", 32768, 80},
+			"coder":           {kernel.RouteBoundedExecution, "low", 8192, 240},
+			"operator":        {kernel.RouteBoundedExecution, "low", 8192, 80},
+			"product-owner":   {kernel.RouteBoundedExecution, "medium", 16384, 80},
+			"project-manager": {kernel.RouteBoundedExecution, "low", 8192, 80},
+			"security":        {kernel.RouteComplexReasoning, "medium", 32768, 80},
+			"senior-coder":    {kernel.RouteComplexReasoning, "medium", 16384, 240},
+			"tester":          {kernel.RouteBoundedExecution, "medium", 16384, 80},
 		}
-		if profile.DecisionRoute != wantRoute {
-			t.Fatalf("local profile %s route = %s, want %s", profile.RoleFQRN, profile.DecisionRoute, wantRoute)
+		want, found := wantProfiles[profile.RoleFQRN]
+		if !found {
+			t.Fatalf("unexpected local profile %s", profile.RoleFQRN)
+		}
+		wantEndpoint := localBoundedModelEndpoint
+		if want.route == kernel.RouteComplexReasoning {
+			wantEndpoint = localComplexModelEndpoint
+		}
+		wantThinking := true
+		wantReasoningEffort := want.reasoningEffort
+		wantReasoningBudgetTokens := uint32(0)
+		wantMaximumOutputTokens := want.maximumOutputTokens
+		if profile.DecisionRoute != want.route {
+			t.Fatalf("local profile %s route = %s, want %s", profile.RoleFQRN, profile.DecisionRoute, want.route)
 		}
 		digest, digestErr := openhands.ModelProfileDigest(profile.RoleFQRN, profile.RoleBundleDigest, profile.AgentSettings)
 		if digestErr != nil || digest != profile.ModelProfileDigest {
@@ -147,15 +158,17 @@ func TestInitializeLocalDeploymentProducesValidatedIsolatedInstallation(t *testi
 		if settings.Condenser.LLM.MaximumInputTokens != 262144 || settings.Condenser.LLM.MaximumOutputTokens != localCondenserOutputTokens || settings.Condenser.LLM.LiteLLMExtraBody.EnableMTP || settings.Condenser.LLM.LiteLLMExtraBody.ReasoningEffort != "" || settings.Condenser.LLM.LiteLLMExtraBody.ChatTemplateKwargs.EnableThinking || settings.Condenser.LLM.LiteLLMExtraBody.ChatTemplateKwargs.PreserveThinking {
 			t.Fatalf("local profile %s condenser is not independently bounded and non-thinking", profile.RoleFQRN)
 		}
-		wantCondenserMaximumEvents := uint32(localCondenserMaximumEvents)
-		if profile.RoleFQRN == "coder" || profile.RoleFQRN == "senior-coder" {
-			wantCondenserMaximumEvents = localEditCondenserMaximumEvents
-		}
+		wantCondenserMaximumEvents := want.maximumEvents
 		if settings.Condenser.MaximumEvents != wantCondenserMaximumEvents {
 			t.Fatalf("local profile %s condenser maximum events = %d, want %d", profile.RoleFQRN, settings.Condenser.MaximumEvents, wantCondenserMaximumEvents)
 		}
-		if settings.SystemPrompt == "" {
-			t.Fatalf("local profile %s inherited the generic OpenHands system prompt", profile.RoleFQRN)
+		charter, err := os.ReadFile(filepath.Join(sourceRoot, "config", "starter-team", "roles-v4", string(profile.RoleFQRN), "ROLE.md"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		wantSystemPrompt, err := openhands.NewTeamsRoleExecutionSystemPrompt(profile.RoleFQRN, string(charter))
+		if err != nil || settings.SystemPrompt != wantSystemPrompt {
+			t.Fatalf("local profile %s did not start from its signed role charter: %v", profile.RoleFQRN, err)
 		}
 		wantTools := map[kernel.RoleFQRN][]string{
 			"operator": {}, "product-owner": {}, "project-manager": {},
@@ -169,6 +182,10 @@ func TestInitializeLocalDeploymentProducesValidatedIsolatedInstallation(t *testi
 		if !slices.Equal(gotTools, wantTools) {
 			t.Fatalf("local profile %s tools = %#v, want %#v", profile.RoleFQRN, gotTools, wantTools)
 		}
+	}
+	dormant, err := loadLocalRoleLLMProfile(filepath.Join(sourceRoot, "config", "starter-team"), "senior-architect")
+	if err != nil || dormant.ReasoningEffort != "xhigh" || dormant.DecisionRoute != kernel.RouteComplexReasoning || dormant.MaximumOutputTokens != 65536 {
+		t.Fatalf("dormant senior-architect profile = %#v, err=%v", dormant, err)
 	}
 	for _, workspace := range config.Workspaces {
 		if len(workspace.Branch) <= len("tekroo-test/") || workspace.Branch[:len("tekroo-test/")] != "tekroo-test/" {

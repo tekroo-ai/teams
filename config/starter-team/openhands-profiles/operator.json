@@ -1,0 +1,9 @@
+{
+  "schema_version": "tekroo.local-role-llm-profile/1.0.0",
+  "role_fqrn": "operator",
+  "decision_route": "BOUNDED_EXECUTION",
+  "reasoning_effort": "low",
+  "maximum_output_tokens": 8192,
+  "enable_mtp": true,
+  "condenser_maximum_events": 80
+}

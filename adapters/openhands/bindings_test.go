@@ -179,8 +179,12 @@ func TestAgentSettingsRejectInvalidThinkingEffort(t *testing.T) {
 		t.Fatalf("missing reasoning effort error = %v", err)
 	}
 	base.ReasoningEffort = "xhigh"
+	if _, err := NewOpenAICompatibleAgentSettings(base); err != nil {
+		t.Fatalf("xhigh reasoning effort error = %v", err)
+	}
+	base.ReasoningEffort = "high"
 	if _, err := NewOpenAICompatibleAgentSettings(base); err != ErrInvalidConfiguration {
-		t.Fatalf("runaway reasoning effort error = %v", err)
+		t.Fatalf("unsupported reasoning effort error = %v", err)
 	}
 	base.ReasoningEffort = "medium"
 	base.CondenserEnableThinking = true
@@ -190,6 +194,28 @@ func TestAgentSettingsRejectInvalidThinkingEffort(t *testing.T) {
 	base.CondenserEnableThinking = false
 	if _, err := NewOpenAICompatibleAgentSettings(base); err != nil {
 		t.Fatalf("controlled thinking error = %v", err)
+	}
+}
+
+func TestRoleSystemPromptBindsSignedCharterIdentity(t *testing.T) {
+	prompt, err := NewTeamsRoleExecutionSystemPrompt("coder", "# Coder\n\nImplement the admitted task.")
+	if err != nil || !strings.Contains(prompt, "Signed role charter") || !strings.Contains(prompt, "Implement the admitted task") {
+		t.Fatalf("role prompt = %q, err=%v", prompt, err)
+	}
+	settings, err := NewOpenAICompatibleAgentSettings(AgentSettingsConfig{
+		Model: "openai/local", ModelCanonicalName: "openai/gpt-4o", BaseURL: "http://127.0.0.1:8800/v1", APIKey: "fixture",
+		Tools: []string{"repository_search"}, EnableThinking: true, EnableMTP: true, ReasoningEffort: "low",
+		MaximumOutputTokens: 8192, CondenserOutputTokens: 4096, TimeoutSeconds: 1200, CondenserMaximumEvents: 80, CondenserMaximumTokens: 96000,
+		SystemPrompt: prompt,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ModelProfileDigest("coder", digest('a'), settings); err != nil {
+		t.Fatalf("matching role prompt: %v", err)
+	}
+	if _, err := ModelProfileDigest("architect", digest('a'), settings); err != ErrInvalidConfiguration {
+		t.Fatalf("mismatched role prompt error = %v", err)
 	}
 }
 

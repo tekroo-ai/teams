@@ -16,7 +16,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -38,20 +37,10 @@ const (
 	localHandlerPublisher       = "tekroo-message-handlers-20260913"
 	localQualificationPublisher = "tekroo-message-handlers-qualification-20260913"
 	localSoftwareWorkflowDigest = "1624fb8ba139c3c1e1ebe880cf79cfa1f9edd025b946f9676a2c3f3ab9ea3967"
-	localBoundedOutputTokens    = 8192
-	localComplexOutputTokens    = 32768
-	// Editing profiles receive a smaller per-decision ceiling than read-only
-	// complex reasoning profiles. Run 41 showed Qwen 3.8 repeating a completed
-	// implementation plan until the 32K ceiling without emitting an action.
-	// This bounds one response, not the actor lifetime or tool iterations, and
-	// is selected from repository.edit authority rather than a named role.
-	localComplexEditingOutputTokens = 16384
-	localComplexReasoningEffort     = "medium"
-	localCondenserOutputTokens      = 4096
-	localCondenserMaximumTokens     = 196608
-	localCondenserMaximumEvents     = 80
-	localEditCondenserMaximumEvents = 240
-	localQualificationSchema        = "tekroo.local-model-profile-qualifications/1.0.0"
+	localCondenserOutputTokens  = 4096
+	localCondenserMaximumTokens = 196608
+	localQualificationSchema    = "tekroo.local-model-profile-qualifications/1.0.0"
+	localRoleLLMProfileSchema   = "tekroo.local-role-llm-profile/1.0.0"
 )
 
 type localInitOptions struct {
@@ -101,6 +90,30 @@ type localProfileQualificationBinding struct {
 	ModelProfileDigest  kernel.Digest                             `json:"model_profile_digest"`
 	QualificationCorpus application.QualificationCorpusDefinition `json:"qualification_corpus"`
 	Qualification       kernel.ModelProfileQualification          `json:"qualification"`
+}
+
+type localRoleLLMProfile struct {
+	SchemaVersion          string               `json:"schema_version"`
+	RoleFQRN               kernel.RoleFQRN      `json:"role_fqrn"`
+	DecisionRoute          kernel.DecisionRoute `json:"decision_route"`
+	ReasoningEffort        string               `json:"reasoning_effort"`
+	MaximumOutputTokens    uint32               `json:"maximum_output_tokens"`
+	EnableMTP              bool                 `json:"enable_mtp"`
+	CondenserMaximumEvents uint32               `json:"condenser_maximum_events"`
+}
+
+func (profile localRoleLLMProfile) validFor(role kernel.RoleFQRN) bool {
+	validEffort := profile.ReasoningEffort == "low" || profile.ReasoningEffort == "medium" || profile.ReasoningEffort == "xhigh"
+	return profile.SchemaVersion == localRoleLLMProfileSchema && profile.RoleFQRN == role && profile.DecisionRoute.Valid() && validEffort && profile.MaximumOutputTokens > 0 && profile.MaximumOutputTokens <= 262144 && profile.CondenserMaximumEvents > 0 && profile.CondenserMaximumEvents <= 1000
+}
+
+func loadLocalRoleLLMProfile(teamRoot string, role kernel.RoleFQRN) (localRoleLLMProfile, error) {
+	var profile localRoleLLMProfile
+	path := filepath.Join(teamRoot, "openhands-profiles", string(role)+".json")
+	if err := readStrictJSON(path, &profile); err != nil || !profile.validFor(role) {
+		return localRoleLLMProfile{}, errors.New("role LLM profile is invalid")
+	}
+	return profile, nil
 }
 
 func runLocalInit(arguments []string, stdout, stderr io.Writer) error {
@@ -458,38 +471,36 @@ func localProductionProfiles(teamRoot string, manifest *organization.TeamManifes
 		if err != nil {
 			return nil, err
 		}
+		bundlePath := filepath.Join(teamRoot, role.BundlePath)
 		var bundle organization.RoleBundle
-		if err := readStrictJSON(filepath.Join(teamRoot, role.BundlePath), &bundle); err != nil || bundle.Validate() != nil || bundle.Role != role.Role {
+		if err := readStrictJSON(bundlePath, &bundle); err != nil || bundle.Validate() != nil || bundle.Role != role.Role {
 			return nil, errors.New("role bundle is invalid")
 		}
 		bundleDigest, err := bundle.ContentDigest()
 		if err != nil || bundleDigest != role.BundleDigest {
 			return nil, errors.New("role bundle digest mismatch")
 		}
+		rolePackage, err := organization.LoadRolePackage(bundlePath, bundle)
+		if err != nil {
+			return nil, errors.New("role package is invalid")
+		}
+		roleSystemPrompt, err := openhands.NewTeamsRoleExecutionSystemPrompt(roleFQRN, rolePackage.Charter)
+		if err != nil {
+			return nil, err
+		}
+		llmProfile, err := loadLocalRoleLLMProfile(teamRoot, roleFQRN)
+		if err != nil {
+			return nil, err
+		}
 		executionTools := openhands.ExecutionToolsForPermissions(bundle.Permissions)
 		endpoint := localBoundedModelEndpoint
-		route := kernel.RouteBoundedExecution
-		thinking := false
-		reasoningEffort := ""
-		maximumOutputTokens := uint32(localBoundedOutputTokens)
-		condenserMaximumEvents := uint32(localCondenserMaximumEvents)
-		if roleFQRN == "coder" || roleFQRN == "senior-coder" {
-			condenserMaximumEvents = localEditCondenserMaximumEvents
-		}
-		if roleFQRN == "architect" || roleFQRN == "security" || roleFQRN == "senior-coder" {
+		if llmProfile.DecisionRoute == kernel.RouteComplexReasoning {
 			endpoint = localComplexModelEndpoint
-			route = kernel.RouteComplexReasoning
-			thinking = true
-			reasoningEffort = localComplexReasoningEffort
-			maximumOutputTokens = localComplexOutputTokens
-			if slices.Contains(bundle.Permissions, "repository.edit") {
-				maximumOutputTokens = localComplexEditingOutputTokens
-			}
 		}
 		agentSettings, err := openhands.NewOpenAICompatibleAgentSettings(openhands.AgentSettingsConfig{
 			Model: "openai/" + localModelIdentity, ModelCanonicalName: "openai/gpt-4o", BaseURL: endpoint,
-			APIKey: "teams-loopback-only", Tools: executionTools, EnableThinking: thinking, CondenserEnableThinking: false, EnableMTP: thinking, CondenserEnableMTP: false,
-			ReasoningEffort: reasoningEffort, MaximumOutputTokens: maximumOutputTokens, CondenserOutputTokens: localCondenserOutputTokens, TimeoutSeconds: 1200, CondenserMaximumEvents: condenserMaximumEvents, CondenserMaximumTokens: localCondenserMaximumTokens,
+			APIKey: "teams-loopback-only", Tools: executionTools, EnableThinking: true, CondenserEnableThinking: false, EnableMTP: llmProfile.EnableMTP, CondenserEnableMTP: false,
+			ReasoningEffort: llmProfile.ReasoningEffort, MaximumOutputTokens: llmProfile.MaximumOutputTokens, CondenserOutputTokens: localCondenserOutputTokens, TimeoutSeconds: 1200, CondenserMaximumEvents: llmProfile.CondenserMaximumEvents, CondenserMaximumTokens: localCondenserMaximumTokens, SystemPrompt: roleSystemPrompt,
 		})
 		if err != nil {
 			return nil, err
@@ -501,7 +512,7 @@ func localProductionProfiles(teamRoot string, manifest *organization.TeamManifes
 		role.ModelProfileDigest = modelDigest
 		profiles = append(profiles, operationalruntime.ProductionProfile{
 			ModelProfileDigest: modelDigest, RoleFQRN: roleFQRN, RoleBundleDigest: role.BundleDigest,
-			DecisionRoute:         route,
+			DecisionRoute:         llmProfile.DecisionRoute,
 			RuntimeIdentityDigest: labelDigest("runtime:" + endpoint + ":" + localModelIdentity + ":" + role.Role),
 			ToolPolicyDigest:      labelDigest("tool-policy:role-tools:v3:" + strings.Join(executionTools, ",")), EffectPolicyDigest: labelDigest("effect-policy:teams-only:v1"), MaximumIterations: 0,
 			AgentSettings: agentSettings,

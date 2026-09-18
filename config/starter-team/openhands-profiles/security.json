@@ -1,0 +1,9 @@
+{
+  "schema_version": "tekroo.local-role-llm-profile/1.0.0",
+  "role_fqrn": "security",
+  "decision_route": "COMPLEX_REASONING",
+  "reasoning_effort": "medium",
+  "maximum_output_tokens": 32768,
+  "enable_mtp": true,
+  "condenser_maximum_events": 80
+}

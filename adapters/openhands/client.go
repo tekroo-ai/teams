@@ -42,6 +42,10 @@ const (
 The user message is the authoritative JSON execution brief. The role_grounding object identifies the running actor by FQN and the signed role bundle by FQRN. Perform only that role, within its stated instructions, capabilities, permissions, task scope, and acceptance criteria. Use only the tools exposed for this invocation. For repository work, read AGENTS.md and only the source and tests relevant to the assigned result; do not tour the repository or inspect accepted contract packages unless the task explicitly requires contract analysis. Never delegate, contact another agent, invent operational identities, or perform unrequested external, deployment, Git publishing, or lifecycle actions.
 
 Make forward progress. Do not repeat an action unless its inputs or relevant state changed. When the task is complete or blocked by a concrete missing prerequisite, call finish exactly once. The finish message must follow result_protocol exactly; Teams ignores any informal completion claim.`
+	teamsRoleIdentityPromptPrefix = "You are the Tekroo Teams role `"
+	teamsRoleIdentityPromptMiddle = "`. Begin every invocation from this role identity and apply its charter consistently."
+	teamsRoleCharterHeading       = "\n\nSigned role charter:\n\n"
+	teamsInvocationHeading        = "\n\nInvocation protocol:\n\n"
 	// The qualified local model advertises a 128K context window. Keep 32K in
 	// reserve for tool results, the next response, and control messages while
 	// avoiding a lossy condensation during the required pre-edit inspection.
@@ -169,10 +173,27 @@ type AgentSettingsConfig struct {
 	TimeoutSeconds          uint32
 	CondenserMaximumEvents  uint32
 	CondenserMaximumTokens  uint32
+	SystemPrompt            string
 }
 
 func validReasoningEffort(effort string) bool {
-	return effort == "low" || effort == "medium"
+	return effort == "low" || effort == "medium" || effort == "xhigh"
+}
+
+// NewTeamsRoleExecutionSystemPrompt starts the model from the authenticated
+// role identity and charter while retaining the common Teams invocation
+// protocol. The caller must supply charter text loaded from the signed role
+// package rather than an independently maintained personality copy.
+func NewTeamsRoleExecutionSystemPrompt(role kernel.RoleFQRN, charter string) (string, error) {
+	charter = strings.TrimSpace(charter)
+	if !role.Valid() || charter == "" || len(charter) > maximumPromptEvidenceBytes || !utf8.ValidString(charter) {
+		return "", ErrInvalidConfiguration
+	}
+	prompt := teamsRoleIdentityPromptPrefix + string(role) + teamsRoleIdentityPromptMiddle + teamsRoleCharterHeading + charter + teamsInvocationHeading + teamsRoleExecutionSystemPrompt
+	if !validTeamsSystemPrompt(prompt) {
+		return "", ErrInvalidConfiguration
+	}
+	return prompt, nil
 }
 
 func NewOpenAICompatibleAgentSettings(config AgentSettingsConfig) (json.RawMessage, error) {
@@ -217,9 +238,16 @@ func NewOpenAICompatibleAgentSettings(config AgentSettingsConfig) (json.RawMessa
 	for index, name := range config.Tools {
 		tools[index] = map[string]any{"name": name, "params": map[string]any{}}
 	}
+	systemPrompt := config.SystemPrompt
+	if systemPrompt == "" {
+		systemPrompt = teamsRoleExecutionSystemPrompt
+	}
+	if !validTeamsSystemPrompt(systemPrompt) {
+		return nil, ErrInvalidConfiguration
+	}
 	settings := map[string]any{
 		"kind": "Agent", "include_default_tools": []string{"FinishTool"},
-		"tools": tools, "system_prompt": teamsRoleExecutionSystemPrompt,
+		"tools": tools, "system_prompt": systemPrompt,
 		"agent_context": map[string]any{"system_message_suffix": qualifiedShellDisciplineSystemSuffix},
 		"llm":           llm(config.EnableThinking, config.EnableMTP, "", config.MaximumOutputTokens, config.ReasoningEffort),
 		"condenser": map[string]any{
@@ -268,7 +296,7 @@ func validExplicitAgentTools(tools []string) bool {
 }
 
 func ModelProfileDigest(role kernel.RoleFQRN, bundleDigest kernel.Digest, agentSettings json.RawMessage) (kernel.Digest, error) {
-	if !role.Valid() || !bundleDigest.Valid() || !configurableAgentSettings(agentSettings) {
+	if !role.Valid() || !bundleDigest.Valid() || !configurableAgentSettings(agentSettings) || !agentSettingsSystemPromptMatchesRole(agentSettings, role) {
 		return "", ErrInvalidConfiguration
 	}
 	document := struct {
@@ -468,8 +496,48 @@ type qualifiedAgentTool struct {
 
 func validTeamsSystemPrompt(value string) bool {
 	// Empty preserves the accepted Step-15 profile. Every profile constructed
-	// by Teams after role grounding became executable carries the exact prompt.
-	return value == "" || value == teamsRoleExecutionSystemPrompt
+	// by Teams after role grounding became executable carries either the legacy
+	// common prompt or a role-bound prompt assembled from its signed charter.
+	if value == "" || value == teamsRoleExecutionSystemPrompt {
+		return true
+	}
+	_, valid := teamsSystemPromptRole(value)
+	return valid
+}
+
+func teamsSystemPromptRole(value string) (kernel.RoleFQRN, bool) {
+	if !strings.HasPrefix(value, teamsRoleIdentityPromptPrefix) || len(value) > maximumPromptEvidenceBytes+len(teamsRoleExecutionSystemPrompt)+1024 || !utf8.ValidString(value) {
+		return "", false
+	}
+	remainder := strings.TrimPrefix(value, teamsRoleIdentityPromptPrefix)
+	roleText, remainder, found := strings.Cut(remainder, teamsRoleIdentityPromptMiddle)
+	if !found {
+		return "", false
+	}
+	role, err := kernel.ParseRoleFQRN(roleText)
+	if err != nil || !strings.HasPrefix(remainder, teamsRoleCharterHeading) {
+		return "", false
+	}
+	remainder = strings.TrimPrefix(remainder, teamsRoleCharterHeading)
+	charter, protocol, found := strings.Cut(remainder, teamsInvocationHeading)
+	if !found || strings.TrimSpace(charter) == "" || protocol != teamsRoleExecutionSystemPrompt {
+		return "", false
+	}
+	return role, true
+}
+
+func agentSettingsSystemPromptMatchesRole(raw json.RawMessage, role kernel.RoleFQRN) bool {
+	var settings struct {
+		SystemPrompt string `json:"system_prompt"`
+	}
+	if json.Unmarshal(raw, &settings) != nil {
+		return false
+	}
+	if settings.SystemPrompt == "" || settings.SystemPrompt == teamsRoleExecutionSystemPrompt {
+		return true
+	}
+	promptRole, valid := teamsSystemPromptRole(settings.SystemPrompt)
+	return valid && promptRole == role
 }
 
 func validQualifiedAgentTools(tools []qualifiedAgentTool) bool {
