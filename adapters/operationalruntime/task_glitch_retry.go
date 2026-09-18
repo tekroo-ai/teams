@@ -208,9 +208,12 @@ func failedTaskEscalationPayload(invocationID kernel.UUIDv7) ([]byte, error) {
 // payload digest so a durable rejection recorded under a different payload
 // (for example one missing the schema-required review_policy) can never
 // collide with a corrected retry as COMMAND_ID_REUSE. This mirrors the
-// precedent in blockStructuredDecisionTask.
+// precedent in blockStructuredDecisionTask. The v2 namespace exists because
+// the v2 command carries actor attribution the v1 shape never had, and the
+// kernel's command-identity ledger has durable rejections recorded under
+// every v2 key the earlier command shape attempted.
 func failedTaskEscalationKey(taskID, invocationID kernel.UUIDv7, payload []byte) string {
-	return "failed-task-escalation-" + string(taskID) + "-" + string(invocationID) + "-" + string(digestBytes(payload))
+	return "failed-task-escalation-v2-" + string(taskID) + "-" + string(invocationID) + "-" + string(digestBytes(payload))
 }
 
 func workTerminationReasonLine(output []byte) string {
