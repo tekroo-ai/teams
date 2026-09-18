@@ -1,12 +1,38 @@
 package operationalruntime
 
 import (
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/tekroo-ai/teams/contract"
 	"github.com/tekroo-ai/teams/kernel"
 	"github.com/tekroo-ai/teams/organization"
 )
+
+func TestFailedTaskEscalationPayloadValidatesAgainstAcceptedCatalogue(t *testing.T) {
+	catalogue, err := contract.Load(os.DirFS(filepath.Join("..", "..")), "CONTRACTS/tekroo.kernel.contracts/0.12.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	invocationID := kernel.UUIDv7("01a0b142-c886-70e6-9155-69ccdb7c8f25")
+	payload, err := failedTaskEscalationPayload(invocationID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := catalogue.ValidateFixtureCommand("tekroo.command.work.block", payload); err != nil {
+		t.Fatalf("escalation payload rejected by accepted catalogue: %v (payload=%s)", err, payload)
+	}
+	var decoded map[string]any
+	if err := json.Unmarshal(payload, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if decoded["review_policy"] != invalidStructuredReviewPolicy {
+		t.Fatalf("escalation payload review_policy = %v", decoded["review_policy"])
+	}
+}
 
 func TestTerminationReasonGlitchClassification(t *testing.T) {
 	validator := organization.PlannedTask{Purpose: kernel.PurposeValidation, AttemptLimit: 3, Validates: []kernel.UUIDv7{kernel.UUIDv7("00000000-0000-7000-8000-0000000000a1")}}

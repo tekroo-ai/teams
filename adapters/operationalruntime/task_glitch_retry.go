@@ -119,10 +119,7 @@ func (service *ProductionService) reconcileGlitchTerminatedTasks(ctx context.Con
 			if state.Condition == kernel.ConditionBlocked {
 				continue
 			}
-			payload, marshalErr := json.Marshal(map[string]any{
-				"blocker_refs": []string{"teams://work-invocation/" + string(invocation.ID)},
-				"reason":       "task invocation failed without an admissible automatic recovery; operator escalation is required",
-			})
+			payload, marshalErr := failedTaskEscalationPayload(invocation.ID)
 			if marshalErr != nil {
 				return false, marshalErr
 			}
@@ -182,6 +179,19 @@ func repeatedTerminalOutput(snapshot kernel.Snapshot, current kernel.WorkInvocat
 
 func automaticGlitchRecoveryDeadline(invocationDeadline time.Time) time.Time {
 	return invocationDeadline.Add(time.Nanosecond)
+}
+
+// failedTaskEscalationPayload builds the work.block payload for an
+// unrecoverable failed invocation. The accepted payload schema requires
+// review_policy alongside blocker_refs and reason; a payload without it is
+// rejected by the catalogue with INVALID_PAYLOAD before the kernel ever sees
+// the command.
+func failedTaskEscalationPayload(invocationID kernel.UUIDv7) ([]byte, error) {
+	return json.Marshal(map[string]any{
+		"blocker_refs":  []string{"teams://work-invocation/" + string(invocationID)},
+		"reason":        "task invocation failed without an admissible automatic recovery; operator escalation is required",
+		"review_policy": invalidStructuredReviewPolicy,
+	})
 }
 
 func workTerminationReasonLine(output []byte) string {
