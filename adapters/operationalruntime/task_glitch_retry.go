@@ -123,7 +123,7 @@ func (service *ProductionService) reconcileGlitchTerminatedTasks(ctx context.Con
 			if marshalErr != nil {
 				return false, marshalErr
 			}
-			key := "failed-task-escalation-" + string(task.ID) + "-" + string(invocation.ID)
+			key := failedTaskEscalationKey(task.ID, invocation.ID, payload)
 			_, err = service.submitDeterministicActorTargetCommand(ctx, feature, "tekroo.command.work.block", kernel.AggregateTask, task.ID, service.policyAuthority, invocation.ActorFQN, invocation.Execution, state.Revision, state.LifecycleEpoch, payload, []kernel.DagParent{{ParentEventID: invocation.LastEventID, EdgeKind: kernel.EdgeResponse}}, evidence, key)
 			if err != nil {
 				return false, fmt.Errorf("escalate failed task %s invocation %s: %w", task.ID, invocation.ID, err)
@@ -192,6 +192,15 @@ func failedTaskEscalationPayload(invocationID kernel.UUIDv7) ([]byte, error) {
 		"reason":        "task invocation failed without an admissible automatic recovery; operator escalation is required",
 		"review_policy": invalidStructuredReviewPolicy,
 	})
+}
+
+// failedTaskEscalationKey is content-derived: it includes the admitted
+// payload digest so a durable rejection recorded under a different payload
+// (for example one missing the schema-required review_policy) can never
+// collide with a corrected retry as COMMAND_ID_REUSE. This mirrors the
+// precedent in blockStructuredDecisionTask.
+func failedTaskEscalationKey(taskID, invocationID kernel.UUIDv7, payload []byte) string {
+	return "failed-task-escalation-" + string(taskID) + "-" + string(invocationID) + "-" + string(digestBytes(payload))
 }
 
 func workTerminationReasonLine(output []byte) string {

@@ -34,6 +34,29 @@ func TestFailedTaskEscalationPayloadValidatesAgainstAcceptedCatalogue(t *testing
 	}
 }
 
+// TestFailedTaskEscalationKeyIsContentDerived pins the second poison layer:
+// the escalation idempotency key must include the payload digest so a
+// durable rejection recorded under a different payload can never collide
+// with a corrected retry as COMMAND_ID_REUSE.
+func TestFailedTaskEscalationKeyIsContentDerived(t *testing.T) {
+	invocationID := kernel.UUIDv7("01a0b142-c886-70e6-9155-69ccdb7c8f25")
+	taskID := kernel.UUIDv7("bbe97cab-c488-7cd4-8907-b351c04b5abd")
+	corrected, err := failedTaskEscalationPayload(invocationID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	malformed, err := json.Marshal(map[string]any{
+		"blocker_refs": []string{"teams://work-invocation/" + string(invocationID)},
+		"reason":       "task invocation failed without an admissible automatic recovery; operator escalation is required",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if failedTaskEscalationKey(taskID, invocationID, corrected) == failedTaskEscalationKey(taskID, invocationID, malformed) {
+		t.Fatal("escalation key must differ when the payload differs")
+	}
+}
+
 func TestTerminationReasonGlitchClassification(t *testing.T) {
 	validator := organization.PlannedTask{Purpose: kernel.PurposeValidation, AttemptLimit: 3, Validates: []kernel.UUIDv7{kernel.UUIDv7("00000000-0000-7000-8000-0000000000a1")}}
 	failed := kernel.WorkInvocation{State: kernel.InvocationFailed, AttemptOrdinal: 1}
