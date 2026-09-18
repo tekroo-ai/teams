@@ -200,10 +200,16 @@ func recoverablePlanningTerminal(invocation kernel.WorkInvocation) bool {
 	switch invocation.State {
 	case kernel.InvocationCancelled:
 		return invocation.CancellationRequestedAt != nil
-	case kernel.InvocationTimedOut:
+	// Planning failures of every classification are operator-recoverable,
+	// mirroring recoverableTaskTerminal: the retryable flag gates the
+	// automatic scheduler, while the operator's evidence-bound amendment
+	// (budget amendment plus a fresh deadline) is the remedy after the
+	// underlying defect - including a defect in the harness that produced
+	// the terminal classification itself - has been remediated. Excluding
+	// non-retryable failures would make transient terminations such as
+	// MODEL_RESPONSE_WITHOUT_ACTION_OR_RESULT permanently unrecoverable.
+	case kernel.InvocationTimedOut, kernel.InvocationFailed, kernel.InvocationStartFailed:
 		return true
-	case kernel.InvocationFailed, kernel.InvocationStartFailed:
-		return invocation.Retryable != nil && *invocation.Retryable
 	default:
 		return false
 	}

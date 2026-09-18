@@ -221,7 +221,7 @@ func TestFeatureBudgetPolicyAcceptsOnlyExpiredPredecessorForRecovery(t *testing.
 	}
 }
 
-func TestRecoverablePlanningTerminalAcceptsOnlyExplicitlyRecoverableTerminals(t *testing.T) {
+func TestRecoverablePlanningTerminalAcceptsEveryFailureForOperatorAmendment(t *testing.T) {
 	now := time.Date(2026, 9, 1, 16, 0, 0, 0, time.UTC)
 	retryable := true
 	notRetryable := false
@@ -234,8 +234,8 @@ func TestRecoverablePlanningTerminalAcceptsOnlyExplicitlyRecoverableTerminals(t 
 		{name: "unrequested cancellation", invocation: recoveryTerminalFixture(kernel.InvocationCancelled, nil, nil)},
 		{name: "timed out", invocation: recoveryTerminalFixture(kernel.InvocationTimedOut, nil, nil), want: true},
 		{name: "retryable failure", invocation: recoveryTerminalFixture(kernel.InvocationFailed, &retryable, nil), want: true},
-		{name: "non-retryable failure", invocation: recoveryTerminalFixture(kernel.InvocationFailed, &notRetryable, nil)},
-		{name: "failure without classification", invocation: recoveryTerminalFixture(kernel.InvocationFailed, nil, nil)},
+		{name: "non-retryable failure", invocation: recoveryTerminalFixture(kernel.InvocationFailed, &notRetryable, nil), want: true},
+		{name: "failure without classification", invocation: recoveryTerminalFixture(kernel.InvocationFailed, nil, nil), want: true},
 		{name: "retryable start failure", invocation: recoveryTerminalFixture(kernel.InvocationStartFailed, &retryable, nil), want: true},
 		{name: "successful invocation", invocation: recoveryTerminalFixture(kernel.InvocationSucceeded, nil, nil)},
 	}
