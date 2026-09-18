@@ -119,12 +119,22 @@ func (service *ProductionService) reconcileGlitchTerminatedTasks(ctx context.Con
 			if state.Condition == kernel.ConditionBlocked {
 				continue
 			}
+			// The command must be attributed to the actor's currently registered
+			// execution, not the failed invocation's tuple: after a daemon restart
+			// the invocation's execution is no longer current and the kernel
+			// rejects attribution as STALE_EXECUTION. While the actor has no
+			// registered execution (role stopped), escalation is deferred to a
+			// later pass rather than poisoning the reconciliation loop.
+			execution, attributable := snapshot.CurrentExecutions[invocation.ActorFQN]
+			if !attributable {
+				continue
+			}
 			payload, marshalErr := failedTaskEscalationPayload(invocation.ID)
 			if marshalErr != nil {
 				return false, marshalErr
 			}
 			key := failedTaskEscalationKey(task.ID, invocation.ID, payload)
-			_, err = service.submitDeterministicActorTargetCommand(ctx, feature, "tekroo.command.work.block", kernel.AggregateTask, task.ID, service.policyAuthority, invocation.ActorFQN, invocation.Execution, state.Revision, state.LifecycleEpoch, payload, []kernel.DagParent{{ParentEventID: invocation.LastEventID, EdgeKind: kernel.EdgeResponse}}, evidence, key)
+			_, err = service.submitDeterministicActorTargetCommand(ctx, feature, "tekroo.command.work.block", kernel.AggregateTask, task.ID, service.policyAuthority, invocation.ActorFQN, execution, state.Revision, state.LifecycleEpoch, payload, []kernel.DagParent{{ParentEventID: invocation.LastEventID, EdgeKind: kernel.EdgeResponse}}, evidence, key)
 			if err != nil {
 				return false, fmt.Errorf("escalate failed task %s invocation %s: %w", task.ID, invocation.ID, err)
 			}
