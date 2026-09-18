@@ -89,7 +89,7 @@ func (service *ProductionService) reconcileFeaturePlanning(ctx context.Context) 
 			return fmt.Errorf("feature %s %s: %w", feature.ID, stage, err)
 		}
 		if service.WorkflowLibrary != nil {
-			if workflowAdmission.AuthorizedInvocationID == nil || !workflowInvocationInAdmissionFamily(invocation, *workflowAdmission.AuthorizedInvocationID, snapshot.WorkInvocations) {
+			if !workflowStageInvocationAccepted(feature, workflowAdmission, invocation, snapshot) {
 				return fmt.Errorf("feature %s %s workflow invocation identity mismatch", feature.ID, stage)
 			}
 			if err := service.startFeatureWorkflowStage(ctx, feature, workflowAdmission); err != nil {
@@ -690,6 +690,21 @@ func (service *ProductionService) ensureFeaturePlanningTaskForRound(ctx context.
 			return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, errors.Join(organization.ErrInvalidFeature, admissionErr)
 		}
 		authorizedInvocationID = admission.AuthorizedInvocationID
+		// A successor architecture round created by a durable plan supersession
+		// activates a new task while the stage admission still names the
+		// invocation authorized for the retired round. That aggregate durably
+		// exists; substituting it would collide as TARGET_ALREADY_EXISTS on
+		// every pass. Let the successor round derive its own round-scoped
+		// invocation identity instead.
+		if authorizedInvocationID != nil && architectureRound > 0 {
+			existing, existsFound, existsErr := service.ReadInvocation(ctx, *authorizedInvocationID)
+			if existsErr != nil {
+				return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, existsErr
+			}
+			if existsFound && existing.TaskID != task.ID {
+				authorizedInvocationID = nil
+			}
+		}
 	}
 	if err := service.activateTaskWithInvocationID(ctx, feature, tracked, profileConfig, workspace, budget.Revision, dependencyEvents, evidence, evidenceID, nil, authorizedInvocationID); err != nil {
 		return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, err

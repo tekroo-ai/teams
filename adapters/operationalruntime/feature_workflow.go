@@ -72,6 +72,34 @@ func workflowInvocationInAdmissionFamily(current kernel.WorkInvocation, admitted
 	}
 }
 
+// workflowStageInvocationAccepted decides whether the invocation currently
+// bound to a planning stage satisfies the stage message's durable admission.
+// Normally the invocation must descend from the admitted invocation family.
+// The one admitted identity cannot be honored after a durable plan
+// supersession: the admission was recorded for the retired round's task,
+// while the successor round runs a new task whose round-derived invocation is
+// a fresh authorization of the same stage under the supersession's own
+// evidence. Accept exactly that successor shape - a first-attempt HANDOFF
+// invocation belonging to an architecture round recorded as superseded by
+// this feature - so the reconciler is not permanently stranded on
+// TARGET_ALREADY_EXISTS.
+func workflowStageInvocationAccepted(feature organization.FeatureRequest, admission kernel.WorkAdmissionResult, invocation kernel.WorkInvocation, snapshot kernel.Snapshot) bool {
+	if admission.AuthorizedInvocationID == nil {
+		return false
+	}
+	if workflowInvocationInAdmissionFamily(invocation, *admission.AuthorizedInvocationID, snapshot.WorkInvocations) {
+		return true
+	}
+	if feature.PlanSupersession == nil {
+		return false
+	}
+	if invocation.Purpose != kernel.PurposeHandoff || invocation.RetryOfInvocationID != nil || invocation.AttemptOrdinal != 1 {
+		return false
+	}
+	round, err := architecturePlanRound(feature.ID, invocation.TaskID)
+	return err == nil && round > 0
+}
+
 func planningInvocationUsesCurrentProfile(snapshot kernel.Snapshot, taskID kernel.UUIDv7, invocation kernel.WorkInvocation) bool {
 	profile, found := snapshot.WorkProfiles[kernel.AggregateRef{Kind: kernel.AggregateTask, ID: taskID}]
 	return found && profile.Profile.Binding() == invocation.WorkProfile
