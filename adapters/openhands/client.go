@@ -899,8 +899,11 @@ func (client *Client) Inspect(ctx context.Context, brief application.ExecutionBr
 		}
 		return client.correctWorkPurposeMutationViolation(ctx, brief, requestDigest, info, events, violation)
 	}
-	if violation, reason, violated := roleToolPolicyViolation(brief.RoleGrounding, events, currentPromptIndex); violated {
-		return client.failForExecutionPolicyViolation(ctx, brief, requestDigest, info, events, reason, describeAction(violation), false)
+	if violation, reason, repeated, violated := roleToolPolicyViolation(brief.RoleGrounding, events, currentPromptIndex); violated {
+		if repeated {
+			return client.failForExecutionPolicyViolation(ctx, brief, requestDigest, info, events, reason, describeAction(violation), false)
+		}
+		return client.correctRoleToolViolation(ctx, brief, requestDigest, info, events, violation, reason)
 	}
 	if violation, violated := shellDisciplineViolation(events, currentPromptIndex); violated {
 		return client.correctShellDisciplineViolation(ctx, brief, requestDigest, info, events, currentPromptIndex, violation)
@@ -1015,6 +1018,7 @@ func (client *Client) ReconcileSuperseded(ctx context.Context, brief application
 
 const shellDisciplineCorrectionPrefix = "TEKROO_SHELL_DISCIPLINE_CORRECTION:"
 const workPurposeMutationCorrectionPrefix = "TEKROO_WORK_PURPOSE_MUTATION_CORRECTION:"
+const roleToolCorrectionPrefix = "TEKROO_ROLE_TOOL_CORRECTION:"
 const repositoryProgressCorrectionPrefix = "TEKROO_REPOSITORY_PROGRESS_CORRECTION:"
 const repositoryGroundingCorrectionPrefix = "TEKROO_REPOSITORY_GROUNDING_CORRECTION:"
 const repositoryScopeCorrectionPrefix = "TEKROO_REPOSITORY_SCOPE_CORRECTION:"
@@ -1313,21 +1317,47 @@ func repositoryScopeViolationCorrected(events []rawEvent, violationIndex int) bo
 	return false
 }
 
-func roleToolPolicyViolation(grounding application.RoleExecutionGrounding, events []rawEvent, promptIndex int) (rawEvent, string, bool) {
+func roleToolPolicyViolation(grounding application.RoleExecutionGrounding, events []rawEvent, promptIndex int) (rawEvent, string, bool, bool) {
 	canRead := slices.Contains(grounding.Permissions, "repository.read") || slices.Contains(grounding.Permissions, "repository.edit")
 	canEdit := slices.Contains(grounding.Permissions, "repository.edit")
+	uncorrected := 0
+	corrected := 0
 	for index, event := range events {
 		if index <= promptIndex || event.Kind != "ActionEvent" || event.Source != "agent" || !repositoryAction(event) {
 			continue
 		}
+		reason := ""
 		if !canRead {
-			return event, "ROLE_REPOSITORY_TOOL_NOT_AUTHORIZED", true
+			reason = "ROLE_REPOSITORY_TOOL_NOT_AUTHORIZED"
+		} else if mutationAction(event) && !canEdit {
+			reason = "ROLE_REPOSITORY_MUTATION_NOT_AUTHORIZED"
 		}
-		if mutationAction(event) && !canEdit {
-			return event, "ROLE_REPOSITORY_MUTATION_NOT_AUTHORIZED", true
+		if reason == "" {
+			continue
+		}
+		if roleToolViolationCorrected(events, index) {
+			corrected++
+			continue
+		}
+		uncorrected++
+		if uncorrected == 1 {
+			return event, reason, corrected > 0, true
+		}
+		return event, reason, true, true
+	}
+	return rawEvent{}, "", false, false
+}
+
+// roleToolViolationCorrected reports whether a harness correction message was
+// delivered after the action at actionIndex, telling the agent to finish the
+// assigned result without the unauthorized repository tool.
+func roleToolViolationCorrected(events []rawEvent, actionIndex int) bool {
+	for index := actionIndex + 1; index < len(events); index++ {
+		if events[index].Kind == "MessageEvent" && events[index].Source == "user" && strings.Contains(events[index].Text, roleToolCorrectionPrefix+events[actionIndex].ID) {
+			return true
 		}
 	}
-	return rawEvent{}, "", false
+	return false
 }
 
 // workPurposeToolPolicyViolation detects repository mutations that actually
@@ -2451,6 +2481,50 @@ func (client *Client) correctRepositoryProgressViolation(ctx context.Context, br
 		return client.observation(ctx, brief, requestDigest, info, events, false)
 	}
 	correction := repositoryProgressCorrectionPrefix + violation.ID + "\nThe most recent repository action exactly repeated an earlier action and returned the same result within the current uninterrupted work period. Continue from that result. Choose the next action required by your assigned role; do not repeat the same action unless repository state or its inputs change."
+	status, _, err := client.request(ctx, http.MethodPost, "/api/conversations/"+url.PathEscape(conversationID)+"/events", map[string]any{
+		"role": "user", "run": true,
+		"content": []map[string]any{{"type": "text", "text": correction}},
+	})
+	if err != nil || status != http.StatusOK {
+		return application.ExternalExecutionObservation{}, ErrProtocol
+	}
+	if refreshed, refreshedStatus, refreshErr := client.getConversation(ctx, conversationID); refreshErr == nil && refreshedStatus == http.StatusOK {
+		info = refreshed
+	}
+	if refreshed, refreshErr := client.events(ctx, conversationID); refreshErr == nil {
+		events = refreshed
+	}
+	return client.observation(ctx, brief, requestDigest, info, events, false)
+}
+
+// correctRoleToolViolation gives a role one correction after it attempted a
+// repository tool its signed role bundle does not authorize. Unlike an
+// effective work-purpose mutation, an unauthorized read leaves no damage, so
+// the correction asks the agent to complete the assigned result from the
+// execution brief alone. A second uncorrected violation fences the
+// invocation: the role will not stop reaching for tools it does not have.
+func (client *Client) correctRoleToolViolation(ctx context.Context, brief application.ExecutionBrief, requestDigest kernel.Digest, info conversationInfo, events []rawEvent, violation rawEvent, reason string) (application.ExternalExecutionObservation, error) {
+	conversationID := string(brief.InvocationID)
+	if executionStillActive(info.ExecutionStatus) {
+		status, _, err := client.request(ctx, http.MethodPost, "/api/conversations/"+url.PathEscape(conversationID)+"/interrupt", nil)
+		if err != nil || status != http.StatusOK && status != http.StatusNoContent && status != http.StatusConflict {
+			return application.ExternalExecutionObservation{}, ErrProtocol
+		}
+	}
+	if refreshed, refreshedStatus, err := client.getConversation(ctx, conversationID); err == nil && refreshedStatus == http.StatusOK {
+		info = refreshed
+	}
+	if refreshed, err := client.events(ctx, conversationID); err == nil {
+		events = refreshed
+	}
+	if index := eventIndexByID(events, violation.ID); index >= 0 && roleToolViolationCorrected(events, index) {
+		return client.observation(ctx, brief, requestDigest, info, events, false)
+	}
+	topic := "read the repository"
+	if reason == "ROLE_REPOSITORY_MUTATION_NOT_AUTHORIZED" {
+		topic = "modify the repository"
+	}
+	correction := roleToolCorrectionPrefix + violation.ID + "\nThe previous action attempted to " + topic + ", which your role bundle does not authorize for this task. No repository access is required: the execution brief contains everything needed. Do not attempt repository tools again, including reading, searching, or editing. Produce the assigned result envelope directly from the brief and call finish exactly once with TEKROO_ORGANIZATIONAL_RESULT: followed by exactly one single-line JSON object and nothing after the closing brace."
 	status, _, err := client.request(ctx, http.MethodPost, "/api/conversations/"+url.PathEscape(conversationID)+"/events", map[string]any{
 		"role": "user", "run": true,
 		"content": []map[string]any{{"type": "text", "text": correction}},

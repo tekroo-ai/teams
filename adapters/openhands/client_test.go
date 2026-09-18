@@ -2616,26 +2616,26 @@ func TestRoleToolPolicyEnforcesSignedRepositoryPermissions(t *testing.T) {
 		{ID: "read", Kind: "ActionEvent", Source: "agent", ToolName: "terminal", ActionCommand: "sed -n '1,80p' organization/host.go"},
 	}
 	withoutRepositoryAccess := application.RoleExecutionGrounding{Permissions: []string{"story.create"}}
-	if violation, reason, found := roleToolPolicyViolation(withoutRepositoryAccess, terminalRead, 0); !found || violation.ID != "read" || reason != "ROLE_REPOSITORY_TOOL_NOT_AUTHORIZED" {
+	if violation, reason, _, found := roleToolPolicyViolation(withoutRepositoryAccess, terminalRead, 0); !found || violation.ID != "read" || reason != "ROLE_REPOSITORY_TOOL_NOT_AUTHORIZED" {
 		t.Fatalf("no-access violation=%+v reason=%q found=%t", violation, reason, found)
 	}
 
 	readOnly := application.RoleExecutionGrounding{Permissions: []string{"repository.read", "test.execute"}}
 	branchInspection := append(append([]rawEvent(nil), terminalRead...), rawEvent{ID: "branch", Kind: "ActionEvent", Source: "agent", ToolName: "terminal", ActionCommand: "git branch --show-current"})
-	if violation, reason, found := roleToolPolicyViolation(readOnly, branchInspection, 0); found {
+	if violation, reason, _, found := roleToolPolicyViolation(readOnly, branchInspection, 0); found {
 		t.Fatalf("read-only branch inspection violation=%+v reason=%q", violation, reason)
 	}
 	branchCreation := append(append([]rawEvent(nil), terminalRead...), rawEvent{ID: "branch-create", Kind: "ActionEvent", Source: "agent", ToolName: "terminal", ActionCommand: "git branch feature/new"})
-	if violation, reason, found := roleToolPolicyViolation(readOnly, branchCreation, 0); !found || violation.ID != "branch-create" || reason != "ROLE_REPOSITORY_MUTATION_NOT_AUTHORIZED" {
+	if violation, reason, _, found := roleToolPolicyViolation(readOnly, branchCreation, 0); !found || violation.ID != "branch-create" || reason != "ROLE_REPOSITORY_MUTATION_NOT_AUTHORIZED" {
 		t.Fatalf("branch creation violation=%+v reason=%q found=%t", violation, reason, found)
 	}
 	mutation := append(append([]rawEvent(nil), terminalRead...), rawEvent{ID: "edit", Kind: "ActionEvent", Source: "agent", ToolName: "file_editor", ActionCommand: "str_replace", ActionPath: "organization/host.go"})
-	if violation, reason, found := roleToolPolicyViolation(readOnly, mutation, 0); !found || violation.ID != "edit" || reason != "ROLE_REPOSITORY_MUTATION_NOT_AUTHORIZED" {
+	if violation, reason, _, found := roleToolPolicyViolation(readOnly, mutation, 0); !found || violation.ID != "edit" || reason != "ROLE_REPOSITORY_MUTATION_NOT_AUTHORIZED" {
 		t.Fatalf("read-only violation=%+v reason=%q found=%t", violation, reason, found)
 	}
 
 	readWrite := application.RoleExecutionGrounding{Permissions: []string{"repository.edit"}}
-	if violation, reason, found := roleToolPolicyViolation(readWrite, mutation, 0); found {
+	if violation, reason, _, found := roleToolPolicyViolation(readWrite, mutation, 0); found {
 		t.Fatalf("read-write violation=%+v reason=%q", violation, reason)
 	}
 
@@ -2643,11 +2643,32 @@ func TestRoleToolPolicyEnforcesSignedRepositoryPermissions(t *testing.T) {
 		{Kind: "MessageEvent", Source: "user"},
 		{ID: "search", Kind: "ActionEvent", Source: "agent", ToolName: "repository_search", ActionPayload: json.RawMessage(`{"kind":"RepositorySearchAction","pattern":"Actor"}`)},
 	}
-	if violation, reason, found := roleToolPolicyViolation(withoutRepositoryAccess, customRead, 0); !found || violation.ID != "search" || reason != "ROLE_REPOSITORY_TOOL_NOT_AUTHORIZED" {
+	if violation, reason, _, found := roleToolPolicyViolation(withoutRepositoryAccess, customRead, 0); !found || violation.ID != "search" || reason != "ROLE_REPOSITORY_TOOL_NOT_AUTHORIZED" {
 		t.Fatalf("custom-read violation=%+v reason=%q found=%t", violation, reason, found)
 	}
-	if violation, reason, found := roleToolPolicyViolation(readOnly, customRead, 0); found {
+	if violation, reason, _, found := roleToolPolicyViolation(readOnly, customRead, 0); found {
 		t.Fatalf("authorized custom-read violation=%+v reason=%q", violation, reason)
+	}
+}
+
+func TestRoleToolPolicyCorrectsOnceThenFencesAfterCorrection(t *testing.T) {
+	withoutRepositoryAccess := application.RoleExecutionGrounding{Permissions: []string{"story.create"}}
+	violatingRead := rawEvent{ID: "read", Kind: "ActionEvent", Source: "agent", ToolName: "terminal", ActionCommand: "sed -n '1,80p' organization/host.go"}
+	correction := rawEvent{Kind: "MessageEvent", Source: "user", Text: roleToolCorrectionPrefix + "read\nNo repository access is required."}
+
+	// First violation: correct, do not fence.
+	if _, _, repeated, found := roleToolPolicyViolation(withoutRepositoryAccess, []rawEvent{{Kind: "MessageEvent", Source: "user"}, violatingRead}, 0); !found || repeated {
+		t.Fatalf("first violation found=%t repeated=%t; expected a correctable violation", found, repeated)
+	}
+	// The delivered correction resolves the violation.
+	if _, _, _, found := roleToolPolicyViolation(withoutRepositoryAccess, []rawEvent{{Kind: "MessageEvent", Source: "user"}, violatingRead, correction}, 0); found {
+		t.Fatal("corrected violation still reported")
+	}
+	// A fresh unauthorized action after the correction proves the agent will
+	// not stop: fence.
+	repeat := rawEvent{ID: "search-2", Kind: "ActionEvent", Source: "agent", ToolName: "repository_search", ActionPayload: json.RawMessage(`{"kind":"RepositorySearchAction","pattern":"Actor"}`)}
+	if violation, reason, repeated, found := roleToolPolicyViolation(withoutRepositoryAccess, []rawEvent{{Kind: "MessageEvent", Source: "user"}, violatingRead, correction, repeat}, 0); !found || !repeated || reason != "ROLE_REPOSITORY_TOOL_NOT_AUTHORIZED" || violation.ID != "search-2" {
+		t.Fatalf("post-correction violation found=%t repeated=%t reason=%q", found, repeated, reason)
 	}
 }
 
