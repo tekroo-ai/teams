@@ -55,6 +55,38 @@ skipped or unavailable work is never reported as passing.
 - Feature acceptance binds the assembled candidate identity only to the
   whole-feature validator and the promotion; task-local validators may name
   narrower candidates.
+- A `retry-task` request whose `deadline_at` exceeds now + the configured
+  planning deadline window is rejected with
+  `TASK_RECOVERY_REJECTED` / "validate recovery preconditions" — the block
+  classification is not at fault. Reissue with a nearer deadline and a fresh
+  idempotency key.
+- Blocked-task recovery reasons must change the *working method*, not restate
+  the task: agents that fail on the no-progress guard need explicit ordering
+  ("create the deliverable file first; never grep for symbols in files you
+  have not created this session"). Same reason text re-fences identically.
+- The daemon can silently wedge: `/v1/status` shows `Worker.Active: 0` with
+  `LastError: "external execution outcome is unknown"` and ~110% CPU while no
+  authorize command is written for hours, even though dispatchable tasks and
+  budget headroom exist. The projection/reconcile loop keeps serving reads.
+  `tekroo stop` + relaunch restores reconciliation immediately; in-flight
+  invocations resume. Check `last event timestamp` (UUIDv7 prefix) against the
+  clock to distinguish a wedge from genuine idleness.
+- Two agent-behavior fences now dominate failures: `REPEATED_CAPABILITY_
+  MISMATCH_REPOSITORY_NO_PROGRESS` fires on `RepositorySearchAction` loops
+  (ban search actions in the retry reason), and
+  `EDITABLE_CANDIDATE_NOT_COMMITTED` when an agent writes its deliverable but
+  ends without committing (require "commit before finish" in the reason).
+  Both were cured by method-changing retry reasons. `REPEATED_SHELL_
+  DISCIPLINE_VIOLATION` (grep/head pipes on go test, /tmp dumps) is the third
+  family; ban pipes and redirection and select tests with -run in the reason.
+- Wake-latency diagnosis must use one clock. Conversation event files under
+  `~/.openhands/agent-canvas/dev_conversations/<id>/events/` timestamp in
+  LOCAL time (UTC-6); daemon/kernel events are UTC. Comparing them without
+  conversion makes correctly-firing wakes look queued or ghosted.
+- Wake latency budget was 3x60s polls plus delivery (~8 min). Tightened to
+  2x30s polls plus REWATCH every 3 min so a still-idle team re-alerts; when
+  summoned by any wake, scan ALL task projections for BLOCKED or
+  retryable-failure states, not only the wake's stated symptom.
 
 ## Operating a qualification daemon
 
