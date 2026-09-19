@@ -153,7 +153,7 @@ func (service *ProductionService) RetryFailedTask(ctx context.Context, principal
 	if err != nil {
 		return InvocationStatus{}, fmt.Errorf("resolve recovery workspace: %w", err)
 	}
-	if recoveryKind == taskRecoveryInvalidStructuredOutput && state.Condition == kernel.ConditionBlocked {
+	if (recoveryKind == taskRecoveryInvalidStructuredOutput || recoveryKind == taskRecoveryFailedEscalation) && state.Condition == kernel.ConditionBlocked {
 		if err := service.unblockInvalidStructuredTask(ctx, feature, planned, state, head, terminal, registered, request.IdempotencyKey); err != nil {
 			return InvocationStatus{}, fmt.Errorf("unblock invalid validator output: %w", err)
 		}
@@ -286,6 +286,12 @@ const (
 	taskRecoveryTerminalInvocation taskRecoveryKind = iota
 	taskRecoveryInvalidStructuredOutput
 	taskRecoveryOperatorRepair
+	// taskRecoveryFailedEscalation recovers a task whose latest invocation
+	// failed and was escalated by the glitch-retry reconciler with
+	// failedTaskEscalationReason. The escalation block itself must not make
+	// the task unretryable: the operator's corrected-condition retry-task is
+	// the designed response to "operator escalation is required".
+	taskRecoveryFailedEscalation
 )
 
 // findPromotionRecoveryUnblock walks the causal chain from the task head back
@@ -324,6 +330,19 @@ func (service *ProductionService) classifyTaskRecovery(ctx context.Context, task
 		(task.Purpose == kernel.PurposeValidation || task.Purpose == kernel.PurposeReview) && len(task.Validates) > 0
 	if recoverablePurpose && state.Condition == kernel.ConditionRunnable && (recoverableTaskTerminal(invocation) || operatorRevalidatableTaskTerminal(task, invocation)) {
 		return taskRecoveryTerminalInvocation, nil
+	}
+	if recoverablePurpose && state.Condition == kernel.ConditionBlocked && recoverableTaskTerminal(invocation) && invocation.State == kernel.InvocationFailed {
+		// The glitch-retry reconciler blocks the task with an escalation whose
+		// reason demands operator action. Without this branch that very block
+		// makes the task unretryable, so escalation has nowhere to go.
+		blocked, found, err := service.Store.ReadEvent(ctx, head)
+		if err != nil || !found {
+			return 0, errors.Join(application.ErrInvalidOperationalExecution, err)
+		}
+		if isExactFailedTaskEscalationBlock(blocked, task, invocation, service.policyAuthority) {
+			return taskRecoveryFailedEscalation, nil
+		}
+		return 0, application.ErrInvalidOperationalExecution
 	}
 	if task.Purpose == kernel.PurposeImplementation && (state.Phase == kernel.PhaseActive || state.Phase == kernel.PhaseCompleted) && state.Condition == kernel.ConditionRunnable && operatorRepairableTaskTerminal(task, invocation) {
 		return taskRecoveryOperatorRepair, nil

@@ -199,10 +199,12 @@ func automaticGlitchRecoveryDeadline(invocationDeadline time.Time) time.Time {
 func failedTaskEscalationPayload(invocationID kernel.UUIDv7) ([]byte, error) {
 	return json.Marshal(map[string]any{
 		"blocker_refs":  []string{"teams://work-invocation/" + string(invocationID)},
-		"reason":        "task invocation failed without an admissible automatic recovery; operator escalation is required",
+		"reason":        failedTaskEscalationReason,
 		"review_policy": invalidStructuredReviewPolicy,
 	})
 }
+
+const failedTaskEscalationReason = "task invocation failed without an admissible automatic recovery; operator escalation is required"
 
 // failedTaskEscalationKey is content-derived: it includes the admitted
 // payload digest so a durable rejection recorded under a different payload

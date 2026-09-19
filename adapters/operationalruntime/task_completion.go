@@ -482,6 +482,22 @@ func isExactRecoverableStructuredDecisionBlock(event kernel.DomainEvent, task or
 	return len(payload.BlockerRefs) == 1 && payload.BlockerRefs[0] == "teams://work-invocation/"+string(invocation.ID) && recoverableReason && payload.ReviewPolicy == invalidStructuredReviewPolicy
 }
 
+// isExactFailedTaskEscalationBlock reports whether event is the glitch-retry
+// escalation block for exactly this failed invocation. The escalation command
+// is attributed to the actor's currently registered execution rather than the
+// failed invocation's tuple (a daemon restart makes the latter stale), so the
+// block's execution is deliberately not compared here.
+func isExactFailedTaskEscalationBlock(event kernel.DomainEvent, task organization.PlannedTask, invocation kernel.WorkInvocation, authority kernel.PrincipalRef) bool {
+	if event.EventID == "" || event.EventType != "tekroo.event.work.blocked" || event.Aggregate != (kernel.AggregateRef{Kind: kernel.AggregateTask, ID: task.ID}) || event.Authority != authority || event.ActorFQN == nil || *event.ActorFQN != invocation.ActorFQN || len(event.Parents) != 1 || event.Parents[0] != (kernel.DagParent{ParentEventID: invocation.LastEventID, EdgeKind: kernel.EdgeResponse}) {
+		return false
+	}
+	var payload planningOutputBlockPayload
+	if json.Unmarshal(event.Payload, &payload) != nil {
+		return false
+	}
+	return len(payload.BlockerRefs) == 1 && payload.BlockerRefs[0] == "teams://work-invocation/"+string(invocation.ID) && payload.Reason == failedTaskEscalationReason && payload.ReviewPolicy == invalidStructuredReviewPolicy
+}
+
 func validatorConditionMatches(snapshot kernel.Snapshot, taskID kernel.UUIDv7, invocation kernel.WorkInvocation, profileDigest, criteriaDigest kernel.Digest, baseConditions []kernel.Digest, baseDigest kernel.Digest) bool {
 	invocationBaseDigest := baseDigest
 	if invocation.WorkProfile.ProfileDigest != profileDigest {

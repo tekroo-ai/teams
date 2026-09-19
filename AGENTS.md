@@ -124,3 +124,20 @@ startup fail permanently), deadline evidence bound to its causing budget
 amendment (a second unbounded accumulator, 69 ids, fault-looped 826 times),
 and out-of-repository scratch redirects (`> /tmp/…`) exempt from the mutation
 classifier.
+
+## Operational monitoring (phase10-prod run)
+
+- `organization.RoleInstanceState` has **no** `invocations` field. Reading
+  `diagnostics.roles[].invocations` silently yields `[]` and makes any
+  live-work counter read zero forever. The only accurate live-work signal is
+  the `work_invocations` collection: states AUTHORIZED/CLAIMED/STARTED.
+- Status-transition watchers cannot see a parked team (blocked tasks awaiting
+  operator recovery produce no transition). Use `/tmp/run_idle_watchdog.sh`:
+  wakes the agent on status change OR on live==0 with unfinished features
+  (3-minute debounce, re-notify every 10 minutes).
+- Agent conversations live under
+  `~/.openhands/agent-canvas/dev_conversations/<invocation-id-no-dashes>/`;
+  `base_state.json` `execution_status` plus `stuck_detection` is the ground
+  truth for whether a STARTED invocation is actually making progress. A
+  `paused` + `stuck_detection=true` conversation will not resume by itself;
+  the harness does not consult the stuck flag (known gap).
