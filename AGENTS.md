@@ -237,3 +237,93 @@ the strict parser in `role_handler_result.go` (single marker + strict Decode +
 EOF) rejects. So the tool-surface fix is proven, while the model's
 large-envelope JSON integrity remains a separate, unresolved defect. Do not
 write a PASS qualification from a replay whose envelope the daemon would reject.
+
+## mlx-serve MTP non-determinism — ROOT CAUSE CONFIRMED (2026-08-13)
+
+Decisive per-request A/B on :8800 (idle server, identical large-envelope
+content-mode request, temp 0, `max_tokens=4096`, brief =
+`/tmp/pm_scenario_message.txt`):
+
+- `enable_mtp:true`  → 3/3 runs **diverge** (sha 43defd5/cb62a47/9800396,
+  lens 5598/4969/4759). Server log shows `spec-stats mode=mtp depth=6` active.
+- `enable_mtp:false` → 3/3 runs **byte-identical** (sha 926bdd57, len 6081).
+  No `mode=mtp` spec-stats emitted — server drops to PLD-only.
+- `enable_mtp` field omitted → 3/3 byte-identical, same 926bdd57/6081.
+- `enable_mtp:false` under forced concurrent load (3 background requests,
+  `--max-concurrent 4`, prefix-cache contention) → still 3/3 byte-identical
+  (c35627e4/5730), and returns to 926bdd57 when idle. PLD + prefix cache are
+  NOT a non-determinism source on their own.
+
+Conclusion: the per-request `enable_mtp` flag is fully respected by mlx-serve
+26.9.4 and is the sole non-determinism source. MTP speculative decode accepts a
+draft token the target model would not at temp 0 → single-token substitution at
+the envelope tail (`]` emitted where `}` required, or vice-versa). PLD
+(launch-flag `--pld`) is deterministic. Hypothesis 1 (MTP verification bug)
+confirmed; hypotheses 2 and 3 refuted.
+
+Operational fix: set `enable_mtp:false` on every role profile's
+`litellm_extra_body` (agent AND condenser). The daemon's
+`NewOpenAICompatibleAgentSettings` (`adapters/openhands/client.go:210`) already
+emits `enable_mtp` per-profile; profiles 0 (architect), 5 (security), 6
+(senior-coder) still carry `enable_mtp:true` in tekrood.json and must be
+flipped to false before re-qualification, or their envelopes will keep
+diverging. The GUI profiles `~/.openhands/profiles/tekroo-{architect,coder,
+product-owner,project-manager,security,senior-architect}.json` also hardcode
+`enable_mtp:true` in `litellm_extra_body`.
+
+§6.5c "config drift / mutation layer": my own operator session's
+`base_state.json` shows `enable_mtp:false` AND the server runs my requests
+PLD-only (no `mode=mtp`), so the per-request flag is honored end-to-end for the
+operator. The PM replays' `base_state.json` also recorded `enable_mtp:false`,
+yet they diverged — the replay-era log window has rotated so the spec mode of
+those exact envelope requests is unrecoverable. The most likely explanation is
+that the replay `agent_settings` were sent but the conversation's LLM was
+materialized from a profile that still had MTP on, OR the divergence was the
+same MTP path via a stale value. Either way the fix is identical: force
+`enable_mtp:false` everywhere and re-run.
+
+## Qualification replay mechanics + PM/PO replay outcome (2026-08-13)
+
+Evidence-id format: the daemon creates conversations with a client-generated
+UUIDv7 (`conversation_id` field in `createConversation`, client.go:3445). The
+qualification record's `validUniqueUUIDs` requires UUIDv7 evidence ids. The
+earlier out-of-band replays let the server mint a UUIDv4 (no `conversation_id`
+sent), which CANNOT serve as evidence. `/tmp/replay_qualify_v7.py` supplies a
+client UUIDv7 and reads events from disk (events API rejects `?limit=` with 422).
+
+Qualification record embedding: the running `tekrood` reads
+`qualification`/`qualification_corpus` DIRECTLY from each tekrood.json profile
+entry (currently null for PM/PO). The separate
+`model-profile-qualifications.json` file is only consumed by `tekroo
+init-local`, NOT by the running daemon. To qualify PM/PO, add the corpus +
+qualification objects into their tekrood.json profile entries.
+`qualificationDefinitionValid` (production.go:149) requires:
+`corpus.ToolSurfaceDigest == profile.ToolPolicyDigest` (b9b6f5bf…),
+`corpus.DecisionRoute == qualification.DecisionRoute == profile.DecisionRoute`,
+`corpus.QualifiedRole == qualification.QualifiedRole == profile.RoleFQRN`,
+same work kinds, and `QualificationDigest`/`corpus.Digest()` recomputable.
+Digest = `sha256(json.Marshal(struct))` in Go field order; I verified a Python
+replication (compact separators, sorted work_kinds+scenario_ids for corpus;
+drop qualification_digest+revoked_at, sort qualified_work_kinds+evidence_ids for
+qualification) reproduces all 5 existing records byte-exactly.
+
+PM replay: PASS. Conversation `01a0bf47-ff51-76a6-be07-e0655e2b23bd` (UUIDv7),
+tools glob×1 + repository_view×3 + repository_search×3 + finish×1, zero
+hallucinated tools, envelope strict-VALID (marker idx 0, single, EOF-clean,
+non-empty work_product, outcome=completed), ran PLD-only (MTP off). This is a
+legitimate qualification evidence id.
+
+PO replay: NOT YET QUALIFIED — 3 attempts all hit the no-progress guard. The PO
+role has ZERO invocations in every DB (prod + phase9 + phase10 runs) and no
+saved scenario, so the PO brief is a reconstruction from the genuine
+`feature.submitted` handler + the real `actor-name-feature-request.json` fixture
++ PO role grounding. The tool surface works (glob/repository_view/
+repository_search all function, zero hallucinations) — this is NOT a tool-surface
+or MTP defect. The failure is agent behavior: the model drifts into Go
+implementation archaeology (`func ParseActorFQN`, struct/schema names,
+role_inbox.go/role_host.go alternating) — engineering work the PO charter
+explicitly forbids ("Keep requirements at the user and product level; do not
+pre-solve the engineering work") — then loops. A product-owner refinement should
+read AGENTS.md + the admitted request and emit the refinement envelope in one
+pass. Decision point surfaced to user: tighten the PO brief's method guidance
+further vs. accept that PO needs a different qualification scenario.
