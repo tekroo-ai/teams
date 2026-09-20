@@ -201,3 +201,39 @@ A "mangled heredoc" is this corruption, not a syntax error in your script.
   truth for whether a STARTED invocation is actually making progress. A
   `paused` + `stuck_detection=true` conversation will not resume by itself;
   the harness does not consult the stuck flag (known gap).
+
+## v202 amendment and honest re-qualification (2026-09-20)
+
+Product-owner 2.0.1 and project-manager 2.0.2 add `repository.read` (tool
+surface `glob,repository_search,repository_view`, tool-policy digest
+`b9b6f5bf…`, identical to the architect's read-only surface). The original
+`tekroo-message-handlers-20260913` private key is unrecoverable (cryptographic
+search of every Ed25519-sized file found no match; never committed), so the
+amendments are signed under the trusted deployment-owned key
+`tekroo-teams-amendment-20260917`, mirroring the v201 project-manager 2.0.1
+pattern.
+
+Applying the amendment requires three coordinated steps, all digest-bound:
+team.json (bundle path/digest/publisher/model-profile), tekrood.json (profile
+identity + patched agent_settings + manifest rebind to the new team.json
+sha256), and the durable `role_instances` documents — a STOPPED instance keeps
+the model_profile_digest it started with, and
+`registerRoleState` fails startup with `role is not configured` unless the
+instance is re-bound in place to the new bundle/model digests (revision
+preserved). The keepalive script auto-resumes the team to RUNNING on restart;
+re-PAUSE after every restart.
+
+The v201 project-manager qualification is NOT trustworthy: its evidence
+conversation `01a0b0f8…` ran with `tools: []` and shows the model hallucinating
+`read_file`/`web_fetch` ("Tool not found. Available: ['finish']"). A PASS was
+recorded on a run that exhibited the bug. Do not treat v201 as a working
+tool-surface precedent.
+
+Honest v202 replay (conversation `65230500…`, PM worktree, new 3-tool profile):
+tool use is correct — `glob` + `repository_view` read AGENTS.md and the
+testdata fixtures, zero hallucinated tools, zero tool errors. But the result
+envelope was malformed JSON (a stray `]` closed the stories array early), which
+the strict parser in `role_handler_result.go` (single marker + strict Decode +
+EOF) rejects. So the tool-surface fix is proven, while the model's
+large-envelope JSON integrity remains a separate, unresolved defect. Do not
+write a PASS qualification from a replay whose envelope the daemon would reject.
