@@ -283,7 +283,6 @@ same MTP path via a stale value. Either way the fix is identical: force
 `enable_mtp:false` everywhere and re-run.
 
 ## Qualification replay mechanics + PM/PO replay outcome (2026-08-13)
-
 Evidence-id format: the daemon creates conversations with a client-generated
 UUIDv7 (`conversation_id` field in `createConversation`, client.go:3445). The
 qualification record's `validUniqueUUIDs` requires UUIDv7 evidence ids. The
@@ -327,3 +326,140 @@ pre-solve the engineering work") — then loops. A product-owner refinement shou
 read AGENTS.md + the admitted request and emit the refinement envelope in one
 pass. Decision point surfaced to user: tighten the PO brief's method guidance
 further vs. accept that PO needs a different qualification scenario.
+
+## response_format json_schema: the RIGHT fix (keeps MTP speed) (2026-08-13)
+
+The model card advertises `json_schema` capability, and mlx-serve DOES implement
+grammar-constrained decoding. Decisive A/B (bracket-heavy schema, temp 0, 3 runs
+per arm):
+
+- `response_format: json_schema` + `enable_mtp:true`  -> 3/3 byte-identical, schema-conforming.
+- `response_format: json_schema` + `enable_mtp:false` -> 3/3 byte-identical, schema-conforming (same bytes as MTP-on).
+- plain (no schema) + `enable_mtp:true`               -> 3/3 DIVERGE.
+- plain (no schema) + `enable_mtp:false`              -> 3/3 byte-identical.
+
+So grammar-constrained decoding makes output valid-by-construction AND
+deterministic EVEN WITH MTP ON: the MTP verifier rejects grammar-violating
+draft tokens, so lossy acceptance cannot emit a wrong bracket. This is strictly
+better than disabling MTP — it keeps the MTP speed boost AND guarantees integrity.
+
+CRITICAL CAVEAT for our production path: the envelope is emitted as the `finish`
+TOOL-CALL argument (`finish.message`), not a plain completion. When both `tools`
+and `response_format: json_schema` are sent, mlx-serve ACCEPTS the request but
+the schema does NOT constrain the tool-call arguments — the model returned a
+free-text `message` string, not a schema-shaped object. OpenAI-compatible APIs
+treat response_format and tool_calls as mutually exclusive; mlx-serve silently
+ignores the schema on the tool path. So json_schema cannot directly guard the
+current envelope, which lives inside a tool-call string argument.
+
+BUT tool-call ARGUMENTS ARE grammar-constrained to the DECLARED TOOL SCHEMA.
+Decisive test: a `finish` tool whose parameters are a strict nested schema
+(enum + required + additionalProperties:false + minItems), 5 runs with
+`enable_mtp:true` and 5 with false — ALL 10 conform to the schema. So the
+grammar mask applies to tool args and MTP lossy acceptance cannot emit a
+schema-violating token there.
+
+THE CLEAN FIX (keeps MTP speed AND guarantees integrity): change the `finish`
+tool schema so the envelope is the tool's STRUCTURED parameters, not a free-text
+`message` string. Today the envelope (marker + JSON) is embedded inside a
+free-form string argument, so the grammar cannot see the inner JSON and cannot
+guard it. If `finish`'s parameters ARE the result schema (outcome/summary/
+evidence/message_proposals/work_product as typed fields), grammar-constrained
+decoding makes the envelope valid-by-construction even with MTP on. This is a
+role/handler PROTOCOL change (role bundle finish tool + the daemon's
+`role_handler_result.go` parser + result_protocol), not a config flip.
+
+Options, ranked:
+1. BEST: restructure `finish` to carry the envelope as structured parameters;
+   keep `enable_mtp:true` everywhere. Requires editing the role bundles' finish
+   tool schema + the daemon result parser. Preserves MTP speed.
+2. Interim: disable MTP for envelope-emitting roles (proven to work, loses speed).
+3. response_format json_schema on a plain completion — works but incompatible
+   with the current tool-call-based finish protocol.
+
+## VALIDATED: structured tool-call envelope fixes JSON with MTP ON (2026-08-13)
+
+The user's insight was correct and the fix is now proven end-to-end. The
+free-text wrapper (`finish.message` = marker + JSON string) was the entire
+problem: the grammar mask guards tool-call ARGUMENTS as JSON at every depth,
+but a JSON document smuggled inside a string literal is invisible to it.
+
+Agent-loop validation (real PM brief, real agent loop via
+`POST /api/conversations` with `client_tools:[submit_result]` whose parameters
+are the full result schema, `enable_mtp:true` confirmed active server-side
+`mode=mtp depth=6`):
+- run 1 `01a0bfc6-e501-704f-877a-748e8b4d9678`: repository_view + submit_result,
+  complete envelope, 4 stories (criteria 9/6/5/4), 8,816 chars.
+- run 2 `01a0bfca-0734-7432-8064-440eb1065ac7`: same shape, 4 stories
+  (7/5/4/4), 8,141 chars.
+- run 3 `01a0bfcd-2592-75be-bf0b-ac2c6fc0fc4b`: STUCK in a repository_search
+  loop (24 searches) and never submitted — the known agent-behavior
+  no-progress failure family, NOT a JSON defect.
+- JSON integrity: 2/2 submitted envelopes syntactically valid AND semantically
+  complete, zero corruption, MTP on. The structured-envelope mechanism is
+  proven. Remaining failure mode is agent behavior (search loops), orthogonal
+  to envelope integrity and present with the old finish protocol too.
+
+Key facts established:
+* The SDK's lossy schema round-trip (from_mcp_schema -> pydantic ->
+  to_mcp_schema strips enum/minItems/additionalProperties/const) does NOT
+  matter: the JSON grammar mask enforces SYNTACTIC validity at every depth
+  regardless of schema strictness, and the daemon's strict parser only checks
+  structure. Wrong-value risk (e.g. bad enum member) remains but was not
+  observed; the daemon validates values after parse anyway.
+* `client_tools` is a top-level field of StartConversationRequest
+  (ConversationConfig.client_tools); it coexists with agent_settings and the
+  server injects the tool into the agent (conversation_service.py:1787-1797).
+* A client tool CANNOT be named `finish` (collides with the builtin);
+  `submit_result` works and the model calls it reliably when instructed.
+* Raw-API (non-agent-loop) tests of tool choice are INVALID: with no system
+  prompt the model hallucinates training-time tools (exec/Read/Agent). All
+  earlier "scale test failures" were this harness artifact.
+
+Implementation (small):
+1. Daemon `client.go`: send `client_tools:[{name:submit_result,
+   parameters:<handler result_schema>}]` on conversation create; add
+   submit_result to the tool surface.
+2. Daemon `role_handler_result.go`: read the envelope from the submit_result
+   ActionEvent's parsed action fields instead of marker-scanning finish.message.
+3. result_protocol text: instruct roles to call submit_result once with the
+   structured envelope.
+MTP stays ON everywhere. No SDK change needed.
+
+## IMPLEMENTED: submit_result injection (2026-08-13, this session)
+
+Design settled differently than the sketch above, for three discovered reasons:
+1. Process-global client-tool registry: OpenHands registers one action kind
+   per tool NAME and 422s a name reused with a different schema
+   (ClientToolSchemaConflictError). Per-handler result schemas therefore
+   CANNOT ride on one tool name. The injected schema is UNIVERSAL (envelope
+   fields, work_product unconstrained {"type":"object"}); per-handler
+   result_schema validation stays daemon-side after extraction. Proven: with
+   work_product fully unconstrained the grammar mask still produced a
+   structurally valid 12,032-char envelope (conv 01a0bff5…, MTP on) — the
+   mask enforces JSON syntax at every depth regardless of schema strictness.
+2. Fork loses client_tools injection: a fork's agent is rebuilt from
+   agent_settings, so the tool entry must ride INSIDE agent_settings.tools
+   ({"name":"submit_result","params":{"spec":…}}) to survive fork/restart;
+   the spec is ALSO sent as client_tools so the class registers (create path
+   does not self-register from settings — a spec-only create 500s at first
+   run). Verified combination: create 201, no duplicate entry, resolves at
+   first run, model calls it (probe_combo2, conv 01a0bff8…).
+3. No digest ripple: injection happens at REQUEST time in
+   createConversation/createOrForkConversation, gated on brief.MessageHandler
+   != nil. Stored profiles/qualifications are untouched; the 5 existing
+   qualifications survive. conversationAgentMatches strips the injected tool
+   from the materialized surface before comparing. withSubmitResultTool
+   refuses profiles without an explicit tools list (Step-15 defaulting).
+Extraction: observationAt captures the last submit_result ActionEvent after
+the prompt index; submitResultActionOutput strips the SDK "kind"
+discriminator (additionalProperties:false) and emits
+marker + "\n" + envelope, so ALL downstream validation
+(ValidateRoleHandlerResult, roleHandlerWorkProduct, strict parser) is
+unchanged. finish+marker remains the fallback path.
+Tests: adapters/openhands/client_submit_result_test.go (4 tests: kind-strip,
+idempotent injection + refusal, agent-matches tolerance, end-to-end create
+payload). Handler result-protocol instruction now directs submit_result
+first, finish+marker as fallback. Validation/review/promotion/handoff
+purposes are NOT handler-bound and keep finish+marker (their shapes differ
+from the universal schema).

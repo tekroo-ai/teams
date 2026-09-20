@@ -656,7 +656,7 @@ func BuildExecutionBriefWithHandler(current OperationalExecutionContext, groundi
 		brief.ResultProtocol = &ExecutionResultProtocol{
 			SchemaVersion: "1.0.0", Marker: OrganizationalResultMarker,
 			Outcomes:    append([]string(nil), handler.AllowedResults...),
-			Instruction: "The OpenHands finish tool message is the result consumed by Teams. Set finish.message to the marker on its own line followed by exactly one JSON object conforming to message_handler.result_schema. Put any task-specific structured result required by the admitted work inside work_product, not beside the envelope. Return only results and message proposals allowed by the selected handler. Teams validates the result and remains the sole authority that records state changes or dispatches successor work.",
+			Instruction: "The submit_result tool is the result channel Teams consumes. Call submit_result exactly once, passing the full envelope as its structured parameters conforming to message_handler.result_schema. Put any task-specific structured result required by the admitted work inside work_product, not beside the envelope. Return only results and message proposals allowed by the selected handler. Only if submit_result is unavailable, call finish with the marker on its own line followed by exactly one JSON object. Teams validates the result and remains the sole authority that records state changes or dispatches successor work.",
 		}
 	} else if invocation.Purpose == kernel.PurposeValidation {
 		brief.ExecutionGuidance = append(brief.ExecutionGuidance, validationExecutionGuidance...)

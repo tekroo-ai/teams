@@ -35,6 +35,18 @@ const (
 	qualifiedCondenserMaximumEvents       = 80
 	maximumPromptEvidenceBytes            = 256 << 10
 	pauseAfterCondensationTag             = "tekroopauseaftercondensation"
+	// submitResultToolName is a client-defined OpenHands tool whose parameters
+	// are the organizational result envelope. Because OpenHands grammar-constrains
+	// tool-call arguments to their declared JSON schema at every depth, emitting
+	// the envelope through this tool makes it structurally valid by construction
+	// even under lossy speculative decoding, unlike the free-text finish.message
+	// carrier. The schema is intentionally universal (work_product unconstrained):
+	// OpenHands registers one client-tool action kind process-globally and rejects
+	// a name reused with a different schema, so per-handler result schemas stay
+	// validated daemon-side after extraction.
+	submitResultToolName                  = "submit_result"
+	submitResultToolDescription           = "Submit the assigned result envelope. Call this tool exactly once when the result is complete, passing the full envelope as structured parameters. This replaces the finish tool for result submission."
+	submitResultToolSchema                = `{"type":"object","additionalProperties":false,"required":["schema_version","outcome","summary","evidence","message_proposals","work_product"],"properties":{"schema_version":{"type":"string"},"outcome":{"type":"string"},"summary":{"type":"string"},"evidence":{"type":"array","items":{"type":"string"}},"message_proposals":{"type":"array","items":{"type":"object"}},"work_product":{"type":"object"}}}`
 	candidateResultRequirementInstruction = "Put exactly one object conforming to result_schema in the outer organizational result's work_product field. Copy both candidate identity values exactly."
 	candidateResultProtocolInstruction    = "The OpenHands finish tool message is consumed by Teams. Set finish.message to the marker followed by one outer object conforming to message_handler.result_schema. Put the validation verdict only in work_product, which MUST conform exactly to candidate_result_requirement.result_schema. Outer outcome describes execution completion and uses the message-handler values; work_product.outcome is the validation verdict and uses PASS, FAIL, BLOCKED, or INCONCLUSIVE. Do not flatten, merge, or rename fields from either schema."
 	teamsRoleExecutionSystemPrompt        = `You execute one authorized Tekroo Teams work invocation.
@@ -825,6 +837,12 @@ func (client *Client) createOrForkConversation(ctx context.Context, brief applic
 	var agentSettings any
 	if json.Unmarshal(prepared.profile.AgentSettings, &agentSettings) != nil {
 		return 0, nil, false, ErrProtocol
+	}
+	if brief.MessageHandler != nil {
+		var ok bool
+		if agentSettings, ok = withSubmitResultTool(agentSettings); !ok {
+			return 0, nil, false, ErrProtocol
+		}
 	}
 	payload := map[string]any{
 		"id":             brief.InvocationID,
@@ -3437,6 +3455,50 @@ func containsDelegationTool(raw json.RawMessage) bool {
 	return visit(value)
 }
 
+// submitResultToolSpec builds the client-tool spec for the structured result
+// envelope. The parameters are the universal envelope schema; work_product is
+// deliberately unconstrained so one process-global client-tool kind serves
+// every message handler, with per-handler result schemas enforced daemon-side.
+func submitResultToolSpec() map[string]any {
+	var parameters any
+	if json.Unmarshal([]byte(submitResultToolSchema), &parameters) != nil {
+		return nil
+	}
+	return map[string]any{"name": submitResultToolName, "description": submitResultToolDescription, "parameters": parameters}
+}
+
+// withSubmitResultTool returns a copy of agent settings whose tool surface
+// carries the submit_result client-tool entry. The entry travels inside
+// agent_settings so it survives fork and restart, while the spec is also sent
+// as client_tools so OpenHands registers the client-tool action class.
+func withSubmitResultTool(agentSettings any) (any, bool) {
+	raw, err := json.Marshal(agentSettings)
+	if err != nil {
+		return nil, false
+	}
+	var settings map[string]any
+	if json.Unmarshal(raw, &settings) != nil {
+		return nil, false
+	}
+	// A profile without an explicit tools list relies on OpenHands defaulting;
+	// injecting a list there would replace the default surface, so refuse.
+	tools, ok := settings["tools"].([]any)
+	if !ok {
+		return nil, false
+	}
+	for _, tool := range tools {
+		if entry, isMap := tool.(map[string]any); isMap && entry["name"] == submitResultToolName {
+			return settings, true
+		}
+	}
+	spec := submitResultToolSpec()
+	if spec == nil {
+		return nil, false
+	}
+	settings["tools"] = append(tools, map[string]any{"name": submitResultToolName, "params": map[string]any{"spec": spec}})
+	return settings, true
+}
+
 func (client *Client) createConversation(ctx context.Context, brief application.ExecutionBrief, prepared preparedExecution) (int, []byte, error) {
 	var agentSettings, hookConfig any
 	if json.Unmarshal(prepared.profile.AgentSettings, &agentSettings) != nil || json.Unmarshal(prepared.profile.HookConfig, &hookConfig) != nil {
@@ -3459,6 +3521,14 @@ func (client *Client) createConversation(ctx context.Context, brief application.
 			"tekroorequest":           string(prepared.requestDigest),
 			pauseAfterCondensationTag: "true",
 		},
+	}
+	if brief.MessageHandler != nil {
+		injected, ok := withSubmitResultTool(agentSettings)
+		if !ok {
+			return 0, nil, ErrProtocol
+		}
+		payload["agent_settings"] = injected
+		payload["client_tools"] = []any{submitResultToolSpec()}
 	}
 	return client.request(ctx, http.MethodPost, "/api/conversations", payload)
 }
@@ -3538,6 +3608,13 @@ func conversationAgentMatches(info conversationInfo, expectedRaw json.RawMessage
 	if expected.LLM.UsageID == "" && info.Agent.LLM.UsageID == "default" {
 		info.Agent.LLM.UsageID = ""
 	}
+	// submit_result is injected into the request's agent settings and client
+	// tools at call time; it is not part of the stored profile, so drop it from
+	// the materialized surface before comparing the remaining tools.
+	info.Agent.Tools = slices.DeleteFunc(info.Agent.Tools, func(tool struct {
+		Name   string         `json:"name"`
+		Params map[string]any `json:"params"`
+	}) bool { return tool.Name == submitResultToolName })
 	if expected.Tools != nil && !reflect.DeepEqual(info.Agent.Tools, expected.Tools) {
 		return false
 	}
@@ -3979,6 +4056,26 @@ func (client *Client) observation(ctx context.Context, brief application.Executi
 	return client.observationAt(brief, requestDigest, info, events, index, interrupted)
 }
 
+// submitResultActionOutput converts a submit_result action payload into the
+// marker-prefixed handler output Teams validates. The SDK stamps a "kind"
+// discriminator into the persisted action; handler result schemas use
+// additionalProperties:false, so it is stripped before serialization.
+func submitResultActionOutput(payload json.RawMessage) ([]byte, bool) {
+	var envelope map[string]json.RawMessage
+	if json.Unmarshal(payload, &envelope) != nil {
+		return nil, false
+	}
+	delete(envelope, "kind")
+	encoded, err := json.Marshal(envelope)
+	if err != nil {
+		return nil, false
+	}
+	output := make([]byte, 0, len(application.OrganizationalResultMarker)+len(encoded)+1)
+	output = append(output, application.OrganizationalResultMarker...)
+	output = append(output, '\n')
+	return append(output, encoded...), true
+}
+
 func (client *Client) observationAt(brief application.ExecutionBrief, requestDigest kernel.Digest, info conversationInfo, events []rawEvent, index int, interrupted bool) (application.ExternalExecutionObservation, error) {
 	state := application.ExternalRunning
 	retryable := false
@@ -4001,6 +4098,7 @@ func (client *Client) observationAt(brief application.ExecutionBrief, requestDig
 	var toolArtifactTime time.Time
 	var modelEvent *rawEvent
 	output := []byte(nil)
+	submitOutput := []byte(nil)
 	for eventIndex, event := range events {
 		if eventIndex < index && event.Kind != "HookExecutionEvent" {
 			continue
@@ -4025,6 +4123,11 @@ func (client *Client) observationAt(brief application.ExecutionBrief, requestDig
 			}
 			toolArtifactJournal = append(toolArtifactJournal, append(json.RawMessage(nil), event.Raw...))
 		}
+		if event.Kind == "ActionEvent" && event.Source == "agent" && event.ToolName == submitResultToolName {
+			if converted, ok := submitResultActionOutput(event.ActionPayload); ok {
+				submitOutput = converted
+			}
+		}
 		if agentFinalEvent(event) {
 			output = []byte(event.Text)
 			copy := event
@@ -4032,7 +4135,11 @@ func (client *Client) observationAt(brief application.ExecutionBrief, requestDig
 		}
 	}
 	if state == application.ExternalSucceeded {
-		output = normalizedHandlerResultOutput(brief, output)
+		if len(submitOutput) > 0 {
+			output = submitOutput
+		} else {
+			output = normalizedHandlerResultOutput(brief, output)
+		}
 	}
 	journalBytes, err := json.Marshal(journal)
 	if err != nil || len(journalBytes) > client.maximumEvidenceBytes || journalTime.IsZero() {
