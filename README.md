@@ -31,6 +31,24 @@ another model. Only a current Teams decision backed by a finite DAG, budget,
 assignment, and single-use invocation can wake an execution worker. This is the
 structural replacement for v3's unbounded conversational loops.
 
+## Download Tekroo Teams
+
+**TEKROO TEAMS 0.10.0** is downloadable software for orchestrating and
+managing AI role actors and virtual assistants in software-development
+workflows.
+
+- [Download the free macOS Apple-silicon operator client](https://tekroo.paul-coppinger.chatgpt.site/downloads/tekroo-teams-0.10.0-darwin-arm64.zip)
+- [View the Tekroo product page](https://tekroo.paul-coppinger.chatgpt.site/#download)
+- Download the source from GitHub with **Code → Download ZIP**, or clone it:
+
+```sh
+git clone https://github.com/tekroo-ai/teams.git
+```
+
+The operator client connects to a configured Tekroo Teams service. See the
+local production installation instructions below to build and operate the full
+service from source.
+
 ## Build and verify
 
 ```sh
