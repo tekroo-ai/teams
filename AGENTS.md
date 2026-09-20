@@ -157,6 +157,34 @@ amendment (a second unbounded accumulator, 69 ids, fault-looped 826 times),
 and out-of-repository scratch redirects (`> /tmp/…`) exempt from the mutation
 classifier.
 
+## Terminal transport hazard (A/B verified 2026-09-19)
+
+Bulk multi-line input sent through the agent terminal corrupts: lines
+duplicate and splice at the 80-column wrap boundary (26-line inputs landed
+as 22-24 lines with 161/242-char splices). Cause isolated by A/B experiment:
+bash readline is the trigger. With readline ON, 2/2 trials corrupted; with
+`set +o emacs` (readline OFF), 4/4 trials landed byte-exact. The terminal
+tool types keystrokes and scrapes the screen; readline's redraw makes it
+re-send chunks, so bash receives duplicated bytes. The tool does not
+"insert characters to wrap lines" — it re-types them.
+
+Mitigations, in order of preference:
+1. **FIXED in harness (SDK commit `95f3c376`, 2026-09-19):**
+   `TmuxTerminal.send_keys` now sends multi-line payloads over 20 lines
+   line-by-line with pacing, mirroring the #2181 fix in
+   `SubprocessTerminal`. Regression tests in
+   `tests/tools/terminal/test_tmux_bulk_input_corruption.py` (burst path
+   corrupts 3/3 with a 60-line payload; chunked path byte-exact).
+   Takes effect when the agent-server restarts — the currently running
+   server still has the old code loaded.
+2. Write file content with the file editor tool (direct disk write, no PTY),
+   run it with a short single-line command.
+3. Keep readline off in the agent shell: `set +o emacs` at session start
+   (persists for the session; the harness may reset it, so re-check after
+   terminal resets).
+
+A "mangled heredoc" is this corruption, not a syntax error in your script.
+
 ## Operational monitoring (phase10-prod run)
 
 - `organization.RoleInstanceState` has **no** `invocations` field. Reading
