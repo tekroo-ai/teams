@@ -770,6 +770,9 @@ func (client *Client) Start(ctx context.Context, brief application.ExecutionBrie
 	if status != http.StatusOK || !conversationMatches(info, conversationID, prepared.workspace.WorkingDirectory, requestDigest) || !conversationAgentMatches(info, prepared.profile.AgentSettings) {
 		return application.ExternalExecutionObservation{}, ErrProtocol
 	}
+	if err := client.setConversationTitle(ctx, conversationID, conversationTitle(brief)); err != nil {
+		return application.ExternalExecutionObservation{}, err
+	}
 	events, err := client.eventsAtLeaf(ctx, conversationID, info.LeafEventID)
 	if err != nil {
 		return application.ExternalExecutionObservation{}, err
@@ -3531,6 +3534,48 @@ func (client *Client) createConversation(ctx context.Context, brief application.
 		payload["client_tools"] = []any{submitResultToolSpec()}
 	}
 	return client.request(ctx, http.MethodPost, "/api/conversations", payload)
+}
+
+const (
+	maximumConversationTitleBytes = 200
+	conversationTitleSeparator    = " — "
+)
+
+// conversationTitle gives each OpenHands conversation a stable, operator-facing
+// identity without asking the model to generate a title. Task.Title is the
+// authoritative short description reconstructed from task.created.
+func conversationTitle(brief application.ExecutionBrief) string {
+	actor := string(brief.ActorFQN)
+	available := maximumConversationTitleBytes - len(actor) - len(conversationTitleSeparator)
+	if available <= 0 {
+		return truncateUTF8(actor, maximumConversationTitleBytes)
+	}
+	return actor + conversationTitleSeparator + truncateUTF8(strings.TrimSpace(brief.Task.Title), available)
+}
+
+func truncateUTF8(value string, maximumBytes int) string {
+	if len(value) <= maximumBytes {
+		return value
+	}
+	value = value[:maximumBytes]
+	for !utf8.ValidString(value) {
+		value = value[:len(value)-1]
+	}
+	return value
+}
+
+func (client *Client) setConversationTitle(ctx context.Context, conversationID, title string) error {
+	if title == "" || len(title) > maximumConversationTitleBytes {
+		return ErrProtocol
+	}
+	status, _, err := client.request(ctx, http.MethodPatch, "/api/conversations/"+url.PathEscape(conversationID), map[string]any{"title": title})
+	if err != nil {
+		return err
+	}
+	if status != http.StatusOK {
+		return ErrProtocol
+	}
+	return nil
 }
 
 type conversationInfo struct {

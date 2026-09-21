@@ -17,6 +17,7 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/tekroo-ai/teams/application"
 	"github.com/tekroo-ai/teams/kernel"
@@ -82,6 +83,9 @@ func TestClientUsesExactQualifiedOpenHandsSurfaceAndRetainsAllEventPages(t *test
 	if state.createCalls != 1 || state.submitCalls != 1 || state.eventPageCalls < 3 {
 		t.Fatalf("calls create=%d submit=%d pages=%d", state.createCalls, state.submitCalls, state.eventPageCalls)
 	}
+	if state.titleUpdate != conversationTitle(brief) {
+		t.Fatalf("conversation title = %q", state.titleUpdate)
+	}
 	if _, present := state.createPayload["client_tools"]; present {
 		t.Fatal("client_tools unexpectedly present")
 	}
@@ -123,6 +127,19 @@ func TestOpenHandsIterationLimitPreservesExplicitBoundsAndEncodesUnbounded(t *te
 	}
 	if got := openHandsIterationLimit(0); got != openHandsOperationallyUnboundedIterations {
 		t.Fatalf("unbounded transport value = %d", got)
+	}
+}
+
+func TestConversationTitleUsesActorFQNAndTaskTitle(t *testing.T) {
+	brief, _ := openHandsTestBrief(t)
+	brief.Task.Title = "Add FQN aliases"
+	if got, want := conversationTitle(brief), "teams::coder-1 — Add FQN aliases"; got != want {
+		t.Fatalf("conversation title = %q, want %q", got, want)
+	}
+	brief.Task.Title = strings.Repeat("😀", 100)
+	title := conversationTitle(brief)
+	if len(title) > maximumConversationTitleBytes || !utf8.ValidString(title) {
+		t.Fatalf("title is not a valid bounded UTF-8 value: %q", title)
 	}
 }
 
@@ -3017,6 +3034,14 @@ func (state *retryForkServerState) serveHTTP(writer http.ResponseWriter, request
 		state.createCalls++
 		state.cleanCreated = true
 		writer.WriteHeader(http.StatusCreated)
+	case request.Method == http.MethodPatch && request.URL.Path == "/api/conversations/"+state.currentID:
+		var payload struct {
+			Title string `json:"title"`
+		}
+		if json.NewDecoder(request.Body).Decode(&payload) != nil || payload.Title == "" {
+			state.t.Error("decode retry title update payload")
+		}
+		writeJSON(writer, map[string]any{"success": true})
 	case request.Method == http.MethodPost && request.URL.Path == "/api/conversations/"+state.currentID+"/events":
 		state.submitCalls++
 		var payload struct {
@@ -3073,6 +3098,15 @@ func (state *openHandsServerState) serveHTTP(writer http.ResponseWriter, request
 			status = "finished"
 		}
 		writeJSON(writer, map[string]any{"id": conversationID, "execution_status": status, "created_at": "2026-08-31T12:00:00Z", "updated_at": "2026-08-31T12:00:01Z", "workspace": map[string]any{"kind": "LocalWorkspace", "working_dir": state.workspace}, "agent": testConversationAgent(), "tags": map[string]string{"tekrooinvocation": conversationID, "tekroorequest": testRequestDigest(state.prompt)}})
+	case request.Method == http.MethodPatch && request.URL.Path == "/api/conversations/"+conversationID:
+		var payload struct {
+			Title string `json:"title"`
+		}
+		if json.NewDecoder(request.Body).Decode(&payload) != nil || payload.Title == "" {
+			state.t.Error("decode title update payload")
+		}
+		state.titleUpdate = payload.Title
+		writeJSON(writer, map[string]any{"success": true})
 	case request.Method == http.MethodPost && request.URL.Path == "/api/conversations/"+conversationID+"/events":
 		state.submitCalls++
 		var payload struct {
