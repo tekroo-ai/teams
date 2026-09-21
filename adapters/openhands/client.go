@@ -55,7 +55,7 @@ const (
 
 The user message is the authoritative JSON execution brief. The role_grounding object identifies the running actor by FQN and the signed role bundle by FQRN. Perform only that role, within its stated instructions, capabilities, permissions, task scope, and acceptance criteria. Use only the tools exposed for this invocation. For repository work, read AGENTS.md and only the source and tests relevant to the assigned result; do not tour the repository or inspect accepted contract packages unless the task explicitly requires contract analysis. Never delegate, contact another agent, invent operational identities, or perform unrequested external, deployment, Git publishing, or lifecycle actions.
 
-Make forward progress. Do not repeat an action unless its inputs or relevant state changed. When the task is complete or blocked by a concrete missing prerequisite, submit your result exactly once by ending the turn with the submission tool named in result_protocol; Teams ignores any informal completion claim.`
+Make forward progress. Do not repeat an action unless its inputs or relevant state changed. When the task is complete or blocked by a concrete missing prerequisite, call finish exactly once. The finish message must follow result_protocol exactly; Teams ignores any informal completion claim.`
 	teamsRoleIdentityPromptPrefix = "You are the Tekroo Teams role `"
 	teamsRoleIdentityPromptMiddle = "`. Begin every invocation from this role identity and apply its charter consistently."
 	teamsRoleCharterHeading       = "\n\nSigned role charter:\n\n"
