@@ -97,18 +97,73 @@ stated, confirming it; it was abandoned. ddalcu repro: fork a
 conversation containing command="create>\n" tool-call events; first
 tool call in the fork leaks identically.
 
+## Deploy + confirmation run (2026-09-21, later same day)
+- Daemon redeployed with 5b3b19a + 3139dab: backed up running binary to
+  `tekrood.pre-3139dab`, killed tekrood (keepalive 7720 relaunched it),
+  swapped with `rm + cp + codesign -s -`. Health `ok`, contract 0.12.0.
+- Confirmation feature `01a0c5ef-58e7-73f7-88cb-f7d3caff75a9` (tiny
+  kernel doc-comment request) ran FULLY AUTONOMOUSLY to
+  AWAITING_ACCEPTANCE, PO recommendation PASS. 8 invocations all
+  SUCCEEDED: refine, specify, design, implementation, validation,
+  2 promotion, acceptance.
+- GROUNDING FIX (5b3b19a) CONFIRMED: every grounding firing in the run
+  was a GENUINE content-before-AGENTS.md race (repository_search /
+  repository_view / `sed`/`cat` of source before AGENTS.md read).
+  Orientation (glob, git metadata) NEVER fired a false grounding
+  correction. (Note: the task brief embeds a serialized prior journal
+  that contains the correction prefix string; a naive grep over
+  MessageEvents double-counts it — count only real fence messages.)
+- SHELL-DISCIPLINE FIX (3139dab) CONFIRMED: the only `2>&1` command in
+  the run (`go test ./kernel/... 2>&1 | tail -30`) fired on its genuine
+  `| tail` pipe, NEVER on `2>&1` alone. Zero `2>&1` false positives.
+- NEW genuine defect surfaced (not a fence bug): the PO refine
+  work_product carried 3 extra keys
+  (preserved_acceptance_criteria, preserved_constraints,
+  ambiguity_findings) beyond the 5 the strict DisallowUnknownFields
+  stage decoder allows, so refine blocked with
+  "planning role returned an invalid structured handoff". This is the
+  known cost of the UNIVERSAL submit_envelope schema leaving
+  work_product unconstrained: the grammar mask guards JSON syntax but
+  not per-handler field sets. Recovered with retry-planning + a
+  method-changing reason ("build work_product as EXACTLY five keys").
+  Candidate permanent fix: tighten the PO refine brief, or add a
+  per-handler work_product schema to submit_envelope (the deferred
+  per-handler-schema option).
+- retry-planning gotcha: `deadline_at` must be strictly AFTER the
+  terminal invocation's own deadline AND within now+planning-deadline
+  (8h). A deadline earlier than the failed invocation's is rejected
+  with PLANNING_RECOVERY_REJECTED / "invalid feature request or plan".
+- Team re-PAUSED after the run (keepalive auto-resumes on restart).
+
+## mlx-serve v26.9.5 release-notes check (2026-09-21)
+- New release v26.9.5 published 2026-09-21T15:26Z (repo ddalcu/mlx-serve,
+  app com.dalcu.mlx-core; running here is 26.9.4).
+- NEITHER of our two bugs is fixed in v26.9.5, and neither is filed as
+  an open issue. The 23 commits between 26.9.4 and 26.9.5 are all
+  GPU-memory-overrun / MTP-throughput / Bonsai-2 / Qwen-Image work; the
+  prefix-cache changes are about not OOM-ing, NOT about bounding SSM
+  checkpoint inheritance to the request's actual matched prefix. So the
+  hot-cache SSM checkpoint-inheritance bug and the in-context
+  template-tag imitation are still open and still worth filing.
+- v26.9.5 breaking note: "Next release, MLX Core.app will become
+  MLX-Serve.app, this will reset your app settings & updates" — relevant
+  if we ever upgrade the deployment.
+
 ## Resume here (virgin session)
-1. Diagnose SHELL_DISCIPLINE family (14 firings): each correction's
-   first line is TEKROO_SHELL_DISCIPLINE_CORRECTION:<action-id>; look
-   up that id among ActionEvents to get the violating command;
-   classify fence false-positive vs model misbehavior; permanent fix +
-   proven regression test. Run invocation ids: re-query
-   work_invocations in tekroo_teams_v4_phase10_prod.
-2. Then CHECKPOINT_COMPLETION (2), REPOSITORY_PROGRESS (1),
-   PROGRESS_CHECKPOINT (5 - may be informational, check intent).
-3. Deploy daemon with 5b3b19a (build, rm+cp+codesign, launchd restarts
-   it; re-PAUSE after - keepalive auto-resumes).
-4. Re-run a feature to confirm grounding corrections are gone; then
-   operator feature-accept the FQN-alias feature to close the RSI test.
-5. File both mlx-serve reports (hot-cache inheritance; tag-leak
-   imitation) with ddalcu.
+1. DONE — SHELL_DISCIPLINE diagnosed + fixed (3139dab): 3/14 were
+   `2>&1` false positives, 11 genuine model misbehavior.
+2. DONE — CHECKPOINT families all diagnosed: CHECKPOINT_COMPLETION (2)
+   and REPOSITORY_PROGRESS (1) are correct fences; PROGRESS_CHECKPOINT
+   (5) is the informational context-condensation recovery.
+3. DONE — daemon deployed with 5b3b19a + 3139dab, re-PAUSED.
+4. DONE — confirmation feature 01a0c5ef ran to AWAITING_ACCEPTANCE
+   (PASS); grounding + shell-discipline fixes both confirmed live.
+   STILL OPEN: operator feature-accept the FQN-alias feature
+   01a0c4b9-dce8-75c6-92b1-d374ca4fef9c (revision 5, PO PASS) to close
+   the RSI test — a human gate, not yet issued.
+5. STILL OPEN — file both mlx-serve reports with ddalcu. v26.9.5 does
+   NOT fix either bug (see release-notes check above); both remain
+   unfiled and valid.
+6. NEW — decide the permanent fix for the PO refine extra-fields
+   defect: tighten the refine brief vs. add a per-handler
+   work_product schema to submit_envelope.
