@@ -183,6 +183,16 @@ Mitigations, in order of preference:
    (persists for the session; the harness may reset it, so re-check after
    terminal resets).
 
+Second corruption family (observed 2026-09-21, same session): **TAB
+characters inside terminal payloads trigger bash filename completion**,
+which splices a directory listing into the heredoc body. Never send
+tab-indented content (Go source, patch scripts) through the terminal;
+create it with the file editor and invoke it by path. A third family is
+generation-level: template-tag leakage in tool-call parameters
+(`command` arriving as `str_replace>\nnull`) — the same defect as the
+`</summary></invoke>` leak in conv `01a0b4d5e4e2`, seen on MTP-on
+sessions; retry the call or use the file editor.
+
 A "mangled heredoc" is this corruption, not a syntax error in your script.
 
 ## Operational monitoring (phase10-prod run)

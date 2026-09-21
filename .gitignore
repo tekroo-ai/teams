@@ -10,3 +10,12 @@ dist/
 tmp/
 __pycache__/
 *.py[cod]
+
+# large untracked artifacts (never commit; repo-scanning tools must skip these)
+/Users/
+/OUTPUT/
+/benchmarks/
+/workspace/
+/outputs/
+/.worktrees/
+nohup.out
