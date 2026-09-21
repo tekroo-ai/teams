@@ -1647,32 +1647,44 @@ func violatesShellDiscipline(command string) bool {
 		}
 	}
 	var singleQuoted, doubleQuoted, escaped bool
+	previous := ' '
 	for _, character := range command {
 		if escaped {
 			escaped = false
+			previous = character
 			continue
 		}
 		if character == '\\' && !singleQuoted {
 			escaped = true
+			previous = character
 			continue
 		}
 		if character == '\'' && !doubleQuoted {
 			singleQuoted = !singleQuoted
+			previous = character
 			continue
 		}
 		if character == '"' && !singleQuoted {
 			doubleQuoted = !doubleQuoted
+			previous = character
 			continue
 		}
 		if singleQuoted {
+			previous = character
 			continue
 		}
 		if character == '$' || character == '`' {
 			return true
 		}
-		if !doubleQuoted && (character == ';' || character == '|' || character == '&') {
+		// An '&' directly after '>' is the file-descriptor duplication
+		// operator (2>&1, >&file), not command chaining or backgrounding;
+		// the discipline rule bans chaining, not redirection. A quoted '&'
+		// never reaches here (single quotes continue, double quotes are
+		// excluded by the guard below).
+		if !doubleQuoted && (character == ';' || character == '|' || (character == '&' && previous != '>')) {
 			return true
 		}
+		previous = character
 	}
 	return false
 }

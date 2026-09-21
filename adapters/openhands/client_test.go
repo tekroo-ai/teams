@@ -2805,6 +2805,19 @@ func TestViolatesShellDisciplineDistinguishesQuotedLiteralsFromOperators(t *test
 		{command: `rg --files; pwd`, want: true},
 		{command: `printf "%s" "$HOME"`, want: true},
 		{command: "rg --files\npwd", want: true},
+		// File-descriptor duplication (2>&1, >&file) is redirection, not
+		// chaining: it must not fence. Regression for the 2026-09-21 run
+		// where `go build/test ... 2>&1` fired 3 false shell-discipline
+		// corrections.
+		{command: "go build ./adapters/... 2>&1", want: false},
+		{command: "go test -race ./adapters/operatorhttp/... 2>&1", want: false},
+		{command: "go test -count=1 -run 'Alias|RoleControl|FQNContinuity|RoleInbox' -v ./adapters/operatorhttp/... 2>&1 -v", want: false},
+		{command: "go test ./... > /tmp/out.log 2>&1", want: false},
+		{command: "go build ./... 2>&1 >/dev/null", want: false},
+		// Chaining and backgrounding still fence even when 2>&1 is present.
+		{command: "go build ./... 2>&1 && go test ./...", want: true},
+		{command: "go build ./... 2>&1; pwd", want: true},
+		{command: "sleep 5 &", want: true},
 	}
 	for _, test := range tests {
 		if got := violatesShellDiscipline(test.command); got != test.want {
