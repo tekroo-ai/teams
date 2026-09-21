@@ -15,7 +15,7 @@ import (
 )
 
 func TestSubmitResultActionOutputStripsKindAndMarks(t *testing.T) {
-	payload := json.RawMessage(`{"schema_version":"1.0.0","outcome":"completed","summary":"s","evidence":[],"message_proposals":[],"work_product":{"a":1},"kind":"ClientAction_submit_result"}`)
+	payload := json.RawMessage(`{"schema_version":"1.0.0","outcome":"completed","summary":"s","evidence":[],"message_proposals":[],"work_product":{"a":1},"kind":"ClientAction_submit_envelope"}`)
 	output, ok := submitResultActionOutput(payload)
 	if !ok {
 		t.Fatal("conversion rejected a valid action payload")
@@ -24,7 +24,7 @@ func TestSubmitResultActionOutputStripsKindAndMarks(t *testing.T) {
 	if !strings.HasPrefix(text, application.OrganizationalResultMarker+"\n") {
 		t.Fatalf("output missing marker prefix: %q", text[:40])
 	}
-	if strings.Contains(text, "ClientAction_submit_result") {
+	if strings.Contains(text, "ClientAction_submit_envelope") {
 		t.Fatal("SDK kind discriminator leaked into handler output")
 	}
 	var envelope map[string]any
@@ -114,7 +114,7 @@ func TestConversationAgentMatchesIgnoresInjectedSubmitResult(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !conversationAgentMatches(info, profileRaw) {
-		t.Fatal("materialized agent with injected submit_result rejected against clean profile")
+		t.Fatal("materialized agent with injected submit_envelope rejected against clean profile")
 	}
 }
 
@@ -171,8 +171,8 @@ func TestClientInjectsSubmitResultToolForHandlerExecution(t *testing.T) {
 	semanticMemory := acceptedSemanticMemoryBinding(t, hookConfig)
 	client, err := NewClient(Config{
 		BaseURL: server.URL, SessionAPIKey: "session-key", HTTPClient: &http.Client{Timeout: time.Second},
-		Workspaces: staticWorkspace{binding: WorkspaceBinding{WorkspaceID: brief.Scope.WorkspaceID, WorktreeID: brief.Scope.WorktreeID, WorkingDirectory: workspace}},
-		Profiles:   staticProfile{profile: ExecutionProfile{ModelProfileDigest: brief.ModelProfileDigest, RuntimeIdentityDigest: brief.RuntimeIdentityDigest, ToolPolicyDigest: brief.ToolPolicyDigest, EffectPolicyDigest: brief.EffectPolicyDigest, AgentSettings: profileRaw, HookConfig: hookConfig, AgentDelegationDisabled: true, SemanticMemory: semanticMemory}},
+		Workspaces:   staticWorkspace{binding: WorkspaceBinding{WorkspaceID: brief.Scope.WorkspaceID, WorktreeID: brief.Scope.WorktreeID, WorkingDirectory: workspace}},
+		Profiles:     staticProfile{profile: ExecutionProfile{ModelProfileDigest: brief.ModelProfileDigest, RuntimeIdentityDigest: brief.RuntimeIdentityDigest, ToolPolicyDigest: brief.ToolPolicyDigest, EffectPolicyDigest: brief.EffectPolicyDigest, AgentSettings: profileRaw, HookConfig: hookConfig, AgentDelegationDisabled: true, SemanticMemory: semanticMemory}},
 		PollInterval: time.Millisecond, MaximumPages: 4, MaximumEvidenceBytes: 1 << 20,
 	})
 	if err != nil {

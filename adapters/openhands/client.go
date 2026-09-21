@@ -32,9 +32,9 @@ var (
 )
 
 const (
-	qualifiedCondenserMaximumEvents       = 80
-	maximumPromptEvidenceBytes            = 256 << 10
-	pauseAfterCondensationTag             = "tekroopauseaftercondensation"
+	qualifiedCondenserMaximumEvents = 80
+	maximumPromptEvidenceBytes      = 256 << 10
+	pauseAfterCondensationTag       = "tekroopauseaftercondensation"
 	// submitResultToolName is a client-defined OpenHands tool whose parameters
 	// are the organizational result envelope. Because OpenHands grammar-constrains
 	// tool-call arguments to their declared JSON schema at every depth, emitting
@@ -43,8 +43,10 @@ const (
 	// carrier. The schema is intentionally universal (work_product unconstrained):
 	// OpenHands registers one client-tool action kind process-globally and rejects
 	// a name reused with a different schema, so per-handler result schemas stay
-	// validated daemon-side after extraction.
-	submitResultToolName                  = "submit_result"
+	// validated daemon-side after extraction. The name must never be reused by
+	// any other client tool in a live agent-server process: a schema collision
+	// there is a permanent 422 until that process restarts.
+	submitResultToolName                  = "submit_envelope"
 	submitResultToolDescription           = "Submit the assigned result envelope. Call this tool exactly once when the result is complete, passing the full envelope as structured parameters. This replaces the finish tool for result submission."
 	submitResultToolSchema                = `{"type":"object","additionalProperties":false,"required":["schema_version","outcome","summary","evidence","message_proposals","work_product"],"properties":{"schema_version":{"type":"string"},"outcome":{"type":"string"},"summary":{"type":"string"},"evidence":{"type":"array","items":{"type":"string"}},"message_proposals":{"type":"array","items":{"type":"object"}},"work_product":{"type":"object"}}}`
 	candidateResultRequirementInstruction = "Put exactly one object conforming to result_schema in the outer organizational result's work_product field. Copy both candidate identity values exactly."
@@ -53,7 +55,7 @@ const (
 
 The user message is the authoritative JSON execution brief. The role_grounding object identifies the running actor by FQN and the signed role bundle by FQRN. Perform only that role, within its stated instructions, capabilities, permissions, task scope, and acceptance criteria. Use only the tools exposed for this invocation. For repository work, read AGENTS.md and only the source and tests relevant to the assigned result; do not tour the repository or inspect accepted contract packages unless the task explicitly requires contract analysis. Never delegate, contact another agent, invent operational identities, or perform unrequested external, deployment, Git publishing, or lifecycle actions.
 
-Make forward progress. Do not repeat an action unless its inputs or relevant state changed. When the task is complete or blocked by a concrete missing prerequisite, call finish exactly once. The finish message must follow result_protocol exactly; Teams ignores any informal completion claim.`
+Make forward progress. Do not repeat an action unless its inputs or relevant state changed. When the task is complete or blocked by a concrete missing prerequisite, submit your result exactly once by ending the turn with the submission tool named in result_protocol; Teams ignores any informal completion claim.`
 	teamsRoleIdentityPromptPrefix = "You are the Tekroo Teams role `"
 	teamsRoleIdentityPromptMiddle = "`. Begin every invocation from this role identity and apply its charter consistently."
 	teamsRoleCharterHeading       = "\n\nSigned role charter:\n\n"
@@ -1065,6 +1067,13 @@ func checkpointCompletionGuardApplies(purpose kernel.WorkPurpose) bool {
 // reads remains available to recover exact details lost at compaction, but it
 // must not permit an agent to reconstruct the same evidence indefinitely.
 // Mutations remain immediate violations.
+// isSubmissionNextAction reports whether a checkpoint next-action sentence names
+// the result terminator, whichever channel this execution uses (submit_envelope
+// for handler-bound executions, finish for the rest).
+func isSubmissionNextAction(nextAction string) bool {
+	return strings.Contains(nextAction, "finish tool") || strings.Contains(nextAction, "submit_envelope tool")
+}
+
 func checkpointCompletionRepositoryViolation(events []rawEvent, promptIndex int) (rawEvent, bool, bool) {
 	checkpointIndex := -1
 	maximumReads := maximumCheckpointCompletionReads
@@ -1072,7 +1081,7 @@ func checkpointCompletionRepositoryViolation(events []rawEvent, promptIndex int)
 	// evidence already retained and the finish step as its canonical next
 	// action. That is a result-only boundary, not a fresh inspection window.
 	if promptIndex >= 0 && promptIndex < len(events) {
-		if checkpoint, found := recoveryCheckpointFromExecutionPrompt(events[promptIndex]); found && strings.Contains(checkpoint.NextAction, "finish tool") {
+		if checkpoint, found := recoveryCheckpointFromExecutionPrompt(events[promptIndex]); found && isSubmissionNextAction(checkpoint.NextAction) {
 			checkpointIndex = promptIndex
 			maximumReads = 0
 		}
@@ -1082,7 +1091,7 @@ func checkpointCompletionRepositoryViolation(events []rawEvent, promptIndex int)
 			continue
 		}
 		checkpoint, found := progressCheckpointFromEvent(event)
-		if found && strings.Contains(checkpoint.NextAction, "finish tool") && checkpointIndex < 0 {
+		if found && isSubmissionNextAction(checkpoint.NextAction) && checkpointIndex < 0 {
 			checkpointIndex = index
 		}
 	}
@@ -2388,7 +2397,7 @@ func (client *Client) correctDeterministicValidationViolation(ctx context.Contex
 			return client.observation(ctx, brief, requestDigest, info, events, false)
 		}
 	}
-	correction := deterministicValidationCorrectionPrefix + violation.ID + "\nAn equivalent deterministic validation has already succeeded twice without an intervening repository change or compaction boundary. Reuse that evidence. Run only a materially different check still required by the acceptance criteria; otherwise call the finish tool exactly once with the result required by result_protocol."
+	correction := deterministicValidationCorrectionPrefix + violation.ID + "\nAn equivalent deterministic validation has already succeeded twice without an intervening repository change or compaction boundary. Reuse that evidence. Run only a materially different check still required by the acceptance criteria; otherwise " + submissionInstruction(brief) + " with the result required by result_protocol."
 	status, _, err := client.request(ctx, http.MethodPost, "/api/conversations/"+url.PathEscape(conversationID)+"/events", map[string]any{
 		"role": "user", "run": true,
 		"content": []map[string]any{{"type": "text", "text": correction}},
@@ -2545,7 +2554,7 @@ func (client *Client) correctRoleToolViolation(ctx context.Context, brief applic
 	if reason == "ROLE_REPOSITORY_MUTATION_NOT_AUTHORIZED" {
 		topic = "modify the repository"
 	}
-	correction := roleToolCorrectionPrefix + violation.ID + "\nThe previous action attempted to " + topic + ", which your role bundle does not authorize for this task. No repository access is required: the execution brief contains everything needed. Do not attempt repository tools again, including reading, searching, or editing. Produce the assigned result envelope directly from the brief and call finish exactly once with TEKROO_ORGANIZATIONAL_RESULT: followed by exactly one single-line JSON object and nothing after the closing brace."
+	correction := roleToolCorrectionPrefix + violation.ID + "\nThe previous action attempted to " + topic + ", which your role bundle does not authorize for this task. No repository access is required: the execution brief contains everything needed. Do not attempt repository tools again, including reading, searching, or editing. Produce the assigned result envelope directly from the brief and " + submissionInstruction(brief)
 	status, _, err := client.request(ctx, http.MethodPost, "/api/conversations/"+url.PathEscape(conversationID)+"/events", map[string]any{
 		"role": "user", "run": true,
 		"content": []map[string]any{{"type": "text", "text": correction}},
@@ -2626,7 +2635,7 @@ func (client *Client) correctCheckpointCompletionViolation(ctx context.Context, 
 			return client.observation(ctx, brief, requestDigest, info, events, false)
 		}
 	}
-	correction := checkpointCompletionCorrectionPrefix + violation.ID + "\nThe retained progress checkpoint has completed the repository-evidence phase and the bounded last-mile read allowance is exhausted. Do not read or modify the repository further. Evaluate the retained evidence and call the finish tool exactly once with the result required by result_protocol."
+	correction := checkpointCompletionCorrectionPrefix + violation.ID + "\nThe retained progress checkpoint has completed the repository-evidence phase and the bounded last-mile read allowance is exhausted. Do not read or modify the repository further. Evaluate the retained evidence and " + submissionInstruction(brief) + " with the result required by result_protocol."
 	status, _, err := client.request(ctx, http.MethodPost, "/api/conversations/"+url.PathEscape(conversationID)+"/events", map[string]any{
 		"role": "user", "run": true,
 		"content": []map[string]any{{"type": "text", "text": correction}},
@@ -2650,7 +2659,7 @@ func (client *Client) correctEditableCandidateCompletion(ctx context.Context, br
 		}
 	}
 	conversationID := string(brief.InvocationID)
-	correction := editableCandidateCompletionCorrectionPrefix + reason + "\nThe implementation cannot be handed to its independent validator until Git contains an immutable candidate. Continue this same task without repeating completed discovery or implementation. Inspect Git status, stage only the intended source and test files, never stage the Teams-injected .openhands runtime hook, commit the intended candidate on the assigned branch, verify the workspace is clean apart from that injected hook, and then call finish exactly once."
+	correction := editableCandidateCompletionCorrectionPrefix + reason + "\nThe implementation cannot be handed to its independent validator until Git contains an immutable candidate. Continue this same task without repeating completed discovery or implementation. Inspect Git status, stage only the intended source and test files, never stage the Teams-injected .openhands runtime hook, commit the intended candidate on the assigned branch, verify the workspace is clean apart from that injected hook, and then " + submissionInstruction(brief)
 	status, _, err := client.request(ctx, http.MethodPost, "/api/conversations/"+url.PathEscape(conversationID)+"/events", map[string]any{
 		"role": "user", "run": true,
 		"content": []map[string]any{{"type": "text", "text": correction}},
@@ -3172,7 +3181,9 @@ func cloneCheckpointAdmittedMessage(message *application.AdmittedMessage) *appli
 
 func checkpointNextAction(brief application.ExecutionBrief, actions []checkpointAction, changed map[string]struct{}, validations []checkpointAction) string {
 	submit := "submit the required result through the finish tool"
-	if brief.ResultProtocol != nil && brief.ResultProtocol.Marker != "" {
+	if brief.MessageHandler != nil {
+		submit = "submit the required result through the submit_envelope tool"
+	} else if brief.ResultProtocol != nil && brief.ResultProtocol.Marker != "" {
 		submit = "submit the required " + brief.ResultProtocol.Marker + " result through the finish tool"
 	}
 	switch brief.Purpose {
@@ -3458,6 +3469,18 @@ func containsDelegationTool(raw json.RawMessage) bool {
 	return visit(value)
 }
 
+// submissionInstruction returns the terminator sentence matching the execution's
+// result channel: handler-bound executions submit through the injected
+// submit_envelope tool; all others terminate with finish plus the marker.
+// Keeping corrections aligned with the actual tool surface prevents the model
+// from being instructed toward a terminator it was not given.
+func submissionInstruction(brief application.ExecutionBrief) string {
+	if brief.MessageHandler != nil {
+		return "call submit_envelope exactly once, passing the full result envelope as its structured parameters."
+	}
+	return "call finish exactly once with TEKROO_ORGANIZATIONAL_RESULT: followed by exactly one single-line JSON object and nothing after the closing brace."
+}
+
 // submitResultToolSpec builds the client-tool spec for the structured result
 // envelope. The parameters are the universal envelope schema; work_product is
 // deliberately unconstrained so one process-global client-tool kind serves
@@ -3659,7 +3682,9 @@ func conversationAgentMatches(info conversationInfo, expectedRaw json.RawMessage
 	info.Agent.Tools = slices.DeleteFunc(info.Agent.Tools, func(tool struct {
 		Name   string         `json:"name"`
 		Params map[string]any `json:"params"`
-	}) bool { return tool.Name == submitResultToolName })
+	}) bool {
+		return tool.Name == submitResultToolName
+	})
 	if expected.Tools != nil && !reflect.DeepEqual(info.Agent.Tools, expected.Tools) {
 		return false
 	}
