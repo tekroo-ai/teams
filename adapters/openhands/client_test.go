@@ -2970,6 +2970,7 @@ type openHandsServerState struct {
 	submitCalls    int
 	eventPageCalls int
 	createPayload  map[string]any
+	titleUpdate    string
 	finalAsFinish  bool
 }
 
