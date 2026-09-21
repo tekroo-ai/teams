@@ -473,3 +473,37 @@ payload). Handler result-protocol instruction now directs submit_result
 first, finish+marker as fallback. Validation/review/promotion/handoff
 purposes are NOT handler-bound and keep finish+marker (their shapes differ
 from the universal schema).
+
+## Fence false-positive fixes and recovery gotchas (2026-09-21)
+
+- Shell-discipline fence: an `&` directly after `>` is the file-descriptor
+  duplication operator (`2>&1`, `>&file`), NOT chaining. The rule bans
+  `&&`/`;`/`|`/`$()`/backgrounding, never redirection. `violatesShellDiscipline`
+  now exempts `&` preceded by `>` (3139dab). Genuine chaining/backgrounding
+  operators are never preceded by `>`, so they still fence.
+- Grounding fence: orientation is content-based (glob, git metadata via
+  `repositoryFileListingAction`/`gitMetadataAction`), not tool-based. Only a
+  genuine content read (repository_search, repository_view of source,
+  `sed`/`cat` of source) before the AGENTS.md result lands is a real violation
+  (5b3b19a).
+- When counting fence firings from conversation event files, the task brief
+  embeds a serialized prior journal that literally contains the correction
+  prefix string; a naive grep over user MessageEvents double-counts it. Count
+  only genuine fence messages (a `TEKROO_*_CORRECTION:<action-id>` whose id
+  matches a real ActionEvent after the prompt).
+- retry-planning `deadline_at` must be strictly AFTER the failed invocation's
+  own deadline AND within now + planning-deadline (8h). An earlier deadline is
+  rejected with `PLANNING_RECOVERY_REJECTED` / "invalid feature request or
+  plan" — the block classification is not at fault.
+- The universal `submit_envelope` schema leaves `work_product` unconstrained,
+  so the grammar mask guards JSON syntax but not per-handler field sets. A PO
+  refine can add extra keys (e.g. preserved_acceptance_criteria) that the
+  strict `DisallowUnknownFields` stage decoder rejects, blocking the planning
+  task. Recover with retry-planning + a method-changing reason ("build
+  work_product as EXACTLY five keys"). Permanent fix options: tighten the
+  refine brief, or add a per-handler work_product schema to submit_envelope.
+- mlx-serve v26.9.5 (2026-09-21) fixes NEITHER the hot-cache SSM
+  checkpoint-inheritance bug NOR the in-context template-tag imitation; both
+  remain unfiled and valid. Its prefix-cache commits are GPU-memory-overrun
+  fixes, not checkpoint-bounding. Note: next release renames MLX Core.app to
+  MLX-Serve.app and resets app settings.
