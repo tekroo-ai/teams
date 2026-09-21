@@ -50,8 +50,33 @@ Created 2026-09-21 just before restarting the agent-server (loads SDK fix
     (delegate to repositoryFileListingAction + gitMetadataAction);
     content reads (repository_search, git show/diff) still fence.
     Proven regression test. NOT YET DEPLOYED (daemon runs e374c7c).
-  - SHELL-DISCIPLINE (14): NOT YET DIAGNOSED - next task.
-  - CHECKPOINT families (8): NOT YET DIAGNOSED.
+  - SHELL-DISCIPLINE (14): DIAGNOSED + FIXED (3139dab). 3 of 14 were
+    fence FALSE POSITIVES: `go build/test ... 2>&1` — the classifier
+    flagged any `&` outside quotes, but `2>&1` is fd-duplication
+    redirection, not chaining (the rule bans `&&`/`;`/`|`/`$()`/
+    backgrounding, never redirection). Fix: an `&` directly after `>`
+    is exempt; genuine chaining/backgrounding operators are never
+    preceded by `>`. Regression test asserts the 3 FPs now pass AND
+    `2>&1 && ...`, `2>&1; ...`, `sleep 5 &` still fence. The other 11
+    are GENUINE model misbehavior (habitual `| tail`/`| head`, `;`
+    chaining, `$(go env ...)`, `git -C <candidate>`) and still fence —
+    no code fix; they are retry-reason/harness-guidance material.
+  - CHECKPOINT_COMPLETION (2): both VALIDATION invocations that
+    over-verified AFTER the progress checkpoint declared
+    "submit_envelope now" as next_action. Guard correctly bounded the
+    post-checkpoint read window (8 reads allowed, fenced on the 9th)
+    and forced submit_envelope; BOTH invocations SUCCEEDED. Fence
+    worked as designed — genuine model over-verification, not a false
+    positive. No code fix.
+  - REPOSITORY_PROGRESS (1): GENUINE exact repeat — identical
+    `grep -n -A12 "func validRoleName" organization/manifest.go` at
+    two points in one uninterrupted work period. One-shot correction
+    fired and the model heeded it (moved to `go test`). Fence correct.
+  - PROGRESS_CHECKPOINT (5): INFORMATIONAL, not a fence. This is the
+    harness's own context-condensation recovery message
+    (execution-progress-checkpoint/1.2.0) that restores authoritative
+    evidence and RESETS the no-progress guard (client.go:1709). Normal
+    operation; no action needed.
 - mlx-serve hot-cache SSM checkpoint inheritance bug: report drafted at
   OUTPUT/mlx-serve-issue-hotcache-ssm-inheritance.md; not yet filed.
 
