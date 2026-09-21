@@ -1574,7 +1574,16 @@ func agentsInstructionReadAction(event rawEvent) bool {
 }
 
 func workspaceOrientationAction(event rawEvent) bool {
-	if event.Kind != "ActionEvent" || event.Source != "agent" || event.ToolName != "terminal" {
+	if event.Kind != "ActionEvent" || event.Source != "agent" {
+		return false
+	}
+	// glob exposes file paths only, never source or design content; it is the
+	// repository-tool equivalent of `ls` and is how an agent establishes where
+	// AGENTS.md is before reading it.
+	if event.ToolName == "glob" {
+		return true
+	}
+	if event.ToolName != "terminal" {
 		return false
 	}
 	command := strings.TrimSpace(event.ActionCommand)

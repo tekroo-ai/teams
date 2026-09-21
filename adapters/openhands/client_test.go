@@ -2114,6 +2114,22 @@ func TestRepositoryGroundingAllowsWorkspaceOrientationBeforeAgentsRead(t *testin
 	}
 }
 
+func TestRepositoryGroundingAllowsGlobBeforeAgentsRead(t *testing.T) {
+	// The project-manager's first action was glob **/AGENTS.md — locating the
+	// instruction file. glob exposes file paths only, so it is orientation, not
+	// substantive repository inspection, and must never be fenced.
+	events := []rawEvent{
+		{Kind: "MessageEvent", Source: "user"},
+		{ID: "glob", Kind: "ActionEvent", Source: "agent", ToolName: "glob", ToolCallID: "glob-call", ActionPayload: json.RawMessage(`{"pattern":"**/AGENTS.md"}`)},
+		{Kind: "ObservationEvent", ToolName: "glob", ToolCallID: "glob-call", Text: "AGENTS.md"},
+		{ID: "agents-read", Kind: "ActionEvent", Source: "agent", ToolName: "repository_view", ToolCallID: "agents-call", ActionPath: "AGENTS.md"},
+		{Kind: "ObservationEvent", ToolName: "repository_view", ToolCallID: "agents-call", Text: "# instructions"},
+	}
+	if violation, found := repositoryGroundingViolation(events, 0, false); found {
+		t.Fatalf("glob orientation was fenced: %+v", violation)
+	}
+}
+
 func TestRepositoryGroundingAcceptsSuccessfulReadFromRecoveryCheckpoint(t *testing.T) {
 	events := []rawEvent{
 		{Kind: "MessageEvent", Source: "user"},
