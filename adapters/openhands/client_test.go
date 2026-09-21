@@ -2130,6 +2130,41 @@ func TestRepositoryGroundingAllowsGlobBeforeAgentsRead(t *testing.T) {
 	}
 }
 
+func TestRepositoryGroundingOrientationIsContentBasedAcrossTools(t *testing.T) {
+	// Every action below exposes only workspace structure (paths, names,
+	// commit metadata) and must be orientation regardless of the tool that
+	// carries it. These are the exact actions the grounding fence falsely
+	// rejected across the FQN-alias run.
+	cases := []rawEvent{
+		{ID: "view-root", Kind: "ActionEvent", Source: "agent", ToolName: "repository_view", ActionPath: "."},
+		{ID: "editor-dir", Kind: "ActionEvent", Source: "agent", ToolName: "file_editor", ActionCommand: "view", ActionPath: "/Users/paul/.local/share/tekroo/teams-v4-phase10-prod/data/evidence/task-workspaces/workspaces/task-1eb2d703-2779-754f-8a4d-857f02c04c03"},
+		{ID: "git-log", Kind: "ActionEvent", Source: "agent", ToolName: "terminal", ActionCommand: "git log --oneline -8"},
+		{ID: "git-rev", Kind: "ActionEvent", Source: "agent", ToolName: "terminal", ActionCommand: "git rev-parse HEAD"},
+	}
+	for _, action := range cases {
+		if !workspaceOrientationAction(action) {
+			t.Fatalf("structure-only action %s (%s) was not orientation", action.ID, action.ToolName)
+		}
+	}
+	// git show and git diff carry file contents and are not orientation.
+	for _, content := range []rawEvent{
+		{ID: "git-show", Kind: "ActionEvent", Source: "agent", ToolName: "terminal", ActionCommand: "git show HEAD"},
+		{ID: "git-diff", Kind: "ActionEvent", Source: "agent", ToolName: "terminal", ActionCommand: "git diff organization/host.go"},
+	} {
+		if workspaceOrientationAction(content) {
+			t.Fatalf("content-bearing action %s was misclassified as orientation", content.ID)
+		}
+	}
+	// A content search before the AGENTS.md read remains a real violation.
+	events := []rawEvent{
+		{Kind: "MessageEvent", Source: "user"},
+		{ID: "search", Kind: "ActionEvent", Source: "agent", ToolName: "repository_search", ToolCallID: "search-call", ActionPayload: json.RawMessage(`{"pattern":"OperatorAlias","max_results":40}`)},
+	}
+	if violation, found := repositoryGroundingViolation(events, 0, false); !found || violation.ID != "search" {
+		t.Fatalf("premature content search was not fenced: found=%t", found)
+	}
+}
+
 func TestRepositoryGroundingAcceptsSuccessfulReadFromRecoveryCheckpoint(t *testing.T) {
 	events := []rawEvent{
 		{Kind: "MessageEvent", Source: "user"},

@@ -1577,30 +1577,57 @@ func workspaceOrientationAction(event rawEvent) bool {
 	if event.Kind != "ActionEvent" || event.Source != "agent" {
 		return false
 	}
-	// glob exposes file paths only, never source or design content; it is the
-	// repository-tool equivalent of `ls` and is how an agent establishes where
-	// AGENTS.md is before reading it.
-	if event.ToolName == "glob" {
-		return true
-	}
+	// Orientation is defined by the information an action exposes, not the tool
+	// that carries it: an action revealing only workspace structure (paths,
+	// names, commit metadata) that mutates nothing is orientation whether it
+	// arrives as a terminal command or a repository tool. The previous
+	// terminal-only allowlist fenced the same information when delivered by
+	// glob, repository_view, or file_editor, producing a false positive in
+	// every stage of every run.
 	if event.ToolName != "terminal" {
-		return false
+		return repositoryFileListingAction(event)
 	}
 	command := strings.TrimSpace(event.ActionCommand)
 	if command == "" || violatesShellDiscipline(command) {
 		return false
 	}
+	if repositoryFileListingAction(event) {
+		return true
+	}
 	fields := strings.Fields(command)
 	if len(fields) == 1 && fields[0] == "pwd" {
 		return true
 	}
-	if len(fields) >= 1 && fields[0] == "ls" {
-		return true
+	return gitMetadataAction(fields)
+}
+
+// gitMetadataAction reports whether a git command exposes only commit and
+// worktree metadata (refs, status, commit subjects, changed-file names) and no
+// file contents. git show/diff carry content unless limited to --stat or
+// --name-only; git log carries content only in patch mode.
+func gitMetadataAction(fields []string) bool {
+	if len(fields) < 2 || fields[0] != "git" {
+		return false
 	}
-	if len(fields) >= 2 && fields[0] == "git" && fields[1] == "status" {
+	switch fields[1] {
+	case "status", "rev-parse", "branch":
 		return true
+	case "log":
+		for _, field := range fields[2:] {
+			if field == "-p" || field == "--patch" || strings.HasPrefix(field, "--word-diff") {
+				return false
+			}
+		}
+		return true
+	case "show", "diff":
+		for _, field := range fields[2:] {
+			if field == "--stat" || field == "--name-only" || field == "--name-status" {
+				return true
+			}
+		}
+		return false
 	}
-	return len(fields) >= 3 && fields[0] == "git" && fields[1] == "rev-parse" && slices.Contains(fields[2:], "--show-toplevel")
+	return false
 }
 
 func violatesShellDiscipline(command string) bool {
