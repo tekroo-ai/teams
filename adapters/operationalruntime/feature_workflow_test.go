@@ -16,7 +16,7 @@ func TestWorkflowPlanningStageDefinitionComesFromConfiguredWorkflow(t *testing.T
 		t.Fatal(err)
 	}
 	path := filepath.Join(filepath.Dir(filepath.Dir(workingDirectory)), "config", "workflows", "software-development.v1.json")
-	definition, err := organization.LoadWorkflowDefinition(path, kernel.Digest("1624fb8ba139c3c1e1ebe880cf79cfa1f9edd025b946f9676a2c3f3ab9ea3967"))
+	definition, err := organization.LoadWorkflowDefinition(path, kernel.Digest("8e9842874ad694f1fce192036f647d4fa8d939d4f754fbc6e9cd9a23bdca9036"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,7 +42,10 @@ func TestWorkflowPlanningStageDefinitionComesFromConfiguredWorkflow(t *testing.T
 		if role != expected.role || purpose != kernel.PurposeHandoff || !strings.HasPrefix(title, expected.id+": ") || len(criteria) != 1 || criteria[0] == "" || !strings.Contains(description, "Completion contract: ") {
 			t.Fatalf("stage %s binding role=%s purpose=%s title=%q description=%q criteria=%v", expected.stage, role, purpose, title, description, criteria)
 		}
-		if strings.Contains(description, "Return exactly TEKROO_ORGANIZATIONAL_RESULT") || !strings.Contains(description, "task-specific work_product") {
+		// The completion contract must describe the task work_product (either by
+		// pointing at the canonical handler result schema or enumerating the
+		// task-specific work_product) and must not dictate the outer envelope.
+		if strings.Contains(description, "Return exactly TEKROO_ORGANIZATIONAL_RESULT") || (!strings.Contains(description, "result schema") && !strings.Contains(description, "task-specific work_product")) {
 			t.Fatalf("stage %s conflates task output with the selected handler envelope: %q", expected.stage, description)
 		}
 		if expected.stage == stageSpecification && !strings.Contains(description, "appears verbatim") {

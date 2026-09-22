@@ -450,6 +450,30 @@ func TestPreAssignmentPlanningResultsPreserveOperatorSuppliedActorFQN(t *testing
 	}
 }
 
+func TestPreAssignmentPlanningResultsAllowFeatureEstablishedActors(t *testing.T) {
+	// A feature carries its own authoritative operator and product-owner actor
+	// identities from submission. A product owner discussing operator scope may
+	// name them without pre-assigning routable work; an invented worker FQN must
+	// still be rejected.
+	feature := organization.FeatureRequest{
+		OperatorActor:     "teams::operator-1",
+		ProductOwnerActor: "teams::product-owner-1",
+		Input: organization.FeatureRequestInput{
+			Title:       "Human-readable aliases for agent instances",
+			Description: "Give an agent instance a human-readable alias.",
+		},
+	}
+	allowed := featureAuthorizedActorFQNs(feature)
+	established := []byte(application.OrganizationalResultMarker + "\n{\"schema_version\":\"1.0.0\",\"result_type\":\"FEATURE_REFINEMENT\",\"acceptance_criteria_disposition\":\"PRESERVE_SUBMITTED\",\"clarification_questions\":[\"Which identity is the operator scope: a named operator actor FQN such as teams::operator-1, or a workspace?\"],\"priority\":\"NORMAL\"}")
+	if _, err := parseRefinementStageResult(established, allowed...); err != nil {
+		t.Fatalf("feature's own operator actor was rejected in a clarification question: %v", err)
+	}
+	inventedWorker := []byte(application.OrganizationalResultMarker + "\n{\"schema_version\":\"1.0.0\",\"result_type\":\"FEATURE_REFINEMENT\",\"acceptance_criteria_disposition\":\"PRESERVE_SUBMITTED\",\"clarification_questions\":[\"Should teams::coder-2 perform the work?\"],\"priority\":\"NORMAL\"}")
+	if _, err := parseRefinementStageResult(inventedWorker, allowed...); err == nil {
+		t.Fatal("model-invented worker FQN was accepted")
+	}
+}
+
 func TestFeaturePlanningDescriptionCarriesAuthoritativeFeatureState(t *testing.T) {
 	feature := organization.FeatureRequest{
 		ID: "00000000-0000-7000-8000-000000000101",

@@ -315,10 +315,26 @@ func operationalIdentityTokens(value string) []string {
 }
 
 func featureAuthorizedActorFQNs(feature organization.FeatureRequest) []kernel.ActorFQN {
-	values := append([]string{feature.Input.Title, feature.Input.Description}, feature.Input.AcceptanceCriteria...)
-	values = append(values, feature.Input.Constraints...)
 	seen := make(map[kernel.ActorFQN]struct{})
 	actors := make([]kernel.ActorFQN, 0)
+	// The feature's own established actor identities are authoritative feature
+	// state (bound at submission and validated), not model-authored work
+	// assignments. A product owner discussing operator scope or its own
+	// authorship may name them without pre-assigning routable work; the guard
+	// still rejects any invented worker FQN absent from both this set and the
+	// free-text input.
+	for _, actor := range []kernel.ActorFQN{feature.OperatorActor, feature.ProductOwnerActor} {
+		if !actor.Valid() {
+			continue
+		}
+		if _, exists := seen[actor]; exists {
+			continue
+		}
+		seen[actor] = struct{}{}
+		actors = append(actors, actor)
+	}
+	values := append([]string{feature.Input.Title, feature.Input.Description}, feature.Input.AcceptanceCriteria...)
+	values = append(values, feature.Input.Constraints...)
 	for _, value := range values {
 		for _, token := range operationalIdentityTokens(value) {
 			actor, err := kernel.ParseActorFQN(token)

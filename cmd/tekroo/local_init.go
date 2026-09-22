@@ -36,7 +36,7 @@ const (
 	localDeploymentVersion      = "1.0.0"
 	localHandlerPublisher       = "tekroo-message-handlers-20260913"
 	localQualificationPublisher = "tekroo-message-handlers-qualification-20260913"
-	localSoftwareWorkflowDigest = "1624fb8ba139c3c1e1ebe880cf79cfa1f9edd025b946f9676a2c3f3ab9ea3967"
+	localSoftwareWorkflowDigest = "8e9842874ad694f1fce192036f647d4fa8d939d4f754fbc6e9cd9a23bdca9036"
 	localCondenserOutputTokens  = 4096
 	localCondenserMaximumTokens = 196608
 	localQualificationSchema    = "tekroo.local-model-profile-qualifications/1.0.0"
