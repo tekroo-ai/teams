@@ -135,6 +135,88 @@ tool call in the fork leaks identically.
   with PLANNING_RECOVERY_REJECTED / "invalid feature request or plan".
 - Team re-PAUSED after the run (keepalive auto-resumes on restart).
 
+## FQN-alias v8 resubmit — first hiccup, root-caused by offline guard replay
+- Resubmitted identical FQN-alias content under key phase10-prod-agent-alias-v8
+  -> feature 01a0c66f-5d55-71bb-8b2d-c7c62b96866d. (No feature-level
+  rollback/cancel command exists anywhere in the kernel/operator surface;
+  FeatureCancelled has no transition path. The old 01a0c4b9 is left inert;
+  nothing was promoted to main, so there is no code to revert.)
+- PO refine asked 3 clarification questions (alias syntax/uniqueness,
+  change/remove authority + lifecycle persistence, resolution surfaces).
+  Answered consistent with the brief's stated product decisions; feature
+  advanced to READY_FOR_PLANNING. This is healthy behavior, not a fault.
+- refine/specify/design/2 implementation tasks SUCCEEDED. Then the task
+  "Add ProductionService agent-alias lifecycle operations with strict
+  operator scoping" (92a635ef) FAILED 3 consecutive attempts and is now
+  BLOCKED ("task invocation failed without an admissible automatic
+  recovery; operator escalation is required").
+- OFFLINE GUARD REPLAY (Go test in-package, production decodeEvent +
+  production guards over the real 623-event stream): the SEARCH_LOOP guard
+  fired on a TRUE identical repeat — `grep -n "func (host \*Host)
+  Heartbeat" -A 18 organization/host.go` at idx 600 and idx 618, same
+  result, no intervening mutation. OVERLAPPING_VIEW guard: no violation.
+  So the fence is CORRECT (fence false-positive hypothesis REFUTED).
+- REAL failure (OBSERVED): the agent created its deliverable
+  adapters/operationalruntime/agent_alias.go at idx 161 (real progress),
+  then spent ~440 events grepping host.go / role_worker.go / the alias
+  store trying to understand the ProductionService integration surface,
+  made one more str_replace at idx 597, then fell into a genuine
+  re-grep loop (5 REPOSITORY_PROGRESS corrections, each heeded for 1-2
+  actions then re-repeated). Terminal code
+  REPEATED_CAPABILITY_MISMATCH_REPOSITORY_NO_PROGRESS. The deliverable
+  was never committed. This is the integration-comprehension /
+  candidate-not-committed family, NOT a search-loop false positive.
+- Verdict: the task's integration surface (ProductionService + Host +
+  InProcessRuntime + mongo alias store) is too large for one bounded
+  invocation; the agent flailed and the guard correctly terminated it.
+  Fix is NOT a fence change. Options: (a) method-changing retry reason
+  ("agent_alias.go already exists; do NOT re-grep host.go; read the one
+  integration point, wire it, commit"); (b) planning fix to decompose the
+  ProductionService wiring into smaller tasks.
+
+## DISCRIMINATING EXPERIMENT (2026-09-22) — verdict: NOT task size
+Two controlled retry-task experiments on the blocked task 92a635ef, each
+preceded by resetting the worktree to its exact pre-invocation state
+(HEAD 18ace9e, discard modified production.go + untracked deliverables).
+- EXP 1 (80ffc743, attempt 4): reason = "don't grep host.go/store; read
+  the ONE production.go wiring point; commit before finish." RESULT: the
+  agent wired the four methods + production.go CLEANLY (no corrections
+  through idx 147, created file, go build, wrote tests, ran go test once)
+  — the wiring half was fixed. Then it fell into a DIFFERENT rabbit hole:
+  building the lifecycle-persistence acceptance test, which needs a full
+  Host+Store+ProductionService fixture. It grepped store.go/host.go/
+  workflow_store.go/manifest.go/fake for ~600 more events, 7
+  REPOSITORY_PROGRESS corrections, FAILED, deliverables written but NOT
+  committed. Its own thinking: "check starter team actor names for the
+  role lifecycle test", "check Host.NewHost requirements and the store
+  interface it needs" — i.e. reconstructing a test fixture from scratch.
+- EXP 2 (c5a2efaa, attempt 5): reason = same wiring guidance PLUS "the
+  repo ALREADY has the pattern: production_integration_test.go builds a
+  full ProductionService via NewProductionService (line 41); helpers
+  startRuntimeMongod/closeRuntimeStore/loadStarterTeam exist; COPY that
+  setup verbatim, do not invent a fixture." RESULT: SUCCEEDED. Committed
+  d8a405a (645 insertions: 4 methods + production.go wiring + unit tests
+  + a mongo_integration lifecycle test proving persistence across
+  start/pause/resume/stop + simulated daemon restart). Only 2
+  shell-discipline corrections (genuine pipes). Task COMPLETED.
+- CONCLUSION: the failure is NOT "task too large" and NOT a fence false
+  positive. It is the model's inability to REUSE an existing test-fixture
+  pattern: it researches the fixture from scratch instead of copying the
+  one that already exists. The decisive lever is pointing it at the exact
+  copyable artifact (file + line + helper names), not generic "don't
+  grep" advice. EXP 1's generic reason fixed the wiring but not the
+  fixture; EXP 2's specific pointer fixed both.
+- PLANNING IMPLICATION: implementation tasks whose acceptance criteria
+  require a heavyweight integration fixture should either (a) name the
+  existing fixture/helper to copy in the task description, or (b) be
+  decomposed so the fixture-dependent test is its own task with the
+  pattern pre-identified. This is a planning-brief quality issue, not a
+  kernel/fence defect.
+- STATE AFTER EXPERIMENT: task 92a635ef COMPLETED; feature 01a0c66f
+  auto-resumed and dispatched 2 more tasks (HTTP/CLI alias surfaces);
+  team re-PAUSED to hold state. Experiment deliverables saved to
+  /tmp/exp1-deliverables/.
+
 ## mlx-serve v26.9.5 release-notes check (2026-09-21)
 - New release v26.9.5 published 2026-09-21T15:26Z (repo ddalcu/mlx-serve,
   app com.dalcu.mlx-core; running here is 26.9.4).
