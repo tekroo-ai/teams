@@ -373,6 +373,8 @@ var repositoryExecutionGuidance = []string{
 
 var editableExecutionGuidance = []string{
 	"Inspect enough current code and tests to justify the change, then make the smallest cohesive edit. If the task remains ambiguous after the relevant surfaces are exhausted, report the concrete blocker.",
+	"Ground every symbol you rely on by reading it: use glob to list a directory and repository_view to read the actual file before you depend on a name, signature, or field. Treat repository_search as a locator only; never infer that a symbol exists, or reconstruct an interface, from a search hit alone, and never enumerate candidate names by varying a regular expression.",
+	"An empty search result means the symbol or text is absent from the searched scope: change your approach by globbing the directory and reading the candidate files, not by retrying a near-identical pattern hoping for a different result. Repeating a search that already returned nothing is a failure to make progress.",
 	"Map and extend existing interfaces before adding a parallel abstraction.",
 	"When the task requires a new artifact of a kind the repository already contains (a test, fixture, handler, or wiring), locate the closest existing example and adapt it rather than reconstructing it from the internals it depends on.",
 	"Implement in cohesive increments and run focused tests after each increment.",
