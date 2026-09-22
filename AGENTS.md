@@ -548,3 +548,54 @@ from the universal schema).
 - Terminal bulk-input hazard RECONFIRMED: multi-line python/heredoc through the
   terminal corrupts (splice/duplicate at wrap). Write scripts with the file
   editor and run by path; `git commit -F msgfile`, never `-m "$(cat <<EOF)"`.
+
+## Root cause: coder "mental breakdown" after compaction (2026-09-22, run _r3)
+
+Diagnosed the degenerate search loop on implementation task 70c633a6 (coder,
+conversation bdc34ae3…). It is NOT a fence false positive and NOT a broken tool.
+Evidence from the full 1116-event record:
+
+- Tool histogram: terminal 9, glob 1, file_editor 75, repository_search 267,
+  repository_view 0. The model NEVER used repository_view in the entire
+  conversation — it never actually read any file. It only ever grepped
+  (repository_search) to GUESS symbol names.
+- The tool was correct: 267 searches, exactly 1 is_error (the model passed a
+  FILE path `adapters/operationalruntime/production.go`; the tool requires a
+  directory — a model error, correctly reported). 120 empty (m=0) results were
+  ACCURATE: the symbols genuinely do not exist (e.g. `func (host *Host) Team`
+  / `Manifest` are absent; only `Roster` exists). Searches with path omitted
+  searched the whole workspace correctly — right directory, valid responses.
+- 5 condensations fired. The condensation summary FABRICATED its COMPLETED
+  section: it claimed the model "read key files (actor_alias.go, production.go,
+  host.go, …)" — but repository_view count is 0, so no file was ever read. The
+  summary is a lossy reconstruction that hallucinated a reading history.
+- The breakdown mechanism: after compaction dropped 122 forgotten events, the
+  model — believing (from the fabricated summary) that it had "read host.go" —
+  tried to RECALL the method names it thought it knew by brute-forcing regex
+  character classes: enumerating the alphabet one letter at a time
+  (`[N]`,`[L]`,`[I]`,`[J]`,`[K]`…) and incrementally growing negated classes
+  (`[^a-zc]`→`[^a-zct]`→…). When a search returned m=0 it did NOT conclude
+  "symbol absent"; it treated the empty result as "my regex was wrong, adjust
+  one char and retry" — a self-reinforcing recall loop.
+- The REPOSITORY_PROGRESS fence correctly detected exact repeats (max exact
+  repeat was only 3; the model evaded it by varying the pattern by one char).
+  The fence worked; it cannot catch "semantically identical, syntactically
+  varying" enumeration.
+
+Root cause = three stacked causes: (1) PRIMARY: search-only exploration
+strategy — the model never grounded itself by reading files, so it had no
+ground-truth in context; (2) TRIGGER: condensation dropped the thin evidence and
+emitted a fabricated summary claiming files were read; (3) AMPLIFIER: the model
+interprets empty search results as "regex wrong, retry" instead of "symbol
+absent." Compaction is the trigger, not the sole cause — the search-only
+strategy is the underlying defect.
+
+Generalizable fixes to evaluate (not yet implemented):
+- Condenser integrity: the summary must not claim actions that did not occur.
+  A fabricated "read X" is worse than an honest "searched for X." Investigate
+  the condenser prompt/model for action-fabrication.
+- Grounding: the implementation brief should force repository_view (read the
+  actual file) before symbol-level repository_search; the deployed grounding
+  fix (5b3b19a) exempts orientation but cannot force a model that never reads.
+- Empty-result discipline: teach the model that m=0 means "absent, change
+  approach (read the file / glob the dir)," not "tweak the regex."
