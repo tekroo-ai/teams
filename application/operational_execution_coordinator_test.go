@@ -40,7 +40,7 @@ func TestOperationalCoordinatorExecutesOneInvocationAndNeverChainsAgentProse(t *
 		t.Fatalf("role grounding = %#v", runtime.lastBrief.RoleGrounding)
 	}
 	guidance := strings.Join(runtime.lastBrief.ExecutionGuidance, "\n")
-	for _, required := range []string{"role_grounding", "role_fqrn", "AGENTS.md", "rg or rg --files", "exactly one shell command", "do not use cd", "concrete open question", "stop discovery", "do not enumerate unrelated directories", "accepted CONTRACTS packages", "focused tests"} {
+	for _, required := range []string{"role_grounding", "role_fqrn", "AGENTS.md", "repository_search tool", "glob tool", "exactly one shell command", "do not use cd", "concrete open question", "stop discovery", "do not enumerate unrelated directories", "accepted CONTRACTS packages", "focused tests"} {
 		if !strings.Contains(guidance, required) {
 			t.Fatalf("execution guidance omitted %q: %v", required, runtime.lastBrief.ExecutionGuidance)
 		}
@@ -56,6 +56,28 @@ func TestOperationalCoordinatorExecutesOneInvocationAndNeverChainsAgentProse(t *
 	duplicate, err := coordinator.Process(context.Background(), runtime.intent)
 	if err != nil || duplicate.State != kernel.InvocationSucceeded || runtime.startCalls != 1 {
 		t.Fatalf("duplicate result=%#v err=%v startCalls=%d", duplicate, err, runtime.startCalls)
+	}
+}
+
+func TestRepositoryGuidanceDirectsSearchToDedicatedTools(t *testing.T) {
+	runtime := newOperationalRuntime(t)
+	brief, _, err := BuildExecutionBrief(runtime.context, testRoleGrounding(runtime.context.Invocation.ActorFQN), 1<<20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	guidance := strings.Join(brief.ExecutionGuidance, "\n")
+	for _, required := range []string{"repository_search tool", "glob tool", "exactly one shell command"} {
+		if !strings.Contains(guidance, required) {
+			t.Fatalf("repository guidance omitted %q: %v", required, brief.ExecutionGuidance)
+		}
+	}
+	// The guidance must not point the agent at a shell grep/rg idiom; that is
+	// what drove the pipe-discipline violation. Discovery belongs to the
+	// dedicated tools, not the terminal.
+	for _, forbidden := range []string{"rg or rg --files", "Use rg"} {
+		if strings.Contains(guidance, forbidden) {
+			t.Fatalf("repository guidance still directs shell discovery %q: %v", forbidden, brief.ExecutionGuidance)
+		}
 	}
 }
 

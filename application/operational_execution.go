@@ -365,7 +365,7 @@ var sharedExecutionGuidance = []string{
 // client tool guard hard-fails the invocation.
 var repositoryExecutionGuidance = []string{
 	"Read and follow AGENTS.md before taking repository actions.",
-	"Use rg or rg --files for repository discovery.",
+	"Search file contents with the repository_search tool and list files with the glob tool; use the terminal only for commands that have no dedicated tool, such as git and go build or test.",
 	"The authorized workspace is already the terminal working directory. Issue exactly one shell command per terminal action: do not use cd, &&, semicolons, pipes, command substitution, environment-variable expansion, or multiple commands separated by newlines.",
 	"Every inspection must resolve a concrete open question in the assigned task. When a search identifies the relevant implementation and tests, inspect those files and stop discovery; do not enumerate unrelated directories to prove absence.",
 	"Read accepted CONTRACTS packages only when they directly resolve an open question in the assigned task. Never modify accepted CONTRACTS packages.",
@@ -374,6 +374,7 @@ var repositoryExecutionGuidance = []string{
 var editableExecutionGuidance = []string{
 	"Inspect enough current code and tests to justify the change, then make the smallest cohesive edit. If the task remains ambiguous after the relevant surfaces are exhausted, report the concrete blocker.",
 	"Map and extend existing interfaces before adding a parallel abstraction.",
+	"When the task requires a new artifact of a kind the repository already contains (a test, fixture, handler, or wiring), locate the closest existing example and adapt it rather than reconstructing it from the internals it depends on.",
 	"Implement in cohesive increments and run focused tests after each increment.",
 	"Before reporting success, commit the intended changes and tests on the assigned branch and leave Git status clean. Validators receive only the committed candidate.",
 }
