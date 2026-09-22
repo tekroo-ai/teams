@@ -507,3 +507,44 @@ from the universal schema).
   remain unfiled and valid. Its prefix-cache commits are GPU-memory-overrun
   fixes, not checkpoint-bounding. Note: next release renames MLX Core.app to
   MLX-Serve.app and resets app settings.
+
+## v204 constrained-schema re-qualification (2026-09-22)
+
+- Making a role bundle's `result.schema.json` canonical (constraining
+  `work_product`) changes the bundle digest, which changes the DERIVED
+  `model_profile_digest` = sha256(role, bundle_digest, agent_settings)
+  (client.go:160). This cascades: team.json PO `model_profile_digest`,
+  tekrood.json profile `model_profile_digest` + qualification + corpus,
+  and the durable `role_instances` doc's `model_profile_digest`/`bundle_digest`/
+  `manifest_digest`/`bundle_version` (rebind in place, revision preserved, or
+  `registerRoleState` fails "role is not configured" at boot). The qualification
+  binds `model_profile_digest`, so ANY bundle change invalidates the model-profile
+  qualification by design — a correct security property, not a bug.
+- Qualification chicken-and-egg: refine admission itself requires a
+  qualification, so a genuine re-qualification must be an OUT-OF-BAND replay
+  (direct `POST /api/conversations` with the role's agent_settings + injected
+  `submit_envelope` + `client_tools`, valid client UUIDv7 id, faithful brief
+  carrying the NEW result_schema). Author the corpus+qualification with the REAL
+  Go digest functions (`QualificationCorpusDefinition.Digest()`,
+  `QualificationDigest`) — never hand-rolled. Attest only work kinds genuinely
+  replayed (PO = DESIGN via refine, RELEASE via product-acceptance over a real
+  candidate workspace).
+- `data` in `role_instances` is BSON Binary (JSON bytes), not an embedded doc:
+  write back `new Binary(Buffer.from(JSON.stringify(j)), Binary.SUBTYPE_DEFAULT)`.
+- Pre-assignment identity guard (feature_stage_result.go): rejects actor FQNs in
+  planning text not present in the feature, to stop the model pre-assigning
+  routable work. FALSE POSITIVE when a PO names the feature's OWN operator actor
+  (teams::operator-1) as subject-matter vocabulary. FIXED 21cc880: seed the
+  allowed set with the feature's authoritative OperatorActor/ProductOwnerActor;
+  invented worker FQNs still rejected.
+- Decoder-defect self-recovery: when a BLOCKED task's blocker is exactly
+  `invalidPlanningOutputReason` for that invocation and a redeployed validator
+  now accepts the STORED output, the reconcile loop reuses the immutable output
+  (no new model call) and the task recovers to RUNNABLE/COMPLETED. This is how
+  the blocked refine recovered after the guard fix — no operator retry needed.
+- A valid FEATURE_REFINEMENT with non-empty clarification_questions drives the
+  feature to CLARIFICATION_REQUIRED (human gate) — the designed outcome, not a
+  failure.
+- Terminal bulk-input hazard RECONFIRMED: multi-line python/heredoc through the
+  terminal corrupts (splice/duplicate at wrap). Write scripts with the file
+  editor and run by path; `git commit -F msgfile`, never `-m "$(cat <<EOF)"`.
