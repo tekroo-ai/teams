@@ -2675,7 +2675,7 @@ func (client *Client) correctRepositoryProgressViolation(ctx context.Context, br
 	if repositoryProgressViolationCorrected(events, eventIndexByID(events, violation.ID)) {
 		return client.observation(ctx, brief, requestDigest, info, events, false)
 	}
-	correction := repositoryProgressCorrectionPrefix + violation.ID + "\nThe most recent repository action exactly repeated an earlier action and returned the same result within the current uninterrupted work period. Continue from that result. Choose the next action required by your assigned role; do not repeat the same action unless repository state or its inputs change."
+	correction := repositoryProgressCorrectionPrefix + violation.ID + "\nYour most recent repository action exactly repeated an earlier action and returned the same result, so repeating it again cannot advance the task. Before your next action, answer in one sentence: what specific fact or artifact are you still trying to obtain, and what concrete action that is NOT a repeat of a search you have already run will obtain it? Then take that action. If the symbol or content you are looking for has not appeared in any result so far, treat it as absent from the paths you have searched: read the whole file with repository_view or list the directory with glob instead of searching for it again with a varied pattern."
 	status, _, err := client.request(ctx, http.MethodPost, "/api/conversations/"+url.PathEscape(conversationID)+"/events", map[string]any{
 		"role": "user", "run": true,
 		"content": []map[string]any{{"type": "text", "text": correction}},

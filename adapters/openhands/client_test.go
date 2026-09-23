@@ -790,6 +790,12 @@ func TestClientCorrectsExactRepeatedPlannerAction(t *testing.T) {
 	if err != nil || observation.State != application.ExternalRunning || state.interruptCalls != 1 || state.correctionCalls != 1 || !strings.HasPrefix(state.correctionText, repositoryProgressCorrectionPrefix+"action-01\n") {
 		t.Fatalf("observation=%#v err=%v interrupts=%d", observation, err, state.interruptCalls)
 	}
+	// ADR 133 Arm 2 tier 1: the progress correction must interrogate the model
+	// (demand a stated goal and a non-repeat action), not inject a statement it
+	// can passively acknowledge and ignore.
+	if !strings.Contains(state.correctionText, "?") || !strings.Contains(state.correctionText, "answer in one sentence") {
+		t.Fatalf("progress correction is not a question: %q", state.correctionText)
+	}
 }
 
 func TestClientRetryCorrectsExactActionRepeatedInsideRetry(t *testing.T) {
