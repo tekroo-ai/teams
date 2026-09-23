@@ -581,7 +581,7 @@ func (service *ProductionService) planningFeatureForTask(ctx context.Context, ta
 				if candidateErr != nil {
 					continue
 				}
-				candidate, candidateErr := parseArchitectureStageResult(architectureOutput, featureAuthorizedActorFQNs(feature)...)
+				candidate, candidateErr := parseArchitectureStageResult(architectureOutput, featureInputOperationalMarkers(feature), featureAuthorizedActorFQNs(feature)...)
 				if candidateErr != nil {
 					return organization.FeatureRequest{}, "", nil, 0, false, candidateErr
 				}

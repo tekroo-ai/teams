@@ -178,7 +178,7 @@ func (service *ProductionService) reconcileFeatureArchitectureReview(ctx context
 	if feature.Specification == nil {
 		return false, organization.ErrInvalidFeature
 	}
-	candidate, err := parseArchitectureStageResult(architectureOutput, featureAuthorizedActorFQNs(feature)...)
+	candidate, err := parseArchitectureStageResult(architectureOutput, featureInputOperationalMarkers(feature), featureAuthorizedActorFQNs(feature)...)
 	if err != nil {
 		return false, err
 	}
@@ -624,7 +624,7 @@ func (service *ProductionService) ensureFeaturePlanningTaskForRound(ctx context.
 			if candidateErr != nil {
 				return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, errors.Join(organization.ErrFeatureConflict, candidateErr)
 			}
-			candidate, parseErr := parseArchitectureStageResult(architectureOutput, featureAuthorizedActorFQNs(feature)...)
+			candidate, parseErr := parseArchitectureStageResult(architectureOutput, featureInputOperationalMarkers(feature), featureAuthorizedActorFQNs(feature)...)
 			if parseErr != nil {
 				return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, errors.Join(organization.ErrFeatureConflict, parseErr)
 			}
@@ -982,7 +982,7 @@ func (service *ProductionService) architecturePlanRejections(ctx context.Context
 	if err != nil {
 		return nil, false, err
 	}
-	candidate, err := parseArchitectureStageResult(architectureOutput, featureAuthorizedActorFQNs(feature)...)
+	candidate, err := parseArchitectureStageResult(architectureOutput, featureInputOperationalMarkers(feature), featureAuthorizedActorFQNs(feature)...)
 	if err != nil {
 		return nil, false, err
 	}
@@ -1145,7 +1145,7 @@ func featureArchitectureReviewDescription(feature organization.FeatureRequest, i
 	if invocation.OutputDigest == nil || digestBytes(output) != *invocation.OutputDigest || feature.Specification == nil {
 		return "", organization.ErrInvalidFeature
 	}
-	candidate, err := parseArchitectureStageResult(output, featureAuthorizedActorFQNs(feature)...)
+	candidate, err := parseArchitectureStageResult(output, featureInputOperationalMarkers(feature), featureAuthorizedActorFQNs(feature)...)
 	if err != nil {
 		return "", err
 	}
@@ -1187,7 +1187,7 @@ func featureArchitectureTaskReviewDescription(feature organization.FeatureReques
 	if invocation.OutputDigest == nil || digestBytes(output) != *invocation.OutputDigest || feature.Specification == nil {
 		return "", organization.ErrInvalidFeature
 	}
-	candidate, err := parseArchitectureStageResult(output, featureAuthorizedActorFQNs(feature)...)
+	candidate, err := parseArchitectureStageResult(output, featureInputOperationalMarkers(feature), featureAuthorizedActorFQNs(feature)...)
 	if err != nil || taskIndex >= uint32(len(candidate.Tasks)) {
 		return "", errors.Join(organization.ErrInvalidFeature, err)
 	}
@@ -1462,18 +1462,19 @@ func (service *ProductionService) ensureFeaturePlanningEvidence(ctx context.Cont
 
 func (service *ProductionService) validateFeatureStageOutput(feature organization.FeatureRequest, stage featurePlanningStage, output []byte) error {
 	allowedActorFQNs := featureAuthorizedActorFQNs(feature)
+	allowedMarkers := featureInputOperationalMarkers(feature)
 	switch stage {
 	case stageRefinement:
-		_, err := parseRefinementStageResult(output, allowedActorFQNs...)
+		_, err := parseRefinementStageResult(output, allowedMarkers, allowedActorFQNs...)
 		return err
 	case stageSpecification:
-		result, err := parseSpecificationStageResult(output, allowedActorFQNs...)
+		result, err := parseSpecificationStageResult(output, allowedMarkers, allowedActorFQNs...)
 		if err != nil || !specificationPreservesSubmittedCriteria(feature.Input.AcceptanceCriteria, result) {
 			return organization.ErrInvalidFeature
 		}
 		return nil
 	case stageArchitecture:
-		result, err := parseArchitectureStageResult(output, allowedActorFQNs...)
+		result, err := parseArchitectureStageResult(output, allowedMarkers, allowedActorFQNs...)
 		if err != nil {
 			return err
 		}
@@ -1492,20 +1493,21 @@ func (service *ProductionService) validateFeatureStageOutput(feature organizatio
 
 func (service *ProductionService) applyFeatureStageOutput(ctx context.Context, feature organization.FeatureRequest, stage featurePlanningStage, invocation kernel.WorkInvocation, output []byte) error {
 	allowedActorFQNs := featureAuthorizedActorFQNs(feature)
+	allowedMarkers := featureInputOperationalMarkers(feature)
 	preparedAt := service.clock.Now().UTC()
 	if invocation.FinishedAt != nil {
 		preparedAt = invocation.FinishedAt.UTC()
 	}
 	switch stage {
 	case stageRefinement:
-		result, err := parseRefinementStageResult(output, allowedActorFQNs...)
+		result, err := parseRefinementStageResult(output, allowedMarkers, allowedActorFQNs...)
 		if err != nil {
 			return err
 		}
 		_, err = service.Features.Refine(ctx, feature.ID, feature.Revision, organization.FeatureRefinement{PreparedBy: invocation.ActorFQN, PreparedExecution: invocation.Execution, AcceptanceCriteria: append([]string(nil), feature.Input.AcceptanceCriteria...), ClarificationQuestions: result.ClarificationQuestions, Priority: result.Priority, PreparedAt: preparedAt})
 		return err
 	case stageSpecification:
-		result, err := parseSpecificationStageResult(output, allowedActorFQNs...)
+		result, err := parseSpecificationStageResult(output, allowedMarkers, allowedActorFQNs...)
 		if err != nil || !specificationPreservesSubmittedCriteria(feature.Input.AcceptanceCriteria, result) {
 			return organization.ErrInvalidFeature
 		}
@@ -1516,7 +1518,7 @@ func (service *ProductionService) applyFeatureStageOutput(ctx context.Context, f
 		_, err = service.Features.Specify(ctx, feature.ID, feature.Revision, organization.FeatureSpecification{PreparedBy: invocation.ActorFQN, PreparedExecution: invocation.Execution, Stories: stories, DesignConstraints: result.DesignConstraints, PreparedAt: preparedAt})
 		return err
 	case stageArchitecture:
-		result, err := parseArchitectureStageResult(output, allowedActorFQNs...)
+		result, err := parseArchitectureStageResult(output, allowedMarkers, allowedActorFQNs...)
 		if err != nil {
 			return err
 		}

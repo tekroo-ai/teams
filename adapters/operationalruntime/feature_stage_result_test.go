@@ -15,7 +15,7 @@ import (
 func TestFeatureStageParserAcceptsValidatedHandlerEnvelope(t *testing.T) {
 	output := []byte(application.OrganizationalResultMarker + `
 {"schema_version":"1.0.0","outcome":"completed","summary":"refined","evidence":[],"message_proposals":[],"work_product":{"schema_version":"1.0.0","result_type":"FEATURE_REFINEMENT","acceptance_criteria_disposition":"PRESERVE_SUBMITTED","clarification_questions":[],"priority":"HIGH"}}`)
-	result, err := parseRefinementStageResult(output)
+	result, err := parseRefinementStageResult(output, nil)
 	if err != nil || result.Priority != organization.PriorityHigh {
 		t.Fatalf("result=%#v err=%v", result, err)
 	}
@@ -132,33 +132,33 @@ func TestInvalidValidatorOutputBlockMatchingIsExact(t *testing.T) {
 
 func TestFeatureStageResultsAreStrictAndBounded(t *testing.T) {
 	refinement := []byte(application.OrganizationalResultMarker + "\n{\"schema_version\":\"1.0.0\",\"result_type\":\"FEATURE_REFINEMENT\",\"acceptance_criteria_disposition\":\"PRESERVE_SUBMITTED\",\"clarification_questions\":[],\"priority\":\"HIGH\"}")
-	if _, err := parseRefinementStageResult(refinement); err != nil {
+	if _, err := parseRefinementStageResult(refinement, nil); err != nil {
 		t.Fatal(err)
 	}
 	duplicatedCriteria := []byte(application.OrganizationalResultMarker + "\n{\"schema_version\":\"1.0.0\",\"result_type\":\"FEATURE_REFINEMENT\",\"acceptance_criteria_disposition\":\"PRESERVE_SUBMITTED\",\"acceptance_criteria\":[\"works\"],\"clarification_questions\":[],\"priority\":\"HIGH\"}")
-	if _, err := parseRefinementStageResult(duplicatedCriteria); err == nil {
+	if _, err := parseRefinementStageResult(duplicatedCriteria, nil); err == nil {
 		t.Fatal("refinement accepted duplicated authoritative acceptance criteria")
 	}
 	specification := []byte(application.OrganizationalResultMarker + "\n{\"schema_version\":\"1.0.0\",\"result_type\":\"FEATURE_SPECIFICATION\",\"stories\":[{\"title\":\"Story\",\"description\":\"Deliver it.\",\"acceptance_criteria\":[\"works\"],\"priority\":\"HIGH\"}],\"design_constraints\":[]}")
-	parsedSpecification, err := parseSpecificationStageResult(specification)
+	parsedSpecification, err := parseSpecificationStageResult(specification, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !specificationPreservesSubmittedCriteria([]string{"works"}, parsedSpecification) || specificationPreservesSubmittedCriteria([]string{"missing"}, parsedSpecification) {
 		t.Fatal("specification acceptance-criteria preservation check is incorrect")
 	}
-	if _, err := parseSpecificationStageResult(append(append([]byte(nil), specification...), '}')); err != nil {
+	if _, err := parseSpecificationStageResult(append(append([]byte(nil), specification...), '}'), nil); err != nil {
 		t.Fatalf("one redundant terminal brace was not normalized: %v", err)
 	}
-	if _, err := parseSpecificationStageResult(append(append([]byte(nil), specification...), []byte("}}")...)); err == nil {
+	if _, err := parseSpecificationStageResult(append(append([]byte(nil), specification...), []byte("}}")...), nil); err == nil {
 		t.Fatal("more than one redundant terminal brace was accepted")
 	}
 	plan := []byte(application.OrganizationalResultMarker + "\n{\"schema_version\":\"1.0.0\",\"result_type\":\"FEATURE_PLAN\",\"architecture\":\"bounded\",\"design_decisions\":[],\"assumptions\":[],\"tasks\":[{\"story_index\":0,\"title\":\"Implement\",\"description\":\"Implement it.\",\"acceptance_criteria\":[\"works\"],\"covers\":[0],\"depends_on\":[],\"validates\":[],\"purpose\":\"IMPLEMENTATION\",\"complexity\":3,\"risk\":\"LOW\",\"critical_path\":true,\"attempt_limit\":2,\"review_round_limit\":2}]}")
-	if _, err := parseArchitectureStageResult(plan); err != nil {
+	if _, err := parseArchitectureStageResult(plan, nil); err != nil {
 		t.Fatal(err)
 	}
 	paragraphPlan := []byte(strings.Replace(string(plan), `"architecture":"bounded"`, `"architecture":["bounded","second paragraph"]`, 1))
-	parsedParagraphPlan, err := parseArchitectureStageResult(paragraphPlan)
+	parsedParagraphPlan, err := parseArchitectureStageResult(paragraphPlan, nil)
 	if err != nil {
 		t.Fatalf("architecture paragraph array was rejected: %v", err)
 	}
@@ -166,7 +166,7 @@ func TestFeatureStageResultsAreStrictAndBounded(t *testing.T) {
 		t.Fatalf("architecture paragraph normalization = %q", parsedParagraphPlan.Architecture)
 	}
 	mediumRisk := []byte(strings.Replace(string(plan), `"risk":"LOW"`, `"risk":"MEDIUM"`, 1))
-	parsedMediumRisk, err := parseArchitectureStageResult(mediumRisk)
+	parsedMediumRisk, err := parseArchitectureStageResult(mediumRisk, nil)
 	if err != nil {
 		t.Fatalf("conventional MEDIUM risk synonym was rejected: %v", err)
 	}
@@ -181,7 +181,7 @@ func TestFeatureStageResultsAreStrictAndBounded(t *testing.T) {
 		"medium":   organization.RiskModerate,
 	} {
 		lowercaseRisk := []byte(strings.Replace(string(plan), `"risk":"LOW"`, `"risk":"`+input+`"`, 1))
-		parsedLowercaseRisk, err := parseArchitectureStageResult(lowercaseRisk)
+		parsedLowercaseRisk, err := parseArchitectureStageResult(lowercaseRisk, nil)
 		if err != nil {
 			t.Fatalf("recognized lowercase risk %q was rejected: %v", input, err)
 		}
@@ -190,12 +190,12 @@ func TestFeatureStageResultsAreStrictAndBounded(t *testing.T) {
 		}
 	}
 	unknownRisk := []byte(strings.Replace(string(plan), `"risk":"LOW"`, `"risk":"SEVERE"`, 1))
-	if _, err := parseArchitectureStageResult(unknownRisk); err == nil {
+	if _, err := parseArchitectureStageResult(unknownRisk, nil); err == nil {
 		t.Fatal("unknown risk value was accepted")
 	}
 	invalid := append([]byte(nil), plan...)
 	invalid = append(invalid, []byte("{}")...)
-	if _, err := parseArchitectureStageResult(invalid); err == nil {
+	if _, err := parseArchitectureStageResult(invalid, nil); err == nil {
 		t.Fatal("trailing JSON was accepted")
 	}
 	reviewDigest := repeatedDigest('a')
@@ -412,18 +412,18 @@ func TestRequiredMaterializedTaskCountSelectsReviewWorkByRisk(t *testing.T) {
 
 func TestPreAssignmentPlanningResultsRejectOperationalIdentity(t *testing.T) {
 	refinement := []byte(application.OrganizationalResultMarker + "\n{\"schema_version\":\"1.0.0\",\"result_type\":\"FEATURE_REFINEMENT\",\"acceptance_criteria_disposition\":\"PRESERVE_SUBMITTED\",\"clarification_questions\":[\"Implementation is committed on tekroo/product-owner-1\"],\"priority\":\"HIGH\"}")
-	if _, err := parseRefinementStageResult(refinement); err == nil {
+	if _, err := parseRefinementStageResult(refinement, nil); err == nil {
 		t.Fatal("refinement accepted a pre-assignment branch identity")
 	}
 	specification := []byte(application.OrganizationalResultMarker + "\n{\"schema_version\":\"1.0.0\",\"result_type\":\"FEATURE_SPECIFICATION\",\"stories\":[{\"title\":\"Story\",\"description\":\"Deliver it from /Users/operator/worktree.\",\"acceptance_criteria\":[\"works\"],\"priority\":\"HIGH\"}],\"design_constraints\":[]}")
-	if _, err := parseSpecificationStageResult(specification); err == nil {
+	if _, err := parseSpecificationStageResult(specification, nil); err == nil {
 		t.Fatal("specification accepted a pre-assignment workspace identity")
 	}
 }
 
 func TestPreAssignmentPlanningResultsAllowRepositoryPathContainingTekrooDirectory(t *testing.T) {
 	plan := []byte(application.OrganizationalResultMarker + "\n{\"schema_version\":\"1.0.0\",\"result_type\":\"FEATURE_PLAN\",\"architecture\":\"bounded\",\"design_decisions\":[],\"assumptions\":[],\"tasks\":[{\"story_index\":0,\"title\":\"Implement\",\"description\":\"Update cmd/tekroo/main.go.\",\"acceptance_criteria\":[\"works\"],\"covers\":[0],\"depends_on\":[],\"validates\":[],\"role\":\"coder\",\"purpose\":\"IMPLEMENTATION\",\"complexity\":3,\"risk\":\"LOW\",\"critical_path\":true,\"attempt_limit\":2,\"review_round_limit\":2}]}")
-	if _, err := parseArchitectureStageResult(plan); err != nil {
+	if _, err := parseArchitectureStageResult(plan, nil); err != nil {
 		t.Fatalf("repository path was mistaken for an operational branch identity: %v", err)
 	}
 }
@@ -437,15 +437,15 @@ func TestPreAssignmentPlanningResultsPreserveOperatorSuppliedActorFQN(t *testing
 	}}
 	allowed := featureAuthorizedActorFQNs(feature)
 	refinement := []byte(application.OrganizationalResultMarker + "\n{\"schema_version\":\"1.0.0\",\"result_type\":\"FEATURE_REFINEMENT\",\"acceptance_criteria_disposition\":\"PRESERVE_SUBMITTED\",\"clarification_questions\":[\"Does teams::coder-1 remain the authoritative identity?\"],\"priority\":\"HIGH\"}")
-	if _, err := parseRefinementStageResult(refinement, allowed...); err != nil {
+	if _, err := parseRefinementStageResult(refinement, nil, allowed...); err != nil {
 		t.Fatalf("operator-supplied FQN was rejected: %v", err)
 	}
 	invented := []byte(application.OrganizationalResultMarker + "\n{\"schema_version\":\"1.0.0\",\"result_type\":\"FEATURE_REFINEMENT\",\"acceptance_criteria_disposition\":\"PRESERVE_SUBMITTED\",\"clarification_questions\":[\"Should teams::coder-2 perform the work?\"],\"priority\":\"HIGH\"}")
-	if _, err := parseRefinementStageResult(invented, allowed...); err == nil {
+	if _, err := parseRefinementStageResult(invented, nil, allowed...); err == nil {
 		t.Fatal("model-invented FQN was accepted")
 	}
 	syntaxReference := []byte(application.OrganizationalResultMarker + "\n{\"schema_version\":\"1.0.0\",\"result_type\":\"FEATURE_REFINEMENT\",\"acceptance_criteria_disposition\":\"PRESERVE_SUBMITTED\",\"clarification_questions\":[\"Are names containing the FQN separator :: rejected while teams::coder-1 remains authoritative?\"],\"priority\":\"HIGH\"}")
-	if _, err := parseRefinementStageResult(syntaxReference, allowed...); err != nil {
+	if _, err := parseRefinementStageResult(syntaxReference, nil, allowed...); err != nil {
 		t.Fatalf("FQN syntax reference was rejected as an actor identity: %v", err)
 	}
 }
@@ -465,13 +465,56 @@ func TestPreAssignmentPlanningResultsAllowFeatureEstablishedActors(t *testing.T)
 	}
 	allowed := featureAuthorizedActorFQNs(feature)
 	established := []byte(application.OrganizationalResultMarker + "\n{\"schema_version\":\"1.0.0\",\"result_type\":\"FEATURE_REFINEMENT\",\"acceptance_criteria_disposition\":\"PRESERVE_SUBMITTED\",\"clarification_questions\":[\"Which identity is the operator scope: a named operator actor FQN such as teams::operator-1, or a workspace?\"],\"priority\":\"NORMAL\"}")
-	if _, err := parseRefinementStageResult(established, allowed...); err != nil {
+	if _, err := parseRefinementStageResult(established, nil, allowed...); err != nil {
 		t.Fatalf("feature's own operator actor was rejected in a clarification question: %v", err)
 	}
 	inventedWorker := []byte(application.OrganizationalResultMarker + "\n{\"schema_version\":\"1.0.0\",\"result_type\":\"FEATURE_REFINEMENT\",\"acceptance_criteria_disposition\":\"PRESERVE_SUBMITTED\",\"clarification_questions\":[\"Should teams::coder-2 perform the work?\"],\"priority\":\"NORMAL\"}")
-	if _, err := parseRefinementStageResult(inventedWorker, allowed...); err == nil {
+	if _, err := parseRefinementStageResult(inventedWorker, nil, allowed...); err == nil {
 		t.Fatal("model-invented worker FQN was accepted")
 	}
+}
+
+func TestPreAssignmentPlanningResultsAllowFeatureInputFieldNames(t *testing.T) {
+	// A product owner discussing the feature's own submitted input may name an
+	// operational field that is authoritative feature vocabulary (workspace_id is
+	// a field of every feature input). The pre-assignment marker guard must not
+	// fence it. A marker absent from the feature input (a genuine runtime-internal
+	// leak) must still be rejected.
+	feature := organization.FeatureRequest{
+		OperatorActor:     "teams::operator-1",
+		ProductOwnerActor: "teams::product-owner-1",
+		Input: organization.FeatureRequestInput{
+			Title:       "Human-readable aliases for agent instances",
+			Description: "Give an agent instance a human-readable alias.",
+			WorkspaceID: "operator-1",
+		},
+	}
+	markers := featureInputOperationalMarkers(feature)
+	if !containsString(markers, "workspace_id") {
+		t.Fatalf("workspace_id was not exempted from the marker guard: %v", markers)
+	}
+	if containsString(markers, "execution_id") || containsString(markers, "/Users/") {
+		t.Fatalf("runtime-internal marker was wrongly exempted: %v", markers)
+	}
+	allowed := featureAuthorizedActorFQNs(feature)
+	question := "How is the 'operator scope' that owns an alias identified and authenticated, and is it the same concept as the request's workspace_id (operator-1) or a separate principal identity?"
+	refinement := []byte(application.OrganizationalResultMarker + "\n{\"schema_version\":\"1.0.0\",\"result_type\":\"FEATURE_REFINEMENT\",\"acceptance_criteria_disposition\":\"PRESERVE_SUBMITTED\",\"clarification_questions\":[\"" + question + "\"],\"priority\":\"NORMAL\"}")
+	if _, err := parseRefinementStageResult(refinement, markers, allowed...); err != nil {
+		t.Fatalf("clarification naming the feature's own workspace_id field was rejected: %v", err)
+	}
+	leak := []byte(application.OrganizationalResultMarker + "\n{\"schema_version\":\"1.0.0\",\"result_type\":\"FEATURE_REFINEMENT\",\"acceptance_criteria_disposition\":\"PRESERVE_SUBMITTED\",\"clarification_questions\":[\"Does the execution_id remain stable across restarts?\"],\"priority\":\"NORMAL\"}")
+	if _, err := parseRefinementStageResult(leak, markers, allowed...); err == nil {
+		t.Fatal("runtime-internal execution_id leak was accepted despite the exemption")
+	}
+}
+
+func containsString(values []string, value string) bool {
+	for _, item := range values {
+		if item == value {
+			return true
+		}
+	}
+	return false
 }
 
 func TestFeaturePlanningDescriptionCarriesAuthoritativeFeatureState(t *testing.T) {
@@ -602,7 +645,7 @@ func TestFeaturePlanningDescriptionCarriesAuthoritativeFeatureState(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	parsedPlan, err := parseArchitectureStageResult(planOutput)
+	parsedPlan, err := parseArchitectureStageResult(planOutput, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -641,7 +684,7 @@ func softwareDevelopmentTaskRoutingPolicy() workflowTaskRoutingPolicy {
 
 func parseArchitectureTaskForTest(t *testing.T, output []byte) architectureTaskResult {
 	t.Helper()
-	result, err := parseArchitectureStageResult(output)
+	result, err := parseArchitectureStageResult(output, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

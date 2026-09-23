@@ -258,13 +258,48 @@ var preAssignmentOperationalIdentityMarkers = []string{
 }
 
 func containsPreAssignmentOperationalIdentity(values ...string) bool {
-	return containsPreAssignmentOperationalIdentityExcept(nil, values...)
+	return containsPreAssignmentOperationalIdentityExcept(nil, nil, values...)
 }
 
-func containsPreAssignmentOperationalIdentityExcept(allowedActorFQNs []kernel.ActorFQN, values ...string) bool {
+// featureInputOperationalMarkers returns the operational-identity markers that
+// already appear in the feature's own submitted input document. A planning role
+// that quotes one of these field names while discussing the requirement is
+// describing authoritative feature vocabulary, not pre-assigning routable work,
+// so the marker must not fence it. This mirrors the actor-FQN allowance in
+// featureAuthorizedActorFQNs: the guard is seeded from authoritative feature
+// state, and a marker absent from the input still fences a genuine leak.
+//
+// The check is against the serialized input document, so a structured field
+// such as workspace_id (a key of every feature input) is authoritative
+// vocabulary the product owner may name, while runtime-internal markers
+// (execution_id, fencing_epoch, worktree_id, the digest fields, and the path
+// markers) are absent from the input and continue to fence a real leak.
+func featureInputOperationalMarkers(feature organization.FeatureRequest) []string {
+	serialized, err := json.Marshal(feature.Input)
+	if err != nil {
+		return nil
+	}
+	input := string(serialized)
+	allowed := make([]string, 0, len(preAssignmentOperationalIdentityMarkers))
+	for _, marker := range preAssignmentOperationalIdentityMarkers {
+		if marker == "::" {
+			continue
+		}
+		if strings.Contains(input, marker) {
+			allowed = append(allowed, marker)
+		}
+	}
+	return allowed
+}
+
+func containsPreAssignmentOperationalIdentityExcept(allowedActorFQNs []kernel.ActorFQN, allowedMarkers []string, values ...string) bool {
 	allowed := make(map[kernel.ActorFQN]struct{}, len(allowedActorFQNs))
 	for _, actor := range allowedActorFQNs {
 		allowed[actor] = struct{}{}
+	}
+	exemptMarkers := make(map[string]struct{}, len(allowedMarkers))
+	for _, marker := range allowedMarkers {
+		exemptMarkers[marker] = struct{}{}
 	}
 	for _, value := range values {
 		if containsTekrooBranchIdentity(value) {
@@ -272,6 +307,9 @@ func containsPreAssignmentOperationalIdentityExcept(allowedActorFQNs []kernel.Ac
 		}
 		for _, marker := range preAssignmentOperationalIdentityMarkers {
 			if marker == "::" {
+				continue
+			}
+			if _, exempt := exemptMarkers[marker]; exempt {
 				continue
 			}
 			if strings.Contains(value, marker) {
@@ -351,32 +389,32 @@ func featureAuthorizedActorFQNs(feature organization.FeatureRequest) []kernel.Ac
 	return actors
 }
 
-func parseRefinementStageResult(output []byte, allowedActorFQNs ...kernel.ActorFQN) (refinementStageResult, error) {
+func parseRefinementStageResult(output []byte, allowedMarkers []string, allowedActorFQNs ...kernel.ActorFQN) (refinementStageResult, error) {
 	var result refinementStageResult
-	if decodeOrganizationalStageResult(output, &result) != nil || result.SchemaVersion != "1.0.0" || result.ResultType != "FEATURE_REFINEMENT" || result.AcceptanceDisposition != preserveSubmittedAcceptanceCriteria || !result.Priority.Valid() || !validStageStrings(result.ClarificationQuestions, false) || len(result.ClarificationQuestions) > 16 || containsPreAssignmentOperationalIdentityExcept(allowedActorFQNs, result.ClarificationQuestions...) {
+	if decodeOrganizationalStageResult(output, &result) != nil || result.SchemaVersion != "1.0.0" || result.ResultType != "FEATURE_REFINEMENT" || result.AcceptanceDisposition != preserveSubmittedAcceptanceCriteria || !result.Priority.Valid() || !validStageStrings(result.ClarificationQuestions, false) || len(result.ClarificationQuestions) > 16 || containsPreAssignmentOperationalIdentityExcept(allowedActorFQNs, allowedMarkers, result.ClarificationQuestions...) {
 		return refinementStageResult{}, organization.ErrInvalidFeature
 	}
 	return result, nil
 }
 
-func parseSpecificationStageResult(output []byte, allowedActorFQNs ...kernel.ActorFQN) (specificationStageResult, error) {
+func parseSpecificationStageResult(output []byte, allowedMarkers []string, allowedActorFQNs ...kernel.ActorFQN) (specificationStageResult, error) {
 	var result specificationStageResult
 	if decodeOrganizationalStageResult(output, &result) != nil || result.SchemaVersion != "1.0.0" || result.ResultType != "FEATURE_SPECIFICATION" || len(result.Stories) == 0 || len(result.Stories) > organization.MaximumFeatureStories || !validStageStrings(result.DesignConstraints, false) {
 		return specificationStageResult{}, organization.ErrInvalidFeature
 	}
 	for _, story := range result.Stories {
 		storyFields := append([]string{story.Title, story.Description}, story.AcceptanceCriteria...)
-		if strings.TrimSpace(story.Title) == "" || len(story.Title) > 256 || strings.TrimSpace(story.Description) == "" || len(story.Description) > 64<<10 || !story.Priority.Valid() || !validStageStrings(story.AcceptanceCriteria, true) || len(story.AcceptanceCriteria) > 32 || containsPreAssignmentOperationalIdentityExcept(allowedActorFQNs, storyFields...) {
+		if strings.TrimSpace(story.Title) == "" || len(story.Title) > 256 || strings.TrimSpace(story.Description) == "" || len(story.Description) > 64<<10 || !story.Priority.Valid() || !validStageStrings(story.AcceptanceCriteria, true) || len(story.AcceptanceCriteria) > 32 || containsPreAssignmentOperationalIdentityExcept(allowedActorFQNs, allowedMarkers, storyFields...) {
 			return specificationStageResult{}, organization.ErrInvalidFeature
 		}
 	}
-	if containsPreAssignmentOperationalIdentityExcept(allowedActorFQNs, result.DesignConstraints...) {
+	if containsPreAssignmentOperationalIdentityExcept(allowedActorFQNs, allowedMarkers, result.DesignConstraints...) {
 		return specificationStageResult{}, organization.ErrInvalidFeature
 	}
 	return result, nil
 }
 
-func parseArchitectureStageResult(output []byte, allowedActorFQNs ...kernel.ActorFQN) (architectureStageResult, error) {
+func parseArchitectureStageResult(output []byte, allowedMarkers []string, allowedActorFQNs ...kernel.ActorFQN) (architectureStageResult, error) {
 	var result architectureStageResult
 	if decodeOrganizationalStageResult(output, &result) != nil || result.SchemaVersion != "1.0.0" || result.ResultType != "FEATURE_PLAN" || strings.TrimSpace(string(result.Architecture)) == "" || len(result.Architecture) > 64<<10 || !validStageStrings(result.DesignDecisions, false) || !validStageStrings(result.Assumptions, false) || len(result.Tasks) == 0 || len(result.Tasks) > organization.MaximumFeatureTasks {
 		return architectureStageResult{}, organization.ErrInvalidFeature
@@ -390,7 +428,7 @@ func parseArchitectureStageResult(output []byte, allowedActorFQNs ...kernel.Acto
 		if task.Risk == organization.RiskLevel("MEDIUM") {
 			task.Risk = organization.RiskModerate
 		}
-		if task.StoryIndex >= organization.MaximumFeatureStories || strings.TrimSpace(task.Title) == "" || len(task.Title) > 256 || strings.TrimSpace(task.Description) == "" || len(task.Description) > 64<<10 || !validStageStrings(task.AcceptanceCriteria, true) || containsPreAssignmentOperationalIdentityExcept(allowedActorFQNs, append([]string{task.Title, task.Description}, task.AcceptanceCriteria...)...) || !task.Purpose.Valid() || task.Complexity == 0 || task.Complexity > 10 || !task.Risk.Valid() || task.AttemptLimit == 0 || task.AttemptLimit > 16 || task.ReviewRoundLimit == 0 || task.ReviewRoundLimit > 8 {
+		if task.StoryIndex >= organization.MaximumFeatureStories || strings.TrimSpace(task.Title) == "" || len(task.Title) > 256 || strings.TrimSpace(task.Description) == "" || len(task.Description) > 64<<10 || !validStageStrings(task.AcceptanceCriteria, true) || containsPreAssignmentOperationalIdentityExcept(allowedActorFQNs, allowedMarkers, append([]string{task.Title, task.Description}, task.AcceptanceCriteria...)...) || !task.Purpose.Valid() || task.Complexity == 0 || task.Complexity > 10 || !task.Risk.Valid() || task.AttemptLimit == 0 || task.AttemptLimit > 16 || task.ReviewRoundLimit == 0 || task.ReviewRoundLimit > 8 {
 			return architectureStageResult{}, organization.ErrInvalidFeature
 		}
 		for _, dependency := range append(append([]uint32(nil), task.DependsOn...), task.Validates...) {
