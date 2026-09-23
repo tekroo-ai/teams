@@ -697,3 +697,58 @@ validator cannot fix the observed case (the string is truncated — the second
 element is absent, so it cannot be reconstructed). DECISION: document-only, no
 code fix; do not add a strict-mode carve-out that the evidence shows is not the
 cause. If this ever hard-fails a task (repeated on one invocation), revisit.
+
+## Root cause: coder-1 implementation "orientation trap" (never writes) (2026-09-23, run _r10)
+
+FAILED invocation e3da34fe (task d4928ed5 "cmd/tekroo: alias CLI commands",
+coder-1). This is the AGENTS.md-documented planning-role "orientation trap /
+never-submits" family, now observed on an IMPLEMENTATION role for the first
+time. Evidence from the full 299-event record:
+
+- 0 condensations — NOT a compaction-triggered breakdown (rules out the _r3
+  coder family).
+- 23 file_editor actions, ALL `view` (reads); 0 writes, 0 commits, 0
+  submit_envelope. The model read and searched but NEVER wrote the deliverable.
+- 57 searches, 48 distinct — it WAS grounding (unlike the search-only _r3
+  coder), but `recipient` was searched 7x in the SAME directory
+  (adapters/operationalruntime) as exact repeats.
+- 4 REPOSITORY_PROGRESS fences, each a correct exact-repeat detection; the model
+  could not recover to the write step and was interrupted (terminal FAILED).
+- Terminal commands were all orientation (ls, wc -l); no build/test/commit.
+
+Retry 18f921fd SUCCEEDED in 45 actions: first WRITE at event 48, then
+build->test->commit->submit. The retry brief carried a generic recovery
+preamble + recovery_directive whose reason was
+"automatic glitch recovery: REPEATED_CAPABILITY_MISMATCH_REPOSITORY_NO_PROGRESS
+(<the repeated recipient search command>)".
+
+KEY FINDING: the retry succeeded WITHOUT a strong method-changing reason. The
+recovery_directive.reason only names the offending repeated command and says
+"address it"; it does NOT say "write the file first." The generic recovery
+preamble contains only mild method guidance — "Inspect Git status, recent
+commits, and the focused diff before reading source broadly" — plus a
+misleading hint that "the workspace may already contain a completed
+implementation from the failed invocation" (false here: the failed attempt wrote
+nothing). The retry still did ~14 orientation actions (git status, git log,
+grep, view) before its first write at event 48 — it was NOT a clean
+"write-first" recovery. So the cure is weak and unproven: the retry succeeded
+on a fresh attempt that happened to reach the write step, with the preamble's
+git-first nudge as a possible but unconfirmed contributing factor. This does
+NOT validate the automatic glitch-recovery reason as a method-changing cure for
+the orientation trap; it restates the symptom command.
+
+Implications:
+- The orientation trap is NOT compaction-specific and NOT planning-role-only;
+  it hits implementation tasks too. The distinguishing signature is
+  read-heavy + never-writes + exact-repeat search loop + interrupt.
+- Automatic glitch recovery (REPEATED_CAPABILITY_MISMATCH_REPOSITORY_NO_PROGRESS)
+  recovers by fresh-attempt variance, which is unreliable — a same-brief retry
+  can re-enter the same trap. A principled fix should make the FIRST attempt
+  emit-first (create the deliverable file early, then refine), so the trap is
+  prevented rather than re-rolled.
+- Candidate fix (not yet implemented, needs a digest-neutrality check): add
+  emit-first ordering to editableExecutionGuidance in
+  application/operational_execution.go — "create the deliverable file before
+  broad repository mapping; do not exhaustively search before your first write."
+  Verify brief text is not in model_profile_digest (it is not) so no
+  re-qualification cascade.
