@@ -1646,7 +1646,7 @@ func gitMetadataAction(fields []string) bool {
 
 func violatesShellDiscipline(command string) bool {
 	command = strings.TrimSpace(command)
-	if command == "cd" || strings.HasPrefix(command, "cd ") || strings.ContainsAny(command, "\r\n") {
+	if command == "cd" || strings.HasPrefix(command, "cd ") {
 		return true
 	}
 	fields := strings.Fields(command)
@@ -1686,6 +1686,14 @@ func violatesShellDiscipline(command string) bool {
 		if singleQuoted {
 			previous = character
 			continue
+		}
+		// A raw newline is a command separator (same family as ';') only when
+		// it is outside quotes. Inside a quoted argument — a multi-line
+		// `git commit -m "..."` message — it is literal text, not chaining.
+		// Regression for run _r9 coder-2, whose valid multi-line commit message
+		// tripped the quote-blind newline check.
+		if (character == '\n' || character == '\r') && !doubleQuoted {
+			return true
 		}
 		if character == '$' || character == '`' {
 			return true

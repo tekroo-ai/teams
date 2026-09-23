@@ -2847,6 +2847,13 @@ func TestViolatesShellDisciplineDistinguishesQuotedLiteralsFromOperators(t *test
 		{command: `rg --files; pwd`, want: true},
 		{command: `printf "%s" "$HOME"`, want: true},
 		{command: "rg --files\npwd", want: true},
+		// A raw newline inside a quoted argument is literal text, not a command
+		// separator. Regression for run _r9 coder-2, whose valid multi-line
+		// `git commit -m "..."` message tripped the quote-blind newline check.
+		{command: "git commit -m \"subject\n\nbody line one\nbody line two\"", want: false},
+		{command: "git commit -m 'subject\nbody'", want: false},
+		// An unquoted newline still separates commands and still fences.
+		{command: "git commit -m subject\npwd", want: true},
 		// File-descriptor duplication (2>&1, >&file) is redirection, not
 		// chaining: it must not fence. Regression for the 2026-09-21 run
 		// where `go build/test ... 2>&1` fired 3 false shell-discipline
