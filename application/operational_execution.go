@@ -364,7 +364,7 @@ var sharedExecutionGuidance = []string{
 // that follows these sentences issues tool calls it does not have, and the
 // client tool guard hard-fails the invocation.
 var repositoryExecutionGuidance = []string{
-	"Read and follow AGENTS.md before taking repository actions.",
+	"Your first repository action must be to read AGENTS.md with the file-view tool and follow it; do not run any content search (repository_search) or file read of source before that AGENTS.md read completes. Listing the workspace with glob or checking Git status is allowed before it, but substantive discovery begins only after AGENTS.md is read.",
 	"Search file contents with the repository_search tool and list files with the glob tool; use the terminal only for commands that have no dedicated tool, such as git and go build or test.",
 	"The authorized workspace is already the terminal working directory. Issue exactly one shell command per terminal action: do not use cd, &&, semicolons, pipes, command substitution, environment-variable expansion, or multiple commands separated by newlines.",
 	"Every inspection must resolve a concrete open question in the assigned task. When a search identifies the relevant implementation and tests, inspect those files and stop discovery; do not enumerate unrelated directories to prove absence.",
