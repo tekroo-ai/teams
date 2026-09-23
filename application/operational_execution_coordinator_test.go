@@ -311,6 +311,34 @@ func TestReadOnlyRoleGuidanceNeverOrdersEditsAndAppliesToHandoffRetry(t *testing
 	}
 }
 
+func TestReadOnlyGuidanceForbidsConcreteInstanceFQNInPlanningText(t *testing.T) {
+	// The pre-assignment identity guard rejects a planning result that names a
+	// concrete agent instance FQN (e.g. teams::coder-2) not present in the
+	// feature input. An architect was blocked for writing such an FQN as a CLI
+	// example operand. The read-only planning brief must tell the model to use a
+	// placeholder operand instead, so it is not fenced for a rule it was never
+	// given.
+	runtime := newOperationalRuntime(t)
+	actor := kernel.ActorFQN("teams::architect-1")
+	runtime.context.Invocation.ActorFQN = actor
+	runtime.context.Invocation.Purpose = kernel.PurposeHandoff
+	grounding := RoleExecutionGrounding{
+		ActorFQN: actor, RoleFQRN: kernel.RoleFQRN("architect"), BundleVersion: "1.1.0", BundleDigest: testDigest('b'),
+		Capabilities: []string{"architecture"}, Permissions: []string{"repository.read"},
+		Instructions: "Inspect the repository and return an evidence-grounded DAG without editing files.",
+	}
+	brief, _, err := BuildExecutionBrief(runtime.context, grounding, 1<<20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	guidance := strings.Join(brief.ExecutionGuidance, "\n")
+	for _, required := range []string{"placeholder operand", "<actor-fqn>", "routing decision Teams owns"} {
+		if !strings.Contains(guidance, required) {
+			t.Fatalf("read-only guidance omitted pre-assignment rule %q: %v", required, brief.ExecutionGuidance)
+		}
+	}
+}
+
 func TestEditCapableRoleReceivesReadOnlyGuidanceForReplanWork(t *testing.T) {
 	runtime := newOperationalRuntime(t)
 	runtime.context.Invocation.Purpose = kernel.PurposeReplan

@@ -399,6 +399,7 @@ var readOnlyExecutionGuidance = []string{
 	"This task does not authorize repository edits. Do not edit repository files or create implementation artifacts.",
 	"Finish the assigned plan, review, or report from enough observed repository evidence to support it; if the relevant surfaces are exhausted and evidence remains insufficient, report the concrete blocker.",
 	"Inspect current interfaces and relevant tests only as needed to perform the assigned role, then return the required result through the finish tool.",
+	"When you write a command, CLI, or API example in planning text, use a placeholder operand (for example <actor-fqn> or <alias>) rather than a concrete agent instance FQN such as teams::coder-2; naming a specific running instance is a routing decision Teams owns, and an invented instance FQN in a plan or refinement is rejected.",
 	"When the task requires a structured result, validate the complete finish message against result_protocol and every required field in the task's result schema before calling finish.",
 }
 
