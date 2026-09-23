@@ -663,3 +663,37 @@ Fixes to evaluate (not yet implemented):
   hallucinate (`exclude2`); the strict schema rejected it correctly, but a
   model that guesses parameter names will keep doing so. Not a defect.
 
+
+## Root cause: `view_range` emitted as a truncated string (2026-09-23, run _r9)
+
+Observed three times across roles (PM `view_range='[1,'`, coder-2
+`view_range='[205,'`, and an `_r8` `exclude2` sibling): the model emits a
+tool-call argument that should be a list as a *string* holding a truncated
+array fragment. The daemon/SDK correctly rejects it (`Input should be a valid
+list`), the AgentError is classified `retryable`, and the model recovers on the
+next turn. No task was lost to it in _r9.
+
+Investigated to root cause (option 3 first, per directive) and the obvious
+hypotheses are all DISPROVEN:
+1. NOT generation truncation. The raw `tool_call.arguments` JSON is COMPLETE
+   and valid — the envelope closes properly. The model deliberately emitted
+   `view_range` as a string value `"[205,"`, not a cut-off stream.
+2. NOT MTP. The offending invocation was coder-2 = coder profile, which has
+   `enable_mtp:false`. (architect/security/senior-coder still carry
+   `enable_mtp:true` and are a separate AGENTS.md-flagged cleanup, but they are
+   not this defect.)
+3. NOT schema strictness. Decisive per-request experiment on mlx-serve :8800
+   (temp 0, identical "view lines 205-230" prompt): the NON-strict
+   `to_openai_tool` schema (view_range as `{"type":"array","items":
+   {"type":"integer"}}`, no `strict:true`) produced a valid `[205, 230]` list
+   5/5; the OpenAI-strict variant produced the same 5/5; strict+MTP-on also 5/5.
+   So a strict schema is NOT the lever — the model already emits a correct list
+   almost always, and strict mode would not have prevented the rare string slip.
+
+Conclusion: a rare, transient model emission defect (the model reaches for a
+stringified array fragment), not a harness, schema, or MTP defect. The existing
+retryable classification is the correct and sufficient handling. A recovery
+validator cannot fix the observed case (the string is truncated — the second
+element is absent, so it cannot be reconstructed). DECISION: document-only, no
+code fix; do not add a strict-mode carve-out that the evidence shows is not the
+cause. If this ever hard-fails a task (repeated on one invocation), revisit.
