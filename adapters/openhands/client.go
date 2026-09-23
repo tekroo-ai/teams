@@ -1695,12 +1695,107 @@ func violatesShellDiscipline(command string) bool {
 		// the discipline rule bans chaining, not redirection. A quoted '&'
 		// never reaches here (single quotes continue, double quotes are
 		// excluded by the guard below).
-		if !doubleQuoted && (character == ';' || character == '|' || (character == '&' && previous != '>')) {
+		if character == '|' && !doubleQuoted {
+			// A pipe is banned when it composes independent effects or masks a
+			// meaningful exit code (go test ./... | grep FAIL). It is exempt
+			// when every stage is a read-only inspection tool (grep -rn ... |
+			// head -20): one process group, no mutation, no exit code whose
+			// masking corrupts evidence. This is the same scaling correction as
+			// the compaction fix — tree-wide search with output limiting becomes
+			// more necessary as the repository grows, and has no pipe-free idiom.
+			if !readOnlyInspectionPipeline(command) {
+				return true
+			}
+		}
+		if !doubleQuoted && (character == ';' || (character == '&' && previous != '>')) {
 			return true
 		}
 		previous = character
 	}
 	return false
+}
+
+// readOnlyInspectionPipeline reports whether command is a pipeline whose every
+// stage is a read-only inspection tool, so that piping between them neither
+// composes an effect nor masks an exit code that matters. Mutation-capable
+// inspection tools are accepted only in their read-only form (sed -n without
+// -i; find without -delete/-exec). A logical-OR (||) yields an empty stage and
+// is therefore not a read-only pipeline.
+func readOnlyInspectionPipeline(command string) bool {
+	stages := splitUnquotedPipes(command)
+	if len(stages) < 2 {
+		return false
+	}
+	for _, stage := range stages {
+		fields := strings.Fields(stage)
+		if len(fields) == 0 {
+			return false
+		}
+		switch tool := filepath.Base(fields[0]); tool {
+		case "grep", "rg", "cat", "head", "tail", "wc", "sort", "uniq", "cut", "tr", "ls":
+			continue
+		case "sed":
+			if !sedStageIsReadOnly(fields[1:]) {
+				return false
+			}
+		case "find":
+			if findStageIsReadOnly(fields[1:]) {
+				continue
+			}
+			return false
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+func splitUnquotedPipes(command string) []string {
+	var stages []string
+	var current strings.Builder
+	var singleQuoted, doubleQuoted, escaped bool
+	for _, character := range command {
+		switch {
+		case escaped:
+			escaped = false
+		case character == '\\' && !singleQuoted:
+			escaped = true
+		case character == '\'' && !doubleQuoted:
+			singleQuoted = !singleQuoted
+		case character == '"' && !singleQuoted:
+			doubleQuoted = !doubleQuoted
+		case character == '|' && !singleQuoted && !doubleQuoted:
+			stages = append(stages, current.String())
+			current.Reset()
+			continue
+		}
+		current.WriteRune(character)
+	}
+	stages = append(stages, current.String())
+	return stages
+}
+
+func sedStageIsReadOnly(arguments []string) bool {
+	quiet := false
+	for _, argument := range arguments {
+		if argument == "-i" || argument == "--in-place" || strings.HasPrefix(argument, "-i") {
+			return false
+		}
+		if argument == "-n" || argument == "--quiet" || argument == "--silent" {
+			quiet = true
+		}
+	}
+	return quiet
+}
+
+func findStageIsReadOnly(arguments []string) bool {
+	for _, argument := range arguments {
+		switch argument {
+		case "-delete", "-exec", "-execdir", "-ok", "-okdir":
+			return false
+		}
+	}
+	return true
 }
 
 func repositorySearchLoopViolation(events []rawEvent, promptIndex int) (rawEvent, bool) {

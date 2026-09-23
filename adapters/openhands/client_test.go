@@ -1887,7 +1887,7 @@ func TestClientCorrectsOneCompoundShellActionInsideTheInvocation(t *testing.T) {
 	workspace := filepath.Join(t.TempDir(), "workspace")
 	events := []map[string]any{
 		event("evt-user", "MessageEvent", "user", string(mustJSON(brief))),
-		actionEvent("compound-action", "terminal", "rg -n name . | head"),
+		actionEvent("compound-action", "terminal", "rg --files; pwd"),
 		observationEvent("compound-observation", "terminal", false, 0),
 	}
 	state := &progressGuardServerState{prompt: string(mustJSON(brief)), workspace: workspace, events: events}
@@ -1947,7 +1947,7 @@ func TestClientCorrectsLaterShellDisciplineIncidentAfterCompliantProgress(t *tes
 	workspace := filepath.Join(t.TempDir(), "workspace")
 	events := []map[string]any{
 		event("evt-user", "MessageEvent", "user", string(mustJSON(brief))),
-		actionEvent("first-compound-action", "terminal", "rg -n name . | head"),
+		actionEvent("first-compound-action", "terminal", "rg --files; pwd"),
 		observationEvent("first-compound-observation", "terminal", false, 0),
 		event("first-correction", "MessageEvent", "user", shellDisciplineCorrectionPrefix+"first-compound-action\ncorrect it"),
 		actionEvent("compliant-action", "terminal", "git status"),
@@ -1970,7 +1970,7 @@ func TestClientTreatsCompliantNoMatchAsShellDisciplineRecovery(t *testing.T) {
 	workspace := filepath.Join(t.TempDir(), "workspace")
 	events := []map[string]any{
 		event("evt-user", "MessageEvent", "user", string(mustJSON(brief))),
-		actionEvent("first-compound-action", "terminal", "rg -n name . | head"),
+		actionEvent("first-compound-action", "terminal", "rg --files; pwd"),
 		observationEvent("first-compound-observation", "terminal", false, 0),
 		event("first-correction", "MessageEvent", "user", shellDisciplineCorrectionPrefix+"first-compound-action\ncorrect it"),
 		actionEvent("compliant-no-match", "terminal", `rg -n "missing symbol" organization`),
@@ -2286,8 +2286,8 @@ func TestClientOneCorrectionCoversConcurrentCompoundShellActions(t *testing.T) {
 	workspace := filepath.Join(t.TempDir(), "workspace")
 	events := []map[string]any{
 		event("evt-user", "MessageEvent", "user", string(mustJSON(brief))),
-		actionEvent("first-compound-action", "terminal", "rg -n name . | head"),
-		actionEvent("second-compound-action", "terminal", "rg -n alias . | head"),
+		actionEvent("first-compound-action", "terminal", "rg --files; pwd"),
+		actionEvent("second-compound-action", "terminal", "rg --files; ls"),
 	}
 	state := &progressGuardServerState{prompt: string(mustJSON(brief)), workspace: workspace, events: events}
 	server := httptest.NewServer(http.HandlerFunc(state.serveHTTP))
@@ -2829,7 +2829,20 @@ func TestViolatesShellDisciplineDistinguishesQuotedLiteralsFromOperators(t *test
 		{command: `printf '%s' '$HOME'`, want: false},
 		{command: `rg -n ActorFQN organization/`, want: false},
 		{command: `cd /tmp`, want: true},
-		{command: `rg -n ActorFQN organization/ | head`, want: true},
+		// A read-only inspection pipeline neither composes an effect nor masks
+		// a meaningful exit code, so it is exempt. Regression for run _r9 where
+		// `grep -rn "Operator:" ... | head -20` (the canonical tree-search with
+		// output limiting, which has no pipe-free idiom) fired a false
+		// shell-discipline correction.
+		{command: `rg -n ActorFQN organization/ | head`, want: false},
+		{command: `grep -rn "Operator:" --include=*.go adapters/operationalruntime | head -20`, want: false},
+		{command: `cat organization/host.go | grep ActorFQN | head -5`, want: false},
+		{command: `find . -name '*.go' | sort | head`, want: false},
+		// A pipe on an effect-producing or validation command still fences: the
+		// exit code must not be masked (go test ./... | grep FAIL).
+		{command: `go test ./... | grep FAIL`, want: true},
+		{command: `sed -i 's/a/b/' organization/host.go | cat`, want: true},
+		{command: `find . -delete | cat`, want: true},
 		{command: `rg --files && pwd`, want: true},
 		{command: `rg --files; pwd`, want: true},
 		{command: `printf "%s" "$HOME"`, want: true},
