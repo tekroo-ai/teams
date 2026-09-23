@@ -66,7 +66,7 @@ func TestRepositoryGuidanceDirectsSearchToDedicatedTools(t *testing.T) {
 		t.Fatal(err)
 	}
 	guidance := strings.Join(brief.ExecutionGuidance, "\n")
-	for _, required := range []string{"repository_search tool", "glob tool", "exactly one shell command"} {
+	for _, required := range []string{"repository_search tool", "glob tool", "exactly one shell command", "searches a single file", "never use shell grep"} {
 		if !strings.Contains(guidance, required) {
 			t.Fatalf("repository guidance omitted %q: %v", required, brief.ExecutionGuidance)
 		}
