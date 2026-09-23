@@ -599,3 +599,67 @@ Generalizable fixes to evaluate (not yet implemented):
   fix (5b3b19a) exempts orientation but cannot force a model that never reads.
 - Empty-result discipline: teach the model that m=0 means "absent, change
   approach (read the file / glob the dir)," not "tweak the regex."
+
+## Root cause: PM "specify" search-loop / never-submits (2026-08-13, run _r8)
+
+Diagnosed the FAILED project-manager specify invocation 01a0ce69 (conversation
+01a0ce69, task ebbb4105 "specify: software-development"). This is a DISTINCT
+failure family from the coder compaction breakdown above — it is NOT a
+condenser-fabrication or grounding defect.
+
+Evidence from the full 168-event record:
+- Grounding was CORRECT: first content action was repository_view AGENTS.md
+  (event 11), then the testdata fixture. No grounding fence fired.
+- The single condensation (event 120) summary was FAITHFUL: every "Read X"
+  matched a real repository_view action (invocation.go, handler.go,
+  kernel/types.go, operatortools/service.go). The condenser faithfulness fix
+  (SDK e226bbeb) WORKED — no fabricated reads.
+- Tool mix: 33 repository_search, 13 repository_view, 3 glob, 0 terminal.
+  Unlike the coder, the PM DID read files (13 views) — it was not search-only.
+- The defect is a never-submits search loop: 33 searches, only 5 empty (m=0),
+  and the searches were mostly DISTINCT and productive (each returned new
+  symbols). The model kept orienting and never emitted the specification
+  envelope. One pattern (ProductionService SendMessage) repeated 4x — the
+  REPOSITORY_PROGRESS fence fired on that exact repeat (event 154).
+- After the REPOSITORY_PROGRESS correction (154) and the CHECKPOINT_COMPLETION
+  correction (163, "read allowance exhausted, call submit_envelope exactly
+  once"), the model issued ONE more search (event 157) and was interrupted
+  (InterruptEvent 161/167) — it NEVER called submit_envelope. Invocation
+  terminal outcome FAILED, Retryable:false.
+- A separate minor side effect of the repository_search schema change: at
+  event 27-28 the model called repository_search with a HALLUCINATED parameter
+  `exclude2` (alongside a valid `exclude`); the strict schema correctly
+  rejected it (extra_forbidden). The schema change is working as designed; the
+  model invented a parameter name. Not the cause of the FAILED outcome.
+
+Root cause = a planning-role "orientation trap": the specify brief asks the PM
+to ground a specification in the repository, and the model treats that as a
+license to exhaustively map every existing surface (federation alias, operator
+identity, roleControl, PrincipalRef, ProductionService, event/audit types,
+RoleLibraryEntry, lifecycle funcs) before writing anything. It is a
+breadth-first orienter that never reaches the emit step. The fences detected
+the loop (exact repeat + exhausted read allowance) but the model could not
+recover to submit — it kept searching even after being told to stop reading and
+submit. This is the AGENTS.md-documented "planning role loops and never submits
+/ no-progress guard" family, independent of compaction.
+
+Distinction from the coder breakdown: the coder failure was search-ONLY (0
+reads) + fabricated condensation + alphabet-enumeration after compaction. The
+PM failure is read+search (grounded, faithful condensation) but a breadth-first
+orientation loop that never reaches submit_envelope. Same "never produces the
+deliverable" symptom, different mechanism.
+
+Fixes to evaluate (not yet implemented):
+- Emit-first planning brief: the specify/refine/design brief should require the
+  role to emit a first-pass result envelope EARLY (a draft specification from
+  the admitted refinement + AGENTS.md), then optionally refine it, rather than
+  orient exhaustively first. The deliverable must be produced before deep
+  codebase mapping.
+- Harder submit steering after CHECKPOINT_COMPLETION: the model ignored
+  "call submit_envelope exactly once" and searched again. The last-mile
+  correction may need to be enforced (e.g., reject further read actions after
+  the allowance is exhausted) rather than only instructed.
+- Hallucinated-parameter note: adding `exclude` gave the model a name to
+  hallucinate (`exclude2`); the strict schema rejected it correctly, but a
+  model that guesses parameter names will keep doing so. Not a defect.
+

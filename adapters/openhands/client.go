@@ -1074,12 +1074,26 @@ func isSubmissionNextAction(nextAction string) bool {
 	return strings.Contains(nextAction, "finish tool") || strings.Contains(nextAction, "submit_envelope tool")
 }
 
+// checkpointPurposeArmsCompletion reports whether an automatic compaction
+// checkpoint for this purpose legitimately means "the investigation is over,
+// emit the result now." It is true only for purposes whose deliverable is the
+// evaluation of already-gathered evidence — a validator or promoter that has
+// run its checks. For planning, handoff, investigation, review, and replan
+// purposes the deliverable is authored AFTER research, so a compaction there is
+// a context event, not a completion signal, and must not arm the bounded
+// last-mile read fence. Those roles are still guarded against the actual
+// pathology (re-deriving dropped evidence) by the exact-repeat progress fence.
+func checkpointPurposeArmsCompletion(purpose kernel.WorkPurpose) bool {
+	return purpose == kernel.PurposeValidation || purpose == kernel.PurposePromotion
+}
+
 func checkpointCompletionRepositoryViolation(events []rawEvent, promptIndex int) (rawEvent, bool, bool) {
 	checkpointIndex := -1
 	maximumReads := maximumCheckpointCompletionReads
 	// An explicit successor recovery can begin with all required repository
 	// evidence already retained and the finish step as its canonical next
-	// action. That is a result-only boundary, not a fresh inspection window.
+	// action. That is an operator-authored result-only boundary, not a fresh
+	// inspection window, so it arms regardless of purpose.
 	if promptIndex >= 0 && promptIndex < len(events) {
 		if checkpoint, found := recoveryCheckpointFromExecutionPrompt(events[promptIndex]); found && isSubmissionNextAction(checkpoint.NextAction) {
 			checkpointIndex = promptIndex
@@ -1091,7 +1105,7 @@ func checkpointCompletionRepositoryViolation(events []rawEvent, promptIndex int)
 			continue
 		}
 		checkpoint, found := progressCheckpointFromEvent(event)
-		if found && isSubmissionNextAction(checkpoint.NextAction) && checkpointIndex < 0 {
+		if found && isSubmissionNextAction(checkpoint.NextAction) && checkpointPurposeArmsCompletion(checkpoint.AuthoritativeExecution.Purpose) && checkpointIndex < 0 {
 			checkpointIndex = index
 		}
 	}

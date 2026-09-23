@@ -969,9 +969,10 @@ func TestRepositoryProgressGuardStartsNewWindowAfterCompactionCheckpoint(t *test
 
 func TestCheckpointCompletionAllowsBoundedReadsAndRejectsPostAnnouncementWork(t *testing.T) {
 	checkpoint := progressCheckpoint{
-		SchemaVersion:       "tekroo.teams.execution-progress-checkpoint/1.2.0",
-		SourceJournalSHA256: kernel.Digest(strings.Repeat("a", 64)),
-		NextAction:          "Evaluate retained evidence and submit the required result through the finish tool.",
+		SchemaVersion:          "tekroo.teams.execution-progress-checkpoint/1.2.0",
+		SourceJournalSHA256:    kernel.Digest(strings.Repeat("a", 64)),
+		AuthoritativeExecution: checkpointExecutionAuthority{Purpose: kernel.PurposeValidation},
+		NextAction:             "Evaluate retained evidence and submit the required result through the finish tool.",
 	}
 	events := []rawEvent{
 		{ID: "checkpoint", Kind: "MessageEvent", Source: "user", Text: compactionCheckpointPrefix + "1\nrestored\n" + string(mustJSON(checkpoint))},
@@ -1023,9 +1024,10 @@ func TestCheckpointCompletionAllowsBoundedReadsAndRejectsPostAnnouncementWork(t 
 
 func TestCheckpointCompletionAllowanceDoesNotResetAtLaterCompaction(t *testing.T) {
 	checkpoint := progressCheckpoint{
-		SchemaVersion:       "tekroo.teams.execution-progress-checkpoint/1.2.0",
-		SourceJournalSHA256: kernel.Digest(strings.Repeat("c", 64)),
-		NextAction:          "Submit the required result through the finish tool.",
+		SchemaVersion:          "tekroo.teams.execution-progress-checkpoint/1.2.0",
+		SourceJournalSHA256:    kernel.Digest(strings.Repeat("c", 64)),
+		AuthoritativeExecution: checkpointExecutionAuthority{Purpose: kernel.PurposeValidation},
+		NextAction:             "Submit the required result through the finish tool.",
 	}
 	checkpointEvent := func(id string) rawEvent {
 		return rawEvent{ID: id, Kind: "MessageEvent", Source: "user", Text: compactionCheckpointPrefix + "1\nrestored\n" + string(mustJSON(checkpoint))}
@@ -1043,6 +1045,31 @@ func TestCheckpointCompletionAllowanceDoesNotResetAtLaterCompaction(t *testing.T
 		t.Fatalf("later checkpoint reset completion allowance: found=%t repeated=%t violation=%+v", found, repeated, violation)
 	}
 }
+
+func TestPlanningCompactionCheckpointDoesNotArmCompletionFence(t *testing.T) {
+	// A planning/handoff role authors its deliverable AFTER research, so a
+	// compaction there is a context event, not a completion signal. The bounded
+	// last-mile read fence must not arm on it, or a thorough investigation gets
+	// cut off before it can emit (the run _r8 PM specify failure). Only the
+	// exact-repeat progress fence guards these roles against re-deriving
+	// dropped evidence.
+	for _, purpose := range []kernel.WorkPurpose{kernel.PurposeHandoff, kernel.PurposeInvestigation, kernel.PurposeReview, kernel.PurposeReplan} {
+		checkpoint := progressCheckpoint{
+			SchemaVersion:          "tekroo.teams.execution-progress-checkpoint/1.2.0",
+			SourceJournalSHA256:    kernel.Digest(strings.Repeat("e", 64)),
+			AuthoritativeExecution: checkpointExecutionAuthority{Purpose: purpose},
+			NextAction:             "Use the retained successful repository evidence to complete the authoritative task now and submit the required result through the submit_envelope tool; do not retry failed broad discovery.",
+		}
+		events := []rawEvent{{ID: "checkpoint", Kind: "MessageEvent", Source: "user", Text: compactionCheckpointPrefix + "1\nrestored\n" + string(mustJSON(checkpoint))}}
+		for index := 0; index < maximumCheckpointCompletionReads*3; index++ {
+			events = append(events, rawEvent{ID: fmt.Sprintf("read-%d", index), Kind: "ActionEvent", Source: "agent", ToolName: "repository_view", ActionPath: fmt.Sprintf("organization/file%d.go", index)})
+		}
+		if violation, _, found := checkpointCompletionRepositoryViolation(events, -1); found {
+			t.Fatalf("%s planning compaction armed the completion fence and fenced productive reads: violation=%+v", purpose, violation)
+		}
+	}
+}
+
 
 func TestResultBoundaryRecoveryAllowsNoNewRepositoryWork(t *testing.T) {
 	invocationID := kernel.UUIDv7("018f0000-0000-7000-8000-000000000101")
@@ -1079,9 +1106,10 @@ func TestCheckpointCompletionGuardDoesNotFenceWritingWork(t *testing.T) {
 
 func TestCheckpointCompletionRejectsRepositoryWorkAfterCorrection(t *testing.T) {
 	checkpoint := progressCheckpoint{
-		SchemaVersion:       "tekroo.teams.execution-progress-checkpoint/1.2.0",
-		SourceJournalSHA256: kernel.Digest(strings.Repeat("b", 64)),
-		NextAction:          "Submit the required result through the finish tool.",
+		SchemaVersion:          "tekroo.teams.execution-progress-checkpoint/1.2.0",
+		SourceJournalSHA256:    kernel.Digest(strings.Repeat("b", 64)),
+		AuthoritativeExecution: checkpointExecutionAuthority{Purpose: kernel.PurposeValidation},
+		NextAction:             "Submit the required result through the finish tool.",
 	}
 	events := []rawEvent{
 		{ID: "checkpoint", Kind: "MessageEvent", Source: "user", Text: compactionCheckpointPrefix + "2\nrestored\n" + string(mustJSON(checkpoint))},
@@ -1890,9 +1918,10 @@ func TestClientMarksPostCheckpointCorrectionFailureRetryable(t *testing.T) {
 	hash := sha256.Sum256(encoded)
 	digest := kernel.Digest(hex.EncodeToString(hash[:]))
 	checkpoint := progressCheckpoint{
-		SchemaVersion:       "tekroo.teams.execution-progress-checkpoint/1.2.0",
-		SourceJournalSHA256: kernel.Digest(strings.Repeat("a", 64)),
-		NextAction:          "Evaluate retained evidence and submit the required result through the finish tool.",
+		SchemaVersion:          "tekroo.teams.execution-progress-checkpoint/1.2.0",
+		SourceJournalSHA256:    kernel.Digest(strings.Repeat("a", 64)),
+		AuthoritativeExecution: checkpointExecutionAuthority{Purpose: kernel.PurposeValidation},
+		NextAction:             "Evaluate retained evidence and submit the required result through the finish tool.",
 	}
 	events := []map[string]any{
 		event("evt-user", "MessageEvent", "user", string(encoded)),
