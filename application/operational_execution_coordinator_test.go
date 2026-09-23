@@ -81,6 +81,32 @@ func TestRepositoryGuidanceDirectsSearchToDedicatedTools(t *testing.T) {
 	}
 }
 
+func TestRepositoryGuidanceNamesEveryShellDisciplineFenceRule(t *testing.T) {
+	// The shell-discipline fence (violatesShellDiscipline) rejects cd, git -C,
+	// make -C, &&, ;, |, backgrounding &, $, backticks, and embedded newlines,
+	// while exempting >& redirection. The brief must name each rejected form so
+	// the model is not fenced for a construct it was never told about, and must
+	// state the redirection exemption so it does not avoid a legal operator.
+	runtime := newOperationalRuntime(t)
+	brief, _, err := BuildExecutionBrief(runtime.context, testRoleGrounding(runtime.context.Invocation.ActorFQN), 1<<20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	guidance := strings.Join(brief.ExecutionGuidance, "\n")
+	for _, required := range []string{"git -C", "make -C", "2>&1"} {
+		if !strings.Contains(guidance, required) {
+			t.Fatalf("repository guidance omitted shell-discipline rule %q: %v", required, brief.ExecutionGuidance)
+		}
+	}
+	// Deterministic-validation discipline: the fence rejects a third equivalent
+	// passing validation and a re-run of an unchanged failing validation.
+	for _, required := range []string{"equivalent passing build or test more than twice", "re-run a failing test unchanged"} {
+		if !strings.Contains(guidance, required) {
+			t.Fatalf("editable guidance omitted deterministic-validation rule %q: %v", required, brief.ExecutionGuidance)
+		}
+	}
+}
+
 func TestRetryExecutionBriefDirectsAgentToContinueFromRetainedState(t *testing.T) {
 	runtime := newOperationalRuntime(t)
 	retryOf := testUUID(778)
