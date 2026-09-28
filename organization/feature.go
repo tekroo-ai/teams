@@ -338,6 +338,7 @@ type PlannedTask struct {
 	AcceptanceCriteria []string             `json:"acceptance_criteria"`
 	DependsOn          []kernel.UUIDv7      `json:"depends_on"`
 	Validates          []kernel.UUIDv7      `json:"validates,omitempty"`
+	WriteScope         []string             `json:"write_scope,omitempty"`
 	Owner              kernel.ActorFQN      `json:"owner"`
 	ModelProfile       kernel.Digest        `json:"model_profile_digest"`
 	DecisionRoute      kernel.DecisionRoute `json:"decision_route"`
@@ -377,7 +378,7 @@ func (plan FeaturePlan) Validate(feature FeatureRequest) error {
 	}
 	tasks := make(map[kernel.UUIDv7]PlannedTask, len(plan.Tasks))
 	for _, task := range plan.Tasks {
-		if !task.ID.Valid() || task.Title == "" || task.Description == "" || len(task.AcceptanceCriteria) == 0 || !task.Owner.Valid() || !task.ModelProfile.Valid() || !task.DecisionRoute.ModelExecutable() || !task.Purpose.Valid() || task.Complexity == 0 || task.Complexity > 10 || !task.Risk.Valid() || task.AttemptLimit == 0 || task.ReviewRoundLimit == 0 {
+		if !task.ID.Valid() || task.Title == "" || task.Description == "" || len(task.AcceptanceCriteria) == 0 || !validPlannedTaskWriteScope(task.WriteScope) || !task.Owner.Valid() || !task.ModelProfile.Valid() || !task.DecisionRoute.ModelExecutable() || !task.Purpose.Valid() || task.Complexity == 0 || task.Complexity > 10 || !task.Risk.Valid() || task.AttemptLimit == 0 || task.ReviewRoundLimit == 0 {
 			return ErrInvalidFeature
 		}
 		if _, found := stories[task.StoryID]; !found {
@@ -458,6 +459,23 @@ func (plan FeaturePlan) Validate(feature FeatureRequest) error {
 		}
 	}
 	return nil
+}
+
+func validPlannedTaskWriteScope(scope []string) bool {
+	if len(scope) > 32 {
+		return false
+	}
+	seen := make(map[string]struct{}, len(scope))
+	for _, item := range scope {
+		if item == "" || len(item) > 1024 {
+			return false
+		}
+		if _, duplicate := seen[item]; duplicate {
+			return false
+		}
+		seen[item] = struct{}{}
+	}
+	return true
 }
 
 type FeatureStore interface {

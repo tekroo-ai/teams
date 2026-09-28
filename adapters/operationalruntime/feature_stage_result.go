@@ -3,6 +3,7 @@ package operationalruntime
 import (
 	"bytes"
 	"encoding/json"
+	"path"
 	"strconv"
 	"strings"
 	"unicode"
@@ -46,6 +47,11 @@ type architectureTaskResult struct {
 	Covers    []uint32 `json:"covers"`
 	DependsOn []uint32 `json:"depends_on"`
 	Validates []uint32 `json:"validates"`
+	// WriteScope names the repository files or directories this task expects to
+	// modify. An empty scope is deliberately conservative: it is treated as
+	// overlapping every other implementation task, so it cannot unlock unsafe
+	// parallel execution.
+	WriteScope []string `json:"write_scope,omitempty"`
 	// Role is accepted only for backward-compatible decoding. Operational role
 	// selection belongs to Teams routing policy, not to the planning agent.
 	Role             string                 `json:"role,omitempty"`
@@ -428,7 +434,7 @@ func parseArchitectureStageResult(output []byte, allowedMarkers []string, allowe
 		if task.Risk == organization.RiskLevel("MEDIUM") {
 			task.Risk = organization.RiskModerate
 		}
-		if task.StoryIndex >= organization.MaximumFeatureStories || strings.TrimSpace(task.Title) == "" || len(task.Title) > 256 || strings.TrimSpace(task.Description) == "" || len(task.Description) > 64<<10 || !validStageStrings(task.AcceptanceCriteria, true) || containsPreAssignmentOperationalIdentityExcept(allowedActorFQNs, allowedMarkers, append([]string{task.Title, task.Description}, task.AcceptanceCriteria...)...) || !task.Purpose.Valid() || task.Complexity == 0 || task.Complexity > 10 || !task.Risk.Valid() || task.AttemptLimit == 0 || task.AttemptLimit > 16 || task.ReviewRoundLimit == 0 || task.ReviewRoundLimit > 8 {
+		if task.StoryIndex >= organization.MaximumFeatureStories || strings.TrimSpace(task.Title) == "" || len(task.Title) > 256 || strings.TrimSpace(task.Description) == "" || len(task.Description) > 64<<10 || !validStageStrings(task.AcceptanceCriteria, true) || !validArchitectureWriteScope(task.WriteScope) || containsPreAssignmentOperationalIdentityExcept(allowedActorFQNs, allowedMarkers, append([]string{task.Title, task.Description}, task.AcceptanceCriteria...)...) || !task.Purpose.Valid() || task.Complexity == 0 || task.Complexity > 10 || !task.Risk.Valid() || task.AttemptLimit == 0 || task.AttemptLimit > 16 || task.ReviewRoundLimit == 0 || task.ReviewRoundLimit > 8 {
 			return architectureStageResult{}, organization.ErrInvalidFeature
 		}
 		for _, dependency := range append(append([]uint32(nil), task.DependsOn...), task.Validates...) {
@@ -438,6 +444,23 @@ func parseArchitectureStageResult(output []byte, allowedMarkers []string, allowe
 		}
 	}
 	return result, nil
+}
+
+func validArchitectureWriteScope(scope []string) bool {
+	if len(scope) > 32 {
+		return false
+	}
+	seen := make(map[string]struct{}, len(scope))
+	for _, item := range scope {
+		if item == "" || len(item) > 1024 || strings.TrimSpace(item) != item || path.IsAbs(item) || path.Clean(item) != item || item == "." || strings.HasPrefix(item, "../") {
+			return false
+		}
+		if _, duplicate := seen[item]; duplicate {
+			return false
+		}
+		seen[item] = struct{}{}
+	}
+	return true
 }
 
 func parseArchitectureReviewStageResult(output []byte) (architectureReviewStageResult, error) {

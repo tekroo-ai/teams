@@ -723,9 +723,9 @@ func TestNormalizeArchitectureTaskCriteriaKeepsStoryAuthoritySeparate(t *testing
 
 func TestNormalizeArchitectureTaskRelationsPreservesImplementationDAG(t *testing.T) {
 	tasks := []architectureTaskResult{
-		{Role: "coder", Purpose: kernel.PurposeImplementation, Complexity: 4},
-		{Role: "senior-coder", Purpose: kernel.PurposeImplementation, Complexity: 5, DependsOn: []uint32{0}},
-		{Role: "tester", Purpose: kernel.PurposeImplementation, Complexity: 3, DependsOn: []uint32{0}},
+		{Role: "coder", Purpose: kernel.PurposeImplementation, Complexity: 4, WriteScope: []string{"organization/alias.go"}},
+		{Role: "senior-coder", Purpose: kernel.PurposeImplementation, Complexity: 5, DependsOn: []uint32{0}, WriteScope: []string{"adapters/mongo/alias.go"}},
+		{Role: "tester", Purpose: kernel.PurposeImplementation, Complexity: 3, DependsOn: []uint32{0}, WriteScope: []string{"adapters/mcp/alias.go"}},
 	}
 	normalized, err := normalizeArchitectureTaskRelations(tasks, softwareDevelopmentTaskRoutingPolicy())
 	if err != nil {
@@ -748,6 +748,28 @@ func TestNormalizeArchitectureTaskRelationsPreservesImplementationDAG(t *testing
 		if _, err := normalizeArchitectureTaskRelations(candidate, softwareDevelopmentTaskRoutingPolicy()); err == nil {
 			t.Fatalf("%s was silently normalized or accepted", name)
 		}
+	}
+}
+
+func TestNormalizeArchitectureTaskRelationsOrdersOverlappingWriteScopes(t *testing.T) {
+	tasks := []architectureTaskResult{
+		{Purpose: kernel.PurposeImplementation, Complexity: 3, WriteScope: []string{"adapters/operatorhttp/handler.go"}},
+		{Purpose: kernel.PurposeImplementation, Complexity: 3, WriteScope: []string{"adapters/operatorhttp/handler.go", "adapters/operatorhttp/handler_test.go"}},
+		{Purpose: kernel.PurposeImplementation, Complexity: 3, WriteScope: []string{"adapters/mcp/handler.go"}},
+		{Purpose: kernel.PurposeImplementation, Complexity: 3},
+	}
+	normalized, err := normalizeArchitectureTaskRelations(tasks, softwareDevelopmentTaskRoutingPolicy())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(normalized[1].DependsOn, []uint32{0}) {
+		t.Fatalf("overlapping task dependencies = %v", normalized[1].DependsOn)
+	}
+	if len(normalized[2].DependsOn) != 0 {
+		t.Fatalf("disjoint task was serialized: %v", normalized[2].DependsOn)
+	}
+	if !reflect.DeepEqual(normalized[3].DependsOn, []uint32{0, 1, 2}) {
+		t.Fatalf("unknown write scope dependencies = %v", normalized[3].DependsOn)
 	}
 }
 

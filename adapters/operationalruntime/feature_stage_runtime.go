@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/tekroo-ai/teams/kernel"
@@ -493,6 +494,9 @@ func (service *ProductionService) ensureFeaturePlanningTaskForRound(ctx context.
 	role, purpose, requiredRoute, title, description, criteria, err := service.workflowPlanningStageDefinition(stage)
 	if err != nil {
 		return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, err
+	}
+	if stage == stageArchitecture {
+		description += " For every implementation task include write_scope: a small JSON array of repository-relative files or directories expected to change. Parallel tasks require disjoint write_scope values; if scopes overlap or are uncertain, declare a dependency so the later task starts from the earlier result."
 	}
 	taskKey := featurePlanningTaskKey(stage, architectureRound, reviewedTaskIndex)
 	taskID := deterministicOperationalUUID("feature-planning-task", string(feature.ID), taskKey)
@@ -1592,7 +1596,7 @@ func (service *ProductionService) buildExecutableFeaturePlan(ctx context.Context
 		}
 		dependencies := indexesToTaskIDs(item.DependsOn, taskIDs)
 		validates := indexesToTaskIDs(item.Validates, taskIDs)
-		tasks = append(tasks, organization.PlannedTask{ID: taskIDs[index], StoryID: planStories[item.StoryIndex].ID, Title: item.Title, Description: item.Description, AcceptanceCriteria: item.AcceptanceCriteria, DependsOn: dependencies, Validates: validates, Owner: owner.ActorFQN, ModelProfile: owner.ModelProfile, DecisionRoute: profile.DecisionRoute, Purpose: item.Purpose, Complexity: item.Complexity, Risk: item.Risk, CriticalPath: item.CriticalPath, AttemptLimit: item.AttemptLimit, ReviewRoundLimit: item.ReviewRoundLimit})
+		tasks = append(tasks, organization.PlannedTask{ID: taskIDs[index], StoryID: planStories[item.StoryIndex].ID, Title: item.Title, Description: item.Description, AcceptanceCriteria: item.AcceptanceCriteria, DependsOn: dependencies, Validates: validates, WriteScope: item.WriteScope, Owner: owner.ActorFQN, ModelProfile: owner.ModelProfile, DecisionRoute: profile.DecisionRoute, Purpose: item.Purpose, Complexity: item.Complexity, Risk: item.Risk, CriticalPath: item.CriticalPath, AttemptLimit: item.AttemptLimit, ReviewRoundLimit: item.ReviewRoundLimit})
 	}
 	tasks, err = service.addRequiredValidationTasks(ctx, feature, tasks, handoffTargets, allocator)
 	if err != nil {
@@ -1826,6 +1830,21 @@ func normalizeArchitectureTaskRelations(tasks []architectureTaskResult, policy w
 			sort.Slice(result[index].DependsOn, func(left, right int) bool { return result[index].DependsOn[left] < result[index].DependsOn[right] })
 			lastTask[result[index].Purpose] = index
 		}
+		if result[index].Purpose == kernel.PurposeImplementation {
+			for prior := 0; prior < index; prior++ {
+				if result[prior].Purpose != kernel.PurposeImplementation || !architectureWriteScopesOverlap(result[prior].WriteScope, result[index].WriteScope) {
+					continue
+				}
+				dependencies := make(map[uint32]struct{}, len(result[index].DependsOn)+1)
+				for _, dependency := range result[index].DependsOn {
+					dependencies[dependency] = struct{}{}
+				}
+				if _, found := dependencies[uint32(prior)]; !found {
+					result[index].DependsOn = append(result[index].DependsOn, uint32(prior))
+				}
+			}
+			sort.Slice(result[index].DependsOn, func(left, right int) bool { return result[index].DependsOn[left] < result[index].DependsOn[right] })
+		}
 	}
 	for purpose, complexity := range maximumComplexity {
 		route := routes[purpose]
@@ -1847,6 +1866,20 @@ func normalizeArchitectureTaskRelations(tasks []architectureTaskResult, policy w
 		}
 	}
 	return result, nil
+}
+
+func architectureWriteScopesOverlap(left, right []string) bool {
+	if len(left) == 0 || len(right) == 0 {
+		return true
+	}
+	for _, leftPath := range left {
+		for _, rightPath := range right {
+			if leftPath == rightPath || strings.HasPrefix(leftPath, rightPath+"/") || strings.HasPrefix(rightPath, leftPath+"/") {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (service *ProductionService) bindValidationWorkspaceContext(ctx context.Context, tasks []organization.PlannedTask) ([]organization.PlannedTask, error) {
