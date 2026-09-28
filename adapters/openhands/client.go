@@ -265,7 +265,7 @@ func NewOpenAICompatibleAgentSettings(config AgentSettingsConfig) (json.RawMessa
 		"agent_context": map[string]any{"system_message_suffix": qualifiedShellDisciplineSystemSuffix},
 		"llm":           llm(config.EnableThinking, config.EnableMTP, "", config.MaximumOutputTokens, config.ReasoningEffort),
 		"condenser": map[string]any{
-			"kind": "LLMSummarizingCondenser", "llm": llm(config.CondenserEnableThinking, config.CondenserEnableMTP, "condenser", config.CondenserOutputTokens, ""),
+			"condenser_kind": "teams_checkpoint", "llm": llm(config.CondenserEnableThinking, config.CondenserEnableMTP, "condenser", config.CondenserOutputTokens, ""),
 			"max_size": config.CondenserMaximumEvents, "max_tokens": config.CondenserMaximumTokens, "keep_first": 2,
 		},
 	}
@@ -604,6 +604,7 @@ func configurableAgentSettings(raw json.RawMessage) bool {
 		LLM       qualifiedLLMSettings `json:"llm"`
 		Condenser struct {
 			Kind          string               `json:"kind"`
+			CondenserKind string               `json:"condenser_kind"`
 			LLM           qualifiedLLMSettings `json:"llm"`
 			MaximumEvents uint32               `json:"max_size"`
 			MaximumTokens uint32               `json:"max_tokens"`
@@ -613,7 +614,8 @@ func configurableAgentSettings(raw json.RawMessage) bool {
 	if json.Unmarshal(raw, &settings) != nil || settings.Kind != "Agent" || !configurableLLM(settings.LLM) || !configurableLLM(settings.Condenser.LLM) {
 		return false
 	}
-	return slices.Equal(settings.IncludeDefaultTools, []string{"FinishTool"}) && validQualifiedAgentTools(settings.Tools) && validTeamsSystemPrompt(settings.SystemPrompt) && settings.AgentContext.SystemMessageSuffix == qualifiedShellDisciplineSystemSuffix && settings.Condenser.Kind == "LLMSummarizingCondenser" && settings.Condenser.MaximumEvents > 0 && settings.Condenser.MaximumEvents <= 1000 && settings.Condenser.MaximumTokens > 0 && settings.Condenser.MaximumTokens <= 262144 && settings.Condenser.KeepFirst == 2
+	knownCondenser := settings.Condenser.CondenserKind == "teams_checkpoint" || settings.Condenser.Kind == "TeamsCheckpointCondenser" || settings.Condenser.Kind == "LLMSummarizingCondenser"
+	return slices.Equal(settings.IncludeDefaultTools, []string{"FinishTool"}) && validQualifiedAgentTools(settings.Tools) && validTeamsSystemPrompt(settings.SystemPrompt) && settings.AgentContext.SystemMessageSuffix == qualifiedShellDisciplineSystemSuffix && knownCondenser && settings.Condenser.MaximumEvents > 0 && settings.Condenser.MaximumEvents <= 1000 && settings.Condenser.MaximumTokens > 0 && settings.Condenser.MaximumTokens <= 262144 && settings.Condenser.KeepFirst == 2
 }
 
 func configurableLLM(settings qualifiedLLMSettings) bool {
@@ -3823,6 +3825,7 @@ type conversationAgentSettings struct {
 	LLM       conversationLLMSettings `json:"llm"`
 	Condenser struct {
 		Kind          string                  `json:"kind"`
+		CondenserKind string                  `json:"condenser_kind"`
 		LLM           conversationLLMSettings `json:"llm"`
 		MaximumEvents uint32                  `json:"max_size"`
 		MaximumTokens uint32                  `json:"max_tokens"`
@@ -3835,6 +3838,14 @@ func conversationAgentMatches(info conversationInfo, expectedRaw json.RawMessage
 	if json.Unmarshal(expectedRaw, &expected) != nil {
 		return false
 	}
+	normalizeTeamsCheckpointCondenser := func(settings *conversationAgentSettings) {
+		if settings.Condenser.CondenserKind == "teams_checkpoint" {
+			settings.Condenser.CondenserKind = ""
+			settings.Condenser.Kind = "TeamsCheckpointCondenser"
+		}
+	}
+	normalizeTeamsCheckpointCondenser(&expected)
+	normalizeTeamsCheckpointCondenser(&info.Agent)
 	// OpenHands materializes the omitted primary usage identifier as "default"
 	// in its read model. Treat that server-owned default as equivalent to the
 	// absent request field while still rejecting any other usage partition.
