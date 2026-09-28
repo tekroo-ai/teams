@@ -1538,6 +1538,9 @@ func (service *ProductionService) buildExecutableFeaturePlan(ctx context.Context
 	if err != nil {
 		return organization.FeaturePlan{}, err
 	}
+	// A normalized dependency may exist only to serialize overlapping write
+	// scopes. Review actual handoffs, not scheduling edges Teams added itself.
+	authoredHandoffs := authoredImplementationHandoffs(result.Tasks)
 	normalizedTasks, err := normalizeArchitecturePlanTasks(feature, result.Tasks, routing)
 	if err != nil {
 		return organization.FeaturePlan{}, err
@@ -1564,6 +1567,12 @@ func (service *ProductionService) buildExecutableFeaturePlan(ctx context.Context
 			taskIDs[index] = deterministicOperationalUUID("feature-task", string(feature.ID), fmt.Sprint(planVersion), fmt.Sprint(index), result.Tasks[index].Title)
 		}
 	}
+	handoffTargets := make(map[kernel.UUIDv7]struct{})
+	for index, handoff := range authoredHandoffs {
+		if handoff {
+			handoffTargets[taskIDs[index]] = struct{}{}
+		}
+	}
 	allocator := newPlanningRoleAllocator(service)
 	tasks := make([]organization.PlannedTask, 0, feature.Input.MaximumTasks)
 	for index, item := range result.Tasks {
@@ -1585,7 +1594,7 @@ func (service *ProductionService) buildExecutableFeaturePlan(ctx context.Context
 		validates := indexesToTaskIDs(item.Validates, taskIDs)
 		tasks = append(tasks, organization.PlannedTask{ID: taskIDs[index], StoryID: planStories[item.StoryIndex].ID, Title: item.Title, Description: item.Description, AcceptanceCriteria: item.AcceptanceCriteria, DependsOn: dependencies, Validates: validates, Owner: owner.ActorFQN, ModelProfile: owner.ModelProfile, DecisionRoute: profile.DecisionRoute, Purpose: item.Purpose, Complexity: item.Complexity, Risk: item.Risk, CriticalPath: item.CriticalPath, AttemptLimit: item.AttemptLimit, ReviewRoundLimit: item.ReviewRoundLimit})
 	}
-	tasks, err = service.addRequiredValidationTasks(ctx, feature, tasks, allocator)
+	tasks, err = service.addRequiredValidationTasks(ctx, feature, tasks, handoffTargets, allocator)
 	if err != nil {
 		return organization.FeaturePlan{}, fmt.Errorf("build plan: required validation tasks: %w", err)
 	}
@@ -1621,13 +1630,34 @@ func normalizeArchitecturePlanTasks(feature organization.FeatureRequest, tasks [
 
 func requiredMaterializedTaskCount(tasks []architectureTaskResult) int {
 	count := len(tasks) + 2 // whole-feature validation and final product acceptance
-	for _, task := range tasks {
-		if task.Purpose != kernel.PurposeImplementation || task.Risk != organization.RiskHigh && task.Risk != organization.RiskCritical {
+	handoffs := authoredImplementationHandoffs(tasks)
+	for index, task := range tasks {
+		if task.Purpose != kernel.PurposeImplementation {
 			continue
 		}
-		count += 2 // one targeted implementation review and one specialized security review
+		if task.Risk == organization.RiskHigh || task.Risk == organization.RiskCritical {
+			count += 2 // targeted validation and specialized security review
+		} else if handoffs[index] {
+			count++ // targeted validation of an authored implementation handoff
+		}
 	}
 	return count
+}
+
+func authoredImplementationHandoffs(tasks []architectureTaskResult) []bool {
+	handoffs := make([]bool, len(tasks))
+	for index, task := range tasks {
+		if task.Purpose != kernel.PurposeImplementation {
+			continue
+		}
+		for _, dependency := range task.DependsOn {
+			if dependency < uint32(index) && tasks[dependency].Purpose == kernel.PurposeImplementation {
+				handoffs[index] = true
+				break
+			}
+		}
+	}
+	return handoffs
 }
 
 func featureValidationTaskID(featureID kernel.UUIDv7, planVersion uint64) kernel.UUIDv7 {
@@ -1858,7 +1888,7 @@ func indexesToTaskIDs(indexes []uint32, ids []kernel.UUIDv7) []kernel.UUIDv7 {
 	return result
 }
 
-func (service *ProductionService) addRequiredValidationTasks(ctx context.Context, feature organization.FeatureRequest, tasks []organization.PlannedTask, allocator *planningRoleAllocator) ([]organization.PlannedTask, error) {
+func (service *ProductionService) addRequiredValidationTasks(ctx context.Context, feature organization.FeatureRequest, tasks []organization.PlannedTask, handoffTargets map[kernel.UUIDv7]struct{}, allocator *planningRoleAllocator) ([]organization.PlannedTask, error) {
 	coverage := make(map[kernel.UUIDv7]map[kernel.WorkPurpose]bool)
 	for _, task := range tasks {
 		for _, target := range task.Validates {
@@ -1872,7 +1902,8 @@ func (service *ProductionService) addRequiredValidationTasks(ctx context.Context
 		if target.Purpose != kernel.PurposeImplementation && target.Purpose != kernel.PurposeRepair {
 			continue
 		}
-		if target.Risk != organization.RiskHigh && target.Risk != organization.RiskCritical {
+		_, handoff := handoffTargets[target.ID]
+		if target.Risk != organization.RiskHigh && target.Risk != organization.RiskCritical && !handoff {
 			continue
 		}
 		if !coverage[target.ID][kernel.PurposeValidation] {
@@ -1885,7 +1916,8 @@ func (service *ProductionService) addRequiredValidationTasks(ctx context.Context
 				return nil, fmt.Errorf("validation profile %s is not qualified for %s: %w", validator.ModelProfile, workKind, organization.ErrInvalidFeature)
 			}
 			id := deterministicOperationalUUID("required-validator", string(feature.ID), string(target.ID), string(profile.RoleFQRN))
-			tasks = append(tasks, organization.PlannedTask{ID: id, StoryID: target.StoryID, Title: "Validate: " + target.Title, Description: "Independently inspect the implementation, run the acceptance checks, and report the structured validation result.", AcceptanceCriteria: append([]string(nil), target.AcceptanceCriteria...), DependsOn: []kernel.UUIDv7{target.ID}, Validates: []kernel.UUIDv7{target.ID}, Owner: validator.ActorFQN, ModelProfile: validator.ModelProfile, DecisionRoute: profile.DecisionRoute, Purpose: kernel.PurposeValidation, Complexity: target.Complexity, Risk: target.Risk, CriticalPath: true, AttemptLimit: target.ReviewRoundLimit + 1, ReviewRoundLimit: target.ReviewRoundLimit})
+			criteria := implementationValidationCriteria(target.AcceptanceCriteria, handoff)
+			tasks = append(tasks, organization.PlannedTask{ID: id, StoryID: target.StoryID, Title: "Validate: " + target.Title, Description: "Independently inspect the implementation, run the acceptance checks, and report the structured validation result.", AcceptanceCriteria: criteria, DependsOn: []kernel.UUIDv7{target.ID}, Validates: []kernel.UUIDv7{target.ID}, Owner: validator.ActorFQN, ModelProfile: validator.ModelProfile, DecisionRoute: profile.DecisionRoute, Purpose: kernel.PurposeValidation, Complexity: target.Complexity, Risk: target.Risk, CriticalPath: true, AttemptLimit: target.ReviewRoundLimit + 1, ReviewRoundLimit: target.ReviewRoundLimit})
 			if coverage[target.ID] == nil {
 				coverage[target.ID] = make(map[kernel.WorkPurpose]bool)
 			}
@@ -1914,10 +1946,18 @@ func (service *ProductionService) addRequiredValidationTasks(ctx context.Context
 	return tasks, nil
 }
 
+func implementationValidationCriteria(criteria []string, handoff bool) []string {
+	result := append([]string(nil), criteria...)
+	if handoff {
+		result = append(result, "For each dependency-produced interface this task consumes, focused verification exercises the consumer's actual call or data exchange against the completed dependency implementation; a stand-in that assumes the interface is insufficient.")
+	}
+	return result
+}
+
 // addFeatureValidationTask adds one independent validation of the complete
 // assembled candidate against the authoritative story criteria. Targeted
-// task review is reserved for high-risk work; this joined check prevents
-// criteria lost during task decomposition from reaching acceptance unnoticed.
+// review covers high-risk work and implementation handoffs; this joined check
+// prevents criteria lost during task decomposition from reaching acceptance.
 func (service *ProductionService) addFeatureValidationTask(ctx context.Context, feature organization.FeatureRequest, stories []organization.PlannedStory, tasks []organization.PlannedTask, planVersion uint64, allocator *planningRoleAllocator) ([]organization.PlannedTask, error) {
 	if len(stories) == 0 || planVersion == 0 {
 		return nil, organization.ErrInvalidFeature
