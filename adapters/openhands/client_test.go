@@ -315,8 +315,6 @@ func TestConversationAgentMatchRejectsCondenserConfigurationDrift(t *testing.T) 
 func TestPrepareDoesNotLetTaskProseOverrideRoleToolAuthority(t *testing.T) {
 	brief, _ := openHandsTestBrief(t)
 	brief.Task.Description = "This is a reasoning-only task: refine the request without repository access."
-	prompt := mustJSON(brief)
-	digest := kernel.Digest(testRequestDigest(string(prompt)))
 	workspace := filepath.Join(t.TempDir(), "workspace")
 	client := newOpenHandsTestClient(t, "http://127.0.0.1:1", workspace, brief)
 	agentSettings, err := NewOpenAICompatibleAgentSettings(AgentSettingsConfig{
@@ -329,7 +327,17 @@ func TestPrepareDoesNotLetTaskProseOverrideRoleToolAuthority(t *testing.T) {
 	}
 	profile := client.profiles.(staticProfile).profile
 	profile.AgentSettings = agentSettings
+	profile.RoleFQRN = brief.RoleGrounding.RoleFQRN
+	profile.RoleBundleDigest = brief.RoleGrounding.BundleDigest
+	profile.ModelProfileDigest, err = ModelProfileDigest(profile.RoleFQRN, profile.RoleBundleDigest, agentSettings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	brief.ModelProfileDigest = profile.ModelProfileDigest
+	brief.SemanticContext.ModelProfileDigest = profile.ModelProfileDigest
 	client.profiles = staticProfile{profile: profile}
+	prompt := mustJSON(brief)
+	digest := kernel.Digest(testRequestDigest(string(prompt)))
 
 	prepared, err := client.prepare(context.Background(), brief, digest)
 	if err != nil {
