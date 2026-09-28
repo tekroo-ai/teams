@@ -67,14 +67,14 @@ func (service *ProductionService) RetryFailedTask(ctx context.Context, principal
 	recoveryCondition, err := planningRecoveryConditionDigest(invocationID, request)
 	now := service.clock.Now().UTC()
 	requestedDeadline := request.DeadlineAt.UTC()
-	if err != nil || !latestFound || latest.ID != terminal.ID || !profileFound || !profileSnapshot.Valid() || !budgetFound || !budget.Valid() || !requestedDeadline.After(now) || !requestedDeadline.After(terminal.DeadlineAt) || requestedDeadline.After(now.Add(service.planningDeadline)) {
+	deadline := effectiveTaskRecoveryDeadline(requestedDeadline, profileSnapshot.Profile.Budgets.DeadlineAt, budget.DeadlineAt)
+	if err != nil || !latestFound || latest.ID != terminal.ID || !profileFound || !profileSnapshot.Valid() || !budgetFound || !budget.Valid() || !validTaskRecoveryDeadline(now, requestedDeadline, deadline, terminal.DeadlineAt, service.planningDeadline) {
 		return InvocationStatus{}, fmt.Errorf("validate recovery preconditions: %w", errors.Join(organization.ErrInvalidFeature, err))
 	}
 	// Host-suspension recovery can legitimately extend the already accepted
 	// profile and shared account by a few seconds after the operator request was
 	// written. Preserve the later durable deadline instead of invalidating the
 	// otherwise current recovery request.
-	deadline := effectiveTaskRecoveryDeadline(requestedDeadline, profileSnapshot.Profile.Budgets.DeadlineAt, budget.DeadlineAt)
 
 	evidenceIDs := make([]kernel.UUIDv7, len(request.EvidenceRefs))
 	for index, evidence := range request.EvidenceRefs {
@@ -268,6 +268,14 @@ func effectiveTaskRecoveryDeadline(requested, profile, account time.Time) time.T
 		result = account.UTC()
 	}
 	return result
+}
+
+func validTaskRecoveryDeadline(now, requested, effective, terminal time.Time, window time.Duration) bool {
+	// Bound the operator's new request to the normal planning window. A prior
+	// host-suspension extension can already put the durable profile/account
+	// beyond that window; it still counts as the successor's deadline and must
+	// not make a cancelled invocation impossible to recover.
+	return window > 0 && requested.After(now) && !requested.After(now.Add(window)) && effective.After(terminal)
 }
 
 func latestPlannedInvocations(plan organization.FeaturePlan, invocations map[kernel.AggregateRef]kernel.WorkInvocation) map[kernel.UUIDv7]kernel.WorkInvocation {

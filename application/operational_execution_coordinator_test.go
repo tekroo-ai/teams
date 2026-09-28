@@ -165,6 +165,38 @@ func TestExplicitRecoveryExecutionBriefUsesCleanConversationAndExistingWorkspace
 	}
 }
 
+func TestReadOnlyExplicitRecoveryDoesNotInheritImplementationDiscoveryGuidance(t *testing.T) {
+	runtime := newOperationalRuntime(t)
+	retryOf := testUUID(782)
+	priorProfileID := runtime.context.Profile.Profile.ProfileID
+	runtime.context.Invocation.RetryOfInvocationID = &retryOf
+	runtime.context.Invocation.RetryOrdinal = 1
+	runtime.context.Profile.Profile.ProfileID = testUUID(783)
+	runtime.context.Profile.Profile.ProfileRevision++
+	runtime.context.Profile.Profile.SupersedesProfileID = &priorProfileID
+	runtime.context.Invocation.WorkProfile = runtime.context.Profile.Profile.Binding()
+	runtime.context.Assignment.WorkProfile = runtime.context.Profile.Profile.Binding()
+	runtime.context.RecoveryDirective = testExecutionRecoveryDirective()
+	runtime.context.Evidence = append(runtime.context.Evidence, runtime.context.RecoveryDirective.Evidence...)
+	grounding := testRoleGrounding(runtime.context.Invocation.ActorFQN)
+	grounding.Permissions = []string{"repository.read"}
+	brief, _, err := BuildExecutionBrief(runtime.context, grounding, 1<<20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	guidance := strings.Join(brief.ExecutionGuidance, "\n")
+	for _, required := range []string{"Start from the admitted request", "Do not inspect the workspace broadly", "selected handler"} {
+		if !strings.Contains(guidance, required) {
+			t.Fatalf("read-only recovery guidance omitted %q: %v", required, brief.ExecutionGuidance)
+		}
+	}
+	for _, forbidden := range []string{"Inspect Git status", "recent commits", "focused diff", "completed implementation"} {
+		if strings.Contains(guidance, forbidden) {
+			t.Fatalf("read-only recovery inherited implementation guidance %q: %v", forbidden, brief.ExecutionGuidance)
+		}
+	}
+}
+
 func TestPreStartFailureRecoveryBriefHasNoPriorConversation(t *testing.T) {
 	runtime := newOperationalRuntime(t)
 	retryOf := testUUID(788)
@@ -241,8 +273,8 @@ func TestReadOnlyExplicitRecoveryRepairsRejectedStructuredResult(t *testing.T) {
 			t.Fatalf("read-only explicit recovery guidance omitted %q: %v", required, brief.ExecutionGuidance)
 		}
 	}
-	if strings.Contains(guidance, "Do not restart implementation") == false {
-		t.Fatalf("read-only explicit recovery lost shared recovery guidance: %v", brief.ExecutionGuidance)
+	if strings.Contains(guidance, "Do not restart implementation") {
+		t.Fatalf("read-only explicit recovery inherited implementation guidance: %v", brief.ExecutionGuidance)
 	}
 }
 

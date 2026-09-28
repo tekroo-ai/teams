@@ -200,6 +200,22 @@ func TestHandlerRequestsFeatureReplanWithBoundHumanIdentity(t *testing.T) {
 	}
 }
 
+func TestHandlerCorrectsFeatureSpecificationOnlyWithValidDocument(t *testing.T) {
+	service := &operatorService{state: operationalruntime.ControlPaused}
+	handler := newTestHandler(t, service, func() {})
+	body := `{"expected_revision":3,"expected_specification_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","stories":[{"title":"Alias","description":"Use a name for one instance.","acceptance_criteria":["Alias resolves to the same instance."],"priority":"NORMAL"}],"design_constraints":[],"reason":"remove an extra regression-only story","evidence_refs":[{"evidence_id":"00000000-0000-7000-8000-000000000090","sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}],"idempotency_key":"correction-1"}`
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, authorizedRequest(http.MethodPost, "/v1/features/00000000-0000-7000-8000-000000000005/correct-specification", strings.NewReader(body)))
+	if response.Code != http.StatusOK || service.featureCorrectionCalls != 1 || service.featureCorrection.ExpectedRevision != 3 || len(service.featureCorrection.Stories) != 1 {
+		t.Fatalf("status=%d calls=%d request=%#v body=%s", response.Code, service.featureCorrectionCalls, service.featureCorrection, response.Body.String())
+	}
+	response = httptest.NewRecorder()
+	handler.ServeHTTP(response, authorizedRequest(http.MethodPost, "/v1/features/00000000-0000-7000-8000-000000000005/correct-specification", strings.NewReader(`{"expected_revision":3}`)))
+	if response.Code != http.StatusBadRequest || service.featureCorrectionCalls != 1 {
+		t.Fatalf("invalid status=%d calls=%d", response.Code, service.featureCorrectionCalls)
+	}
+}
+
 func TestHandlerReadsFeatureWorkflowTiming(t *testing.T) {
 	service := &operatorService{state: operationalruntime.ControlRunning}
 	handler := newTestHandler(t, service, func() {})
@@ -276,6 +292,8 @@ type operatorService struct {
 	taskRecovery           operationalruntime.TaskRecoveryRequest
 	featureReplanCalls     int
 	featureReplan          operationalruntime.FeatureReplanRequest
+	featureCorrectionCalls int
+	featureCorrection      operationalruntime.FeatureSpecificationCorrectionRequest
 	clarificationPrincipal kernel.PrincipalRef
 	clarificationInput     organization.FeatureClarificationResponseInput
 	eventWait              operationalruntime.EventWaitRequest
@@ -462,6 +480,12 @@ func (service *operatorService) RetryFailedTask(_ context.Context, _ kernel.Prin
 func (service *operatorService) RequestFeatureReplan(_ context.Context, _ kernel.PrincipalRef, _ kernel.UUIDv7, request operationalruntime.FeatureReplanRequest) (organization.FeatureRequest, error) {
 	service.featureReplanCalls++
 	service.featureReplan = request
+	return organization.FeatureRequest{}, nil
+}
+
+func (service *operatorService) CorrectFeatureSpecification(_ context.Context, _ kernel.PrincipalRef, _ kernel.UUIDv7, request operationalruntime.FeatureSpecificationCorrectionRequest) (organization.FeatureRequest, error) {
+	service.featureCorrectionCalls++
+	service.featureCorrection = request
 	return organization.FeatureRequest{}, nil
 }
 

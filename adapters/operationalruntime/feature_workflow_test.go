@@ -16,7 +16,7 @@ func TestWorkflowPlanningStageDefinitionComesFromConfiguredWorkflow(t *testing.T
 		t.Fatal(err)
 	}
 	path := filepath.Join(filepath.Dir(filepath.Dir(workingDirectory)), "config", "workflows", "software-development.v1.json")
-	definition, err := organization.LoadWorkflowDefinition(path, kernel.Digest("8e9842874ad694f1fce192036f647d4fa8d939d4f754fbc6e9cd9a23bdca9036"))
+	definition, err := organization.LoadWorkflowDefinition(path, kernel.Digest("2578a9e5e1c2b3da2874775bb97897e5b6593c76442d805579f465a4c25d4e0a"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -51,6 +51,9 @@ func TestWorkflowPlanningStageDefinitionComesFromConfiguredWorkflow(t *testing.T
 		if expected.stage == stageSpecification && !strings.Contains(description, "appears verbatim") {
 			t.Fatalf("specification stage omitted deterministic acceptance-criteria traceability: %q", description)
 		}
+		if expected.stage == stageArchitecture && (!strings.Contains(description, "story_index is one zero-based integer") || !strings.Contains(description, "depends_on and validates are zero-based integer arrays")) {
+			t.Fatalf("architecture stage omitted the scalar story-index and array dependency contract: %q", description)
+		}
 	}
 }
 
@@ -68,6 +71,29 @@ func TestWorkflowInvocationAdmissionFamilyIncludesChangedConditionRetries(t *tes
 	unrelated := workflowTestInvocation("unrelated")
 	if workflowInvocationInAdmissionFamily(unrelated, root.ID, invocations) {
 		t.Fatal("unrelated invocation joined admitted workflow stage")
+	}
+}
+
+func TestSpecificationCorrectionAuthorizesOnlyFreshSuccessorArchitectureRound(t *testing.T) {
+	featureID := deterministicOperationalUUID("workflow-test-feature", "corrected")
+	admittedID := workflowTestInvocation("admitted").ID
+	admission := kernel.WorkAdmissionResult{AuthorizedInvocationID: &admittedID}
+	feature := organization.FeatureRequest{ID: featureID, SpecificationCorrection: &organization.FeatureSpecificationCorrection{ArchitectureRound: 1}}
+	successor := workflowTestInvocation("corrected-successor")
+	successor.TaskID = featurePlanningTaskID(featureID, stageArchitecture, 1, nil)
+	successor.Purpose = kernel.PurposeHandoff
+	successor.AttemptOrdinal = 1
+	if !workflowStageInvocationAccepted(feature, admission, successor, kernel.Snapshot{}) {
+		t.Fatal("correction successor was detached from the admitted design stage")
+	}
+	successor.AttemptOrdinal = 2
+	if workflowStageInvocationAccepted(feature, admission, successor, kernel.Snapshot{}) {
+		t.Fatal("unrelated second attempt was accepted as the correction successor")
+	}
+	successor.AttemptOrdinal = 1
+	feature.SpecificationCorrection = nil
+	if workflowStageInvocationAccepted(feature, admission, successor, kernel.Snapshot{}) {
+		t.Fatal("successor was accepted without an operator correction")
 	}
 }
 

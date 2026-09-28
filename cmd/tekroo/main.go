@@ -114,6 +114,8 @@ func run(arguments []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		method, path, body, err = loadFeaturePlan(operands, stdin, config.Operator.MaximumBodyBytes)
 	case "feature-replan":
 		method, path, body, err = loadFeatureReplan(operands, stdin, config.Operator.MaximumBodyBytes)
+	case "feature-correct-specification":
+		method, path, body, err = loadFeatureSpecificationCorrection(operands, stdin, config.Operator.MaximumBodyBytes)
 	case "feature-accept":
 		method, path, body, err = featureAccept(operands)
 	case "feature-release":
@@ -415,6 +417,21 @@ func loadFeatureReplan(operands []string, stdin io.Reader, maximum int64) (strin
 	return http.MethodPost, "/v1/features/" + operands[0] + "/replan", raw, nil
 }
 
+func loadFeatureSpecificationCorrection(operands []string, stdin io.Reader, maximum int64) (string, string, []byte, error) {
+	if len(operands) != 2 || !kernel.UUIDv7(operands[0]).Valid() {
+		return "", "", nil, usageError()
+	}
+	raw, err := loadDocument(operands[1:], stdin, maximum)
+	if err != nil {
+		return "", "", nil, err
+	}
+	var input operationalruntime.FeatureSpecificationCorrectionRequest
+	if err := strictDocument(raw, &input); err != nil || !input.Valid() {
+		return "", "", nil, errors.New("feature specification correction document is invalid")
+	}
+	return http.MethodPost, "/v1/features/" + operands[0] + "/correct-specification", raw, nil
+}
+
 func loadFeatureRelease(operands []string, stdin io.Reader, maximum int64) (string, string, []byte, error) {
 	if len(operands) != 2 || !kernel.UUIDv7(operands[0]).Valid() {
 		return "", "", nil, usageError()
@@ -598,5 +615,5 @@ func loadCommand(operands []string, stdin io.Reader, maximum int64) ([]byte, ker
 }
 
 func usageError() error {
-	return errors.New("usage: tekroo init-local [OPTIONS] | tekroo -config CONFIG health|status|diagnostics|federation|federation-alias NAME|federation-send ALIAS FILE|-|pause|resume|stop|feature FILE|-|feature-status ID|feature-clarify ID FILE|-|feature-plan ID FILE|-|feature-replan ID FILE|-|feature-accept ID REVISION NO_RELEASE_REASON|feature-release ID FILE|-|human-register FILE|-|human-ask FILE|-|human-notifications [open|all]|human-respond FILE|-|human-interaction ID|roles|libraries|library-sync|role ACTOR start|stop|restart|pause|resume|inbox ACTOR|message FILE|-|message-status ID|message-trace THREAD_ID|deadletters [ACTOR]|deadletter-repair ID FILE|-|task ID|story ID|invocation ID|wait KIND ID --timeout DURATION [--after-revision REVISION] [--event-type TYPE]...|submit FILE|-|cancel INVOCATION_ID FILE|-|retry-planning INVOCATION_ID FILE|-|retry-task INVOCATION_ID FILE|-")
+	return errors.New("usage: tekroo init-local [OPTIONS] | tekroo -config CONFIG health|status|diagnostics|federation|federation-alias NAME|federation-send ALIAS FILE|-|pause|resume|stop|feature FILE|-|feature-status ID|feature-clarify ID FILE|-|feature-plan ID FILE|-|feature-replan ID FILE|-|feature-correct-specification ID FILE|-|feature-accept ID REVISION NO_RELEASE_REASON|feature-release ID FILE|-|human-register FILE|-|human-ask FILE|-|human-notifications [open|all]|human-respond FILE|-|human-interaction ID|roles|libraries|library-sync|role ACTOR start|stop|restart|pause|resume|inbox ACTOR|message FILE|-|message-status ID|message-trace THREAD_ID|deadletters [ACTOR]|deadletter-repair ID FILE|-|task ID|story ID|invocation ID|wait KIND ID --timeout DURATION [--after-revision REVISION] [--event-type TYPE]...|submit FILE|-|cancel INVOCATION_ID FILE|-|retry-planning INVOCATION_ID FILE|-|retry-task INVOCATION_ID FILE|-")
 }

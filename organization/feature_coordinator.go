@@ -359,6 +359,29 @@ func (coordinator *FeatureCoordinator) Specify(ctx context.Context, featureID ke
 	return coordinator.store.AdvanceFeature(ctx, next, expectedRevision, &message)
 }
 
+// CorrectSpecification applies one evidence-bound operator amendment before
+// any feature plan is materialized. The PM output remains embedded in the
+// correction record, while a new architecture round consumes the replacement.
+func (coordinator *FeatureCoordinator) CorrectSpecification(ctx context.Context, featureID kernel.UUIDv7, expectedRevision uint64, replacement FeatureSpecification, correction FeatureSpecificationCorrection) (FeatureRequest, error) {
+	feature, err := coordinator.currentFeature(ctx, featureID, expectedRevision, FeatureSpecified)
+	if err != nil {
+		return FeatureRequest{}, err
+	}
+	if feature.Specification == nil || feature.Plan != nil || feature.SpecificationCorrection != nil || correction.RequestedBy != feature.SubmittedBy || !reflect.DeepEqual(correction.PriorSpecification, *feature.Specification) {
+		return FeatureRequest{}, ErrInvalidFeature
+	}
+	next := feature
+	next.Revision++
+	next.ScopeRevision++
+	next.UpdatedAt = correction.RequestedAt
+	next.Specification = &replacement
+	next.SpecificationCorrection = &correction
+	if next.Validate() != nil {
+		return FeatureRequest{}, ErrInvalidFeature
+	}
+	return coordinator.store.AdvanceFeature(ctx, next, expectedRevision, nil)
+}
+
 func (coordinator *FeatureCoordinator) currentFeature(ctx context.Context, id kernel.UUIDv7, revision uint64, status FeatureStatus) (FeatureRequest, error) {
 	if coordinator == nil || !id.Valid() || revision == 0 {
 		return FeatureRequest{}, ErrInvalidFeature

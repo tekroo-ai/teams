@@ -124,7 +124,7 @@ func TestShippedSoftwareWorkflowLoadsByFrozenDigest(t *testing.T) {
 		t.Fatal(err)
 	}
 	path := filepath.Join(filepath.Dir(workingDirectory), "config", "workflows", "software-development.v1.json")
-	digest := kernel.Digest("8e9842874ad694f1fce192036f647d4fa8d939d4f754fbc6e9cd9a23bdca9036")
+	digest := kernel.Digest("2578a9e5e1c2b3da2874775bb97897e5b6593c76442d805579f465a4c25d4e0a")
 	definition, err := LoadWorkflowDefinition(path, digest)
 	if err != nil {
 		t.Fatal(err)

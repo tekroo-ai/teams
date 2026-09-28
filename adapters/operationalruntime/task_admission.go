@@ -167,10 +167,6 @@ func (service *ProductionService) preparePlannedTasks(ctx context.Context, featu
 		if err != nil || !taskFound || taskState.LifecycleEpoch == 0 || taskState.ScopeRevision == 0 || taskState.Phase == kernel.PhaseClosed || taskState.Condition == kernel.ConditionBlocked {
 			return errors.Join(organization.ErrInvalidFeature, err)
 		}
-		profileConfig, found := service.profilesByModel[item.ModelProfile]
-		if !found || !profileConfig.qualifiedFor(item.DecisionRoute, workKindForPurpose(item.Purpose, item.Risk), service.clock.Now().UTC()) {
-			return organization.ErrInvalidFeature
-		}
 		owner, active, err := service.RoleHost.Status(ctx, item.Owner)
 		if err != nil {
 			return err
@@ -178,8 +174,12 @@ func (service *ProductionService) preparePlannedTasks(ctx context.Context, featu
 		if !active || owner.Status != organization.RoleIdle {
 			owner, err = service.RoleHost.EnsureStarted(ctx, item.Owner)
 		}
-		if err != nil || owner.ModelProfile != item.ModelProfile {
+		if err != nil {
 			return errors.Join(organization.ErrRoleNotRunning, err)
+		}
+		profileConfig, err := service.qualifiedTaskOwnerProfile(owner, item)
+		if err != nil {
+			return err
 		}
 		if _, found := service.workspacesByID[owner.WorkspaceID]; !found {
 			return organization.ErrInvalidFeature
@@ -212,6 +212,20 @@ func (service *ProductionService) preparePlannedTasks(ctx context.Context, featu
 		// revision or sharing an editable repository checkout.
 	}
 	return nil
+}
+
+func (service *ProductionService) qualifiedTaskOwnerProfile(owner organization.RoleInstanceState, item organization.PlannedTask) (ProductionProfile, error) {
+	if service == nil || service.clock == nil || owner.ActorFQN != item.Owner {
+		return ProductionProfile{}, organization.ErrInvalidFeature
+	}
+	// The plan's model digest is historical. A role may be rebound to a newer
+	// qualified model while the feature is in flight; the live role identity,
+	// exact role qualification, and selected decision route are authoritative.
+	profile, found := service.profilesByModel[owner.ModelProfile]
+	if !found || profile.RoleFQRN != kernel.RoleFQRN(owner.Role) || !profile.qualifiedFor(item.DecisionRoute, workKindForPurpose(item.Purpose, item.Risk), service.clock.Now().UTC()) {
+		return ProductionProfile{}, organization.ErrInvalidFeature
+	}
+	return profile, nil
 }
 
 func (service *ProductionService) workProfile(feature organization.FeatureRequest, task organization.PlannedTask, lifecycleEpoch, scopeRevision uint64, evidenceID kernel.UUIDv7, deadline time.Time) kernel.WorkRiskProfile {
@@ -722,12 +736,13 @@ func validInvocationContinuation(prior kernel.WorkInvocation, purpose kernel.Wor
 		return false
 	}
 	if !reusePriorCondition {
-		// HANDOFF is the configured workflow's planning purpose and reaches this
-		// path only through explicit invalid-planning-output recovery. Promotion is
-		// likewise admitted only for the exact invalid-structured-output block; a
-		// recorded product decision remains unrecoverable and still needs a passing
-		// structured result from the next promotion attempt.
-		return technicalExtension && (recoverableTaskTerminal(prior) || prior.State == kernel.InvocationSucceeded && (purpose == kernel.PurposeHandoff || purpose == kernel.PurposeValidation || purpose == kernel.PurposeReview || purpose == kernel.PurposeRepair || purpose == kernel.PurposeReplan || purpose == kernel.PurposePromotion)) || !technicalExtension && prior.State == kernel.InvocationSucceeded && (purpose == kernel.PurposeValidation || purpose == kernel.PurposeReview)
+		// HANDOFF is the configured workflow's planning purpose. Its failed
+		// terminals are retried only through an explicit, evidence-bound planning
+		// recovery; unlike the automatic scheduler, that path may repair a
+		// non-retryable terminal. Promotion remains limited to its exact
+		// invalid-structured-output recovery path.
+		planningRecovery := purpose == kernel.PurposeHandoff && recoverablePlanningTerminal(prior)
+		return technicalExtension && (recoverableTaskTerminal(prior) || planningRecovery || prior.State == kernel.InvocationSucceeded && (purpose == kernel.PurposeHandoff || purpose == kernel.PurposeValidation || purpose == kernel.PurposeReview || purpose == kernel.PurposeRepair || purpose == kernel.PurposeReplan || purpose == kernel.PurposePromotion)) || !technicalExtension && prior.State == kernel.InvocationSucceeded && (purpose == kernel.PurposeValidation || purpose == kernel.PurposeReview)
 	}
 	if prior.Retryable == nil || !*prior.Retryable {
 		return false
@@ -817,7 +832,11 @@ func planTaskExecutionRefresh(task *trackedTask, profile ProductionProfile, work
 	if task != nil {
 		workKind = workKindForPurpose(task.plan.Purpose, task.plan.Risk)
 	}
-	if task == nil || !profile.qualifiedFor(task.plan.DecisionRoute, workKind, at) || task.plan.Owner != task.owner.ActorFQN || task.owner.WorkspaceID != workspace.WorkspaceID || task.owner.ModelProfile != task.plan.ModelProfile || task.owner.Execution.Valid() == false {
+	// A plan records the model profile selected when it was written. A qualified
+	// replacement can be selected later (for example after a server upgrade),
+	// so compare the live actor to the current qualified profile and assignment,
+	// not to the plan's historical model digest.
+	if task == nil || !profile.qualifiedFor(task.plan.DecisionRoute, workKind, at) || task.plan.Owner != task.owner.ActorFQN || task.owner.WorkspaceID != workspace.WorkspaceID || task.owner.ModelProfile != profile.ModelProfileDigest || task.owner.Execution.Valid() == false {
 		return taskExecutionRefreshPlan{}, organization.ErrInvalidFeature
 	}
 	taskRef := kernel.AggregateRef{Kind: kernel.AggregateTask, ID: task.plan.ID}

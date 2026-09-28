@@ -390,10 +390,6 @@ func (service *ProductionService) authorizeStructuredOutputGlitchRetry(ctx conte
 	if err != nil {
 		return false, nil
 	}
-	profileConfig, configured := service.profilesByModel[task.ModelProfile]
-	if !configured || !profileConfig.qualifiedFor(task.DecisionRoute, workKindForPurpose(task.Purpose, task.Risk), service.clock.Now().UTC()) {
-		return false, nil
-	}
 	profileSnapshot, profileFound := snapshot.WorkProfiles[kernel.AggregateRef{Kind: kernel.AggregateTask, ID: task.ID}]
 	if !profileFound || !profileSnapshot.Valid() {
 		return false, organization.ErrInvalidFeature
@@ -401,6 +397,10 @@ func (service *ProductionService) authorizeStructuredOutputGlitchRetry(ctx conte
 	owner, err := service.StartRole(ctx, task.Owner)
 	if err != nil || owner.Status != organization.RoleIdle {
 		return false, errors.Join(organization.ErrRoleNotRunning, err)
+	}
+	profileConfig, err := service.qualifiedTaskOwnerProfile(owner, task)
+	if err != nil {
+		return false, err
 	}
 	tracked := &trackedTask{plan: task, revision: state.Revision, last: head, profile: profileSnapshot.Profile, owner: owner}
 	latestInvocations := make(map[kernel.UUIDv7]kernel.WorkInvocation, len(feature.Plan.Tasks))
@@ -678,12 +678,15 @@ func (service *ProductionService) authorizeRepairAfterFailedReview(ctx context.C
 		_, err := service.submitDeterministicActorTargetCommand(ctx, feature, "tekroo.command.work.block", kernel.AggregateTask, target.ID, service.policyAuthority, owner.ActorFQN, owner.Execution, state.Revision, state.LifecycleEpoch, payload, []kernel.DagParent{{ParentEventID: reviewHead, EdgeKind: kernel.EdgeResponse}}, evidence, "repair-exhausted-"+string(target.ID)+"-"+string(*implementer.OutputDigest))
 		return err == nil, err
 	}
-	profileConfig, configured := service.profilesByModel[target.ModelProfile]
 	owner, ownerErr := service.StartRole(ctx, target.Owner)
 	workspace, workspaceErr := service.workspaceForExistingTask(ctx, target, owner, snapshot)
 	budget := snapshot.WorkBudgetAccounts[kernel.AggregateRef{Kind: kernel.AggregateWorkBudget, ID: feature.BudgetAccountID}]
-	if !configured || !profileConfig.qualifiedFor(target.DecisionRoute, workKindForPurpose(target.Purpose, target.Risk), service.clock.Now().UTC()) || ownerErr != nil || owner.Status != organization.RoleIdle || workspaceErr != nil || !budget.Valid() {
+	if ownerErr != nil || owner.Status != organization.RoleIdle || workspaceErr != nil || !budget.Valid() {
 		return false, errors.Join(organization.ErrRoleNotRunning, ownerErr, workspaceErr)
+	}
+	profileConfig, err := service.qualifiedTaskOwnerProfile(owner, target)
+	if err != nil {
+		return false, err
 	}
 	tracked := &trackedTask{plan: target, revision: state.Revision, last: head, profile: profileSnapshot.Profile, owner: owner}
 	if err := service.authorizeTaskInvocationWithCondition(ctx, feature, tracked, profileConfig, workspace, budget.Revision, kernel.PurposeRepair, nextRound, nil, conditionParts); err != nil {

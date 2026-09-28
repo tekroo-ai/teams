@@ -69,6 +69,53 @@ func TestPlanTaskExecutionRefreshRejectsActorOrWorkspaceSubstitution(t *testing.
 	}
 }
 
+func TestPlanTaskExecutionRefreshAllowsQualifiedModelReplacement(t *testing.T) {
+	task, profile, workspace, snapshot := taskExecutionRefreshFixture(t)
+	// The plan was written before the active actor switched to the currently
+	// qualified model. The assignment and actor both use the replacement.
+	task.plan.ModelProfile = repeatedDigest('e')
+	plan, err := planTaskExecutionRefresh(task, profile, workspace, snapshot, taskExecutionRefreshAt())
+	if err != nil {
+		t.Fatalf("qualified replacement rejected: %v", err)
+	}
+	if !plan.assignment || !plan.scope {
+		t.Fatalf("refresh plan = %+v, want assignment and scope refresh", plan)
+	}
+
+	wrongActorProfile := *task
+	wrongActorProfile.owner.ModelProfile = repeatedDigest('f')
+	if _, err := planTaskExecutionRefresh(&wrongActorProfile, profile, workspace, snapshot, taskExecutionRefreshAt()); !errors.Is(err, organization.ErrInvalidFeature) {
+		t.Fatalf("actor/profile mismatch error = %v", err)
+	}
+}
+
+func TestQualifiedTaskOwnerProfileUsesCurrentQualifiedRoleModel(t *testing.T) {
+	task, profile, _, _ := taskExecutionRefreshFixture(t)
+	task.plan.ModelProfile = repeatedDigest('e') // Historical selection remains in the plan.
+	task.plan.Purpose = kernel.PurposeImplementation
+	task.plan.Risk = organization.RiskLow
+	task.owner.Role = "coder"
+	service := &ProductionService{
+		profilesByModel: map[kernel.Digest]ProductionProfile{profile.ModelProfileDigest: profile},
+		clock:           fixedClock{now: taskExecutionRefreshAt()},
+	}
+	selected, err := service.qualifiedTaskOwnerProfile(task.owner, task.plan)
+	if err != nil || selected.ModelProfileDigest != profile.ModelProfileDigest {
+		t.Fatalf("current qualified profile = %s, %v", selected.ModelProfileDigest, err)
+	}
+
+	wrongRole := task.owner
+	wrongRole.Role = "tester"
+	if _, err := service.qualifiedTaskOwnerProfile(wrongRole, task.plan); !errors.Is(err, organization.ErrInvalidFeature) {
+		t.Fatalf("wrong role error = %v", err)
+	}
+	wrongProfile := task.owner
+	wrongProfile.ModelProfile = repeatedDigest('f')
+	if _, err := service.qualifiedTaskOwnerProfile(wrongProfile, task.plan); !errors.Is(err, organization.ErrInvalidFeature) {
+		t.Fatalf("unqualified profile error = %v", err)
+	}
+}
+
 func TestPlanTaskExecutionRefreshRebindsMaintenanceSuccessorWorkProfile(t *testing.T) {
 	task, profile, workspace, snapshot := taskExecutionRefreshFixture(t)
 	taskRef := kernel.AggregateRef{Kind: kernel.AggregateTask, ID: task.plan.ID}

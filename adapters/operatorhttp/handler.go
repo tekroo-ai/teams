@@ -47,6 +47,7 @@ type Service interface {
 	RespondToFeatureClarification(context.Context, kernel.PrincipalRef, kernel.UUIDv7, organization.FeatureClarificationResponseInput) (organization.FeatureRequest, error)
 	ApplyFeaturePlan(context.Context, kernel.UUIDv7, uint64, organization.FeaturePlan) (organization.FeatureRequest, error)
 	RequestFeatureReplan(context.Context, kernel.PrincipalRef, kernel.UUIDv7, operationalruntime.FeatureReplanRequest) (organization.FeatureRequest, error)
+	CorrectFeatureSpecification(context.Context, kernel.PrincipalRef, kernel.UUIDv7, operationalruntime.FeatureSpecificationCorrectionRequest) (organization.FeatureRequest, error)
 	AcceptFeature(context.Context, kernel.UUIDv7, uint64, kernel.PrincipalRef, string) (organization.FeatureRequest, error)
 	AcceptFeatureWithRelease(context.Context, kernel.UUIDv7, kernel.PrincipalRef, organization.FeatureAcceptanceInput) (organization.FeatureRequest, error)
 	RegisterHumanParticipant(context.Context, kernel.PrincipalRef, organization.HumanParticipantRegistration) (kernel.HumanParticipantSnapshot, error)
@@ -206,6 +207,8 @@ func (handler *Handler) ServeHTTP(writer http.ResponseWriter, request *http.Requ
 		handler.respondToFeatureClarification(writer, request, strings.TrimSuffix(strings.TrimPrefix(request.URL.Path, "/v1/features/"), "/clarifications"))
 	case request.Method == http.MethodPost && strings.HasPrefix(request.URL.Path, "/v1/features/") && strings.HasSuffix(request.URL.Path, "/replan"):
 		handler.replanFeature(writer, request, strings.TrimSuffix(strings.TrimPrefix(request.URL.Path, "/v1/features/"), "/replan"))
+	case request.Method == http.MethodPost && strings.HasPrefix(request.URL.Path, "/v1/features/") && strings.HasSuffix(request.URL.Path, "/correct-specification"):
+		handler.correctFeatureSpecification(writer, request, strings.TrimSuffix(strings.TrimPrefix(request.URL.Path, "/v1/features/"), "/correct-specification"))
 	case request.Method == http.MethodPost && strings.HasPrefix(request.URL.Path, "/v1/features/") && strings.HasSuffix(request.URL.Path, "/accept"):
 		handler.acceptFeature(writer, request, strings.TrimSuffix(strings.TrimPrefix(request.URL.Path, "/v1/features/"), "/accept"))
 	case request.Method == http.MethodPost && strings.HasPrefix(request.URL.Path, "/v1/features/") && strings.HasSuffix(request.URL.Path, "/release"):
@@ -535,6 +538,22 @@ func (handler *Handler) replanFeature(writer http.ResponseWriter, request *http.
 	if err != nil {
 		log.Printf("feature replan rejected feature=%s: %v", id, err)
 		writeError(writer, http.StatusConflict, "FEATURE_REPLAN_REJECTED")
+		return
+	}
+	writeJSON(writer, http.StatusOK, feature)
+}
+
+func (handler *Handler) correctFeatureSpecification(writer http.ResponseWriter, request *http.Request, value string) {
+	id := kernel.UUIDv7(value)
+	var input operationalruntime.FeatureSpecificationCorrectionRequest
+	if !id.Valid() || strings.Contains(value, "/") || decodeBody(writer, request, handler.maxBody, &input) != nil || !input.Valid() {
+		writeError(writer, http.StatusBadRequest, "INVALID_FEATURE_SPECIFICATION_CORRECTION")
+		return
+	}
+	feature, err := handler.service.CorrectFeatureSpecification(request.Context(), handler.principal, id, input)
+	if err != nil {
+		log.Printf("feature specification correction rejected feature=%s: %v", id, err)
+		writeError(writer, http.StatusConflict, "FEATURE_SPECIFICATION_CORRECTION_REJECTED")
 		return
 	}
 	writeJSON(writer, http.StatusOK, feature)

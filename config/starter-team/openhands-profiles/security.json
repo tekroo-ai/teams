@@ -5,5 +5,5 @@
   "reasoning_effort": "medium",
   "maximum_output_tokens": 32768,
   "enable_mtp": true,
-  "condenser_maximum_events": 80
+  "condenser_maximum_events": 1000
 }

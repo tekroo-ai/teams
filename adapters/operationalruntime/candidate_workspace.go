@@ -553,6 +553,19 @@ func writeExclusiveSynced(path string, content []byte) error {
 }
 
 func (manager *candidateWorkspaceManager) verifyMaterialized(ctx context.Context, receipt candidateReceipt) error {
+	return manager.verifyMaterializedWithFingerprint(ctx, receipt, true)
+}
+
+// verifyMaterializedForRehydrate validates that the retained view still names
+// the exact clean immutable commit before registering it at startup. The full
+// content fingerprints are deliberately deferred until a retained candidate is
+// consumed: recomputing every historical binary diff makes service recovery
+// proportional to archived work rather than the work being resumed.
+func (manager *candidateWorkspaceManager) verifyMaterializedForRehydrate(ctx context.Context, receipt candidateReceipt) error {
+	return manager.verifyMaterializedWithFingerprint(ctx, receipt, false)
+}
+
+func (manager *candidateWorkspaceManager) verifyMaterializedWithFingerprint(ctx context.Context, receipt candidateReceipt, verifyFingerprint bool) error {
 	expectedPath := filepath.Join(manager.workspaceRoot(), candidateViewID(receipt.CandidateID, receipt.ConsumerTaskID))
 	if filepath.Clean(receipt.MaterializedWorkspace) != expectedPath || receipt.MaterializedReference != "refs/heads/candidate/"+string(receipt.CandidateID) {
 		return errInvalidCandidateWorkspace
@@ -571,9 +584,11 @@ func (manager *candidateWorkspaceManager) verifyMaterialized(ctx context.Context
 			return errors.Join(errInvalidCandidateWorkspace, err)
 		}
 	}
-	status, err := manager.git(ctx, receipt.MaterializedWorkspace, "--no-optional-locks", "status", "--porcelain=v1", "--untracked-files=all")
-	if err != nil || !candidateMaterializedStatusClean(status, receipt.RuntimeHookSHA256.Valid()) {
-		return errors.Join(errInvalidCandidateWorkspace, err)
+	if verifyFingerprint {
+		status, err := manager.git(ctx, receipt.MaterializedWorkspace, "--no-optional-locks", "status", "--porcelain=v1", "--untracked-files=all")
+		if err != nil || !candidateMaterializedStatusClean(status, receipt.RuntimeHookSHA256.Valid()) {
+			return errors.Join(errInvalidCandidateWorkspace, err)
+		}
 	}
 	if receipt.RuntimeHookSHA256.Valid() {
 		hook, readErr := os.ReadFile(filepath.Join(receipt.MaterializedWorkspace, ".openhands", "hooks", "sma_context_hook.py"))
@@ -584,13 +599,15 @@ func (manager *candidateWorkspaceManager) verifyMaterialized(ctx context.Context
 	if _, err := manager.git(ctx, receipt.MaterializedWorkspace, "merge-base", "--is-ancestor", receipt.BaselineCommit, receipt.CandidateCommit); err != nil || receipt.BaselineCommit == receipt.CandidateCommit {
 		return errors.Join(errInvalidCandidateWorkspace, err)
 	}
-	changed, err := manager.git(ctx, receipt.MaterializedWorkspace, "diff", "--name-only", "-z", receipt.BaselineCommit+".."+receipt.CandidateCommit)
-	if err != nil || digestBytes(changed) != receipt.ChangedFileInventoryDigest || !slices.Equal(strings.Split(strings.TrimSuffix(string(changed), "\x00"), "\x00"), receipt.ChangedFileInventory) {
-		return errors.Join(errInvalidCandidateWorkspace, err)
-	}
-	diff, err := manager.git(ctx, receipt.MaterializedWorkspace, "diff", "--binary", "--full-index", receipt.BaselineCommit+".."+receipt.CandidateCommit)
-	if err != nil || digestBytes(diff) != receipt.DiffSHA256 {
-		return errors.Join(errInvalidCandidateWorkspace, err)
+	if verifyFingerprint {
+		changed, err := manager.git(ctx, receipt.MaterializedWorkspace, "diff", "--name-only", "-z", receipt.BaselineCommit+".."+receipt.CandidateCommit)
+		if err != nil || digestBytes(changed) != receipt.ChangedFileInventoryDigest || !slices.Equal(strings.Split(strings.TrimSuffix(string(changed), "\x00"), "\x00"), receipt.ChangedFileInventory) {
+			return errors.Join(errInvalidCandidateWorkspace, err)
+		}
+		diff, err := manager.git(ctx, receipt.MaterializedWorkspace, "diff", "--binary", "--full-index", receipt.BaselineCommit+".."+receipt.CandidateCommit)
+		if err != nil || digestBytes(diff) != receipt.DiffSHA256 {
+			return errors.Join(errInvalidCandidateWorkspace, err)
+		}
 	}
 	return nil
 }
@@ -690,7 +707,7 @@ func (manager *candidateWorkspaceManager) rehydrate(ctx context.Context) error {
 				verificationErrors[index] = ctx.Err()
 				return
 			}
-			verificationErrors[index] = manager.verifyMaterialized(ctx, retained[index].receipt)
+			verificationErrors[index] = manager.verifyMaterializedForRehydrate(ctx, retained[index].receipt)
 		}(index)
 	}
 	wait.Wait()

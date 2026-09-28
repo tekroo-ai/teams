@@ -170,10 +170,6 @@ func (service *ProductionService) reconcileFeaturePlan(ctx context.Context, feat
 			continue
 		}
 		sort.Slice(dependencyEvents, func(left, right int) bool { return dependencyEvents[left] < dependencyEvents[right] })
-		profileConfig, found := service.profilesByModel[item.ModelProfile]
-		if !found || !profileConfig.qualifiedFor(item.DecisionRoute, workKindForPurpose(item.Purpose, item.Risk), service.clock.Now().UTC()) {
-			return organization.ErrInvalidFeature
-		}
 		owner, active, err := service.RoleHost.Status(ctx, item.Owner)
 		if err != nil {
 			return err
@@ -181,8 +177,12 @@ func (service *ProductionService) reconcileFeaturePlan(ctx context.Context, feat
 		if roleNeedsStart(active, owner.Status) {
 			owner, err = service.RoleHost.EnsureStarted(ctx, item.Owner)
 		}
-		if err != nil || owner.ModelProfile != item.ModelProfile {
+		if err != nil {
 			return errors.Join(organization.ErrRoleNotRunning, err)
+		}
+		profileConfig, err := service.qualifiedTaskOwnerProfile(owner, item)
+		if err != nil {
+			return err
 		}
 		if owner.Status != organization.RoleIdle {
 			// A long-running actor executes one assigned work item at a time.
@@ -379,10 +379,13 @@ func (service *ProductionService) resumeInvocationlessActiveTask(ctx context.Con
 	if err != nil || owner.Status != organization.RoleIdle {
 		return errors.Join(organization.ErrRoleNotRunning, err)
 	}
-	profileConfig, configured := service.profilesByModel[item.ModelProfile]
 	workspace, workspaceErr := service.workspaceForExistingTask(ctx, item, owner, snapshot)
-	if !configured || !profileConfig.qualifiedFor(item.DecisionRoute, workKindForPurpose(item.Purpose, item.Risk), service.clock.Now().UTC()) || workspaceErr != nil || owner.ModelProfile != item.ModelProfile {
+	if workspaceErr != nil {
 		return organization.ErrInvalidFeature
+	}
+	profileConfig, err := service.qualifiedTaskOwnerProfile(owner, item)
+	if err != nil {
+		return err
 	}
 	if err := service.registerExecution(ctx, owner, profileConfig); err != nil {
 		return err
@@ -543,10 +546,13 @@ func (service *ProductionService) reconcileValidationRounds(ctx context.Context,
 			return service.blockStructuredDecisionTask(ctx, feature, validator, state, latest, snapshot, validationTimeCeilingReason, "changed-candidate-validation-time-ceiling")
 		}
 		technicalExtension := nextAttempt > uint64(validator.AttemptLimit)
-		profileConfig, configured := service.profilesByModel[validator.ModelProfile]
 		owner, ownerErr := service.StartRole(ctx, validator.Owner)
-		if !configured || !profileConfig.qualifiedFor(validator.DecisionRoute, workKindForPurpose(validator.Purpose, validator.Risk), service.clock.Now().UTC()) || ownerErr != nil || owner.Status != organization.RoleIdle {
+		if ownerErr != nil || owner.Status != organization.RoleIdle {
 			return false, errors.Join(organization.ErrRoleNotRunning, ownerErr)
+		}
+		profileConfig, err := service.qualifiedTaskOwnerProfile(owner, validator)
+		if err != nil {
+			return false, err
 		}
 		tracked := &trackedTask{plan: validator, revision: states[validator.ID].Revision, last: heads[validator.ID], profile: profileSnapshot.Profile, owner: owner}
 		workspace, candidateEvidence, workspaceErr := service.prepareCandidateConsumerWorkspace(ctx, feature, validator, owner, plan, invocations, evidence)

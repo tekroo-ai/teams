@@ -54,6 +54,23 @@ func TestPlanningRecoveryRequestValidationAndDigestAreDeterministic(t *testing.T
 	}
 }
 
+func TestPlanningRecoveryDeadlineRequiresBoundedSuccessorDeadline(t *testing.T) {
+	now := time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC)
+	deadline := now.Add(time.Hour)
+	if validPlanningRecoveryDeadline(now, deadline, deadline, deadline, 2*time.Hour) {
+		t.Fatal("unchanged terminal deadline was accepted")
+	}
+	if !validPlanningRecoveryDeadline(now, deadline.Add(time.Minute), deadline, deadline, 2*time.Hour) {
+		t.Fatal("bounded successor deadline rejected")
+	}
+	if validPlanningRecoveryDeadline(now, deadline.Add(-time.Minute), deadline, deadline, 2*time.Hour) {
+		t.Fatal("deadline before terminal/profile was accepted")
+	}
+	if validPlanningRecoveryDeadline(now, now.Add(3*time.Hour), deadline, deadline, 2*time.Hour) {
+		t.Fatal("deadline beyond planning limit was accepted")
+	}
+}
+
 func TestPlanningRecoveryProfileSupersedesDeadlineAndIsIdempotent(t *testing.T) {
 	tracked, _, _, _ := taskExecutionRefreshFixture(t)
 	prior := tracked.profile.Binding()
@@ -115,6 +132,26 @@ func TestPlanningRecoveryProfileReusesCompatibleCommittedSuccessor(t *testing.T)
 	reused, alreadyBound, err := planningRecoveryProfile(committed, prior, planning, repeatedDigest('b'), deadline, []kernel.UUIDv7{evidenceID})
 	if err != nil || !alreadyBound || reused.ProfileDigest != committed.ProfileDigest {
 		t.Fatalf("reused=%#v alreadyBound=%t err=%v", reused, alreadyBound, err)
+	}
+}
+
+func TestPlanningRecoveryProfileAdvancesCanceledRecoveryWithNewDeadline(t *testing.T) {
+	tracked, _, _, _ := taskExecutionRefreshFixture(t)
+	prior := tracked.profile.Binding()
+	firstCondition := repeatedDigest('a')
+	secondCondition := repeatedDigest('b')
+	firstDeadline := tracked.profile.Budgets.DeadlineAt.Add(time.Hour)
+	secondDeadline := firstDeadline.Add(time.Minute)
+	firstEvidence := kernel.UUIDv7("00000000-0000-7000-8000-000000000306")
+	secondEvidence := kernel.UUIDv7("00000000-0000-7000-8000-000000000307")
+	planning := ProductionPlanning{PolicyRevision: 2, ClassificationPolicyDigest: repeatedDigest('d'), PromotionPolicyDigest: repeatedDigest('e'), VerificationTopologyDigest: repeatedDigest('f')}
+	partial, _, err := planningRecoveryProfile(tracked.profile, prior, planning, firstCondition, firstDeadline, []kernel.UUIDv7{firstEvidence})
+	if err != nil {
+		t.Fatal(err)
+	}
+	advanced, alreadyBound, err := planningRecoveryProfile(partial, prior, planning, secondCondition, secondDeadline, []kernel.UUIDv7{secondEvidence})
+	if err != nil || alreadyBound || advanced.ProfileRevision != partial.ProfileRevision+1 || advanced.SupersedesProfileID == nil || *advanced.SupersedesProfileID != partial.ProfileID || !advanced.Budgets.DeadlineAt.Equal(secondDeadline) || !containsEveryUUID(advanced.ClassificationEvidenceIDs, []kernel.UUIDv7{firstEvidence, secondEvidence}) {
+		t.Fatalf("advanced=%#v alreadyBound=%t err=%v", advanced, alreadyBound, err)
 	}
 }
 
@@ -398,6 +435,19 @@ func TestSucceededRepairCanContinueWithChangedCondition(t *testing.T) {
 	prior.OutputDigest = &output
 	if !validInvocationContinuation(prior, kernel.PurposeRepair, 2, true, false) {
 		t.Fatal("succeeded repair could not be superseded by an evidence-bound correction")
+	}
+}
+
+func TestExplicitPlanningRecoveryCanRepairNonRetryableHandoffFailure(t *testing.T) {
+	retryable := false
+	prior := recoveryTerminalFixture(kernel.InvocationFailed, &retryable, nil)
+	prior.Purpose = kernel.PurposeHandoff
+	prior.AttemptFamily = "handoff"
+	if !validInvocationContinuation(prior, kernel.PurposeHandoff, prior.AttemptOrdinal+1, true, false) {
+		t.Fatal("explicit planning recovery rejected non-retryable handoff failure")
+	}
+	if validInvocationContinuation(prior, kernel.PurposeHandoff, prior.AttemptOrdinal+1, false, false) {
+		t.Fatal("ordinary continuation accepted non-retryable handoff failure")
 	}
 }
 

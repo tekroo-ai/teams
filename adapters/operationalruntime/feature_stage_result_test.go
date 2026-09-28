@@ -157,6 +157,10 @@ func TestFeatureStageResultsAreStrictAndBounded(t *testing.T) {
 	if _, err := parseArchitectureStageResult(plan, nil); err != nil {
 		t.Fatal(err)
 	}
+	arrayStoryIndex := []byte(strings.Replace(string(plan), `"story_index":0`, `"story_index":[0]`, 1))
+	if _, err := parseArchitectureStageResult(arrayStoryIndex, nil); err == nil {
+		t.Fatal("architecture plan accepted an array-valued story_index")
+	}
 	paragraphPlan := []byte(strings.Replace(string(plan), `"architecture":"bounded"`, `"architecture":["bounded","second paragraph"]`, 1))
 	parsedParagraphPlan, err := parseArchitectureStageResult(paragraphPlan, nil)
 	if err != nil {
@@ -568,7 +572,7 @@ func TestFeaturePlanningDescriptionCarriesAuthoritativeFeatureState(t *testing.T
 			}
 		}
 		if stage == stageArchitecture {
-			for _, required := range []string{"Read AGENTS.md", "read-only repository tools", "repository-relative files", "actually inspected", "external package or API", "inspected repository evidence", "dependency-manifest entry alone is insufficient", "implementation responsibility", "acyclic plan", "authored_task_policy.maximum_task_complexity", "Do not author test, validation, security-review, or product-acceptance tasks", "whole-feature validation", "do not select an operational role", "Teams applies execution_routing_policy", "task-specific acceptance criteria", "feature specification remains authoritative", "final product acceptance", "do not duplicate them across tasks merely for bookkeeping", "invariants", "ownership boundaries", "state transitions", "linearization points", "failure or compensation semantics", "read-then-act sequence", "proof of atomicity", "partial-failure safety", "without prescribing a particular implementation", "exactly one owning component or layer", "consume that owner's abstraction", "must not depend on higher-level workflow, deployment, or team configuration", "duplicate, conflicting, or inverted ownership", "one consistent state model", "unresolved mutually exclusive alternatives", "external control surfaces", "HIGH risk", "materialized_total=2*len(tasks)+count(HIGH-or-CRITICAL tasks)+2", "task_budget.maximum_total_tasks", "maximum_moderate_or_lower_implementation_tasks", "authored_task_policy", "purpose=IMPLEMENTATION", "backward depends_on indexes", "zero-based JSON array index", "second task depending on the first emits depends_on=[0]", "LOW, MODERATE, HIGH, or CRITICAL", "finish.message"} {
+			for _, required := range []string{"Read AGENTS.md", "read-only repository tools", "repository-relative files", "actually inspected", "external package or API", "inspected repository evidence", "dependency-manifest entry alone is insufficient", "implementation responsibility", "acyclic plan", "authored_task_policy.maximum_task_complexity", "Do not author test, validation, security-review, or product-acceptance tasks", "whole-feature validation", "do not select an operational role", "Teams applies execution_routing_policy", "task-specific acceptance criteria", "feature specification remains authoritative", "final product acceptance", "do not duplicate them across tasks merely for bookkeeping", "invariants", "ownership boundaries", "state transitions", "linearization points", "failure or compensation semantics", "read-then-act sequence", "proof of atomicity", "partial-failure safety", "without prescribing a particular implementation", "exactly one owning component or layer", "consume that owner's abstraction", "must not depend on higher-level workflow, deployment, or team configuration", "duplicate, conflicting, or inverted ownership", "one consistent state model", "unresolved mutually exclusive alternatives", "external control surfaces", "HIGH risk", "materialized_total=2*len(tasks)+count(HIGH-or-CRITICAL tasks)+2", "task_budget.maximum_total_tasks", "maximum_moderate_or_lower_implementation_tasks", "authored_task_policy", "purpose=IMPLEMENTATION", "backward depends_on indexes", "story_index is one zero-based integer", "depends_on and validates contain zero-based task indexes", "second task depending on the first emits depends_on=[0]", "LOW, MODERATE, HIGH, or CRITICAL", "finish.message"} {
 				if !strings.Contains(description, required) {
 					t.Fatalf("architecture schema instruction omitted %q", required)
 				}
@@ -603,7 +607,7 @@ func TestFeaturePlanningDescriptionCarriesAuthoritativeFeatureState(t *testing.T
 				t.Fatalf("%s instruction is %d bytes, want at most 1000", stage, len(instruction))
 			}
 			if stage == stageRefinement {
-				for _, required := range []string{"acceptance_criteria_disposition", "PRESERVE_SUBMITTED", "without changing"} {
+				for _, required := range []string{"acceptance_criteria_disposition", "PRESERVE_SUBMITTED", "without changing", "genuinely blocking product ambiguity", "downstream engineering choice", "at most one consolidated question", "short request needs no elaboration"} {
 					if !strings.Contains(description, required) {
 						t.Fatalf("refinement schema instruction omitted %q", required)
 					}

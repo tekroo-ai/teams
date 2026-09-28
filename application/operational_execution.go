@@ -432,11 +432,11 @@ var readOnlyRetainedRetryExecutionGuidance = []string{
 var sharedExplicitRecoveryExecutionGuidance = []string{
 	"This explicit recovery starts a clean OpenHands conversation. Prior conversational history is not available; use the current workspace and task evidence as the durable recovery state.",
 	"The recovery_directive records the exact condition that made the preceding result unacceptable. Address it before re-evaluating the original acceptance criteria; satisfying the original task without resolving the directive is not a successful recovery.",
-	"Inspect Git status, recent commits, and the focused diff before reading source broadly. The workspace may already contain a completed implementation from the failed invocation.",
-	"Do not restart implementation or force a new edit when the current committed work already satisfies the task. Verify the existing result against the acceptance criteria and finish promptly.",
 }
 
 var editableExplicitRecoveryExecutionGuidance = []string{
+	"Inspect Git status, recent commits, and the focused diff before reading source broadly. The workspace may already contain a completed implementation from the failed invocation.",
+	"Do not restart implementation or force a new edit when the current committed work already satisfies the task. Verify the existing result against the acceptance criteria and finish promptly.",
 	"If the existing workspace does not satisfy the task, make the smallest justified code or test correction, then run focused verification. If it already satisfies the task, run focused verification and finish without changing it.",
 	"Map and extend existing interfaces before adding a parallel abstraction.",
 	"Implement in cohesive increments and run focused tests after each increment.",
@@ -444,6 +444,7 @@ var editableExplicitRecoveryExecutionGuidance = []string{
 
 var readOnlyExplicitRecoveryExecutionGuidance = []string{
 	"This task does not authorize repository edits. Do not edit repository files or create implementation artifacts.",
+	"Start from the admitted request, recovery directive, task evidence, selected handler, and result schema. Do not inspect the workspace broadly; use repository evidence only when the assigned result specifically requires it.",
 	"If the preceding result was rejected by a deterministic result validator, preserve its supported engineering conclusions and regenerate the complete structured result from the authoritative task schema. Before calling finish, verify every required object field is present and every required value is non-empty.",
 	"Produce the assigned plan, review, or report from the current workspace and task evidence, then return the result through the finish tool.",
 }
@@ -661,7 +662,7 @@ func BuildExecutionBriefWithHandler(current OperationalExecutionContext, groundi
 		brief.ResultProtocol = &ExecutionResultProtocol{
 			SchemaVersion: "1.0.0", Marker: OrganizationalResultMarker,
 			Outcomes:    append([]string(nil), handler.AllowedResults...),
-			Instruction: "The submit_envelope tool is the result channel Teams consumes. Call submit_envelope exactly once, passing the full envelope as its structured parameters conforming to message_handler.result_schema. Put any task-specific structured result required by the admitted work inside work_product, not beside the envelope. Return only results and message proposals allowed by the selected handler. Only if submit_envelope is unavailable, call finish with the marker on its own line followed by exactly one JSON object. Teams validates the result and remains the sole authority that records state changes or dispatches successor work.",
+			Instruction: "The submit_envelope tool is the only result channel Teams consumes for this invocation. Call submit_envelope exactly once, passing the full envelope as its structured parameters conforming to message_handler.result_schema. Put any task-specific structured result required by the admitted work inside work_product, not beside the envelope. Return only results and message proposals allowed by the selected handler. Teams validates the result and remains the sole authority that records state changes or dispatches successor work.",
 		}
 	} else if invocation.Purpose == kernel.PurposeValidation {
 		brief.ExecutionGuidance = append(brief.ExecutionGuidance, validationExecutionGuidance...)

@@ -175,6 +175,29 @@ func TestLoadFeatureReplanBuildsFocusedExactFeatureRequest(t *testing.T) {
 	}
 }
 
+func TestLoadFeatureSpecificationCorrectionRejectsUnknownFields(t *testing.T) {
+	t.Parallel()
+	featureID := kernel.UUIDv7("018f0000-0000-7000-8000-000000000010")
+	request := operationalruntime.FeatureSpecificationCorrectionRequest{
+		ExpectedRevision: 3, ExpectedSpecificationDigest: kernel.Digest(strings.Repeat("a", 64)),
+		Stories: []operationalruntime.SpecificationStoryInput{{Title: "Alias", Description: "Address one instance by name.", AcceptanceCriteria: []string{"works"}, Priority: organization.PriorityNormal}},
+		Reason:  "remove unrequested scope", EvidenceRefs: []kernel.EvidenceRef{{EvidenceID: "018f0000-0000-7000-8000-000000000003", SHA256: kernel.Digest(strings.Repeat("b", 64))}},
+		IdempotencyKey: "correct-1",
+	}
+	raw, err := json.Marshal(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	method, target, loaded, err := loadFeatureSpecificationCorrection([]string{string(featureID), "-"}, bytes.NewReader(raw), 4096)
+	if err != nil || method != http.MethodPost || target != "/v1/features/"+string(featureID)+"/correct-specification" || !bytes.Equal(loaded, raw) {
+		t.Fatalf("method=%s target=%s err=%v", method, target, err)
+	}
+	invalid := append(raw[:len(raw)-1], []byte(`,"unexpected":true}`)...)
+	if _, _, _, err := loadFeatureSpecificationCorrection([]string{string(featureID), "-"}, bytes.NewReader(invalid), 4096); err == nil {
+		t.Fatal("unknown field accepted")
+	}
+}
+
 func TestLoadFeatureClarificationBuildsFocusedExactFeatureRequest(t *testing.T) {
 	t.Parallel()
 	featureID := kernel.UUIDv7("00000000-0000-7000-8000-000000000005")

@@ -90,7 +90,7 @@ func workflowStageInvocationAccepted(feature organization.FeatureRequest, admiss
 	if workflowInvocationInAdmissionFamily(invocation, *admission.AuthorizedInvocationID, snapshot.WorkInvocations) {
 		return true
 	}
-	if feature.PlanSupersession == nil {
+	if feature.PlanSupersession == nil && feature.SpecificationCorrection == nil {
 		return false
 	}
 	if invocation.Purpose != kernel.PurposeHandoff || invocation.RetryOfInvocationID != nil || invocation.AttemptOrdinal != 1 {

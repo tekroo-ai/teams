@@ -5,5 +5,5 @@
   "reasoning_effort": "xhigh",
   "maximum_output_tokens": 65536,
   "enable_mtp": true,
-  "condenser_maximum_events": 80
+  "condenser_maximum_events": 1000
 }

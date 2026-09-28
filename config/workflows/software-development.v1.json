@@ -2,7 +2,7 @@
   "schema_version": "1.0.0",
   "name": "software-development",
   "version": "1.2.0",
-  "content_digest": "8e9842874ad694f1fce192036f647d4fa8d939d4f754fbc6e9cd9a23bdca9036",
+  "content_digest": "2578a9e5e1c2b3da2874775bb97897e5b6593c76442d805579f465a4c25d4e0a",
   "trigger_types": [
     "tekroo.message.feature.submitted"
   ],
@@ -22,7 +22,7 @@
       "allowed_outgoing_purposes": ["HANDOFF"],
       "target_selection": "CAPABILITY",
       "validation_policy": "DETERMINISTIC_ONLY",
-      "completion_condition": "The refinement conforms to the selected handler's result schema. It preserves every submitted acceptance criterion verbatim and makes material ambiguity explicit as clarification questions. Follow the selected handler's result protocol for the outer envelope."
+      "completion_condition": "The refinement conforms to the selected handler's result schema and preserves every submitted acceptance criterion verbatim. A clarification question is permitted only when mutually incompatible explicit user-visible interpretations require a needs_decision outcome; completed refinements leave clarification_questions empty. Follow the selected handler's result protocol for the outer envelope."
     },
     {
       "stage_id": "specify",
@@ -59,7 +59,7 @@
       "allowed_outgoing_purposes": ["HANDOFF"],
       "target_selection": "CAPABILITY",
       "validation_policy": "DETERMINISTIC_ONLY",
-      "completion_condition": "The task-specific work_product contains only schema_version=1.0.0, result_type=FEATURE_PLAN, architecture, design_decisions, assumptions, and tasks. Each task contains only story_index, title, description, acceptance_criteria, backward depends_on indexes, empty validates, purpose=IMPLEMENTATION, complexity, risk, critical_path, attempt_limit, and review_round_limit. The plan is repository-grounded, acyclic, uses true dependencies, preserves layer ownership, and contains only work needed for the accepted feature. Follow the selected handler's result protocol for the outer envelope."
+      "completion_condition": "The task-specific work_product contains only schema_version=1.0.0, result_type=FEATURE_PLAN, architecture, design_decisions, assumptions, and tasks. Each task contains only story_index, title, description, acceptance_criteria, backward depends_on indexes, empty validates, purpose=IMPLEMENTATION, complexity, risk, critical_path, attempt_limit, and review_round_limit. story_index is one zero-based integer naming the task's primary story; it is never an array. depends_on and validates are zero-based integer arrays; validates must be empty. If one task supports more than one story, select its primary story_index and state the cross-story requirement in that task's acceptance criteria. The plan is repository-grounded, acyclic, uses true dependencies, preserves layer ownership, and contains only work needed for the accepted feature. Follow the selected handler's result protocol for the outer envelope."
     }
   ],
   "root_budgets": {

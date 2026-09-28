@@ -291,7 +291,7 @@ func ExecutionToolsForPermissions(permissions []string) []string {
 		return []string{}
 	}
 	if slices.Contains(permissions, "repository.edit") {
-		return []string{"terminal", "glob", "repository_search", "file_editor", "task_tracker"}
+		return []string{"terminal", "glob", "repository_search", "file_editor_commands", "task_tracker"}
 	}
 	if slices.Contains(permissions, "test.execute") || slices.Contains(permissions, "security-check.execute") {
 		return []string{"terminal", "glob", "repository_search", "repository_view"}
@@ -300,7 +300,7 @@ func ExecutionToolsForPermissions(permissions []string) []string {
 }
 
 func validExplicitAgentTools(tools []string) bool {
-	canonical := []string{"terminal", "glob", "repository_search", "repository_view", "file_editor", "task_tracker"}
+	canonical := []string{"terminal", "glob", "repository_search", "repository_view", "file_editor_commands", "task_tracker"}
 	position := -1
 	for _, tool := range tools {
 		next := slices.Index(canonical, tool)
@@ -583,6 +583,7 @@ func qualifiedAgentSettings(raw json.RawMessage) bool {
 		LLM       qualifiedLLMSettings `json:"llm"`
 		Condenser struct {
 			Kind          string               `json:"kind"`
+			CondenserKind string               `json:"condenser_kind"`
 			LLM           qualifiedLLMSettings `json:"llm"`
 			MaximumEvents uint32               `json:"max_size"`
 			MaximumTokens uint32               `json:"max_tokens"`
@@ -1811,6 +1812,7 @@ func findStageIsReadOnly(arguments []string) bool {
 }
 
 func repositorySearchLoopViolation(events []rawEvent, promptIndex int) (rawEvent, bool) {
+	const maximumConsecutiveSameSearchResults = 8
 	type pendingAction struct {
 		event      rawEvent
 		toolCallID string
@@ -1823,6 +1825,8 @@ func repositorySearchLoopViolation(events []rawEvent, promptIndex int) (rawEvent
 	batchNovel := make(map[uint64]bool)
 	var currentBatch uint64
 	actionBatchOpen := false
+	lastSearchResult := ""
+	consecutiveSameSearchResults := 0
 	for index, event := range events {
 		if index <= promptIndex {
 			continue
@@ -1836,9 +1840,19 @@ func repositorySearchLoopViolation(events []rawEvent, promptIndex int) (rawEvent
 			pendingByTool = make(map[string][]pendingAction)
 			batchNovel = make(map[uint64]bool)
 			actionBatchOpen = false
+			lastSearchResult = ""
+			consecutiveSameSearchResults = 0
 			continue
 		}
+		if event.Kind == "MessageEvent" && event.Source == "user" && strings.HasPrefix(event.Text, repositoryProgressCorrectionPrefix) {
+			lastSearchResult = ""
+			consecutiveSameSearchResults = 0
+		}
 		if event.Kind == "ActionEvent" && event.Source == "agent" {
+			if event.ToolName != "repository_search" {
+				lastSearchResult = ""
+				consecutiveSameSearchResults = 0
+			}
 			if !actionBatchOpen {
 				currentBatch++
 				actionBatchOpen = true
@@ -1882,6 +1896,21 @@ func repositorySearchLoopViolation(events []rawEvent, promptIndex int) (rawEvent
 		resultSignature, ok := repositoryObservationSignature(event)
 		if !ok {
 			continue
+		}
+		if pending.event.ToolName == "repository_search" {
+			// Different patterns can still be one search loop when every query
+			// returns the same evidence. Ask the agent to reassess after a bounded
+			// streak; a file read, edit, or genuinely new result resets it.
+			searchResultSignature, resultOK := repositorySearchResultSignature(event)
+			if resultOK && searchResultSignature == lastSearchResult {
+				consecutiveSameSearchResults++
+			} else {
+				lastSearchResult = searchResultSignature
+				consecutiveSameSearchResults = 1
+			}
+			if consecutiveSameSearchResults > maximumConsecutiveSameSearchResults && !repositoryProgressViolationCorrected(events, eventIndexByID(events, pending.event.ID)) {
+				return pending.event, true
+			}
 		}
 		results := seen[pending.signature]
 		if results == nil {
@@ -1971,7 +2000,7 @@ func overlappingRepositoryViewLoopViolation(events []rawEvent, promptIndex int) 
 }
 
 func repositoryViewRange(event rawEvent) (view repositoryViewWindow, ok bool) {
-	if event.ToolName != "file_editor" && event.ToolName != "repository_view" || !strings.EqualFold(strings.TrimSpace(event.ActionCommand), "view") || event.ActionPath == "" {
+	if event.ToolName != "file_editor" && event.ToolName != "file_view" && event.ToolName != "repository_view" || !strings.EqualFold(strings.TrimSpace(event.ActionCommand), "view") || event.ActionPath == "" {
 		return view, false
 	}
 	var action struct {
@@ -2030,9 +2059,33 @@ func repositoryObservationSignature(event rawEvent) (string, bool) {
 	return hex.EncodeToString(digest[:]), true
 }
 
+func repositorySearchResultSignature(event rawEvent) (string, bool) {
+	if event.Kind != "ObservationEvent" || event.ToolName != "repository_search" {
+		return "", false
+	}
+	// A no-match response echoes the query pattern in its display text. Ignore
+	// that echo so changing a fruitless pattern does not look like new evidence.
+	resultText := event.Text
+	if strings.HasPrefix(resultText, "No matching lines found for pattern '") {
+		resultText = "No matching lines found"
+	}
+	encoded, err := json.Marshal(struct {
+		Text      string `json:"text"`
+		Error     bool   `json:"error"`
+		Timeout   bool   `json:"timeout"`
+		ExitCode  *int   `json:"exit_code,omitempty"`
+		Truncated *bool  `json:"truncated,omitempty"`
+	}{resultText, event.ObservationError, event.ObservationTimeout, event.ObservationExitCode, event.ObservationTruncated})
+	if err != nil {
+		return "", false
+	}
+	digest := sha256.Sum256(encoded)
+	return hex.EncodeToString(digest[:]), true
+}
+
 func repositoryAction(event rawEvent) bool {
 	switch event.ToolName {
-	case "terminal", "file_editor", "glob", "repository_search", "repository_view":
+	case "terminal", "file_editor", "file_view", "file_create", "file_replace", "file_insert", "file_undo", "glob", "repository_search", "repository_view":
 		return true
 	default:
 		return false
@@ -2043,7 +2096,7 @@ func repositoryFileListingAction(event rawEvent) bool {
 	if event.ToolName == "glob" {
 		return true
 	}
-	if event.ToolName == "file_editor" || event.ToolName == "repository_view" {
+	if event.ToolName == "file_editor" || event.ToolName == "file_view" || event.ToolName == "repository_view" {
 		if event.ToolName == "file_editor" && !strings.EqualFold(strings.TrimSpace(event.ActionCommand), "view") || event.ActionPath == "" {
 			return false
 		}
@@ -2082,8 +2135,8 @@ func repositoryInspectionAction(event rawEvent) bool {
 	if event.ToolName == "repository_search" {
 		return true
 	}
-	if event.ToolName == "file_editor" || event.ToolName == "repository_view" {
-		return (event.ToolName == "repository_view" || strings.EqualFold(strings.TrimSpace(event.ActionCommand), "view")) && event.ActionPath != "" && !repositoryFileListingAction(event)
+	if event.ToolName == "file_editor" || event.ToolName == "file_view" || event.ToolName == "repository_view" {
+		return (event.ToolName == "repository_view" || event.ToolName == "file_view" || strings.EqualFold(strings.TrimSpace(event.ActionCommand), "view")) && event.ActionPath != "" && !repositoryFileListingAction(event)
 	}
 	if event.ToolName != "terminal" {
 		return false
@@ -2106,8 +2159,8 @@ func repositoryContentReadAction(event rawEvent) bool {
 	if event.ToolName == "repository_search" {
 		return true
 	}
-	if event.ToolName == "file_editor" || event.ToolName == "repository_view" {
-		return (event.ToolName == "repository_view" || strings.EqualFold(strings.TrimSpace(event.ActionCommand), "view")) && event.ActionPath != "" && !repositoryFileListingAction(event)
+	if event.ToolName == "file_editor" || event.ToolName == "file_view" || event.ToolName == "repository_view" {
+		return (event.ToolName == "repository_view" || event.ToolName == "file_view" || strings.EqualFold(strings.TrimSpace(event.ActionCommand), "view")) && event.ActionPath != "" && !repositoryFileListingAction(event)
 	}
 	if event.ToolName != "terminal" {
 		return false
@@ -2200,7 +2253,7 @@ func retainedSuccessfulRepositoryGrounding(brief application.ExecutionBrief, eve
 		return false, false
 	}
 	checkpoint := input.RecoveryCheckpoint
-	if checkpoint.SchemaVersion != "tekroo.teams.execution-progress-checkpoint/1.2.0" || checkpoint.Source != "OPENHANDS_EVENT_JOURNAL" || !checkpoint.SourceJournalSHA256.Valid() || checkpoint.InvocationID != brief.InvocationID || checkpoint.PriorInvocationID == nil || brief.RetryOfInvocationID == nil || *checkpoint.PriorInvocationID != *brief.RetryOfInvocationID {
+	if checkpoint.SchemaVersion != "tekroo.teams.execution-progress-checkpoint/1.2.0" && checkpoint.SchemaVersion != "tekroo.teams.execution-progress-checkpoint/1.3.0" || checkpoint.Source != "OPENHANDS_EVENT_JOURNAL" || !checkpoint.SourceJournalSHA256.Valid() || checkpoint.InvocationID != brief.InvocationID || checkpoint.PriorInvocationID == nil || brief.RetryOfInvocationID == nil || *checkpoint.PriorInvocationID != *brief.RetryOfInvocationID {
 		return false, false
 	}
 	encoded, err := json.Marshal(brief)
@@ -2679,7 +2732,7 @@ func (client *Client) correctRepositoryProgressViolation(ctx context.Context, br
 	if repositoryProgressViolationCorrected(events, eventIndexByID(events, violation.ID)) {
 		return client.observation(ctx, brief, requestDigest, info, events, false)
 	}
-	correction := repositoryProgressCorrectionPrefix + violation.ID + "\nYour most recent repository action exactly repeated an earlier action and returned the same result, so repeating it again cannot advance the task. Before your next action, answer in one sentence: what specific fact or artifact are you still trying to obtain, and what concrete action that is NOT a repeat of a search you have already run will obtain it? Then take that action. If the symbol or content you are looking for has not appeared in any result so far, treat it as absent from the paths you have searched: read the whole file with repository_view or list the directory with glob instead of searching for it again with a varied pattern."
+	correction := repositoryProgressCorrectionPrefix + violation.ID + "\nYour recent repository searches have returned the same evidence without advancing the task. Before your next action, answer in one sentence: what specific fact or artifact are you still trying to obtain, and what different concrete action will obtain it? Then take that action. If the symbol or content you are looking for has not appeared in any result so far, treat it as absent from the paths you have searched: inspect the relevant file or directory instead of extending the search pattern again."
 	status, _, err := client.request(ctx, http.MethodPost, "/api/conversations/"+url.PathEscape(conversationID)+"/events", map[string]any{
 		"role": "user", "run": true,
 		"content": []map[string]any{{"type": "text", "text": correction}},
@@ -2959,9 +3012,12 @@ type progressCheckpoint struct {
 }
 
 const (
-	maximumCheckpointActions            = 12
-	maximumCheckpointRepositoryEvidence = 12
-	maximumCheckpointValidations        = 24
+	// A checkpoint is a restart boundary, not a second copy of the journal.
+	// Keep only the small amount of current state needed to resume work; the
+	// event journal remains the provenance record for older tool output.
+	maximumCheckpointActions            = 4
+	maximumCheckpointRepositoryEvidence = 4
+	maximumCheckpointValidations        = 8
 )
 
 // checkpointExecutionAuthority repeats the minimum canonical Teams state that
@@ -3081,9 +3137,8 @@ func buildProgressCheckpoint(brief application.ExecutionBrief, events []rawEvent
 				repositoryEvidence = retainCheckpointRepositoryEvidence(repositoryEvidence, evidence, maximumCheckpointRepositoryEvidence)
 			}
 		}
-		// Version 1.1 did not have repository_evidence. Its Actions are
-		// nevertheless raw, digest-bound observations, so a successor can
-		// recover useful source evidence from the immediately prior slice.
+		// Version 1.1 retained source reads in Actions. Preserve their identity
+		// metadata for recovery, but never carry forward their old text excerpts.
 		for _, action := range retained.Actions {
 			if action.Outcome == "SUCCEEDED" && checkpointActionIsRepositoryEvidence(action) {
 				repositoryEvidence = retainCheckpointRepositoryEvidence(repositoryEvidence, action, maximumCheckpointRepositoryEvidence)
@@ -3113,7 +3168,7 @@ func buildProgressCheckpoint(brief application.ExecutionBrief, events []rawEvent
 			actions = append(actions, checkpointAction{EventID: event.ID, Tool: event.ToolName, Command: truncateRunes(describeAction(event), 500), Path: truncateRunes(event.ActionPath, 1000), Outcome: "PENDING"})
 			continue
 		}
-		if event.Kind != "ObservationEvent" || len(pendingByTool[event.ToolName]) == 0 {
+		if !checkpointTerminalEvent(event) || len(pendingByTool[event.ToolName]) == 0 {
 			continue
 		}
 		pendingIndex := 0
@@ -3128,7 +3183,9 @@ func buildProgressCheckpoint(brief application.ExecutionBrief, events []rawEvent
 		pending := pendingByTool[event.ToolName][pendingIndex]
 		pendingByTool[event.ToolName] = slices.Delete(pendingByTool[event.ToolName], pendingIndex, pendingIndex+1)
 		outcome := "SUCCEEDED"
-		if event.ObservationTimeout {
+		if event.Kind == "AgentErrorEvent" {
+			outcome = "FAILED"
+		} else if event.ObservationTimeout {
 			outcome = "TIMED_OUT"
 		} else if event.ObservationError || event.ObservationExitCode != nil && *event.ObservationExitCode != 0 {
 			outcome = "FAILED"
@@ -3136,7 +3193,6 @@ func buildProgressCheckpoint(brief application.ExecutionBrief, events []rawEvent
 		digest := sha256.Sum256(event.Raw)
 		actions[pending.index].Outcome = outcome
 		actions[pending.index].ObservationSHA256 = kernel.Digest(hex.EncodeToString(digest[:]))
-		actions[pending.index].ObservationExcerpt = truncateRunes(strings.TrimSpace(event.Text), 1600)
 		if outcome == "SUCCEEDED" && repositoryContentReadAction(pending.event) && pending.event.ActionPath != "" {
 			inspected[pending.event.ActionPath] = struct{}{}
 		}
@@ -3152,7 +3208,7 @@ func buildProgressCheckpoint(brief application.ExecutionBrief, events []rawEvent
 	}
 	actions = compactCheckpointActions(actions, maximumCheckpointActions)
 	return progressCheckpoint{
-		SchemaVersion:          "tekroo.teams.execution-progress-checkpoint/1.2.0",
+		SchemaVersion:          "tekroo.teams.execution-progress-checkpoint/1.3.0",
 		InvocationID:           brief.InvocationID,
 		AuthoritativeExecution: checkpointAuthority(brief),
 		Source:                 "OPENHANDS_EVENT_JOURNAL",
@@ -3164,8 +3220,16 @@ func buildProgressCheckpoint(brief application.ExecutionBrief, events []rawEvent
 		ChangedPaths:           sortedKeys(changed),
 		Validations:            validations,
 		NextAction:             checkpointNextAction(brief, actions, changed, validations),
-		ContinuationRule:       "Treat authoritative_execution as canonical. Perform next_action first. A focused reread of retained pre-checkpoint evidence is allowed when compression removed a needed detail; never repeat an action already performed after this checkpoint unless repository state or its inputs changed.",
+		ContinuationRule:       "Treat authoritative_execution as canonical. Perform next_action first. The journal is retained as provenance but is not repeated here; reread only the exact source or test evidence needed to continue. Never repeat an action unless its relevant inputs or repository state changed.",
 	}
+}
+
+// checkpointTerminalEvent identifies every event that completes a tool action
+// in the OpenHands journal. AgentErrorEvent is terminal feedback for a rejected
+// tool invocation; leaving it pending turns a completed error into a false
+// recovery obligation after compaction.
+func checkpointTerminalEvent(event rawEvent) bool {
+	return event.Kind == "ObservationEvent" || event.Kind == "AgentErrorEvent"
 }
 
 func compactCheckpointActions(actions []checkpointAction, maximum int) []checkpointAction {
@@ -3186,7 +3250,7 @@ func recoveryCheckpointFromExecutionPrompt(event rawEvent) (progressCheckpoint, 
 		return progressCheckpoint{}, false
 	}
 	checkpoint := *input.RecoveryCheckpoint
-	if checkpoint.SchemaVersion != "tekroo.teams.execution-progress-checkpoint/1.2.0" || checkpoint.Source != "OPENHANDS_EVENT_JOURNAL" || !checkpoint.SourceJournalSHA256.Valid() || !checkpoint.InvocationID.Valid() || checkpoint.PriorInvocationID == nil || !checkpoint.PriorInvocationID.Valid() {
+	if checkpoint.SchemaVersion != "tekroo.teams.execution-progress-checkpoint/1.2.0" && checkpoint.SchemaVersion != "tekroo.teams.execution-progress-checkpoint/1.3.0" || checkpoint.Source != "OPENHANDS_EVENT_JOURNAL" || !checkpoint.SourceJournalSHA256.Valid() || !checkpoint.InvocationID.Valid() || checkpoint.PriorInvocationID == nil || !checkpoint.PriorInvocationID.Valid() {
 		return progressCheckpoint{}, false
 	}
 	return checkpoint, true
@@ -3201,7 +3265,7 @@ func progressCheckpointFromEvent(event rawEvent) (progressCheckpoint, bool) {
 		return progressCheckpoint{}, false
 	}
 	var checkpoint progressCheckpoint
-	if json.Unmarshal([]byte(parts[2]), &checkpoint) != nil || checkpoint.SchemaVersion != "tekroo.teams.execution-progress-checkpoint/1.1.0" && checkpoint.SchemaVersion != "tekroo.teams.execution-progress-checkpoint/1.2.0" || !checkpoint.SourceJournalSHA256.Valid() {
+	if json.Unmarshal([]byte(parts[2]), &checkpoint) != nil || checkpoint.SchemaVersion != "tekroo.teams.execution-progress-checkpoint/1.1.0" && checkpoint.SchemaVersion != "tekroo.teams.execution-progress-checkpoint/1.2.0" && checkpoint.SchemaVersion != "tekroo.teams.execution-progress-checkpoint/1.3.0" || !checkpoint.SourceJournalSHA256.Valid() {
 		return progressCheckpoint{}, false
 	}
 	return checkpoint, true
@@ -3222,6 +3286,10 @@ func retainCheckpointAction(retained []checkpointAction, action checkpointAction
 }
 
 func retainCheckpointRepositoryEvidence(retained []checkpointAction, action checkpointAction, maximum int) []checkpointAction {
+	// Tool output belongs to the append-only journal. A checkpoint preserves
+	// only the evidence identity and target so it stays compact and cannot make
+	// stale text look like current source.
+	action.ObservationExcerpt = ""
 	if checkpointActionTargetsRepositoryInstructions(action) {
 		retained = slices.DeleteFunc(retained, checkpointActionTargetsRepositoryInstructions)
 	}
@@ -3262,7 +3330,7 @@ func checkpointRepositoryEvidenceAction(event rawEvent) bool {
 
 func checkpointActionIsRepositoryEvidence(action checkpointAction) bool {
 	switch action.Tool {
-	case "repository_view", "repository_search":
+	case "repository_view", "repository_search", "file_view":
 		return true
 	case "terminal":
 		fields := strings.Fields(strings.ToLower(strings.TrimSpace(action.Command)))
@@ -3281,7 +3349,7 @@ func checkpointActionIsRepositoryEvidence(action checkpointAction) bool {
 
 func checkpointActionIsReadOnlyInspection(action checkpointAction) bool {
 	switch action.Tool {
-	case "repository_view", "repository_search", "glob":
+	case "repository_view", "repository_search", "glob", "file_view":
 		return true
 	case "file_editor":
 		return strings.EqualFold(strings.TrimSpace(action.Command), "view")
@@ -3357,7 +3425,7 @@ func checkpointNextAction(brief application.ExecutionBrief, actions []checkpoint
 	}
 	switch brief.Purpose {
 	case kernel.PurposeReplan, kernel.PurposeInvestigation, kernel.PurposeReview, kernel.PurposeHandoff, kernel.PurposeEscalation:
-		return "Use the retained successful repository evidence to complete the authoritative task now and " + submit + "; do not retry failed broad discovery. Reread retained pre-checkpoint evidence only when one exact detail is needed."
+		return "Use the authoritative task and retained path and validation state to complete the task now and " + submit + "; do not retry failed broad discovery. Reread source only when one exact detail is needed."
 	}
 	for index := len(actions) - 1; index >= 0; index-- {
 		switch actions[index].Outcome {
@@ -3365,21 +3433,22 @@ func checkpointNextAction(brief application.ExecutionBrief, actions []checkpoint
 			if checkpointActionIsReadOnlyInspection(actions[index]) {
 				continue
 			}
-			if actions[index].Outcome == "FAILED" && deterministicValidationAction(rawEvent{ToolName: actions[index].Tool, ActionCommand: actions[index].Command}) {
+			if actions[index].Outcome == "FAILED" && deterministicValidationAction(rawEvent{ToolName: actions[index].Tool, ActionCommand: actions[index].Command}) && latestValidationRequiresRepair(validations) {
 				return "Use the retained failed validation output to repair its root cause. Do not rerun the same validation until repository state or its relevant external prerequisite changes."
+			}
+			if actions[index].Outcome == "FAILED" && deterministicValidationAction(rawEvent{ToolName: actions[index].Tool, ActionCommand: actions[index].Command}) {
+				continue
 			}
 			return fmt.Sprintf("Resolve the retained %s %s action before continuing; do not repeat any unrelated successful discovery.", strings.ToLower(actions[index].Outcome), actions[index].Tool)
 		}
 	}
-	for index := len(validations) - 1; index >= 0; index-- {
-		if validations[index].Outcome != "SUCCEEDED" {
-			return "Repair the latest failed validation, then rerun only that affected validation."
-		}
+	if latestValidationRequiresRepair(validations) {
+		return "Use the retained failed validation output to repair its root cause. Do not rerun the same validation until repository state or its relevant external prerequisite changes."
 	}
 	switch brief.Purpose {
 	case kernel.PurposeImplementation, kernel.PurposeRepair:
 		if len(changed) == 0 {
-			return "Use the retained repository evidence to implement the first unmet acceptance criterion now; do not repeat broad discovery."
+			return "Implement the first unmet acceptance criterion now; do not repeat broad discovery."
 		}
 		if len(validations) == 0 {
 			return "Run the narrowest deterministic validation that covers the retained changes."
@@ -3395,6 +3464,23 @@ func checkpointNextAction(brief application.ExecutionBrief, actions []checkpoint
 	default:
 		return "Perform the first incomplete requirement in the authoritative task, then " + submit + "."
 	}
+}
+
+// latestValidationRequiresRepair only promotes a retained failure into a
+// mandatory recovery action when it is still the newest validation state. A
+// later successful validation is evidence that the candidate progressed after
+// an earlier failure; without a structured coverage proof, the reducer must
+// not falsely claim that the older command remains the current failure.
+func latestValidationRequiresRepair(validations []checkpointAction) bool {
+	for index := len(validations) - 1; index >= 0; index-- {
+		switch validations[index].Outcome {
+		case "SUCCEEDED":
+			return false
+		case "FAILED", "TIMED_OUT":
+			return true
+		}
+	}
+	return false
 }
 
 func truncateRunes(value string, maximum int) string {
@@ -3415,9 +3501,23 @@ func sortedKeys(values map[string]struct{}) []string {
 }
 
 func missingCompactionCheckpoint(info conversationInfo, events []rawEvent, promptIndex int) int {
-	condenserRuns := len(info.Stats.UsageToMetrics["condenser"].TokenUsages)
+	// A Teams checkpoint condenser deliberately performs no LLM call, so token
+	// usage cannot be the signal that a context boundary occurred. The durable
+	// Condensation events are the source of truth for both summarizing and
+	// deterministic condensers.
+	condenserRuns := 0
+	for index, event := range events {
+		if index > promptIndex && event.Kind == "Condensation" {
+			condenserRuns++
+		}
+	}
 	if condenserRuns == 0 {
-		return 0
+		// Older, accepted profiles used the stock summarizer. Preserve their
+		// recovery behavior while new Teams profiles use durable events above.
+		condenserRuns = len(info.Stats.UsageToMetrics["condenser"].TokenUsages)
+		if condenserRuns == 0 {
+			return 0
+		}
 	}
 	covered := 0
 	for index, event := range events {
@@ -3595,6 +3695,27 @@ func (client *Client) prepare(ctx context.Context, brief application.ExecutionBr
 			if len(materialized) > 0 {
 				envelope["evidence_materializations"] = materialized
 			}
+		}
+		prompt, err = json.Marshal(envelope)
+		if err != nil {
+			return preparedExecution{}, ErrProtocol
+		}
+	}
+	if brief.MessageHandler != nil {
+		var envelope map[string]any
+		if json.Unmarshal(prompt, &envelope) != nil {
+			return preparedExecution{}, ErrProtocol
+		}
+		overview := strings.TrimSpace(brief.Task.Description)
+		if paragraph := strings.Index(overview, "\n\n"); paragraph >= 0 {
+			overview = overview[:paragraph]
+		}
+		envelope["agent_task"] = map[string]any{
+			"title":           brief.Task.Title,
+			"overview":        truncateRunes(overview, 500),
+			"role":            brief.RoleGrounding.RoleFQRN,
+			"message_type":    brief.MessageHandler.MessageType,
+			"completion_tool": submitResultToolName,
 		}
 		prompt, err = json.Marshal(envelope)
 		if err != nil {
@@ -4100,7 +4221,22 @@ func decodeEvent(raw json.RawMessage) (rawEvent, error) {
 	if envelope.Timestamp != "" {
 		timestamp, _ = time.Parse(time.RFC3339Nano, envelope.Timestamp)
 	}
-	return rawEvent{Raw: append(json.RawMessage(nil), raw...), ID: envelope.ID, Kind: envelope.Kind, Source: envelope.Source, ObservationKind: envelope.Observation.Kind, Timestamp: timestamp, Text: text.String(), Summary: envelope.Summary, ToolName: envelope.ToolName, ToolCallID: envelope.ToolCallID, ActionCommand: envelope.Action.Command, ActionPayload: append(json.RawMessage(nil), actionEnvelope.Action...), ActionPath: envelope.Action.Path, ObservationError: envelope.Observation.IsError, ObservationTimeout: envelope.Observation.Timeout, ObservationExitCode: envelope.Observation.ExitCode, ObservationTruncated: envelope.Observation.Truncated}, nil
+	command := envelope.Action.Command
+	if command == "" {
+		switch envelope.ToolName {
+		case "file_view":
+			command = "view"
+		case "file_create":
+			command = "create"
+		case "file_replace":
+			command = "str_replace"
+		case "file_insert":
+			command = "insert"
+		case "file_undo":
+			command = "undo_edit"
+		}
+	}
+	return rawEvent{Raw: append(json.RawMessage(nil), raw...), ID: envelope.ID, Kind: envelope.Kind, Source: envelope.Source, ObservationKind: envelope.Observation.Kind, Timestamp: timestamp, Text: text.String(), Summary: envelope.Summary, ToolName: envelope.ToolName, ToolCallID: envelope.ToolCallID, ActionCommand: command, ActionPayload: append(json.RawMessage(nil), actionEnvelope.Action...), ActionPath: envelope.Action.Path, ObservationError: envelope.Observation.IsError, ObservationTimeout: envelope.Observation.Timeout, ObservationExitCode: envelope.Observation.ExitCode, ObservationTruncated: envelope.Observation.Truncated}, nil
 }
 
 func deterministicValidationAction(event rawEvent) bool {
@@ -4131,6 +4267,10 @@ func deterministicValidationAction(event rawEvent) bool {
 
 func mutationAction(event rawEvent) bool {
 	command := strings.ToLower(strings.TrimSpace(event.ActionCommand))
+	switch event.ToolName {
+	case "file_create", "file_replace", "file_insert", "file_undo":
+		return true
+	}
 	if event.ToolName == "file_editor" {
 		return command != "" && command != "view"
 	}
@@ -4590,6 +4730,25 @@ func executionPromptIndex(events []rawEvent, prepared preparedExecution, brief a
 		return index
 	}
 	if !explicitRecoveryProfile(brief) {
+		// Presentation may change across restarts while the canonical brief
+		// remains identical. Match the signed brief, not only prompt bytes.
+		for index, event := range events {
+			if event.Kind != "MessageEvent" || event.Source != "user" {
+				continue
+			}
+			var observed application.ExecutionBrief
+			if json.Unmarshal([]byte(event.Text), &observed) != nil {
+				continue
+			}
+			encoded, err := json.Marshal(observed)
+			if err != nil {
+				continue
+			}
+			digest := sha256.Sum256(encoded)
+			if kernel.Digest(hex.EncodeToString(digest[:])) == requestDigest {
+				return index
+			}
+		}
 		return -1
 	}
 	for index, event := range events {
@@ -4611,7 +4770,7 @@ func recoveryExecutionPromptMatches(prompt string, expectedCandidate *CandidateW
 		return false
 	}
 	checkpoint := envelope.RecoveryCheckpoint
-	if checkpoint.SchemaVersion != "tekroo.teams.execution-progress-checkpoint/1.1.0" && checkpoint.SchemaVersion != "tekroo.teams.execution-progress-checkpoint/1.2.0" || checkpoint.InvocationID != brief.InvocationID || checkpoint.PriorInvocationID == nil || brief.RetryOfInvocationID == nil || *checkpoint.PriorInvocationID != *brief.RetryOfInvocationID || checkpoint.Source != "OPENHANDS_EVENT_JOURNAL" || checkpoint.SourceEventCount <= 0 || !checkpoint.SourceJournalSHA256.Valid() || checkpoint.AuthoritativeExecution.ExecutionBriefSHA256 != requestDigest || !reflect.DeepEqual(checkpoint.AuthoritativeExecution, checkpointAuthority(brief)) {
+	if checkpoint.SchemaVersion != "tekroo.teams.execution-progress-checkpoint/1.1.0" && checkpoint.SchemaVersion != "tekroo.teams.execution-progress-checkpoint/1.2.0" && checkpoint.SchemaVersion != "tekroo.teams.execution-progress-checkpoint/1.3.0" || checkpoint.InvocationID != brief.InvocationID || checkpoint.PriorInvocationID == nil || brief.RetryOfInvocationID == nil || *checkpoint.PriorInvocationID != *brief.RetryOfInvocationID || checkpoint.Source != "OPENHANDS_EVENT_JOURNAL" || checkpoint.SourceEventCount <= 0 || !checkpoint.SourceJournalSHA256.Valid() || checkpoint.AuthoritativeExecution.ExecutionBriefSHA256 != requestDigest || !reflect.DeepEqual(checkpoint.AuthoritativeExecution, checkpointAuthority(brief)) {
 		return false
 	}
 	if (expectedCandidate == nil) != (envelope.Candidate == nil) {

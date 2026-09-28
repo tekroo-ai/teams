@@ -36,7 +36,7 @@ const (
 	localDeploymentVersion      = "1.0.0"
 	localHandlerPublisher       = "tekroo-message-handlers-20260913"
 	localQualificationPublisher = "tekroo-message-handlers-qualification-20260913"
-	localSoftwareWorkflowDigest = "8e9842874ad694f1fce192036f647d4fa8d939d4f754fbc6e9cd9a23bdca9036"
+	localSoftwareWorkflowDigest = "2578a9e5e1c2b3da2874775bb97897e5b6593c76442d805579f465a4c25d4e0a"
 	localCondenserOutputTokens  = 4096
 	localCondenserMaximumTokens = 196608
 	localQualificationSchema    = "tekroo.local-model-profile-qualifications/1.0.0"
@@ -341,7 +341,7 @@ func initializeLocalDeployment(ctx context.Context, options localInitOptions) (r
 		ContractRoot:          options.SourceRoot,
 		Mongo:                 operationalruntime.ProductionMongoConfig{URIFile: mongoPath, Database: options.Database, BacklogLimit: 10000, DeliveryPolicyRevision: 1, MessageWaitTimeout: "1m"},
 		OpenHands:             operationalruntime.ProductionOpenHandsConfig{BaseURL: options.OpenHandsBaseURL, SessionAPIKeyFile: options.OpenHandsKeyFile, RequestTimeout: "20m", PollInterval: "250ms", MaximumPages: 64, MaximumEvidenceBytes: 16 << 20},
-		Operator:              operationalruntime.ProductionOperatorConfig{Address: options.OperatorAddress, BearerTokenFile: operatorTokenPath, Principal: kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "principal"}, OperationTimeout: "30s", MaximumBodyBytes: 1 << 20},
+		Operator:              operationalruntime.ProductionOperatorConfig{Address: options.OperatorAddress, BearerTokenFile: operatorTokenPath, Principal: kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "principal"}, OperationTimeout: "20m", MaximumBodyBytes: 1 << 20},
 		TeamsDatabaseIdentity: options.Database, SMADatabaseIdentity: options.SMADatabase, DeploymentIdentity: kernel.Digest(deploymentIdentity),
 		AuthorizationPolicyFile: policyPath, ProvenanceFile: filepath.Join(configRoot, "provenance.json"), EvidenceRoot: evidenceRoot,
 		ServiceAuthority: kernel.PrincipalRef{Kind: kernel.PrincipalService, ID: "teams-operational-runtime"}, ExpiryAuthority: kernel.PrincipalRef{Kind: kernel.PrincipalPolicy, ID: "teams-admission-policy"},

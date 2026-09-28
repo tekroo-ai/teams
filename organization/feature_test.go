@@ -113,6 +113,48 @@ func TestFeatureRoleHandoffsFormFiniteProductOwnerProjectManagerArchitectDAG(t *
 	}
 }
 
+func TestFeatureSpecificationCorrectionPreservesPriorOutputAndAdvancesScope(t *testing.T) {
+	now := time.Date(2026, 9, 27, 20, 0, 0, 0, time.UTC)
+	principal := kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "paul"}
+	prior := organization.FeatureSpecification{
+		PreparedBy: "teams::project-manager-1", PreparedExecution: kernel.ExecutionTuple{ExecutionID: featureUUID(91), FencingEpoch: 1},
+		Stories:    []organization.PlannedStory{{ID: featureUUID(20), Title: "Overbroad", Description: "Extra work.", AcceptanceCriteria: []string{"a finite DAG is created"}, Priority: organization.PriorityHigh}},
+		PreparedAt: now.Add(-time.Hour),
+	}
+	feature := organization.FeatureRequest{
+		SchemaVersion: organization.FeatureSchemaVersion, ID: featureUUID(1), Revision: 3, SubmittedBy: principal,
+		Input: featureInput(), Status: organization.FeatureSpecified, OperatorActor: "teams::operator-1", ProductOwnerActor: "teams::product-owner-1",
+		InitialMessageID: featureUUID(2), LastMessageID: featureUUID(4), LastStepID: featureUUID(5), LastHop: 3,
+		BudgetAccountID: featureUUID(6), LifecycleEpoch: 1, ScopeRevision: 1,
+		CreatedAt: now.Add(-2 * time.Hour), UpdatedAt: now.Add(-time.Hour), Specification: &prior,
+	}
+	store := &featureStoreFake{feature: feature}
+	coordinator, err := organization.NewFeatureCoordinator(store, &featureHostFake{}, materializerFake{}, fixedClock(now), &idQueue{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	priorRaw, _ := json.Marshal(prior)
+	priorSHA := sha256.Sum256(priorRaw)
+	replacement := prior
+	replacement.Stories = []organization.PlannedStory{{ID: featureUUID(21), Title: "Right-sized", Description: "Deliver the original request.", AcceptanceCriteria: []string{"a finite DAG is created"}, Priority: organization.PriorityHigh}}
+	replacement.AmendedBy = &principal
+	replacement.AmendedAt = &now
+	replacementRaw, _ := json.Marshal(replacement)
+	replacementSHA := sha256.Sum256(replacementRaw)
+	correction := organization.FeatureSpecificationCorrection{
+		PriorSpecification: prior, PriorDigest: kernel.Digest(hex.EncodeToString(priorSHA[:])), ReplacementDigest: kernel.Digest(hex.EncodeToString(replacementSHA[:])),
+		ArchitectureRound: 1, RequestedBy: principal, Reason: "Remove unrequested scope", EvidenceRefs: []kernel.EvidenceRef{{EvidenceID: featureUUID(30), SHA256: featureDigest('a')}},
+		RequestedAt: now, IdempotencyKey: "correction-1",
+	}
+	corrected, err := coordinator.CorrectSpecification(context.Background(), feature.ID, 3, replacement, correction)
+	if err != nil || corrected.Revision != 4 || corrected.ScopeRevision != 2 || corrected.Status != organization.FeatureSpecified || corrected.SpecificationCorrection == nil || corrected.SpecificationCorrection.PriorSpecification.Stories[0].Title != "Overbroad" || corrected.Specification.Stories[0].Title != "Right-sized" {
+		t.Fatalf("corrected=%#v err=%v", corrected, err)
+	}
+	if _, err := coordinator.CorrectSpecification(context.Background(), feature.ID, 4, replacement, correction); err == nil {
+		t.Fatal("a second correction replaced the retained history")
+	}
+}
+
 func TestFeatureClarificationResponsePreservesQuestionsAndResumesPlanning(t *testing.T) {
 	now := time.Date(2026, 9, 13, 12, 0, 0, 0, time.UTC)
 	operator := activeRole("teams::operator-1", "operator", featureUUID(81), featureDigest('3'))

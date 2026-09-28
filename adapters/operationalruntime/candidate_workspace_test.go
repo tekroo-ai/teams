@@ -228,7 +228,7 @@ func TestCandidateWorkspaceReusesVerifiedReceiptWithoutRerunningGate(t *testing.
 	makeWritableForCleanup(t, firstWorkspace.WorkingDirectory)
 }
 
-func TestCandidateWorkspaceRehydrateRejectsMutatedWorkspace(t *testing.T) {
+func TestCandidateWorkspaceRehydrateDefersMutatedWorkspaceCheckUntilUse(t *testing.T) {
 	source, baseline, _ := candidateRepository(t)
 	resolver, err := openhands.NewBoundWorkspaceResolver([]openhands.WorkspaceBinding{{WorkspaceID: "tester-1", WorktreeID: "tester-default", WorkingDirectory: t.TempDir()}})
 	if err != nil {
@@ -244,7 +244,7 @@ func TestCandidateWorkspaceRehydrateRejectsMutatedWorkspace(t *testing.T) {
 	consumer := organization.PlannedTask{ID: candidateTestUUID(32), Owner: "teams::tester-1"}
 	targets := []candidateTargetReceipt{{TaskID: candidateTestUUID(33), InvocationID: candidateTestUUID(34), OutputSHA256: candidateTestDigest('d'), TerminalEvidenceIDs: []kernel.UUIDv7{candidateTestUUID(35)}}}
 	sourceWorkspace := ProductionWorkspace{WorkspaceID: "coder-1", WorktreeID: "coder-source", WorkingDirectory: source, Branch: "source", BaselineSHA: baseline, WritablePaths: []string{"."}}
-	workspace, _, _, err := manager.Prepare(context.Background(), feature, consumer, "tester-1", sourceWorkspace, targets, []string{"candidate-head"})
+	workspace, receipt, _, err := manager.Prepare(context.Background(), feature, consumer, "tester-1", sourceWorkspace, targets, []string{"candidate-head"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -256,8 +256,41 @@ func TestCandidateWorkspaceRehydrateRejectsMutatedWorkspace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := newCandidateWorkspaceManager(evidenceRoot, "git", time.Minute, gates, restartedResolver); !errors.Is(err, errInvalidCandidateWorkspace) {
-		t.Fatalf("mutated rehydration error = %v", err)
+	restarted, err := newCandidateWorkspaceManager(evidenceRoot, "git", time.Minute, gates, restartedResolver)
+	if err != nil {
+		t.Fatalf("rehydration error = %v", err)
+	}
+	if err := restarted.verifyMaterialized(context.Background(), receipt); !errors.Is(err, errInvalidCandidateWorkspace) {
+		t.Fatalf("on-demand mutated verification error = %v", err)
+	}
+}
+
+func TestCandidateWorkspaceRehydrateDefersOnlyRetainedContentFingerprint(t *testing.T) {
+	source, baseline, _ := candidateRepository(t)
+	resolver, err := openhands.NewBoundWorkspaceResolver([]openhands.WorkspaceBinding{{WorkspaceID: "tester-1", WorktreeID: "tester-default", WorkingDirectory: t.TempDir()}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager, err := newCandidateWorkspaceManager(t.TempDir(), "git", time.Minute, []ProductionCandidateGate{{GateID: "candidate-head", Command: []string{"git", "rev-parse", "HEAD"}, Timeout: "10s"}}, resolver)
+	if err != nil {
+		t.Fatal(err)
+	}
+	feature := organization.FeatureRequest{ID: candidateTestUUID(41)}
+	consumer := organization.PlannedTask{ID: candidateTestUUID(42), Owner: "teams::tester-1"}
+	targets := []candidateTargetReceipt{{TaskID: candidateTestUUID(43), InvocationID: candidateTestUUID(44), OutputSHA256: candidateTestDigest('d'), TerminalEvidenceIDs: []kernel.UUIDv7{candidateTestUUID(45)}}}
+	sourceWorkspace := ProductionWorkspace{WorkspaceID: "coder-1", WorktreeID: "coder-source", WorkingDirectory: source, Branch: "source", BaselineSHA: baseline, WritablePaths: []string{"."}}
+	workspace, receipt, _, err := manager.Prepare(context.Background(), feature, consumer, "tester-1", sourceWorkspace, targets, []string{"candidate-head"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer makeWritableForCleanup(t, workspace.WorkingDirectory)
+	altered := receipt
+	altered.DiffSHA256 = candidateTestDigest('e')
+	if err := manager.verifyMaterializedForRehydrate(context.Background(), altered); err != nil {
+		t.Fatalf("fast rehydration verification rejected unchanged candidate: %v", err)
+	}
+	if err := manager.verifyMaterialized(context.Background(), altered); !errors.Is(err, errInvalidCandidateWorkspace) {
+		t.Fatalf("on-demand fingerprint verification error = %v", err)
 	}
 }
 

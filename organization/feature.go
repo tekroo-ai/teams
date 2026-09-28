@@ -92,29 +92,30 @@ func (input FeatureRequestInput) Validate() error {
 }
 
 type FeatureRequest struct {
-	SchemaVersion     string                   `json:"schema_version"`
-	ID                kernel.UUIDv7            `json:"id"`
-	Revision          uint64                   `json:"revision"`
-	SubmittedBy       kernel.PrincipalRef      `json:"submitted_by"`
-	Input             FeatureRequestInput      `json:"input"`
-	Status            FeatureStatus            `json:"status"`
-	OperatorActor     kernel.ActorFQN          `json:"operator_actor"`
-	ProductOwnerActor kernel.ActorFQN          `json:"product_owner_actor"`
-	InitialMessageID  kernel.UUIDv7            `json:"initial_message_id"`
-	BudgetAccountID   kernel.UUIDv7            `json:"budget_account_id"`
-	LifecycleEpoch    uint64                   `json:"lifecycle_epoch"`
-	ScopeRevision     uint64                   `json:"scope_revision"`
-	CreatedAt         time.Time                `json:"created_at"`
-	UpdatedAt         time.Time                `json:"updated_at"`
-	LastMessageID     kernel.UUIDv7            `json:"last_message_id"`
-	LastStepID        kernel.UUIDv7            `json:"last_step_id"`
-	LastHop           uint32                   `json:"last_hop"`
-	Refinement        *FeatureRefinement       `json:"refinement,omitempty"`
-	Clarification     *FeatureClarification    `json:"clarification,omitempty"`
-	Specification     *FeatureSpecification    `json:"specification,omitempty"`
-	Plan              *FeaturePlan             `json:"plan,omitempty"`
-	PlanSupersession  *FeaturePlanSupersession `json:"plan_supersession,omitempty"`
-	Acceptance        *FeatureAcceptance       `json:"acceptance,omitempty"`
+	SchemaVersion           string                          `json:"schema_version"`
+	ID                      kernel.UUIDv7                   `json:"id"`
+	Revision                uint64                          `json:"revision"`
+	SubmittedBy             kernel.PrincipalRef             `json:"submitted_by"`
+	Input                   FeatureRequestInput             `json:"input"`
+	Status                  FeatureStatus                   `json:"status"`
+	OperatorActor           kernel.ActorFQN                 `json:"operator_actor"`
+	ProductOwnerActor       kernel.ActorFQN                 `json:"product_owner_actor"`
+	InitialMessageID        kernel.UUIDv7                   `json:"initial_message_id"`
+	BudgetAccountID         kernel.UUIDv7                   `json:"budget_account_id"`
+	LifecycleEpoch          uint64                          `json:"lifecycle_epoch"`
+	ScopeRevision           uint64                          `json:"scope_revision"`
+	CreatedAt               time.Time                       `json:"created_at"`
+	UpdatedAt               time.Time                       `json:"updated_at"`
+	LastMessageID           kernel.UUIDv7                   `json:"last_message_id"`
+	LastStepID              kernel.UUIDv7                   `json:"last_step_id"`
+	LastHop                 uint32                          `json:"last_hop"`
+	Refinement              *FeatureRefinement              `json:"refinement,omitempty"`
+	Clarification           *FeatureClarification           `json:"clarification,omitempty"`
+	Specification           *FeatureSpecification           `json:"specification,omitempty"`
+	SpecificationCorrection *FeatureSpecificationCorrection `json:"specification_correction,omitempty"`
+	Plan                    *FeaturePlan                    `json:"plan,omitempty"`
+	PlanSupersession        *FeaturePlanSupersession        `json:"plan_supersession,omitempty"`
+	Acceptance              *FeatureAcceptance              `json:"acceptance,omitempty"`
 }
 
 func (feature FeatureRequest) Validate() error {
@@ -146,6 +147,9 @@ func (feature FeatureRequest) Validate() error {
 		return ErrInvalidFeature
 	}
 	if feature.Specification != nil && feature.Specification.Validate(feature) != nil {
+		return ErrInvalidFeature
+	}
+	if feature.SpecificationCorrection != nil && feature.SpecificationCorrection.Validate(feature) != nil {
 		return ErrInvalidFeature
 	}
 	if feature.Acceptance != nil && feature.Acceptance.Validate(feature) != nil {
@@ -280,10 +284,18 @@ type FeatureSpecification struct {
 	Stories           []PlannedStory        `json:"stories"`
 	DesignConstraints []string              `json:"design_constraints"`
 	PreparedAt        time.Time             `json:"prepared_at"`
+	AmendedBy         *kernel.PrincipalRef  `json:"amended_by,omitempty"`
+	AmendedAt         *time.Time            `json:"amended_at,omitempty"`
 }
 
 func (specification FeatureSpecification) Validate(feature FeatureRequest) error {
 	if !specification.PreparedBy.Valid() || !specification.PreparedExecution.Valid() || len(specification.Stories) == 0 || len(specification.Stories) > int(feature.Input.MaximumStories) || len(specification.DesignConstraints) > 64 || specification.PreparedAt.Before(feature.CreatedAt) {
+		return ErrInvalidFeature
+	}
+	if (specification.AmendedBy == nil) != (specification.AmendedAt == nil) {
+		return ErrInvalidFeature
+	}
+	if specification.AmendedBy != nil && (specification.AmendedBy.Kind != kernel.PrincipalHuman || !specification.AmendedBy.Valid() || specification.AmendedAt.Before(specification.PreparedAt)) {
 		return ErrInvalidFeature
 	}
 	seen := make(map[kernel.UUIDv7]struct{}, len(specification.Stories))

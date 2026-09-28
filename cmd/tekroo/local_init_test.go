@@ -86,14 +86,14 @@ func TestInitializeLocalDeploymentProducesValidatedIsolatedInstallation(t *testi
 			maximumOutputTokens uint32
 			maximumEvents       uint32
 		}{
-			"architect":       {kernel.RouteComplexReasoning, "medium", 32768, 80},
-			"coder":           {kernel.RouteBoundedExecution, "low", 8192, 240},
-			"operator":        {kernel.RouteBoundedExecution, "low", 8192, 80},
-			"product-owner":   {kernel.RouteBoundedExecution, "medium", 16384, 80},
-			"project-manager": {kernel.RouteBoundedExecution, "low", 8192, 80},
-			"security":        {kernel.RouteComplexReasoning, "medium", 32768, 80},
-			"senior-coder":    {kernel.RouteComplexReasoning, "medium", 16384, 240},
-			"tester":          {kernel.RouteBoundedExecution, "medium", 16384, 80},
+			"architect":       {kernel.RouteComplexReasoning, "medium", 32768, 1000},
+			"coder":           {kernel.RouteBoundedExecution, "low", 8192, 1000},
+			"operator":        {kernel.RouteBoundedExecution, "low", 8192, 1000},
+			"product-owner":   {kernel.RouteBoundedExecution, "medium", 16384, 1000},
+			"project-manager": {kernel.RouteBoundedExecution, "low", 8192, 1000},
+			"security":        {kernel.RouteComplexReasoning, "medium", 32768, 1000},
+			"senior-coder":    {kernel.RouteComplexReasoning, "medium", 16384, 1000},
+			"tester":          {kernel.RouteBoundedExecution, "medium", 16384, 1000},
 		}
 		want, found := wantProfiles[profile.RoleFQRN]
 		if !found {
@@ -173,7 +173,7 @@ func TestInitializeLocalDeploymentProducesValidatedIsolatedInstallation(t *testi
 		wantTools := map[kernel.RoleFQRN][]string{
 			"operator": {}, "product-owner": {}, "project-manager": {},
 			"architect": {"glob", "repository_search", "repository_view"}, "security": {"terminal", "glob", "repository_search", "repository_view"}, "tester": {"terminal", "glob", "repository_search", "repository_view"},
-			"coder": {"terminal", "glob", "repository_search", "file_editor", "task_tracker"}, "senior-coder": {"terminal", "glob", "repository_search", "file_editor", "task_tracker"},
+			"coder": {"terminal", "glob", "repository_search", "file_editor_commands", "task_tracker"}, "senior-coder": {"terminal", "glob", "repository_search", "file_editor_commands", "task_tracker"},
 		}[profile.RoleFQRN]
 		gotTools := make([]string, len(settings.Tools))
 		for index, tool := range settings.Tools {

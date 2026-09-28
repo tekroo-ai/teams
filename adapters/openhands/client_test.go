@@ -319,7 +319,7 @@ func TestPrepareDoesNotLetTaskProseOverrideRoleToolAuthority(t *testing.T) {
 	client := newOpenHandsTestClient(t, "http://127.0.0.1:1", workspace, brief)
 	agentSettings, err := NewOpenAICompatibleAgentSettings(AgentSettingsConfig{
 		Model: qualifiedModelID, ModelCanonicalName: "openai/gpt-4o", BaseURL: qualifiedModelAPIRoot, APIKey: "sma-e1-loopback-only",
-		Tools: []string{"terminal", "glob", "repository_search", "file_editor", "task_tracker"}, EnableThinking: false, CondenserEnableThinking: false,
+		Tools: []string{"terminal", "glob", "repository_search", "file_editor_commands", "task_tracker"}, EnableThinking: false, CondenserEnableThinking: false,
 		MaximumOutputTokens: 8192, CondenserOutputTokens: 8192, TimeoutSeconds: 1200, CondenserMaximumEvents: 80, CondenserMaximumTokens: 96000,
 	})
 	if err != nil {
@@ -1084,7 +1084,6 @@ func TestPlanningCompactionCheckpointDoesNotArmCompletionFence(t *testing.T) {
 	}
 }
 
-
 func TestResultBoundaryRecoveryAllowsNoNewRepositoryWork(t *testing.T) {
 	invocationID := kernel.UUIDv7("018f0000-0000-7000-8000-000000000101")
 	priorInvocationID := kernel.UUIDv7("018f0000-0000-7000-8000-000000000102")
@@ -1150,7 +1149,7 @@ func TestProgressCheckpointRecordsActionOutcomesAndPaths(t *testing.T) {
 		{Kind: "ObservationEvent", ToolName: "file_editor", Text: "package example", ObservationExitCode: &exitSuccess},
 	}
 	checkpoint := buildProgressCheckpoint(brief, events, -1)
-	if checkpoint.SchemaVersion != "tekroo.teams.execution-progress-checkpoint/1.2.0" || checkpoint.AuthoritativeExecution.ExecutionBriefSHA256 != requestDigest || !reflect.DeepEqual(checkpoint.AuthoritativeExecution.Task, brief.Task) || checkpoint.AuthoritativeExecution.ActorFQN != brief.ActorFQN || checkpoint.AuthoritativeExecution.RoleGrounding.RoleFQRN != brief.RoleGrounding.RoleFQRN || checkpoint.AuthoritativeExecution.Scope.WorkspaceID != brief.Scope.WorkspaceID || len(checkpoint.Actions) != 3 || checkpoint.Actions[0].Outcome != "FAILED" || checkpoint.Actions[1].Outcome != "TIMED_OUT" || checkpoint.Actions[2].Outcome != "SUCCEEDED" || checkpoint.Actions[2].ObservationExcerpt == "" || len(checkpoint.InspectedPaths) != 1 || checkpoint.InspectedPaths[0] != "/workspace/b.go" || !checkpoint.SourceJournalSHA256.Valid() || checkpoint.NextAction == "" {
+	if checkpoint.SchemaVersion != "tekroo.teams.execution-progress-checkpoint/1.3.0" || checkpoint.AuthoritativeExecution.ExecutionBriefSHA256 != requestDigest || !reflect.DeepEqual(checkpoint.AuthoritativeExecution.Task, brief.Task) || checkpoint.AuthoritativeExecution.ActorFQN != brief.ActorFQN || checkpoint.AuthoritativeExecution.RoleGrounding.RoleFQRN != brief.RoleGrounding.RoleFQRN || checkpoint.AuthoritativeExecution.Scope.WorkspaceID != brief.Scope.WorkspaceID || len(checkpoint.Actions) != 3 || checkpoint.Actions[0].Outcome != "FAILED" || checkpoint.Actions[1].Outcome != "TIMED_OUT" || checkpoint.Actions[2].Outcome != "SUCCEEDED" || checkpoint.Actions[2].ObservationExcerpt != "" || len(checkpoint.InspectedPaths) != 1 || checkpoint.InspectedPaths[0] != "/workspace/b.go" || !checkpoint.SourceJournalSHA256.Valid() || checkpoint.NextAction == "" {
 		t.Fatalf("checkpoint = %#v", checkpoint)
 	}
 }
@@ -1209,7 +1208,7 @@ func TestProgressCheckpointCompactsLongActionHistory(t *testing.T) {
 	}
 
 	checkpoint := buildProgressCheckpoint(brief, events, -1)
-	if len(checkpoint.Actions) != maximumCheckpointActions || checkpoint.Actions[0].EventID != "action-08" || checkpoint.Actions[len(checkpoint.Actions)-1].EventID != "action-19" {
+	if len(checkpoint.Actions) != maximumCheckpointActions || checkpoint.Actions[0].EventID != "action-16" || checkpoint.Actions[len(checkpoint.Actions)-1].EventID != "action-19" {
 		t.Fatalf("compacted actions = %#v", checkpoint.Actions)
 	}
 	if len(checkpoint.RepositoryEvidence) != maximumCheckpointRepositoryEvidence || checkpoint.SourceEventCount != len(events) {
@@ -1217,7 +1216,7 @@ func TestProgressCheckpointCompactsLongActionHistory(t *testing.T) {
 	}
 }
 
-func TestProgressCheckpointPreservesRepositoryInstructionEvidence(t *testing.T) {
+func TestProgressCheckpointDoesNotDuplicateRepositoryOutput(t *testing.T) {
 	brief, _ := openHandsTestBrief(t)
 	exitSuccess := 0
 	events := []rawEvent{
@@ -1233,8 +1232,8 @@ func TestProgressCheckpointPreservesRepositoryInstructionEvidence(t *testing.T) 
 	}
 
 	checkpoint := buildProgressCheckpoint(brief, events, -1)
-	if len(checkpoint.RepositoryEvidence) != maximumCheckpointRepositoryEvidence || !slices.ContainsFunc(checkpoint.RepositoryEvidence, checkpointActionTargetsRepositoryInstructions) {
-		t.Fatalf("repository instruction evidence was evicted: %#v", checkpoint.RepositoryEvidence)
+	if len(checkpoint.RepositoryEvidence) != maximumCheckpointRepositoryEvidence || !slices.ContainsFunc(checkpoint.RepositoryEvidence, checkpointActionTargetsRepositoryInstructions) || slices.ContainsFunc(checkpoint.RepositoryEvidence, func(action checkpointAction) bool { return action.ObservationExcerpt != "" }) {
+		t.Fatalf("checkpoint retained repository output instead of metadata: %#v", checkpoint.RepositoryEvidence)
 	}
 }
 
@@ -1245,7 +1244,7 @@ func TestCheckpointNextActionIgnoresFailedReadOnlyInspection(t *testing.T) {
 		{Tool: "repository_search", Command: `{"pattern":"RetentionPolicy"}`, Path: "organization", Outcome: "PENDING"},
 	}
 	next := checkpointNextAction(brief, actions, nil, nil)
-	if !strings.Contains(next, "implement the first unmet acceptance criterion") {
+	if !strings.Contains(strings.ToLower(next), "implement the first unmet acceptance criterion") {
 		t.Fatalf("next action = %q", next)
 	}
 }
@@ -1253,9 +1252,51 @@ func TestCheckpointNextActionIgnoresFailedReadOnlyInspection(t *testing.T) {
 func TestCheckpointNextActionRequiresRepairBeforeFailedValidationRerun(t *testing.T) {
 	brief, _ := openHandsTestBrief(t)
 	actions := []checkpointAction{{Tool: "terminal", Command: "go test -run TestActorName ./adapters/operationalruntime", Outcome: "FAILED"}}
-	next := checkpointNextAction(brief, actions, nil, nil)
+	validations := []checkpointAction{{Tool: "terminal", Command: "go test -run TestActorName ./adapters/operationalruntime", Outcome: "FAILED"}}
+	next := checkpointNextAction(brief, actions, nil, validations)
 	if !strings.Contains(next, "repair its root cause") || !strings.Contains(next, "Do not rerun the same validation") {
 		t.Fatalf("next action = %q", next)
+	}
+}
+
+func TestCheckpointNextActionDoesNotPromoteSupersededValidationFailure(t *testing.T) {
+	brief, _ := openHandsTestBrief(t)
+	validations := []checkpointAction{
+		{Tool: "terminal", Command: "go test ./adapters/operatortools ./adapters/mcp", Outcome: "FAILED"},
+		{Tool: "terminal", Command: "go test ./adapters/operatortools", Outcome: "SUCCEEDED"},
+		{Tool: "terminal", Command: "go test ./adapters/mcp", Outcome: "SUCCEEDED"},
+	}
+	next := checkpointNextAction(brief, nil, map[string]struct{}{"/workspace/alias.go": {}}, validations)
+	if strings.Contains(next, "repair its root cause") || !strings.Contains(next, "complete any remaining implementation") {
+		t.Fatalf("next action = %q", next)
+	}
+}
+
+func TestProgressCheckpointTerminalizesAgentError(t *testing.T) {
+	brief, _ := openHandsTestBrief(t)
+	events := []rawEvent{
+		{Raw: json.RawMessage(`{"id":"action"}`), ID: "action", Kind: "ActionEvent", Source: "agent", ToolName: "file_editor", ToolCallID: "call-1", ActionCommand: "view", ActionPath: "/workspace/a.go"},
+		{Raw: json.RawMessage(`{"id":"error"}`), ID: "error", Kind: "AgentErrorEvent", Source: "environment", ToolName: "file_editor", ToolCallID: "call-1", Text: "invalid view_range"},
+	}
+	checkpoint := buildProgressCheckpoint(brief, events, -1)
+	if len(checkpoint.Actions) != 1 || checkpoint.Actions[0].Outcome != "FAILED" || !checkpoint.Actions[0].ObservationSHA256.Valid() || checkpoint.Actions[0].ObservationExcerpt != "" || strings.Contains(checkpoint.NextAction, "PENDING") {
+		t.Fatalf("checkpoint = %#v", checkpoint)
+	}
+}
+
+func TestMissingCompactionCheckpointUsesDurableCondensationEvent(t *testing.T) {
+	events := []rawEvent{
+		{ID: "condensation-1", Kind: "Condensation", Source: "environment"},
+	}
+	if got := missingCompactionCheckpoint(conversationInfo{}, events, -1); got != 1 {
+		t.Fatalf("missing checkpoint ordinal = %d, want 1", got)
+	}
+	events = append(events, rawEvent{
+		ID: "checkpoint-1", Kind: "MessageEvent", Source: "user",
+		Text: compactionCheckpointPrefix + "1\nrestored\n{}",
+	})
+	if got := missingCompactionCheckpoint(conversationInfo{}, events, -1); got != 0 {
+		t.Fatalf("covered checkpoint ordinal = %d, want 0", got)
 	}
 }
 
@@ -1296,6 +1337,20 @@ func TestDecodeEventPreservesCustomRepositoryAction(t *testing.T) {
 	}
 }
 
+func TestCommandSpecificEditorEventsRetainRepositorySemantics(t *testing.T) {
+	view, err := decodeEvent(json.RawMessage(`{"id":"view-1","kind":"ActionEvent","source":"agent","tool_name":"file_view","action":{"kind":"FileViewAction","path":"/workspace/a.go","view_range":[1,10]}}`))
+	if err != nil || view.ActionCommand != "view" || !repositoryInspectionAction(view) || mutationAction(view) {
+		t.Fatalf("view=%#v err=%v", view, err)
+	}
+	if _, ok := repositoryViewRange(view); !ok {
+		t.Fatalf("view range not recognized: %#v", view)
+	}
+	replace, err := decodeEvent(json.RawMessage(`{"id":"replace-1","kind":"ActionEvent","source":"agent","tool_name":"file_replace","action":{"kind":"FileReplaceAction","path":"/workspace/a.go","old_str":"a","new_str":"b"}}`))
+	if err != nil || replace.ActionCommand != "str_replace" || !mutationAction(replace) || !repositoryAction(replace) {
+		t.Fatalf("replace=%#v err=%v", replace, err)
+	}
+}
+
 func TestProgressCheckpointRecordsValidationAndChangedPath(t *testing.T) {
 	brief, _ := openHandsTestBrief(t)
 	exitSuccess := 0
@@ -1333,7 +1388,7 @@ func TestProgressCheckpointDoesNotLetCondenserRedefineAssignment(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := string(encoded)
-	if checkpoint.AuthoritativeExecution.Task.Title != "Produce the implementation plan" || checkpoint.AuthoritativeExecution.RoleGrounding.RoleFQRN != "architect" || checkpoint.AuthoritativeExecution.Purpose != kernel.PurposeReplan || !strings.Contains(checkpoint.NextAction, "complete the authoritative task") || strings.Contains(text, "Explore and understand the repository") || strings.Contains(text, "untrusted_condenser_summary") || strings.Contains(text, "untrusted_agent_reported_state") {
+	if checkpoint.AuthoritativeExecution.Task.Title != "Produce the implementation plan" || checkpoint.AuthoritativeExecution.RoleGrounding.RoleFQRN != "architect" || checkpoint.AuthoritativeExecution.Purpose != kernel.PurposeReplan || !strings.Contains(checkpoint.NextAction, "complete the task now") || strings.Contains(text, "Explore and understand the repository") || strings.Contains(text, "untrusted_condenser_summary") || strings.Contains(text, "untrusted_agent_reported_state") {
 		t.Fatalf("checkpoint = %s", encoded)
 	}
 }
@@ -1355,7 +1410,7 @@ func TestProgressCheckpointDoesNotMakeArchitectRetryFailedDiscovery(t *testing.T
 	}
 
 	checkpoint := buildProgressCheckpoint(brief, events, -1)
-	if strings.Contains(checkpoint.NextAction, "Resolve the retained failed") || !strings.Contains(checkpoint.NextAction, "complete the authoritative task") || !strings.Contains(checkpoint.NextAction, "do not retry failed broad discovery") {
+	if strings.Contains(checkpoint.NextAction, "Resolve the retained failed") || !strings.Contains(checkpoint.NextAction, "complete the task now") || !strings.Contains(checkpoint.NextAction, "do not retry failed broad discovery") {
 		t.Fatalf("next action = %q", checkpoint.NextAction)
 	}
 }
@@ -1368,7 +1423,7 @@ func TestProgressCheckpointNextActionAdvancesImplementation(t *testing.T) {
 		{Kind: "ObservationEvent", ToolName: "file_editor", Text: "package example", ObservationExitCode: &exitSuccess},
 	}
 	checkpoint := buildProgressCheckpoint(brief, discovery, -1)
-	if !strings.Contains(checkpoint.NextAction, "implement the first unmet acceptance criterion") {
+	if !strings.Contains(strings.ToLower(checkpoint.NextAction), "implement the first unmet acceptance criterion") {
 		t.Fatalf("discovery next action = %q", checkpoint.NextAction)
 	}
 
@@ -1783,7 +1838,7 @@ func TestProgressCheckpointCarriesSuccessfulValidationAcrossCompactionBoundary(t
 	if !slices.Contains(checkpoint.InspectedPaths, "adapters/mongo/widget_store.go") || !slices.Contains(checkpoint.InspectedPaths, "adapters/mongo/store.go") {
 		t.Fatalf("cumulative inspected paths=%v", checkpoint.InspectedPaths)
 	}
-	if len(checkpoint.RepositoryEvidence) != 2 || checkpoint.RepositoryEvidence[0].Path != "adapters/mongo/widget_store.go" || checkpoint.RepositoryEvidence[0].ObservationExcerpt != "func Save()" || checkpoint.RepositoryEvidence[1].Path != "adapters/mongo/store.go" || checkpoint.RepositoryEvidence[1].ObservationExcerpt != "package mongo" {
+	if len(checkpoint.RepositoryEvidence) != 2 || checkpoint.RepositoryEvidence[0].Path != "adapters/mongo/widget_store.go" || checkpoint.RepositoryEvidence[0].ObservationExcerpt != "" || checkpoint.RepositoryEvidence[1].Path != "adapters/mongo/store.go" || checkpoint.RepositoryEvidence[1].ObservationExcerpt != "" {
 		t.Fatalf("cumulative repository evidence=%#v", checkpoint.RepositoryEvidence)
 	}
 }
@@ -1806,7 +1861,7 @@ func TestProgressCheckpointCarriesBoundedRepositoryEvidenceAcrossCompactionBound
 	}
 
 	checkpoint := buildProgressCheckpoint(brief, events, 0)
-	if len(checkpoint.RepositoryEvidence) != 2 || checkpoint.RepositoryEvidence[0].ObservationExcerpt != "func Save()" || checkpoint.RepositoryEvidence[1].ObservationExcerpt != "func ensureIndexes()" {
+	if len(checkpoint.RepositoryEvidence) != 2 || checkpoint.RepositoryEvidence[0].ObservationExcerpt != "" || checkpoint.RepositoryEvidence[1].ObservationExcerpt != "" {
 		t.Fatalf("retained repository evidence=%#v", checkpoint.RepositoryEvidence)
 	}
 }
@@ -2426,6 +2481,49 @@ func TestRepositorySearchLoopRejectsExactRepeatedCustomToolAction(t *testing.T) 
 	violation, found := repositorySearchLoopViolation(events, 0)
 	if !found || violation.ID != "repeated-search" {
 		t.Fatalf("violation=%+v found=%t", violation, found)
+	}
+}
+
+func TestRepositorySearchLoopAsksAfterDifferentPatternsReturnSameEvidence(t *testing.T) {
+	events := []rawEvent{{Kind: "MessageEvent", Source: "user"}}
+	for index := 0; index < 9; index++ {
+		id := fmt.Sprintf("search-%d", index)
+		payload := json.RawMessage(fmt.Sprintf(`{"kind":"RepositorySearchAction","pattern":"RoleBundleMethod%d","path":"organization"}`, index))
+		observation := json.RawMessage(fmt.Sprintf(`{"observation":{"pattern":"RoleBundleMethod%d","content":[{"type":"text","text":"organization/manifest.go:102:func (bundle RoleBundle) ContentDigest()"}]}}`, index))
+		events = append(events,
+			rawEvent{ID: id, Kind: "ActionEvent", Source: "agent", ToolName: "repository_search", ActionPayload: payload, ActionPath: "organization"},
+			rawEvent{Kind: "ObservationEvent", ToolName: "repository_search", Text: "organization/manifest.go:102:func (bundle RoleBundle) ContentDigest()", ObservationExitCode: intPointer(0), Raw: observation},
+		)
+	}
+	violation, found := repositorySearchLoopViolation(events, 0)
+	if !found || violation.ID != "search-8" {
+		t.Fatalf("violation=%+v found=%t, want ninth no-progress search", violation, found)
+	}
+
+	// Inspecting source is legitimate progress and starts a fresh search streak.
+	read := []rawEvent{
+		{ID: "read-source", Kind: "ActionEvent", Source: "agent", ToolName: "file_editor", ActionCommand: "view", ActionPath: "organization/manifest.go"},
+		{Kind: "ObservationEvent", ToolName: "file_editor", Text: "package organization"},
+	}
+	events = append(events[:9], append(read, events[9:]...)...)
+	if violation, found := repositorySearchLoopViolation(events, 0); found {
+		t.Fatalf("source inspection did not reset search streak: %+v", violation)
+	}
+}
+
+func TestRepositorySearchLoopAsksAfterDifferentPatternsReturnNoMatches(t *testing.T) {
+	events := []rawEvent{{Kind: "MessageEvent", Source: "user"}}
+	for index := 0; index < 9; index++ {
+		id := fmt.Sprintf("search-%d", index)
+		pattern := fmt.Sprintf("MissingRoleMethod%d", index)
+		events = append(events,
+			rawEvent{ID: id, Kind: "ActionEvent", Source: "agent", ToolName: "repository_search", ActionPayload: json.RawMessage(fmt.Sprintf(`{"kind":"RepositorySearchAction","pattern":%q}`, pattern))},
+			rawEvent{Kind: "ObservationEvent", ToolName: "repository_search", Text: "No matching lines found for pattern '" + pattern + "'", ObservationExitCode: intPointer(0)},
+		)
+	}
+	violation, found := repositorySearchLoopViolation(events, 0)
+	if !found || violation.ID != "search-8" {
+		t.Fatalf("violation=%+v found=%t, want ninth no-progress search", violation, found)
 	}
 }
 

@@ -16,6 +16,31 @@ import (
 	"github.com/tekroo-ai/teams/kernel"
 )
 
+func TestHandlerPromptStartsWithTaskCardAndRecognizesEarlierPresentation(t *testing.T) {
+	brief, _ := openHandsTestBrief(t)
+	brief.MessageHandler = &application.MessageHandlerGrounding{MessageType: "tekroo.message.task.assigned"}
+	encoded := mustJSON(brief)
+	hash := sha256.Sum256(encoded)
+	requestDigest := kernel.Digest(hex.EncodeToString(hash[:]))
+	client := newOpenHandsTestClient(t, "http://127.0.0.1", t.TempDir(), brief)
+	prepared, err := client.prepare(context.Background(), brief, requestDigest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var prompt map[string]any
+	if err := json.Unmarshal([]byte(prepared.prompt), &prompt); err != nil {
+		t.Fatal(err)
+	}
+	card, ok := prompt["agent_task"].(map[string]any)
+	if !ok || card["title"] != brief.Task.Title || card["role"] != string(brief.RoleGrounding.RoleFQRN) || card["completion_tool"] != submitResultToolName {
+		t.Fatalf("agent task card = %#v", prompt["agent_task"])
+	}
+	legacy := []rawEvent{{Kind: "MessageEvent", Source: "user", Text: string(encoded)}}
+	if index := executionPromptIndex(legacy, prepared, brief, requestDigest); index != 0 {
+		t.Fatalf("prior prompt presentation not recognized: %d", index)
+	}
+}
+
 func TestSubmitResultActionOutputStripsKindAndMarks(t *testing.T) {
 	payload := json.RawMessage(`{"schema_version":"1.0.0","outcome":"completed","summary":"s","evidence":[],"message_proposals":[],"work_product":{"a":1},"kind":"ClientAction_submit_envelope"}`)
 	output, ok := submitResultActionOutput(payload)

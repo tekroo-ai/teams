@@ -59,15 +59,15 @@ func (service *ProductionService) RetryCancelledFeaturePlanning(ctx context.Cont
 
 	feature, stage, reviewedTaskIndex, architectureRound, found, err := service.planningFeatureForTask(ctx, terminal.TaskID)
 	if err != nil || !found {
-		return InvocationStatus{}, errors.Join(organization.ErrInvalidFeature, err)
+		return InvocationStatus{}, fmt.Errorf("locate planning feature task=%s found=%t: %w", terminal.TaskID, found, errors.Join(organization.ErrInvalidFeature, err))
 	}
 	task, state, head, latest, snapshot, err := service.ensureFeaturePlanningTaskForRound(ctx, feature, stage, reviewedTaskIndex, architectureRound)
 	if err != nil {
-		return InvocationStatus{}, err
+		return InvocationStatus{}, fmt.Errorf("materialize planning recovery task stage=%s: %w", stage, err)
 	}
 	recoverable, err := service.recoverablePlanningInvocation(ctx, task, state, head, latest, terminal)
 	if err != nil || !recoverable {
-		return InvocationStatus{}, errors.Join(application.ErrInvalidOperationalExecution, err)
+		return InvocationStatus{}, fmt.Errorf("validate planning recovery terminal task=%s terminal=%s latest=%s state=%s/%s recoverable=%t: %w", task.ID, terminal.ID, latest.ID, state.Phase, state.Condition, recoverable, errors.Join(application.ErrInvalidOperationalExecution, err))
 	}
 	taskRef := kernel.AggregateRef{Kind: kernel.AggregateTask, ID: task.ID}
 	profileSnapshot, profileFound := snapshot.WorkProfiles[taskRef]
@@ -76,8 +76,8 @@ func (service *ProductionService) RetryCancelledFeaturePlanning(ctx context.Cont
 	recoveryCondition, err := planningRecoveryConditionDigest(invocationID, request)
 	now := service.clock.Now().UTC()
 	deadline := request.DeadlineAt.UTC()
-	if err != nil || !profileFound || !profileSnapshot.Valid() || !budgetFound || !budget.Valid() || !deadline.After(now) || !deadline.After(terminal.DeadlineAt) || deadline.Before(profileSnapshot.Profile.Budgets.DeadlineAt) || deadline.After(now.Add(service.planningDeadline)) {
-		return InvocationStatus{}, errors.Join(organization.ErrInvalidFeature, err)
+	if err != nil || !profileFound || !profileSnapshot.Valid() || !budgetFound || !budget.Valid() || !validPlanningRecoveryDeadline(now, deadline, terminal.DeadlineAt, profileSnapshot.Profile.Budgets.DeadlineAt, service.planningDeadline) {
+		return InvocationStatus{}, fmt.Errorf("validate planning recovery bounds profile_found=%t profile_valid=%t budget_found=%t budget_valid=%t deadline=%s terminal_deadline=%s profile_deadline=%s: %w", profileFound, profileSnapshot.Valid(), budgetFound, budget.Valid(), deadline, terminal.DeadlineAt, profileSnapshot.Profile.Budgets.DeadlineAt, errors.Join(organization.ErrInvalidFeature, err))
 	}
 
 	evidenceIDs := make([]kernel.UUIDv7, len(request.EvidenceRefs))
@@ -87,15 +87,15 @@ func (service *ProductionService) RetryCancelledFeaturePlanning(ctx context.Cont
 	sort.Slice(evidenceIDs, func(left, right int) bool { return evidenceIDs[left] < evidenceIDs[right] })
 	registered, err := evidenceRefsForIDs(snapshot, evidenceIDs)
 	if err != nil || !sameEvidenceSet(registered, request.EvidenceRefs) {
-		return InvocationStatus{}, errors.Join(organization.ErrInvalidFeature, err)
+		return InvocationStatus{}, fmt.Errorf("validate planning recovery evidence: %w", errors.Join(organization.ErrInvalidFeature, err))
 	}
 	profileEvidenceIDs := recoveryProfileEvidenceIDs(terminal, evidenceIDs)
 	if _, err := evidenceRefsForIDs(snapshot, profileEvidenceIDs); err != nil {
-		return InvocationStatus{}, err
+		return InvocationStatus{}, fmt.Errorf("validate planning recovery profile evidence: %w", err)
 	}
 	successorProfile, profileBound, err := planningRecoveryProfile(profileSnapshot.Profile, terminal.WorkProfile, service.planning, recoveryCondition, deadline, profileEvidenceIDs)
 	if err != nil {
-		return InvocationStatus{}, err
+		return InvocationStatus{}, fmt.Errorf("prepare planning recovery work profile: %w", err)
 	}
 	criteria, err := json.Marshal(task.AcceptanceCriteria)
 	if err != nil {
@@ -111,27 +111,27 @@ func (service *ProductionService) RetryCancelledFeaturePlanning(ctx context.Cont
 				return status, nil
 			}
 		}
-		return InvocationStatus{}, application.ErrInvalidOperationalExecution
+		return InvocationStatus{}, fmt.Errorf("planning recovery successor conflict terminal=%s latest=%s latest_attempt=%d terminal_attempt=%d: %w", terminal.ID, latest.ID, latest.AttemptOrdinal, terminal.AttemptOrdinal, application.ErrInvalidOperationalExecution)
 	}
 	budget, err = service.amendPlanningRecoveryBudget(ctx, principal, feature, terminal, budget, request, recoveryCondition, registered)
 	if err != nil {
-		return InvocationStatus{}, err
+		return InvocationStatus{}, fmt.Errorf("amend planning recovery budget: %w", err)
 	}
 	tracked := &trackedTask{plan: task, revision: state.Revision, last: head, profile: successorProfile}
 	if !profileBound {
 		profileEvidence, evidenceErr := evidenceRefsForIDs(snapshot, successorProfile.ClassificationEvidenceIDs)
 		if evidenceErr != nil {
-			return InvocationStatus{}, evidenceErr
+			return InvocationStatus{}, fmt.Errorf("load planning recovery profile evidence: %w", evidenceErr)
 		}
 		key := "planning-recovery-profile-" + string(terminal.ID) + "-" + string(successorProfile.ProfileID) + "-" + request.IdempotencyKey
 		if err := service.applyTaskCommand(ctx, feature, tracked, "tekroo.command.task.bind-work-profile", kernel.SchemaVersion, service.policyAuthority, successorProfile, profileEvidence, nil, key); err != nil {
-			return InvocationStatus{}, err
+			return InvocationStatus{}, fmt.Errorf("bind planning recovery work profile: %w", err)
 		}
 	}
 
 	owner, active, err := service.RoleHost.Status(ctx, task.Owner)
 	if err != nil {
-		return InvocationStatus{}, err
+		return InvocationStatus{}, fmt.Errorf("read planning recovery role: %w", err)
 	}
 	if active {
 		if owner.Status != organization.RoleIdle {
@@ -144,23 +144,23 @@ func (service *ProductionService) RetryCancelledFeaturePlanning(ctx context.Cont
 		owner, err = service.StartRole(ctx, task.Owner)
 	}
 	if err != nil || owner.Status != organization.RoleIdle || owner.Execution == terminal.Execution {
-		return InvocationStatus{}, errors.Join(organization.ErrRoleNotRunning, err)
+		return InvocationStatus{}, fmt.Errorf("restart planning recovery role active=%t status=%s execution_changed=%t: %w", active, owner.Status, owner.Execution != terminal.Execution, errors.Join(organization.ErrRoleNotRunning, err))
 	}
 	profileConfig, configured := service.profilesByModel[owner.ModelProfile]
 	workspace, workspaceFound := service.workspacesByID[owner.WorkspaceID]
 	if !configured || !profileConfig.qualifiedFor(task.DecisionRoute, workKindForPurpose(task.Purpose, task.Risk), service.clock.Now().UTC()) || !workspaceFound {
-		return InvocationStatus{}, organization.ErrInvalidFeature
+		return InvocationStatus{}, fmt.Errorf("resolve planning recovery execution profile configured=%t qualified=%t workspace_found=%t: %w", configured, configured && profileConfig.qualifiedFor(task.DecisionRoute, workKindForPurpose(task.Purpose, task.Risk), service.clock.Now().UTC()), workspaceFound, organization.ErrInvalidFeature)
 	}
 	state, head, found, err = service.Store.ReadAggregateHead(ctx, taskRef)
 	if err != nil || !found {
-		return InvocationStatus{}, errors.Join(organization.ErrInvalidFeature, err)
+		return InvocationStatus{}, fmt.Errorf("refresh planning recovery task head found=%t: %w", found, errors.Join(organization.ErrInvalidFeature, err))
 	}
 	tracked = &trackedTask{plan: task, revision: state.Revision, last: head, profile: successorProfile, owner: owner}
 	if err := service.rebindPlanningRecoveryAssignment(ctx, feature, tracked, profileConfig, owner); err != nil {
-		return InvocationStatus{}, err
+		return InvocationStatus{}, fmt.Errorf("rebind planning recovery assignment: %w", err)
 	}
 	if err := service.refreshTaskExecutionBinding(ctx, feature, tracked, profileConfig, workspace); err != nil {
-		return InvocationStatus{}, err
+		return InvocationStatus{}, fmt.Errorf("refresh planning recovery execution binding: %w", err)
 	}
 	if terminal.State == kernel.InvocationSucceeded {
 		if err := service.ensureInvalidPlanningOutputUnblocked(ctx, feature, tracked, terminal, registered, request.IdempotencyKey); err != nil {
@@ -169,28 +169,35 @@ func (service *ProductionService) RetryCancelledFeaturePlanning(ctx context.Cont
 	}
 	budgetRevision, err := service.extendTaskTechnicalRetryBudget(ctx, feature, tracked, task.Purpose, terminal.AttemptOrdinal+1)
 	if err != nil {
-		return InvocationStatus{}, err
+		return InvocationStatus{}, fmt.Errorf("extend planning recovery budget: %w", err)
 	}
 	if budgetRevision != budget.Revision {
-		return InvocationStatus{}, organization.ErrInvalidFeature
+		return InvocationStatus{}, fmt.Errorf("extend planning recovery budget revision expected=%d actual=%d: %w", budget.Revision, budgetRevision, organization.ErrInvalidFeature)
 	}
 	if err := service.authorizeTaskInvocationWithConditionPolicy(ctx, feature, tracked, profileConfig, workspace, budgetRevision, task.Purpose, terminal.AttemptOrdinal+1, &terminal, []kernel.Digest{recoveryCondition}, true, false); err != nil {
-		return InvocationStatus{}, err
+		return InvocationStatus{}, fmt.Errorf("authorize planning recovery successor: %w", err)
 	}
 
 	updated, err := service.Store.LoadDecision(ctx, kernel.KernelCommand{Target: taskRef})
 	if err != nil {
-		return InvocationStatus{}, err
+		return InvocationStatus{}, fmt.Errorf("load planning recovery successor: %w", err)
 	}
 	next, nextFound := latestTaskInvocation(updated.WorkInvocations, task.ID)
 	if !nextFound || next.ID == invocationID || next.AttemptOrdinal != terminal.AttemptOrdinal+1 || next.ConditionDigest != expectedCondition {
-		return InvocationStatus{}, application.ErrInvalidOperationalExecution
+		return InvocationStatus{}, fmt.Errorf("validate planning recovery successor found=%t successor=%s attempt=%d: %w", nextFound, next.ID, next.AttemptOrdinal, application.ErrInvalidOperationalExecution)
 	}
 	status, statusFound, err := service.ReadInvocation(ctx, next.ID)
 	if err != nil || !statusFound {
-		return InvocationStatus{}, errors.Join(application.ErrInvalidOperationalExecution, err)
+		return InvocationStatus{}, fmt.Errorf("read planning recovery successor status found=%t: %w", statusFound, errors.Join(application.ErrInvalidOperationalExecution, err))
 	}
 	return status, nil
+}
+
+// validPlanningRecoveryDeadline requires an explicit finite successor deadline.
+// The kernel binds that deadline into the successor work profile and rejects a
+// changed-condition retry that merely reuses its predecessor's deadline.
+func validPlanningRecoveryDeadline(now, requested, terminal, profile time.Time, maximumExtension time.Duration) bool {
+	return requested.After(now) && requested.After(terminal) && !requested.Before(profile) && !requested.After(now.Add(maximumExtension))
 }
 
 func recoverablePlanningTerminal(invocation kernel.WorkInvocation) bool {
@@ -351,6 +358,30 @@ func planningRecoveryProfile(current kernel.WorkRiskProfile, prior kernel.WorkPr
 			}
 			return completed, false, nil
 		}
+		// A client cancellation can occur after the first recovery profile is
+		// durably bound but before the successor invocation is authorized. A
+		// later operator recovery has a new condition and must be able to advance
+		// that partial profile to its own finite deadline rather than being
+		// rejected for not matching the abandoned request's deadline.
+		if partialPlanningRecoveryProfileBase(current, prior, planning) {
+			completed := current.Clone()
+			completed.ProfileID = deterministicOperationalUUID("planning-recovery-profile-completion", string(current.ProfileID), string(condition))
+			completed.ProfileRevision = current.ProfileRevision + 1
+			currentID := current.ProfileID
+			completed.SupersedesProfileID = &currentID
+			completed.Budgets.DeadlineAt = deadline
+			completed.ClassificationEvidenceIDs = reopenedProfileEvidenceIDs(current.ClassificationEvidenceIDs, evidenceIDs)
+			completed.ProfileDigest = ""
+			encoded, err := json.Marshal(completed)
+			if err != nil {
+				return kernel.WorkRiskProfile{}, false, err
+			}
+			completed.ProfileDigest = digestBytes(encoded)
+			if !completed.Valid() {
+				return kernel.WorkRiskProfile{}, false, fmt.Errorf("%w: recovery deadline-successor profile %s invalid", organization.ErrInvalidFeature, completed.ProfileID)
+			}
+			return completed, false, nil
+		}
 		if current.ProfileID != targetID || current.ProfileRevision != targetRevision || current.SupersedesProfileID == nil || *current.SupersedesProfileID != prior.ProfileID || current.ClassificationPolicyRevision != planning.PolicyRevision || current.ClassificationPolicyDigest != planning.ClassificationPolicyDigest || current.PromotionPolicyRevision != planning.PolicyRevision || current.PromotionPolicyDigest != planning.PromotionPolicyDigest || current.VerificationTopologyDigest != planning.VerificationTopologyDigest || !current.Budgets.DeadlineAt.Equal(deadline) {
 			return kernel.WorkRiskProfile{}, false, fmt.Errorf("%w: recovery profile %s rev %d supersedes %v deadline %v does not match target %s rev %d deadline %v", organization.ErrInvalidFeature, current.ProfileID, current.ProfileRevision, current.SupersedesProfileID, current.Budgets.DeadlineAt, targetID, targetRevision, deadline)
 		}
@@ -407,11 +438,15 @@ func compatibleCommittedRecoveryProfile(current kernel.WorkRiskProfile, prior ke
 }
 
 func committedRecoveryProfileBase(current kernel.WorkRiskProfile, prior kernel.WorkProfileBinding, planning ProductionPlanning, deadline time.Time) bool {
+	return partialPlanningRecoveryProfileBase(current, prior, planning) && current.Budgets.DeadlineAt.Equal(deadline)
+}
+
+func partialPlanningRecoveryProfileBase(current kernel.WorkRiskProfile, prior kernel.WorkProfileBinding, planning ProductionPlanning) bool {
 	return current.ProfileRevision == prior.ProfileRevision+1 &&
 		current.SupersedesProfileID != nil && *current.SupersedesProfileID == prior.ProfileID &&
 		current.ClassificationPolicyRevision == planning.PolicyRevision && current.ClassificationPolicyDigest == planning.ClassificationPolicyDigest &&
 		current.PromotionPolicyRevision == planning.PolicyRevision && current.PromotionPolicyDigest == planning.PromotionPolicyDigest &&
-		current.VerificationTopologyDigest == planning.VerificationTopologyDigest && current.Budgets.DeadlineAt.Equal(deadline) && planningRecoveryProfileDigestMatches(current)
+		current.VerificationTopologyDigest == planning.VerificationTopologyDigest && planningRecoveryProfileDigestMatches(current)
 }
 
 func compatibleCommittedRecoveryCompletion(current kernel.WorkRiskProfile, prior kernel.WorkProfileBinding, planning ProductionPlanning, deadline time.Time, evidenceIDs []kernel.UUIDv7) bool {
@@ -508,10 +543,11 @@ func (service *ProductionService) rebindPlanningRecoveryAssignment(ctx context.C
 	}
 	assignment, found := snapshot.QualifiedAssignments[taskRef]
 	profileSnapshot, profileFound := snapshot.WorkProfiles[taskRef]
-	if !found || !assignment.Valid() || !profile.qualificationMatches(assignment.Qualification, task.plan.DecisionRoute, workKindForPurpose(task.plan.Purpose, task.plan.Risk), service.clock.Now().UTC()) || !profileFound || !profileSnapshot.Valid() || profileSnapshot.Profile.Binding() != task.profile.Binding() || assignment.TaskID != task.plan.ID || assignment.SelectedActorFQN != owner.ActorFQN || assignment.ModelProfileDigest != profile.ModelProfileDigest || assignment.RuntimeIdentityDigest != profile.RuntimeIdentityDigest {
+	qualification, qualified := profile.qualificationReceipt()
+	if !found || !assignment.Valid() || !qualified || !profile.qualifiedFor(task.plan.DecisionRoute, workKindForPurpose(task.plan.Purpose, task.plan.Risk), service.clock.Now().UTC()) || !profileFound || !profileSnapshot.Valid() || profileSnapshot.Profile.Binding() != task.profile.Binding() || assignment.TaskID != task.plan.ID || assignment.RequiredDecisionRoute != task.plan.DecisionRoute || !assignment.SelectedDecisionRoute.Satisfies(task.plan.DecisionRoute) || assignment.SelectedActorFQN != owner.ActorFQN {
 		return organization.ErrInvalidFeature
 	}
-	if assignment.WorkProfile == task.profile.Binding() && assignment.SelectedExecution() == owner.Execution && assignment.SelectionPolicyRevision == service.planning.PolicyRevision && assignment.SelectionPolicyDigest == service.planning.SelectionPolicyDigest {
+	if assignment.WorkProfile == task.profile.Binding() && assignment.SelectedExecution() == owner.Execution && assignment.ModelProfileDigest == profile.ModelProfileDigest && assignment.RuntimeIdentityDigest == profile.RuntimeIdentityDigest && profile.qualificationMatches(assignment.Qualification, task.plan.DecisionRoute, workKindForPurpose(task.plan.Purpose, task.plan.Risk), service.clock.Now().UTC()) && assignment.SelectionPolicyRevision == service.planning.PolicyRevision && assignment.SelectionPolicyDigest == service.planning.SelectionPolicyDigest {
 		return nil
 	}
 	evidence, err := evidenceRefsForIDs(snapshot, assignment.EvidenceIDs)
@@ -523,8 +559,8 @@ func (service *ProductionService) rebindPlanningRecoveryAssignment(ctx context.C
 		"work_profile": task.profile.Binding(), "required_decision_route": assignment.RequiredDecisionRoute,
 		"selected_decision_route": assignment.SelectedDecisionRoute, "selected_actor_fqn": owner.ActorFQN,
 		"selected_execution_id": owner.Execution.ExecutionID, "selected_fencing_epoch": owner.Execution.FencingEpoch,
-		"model_profile_digest": assignment.ModelProfileDigest, "runtime_identity_digest": assignment.RuntimeIdentityDigest,
-		"qualification": assignment.Qualification, "selection_policy_revision": service.planning.PolicyRevision,
+		"model_profile_digest": profile.ModelProfileDigest, "runtime_identity_digest": profile.RuntimeIdentityDigest,
+		"qualification": qualification, "selection_policy_revision": service.planning.PolicyRevision,
 		"selection_policy_digest": service.planning.SelectionPolicyDigest, "hard_constraint_results": assignment.HardConstraintResults,
 		"selection_reasons": assignment.SelectionReasons, "evidence_ids": assignment.EvidenceIDs,
 	}

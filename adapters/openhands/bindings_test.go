@@ -71,7 +71,7 @@ func TestBoundExecutionProfileBindsExactRoleBundleAndAgentSettings(t *testing.T)
 	bundle := digest('9')
 	settings, err := NewOpenAICompatibleAgentSettings(AgentSettingsConfig{
 		Model: "openai/local-architect", ModelCanonicalName: "openai/gpt-4o", BaseURL: "http://127.0.0.1:8800/v1", APIKey: "fixture",
-		Tools:          []string{"terminal", "file_editor"},
+		Tools:          []string{"terminal", "file_editor_commands"},
 		EnableThinking: true, CondenserEnableThinking: false, ReasoningEffort: "medium", MaximumOutputTokens: 32768, CondenserOutputTokens: 4096, TimeoutSeconds: 1200, CondenserMaximumEvents: 80, CondenserMaximumTokens: 96000,
 	})
 	if err != nil {
@@ -118,7 +118,7 @@ func TestAgentSettingsBindExactToolsDerivedFromRolePermissions(t *testing.T) {
 		{name: "organizational-role", permissions: []string{"feature.refine", "story.propose"}, want: []string{}},
 		{name: "read-only-design-role", permissions: []string{"repository.read", "task.create"}, want: []string{"glob", "repository_search", "repository_view"}},
 		{name: "read-only-test-role", permissions: []string{"repository.read", "test.execute"}, want: []string{"terminal", "glob", "repository_search", "repository_view"}},
-		{name: "implementation-role", permissions: []string{"repository.edit", "task.complete-propose"}, want: []string{"terminal", "glob", "repository_search", "file_editor", "task_tracker"}},
+		{name: "implementation-role", permissions: []string{"repository.edit", "task.complete-propose"}, want: []string{"terminal", "glob", "repository_search", "file_editor_commands", "task_tracker"}},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

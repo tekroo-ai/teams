@@ -3,10 +3,27 @@ package operationalruntime
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/tekroo-ai/teams/kernel"
 	"github.com/tekroo-ai/teams/organization"
 )
+
+func TestTaskRecoveryDeadlineUsesDurableHostSuspensionExtension(t *testing.T) {
+	now := time.Date(2026, 9, 28, 1, 0, 0, 0, time.UTC)
+	terminal := now.Add(44 * time.Hour)
+	requested := now.Add(4 * time.Hour)
+	effective := effectiveTaskRecoveryDeadline(requested, now.Add(43*time.Hour), terminal.Add(2*time.Minute))
+	if !validTaskRecoveryDeadline(now, requested, effective, terminal, 8*time.Hour) {
+		t.Fatal("existing durable deadline extension made task recovery impossible")
+	}
+	if validTaskRecoveryDeadline(now, requested, terminal, terminal, 8*time.Hour) {
+		t.Fatal("successor deadline did not extend the terminal")
+	}
+	if validTaskRecoveryDeadline(now, now.Add(9*time.Hour), effective, terminal, 8*time.Hour) {
+		t.Fatal("operator request exceeded the normal planning window")
+	}
+}
 
 func TestPlanRecoveryRoleTransitionTreatsStoppedRecordAsStartable(t *testing.T) {
 	terminal := kernel.ExecutionTuple{ExecutionID: "00000000-0000-7000-8000-000000000001", FencingEpoch: 7}
