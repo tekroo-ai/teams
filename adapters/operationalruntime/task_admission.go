@@ -614,6 +614,10 @@ func (service *ProductionService) ensurePlannedTaskMessages(ctx context.Context,
 	if service == nil || service.MessageBus == nil || service.roleGrounding == nil {
 		return application.ErrInvalidConfiguration
 	}
+	senderExecution, err := service.MessageBus.CurrentSenderExecution(ctx, plan.PreparedBy)
+	if err != nil {
+		return err
+	}
 	for _, task := range plan.Tasks {
 		if !service.roleGrounding.requiresMessageHandler(task.Owner) {
 			continue
@@ -646,7 +650,7 @@ func (service *ProductionService) ensurePlannedTaskMessages(ctx context.Context,
 		message := organization.OrganizationalMessage{
 			SchemaVersion: organization.OrganizationalMessageSchemaVersion,
 			ID:            messageID, Type: route.MessageType, Purpose: route.MessagePurpose,
-			Sender: plan.PreparedBy, SenderExecution: plan.PreparedExecution, Recipient: task.Owner,
+			Sender: plan.PreparedBy, SenderExecution: senderExecution, Recipient: task.Owner,
 			CorrelationID: messageID,
 			Work:          organization.MessageWorkLink{FeatureID: cloneKernelUUID(feature.ID), StoryID: cloneKernelUUID(task.StoryID), TaskID: cloneKernelUUID(task.ID), DAGNodeID: task.ID},
 			Flow:          organization.MessageFlow{ThreadID: messageID, StepID: task.ID, Hop: 1, MaximumHops: 1, BudgetAccountID: feature.BudgetAccountID, LifecycleEpoch: feature.LifecycleEpoch, ScopeRevision: feature.ScopeRevision, ProgressDigest: digestBytes(append([]byte(string(planDigest)+"\x00"), body...))},
@@ -660,6 +664,10 @@ func (service *ProductionService) ensurePlannedTaskMessages(ctx context.Context,
 			return err
 		}
 		if exists {
+			// A prior pass may have dispatched this task before a daemon restart.
+			// Compare the immutable message content while retaining that pass's
+			// authenticated sender execution as historical transport provenance.
+			message.SenderExecution = prior.Message.SenderExecution
 			left, leftErr := json.Marshal(prior.Message)
 			right, rightErr := json.Marshal(message)
 			if leftErr != nil || rightErr != nil || !bytes.Equal(left, right) {

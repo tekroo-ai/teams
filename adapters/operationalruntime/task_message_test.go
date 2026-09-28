@@ -49,13 +49,34 @@ func TestSuccessorPlannedTaskIsBoundToDurableMessageAndHandler(t *testing.T) {
 	task := organization.PlannedTask{ID: taskID, StoryID: storyID, Title: "Implement bounded change", Description: "Implement it.", AcceptanceCriteria: []string{"it works"}, Owner: coder.ActorFQN, ModelProfile: coder.ModelProfile, DecisionRoute: kernel.RouteBoundedExecution, Purpose: kernel.PurposeImplementation, Complexity: 2, Risk: organization.RiskLow, CriticalPath: true, AttemptLimit: 2, ReviewRoundLimit: 1}
 	plan := organization.FeaturePlan{Version: 1, PreparedBy: architect.ActorFQN, PreparedExecution: architect.Execution, Architecture: "One bounded node.", Stories: []organization.PlannedStory{{ID: storyID, Title: "Story", Description: "Deliver it.", AcceptanceCriteria: []string{"it works"}, Priority: organization.PriorityHigh}}, Tasks: []organization.PlannedTask{task}, CreatedAt: now}
 	feature := organization.FeatureRequest{ID: featureID, BudgetAccountID: budgetID, LifecycleEpoch: 1, ScopeRevision: 1, Plan: &plan}
+	architect.Revision++
+	architect.Execution = kernel.ExecutionTuple{ExecutionID: testUUIDValue(976), FencingEpoch: 2}
+	architect.RuntimeGeneration++
+	if err := roleStore.CompareAndSwapRole(context.Background(), 1, architect); err != nil {
+		t.Fatal(err)
+	}
 	if err := service.ensurePlannedTaskMessages(context.Background(), feature, plan, map[kernel.UUIDv7]kernel.UUIDv7{}, testDigestValue('a'), now.Add(time.Hour)); err != nil {
 		t.Fatal(err)
 	}
 	messageID := plannedTaskMessageID(featureID, taskID)
 	claim, found, err := bus.Read(context.Background(), messageID)
-	if err != nil || !found || claim.State != organization.MessagePending || claim.Message.Recipient != coder.ActorFQN || claim.Message.Type != "tekroo.message.task.assigned" || claim.Message.Flow.MaximumHops != 1 {
+	if err != nil || !found || claim.State != organization.MessagePending || claim.Message.Recipient != coder.ActorFQN || claim.Message.Type != "tekroo.message.task.assigned" || claim.Message.Flow.MaximumHops != 1 || claim.Message.SenderExecution != architect.Execution || plan.PreparedExecution == architect.Execution {
 		t.Fatalf("message=%#v found=%t err=%v", claim, found, err)
+	}
+	// Recovery after another restart must reuse the same durable message,
+	// rather than replacing its already-authenticated dispatch provenance.
+	architect.Revision++
+	architect.Execution = kernel.ExecutionTuple{ExecutionID: testUUIDValue(977), FencingEpoch: 3}
+	architect.RuntimeGeneration++
+	if err := roleStore.CompareAndSwapRole(context.Background(), 2, architect); err != nil {
+		t.Fatal(err)
+	}
+	if err := service.ensurePlannedTaskMessages(context.Background(), feature, plan, map[kernel.UUIDv7]kernel.UUIDv7{}, testDigestValue('a'), now.Add(time.Hour)); err != nil {
+		t.Fatalf("restart-safe message replay: %v", err)
+	}
+	replayed, found, err := bus.Read(context.Background(), messageID)
+	if err != nil || !found || replayed.Message.SenderExecution != claim.Message.SenderExecution {
+		t.Fatalf("replayed message=%#v found=%t err=%v", replayed, found, err)
 	}
 	binding, err := resolver.bindMessageHandler(coder.ActorFQN, claim.Message)
 	if err != nil || binding == nil || binding.MessageID != messageID || binding.HandlerDigest == "" {

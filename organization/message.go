@@ -209,6 +209,24 @@ func (bus *MessageBus) Send(ctx context.Context, message OrganizationalMessage) 
 	return bus.store.AppendMessage(ctx, message)
 }
 
+// CurrentSenderExecution identifies the live process dispatching a message.
+// A durable plan may have been authored by an earlier execution of the same
+// role; its historical author remains recorded in the plan, not in a new
+// message's dispatch identity.
+func (bus *MessageBus) CurrentSenderExecution(ctx context.Context, sender kernel.ActorFQN) (kernel.ExecutionTuple, error) {
+	if bus == nil || !sender.Valid() {
+		return kernel.ExecutionTuple{}, ErrInvalidOrganizationalMessage
+	}
+	role, found, err := bus.roles.LoadRole(ctx, sender)
+	if err != nil {
+		return kernel.ExecutionTuple{}, err
+	}
+	if !found || role.Status != RoleIdle || !role.Execution.Valid() {
+		return kernel.ExecutionTuple{}, ErrStaleOrganizationalClaim
+	}
+	return role.Execution, nil
+}
+
 func (bus *MessageBus) Readdress(ctx context.Context, id kernel.UUIDv7, sender kernel.ActorFQN, execution kernel.ExecutionTuple, recipient kernel.ActorFQN, now time.Time, maximumReaddresses uint32) (OrganizationalMessage, error) {
 	if bus == nil || !id.Valid() || !sender.Valid() || !execution.Valid() || !recipient.Valid() || now.IsZero() || maximumReaddresses == 0 || maximumReaddresses > 8 {
 		return OrganizationalMessage{}, ErrInvalidOrganizationalMessage
