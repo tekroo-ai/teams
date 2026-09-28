@@ -746,7 +746,7 @@ func legacyPlanningStageDefinition(stage featurePlanningStage) (string, kernel.W
 	case stageRefinement:
 		return "product-owner", kernel.PurposeHandoff, kernel.RouteBoundedExecution, "Refine feature request", "Review the authoritative request for priority and only genuinely blocking product ambiguity without changing its submitted acceptance criteria. A missing implementation, interface, persistence, lifecycle, error-handling, naming, or edge-case detail is a downstream engineering choice, not a clarification. Use established product and repository conventions for ordinary defaults. Ask at most one consolidated question, and only when reasonable product interpretations make a submitted acceptance criterion mutually incompatible or materially change its user-visible outcome. A short request needs no elaboration. Return exactly TEKROO_ORGANIZATIONAL_RESULT: followed by one JSON object with schema_version=1.0.0, result_type=FEATURE_REFINEMENT, acceptance_criteria_disposition=PRESERVE_SUBMITTED, clarification_questions (empty when none), and priority (LOW, NORMAL, HIGH, or CRITICAL). Do not add operational identities or delegate. Put only that result in finish.message and call finish once.", []string{"requirements are testable and ambiguities are explicit"}, nil
 	case stageSpecification:
-		return "project-manager", kernel.PurposeHandoff, kernel.RouteBoundedExecution, "Specify feature stories", "Turn the authoritative request into the smallest complete product specification. Default to one story. Split only when each proposed story would remain independently usable, testable, and releasable from the current baseline if every other proposed story were omitted. Apply that omission test before finish and merge dependent outcomes. A shared capability and its organization, persistence, operator surfaces, tests, documentation, and review are one story, not layer stories. Preserve every submitted acceptance criterion verbatim in at least one story; derived criteria may be added. Return exactly TEKROO_ORGANIZATIONAL_RESULT: followed by one JSON object with schema_version=1.0.0, result_type=FEATURE_SPECIFICATION, stories [{title, description, acceptance_criteria, priority}], and design_constraints. Priority is LOW, NORMAL, HIGH, or CRITICAL. Do not add operational identities or delegate. Put only that result in finish.message and call finish once.", []string{"stories are finite, testable, and within the accepted feature scope"}, nil
+		return "project-manager", kernel.PurposeHandoff, kernel.RouteBoundedExecution, "Specify feature stories", "Turn the authoritative request into the smallest complete product specification. Default to one story. Split only when each proposed story would remain independently usable, testable, and releasable from the current baseline if every other proposed story were omitted. Apply that omission test before finish and merge dependent outcomes. A shared capability and its organization, persistence, operator surfaces, tests, documentation, and review are one story, not layer stories. Preserve every submitted acceptance criterion verbatim in a story; add none. Return exactly TEKROO_ORGANIZATIONAL_RESULT: followed by one JSON object with schema_version=1.0.0, result_type=FEATURE_SPECIFICATION, stories [{title, description, acceptance_criteria, priority}]. Teams carries operator constraints; omit design_constraints. Priority is LOW, NORMAL, HIGH, or CRITICAL. Do not add operational identities or delegate. Put only that result in finish.message and call finish once.", []string{"stories are finite, testable, and within the accepted feature scope"}, nil
 	case stageArchitecture:
 		return "architect", kernel.PurposeReplan, kernel.RouteComplexReasoning, "Design executable feature DAG", "Read AGENTS.md and inspect relevant source, interfaces, and tests with read-only repository tools. Cite only repository-relative files actually inspected. Name an external package or API only when inspected repository evidence supports it; a dependency-manifest entry alone is insufficient. Otherwise describe the capability and make API verification an implementation responsibility. Produce the smallest complete acyclic plan. Every task is implementation work, fits one run, and has complexity at most authored_task_policy.maximum_task_complexity. Do not author test, validation, security-review, or product-acceptance tasks; Teams appends those and whole-feature validation independently. Describe the work, dependencies, complexity, and risk; do not select an operational role. Teams applies execution_routing_policy after validating the plan. Give each task measurable, task-specific acceptance criteria. The feature specification remains authoritative, and Teams carries its complete story-level acceptance criteria into independent whole-feature validation and final product acceptance; do not duplicate them across tasks merely for bookkeeping. For stateful or concurrent work identify invariants, ownership boundaries, state transitions, linearization points, and failure or compensation semantics. A read-then-act sequence is not proof of atomicity. Explain partial-failure safety without prescribing a particular implementation unless requirements or inspected architecture demand it. Assign each invariant to exactly one owning component or layer; other tasks consume that owner's abstraction. Lower-level storage and transport must not depend on higher-level workflow, deployment, or team configuration. Compare every task with the architecture and decisions; remove duplicate, conflicting, or inverted ownership. Self-check for one consistent state model and remove unresolved mutually exclusive alternatives. Treat changes that affect identity, authority, credentials, external control surfaces, or routing as HIGH risk. Compute materialized_total=2*len(tasks)+count(HIGH-or-CRITICAL tasks)+2 and keep it within task_budget.maximum_total_tasks. Combine cohesive work and obey maximum_moderate_or_lower_implementation_tasks. Obey authored_task_policy: purpose=IMPLEMENTATION, validates=[], and backward depends_on indexes. story_index is one zero-based integer naming the task's primary story; it is never an array. depends_on and validates contain zero-based task indexes, so a second task depending on the first emits depends_on=[0]. Risk is LOW, MODERATE, HIGH, or CRITICAL. Do not add contract verification unless a normative contract change is requested. Return exactly TEKROO_ORGANIZATIONAL_RESULT: then one JSON object with schema_version=1.0.0, result_type=FEATURE_PLAN, architecture, design_decisions, assumptions, and tasks. Each task has story_index, title, description, acceptance_criteria, depends_on, validates, purpose, complexity, risk, critical_path, attempt_limit, and review_round_limit. Do not edit, invent paths, assign operational identities, or delegate. Put only that result in finish.message and call finish once.", []string{"the result is a repository-grounded finite acyclic task plan with explicit validation"}, nil
 	case stageArchitectureTaskReview:
@@ -1303,19 +1303,21 @@ func featurePlanningStateDigest(value any) (kernel.Digest, error) {
 	return kernel.Digest(fmt.Sprintf("%x", digest[:])), nil
 }
 
-func specificationPreservesSubmittedCriteria(submitted []string, result specificationStageResult) bool {
-	preserved := make(map[string]struct{})
+func specificationUsesExactlySubmittedCriteria(submitted []string, result specificationStageResult) bool {
+	accepted := make(map[string]struct{}, len(submitted))
+	for _, criterion := range submitted {
+		accepted[criterion] = struct{}{}
+	}
+	used := make(map[string]struct{}, len(submitted))
 	for _, story := range result.Stories {
 		for _, criterion := range story.AcceptanceCriteria {
-			preserved[criterion] = struct{}{}
+			if _, ok := accepted[criterion]; !ok {
+				return false
+			}
+			used[criterion] = struct{}{}
 		}
 	}
-	for _, criterion := range submitted {
-		if _, found := preserved[criterion]; !found {
-			return false
-		}
-	}
-	return true
+	return len(used) == len(accepted)
 }
 
 func priorPlanningStage(stage featurePlanningStage) (featurePlanningStage, bool) {
@@ -1509,7 +1511,7 @@ func (service *ProductionService) validateFeatureStageOutput(feature organizatio
 		return err
 	case stageSpecification:
 		result, err := parseSpecificationStageResult(output, allowedMarkers, allowedActorFQNs...)
-		if err != nil || !specificationPreservesSubmittedCriteria(feature.Input.AcceptanceCriteria, result) {
+		if err != nil || !specificationUsesExactlySubmittedCriteria(feature.Input.AcceptanceCriteria, result) {
 			return organization.ErrInvalidFeature
 		}
 		return nil
@@ -1548,14 +1550,14 @@ func (service *ProductionService) applyFeatureStageOutput(ctx context.Context, f
 		return err
 	case stageSpecification:
 		result, err := parseSpecificationStageResult(output, allowedMarkers, allowedActorFQNs...)
-		if err != nil || !specificationPreservesSubmittedCriteria(feature.Input.AcceptanceCriteria, result) {
+		if err != nil || !specificationUsesExactlySubmittedCriteria(feature.Input.AcceptanceCriteria, result) {
 			return organization.ErrInvalidFeature
 		}
 		stories := make([]organization.PlannedStory, len(result.Stories))
 		for index, item := range result.Stories {
 			stories[index] = organization.PlannedStory{ID: deterministicOperationalUUID("feature-story", string(feature.ID), fmt.Sprint(index), item.Title), Title: item.Title, Description: item.Description, AcceptanceCriteria: item.AcceptanceCriteria, Priority: item.Priority}
 		}
-		_, err = service.Features.Specify(ctx, feature.ID, feature.Revision, organization.FeatureSpecification{PreparedBy: invocation.ActorFQN, PreparedExecution: invocation.Execution, Stories: stories, DesignConstraints: result.DesignConstraints, PreparedAt: preparedAt})
+		_, err = service.Features.Specify(ctx, feature.ID, feature.Revision, organization.FeatureSpecification{PreparedBy: invocation.ActorFQN, PreparedExecution: invocation.Execution, Stories: stories, DesignConstraints: append([]string(nil), feature.Input.Constraints...), PreparedAt: preparedAt})
 		return err
 	case stageArchitecture:
 		result, err := parseArchitectureStageResult(output, allowedMarkers, allowedActorFQNs...)

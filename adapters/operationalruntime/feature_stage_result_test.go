@@ -139,13 +139,25 @@ func TestFeatureStageResultsAreStrictAndBounded(t *testing.T) {
 	if _, err := parseRefinementStageResult(duplicatedCriteria, nil); err == nil {
 		t.Fatal("refinement accepted duplicated authoritative acceptance criteria")
 	}
-	specification := []byte(application.OrganizationalResultMarker + "\n{\"schema_version\":\"1.0.0\",\"result_type\":\"FEATURE_SPECIFICATION\",\"stories\":[{\"title\":\"Story\",\"description\":\"Deliver it.\",\"acceptance_criteria\":[\"works\"],\"priority\":\"HIGH\"}],\"design_constraints\":[]}")
+	specification := []byte(application.OrganizationalResultMarker + "\n{\"schema_version\":\"1.0.0\",\"result_type\":\"FEATURE_SPECIFICATION\",\"stories\":[{\"title\":\"Story\",\"description\":\"Deliver it.\",\"acceptance_criteria\":[\"works\"],\"priority\":\"HIGH\"}]}")
 	parsedSpecification, err := parseSpecificationStageResult(specification, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !specificationPreservesSubmittedCriteria([]string{"works"}, parsedSpecification) || specificationPreservesSubmittedCriteria([]string{"missing"}, parsedSpecification) {
-		t.Fatal("specification acceptance-criteria preservation check is incorrect")
+	if !specificationUsesExactlySubmittedCriteria([]string{"works"}, parsedSpecification) || specificationUsesExactlySubmittedCriteria([]string{"missing"}, parsedSpecification) {
+		t.Fatal("specification acceptance-criteria boundary is incorrect")
+	}
+	if specificationUsesExactlySubmittedCriteria([]string{"works", "missing"}, parsedSpecification) {
+		t.Fatal("specification omitted an accepted criterion")
+	}
+	extraCriterion := []byte(strings.Replace(string(specification), `"acceptance_criteria":["works"]`, `"acceptance_criteria":["works","invented"]`, 1))
+	parsedExtra, err := parseSpecificationStageResult(extraCriterion, nil)
+	if err != nil || specificationUsesExactlySubmittedCriteria([]string{"works"}, parsedExtra) {
+		t.Fatal("specification accepted an unapproved criterion")
+	}
+	withTechnicalConstraints := []byte(strings.Replace(string(specification), `"priority":"HIGH"}]}`, `"priority":"HIGH"}],"design_constraints":["invented design"]}`, 1))
+	if _, err := parseSpecificationStageResult(withTechnicalConstraints, nil); err == nil {
+		t.Fatal("specification accepted model-authored design constraints")
 	}
 	if _, err := parseSpecificationStageResult(append(append([]byte(nil), specification...), '}'), nil); err != nil {
 		t.Fatalf("one redundant terminal brace was not normalized: %v", err)
@@ -419,7 +431,7 @@ func TestPreAssignmentPlanningResultsRejectOperationalIdentity(t *testing.T) {
 	if _, err := parseRefinementStageResult(refinement, nil); err == nil {
 		t.Fatal("refinement accepted a pre-assignment branch identity")
 	}
-	specification := []byte(application.OrganizationalResultMarker + "\n{\"schema_version\":\"1.0.0\",\"result_type\":\"FEATURE_SPECIFICATION\",\"stories\":[{\"title\":\"Story\",\"description\":\"Deliver it from /Users/operator/worktree.\",\"acceptance_criteria\":[\"works\"],\"priority\":\"HIGH\"}],\"design_constraints\":[]}")
+	specification := []byte(application.OrganizationalResultMarker + "\n{\"schema_version\":\"1.0.0\",\"result_type\":\"FEATURE_SPECIFICATION\",\"stories\":[{\"title\":\"Story\",\"description\":\"Deliver it from /Users/operator/worktree.\",\"acceptance_criteria\":[\"works\"],\"priority\":\"HIGH\"}]}")
 	if _, err := parseSpecificationStageResult(specification, nil); err == nil {
 		t.Fatal("specification accepted a pre-assignment workspace identity")
 	}

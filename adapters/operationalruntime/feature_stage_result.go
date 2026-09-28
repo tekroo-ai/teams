@@ -32,7 +32,6 @@ type specificationStageResult struct {
 		AcceptanceCriteria []string                     `json:"acceptance_criteria"`
 		Priority           organization.FeaturePriority `json:"priority"`
 	} `json:"stories"`
-	DesignConstraints []string `json:"design_constraints"`
 }
 
 type architectureTaskResult struct {
@@ -405,7 +404,7 @@ func parseRefinementStageResult(output []byte, allowedMarkers []string, allowedA
 
 func parseSpecificationStageResult(output []byte, allowedMarkers []string, allowedActorFQNs ...kernel.ActorFQN) (specificationStageResult, error) {
 	var result specificationStageResult
-	if decodeOrganizationalStageResult(output, &result) != nil || result.SchemaVersion != "1.0.0" || result.ResultType != "FEATURE_SPECIFICATION" || len(result.Stories) == 0 || len(result.Stories) > organization.MaximumFeatureStories || !validStageStrings(result.DesignConstraints, false) {
+	if decodeOrganizationalStageResult(output, &result) != nil || result.SchemaVersion != "1.0.0" || result.ResultType != "FEATURE_SPECIFICATION" || len(result.Stories) == 0 || len(result.Stories) > organization.MaximumFeatureStories {
 		return specificationStageResult{}, organization.ErrInvalidFeature
 	}
 	for _, story := range result.Stories {
@@ -413,9 +412,6 @@ func parseSpecificationStageResult(output []byte, allowedMarkers []string, allow
 		if strings.TrimSpace(story.Title) == "" || len(story.Title) > 256 || strings.TrimSpace(story.Description) == "" || len(story.Description) > 64<<10 || !story.Priority.Valid() || !validStageStrings(story.AcceptanceCriteria, true) || len(story.AcceptanceCriteria) > 32 || containsPreAssignmentOperationalIdentityExcept(allowedActorFQNs, allowedMarkers, storyFields...) {
 			return specificationStageResult{}, organization.ErrInvalidFeature
 		}
-	}
-	if containsPreAssignmentOperationalIdentityExcept(allowedActorFQNs, allowedMarkers, result.DesignConstraints...) {
-		return specificationStageResult{}, organization.ErrInvalidFeature
 	}
 	return result, nil
 }

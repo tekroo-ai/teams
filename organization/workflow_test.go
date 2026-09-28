@@ -124,12 +124,12 @@ func TestShippedSoftwareWorkflowLoadsByFrozenDigest(t *testing.T) {
 		t.Fatal(err)
 	}
 	path := filepath.Join(filepath.Dir(workingDirectory), "config", "workflows", "software-development.v1.json")
-	digest := kernel.Digest("2578a9e5e1c2b3da2874775bb97897e5b6593c76442d805579f465a4c25d4e0a")
+	digest := kernel.Digest("7b93d463c0a662ae9550dfcbec24615b89ce619029f50927320b2a638210649e")
 	definition, err := LoadWorkflowDefinition(path, digest)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if definition.Name != "software-development" || definition.Version != "1.2.0" || len(definition.Stages) != 3 || definition.Stages[2].StageID != "design" || definition.Stages[2].ComplexityMinimum != 2 {
+	if definition.Name != "software-development" || definition.Version != "1.3.0" || len(definition.Stages) != 3 || definition.Stages[2].StageID != "design" || definition.Stages[2].ComplexityMinimum != 2 {
 		t.Fatalf("unexpected shipped workflow: %+v", definition)
 	}
 }

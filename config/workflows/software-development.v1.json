@@ -1,8 +1,8 @@
 {
   "schema_version": "1.0.0",
   "name": "software-development",
-  "version": "1.2.0",
-  "content_digest": "2578a9e5e1c2b3da2874775bb97897e5b6593c76442d805579f465a4c25d4e0a",
+  "version": "1.3.0",
+  "content_digest": "7b93d463c0a662ae9550dfcbec24615b89ce619029f50927320b2a638210649e",
   "trigger_types": [
     "tekroo.message.feature.submitted"
   ],
@@ -39,7 +39,7 @@
       "allowed_outgoing_purposes": ["HANDOFF"],
       "target_selection": "CAPABILITY",
       "validation_policy": "DETERMINISTIC_ONLY",
-      "completion_condition": "The task-specific work_product contains only schema_version=1.0.0, result_type=FEATURE_SPECIFICATION, stories [{title, description, acceptance_criteria, priority}], and design_constraints. Priority is LOW, NORMAL, HIGH, or CRITICAL. The smallest finite set of independently useful stories covers every submitted acceptance criterion, and every submitted acceptance criterion appears verbatim in at least one story. Follow the selected handler's result protocol for the outer envelope."
+      "completion_condition": "The task-specific work_product contains only schema_version=1.0.0, result_type=FEATURE_SPECIFICATION, and stories [{title, description, acceptance_criteria, priority}]. Priority is LOW, NORMAL, HIGH, or CRITICAL. Use the smallest set of independently useful product stories. Every accepted criterion appears verbatim in at least one story, and no story adds a new acceptance criterion. Teams carries operator constraints forward; the architect owns technical design decisions. Follow the selected handler's result protocol for the outer envelope."
     },
     {
       "stage_id": "design",
@@ -59,7 +59,7 @@
       "allowed_outgoing_purposes": ["HANDOFF"],
       "target_selection": "CAPABILITY",
       "validation_policy": "DETERMINISTIC_ONLY",
-      "completion_condition": "The task-specific work_product contains only schema_version=1.0.0, result_type=FEATURE_PLAN, architecture, design_decisions, assumptions, and tasks. Each task contains only story_index, title, description, acceptance_criteria, backward depends_on indexes, empty validates, purpose=IMPLEMENTATION, complexity, risk, critical_path, attempt_limit, and review_round_limit. story_index is one zero-based integer naming the task's primary story; it is never an array. depends_on and validates are zero-based integer arrays; validates must be empty. If one task supports more than one story, select its primary story_index and state the cross-story requirement in that task's acceptance criteria. The plan is repository-grounded, acyclic, uses true dependencies, preserves layer ownership, and contains only work needed for the accepted feature. Follow the selected handler's result protocol for the outer envelope."
+      "completion_condition": "The task-specific work_product contains only schema_version=1.0.0, result_type=FEATURE_PLAN, architecture, design_decisions, assumptions, and tasks. Each task contains only story_index, title, description, acceptance_criteria, backward depends_on indexes, empty validates, write_scope, purpose=IMPLEMENTATION, complexity, risk, critical_path, attempt_limit, and review_round_limit. story_index is one zero-based integer naming the task's primary story; it is never an array. depends_on and validates are zero-based integer arrays; validates must be empty. If one task supports more than one story, select its primary story_index and state the cross-story requirement in that task's acceptance criteria. write_scope is the small list of repository-relative files or directories expected to change. Tasks may run in parallel only when their write_scope values are disjoint; overlapping or uncertain scopes require a dependency. The plan is repository-grounded, acyclic, uses true dependencies, preserves layer ownership, and contains only work needed for the accepted feature. Follow the selected handler's result protocol for the outer envelope."
     }
   ],
   "root_budgets": {

@@ -619,7 +619,6 @@ func (server *integratedOpenHands) serveHTTP(writer http.ResponseWriter, request
 									"title": "Deliver behavior", "description": "Implement and verify the requested behavior.",
 									"acceptance_criteria": criteria, "priority": "HIGH",
 								}},
-								"design_constraints": []string{"preserve current interfaces"},
 							})
 							agentText = application.OrganizationalResultMarker + "\n" + string(resultBytes)
 						case "Design executable feature DAG":
