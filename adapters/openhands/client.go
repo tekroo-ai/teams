@@ -49,6 +49,9 @@ const (
 	submitResultToolName                  = "submit_envelope"
 	submitResultToolDescription           = "Submit the assigned result envelope. Call this tool exactly once when the result is complete, passing the full envelope as structured parameters. This replaces the finish tool for result submission."
 	submitResultToolSchema                = `{"type":"object","additionalProperties":false,"required":["schema_version","outcome","summary","evidence","message_proposals","work_product"],"properties":{"schema_version":{"type":"string"},"outcome":{"type":"string"},"summary":{"type":"string"},"evidence":{"type":"array","items":{"type":"string"}},"message_proposals":{"type":"array","items":{"type":"object"}},"work_product":{"type":"object"}}}`
+	structuredCompletionSystemSuffix      = " For this handler-bound invocation, submit_envelope is the only completion channel: call it exactly once with the full structured result; do not call finish or return a prose completion."
+	finishCompletionInstruction           = "When the task is complete or blocked by a concrete missing prerequisite, call finish exactly once. The finish message must follow result_protocol exactly; Teams ignores any informal completion claim."
+	structuredCompletionInstruction       = "When the task is complete or blocked by a concrete missing prerequisite, call submit_envelope exactly once with the result required by result_protocol. Do not return a prose completion."
 	candidateResultRequirementInstruction = "Put exactly one object conforming to result_schema in the outer organizational result's work_product field. Copy both candidate identity values exactly."
 	candidateResultProtocolInstruction    = "The OpenHands finish tool message is consumed by Teams. Set finish.message to the marker followed by one outer object conforming to message_handler.result_schema. Put the validation verdict only in work_product, which MUST conform exactly to candidate_result_requirement.result_schema. Outer outcome describes execution completion and uses the message-handler values; work_product.outcome is the validation verdict and uses PASS, FAIL, BLOCKED, or INCONCLUSIVE. Do not flatten, merge, or rename fields from either schema."
 	teamsRoleExecutionSystemPrompt        = `You execute one authorized Tekroo Teams work invocation.
@@ -782,7 +785,7 @@ func (client *Client) Start(ctx context.Context, brief application.ExecutionBrie
 		return application.ExternalExecutionObservation{}, err
 	}
 	if executionPromptIndex(events, prepared, brief, requestDigest) >= 0 {
-		return client.observation(ctx, brief, requestDigest, info, events, false)
+		return client.Inspect(ctx, brief, conversationID, requestDigest)
 	}
 	status, response, err := client.request(ctx, http.MethodPost, "/api/conversations/"+url.PathEscape(conversationID)+"/events", map[string]any{
 		"role": "user", "run": true,
@@ -798,8 +801,7 @@ func (client *Client) Start(ctx context.Context, brief application.ExecutionBrie
 	if status != http.StatusOK {
 		events, eventsErr := client.events(ctx, conversationID)
 		if eventsErr == nil && executionPromptIndex(events, prepared, brief, requestDigest) >= 0 {
-			info, _, _ = client.getConversation(ctx, conversationID)
-			return client.observation(ctx, brief, requestDigest, info, events, false)
+			return client.Inspect(ctx, brief, conversationID, requestDigest)
 		}
 		return rejectedObservation(brief, requestDigest, response), nil
 	}
@@ -808,7 +810,7 @@ func (client *Client) Start(ctx context.Context, brief application.ExecutionBrie
 		if err == nil && executionPromptIndex(events, prepared, brief, requestDigest) >= 0 {
 			info, status, err = client.getConversation(ctx, conversationID)
 			if err == nil && status == http.StatusOK {
-				return client.observation(ctx, brief, requestDigest, info, events, false)
+				return client.Inspect(ctx, brief, conversationID, requestDigest)
 			}
 		}
 		if err := wait(ctx, client.pollInterval); err != nil {
@@ -888,7 +890,7 @@ func (client *Client) ReconcileStart(ctx context.Context, brief application.Exec
 	if executionPromptIndex(events, prepared, brief, requestDigest) < 0 {
 		return absentObservation(brief, requestDigest), nil
 	}
-	return client.observation(ctx, brief, requestDigest, info, events, false)
+	return client.Inspect(ctx, brief, conversationID, requestDigest)
 }
 
 func (client *Client) Inspect(ctx context.Context, brief application.ExecutionBrief, conversationID string, requestDigest kernel.Digest) (application.ExternalExecutionObservation, error) {
@@ -3679,6 +3681,31 @@ func withSubmitResultTool(agentSettings any) (any, bool) {
 	if !ok {
 		return nil, false
 	}
+	// A handler-bound Teams invocation has one result channel. Do not advertise
+	// the generic finish tool alongside submit_envelope.
+	settings["require_tool_call_for_completion"] = true
+	settings["include_default_tools"] = []string{}
+	systemPrompt, _ := settings["system_prompt"].(string)
+	if systemPrompt == "" {
+		systemPrompt = teamsRoleExecutionSystemPrompt
+	}
+	if strings.Contains(systemPrompt, finishCompletionInstruction) {
+		systemPrompt = strings.Replace(systemPrompt, finishCompletionInstruction, structuredCompletionInstruction, 1)
+	} else if !strings.Contains(systemPrompt, structuredCompletionInstruction) {
+		return nil, false
+	}
+	settings["system_prompt"] = systemPrompt
+	context, ok := settings["agent_context"].(map[string]any)
+	if !ok {
+		return nil, false
+	}
+	suffix, ok := context["system_message_suffix"].(string)
+	if !ok {
+		return nil, false
+	}
+	if !strings.HasSuffix(suffix, structuredCompletionSystemSuffix) {
+		context["system_message_suffix"] = suffix + structuredCompletionSystemSuffix
+	}
 	for _, tool := range tools {
 		if entry, isMap := tool.(map[string]any); isMap && entry["name"] == submitResultToolName {
 			return settings, true
@@ -3812,10 +3839,11 @@ type conversationLLMSettings struct {
 }
 
 type conversationAgentSettings struct {
-	Kind                string   `json:"kind"`
-	IncludeDefaultTools []string `json:"include_default_tools"`
-	SystemPrompt        string   `json:"system_prompt"`
-	Tools               []struct {
+	Kind                         string   `json:"kind"`
+	IncludeDefaultTools          []string `json:"include_default_tools"`
+	RequireToolCallForCompletion bool     `json:"require_tool_call_for_completion"`
+	SystemPrompt                 string   `json:"system_prompt"`
+	Tools                        []struct {
 		Name   string         `json:"name"`
 		Params map[string]any `json:"params"`
 	} `json:"tools"`
@@ -3861,6 +3889,15 @@ func conversationAgentMatches(info conversationInfo, expectedRaw json.RawMessage
 	}) bool {
 		return tool.Name == submitResultToolName
 	})
+	// The structured-completion requirement is injected together with the
+	// client tool and is not part of the signed role profile.
+	info.Agent.RequireToolCallForCompletion = false
+	info.Agent.IncludeDefaultTools = expected.IncludeDefaultTools
+	info.Agent.SystemPrompt = strings.Replace(info.Agent.SystemPrompt, structuredCompletionInstruction, finishCompletionInstruction, 1)
+	if expected.SystemPrompt == "" && info.Agent.SystemPrompt == teamsRoleExecutionSystemPrompt {
+		info.Agent.SystemPrompt = ""
+	}
+	info.Agent.AgentContext.SystemMessageSuffix = strings.TrimSuffix(info.Agent.AgentContext.SystemMessageSuffix, structuredCompletionSystemSuffix)
 	if expected.Tools != nil && !reflect.DeepEqual(info.Agent.Tools, expected.Tools) {
 		return false
 	}
@@ -4299,6 +4336,39 @@ func (client *Client) observation(ctx context.Context, brief application.Executi
 	if index < 0 {
 		return application.ExternalExecutionObservation{}, ErrProtocol
 	}
+	if brief.MessageHandler != nil && !interrupted {
+		if result, accepted := acceptedSubmitResult(*brief.MessageHandler, events, index); accepted {
+			// A client tool is not an OpenHands finish tool. Once its observation
+			// confirms delivery, Teams owns completion and must stop the model
+			// before it can submit the same result again.
+			if executionStillActive(info.ExecutionStatus) {
+				status, _, err := client.request(ctx, http.MethodPost, "/api/conversations/"+url.PathEscape(string(brief.InvocationID))+"/interrupt", nil)
+				if err != nil || status != http.StatusOK && status != http.StatusNoContent && status != http.StatusConflict {
+					return application.ExternalExecutionObservation{}, ErrProtocol
+				}
+				info, status, err = client.getConversation(ctx, string(brief.InvocationID))
+				if err != nil || status != http.StatusOK {
+					return application.ExternalExecutionObservation{}, ErrProtocol
+				}
+				events, err = client.eventsAtLeaf(ctx, string(brief.InvocationID), info.LeafEventID)
+				if err != nil {
+					return application.ExternalExecutionObservation{}, err
+				}
+				index = executionPromptIndex(events, prepared, brief, requestDigest)
+				if index < 0 {
+					return application.ExternalExecutionObservation{}, ErrProtocol
+				}
+			}
+			observation, err := client.observationAt(brief, requestDigest, info, events, index, false)
+			if err != nil {
+				return application.ExternalExecutionObservation{}, err
+			}
+			observation.State = application.ExternalSucceeded
+			observation.Retryable = false
+			observation.Output = result
+			return observation, nil
+		}
+	}
 	return client.observationAt(brief, requestDigest, info, events, index, interrupted)
 }
 
@@ -4320,6 +4390,33 @@ func submitResultActionOutput(payload json.RawMessage) ([]byte, bool) {
 	output = append(output, application.OrganizationalResultMarker...)
 	output = append(output, '\n')
 	return append(output, encoded...), true
+}
+
+// acceptedSubmitResult selects the first schema-valid result whose client-tool
+// observation confirms delivery. Later model steps cannot replace that result.
+func acceptedSubmitResult(handler application.MessageHandlerGrounding, events []rawEvent, promptIndex int) ([]byte, bool) {
+	pending := make(map[string][]byte)
+	for index, event := range events {
+		if index <= promptIndex || event.ToolName != submitResultToolName || event.ToolCallID == "" {
+			continue
+		}
+		if event.Kind == "ActionEvent" && event.Source == "agent" {
+			output, ok := submitResultActionOutput(event.ActionPayload)
+			if !ok {
+				continue
+			}
+			if _, err := application.ValidateRoleHandlerResult(handler, output); err == nil {
+				pending[event.ToolCallID] = output
+			}
+			continue
+		}
+		if event.Kind == "ObservationEvent" && event.ObservationKind == "ClientToolObservation" && !event.ObservationError {
+			if output, ok := pending[event.ToolCallID]; ok {
+				return output, true
+			}
+		}
+	}
+	return nil, false
 }
 
 func (client *Client) observationAt(brief application.ExecutionBrief, requestDigest kernel.Digest, info conversationInfo, events []rawEvent, index int, interrupted bool) (application.ExternalExecutionObservation, error) {

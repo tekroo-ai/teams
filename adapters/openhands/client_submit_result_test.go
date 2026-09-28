@@ -2,6 +2,8 @@ package openhands
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -36,6 +38,107 @@ func TestSubmitResultActionOutputStripsKindAndMarks(t *testing.T) {
 	}
 }
 
+func TestAcceptedSubmitResultRequiresSuccessfulDeliveryAndKeepsFirst(t *testing.T) {
+	handler := application.MessageHandlerGrounding{
+		ResultSchema: json.RawMessage(`{"type":"object","required":["outcome","work_product"],"properties":{"outcome":{"const":"completed"},"work_product":{"type":"object"}}}`),
+		AllowedResults: []string{"completed"},
+	}
+	first := json.RawMessage(`{"outcome":"completed","work_product":{"answer":"first"},"kind":"ClientAction_submit_envelope"}`)
+	second := json.RawMessage(`{"outcome":"completed","work_product":{"answer":"second"},"kind":"ClientAction_submit_envelope"}`)
+	events := []rawEvent{
+		{Kind: "MessageEvent", Source: "user"},
+		{Kind: "ActionEvent", Source: "agent", ToolName: submitResultToolName, ToolCallID: "call-1", ActionPayload: first},
+		{Kind: "ObservationEvent", Source: "environment", ToolName: submitResultToolName, ToolCallID: "call-1", ObservationKind: "ClientToolObservation"},
+		{Kind: "ActionEvent", Source: "agent", ToolName: submitResultToolName, ToolCallID: "call-2", ActionPayload: second},
+		{Kind: "ObservationEvent", Source: "environment", ToolName: submitResultToolName, ToolCallID: "call-2", ObservationKind: "ClientToolObservation"},
+	}
+	if _, accepted := acceptedSubmitResult(handler, events[:2], 0); accepted {
+		t.Fatal("unobserved client tool call was accepted")
+	}
+	failed := append([]rawEvent(nil), events[:3]...)
+	failed[2].ObservationError = true
+	if _, accepted := acceptedSubmitResult(handler, failed, 0); accepted {
+		t.Fatal("failed client tool delivery was accepted")
+	}
+	output, accepted := acceptedSubmitResult(handler, events, 0)
+	if !accepted || !strings.Contains(string(output), `"answer":"first"`) || strings.Contains(string(output), `"answer":"second"`) {
+		t.Fatalf("first delivered result not retained: accepted=%t output=%s", accepted, output)
+	}
+	invalid := append([]rawEvent(nil), events[:3]...)
+	invalid[1].ActionPayload = json.RawMessage(`{"outcome":"failed","work_product":{}}`)
+	if _, accepted := acceptedSubmitResult(handler, invalid, 0); accepted {
+		t.Fatal("handler-invalid result was accepted")
+	}
+}
+
+func TestInspectStopsAfterDeliveredHandlerResult(t *testing.T) {
+	brief, _ := openHandsTestBrief(t)
+	brief.MessageHandler = &application.MessageHandlerGrounding{
+		MessageType: "tekroo.message.task.assigned",
+		ResultSchema: json.RawMessage(`{"type":"object","required":["outcome","work_product"],"properties":{"outcome":{"const":"completed"},"work_product":{"type":"object"}}}`),
+		AllowedResults: []string{"completed"},
+	}
+	encoded := mustJSON(brief)
+	hash := sha256.Sum256(encoded)
+	requestDigest := kernel.Digest(hex.EncodeToString(hash[:]))
+	workspace := filepath.Join(t.TempDir(), "workspace")
+	preliminary := newOpenHandsTestClient(t, "http://127.0.0.1", workspace, brief)
+	prepared, err := preliminary.prepare(context.Background(), brief, requestDigest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var profile map[string]any
+	if err := json.Unmarshal([]byte(qualifiedAgentSettingsJSON), &profile); err != nil {
+		t.Fatal(err)
+	}
+	profile["tools"] = []any{map[string]any{"name": "glob", "params": map[string]any{}}}
+	injected, ok := withSubmitResultTool(profile)
+	if !ok {
+		t.Fatal("cannot inject completion tool into test profile")
+	}
+	profileRaw := mustJSON(profile)
+	result := map[string]any{"outcome": "completed", "work_product": map[string]any{"answer": "accepted"}, "kind": "ClientAction_submit_envelope"}
+	events := []map[string]any{
+		event("prompt", "MessageEvent", "user", prepared.prompt),
+		{"id": "result-action", "kind": "ActionEvent", "source": "agent", "timestamp": "2026-08-31T12:00:02Z", "tool_name": submitResultToolName, "tool_call_id": "result-call", "action": result},
+		{"id": "result-observation", "kind": "ObservationEvent", "source": "environment", "timestamp": "2026-08-31T12:00:03Z", "tool_name": submitResultToolName, "tool_call_id": "result-call", "observation": map[string]any{"kind": "ClientToolObservation", "is_error": false}},
+	}
+	interrupts := 0
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		path := "/api/conversations/" + string(brief.InvocationID)
+		switch {
+		case request.Method == http.MethodGet && request.URL.Path == path:
+			status := "running"
+			if interrupts > 0 {
+				status = "paused"
+			}
+			writeJSON(writer, map[string]any{"id": string(brief.InvocationID), "execution_status": status, "created_at": "2026-08-31T12:00:00Z", "workspace": map[string]any{"kind": "LocalWorkspace", "working_dir": workspace}, "agent": injected, "tags": map[string]string{"tekrooinvocation": string(brief.InvocationID), "tekroorequest": string(requestDigest)}})
+		case request.Method == http.MethodGet && request.URL.Path == path+"/events/search":
+			writeJSON(writer, map[string]any{"items": events, "next_page_id": nil})
+		case request.Method == http.MethodPost && request.URL.Path == path+"/interrupt":
+			interrupts++
+			writer.WriteHeader(http.StatusNoContent)
+		default:
+			writer.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+	hookConfig := append(json.RawMessage(nil), qualifiedSMAHookConfig...)
+	client, err := NewClient(Config{
+		BaseURL: server.URL, SessionAPIKey: "session-key", HTTPClient: &http.Client{Timeout: time.Second},
+		Workspaces: staticWorkspace{binding: WorkspaceBinding{WorkspaceID: brief.Scope.WorkspaceID, WorktreeID: brief.Scope.WorktreeID, WorkingDirectory: workspace}},
+		Profiles: staticProfile{profile: ExecutionProfile{ModelProfileDigest: brief.ModelProfileDigest, RuntimeIdentityDigest: brief.RuntimeIdentityDigest, ToolPolicyDigest: brief.ToolPolicyDigest, EffectPolicyDigest: brief.EffectPolicyDigest, AgentSettings: profileRaw, HookConfig: hookConfig, AgentDelegationDisabled: true, SemanticMemory: acceptedSemanticMemoryBinding(t, hookConfig)}},
+		PollInterval: time.Millisecond, MaximumPages: 4, MaximumEvidenceBytes: 1 << 20,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	observation, err := client.Inspect(context.Background(), brief, string(brief.InvocationID), requestDigest)
+	if err != nil || observation.State != application.ExternalSucceeded || interrupts != 1 || !strings.Contains(string(observation.Output), `"answer":"accepted"`) {
+		t.Fatalf("observation=%#v err=%v interrupts=%d", observation, err, interrupts)
+	}
+}
+
 func TestWithSubmitResultToolInjectsSpecOnce(t *testing.T) {
 	var settings any
 	if err := json.Unmarshal([]byte(qualifiedAgentSettingsJSON), &settings); err != nil {
@@ -49,6 +152,15 @@ func TestWithSubmitResultToolInjectsSpecOnce(t *testing.T) {
 	injected, ok := withSubmitResultTool(settings)
 	if !ok {
 		t.Fatal("injection rejected qualified settings")
+	}
+	if enabled, ok := injected.(map[string]any)["require_tool_call_for_completion"].(bool); !ok || !enabled {
+		t.Fatal("injection did not require structured completion")
+	}
+	if defaults, ok := injected.(map[string]any)["include_default_tools"].([]string); !ok || len(defaults) != 0 {
+		t.Fatalf("handler-bound invocation still advertises finish: %#v", injected.(map[string]any)["include_default_tools"])
+	}
+	if prompt, ok := injected.(map[string]any)["system_prompt"].(string); !ok || !strings.Contains(prompt, structuredCompletionInstruction) || strings.Contains(prompt, finishCompletionInstruction) {
+		t.Fatal("handler-bound system prompt has conflicting completion instructions")
 	}
 	tools := injected.(map[string]any)["tools"].([]any)
 	if len(tools) != 4 {
@@ -195,6 +307,9 @@ func TestClientInjectsSubmitResultToolForHandlerExecution(t *testing.T) {
 		t.Fatalf("spec = %#v", spec)
 	}
 	settings := createPayload["agent_settings"].(map[string]any)
+	if defaults, ok := settings["include_default_tools"].([]any); !ok || len(defaults) != 0 {
+		t.Fatalf("handler-bound invocation still advertises finish: %#v", settings["include_default_tools"])
+	}
 	agentTools := settings["tools"].([]any)
 	if len(agentTools) != 4 || agentTools[3].(map[string]any)["name"] != submitResultToolName {
 		t.Fatalf("agent_settings tools = %#v", agentTools)
