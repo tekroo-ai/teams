@@ -13,6 +13,10 @@ stop and report the disagreement; do not weaken fixtures to make code pass.
 ## Scope boundaries
 
 - Implement v4 from the approved semantics, not by copying the v3 codebase.
+- For live feature work, the admitted operator request and its accepted refinements
+  define scope. Historical run records and test fixtures are examples or
+  regression evidence, not additional requirements; do not import their
+  acceptance criteria into a new feature unless the operator explicitly asks.
 - Begin with the pure deterministic kernel and in-memory reference adapters.
 - Keep provider, MongoDB, transport, API, CLI, and serialization concerns outside
   the pure domain evaluator.
