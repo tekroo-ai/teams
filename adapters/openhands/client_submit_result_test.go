@@ -199,6 +199,12 @@ func TestWithSubmitResultToolInjectsSpecOnce(t *testing.T) {
 	if spec["name"] != submitResultToolName {
 		t.Fatalf("spec = %#v", spec)
 	}
+	parameters := spec["parameters"].(map[string]any)
+	workProduct := parameters["properties"].(map[string]any)["work_product"].(map[string]any)
+	description, _ := workProduct["description"].(string)
+	if workProduct["type"] != "object" || !strings.Contains(description, `{"key":"value"}`) || !strings.Contains(description, `"{\"key\":\"value\"}"`) {
+		t.Fatalf("work_product must remain an object with an object-versus-string example: %#v", workProduct)
+	}
 	// Idempotent: a second injection must not duplicate the entry.
 	again, ok := withSubmitResultTool(injected)
 	if !ok || len(again.(map[string]any)["tools"].([]any)) != 4 {

@@ -7,9 +7,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -130,6 +132,8 @@ func newCandidateWorkspaceManagerWithContext(ctx context.Context, evidenceRoot, 
 }
 
 func (manager *candidateWorkspaceManager) Prepare(ctx context.Context, feature organization.FeatureRequest, consumer organization.PlannedTask, consumerWorkspaceID string, source ProductionWorkspace, targets []candidateTargetReceipt, requiredGateIDs []string) (ProductionWorkspace, candidateReceipt, kernel.Digest, error) {
+	started := time.Now()
+	defer func() { log.Printf("candidate_prepare consumer=%s elapsed=%s", consumer.ID, time.Since(started)) }()
 	if manager == nil || !feature.ID.Valid() || !consumer.ID.Valid() || consumerWorkspaceID == "" || source.WorkspaceID == "" || !filepath.IsAbs(source.WorkingDirectory) || len(source.BaselineSHA) != 40 || len(targets) == 0 || len(requiredGateIDs) == 0 {
 		return ProductionWorkspace{}, candidateReceipt{}, "", fmt.Errorf("%w: consumer %s workspace %q workdir %q baseline %d targets %d gates %d", errInvalidCandidateWorkspace, consumer.ID, consumerWorkspaceID, source.WorkingDirectory, len(source.BaselineSHA), len(targets), len(requiredGateIDs))
 	}
@@ -217,6 +221,8 @@ func (manager *candidateWorkspaceManager) Prepare(ctx context.Context, feature o
 // an already verified candidate. It preserves the candidate and gate identity;
 // only the consumer binding and its receipt change.
 func (manager *candidateWorkspaceManager) Reuse(ctx context.Context, feature organization.FeatureRequest, consumer organization.PlannedTask, consumerWorkspaceID string, source candidateReceipt) (ProductionWorkspace, candidateReceipt, kernel.Digest, error) {
+	started := time.Now()
+	defer func() { log.Printf("candidate_reuse consumer=%s elapsed=%s", consumer.ID, time.Since(started)) }()
 	if manager == nil || !feature.ID.Valid() || !consumer.ID.Valid() || consumerWorkspaceID == "" || source.FeatureID != feature.ID || !manager.validReceipt(source) {
 		return ProductionWorkspace{}, candidateReceipt{}, "", errInvalidCandidateWorkspace
 	}
@@ -233,7 +239,7 @@ func (manager *candidateWorkspaceManager) Reuse(ctx context.Context, feature org
 	}
 	receiptBytes = append(receiptBytes, '\n')
 	receiptDigest := digestBytes(receiptBytes)
-	if err := manager.materialize(ctx, source.MaterializedWorkspace, receipt, receiptBytes); err != nil {
+	if err := manager.materializeReuse(ctx, source.MaterializedWorkspace, receipt, receiptBytes); err != nil {
 		return ProductionWorkspace{}, candidateReceipt{}, "", err
 	}
 	workspace := manager.productionWorkspace(consumer, receipt)
@@ -241,6 +247,71 @@ func (manager *candidateWorkspaceManager) Reuse(ctx context.Context, feature org
 		return ProductionWorkspace{}, candidateReceipt{}, "", err
 	}
 	return workspace, receipt, receiptDigest, nil
+}
+
+// A reused candidate already has the exact commit, branch, clean tree, and
+// verified gate receipt. On APFS, clonefile makes an independent view without
+// fetching Git objects and checking out the large repository a second time.
+// Other filesystems retain the original, self-contained Git materialization.
+func (manager *candidateWorkspaceManager) materializeReuse(ctx context.Context, source string, receipt candidateReceipt, receiptBytes []byte) error {
+	if runtime.GOOS != "darwin" {
+		return manager.materialize(ctx, source, receipt, receiptBytes)
+	}
+	if _, err := os.Lstat(manager.receiptPath(receipt)); err == nil {
+		return manager.materialize(ctx, source, receipt, receiptBytes)
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	if _, err := os.Lstat(receipt.MaterializedWorkspace); err == nil {
+		return manager.materialize(ctx, source, receipt, receiptBytes)
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	temporary, err := os.MkdirTemp(manager.workspaceRoot(), ".candidate-clone-*")
+	if err != nil {
+		return err
+	}
+	defer removeCandidateTemporary(temporary)
+	started := time.Now()
+	output, err := exec.CommandContext(ctx, "/bin/cp", "-cR", filepath.Clean(source)+string(os.PathSeparator)+".", temporary).CombinedOutput()
+	log.Printf("candidate_reuse_copy elapsed=%s error=%t", time.Since(started), err != nil)
+	if err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		log.Printf("candidate_reuse_copy unavailable; using Git materialization: %v: %s", err, strings.TrimSpace(string(output)))
+		return manager.materialize(ctx, source, receipt, receiptBytes)
+	}
+	started = time.Now()
+	if err := makeTreeReadOnly(temporary); err != nil {
+		return err
+	}
+	log.Printf("candidate_reuse_readonly elapsed=%s", time.Since(started))
+	if err := os.Rename(temporary, receipt.MaterializedWorkspace); err != nil {
+		return err
+	}
+	temporary = ""
+	if err := manager.verifyMaterialized(ctx, receipt); err != nil {
+		removeCandidateTemporary(receipt.MaterializedWorkspace)
+		return err
+	}
+	return writeExclusiveSynced(manager.receiptPath(receipt), receiptBytes)
+}
+
+func removeCandidateTemporary(path string) {
+	if path == "" {
+		return
+	}
+	_ = filepath.WalkDir(path, func(item string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.IsDir() {
+			_ = os.Chmod(item, 0o700)
+		}
+		return nil
+	})
+	_ = os.RemoveAll(path)
 }
 
 func (manager *candidateWorkspaceManager) retainedReceipt(ctx context.Context, featureID, consumerTaskID, candidateID kernel.UUIDv7) (candidateReceipt, kernel.Digest, error) {
@@ -448,7 +519,9 @@ func (manager *candidateWorkspaceManager) runGates(ctx context.Context, director
 		command.Env = append(os.Environ(), "CI=1", "GIT_PAGER=cat", "PAGER=cat", "GIT_TERMINAL_PROMPT=0")
 		var stdout, stderr bytes.Buffer
 		command.Stdout, command.Stderr = &stdout, &stderr
+		started := time.Now()
 		runErr := command.Run()
+		log.Printf("candidate_gate gate=%s elapsed=%s error=%t", gateID, time.Since(started), runErr != nil)
 		cancel()
 		exitCode := 0
 		if runErr != nil {
@@ -630,6 +703,9 @@ func makeTreeReadOnly(root string) error {
 			return err
 		}
 		mode := info.Mode()
+		if mode&os.ModeSymlink != 0 {
+			return nil
+		}
 		if mode.IsDir() {
 			return os.Chmod(path, mode.Perm()&0o555)
 		}
@@ -638,12 +714,14 @@ func makeTreeReadOnly(root string) error {
 }
 
 func (manager *candidateWorkspaceManager) git(ctx context.Context, directory string, arguments ...string) ([]byte, error) {
+	started := time.Now()
 	commandCtx, cancel := context.WithTimeout(ctx, manager.timeout)
 	defer cancel()
 	command := exec.CommandContext(commandCtx, manager.gitBinary, arguments...)
 	command.Dir = directory
 	command.Env = append(os.Environ(), "LC_ALL=C", "TZ=UTC", "GIT_TERMINAL_PROMPT=0", "GIT_PAGER=cat", "PAGER=cat")
 	output, err := command.CombinedOutput()
+	log.Printf("candidate_git operation=%s elapsed=%s error=%t", arguments[0], time.Since(started), err != nil)
 	if err != nil {
 		return output, fmt.Errorf("git %s: %w: %s", arguments[0], err, strings.TrimSpace(string(output)))
 	}

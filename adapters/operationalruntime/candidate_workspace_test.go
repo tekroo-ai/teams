@@ -105,6 +105,12 @@ func TestCandidateWorkspaceMaterializesExactIsolatedReadOnlyRepository(t *testin
 		t.Fatalf("reused candidate binding=%#v err=%v", rebound, err)
 	}
 	makeWritableForCleanup(t, thirdWorkspace.WorkingDirectory)
+	if err := os.WriteFile(filepath.Join(thirdWorkspace.WorkingDirectory, "file.txt"), []byte("reuse mutated\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if original, err := os.ReadFile(filepath.Join(binding.WorkingDirectory, "file.txt")); err != nil || string(original) != "candidate\n" {
+		t.Fatalf("reused view changed its source: %q, %v", original, err)
+	}
 	makeWritableForCleanup(t, secondWorkspace.WorkingDirectory)
 	tracked := filepath.Join(binding.WorkingDirectory, "file.txt")
 	if err := os.WriteFile(tracked, []byte("mutation\n"), 0o644); err == nil {

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -116,6 +117,10 @@ func (manager *taskWorkspaceManager) PrepareAssembly(ctx context.Context, featur
 }
 
 func (manager *taskWorkspaceManager) prepareObserved(ctx context.Context, kind taskWorkspaceKind, feature organization.FeatureRequest, workID kernel.UUIDv7, workspaceID string, root ProductionWorkspace, observed []taskWorkspaceComponent) (ProductionWorkspace, taskWorkspaceReceipt, error) {
+	started := time.Now()
+	defer func() {
+		log.Printf("task_workspace_prepare kind=%s work=%s components=%d elapsed=%s", kind, workID, len(observed), time.Since(started))
+	}()
 	if manager == nil || !feature.ID.Valid() || !workID.Valid() || workspaceID == "" || !validTaskWorkspaceRoot(root) || kind != taskWorkspaceEditable && kind != taskWorkspaceAssembly {
 		return ProductionWorkspace{}, taskWorkspaceReceipt{}, errInvalidTaskWorkspace
 	}
@@ -341,6 +346,7 @@ func (manager *taskWorkspaceManager) git(ctx context.Context, directory string, 
 }
 
 func (manager *taskWorkspaceManager) gitWithEnvironment(ctx context.Context, directory string, environment []string, arguments ...string) ([]byte, error) {
+	started := time.Now()
 	commandCtx, cancel := context.WithTimeout(ctx, manager.timeout)
 	defer cancel()
 	command := exec.CommandContext(commandCtx, manager.gitBinary, arguments...)
@@ -348,6 +354,7 @@ func (manager *taskWorkspaceManager) gitWithEnvironment(ctx context.Context, dir
 	command.Env = append(os.Environ(), "LC_ALL=C", "TZ=UTC", "GIT_TERMINAL_PROMPT=0", "GIT_PAGER=cat", "PAGER=cat")
 	command.Env = append(command.Env, environment...)
 	output, err := command.CombinedOutput()
+	log.Printf("task_workspace_git operation=%s elapsed=%s error=%t", arguments[0], time.Since(started), err != nil)
 	if err != nil {
 		return output, fmt.Errorf("git %s: %w: %s", arguments[0], err, strings.TrimSpace(string(output)))
 	}
