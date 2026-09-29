@@ -662,7 +662,7 @@ func BuildExecutionBriefWithHandler(current OperationalExecutionContext, groundi
 		brief.ResultProtocol = &ExecutionResultProtocol{
 			SchemaVersion: "1.0.0", Marker: OrganizationalResultMarker,
 			Outcomes:    append([]string(nil), handler.AllowedResults...),
-			Instruction: "The submit_envelope tool is the only result channel Teams consumes for this invocation. Call submit_envelope exactly once, passing the full envelope as its structured parameters conforming to message_handler.result_schema. Put any task-specific structured result required by the admitted work inside work_product, not beside the envelope. Return only results and message proposals allowed by the selected handler. Teams validates the result and remains the sole authority that records state changes or dispatches successor work.",
+			Instruction: "The submit_envelope_v2 tool is the only result channel Teams consumes for this invocation. Call submit_envelope_v2 exactly once, passing the result envelope as structured parameters. The outer schema_version is fixed at 1.0.0 and Teams supplies it if omitted; any supplied value must match. Put any task-specific structured result required by the admitted work inside work_product, not beside the envelope. Return only results and message proposals allowed by the selected handler. Teams validates the result against message_handler.result_schema and remains the sole authority that records state changes or dispatches successor work.",
 		}
 	} else if invocation.Purpose == kernel.PurposeValidation {
 		brief.ExecutionGuidance = append(brief.ExecutionGuidance, validationExecutionGuidance...)

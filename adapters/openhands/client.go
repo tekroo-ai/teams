@@ -46,15 +46,18 @@ const (
 	// validated daemon-side after extraction. The name must never be reused by
 	// any other client tool in a live agent-server process: a schema collision
 	// there is a permanent 422 until that process restarts.
-	submitResultToolName                  = "submit_envelope"
-	submitResultToolDescription           = "Submit the assigned result envelope. Call this tool exactly once when the result is complete, passing the full envelope as structured parameters. This replaces the finish tool for result submission."
-	submitResultToolSchema                = `{"type":"object","additionalProperties":false,"required":["schema_version","outcome","summary","evidence","message_proposals","work_product"],"properties":{"schema_version":{"type":"string"},"outcome":{"type":"string"},"summary":{"type":"string"},"evidence":{"type":"array","items":{"type":"string"}},"message_proposals":{"type":"array","items":{"type":"object"}},"work_product":{"type":"object","description":"Use a JSON object, for example {\"key\":\"value\"}; never a JSON-encoded string such as \"{\\\"key\\\":\\\"value\\\"}\". The actual keys must follow the selected handler's result_schema."}}}`
-	structuredCompletionSystemSuffix      = " For this handler-bound invocation, submit_envelope is the only completion channel: call it exactly once with the full structured result; do not call finish or return a prose completion."
-	finishCompletionInstruction           = "When the task is complete or blocked by a concrete missing prerequisite, call finish exactly once. The finish message must follow result_protocol exactly; Teams ignores any informal completion claim."
-	structuredCompletionInstruction       = "When the task is complete or blocked by a concrete missing prerequisite, call submit_envelope exactly once with the result required by result_protocol. Do not return a prose completion."
-	candidateResultRequirementInstruction = "Put exactly one object conforming to result_schema in the outer organizational result's work_product field. Copy both candidate identity values exactly."
-	candidateResultProtocolInstruction    = "The OpenHands finish tool message is consumed by Teams. Set finish.message to the marker followed by one outer object conforming to message_handler.result_schema. Put the validation verdict only in work_product, which MUST conform exactly to candidate_result_requirement.result_schema. Outer outcome describes execution completion and uses the message-handler values; work_product.outcome is the validation verdict and uses PASS, FAIL, BLOCKED, or INCONCLUSIVE. Do not flatten, merge, or rename fields from either schema."
-	teamsRoleExecutionSystemPrompt        = `You execute one authorized Tekroo Teams work invocation.
+	legacySubmitResultToolName             = "submit_envelope"
+	submitResultToolName                   = "submit_envelope_v2"
+	submitResultToolDescription            = "Submit the assigned result envelope. Call this tool exactly once when the result is complete, passing the full envelope as structured parameters. This replaces the finish tool for result submission."
+	submitResultToolSchema                 = `{"type":"object","additionalProperties":false,"required":["outcome","summary","evidence","message_proposals","work_product"],"properties":{"schema_version":{"type":"string","description":"Optional; Teams supplies the fixed outer envelope version 1.0.0 when omitted."},"outcome":{"type":"string"},"summary":{"type":"string"},"evidence":{"type":"array","items":{"type":"string"}},"message_proposals":{"type":"array","items":{"type":"object"}},"work_product":{"type":"object","description":"Use a JSON object, for example {\"key\":\"value\"}; never a JSON-encoded string such as \"{\\\"key\\\":\\\"value\\\"}\". The actual keys must follow the selected handler's result_schema."}}}`
+	structuredCompletionSystemSuffix       = " For this handler-bound invocation, submit_envelope_v2 is the only completion channel: call it exactly once with the structured result; do not call finish or return a prose completion."
+	legacyStructuredCompletionSystemSuffix = " For this handler-bound invocation, submit_envelope is the only completion channel: call it exactly once with the full structured result; do not call finish or return a prose completion."
+	finishCompletionInstruction            = "When the task is complete or blocked by a concrete missing prerequisite, call finish exactly once. The finish message must follow result_protocol exactly; Teams ignores any informal completion claim."
+	structuredCompletionInstruction        = "When the task is complete or blocked by a concrete missing prerequisite, call submit_envelope_v2 exactly once with the result required by result_protocol. Do not return a prose completion."
+	legacyStructuredCompletionInstruction  = "When the task is complete or blocked by a concrete missing prerequisite, call submit_envelope exactly once with the result required by result_protocol. Do not return a prose completion."
+	candidateResultRequirementInstruction  = "Put exactly one object conforming to result_schema in the outer organizational result's work_product field. Copy both candidate identity values exactly."
+	candidateResultProtocolInstruction     = "The OpenHands finish tool message is consumed by Teams. Set finish.message to the marker followed by one outer object conforming to message_handler.result_schema. Put the validation verdict only in work_product, which MUST conform exactly to candidate_result_requirement.result_schema. Outer outcome describes execution completion and uses the message-handler values; work_product.outcome is the validation verdict and uses PASS, FAIL, BLOCKED, or INCONCLUSIVE. Do not flatten, merge, or rename fields from either schema."
+	teamsRoleExecutionSystemPrompt         = `You execute one authorized Tekroo Teams work invocation.
 
 The user message is the authoritative JSON execution brief. The role_grounding object identifies the running actor by FQN and the signed role bundle by FQRN. Perform only that role, within its stated instructions, capabilities, permissions, task scope, and acceptance criteria. Use only the tools exposed for this invocation. For repository work, read AGENTS.md and only the source and tests relevant to the assigned result; do not tour the repository or inspect accepted contract packages unless the task explicitly requires contract analysis. Never delegate, contact another agent, invent operational identities, or perform unrequested external, deployment, Git publishing, or lifecycle actions.
 
@@ -1076,7 +1079,7 @@ func checkpointCompletionGuardApplies(purpose kernel.WorkPurpose) bool {
 // the result terminator, whichever channel this execution uses (submit_envelope
 // for handler-bound executions, finish for the rest).
 func isSubmissionNextAction(nextAction string) bool {
-	return strings.Contains(nextAction, "finish tool") || strings.Contains(nextAction, "submit_envelope tool")
+	return strings.Contains(nextAction, "finish tool") || strings.Contains(nextAction, submitResultToolName+" tool") || strings.Contains(nextAction, legacySubmitResultToolName+" tool")
 }
 
 // checkpointPurposeArmsCompletion reports whether an automatic compaction
@@ -3419,7 +3422,7 @@ func cloneCheckpointAdmittedMessage(message *application.AdmittedMessage) *appli
 func checkpointNextAction(brief application.ExecutionBrief, actions []checkpointAction, changed map[string]struct{}, validations []checkpointAction) string {
 	submit := "submit the required result through the finish tool"
 	if brief.MessageHandler != nil {
-		submit = "submit the required result through the submit_envelope tool"
+		submit = "submit the required result through the " + submitResultToolName + " tool"
 	} else if brief.ResultProtocol != nil && brief.ResultProtocol.Marker != "" {
 		submit = "submit the required " + brief.ResultProtocol.Marker + " result through the finish tool"
 	}
@@ -3766,21 +3769,25 @@ func containsDelegationTool(raw json.RawMessage) bool {
 // from being instructed toward a terminator it was not given.
 func submissionInstruction(brief application.ExecutionBrief) string {
 	if brief.MessageHandler != nil {
-		return "call submit_envelope exactly once, passing the full result envelope as its structured parameters."
+		return "call " + submitResultToolName + " exactly once, passing the result envelope as its structured parameters."
 	}
 	return "call finish exactly once with TEKROO_ORGANIZATIONAL_RESULT: followed by exactly one single-line JSON object and nothing after the closing brace."
 }
 
 // submitResultToolSpec builds the client-tool spec for the structured result
-// envelope. The parameters are the universal envelope schema; work_product is
-// deliberately unconstrained so one process-global client-tool kind serves
-// every message handler, with per-handler result schemas enforced daemon-side.
+// envelope. Work_product is deliberately unconstrained so one process-global
+// client-tool kind serves every handler. The fixed outer schema version is
+// supplied at ingestion, rather than asking the model to repeat a constant.
 func submitResultToolSpec() map[string]any {
 	var parameters any
 	if json.Unmarshal([]byte(submitResultToolSchema), &parameters) != nil {
 		return nil
 	}
 	return map[string]any{"name": submitResultToolName, "description": submitResultToolDescription, "parameters": parameters}
+}
+
+func isSubmitResultTool(name string) bool {
+	return name == submitResultToolName || name == legacySubmitResultToolName
 }
 
 // withSubmitResultTool returns a copy of agent settings whose tool surface
@@ -4008,17 +4015,19 @@ func conversationAgentMatches(info conversationInfo, expectedRaw json.RawMessage
 		Name   string         `json:"name"`
 		Params map[string]any `json:"params"`
 	}) bool {
-		return tool.Name == submitResultToolName
+		return isSubmitResultTool(tool.Name)
 	})
 	// The structured-completion requirement is injected together with the
 	// client tool and is not part of the signed role profile.
 	info.Agent.RequireToolCallForCompletion = false
 	info.Agent.IncludeDefaultTools = expected.IncludeDefaultTools
 	info.Agent.SystemPrompt = strings.Replace(info.Agent.SystemPrompt, structuredCompletionInstruction, finishCompletionInstruction, 1)
+	info.Agent.SystemPrompt = strings.Replace(info.Agent.SystemPrompt, legacyStructuredCompletionInstruction, finishCompletionInstruction, 1)
 	if expected.SystemPrompt == "" && info.Agent.SystemPrompt == teamsRoleExecutionSystemPrompt {
 		info.Agent.SystemPrompt = ""
 	}
 	info.Agent.AgentContext.SystemMessageSuffix = strings.TrimSuffix(info.Agent.AgentContext.SystemMessageSuffix, structuredCompletionSystemSuffix)
+	info.Agent.AgentContext.SystemMessageSuffix = strings.TrimSuffix(info.Agent.AgentContext.SystemMessageSuffix, legacyStructuredCompletionSystemSuffix)
 	if expected.Tools != nil && !reflect.DeepEqual(info.Agent.Tools, expected.Tools) {
 		return false
 	}
@@ -4518,10 +4527,13 @@ func (client *Client) observation(ctx context.Context, brief application.Executi
 // additionalProperties:false, so it is stripped before serialization.
 func submitResultActionOutput(payload json.RawMessage) ([]byte, bool) {
 	var envelope map[string]json.RawMessage
-	if json.Unmarshal(payload, &envelope) != nil {
+	if json.Unmarshal(payload, &envelope) != nil || envelope == nil {
 		return nil, false
 	}
 	delete(envelope, "kind")
+	if _, supplied := envelope["schema_version"]; !supplied {
+		envelope["schema_version"] = json.RawMessage(`"1.0.0"`)
+	}
 	encoded, err := json.Marshal(envelope)
 	if err != nil {
 		return nil, false
@@ -4537,7 +4549,7 @@ func submitResultActionOutput(payload json.RawMessage) ([]byte, bool) {
 func acceptedSubmitResult(handler application.MessageHandlerGrounding, events []rawEvent, promptIndex int) ([]byte, bool) {
 	pending := make(map[string][]byte)
 	for index, event := range events {
-		if index <= promptIndex || event.ToolName != submitResultToolName || event.ToolCallID == "" {
+		if index <= promptIndex || !isSubmitResultTool(event.ToolName) || event.ToolCallID == "" {
 			continue
 		}
 		if event.Kind == "ActionEvent" && event.Source == "agent" {
@@ -4606,7 +4618,7 @@ func (client *Client) observationAt(brief application.ExecutionBrief, requestDig
 			}
 			toolArtifactJournal = append(toolArtifactJournal, append(json.RawMessage(nil), event.Raw...))
 		}
-		if event.Kind == "ActionEvent" && event.Source == "agent" && event.ToolName == submitResultToolName {
+		if event.Kind == "ActionEvent" && event.Source == "agent" && isSubmitResultTool(event.ToolName) {
 			if converted, ok := submitResultActionOutput(event.ActionPayload); ok {
 				submitOutput = converted
 			}
