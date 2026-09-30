@@ -147,6 +147,49 @@ func TestTransportNeutralRolePackagesKeepCompletionInRuntime(t *testing.T) {
 	}
 }
 
+func TestArchitectRiskEnumSuccessorManifestLoads(t *testing.T) {
+	root, err := filepath.Abs(filepath.Join("..", "config", "starter-team", "transport-neutral-20260929"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifestPath := filepath.Join(root, "team-architect-2.1.1.json")
+	manifestRaw, err := os.ReadFile(manifestPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	publicRaw, err := os.ReadFile(filepath.Join(root, "publisher.pub"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	publicKey, err := base64.StdEncoding.Strict().DecodeString(strings.TrimSpace(string(publicRaw)))
+	if err != nil || len(publicKey) != ed25519.PublicKeySize {
+		t.Fatalf("published key: %v", err)
+	}
+	manifestHash := sha256.Sum256(manifestRaw)
+	loaded, err := LoadTeamManifest(manifestPath, kernel.Digest(hex.EncodeToString(manifestHash[:])), map[string]ed25519.PublicKey{"tekroo-teams-amendment-20260917": publicKey})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(loaded.Roles) != 8 {
+		t.Fatalf("loaded roles = %d", len(loaded.Roles))
+	}
+	for _, role := range loaded.Roles {
+		if role.Binding.Role != "architect" {
+			continue
+		}
+		if role.Bundle.Version != "2.1.1" || role.Package == nil {
+			t.Fatalf("architect successor not loaded: version=%s", role.Bundle.Version)
+		}
+		for _, handler := range role.Package.Handlers {
+			if !strings.Contains(string(handler.ResultSchema), `"MODERATE"`) || !strings.Contains(string(handler.ResultSchema), `"CRITICAL"`) {
+				t.Fatal("architect result schema lost the risk enumeration")
+			}
+		}
+		return
+	}
+	t.Fatal("architect role missing")
+}
+
 func TestLoadRoleBundleFailsClosed(t *testing.T) {
 	publicKey, privateKey, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {

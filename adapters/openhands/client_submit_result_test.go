@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"slices"
 	"strings"
@@ -108,6 +109,50 @@ func TestRejectedSubmitResultExplainsUnauthorizedProposalOnce(t *testing.T) {
 	beforeCorrection = append(beforeCorrection, second, rawEvent{Kind: "ObservationEvent", Source: "environment", ToolName: submitResultToolName, ToolCallID: "call-2", ObservationKind: "ClientToolObservation"}, events[3])
 	if _, _, _, rejected := rejectedSubmitResult(handler, beforeCorrection, 0); rejected {
 		t.Fatal("pre-correction submissions were not covered by one correction")
+	}
+}
+
+func TestArchitectRiskEnumRejectsR33ShapeBeforeCompletion(t *testing.T) {
+	schemaPath := filepath.Join("..", "..", "config", "starter-team", "transport-neutral-20260929", "roles-v4", "architect-2.1.1", "handlers", "story.design-requested", "result.schema.json")
+	schema, err := os.ReadFile(schemaPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := application.MessageHandlerGrounding{
+		ResultSchema:   schema,
+		AllowedResults: []string{"blocked", "completed", "failed", "needs_decision"},
+	}
+	invalid := rawEvent{ID: "r33-risk", Kind: "ActionEvent", Source: "agent", ToolName: submitResultToolName, ToolCallID: "call-1", ActionPayload: json.RawMessage(`{"outcome":"completed","summary":"design complete","evidence":[],"work_product":{"schema_version":"1.0.0","result_type":"FEATURE_PLAN","architecture":"small plan","tasks":[{"story_index":0,"title":"T","description":"D","acceptance_criteria":["C"],"purpose":"IMPLEMENTATION","complexity":1,"risk":"LOW: new isolated type; risk of coupling to federation","attempt_limit":1,"review_round_limit":1}]}}`)}
+	delivery := rawEvent{Kind: "ObservationEvent", Source: "environment", ToolName: submitResultToolName, ToolCallID: "call-1", ObservationKind: "ClientToolObservation"}
+	events := []rawEvent{{Kind: "MessageEvent", Source: "user"}, invalid, delivery}
+	if _, accepted := acceptedSubmitResult(handler, events, 0); accepted {
+		t.Fatal("r33-style risk explanation was accepted as a completed result")
+	}
+	got, reason, repeated, rejected := rejectedSubmitResult(handler, events, 0)
+	if !rejected || repeated || got.ID != invalid.ID || !strings.Contains(reason, "risk") {
+		t.Fatalf("invalid risk was not returned for correction: rejected=%t repeated=%t reason=%q", rejected, repeated, reason)
+	}
+	valid := invalid
+	valid.ID, valid.ToolCallID = "corrected-risk", "call-2"
+	valid.ActionPayload = json.RawMessage(`{"outcome":"completed","summary":"design complete","evidence":[],"work_product":{"schema_version":"1.0.0","result_type":"FEATURE_PLAN","architecture":"small plan","tasks":[{"story_index":0,"title":"T","description":"D","acceptance_criteria":["C"],"purpose":"IMPLEMENTATION","complexity":1,"risk":"LOW","attempt_limit":1,"review_round_limit":1},{"story_index":0,"title":"T2","description":"D2","acceptance_criteria":["C2"],"purpose":"IMPLEMENTATION","complexity":1,"risk":"MODERATE","attempt_limit":1,"review_round_limit":1},{"story_index":0,"title":"T3","description":"D3","acceptance_criteria":["C3"],"purpose":"IMPLEMENTATION","complexity":1,"risk":"HIGH","attempt_limit":1,"review_round_limit":1},{"story_index":0,"title":"T4","description":"D4","acceptance_criteria":["C4"],"purpose":"IMPLEMENTATION","complexity":1,"risk":"CRITICAL","attempt_limit":1,"review_round_limit":1}]}}`)
+	delivery.ToolCallID = valid.ToolCallID
+	events = append(events, valid, delivery)
+	if _, accepted := acceptedSubmitResult(handler, events, 0); !accepted {
+		t.Fatal("corrected four-value risk plan was not accepted")
+	}
+	paragraphPlan, ok := submitResultActionOutput(json.RawMessage(`{"outcome":"completed","summary":"design complete","evidence":[],"work_product":{"schema_version":"1.0.0","result_type":"FEATURE_PLAN","architecture":["First paragraph.","Second paragraph."],"design_decisions":[{"decision":["Keep it small."],"rationale":["Fits the request."]}],"assumptions":[],"tasks":[{"story_index":0,"title":"T","description":"D","acceptance_criteria":["C"],"depends_on":[],"validates":[],"write_scope":[],"purpose":"IMPLEMENTATION","complexity":1,"risk":"LOW","critical_path":true,"attempt_limit":1,"review_round_limit":1}]}}`))
+	if !ok {
+		t.Fatal("paragraph-form plan conversion failed")
+	}
+	if _, err := application.ValidateRoleHandlerResult(handler, paragraphPlan); err != nil {
+		t.Fatalf("accepted paragraph-form design was rejected: %v", err)
+	}
+	otherOutcome, ok := submitResultActionOutput(json.RawMessage(`{"outcome":"needs_decision","summary":"question","evidence":[],"work_product":{}}`))
+	if !ok {
+		t.Fatal("non-completed result conversion failed")
+	}
+	if _, err := application.ValidateRoleHandlerResult(handler, otherOutcome); err != nil {
+		t.Fatalf("non-completed outcome incorrectly required a plan: %v", err)
 	}
 }
 
@@ -510,6 +555,139 @@ func TestWithSubmitResultToolInjectsSpecOnce(t *testing.T) {
 	}
 	if _, ok := withSubmitResultTool(defaults); ok {
 		t.Fatal("injection accepted a profile without an explicit tools list")
+	}
+}
+
+func TestSubmitResultToolRestrictsProposedMessageTypes(t *testing.T) {
+	handler := &application.MessageHandlerGrounding{
+		ResultSchema:            json.RawMessage(`{"type":"object","required":["outcome","summary","evidence","work_product","schema_version","message_proposals"],"properties":{"outcome":{"enum":["completed"]},"summary":{"type":"string"},"evidence":{"type":"array"},"work_product":{"type":"object"},"schema_version":{"const":"1.0.0"},"message_proposals":{"type":"array","items":{"type":"object","properties":{"type":{"type":"string"},"recipient":{"type":"string"},"body":{"type":"object"}}}}}}`),
+		AllowedResults:          []string{"completed"},
+		AllowedMessageProposals: []string{"tekroo.message.task.completed", "tekroo.message.task.review-requested"},
+	}
+	spec := submitResultToolSpec(handler)
+	if spec == nil {
+		t.Fatal("allowed proposal handler was rejected")
+	}
+	parameters := spec["parameters"].(map[string]any)
+	outcome := parameters["properties"].(map[string]any)["outcome"].(map[string]any)
+	if !reflect.DeepEqual(outcome["enum"], handler.AllowedResults) {
+		t.Fatalf("outcome enum did not match handler authority: %#v", outcome)
+	}
+	proposals := parameters["properties"].(map[string]any)["message_proposals"].(map[string]any)
+	proposalType := proposals["items"].(map[string]any)["properties"].(map[string]any)["type"].(map[string]any)
+	if !reflect.DeepEqual(proposalType["enum"], handler.AllowedMessageProposals) {
+		t.Fatalf("proposal enum did not match handler authority: %#v", proposalType)
+	}
+}
+
+func TestSubmitResultToolExposesSignedArchitectRiskEnum(t *testing.T) {
+	schemaPath := filepath.Join("..", "..", "config", "starter-team", "transport-neutral-20260929", "roles-v4", "architect-2.1.1", "handlers", "story.design-requested", "result.schema.json")
+	schema, err := os.ReadFile(schemaPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := &application.MessageHandlerGrounding{ResultSchema: schema}
+	spec := submitResultToolSpec(handler)
+	if spec == nil || spec["name"] != submitResultToolName {
+		t.Fatalf("signed handler did not retain the stable tool name: %#v", spec)
+	}
+	parameters := spec["parameters"].(map[string]any)
+	proposals := parameters["properties"].(map[string]any)["message_proposals"].(map[string]any)
+	if proposals["maxItems"] != 0 {
+		t.Fatalf("unauthorized message proposals remain model-visible: %#v", proposals)
+	}
+	for _, field := range parameters["required"].([]any) {
+		if field == "schema_version" || field == "message_proposals" {
+			t.Fatalf("Teams-supplied field remains required by OpenHands: %v", field)
+		}
+	}
+	workProduct := parameters["properties"].(map[string]any)["work_product"].(map[string]any)
+	tasks := workProduct["properties"].(map[string]any)["tasks"].(map[string]any)
+	risk := tasks["items"].(map[string]any)["properties"].(map[string]any)["risk"].(map[string]any)
+	values, err := json.Marshal(risk["enum"])
+	if err != nil || string(values) != `["LOW","MODERATE","HIGH","CRITICAL"]` {
+		t.Fatalf("model-facing risk enum = %s, err=%v", values, err)
+	}
+	var settings any
+	if err := json.Unmarshal([]byte(qualifiedAgentSettingsJSON), &settings); err != nil {
+		t.Fatal(err)
+	}
+	settings.(map[string]any)["tools"] = []any{map[string]any{"name": "glob", "params": map[string]any{}}}
+	injected, ok := withSubmitResultTool(settings, handler)
+	if !ok {
+		t.Fatal("handler-specific tool injection failed")
+	}
+	entry := injected.(map[string]any)["tools"].([]any)[1].(map[string]any)
+	injectedSpec := entry["params"].(map[string]any)["spec"].(map[string]any)
+	injectedParameters, err := json.Marshal(injectedSpec["parameters"])
+	if err != nil || !bytes.Contains(injectedParameters, []byte(`"enum":["LOW","MODERATE","HIGH","CRITICAL"]`)) {
+		t.Fatalf("injected model-facing tool lost the risk enum: %s, err=%v", injectedParameters, err)
+	}
+	// A reused conversation must not keep a previous handler's weaker schema.
+	entry["params"] = map[string]any{"spec": submitResultToolSpec()}
+	rebound, ok := withSubmitResultTool(injected, handler)
+	if !ok || len(rebound.(map[string]any)["tools"].([]any)) != 2 {
+		t.Fatal("existing submit_result tool was not rebound in place")
+	}
+	reboundEntry := rebound.(map[string]any)["tools"].([]any)[1].(map[string]any)
+	reboundSpec := reboundEntry["params"].(map[string]any)["spec"].(map[string]any)
+	reboundParameters, err := json.Marshal(reboundSpec["parameters"])
+	if err != nil || !bytes.Contains(reboundParameters, []byte(`"enum":["LOW","MODERATE","HIGH","CRITICAL"]`)) {
+		t.Fatalf("rebound tool kept stale schema: %s, err=%v", reboundParameters, err)
+	}
+}
+
+func TestEveryTransportNeutralHandlerUsesItsResultSchemaAsToolContract(t *testing.T) {
+	root := filepath.Join("..", "..", "config", "starter-team", "transport-neutral-20260929", "roles-v4")
+	paths, err := filepath.Glob(filepath.Join(root, "*-2.1.0", "handlers", "*", "result.schema.json"))
+	if err != nil || len(paths) != 9 {
+		t.Fatalf("discover selected handler schemas: count=%d err=%v", len(paths), err)
+	}
+	for _, path := range paths {
+		t.Run(path, func(t *testing.T) {
+			for _, name := range []string{"input.schema.json", "result.schema.json"} {
+				schemaBytes, err := os.ReadFile(filepath.Join(filepath.Dir(path), name))
+				if err != nil {
+					t.Fatal(err)
+				}
+				document, err := jsonschema.UnmarshalJSON(bytes.NewReader(schemaBytes))
+				if err != nil {
+					t.Fatalf("decode %s: %v", name, err)
+				}
+				compiler := jsonschema.NewCompiler()
+				compiler.DefaultDraft(jsonschema.Draft2020)
+				const resource = "urn:tekroo:transport-neutral-handler-schema"
+				if err := compiler.AddResource(resource, document); err != nil {
+					t.Fatalf("add %s: %v", name, err)
+				}
+				if _, err := compiler.Compile(resource); err != nil {
+					t.Fatalf("compile %s: %v", name, err)
+				}
+			}
+			raw, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			spec := submitResultToolSpec(&application.MessageHandlerGrounding{ResultSchema: raw})
+			if spec == nil {
+				t.Fatal("handler schema cannot be exposed as a tool contract")
+			}
+			var source map[string]any
+			if err := json.Unmarshal(raw, &source); err != nil {
+				t.Fatal(err)
+			}
+			actual := spec["parameters"].(map[string]any)
+			if actual["properties"].(map[string]any)["outcome"] == nil || actual["properties"].(map[string]any)["work_product"] == nil {
+				t.Fatal("model-facing tool lost the handler's fields")
+			}
+			proposals := actual["properties"].(map[string]any)["message_proposals"].(map[string]any)
+			if proposals["maxItems"] != 0 {
+				t.Fatal("handler without proposal authority can still propose messages")
+			}
+			if !reflect.DeepEqual(source["properties"].(map[string]any)["outcome"], actual["properties"].(map[string]any)["outcome"]) {
+				t.Fatal("model-facing outcome constraint diverged from handler schema")
+			}
+		})
 	}
 }
 

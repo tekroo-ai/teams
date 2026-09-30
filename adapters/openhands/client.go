@@ -37,13 +37,10 @@ const (
 	pauseAfterCondensationTag       = "tekroopauseaftercondensation"
 	// submitResultToolName is a client-defined OpenHands tool whose parameters
 	// are the organizational result envelope. Structured arguments expose the
-	// outer envelope to tool-schema validation instead of hiding it in a free-text
-	// finish.message string. The schema is intentionally universal (work_product
-	// unconstrained):
-	// OpenHands registers one client-tool action kind process-globally and rejects
-	// a name reused with a different schema, so per-handler result schemas stay
-	// validated daemon-side after extraction. A changed schema requires a fresh
-	// agent-server process, not a version suffix on the public tool name.
+	// selected handler's result schema to the model rather than hiding its
+	// work_product in a free-text finish.message string. Current OpenHands
+	// registers one resolver per tool name and keeps each conversation's original
+	// schema in its tool spec, so the public name remains stable across handlers.
 	submitResultToolName                         = "submit_result"
 	legacySubmitResultToolName                   = "submit_envelope"
 	historicalSubmitResultToolName               = "submit_envelope_v2"
@@ -867,7 +864,7 @@ func (client *Client) createOrForkConversation(ctx context.Context, brief applic
 	}
 	if brief.MessageHandler != nil {
 		var ok bool
-		if agentSettings, ok = withSubmitResultTool(agentSettings); !ok {
+		if agentSettings, ok = withSubmitResultTool(agentSettings, brief.MessageHandler); !ok {
 			return 0, nil, false, ErrProtocol
 		}
 	}
@@ -3835,14 +3832,68 @@ func submissionInstruction(brief application.ExecutionBrief) string {
 	return "call finish exactly once with TEKROO_ORGANIZATIONAL_RESULT: followed by exactly one single-line JSON object and nothing after the closing brace."
 }
 
-// submitResultToolSpec builds the client-tool spec for the structured result
-// envelope. Work_product is deliberately unconstrained so one process-global
-// client-tool kind serves every handler. The fixed outer schema version is
-// supplied at ingestion, rather than asking the model to repeat a constant.
-func submitResultToolSpec() map[string]any {
-	var parameters any
+// submitResultToolSpec exposes the selected signed handler schema to the model.
+// Teams supplies schema_version and an empty message_proposals array when the
+// model omits them, so those two fields remain optional at the tool boundary.
+func submitResultToolSpec(handlers ...*application.MessageHandlerGrounding) map[string]any {
+	var parameters map[string]any
 	if json.Unmarshal([]byte(submitResultToolSchema), &parameters) != nil {
 		return nil
+	}
+	if len(handlers) > 0 && handlers[0] != nil {
+		if json.Unmarshal(handlers[0].ResultSchema, &parameters) != nil || parameters["type"] != "object" {
+			return nil
+		}
+		required, ok := parameters["required"].([]any)
+		if !ok {
+			return nil
+		}
+		optional := make([]any, 0, len(required))
+		for _, field := range required {
+			if field != "schema_version" && field != "message_proposals" {
+				optional = append(optional, field)
+			}
+		}
+		parameters["required"] = optional
+		properties, ok := parameters["properties"].(map[string]any)
+		if !ok {
+			return nil
+		}
+		if len(handlers[0].AllowedResults) > 0 {
+			outcome, ok := properties["outcome"].(map[string]any)
+			if !ok {
+				return nil
+			}
+			outcome["enum"] = handlers[0].AllowedResults
+		}
+		proposals, ok := properties["message_proposals"].(map[string]any)
+		if !ok || proposals["type"] != "array" {
+			return nil
+		}
+		if len(handlers[0].AllowedMessageProposals) == 0 {
+			proposals["maxItems"] = 0
+		} else {
+			items, ok := proposals["items"].(map[string]any)
+			if !ok {
+				return nil
+			}
+			itemProperties, ok := items["properties"].(map[string]any)
+			if !ok {
+				return nil
+			}
+			proposalType, ok := itemProperties["type"].(map[string]any)
+			if !ok {
+				return nil
+			}
+			proposalType["enum"] = handlers[0].AllowedMessageProposals
+		}
+		workProduct, ok := properties["work_product"].(map[string]any)
+		if !ok || workProduct["type"] != "object" {
+			return nil
+		}
+		if _, found := workProduct["description"]; !found {
+			workProduct["description"] = "Use a JSON object, never a JSON-encoded string. Follow this handler's nested field constraints."
+		}
 	}
 	return map[string]any{"name": submitResultToolName, "description": submitResultToolDescription, "parameters": parameters}
 }
@@ -3857,7 +3908,7 @@ func isSubmitResultTool(name string) bool {
 // carries the submit_result client-tool entry. The entry travels inside
 // agent_settings so it survives fork and restart, while the spec is also sent
 // as client_tools so OpenHands registers the client-tool action class.
-func withSubmitResultTool(agentSettings any) (any, bool) {
+func withSubmitResultTool(agentSettings any, handlers ...*application.MessageHandlerGrounding) (any, bool) {
 	raw, err := json.Marshal(agentSettings)
 	if err != nil {
 		return nil, false
@@ -3906,14 +3957,17 @@ func withSubmitResultTool(agentSettings any) (any, bool) {
 	if !strings.HasSuffix(suffix, structuredCompletionSystemSuffix) {
 		context["system_message_suffix"] = suffix + structuredCompletionSystemSuffix
 	}
-	for _, tool := range tools {
-		if entry, isMap := tool.(map[string]any); isMap && entry["name"] == submitResultToolName {
-			return settings, true
-		}
-	}
-	spec := submitResultToolSpec()
+	spec := submitResultToolSpec(handlers...)
 	if spec == nil {
 		return nil, false
+	}
+	for _, tool := range tools {
+		if entry, isMap := tool.(map[string]any); isMap && entry["name"] == submitResultToolName {
+			// A fork can inherit a prior handler's schema. Rebind it to the
+			// current invocation instead of silently keeping stale constraints.
+			entry["params"] = map[string]any{"spec": spec}
+			return settings, true
+		}
 	}
 	settings["tools"] = append(tools, map[string]any{"name": submitResultToolName, "params": map[string]any{"spec": spec}})
 	return settings, true
@@ -3994,12 +4048,12 @@ func (client *Client) createConversation(ctx context.Context, brief application.
 		},
 	}
 	if brief.MessageHandler != nil {
-		injected, ok := withSubmitResultTool(agentSettings)
+		injected, ok := withSubmitResultTool(agentSettings, brief.MessageHandler)
 		if !ok {
 			return 0, nil, ErrProtocol
 		}
 		payload["agent_settings"] = injected
-		payload["client_tools"] = []any{submitResultToolSpec()}
+		payload["client_tools"] = []any{submitResultToolSpec(brief.MessageHandler)}
 	}
 	return client.request(ctx, http.MethodPost, "/api/conversations", payload)
 }

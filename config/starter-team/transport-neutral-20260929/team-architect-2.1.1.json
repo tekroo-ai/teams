@@ -1,0 +1,117 @@
+{
+  "schema_version": "1.0.0",
+  "team": "teams",
+  "version": "1.0.2",
+  "roles": [
+    {
+      "role": "architect",
+      "bundle_path": "roles-v4/architect-2.1.1/role.json",
+      "bundle_digest": "98a6625e1b83860c27162970ea53f80148487f2cc6b197c4e052be48dd18fdf0",
+      "publisher_key_id": "tekroo-teams-amendment-20260917",
+      "initial_instances": 2,
+      "maximum_instances": 2,
+      "launch_mode": "ON_DEMAND",
+      "model_profile_digest": "0fc10d88715bda2be0800ae39c9ece51a1f4a1d4215d07c5b29008bbe62fd6f7",
+      "workspace_ids": [
+        "architect-1",
+        "architect-2"
+      ]
+    },
+    {
+      "role": "coder",
+      "bundle_path": "roles-v4/coder-2.1.0/role.json",
+      "bundle_digest": "f02d2de635d7f630363b82680464c5fe7ed8e26bbe3f0bd5503fb57ff593979a",
+      "publisher_key_id": "tekroo-teams-amendment-20260917",
+      "initial_instances": 1,
+      "maximum_instances": 4,
+      "launch_mode": "ON_DEMAND",
+      "model_profile_digest": "0e0a0ba86e468531295e93f152a10a565b5b02d3f53e3329a9c4cfce1365c6e8",
+      "workspace_ids": [
+        "coder-1",
+        "coder-2",
+        "coder-3",
+        "coder-4"
+      ]
+    },
+    {
+      "role": "operator",
+      "bundle_path": "roles-v4/operator-2.1.0/role.json",
+      "bundle_digest": "3d0c3a5088596273bcff24b37dfbe98327df7cad6dadb60b0902fb6793d46eb5",
+      "publisher_key_id": "tekroo-teams-amendment-20260917",
+      "initial_instances": 1,
+      "maximum_instances": 1,
+      "launch_mode": "MANUAL",
+      "model_profile_digest": "4518eec798283d23b33410f71279f3f4b03d8579a7ce2971aff878b2b96cd228",
+      "workspace_ids": [
+        "operator-1"
+      ]
+    },
+    {
+      "role": "product-owner",
+      "bundle_path": "roles-v4/product-owner-2.1.0/role.json",
+      "bundle_digest": "704db81173554b1396e25904249716413b5c4d2048f3fc788ab1a55d5da55120",
+      "publisher_key_id": "tekroo-teams-amendment-20260917",
+      "initial_instances": 1,
+      "maximum_instances": 1,
+      "launch_mode": "EAGER",
+      "model_profile_digest": "a0910a40d39135ba8e5140a6e6f74f66e3b33ea060a90d2b0a91f4f108fc8764",
+      "workspace_ids": [
+        "product-owner-1"
+      ]
+    },
+    {
+      "role": "project-manager",
+      "bundle_path": "roles-v4/project-manager-2.1.0/role.json",
+      "bundle_digest": "7ebc68016008f45e70758e3a69dc838494973434776e0cc348f19b3293912bb1",
+      "publisher_key_id": "tekroo-teams-amendment-20260917",
+      "initial_instances": 1,
+      "maximum_instances": 1,
+      "launch_mode": "ON_DEMAND",
+      "model_profile_digest": "c8c917bfa69120a99af6cf2f08789159b140484596fa17e660987d5a6b84ce56",
+      "workspace_ids": [
+        "project-manager-1"
+      ]
+    },
+    {
+      "role": "security",
+      "bundle_path": "roles-v4/security-2.1.0/role.json",
+      "bundle_digest": "d7de7d12729d48d1d07a35f228b7044107a9db7c07666096ddee308073cbf4d4",
+      "publisher_key_id": "tekroo-teams-amendment-20260917",
+      "initial_instances": 1,
+      "maximum_instances": 1,
+      "launch_mode": "ON_DEMAND",
+      "model_profile_digest": "9362d5a376151bad28e7beffa436942ed9da193374cf48827e2b0ba276da8c58",
+      "workspace_ids": [
+        "security-1"
+      ]
+    },
+    {
+      "role": "senior-coder",
+      "bundle_path": "roles-v4/senior-coder-2.1.0/role.json",
+      "bundle_digest": "242a4c216fee010d195d3b86bbbd082e8ee155d1334073e0e9b2a052fbee8473",
+      "publisher_key_id": "tekroo-teams-amendment-20260917",
+      "initial_instances": 1,
+      "maximum_instances": 2,
+      "launch_mode": "ON_DEMAND",
+      "model_profile_digest": "8fe16ab51e47e08fed31e98caf155528454a3809c1b1b26decf30d8de2a9ab0d",
+      "workspace_ids": [
+        "senior-coder-1",
+        "senior-coder-2"
+      ]
+    },
+    {
+      "role": "tester",
+      "bundle_path": "roles-v4/tester-2.1.0/role.json",
+      "bundle_digest": "f425f24216819e2851b0f412d11a240a67277e571cca4e105c6a0c984cd203cb",
+      "publisher_key_id": "tekroo-teams-amendment-20260917",
+      "initial_instances": 1,
+      "maximum_instances": 2,
+      "launch_mode": "ON_DEMAND",
+      "model_profile_digest": "a9f08f3c74d81fa4ead29104d91eaf7b5edb0db55bb95c920954ca082ca6f152",
+      "workspace_ids": [
+        "tester-1",
+        "tester-2"
+      ]
+    }
+  ]
+}

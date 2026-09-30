@@ -1,0 +1,56 @@
+{
+  "schema_version": "2.0.0",
+  "role": "architect",
+  "version": "2.1.1",
+  "capabilities": [
+    "architecture",
+    "decomposition",
+    "risk-analysis"
+  ],
+  "subscriptions": [
+    {
+      "type": "tekroo.message.story.design-requested",
+      "purpose": "design-and-decomposition"
+    }
+  ],
+  "permissions": [
+    "evidence.record",
+    "repository.read",
+    "task.plan-propose"
+  ],
+  "charter": {
+    "path": "ROLE.md",
+    "sha256": "db0eae599fee82c9f2cfba30dcde1d84f99a7dd3204d343c601fc98abcd042ae",
+    "media_type": "text/markdown"
+  },
+  "handler_bindings": {
+    "tekroo.message.story.design-requested": {
+      "subscription_purpose": "design-and-decomposition",
+      "message_purpose": "HANDOFF",
+      "disposition": "MODEL_HANDLER",
+      "resource": {
+        "path": "handlers/story.design-requested/HANDLER.md",
+        "sha256": "9c53ba1f77c5ae38839a3115761f5953231ea73cd20453b019ed922c3b547dcc",
+        "media_type": "text/markdown"
+      },
+      "input_schema": {
+        "path": "handlers/story.design-requested/input.schema.json",
+        "sha256": "960e6113c1f72ef5672432a5f06eec244460bc3e6786b1c8e5fde201408249f0",
+        "media_type": "application/schema+json"
+      },
+      "result_schema": {
+        "path": "handlers/story.design-requested/result.schema.json",
+        "sha256": "a004f4f86e07d4965a6ec8dffa384878e701ed75b75360faac65f4a52d916826",
+        "media_type": "application/schema+json"
+      },
+      "allowed_results": [
+        "blocked",
+        "completed",
+        "failed",
+        "needs_decision"
+      ]
+    }
+  },
+  "publisher_key_id": "tekroo-teams-amendment-20260917",
+  "signature": "McQSqi25IC+62XW5WLKaxuuWHMEywJF6Vb5R9lszIMTwZoBRf6oE6aHC5U3l4QZubTzWGClwMqnSil1yCC6wAA=="
+}
