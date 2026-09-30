@@ -836,6 +836,9 @@ func NewProductionService(ctx context.Context, config ProductionConfig) (*Produc
 	if err := ValidateOperationalProfileQualifications(config.Profiles, time.Now().UTC()); err != nil {
 		return nil, err
 	}
+	if err := ensureConfiguredRuntimeHooks(config.Workspaces); err != nil {
+		return nil, fmt.Errorf("prepare workspace runtime hooks: %w", err)
+	}
 	if err := os.MkdirAll(config.EvidenceRoot, 0o700); err != nil {
 		return nil, fmt.Errorf("create evidence root: %w", err)
 	}

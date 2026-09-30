@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"sort"
 	"time"
 
@@ -20,7 +18,7 @@ func (service *ProductionService) SubmitFeature(ctx context.Context, principal k
 	if service == nil || service.Features == nil {
 		return organization.FeatureRequest{}, false, organization.ErrInvalidFeature
 	}
-	if err := service.verifyConfiguredRuntimeHooks(); err != nil {
+	if err := service.ensureConfiguredRuntimeHooks(); err != nil {
 		return organization.FeatureRequest{}, false, err
 	}
 	feature, created, err := service.Features.Submit(ctx, principal, input)
@@ -49,30 +47,15 @@ func (service *ProductionService) SubmitFeature(ctx context.Context, principal k
 	return feature, created, nil
 }
 
-// Feature submission must fail before creating durable work if a configured
-// OpenHands workspace cannot execute its required SMA prompt hook. Otherwise
-// the first role invocation fails after the feature has already been accepted.
-func (service *ProductionService) verifyConfiguredRuntimeHooks() error {
-	workspaceIDs := make([]string, 0, len(service.workspacesByID))
-	for workspaceID := range service.workspacesByID {
-		workspaceIDs = append(workspaceIDs, workspaceID)
+// A workspace may be replaced after daemon startup. Re-check and install its
+// fixture before creating any durable feature work.
+func (service *ProductionService) ensureConfiguredRuntimeHooks() error {
+	workspaces := make([]ProductionWorkspace, 0, len(service.workspacesByID))
+	for _, workspace := range service.workspacesByID {
+		workspaces = append(workspaces, workspace)
 	}
-	sort.Strings(workspaceIDs)
-	for _, workspaceID := range workspaceIDs {
-		workspace := service.workspacesByID[workspaceID]
-		path := filepath.Join(workspace.WorkingDirectory, ".openhands", "hooks", "sma_context_hook.py")
-		info, err := os.Lstat(path)
-		if err != nil || !info.Mode().IsRegular() || info.Size() == 0 {
-			return fmt.Errorf("required OpenHands hook is unavailable in workspace %s: %w", workspaceID, errRuntimeHookUnavailable)
-		}
-		if _, err := os.ReadFile(path); err != nil {
-			return fmt.Errorf("required OpenHands hook is unreadable in workspace %s: %w: %v", workspaceID, errRuntimeHookUnavailable, err)
-		}
-	}
-	return nil
+	return ensureConfiguredRuntimeHooks(workspaces)
 }
-
-var errRuntimeHookUnavailable = errors.New("required OpenHands runtime hook is unavailable")
 
 func (service *ProductionService) ReadFeature(ctx context.Context, id kernel.UUIDv7) (organization.FeatureRequest, bool, error) {
 	if service == nil || service.Features == nil {
