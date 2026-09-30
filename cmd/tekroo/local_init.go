@@ -36,6 +36,7 @@ const (
 	localDeploymentVersion      = "1.0.0"
 	localHandlerPublisher       = "tekroo-message-handlers-20260913"
 	localQualificationPublisher = "tekroo-message-handlers-qualification-20260913"
+	localAmendmentPublisher     = "tekroo-teams-amendment-20260917"
 	localSoftwareWorkflowDigest = "7b93d463c0a662ae9550dfcbec24615b89ce619029f50927320b2a638210649e"
 	localCondenserOutputTokens  = 4096
 	localCondenserMaximumTokens = 196608
@@ -189,6 +190,9 @@ func initializeLocalDeployment(ctx context.Context, options localInitOptions) (r
 		return result, err
 	}
 	if err := requireRegularFile(filepath.Join(starterRoot, "message-handler-publisher-qualification.pub"), false); err != nil {
+		return result, err
+	}
+	if err := requireRegularFile(filepath.Join(starterRoot, "role-amendment-publisher.pub"), false); err != nil {
 		return result, err
 	}
 	workflowSourcePath := filepath.Join(options.SourceRoot, "config", "workflows", "software-development.v1.json")
@@ -351,7 +355,7 @@ func initializeLocalDeployment(ctx context.Context, options localInitOptions) (r
 		Worker:       operationalruntime.ProductionWorker{LeaseDuration: "90s", ReconciliationInterval: "250ms", MaximumReconciliations: 160, MaximumConcurrentInvocations: 8, LeaseOperationTimeout: "5s"},
 		Projection:   operationalruntime.ProductionProjection{Interval: "100ms", OperationTimeout: "5s"},
 		Continuity:   &operationalruntime.ProductionContinuity{HeartbeatInterval: "2s", SuspensionThreshold: "10s"},
-		Organization: operationalruntime.ProductionOrganization{ManifestFile: teamPath, ManifestDigest: manifestDigest, WorkflowDefinitions: []operationalruntime.ProductionWorkflowSource{{DefinitionFile: workflowPath, DefinitionDigest: kernel.Digest(localSoftwareWorkflowDigest)}}, Publishers: []operationalruntime.ProductionPublisher{{KeyID: localHandlerPublisher, PublicKeyFile: filepath.Join(deploymentTeamRoot, "message-handler-publisher.pub")}, {KeyID: localQualificationPublisher, PublicKeyFile: filepath.Join(deploymentTeamRoot, "message-handler-publisher-qualification.pub")}}, ReconciliationInterval: "1s", MaximumRestarts: 3, MaximumDeliveryAttempts: 3},
+		Organization: operationalruntime.ProductionOrganization{ManifestFile: teamPath, ManifestDigest: manifestDigest, WorkflowDefinitions: []operationalruntime.ProductionWorkflowSource{{DefinitionFile: workflowPath, DefinitionDigest: kernel.Digest(localSoftwareWorkflowDigest)}}, Publishers: []operationalruntime.ProductionPublisher{{KeyID: localHandlerPublisher, PublicKeyFile: filepath.Join(deploymentTeamRoot, "message-handler-publisher.pub")}, {KeyID: localQualificationPublisher, PublicKeyFile: filepath.Join(deploymentTeamRoot, "message-handler-publisher-qualification.pub")}, {KeyID: localAmendmentPublisher, PublicKeyFile: filepath.Join(deploymentTeamRoot, "role-amendment-publisher.pub")}}, ReconciliationInterval: "1s", MaximumRestarts: 3, MaximumDeliveryAttempts: 3},
 		Planning: operationalruntime.ProductionPlanning{PolicyRevision: 3, ClassificationPolicyDigest: labelDigest("classification-policy-v3"), PromotionPolicyDigest: labelDigest("promotion-policy-v3"), VerificationTopologyDigest: labelDigest("verification-topology-v3"), SelectionPolicyDigest: labelDigest("selection-policy-v3"), BudgetPolicyDigest: labelDigest("budget-policy-v3"), RequiredGateIDs: []string{"go-test"}, CandidateGates: []operationalruntime.ProductionCandidateGate{{GateID: "go-test", Command: []string{goBinary, "test", "./..."}, Timeout: "20m"}}, TaskMessageRoutes: map[kernel.WorkPurpose]operationalruntime.ProductionTaskMessageRoute{
 			kernel.PurposeEscalation:     {MessageType: "tekroo.message.task.escalated", MessagePurpose: organization.PurposeHandoff},
 			kernel.PurposeImplementation: {MessageType: "tekroo.message.task.assigned", MessagePurpose: organization.PurposeHandoff},

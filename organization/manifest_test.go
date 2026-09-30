@@ -80,7 +80,15 @@ func TestStarterSuccessorRolePackagesLoadWithPublishedKey(t *testing.T) {
 	if err != nil || len(qualificationKey) != ed25519.PublicKeySize {
 		t.Fatalf("qualification key: %v", err)
 	}
-	loaded, err := LoadTeamManifest(manifestPath, kernel.Digest(hex.EncodeToString(manifestHash[:])), map[string]ed25519.PublicKey{"tekroo-message-handlers-20260913": publicKey, "tekroo-message-handlers-qualification-20260913": qualificationKey})
+	amendmentRaw, err := os.ReadFile(filepath.Join(filepath.Dir(manifestPath), "role-amendment-publisher.pub"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	amendmentKey, err := base64.StdEncoding.Strict().DecodeString(strings.TrimSpace(string(amendmentRaw)))
+	if err != nil || len(amendmentKey) != ed25519.PublicKeySize {
+		t.Fatalf("amendment key: %v", err)
+	}
+	loaded, err := LoadTeamManifest(manifestPath, kernel.Digest(hex.EncodeToString(manifestHash[:])), map[string]ed25519.PublicKey{"tekroo-message-handlers-20260913": publicKey, "tekroo-message-handlers-qualification-20260913": qualificationKey, "tekroo-teams-amendment-20260917": amendmentKey})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,6 +99,51 @@ func TestStarterSuccessorRolePackagesLoadWithPublishedKey(t *testing.T) {
 		if role.Bundle.SchemaVersion != RolePackageSchemaVersion || role.Package == nil || len(role.Package.Handlers) != len(role.Bundle.Subscriptions) {
 			t.Fatalf("incomplete successor role package: %s", role.Binding.Role)
 		}
+	}
+}
+
+func TestTransportNeutralRolePackagesKeepCompletionInRuntime(t *testing.T) {
+	root, err := filepath.Abs(filepath.Join("..", "config", "starter-team", "transport-neutral-20260929"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifestPath := filepath.Join(root, "team.json")
+	manifestRaw, err := os.ReadFile(manifestPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	publicRaw, err := os.ReadFile(filepath.Join(root, "publisher.pub"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	publicKey, err := base64.StdEncoding.Strict().DecodeString(strings.TrimSpace(string(publicRaw)))
+	if err != nil || len(publicKey) != ed25519.PublicKeySize {
+		t.Fatalf("published key: %v", err)
+	}
+	manifestHash := sha256.Sum256(manifestRaw)
+	loaded, err := LoadTeamManifest(manifestPath, kernel.Digest(hex.EncodeToString(manifestHash[:])), map[string]ed25519.PublicKey{"tekroo-teams-amendment-20260917": publicKey})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(loaded.Roles) != 8 {
+		t.Fatalf("loaded roles = %d", len(loaded.Roles))
+	}
+	var handlers int
+	for _, role := range loaded.Roles {
+		if role.Package == nil || len(role.Package.Handlers) == 0 {
+			t.Fatalf("missing handlers: %s", role.Binding.Role)
+		}
+		for _, handler := range role.Package.Handlers {
+			handlers++
+			for _, forbidden := range []string{"TEKROO_ORGANIZATIONAL_RESULT:", "submit_envelope", "finish tool"} {
+				if strings.Contains(handler.Instructions, forbidden) {
+					t.Fatalf("%s handler contains transport instruction %q", role.Binding.Role, forbidden)
+				}
+			}
+		}
+	}
+	if handlers != 9 {
+		t.Fatalf("handlers = %d, want 9", handlers)
 	}
 }
 

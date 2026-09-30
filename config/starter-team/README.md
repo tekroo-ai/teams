@@ -16,12 +16,14 @@ Ed25519 key to publish later amendments; do not edit a signed bundle in place.
 `team.v4.example.json` and `roles-v4/` are the successor Teams v4 role-package
 format. Each package separates its concise always-on `ROLE.md` charter from the
 one message handler selected for an admitted invocation. Every resource is
-content-addressed and every bundle is signed by
-`message-handler-publisher.pub`. The example is not activated merely by being
-present: a deployment must explicitly bind the new manifest digest and trust
-that publisher. The private example signing key was never written to disk.
+content-addressed and every bundle is signed. Most use
+`message-handler-publisher.pub`; the repository-enabled product-owner and
+project-manager successors use `role-amendment-publisher.pub`. The example is
+not activated merely by being present: a deployment must explicitly bind the
+new manifest digest and trust its publishers. The private example signing key
+was never written to disk.
 
-Successor handlers return one `TEKROO_ORGANIZATIONAL_RESULT` JSON envelope.
+Successor handlers produce one organizational result envelope.
 The envelope contains a terminal outcome, summary, evidence, the handler's
 typed `work_product`, and zero or more message proposals. Teams validates the
 whole envelope against the selected content-addressed result schema and the
@@ -29,6 +31,14 @@ handler's declared authority before accepting the terminal result. The starter
 packages currently allow no model-authored message proposals: workflow
 progression remains a deterministic Teams operation, so a role cannot create a
 reply chain by choosing another message type.
+
+Transport-neutral successor packages under `transport-neutral-20260929/`
+contain only role and message-handling instructions. Their handlers do not name
+OpenHands tools, `finish`, or the marker. Teams owns the completion channel and
+publishes it through each invocation's `result_protocol`; handler result schemas
+continue to define the accepted envelope. New handler packages should preserve
+this separation so changing the execution provider never requires rewriting a
+role's substantive work instructions.
 
 The starter workflow uses durable one-hop task messages selected by configured
 work purpose: implementation and repair use `tekroo.message.task.assigned`,

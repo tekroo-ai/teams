@@ -196,6 +196,15 @@ func TestClientBindsCandidateIdentityIntoPromptAndRequiresReceiptEvidence(t *tes
 	}
 }
 
+func TestCandidateResultInstructionMatchesAvailableCompletionChannel(t *testing.T) {
+	if got := candidateResultInstruction(nil); got != candidateResultProtocolInstruction || strings.Contains(got, "message_handler") {
+		t.Fatalf("legacy candidate result instruction = %q", got)
+	}
+	if got := candidateResultInstruction(&application.MessageHandlerGrounding{}); got != candidateStructuredResultProtocolInstruction || strings.Contains(got, "finish tool") {
+		t.Fatalf("handler-bound candidate result instruction = %q", got)
+	}
+}
+
 type staticEvidenceReader map[kernel.Digest][]byte
 
 func (reader staticEvidenceReader) Read(_ context.Context, digest kernel.Digest) ([]byte, error) {
@@ -1072,7 +1081,7 @@ func TestPlanningCompactionCheckpointDoesNotArmCompletionFence(t *testing.T) {
 			SchemaVersion:          "tekroo.teams.execution-progress-checkpoint/1.2.0",
 			SourceJournalSHA256:    kernel.Digest(strings.Repeat("e", 64)),
 			AuthoritativeExecution: checkpointExecutionAuthority{Purpose: purpose},
-			NextAction:             "Use the retained successful repository evidence to complete the authoritative task now and submit the required result through the submit_envelope tool; do not retry failed broad discovery.",
+			NextAction:             "Use the retained successful repository evidence to complete the authoritative task now and submit the required result through the submit_result tool; do not retry failed broad discovery.",
 		}
 		events := []rawEvent{{ID: "checkpoint", Kind: "MessageEvent", Source: "user", Text: compactionCheckpointPrefix + "1\nrestored\n" + string(mustJSON(checkpoint))}}
 		for index := 0; index < maximumCheckpointCompletionReads*3; index++ {

@@ -3,12 +3,17 @@
 ## Governing authority
 
 The latest accepted package is
-`CONTRACTS/tekroo.kernel.contracts/0.11.0/`; its source-lineage decisions are
-binding successor requirements. Packages `0.1.0` through `0.10.0` remain
+`CONTRACTS/tekroo.kernel.contracts/0.12.0/`; its source-lineage decisions are
+binding successor requirements. Packages `0.1.0` through `0.11.0` remain
 preserved for historical replay and compatibility analysis. Public-network or
 production deployment retains separate authorization. Do not edit an accepted
 or released package in place. If code and its governing contract disagree,
 stop and report the disagreement; do not weaken fixtures to make code pass.
+
+Dated incident and experiment sections below preserve history, not live tool or
+completion instructions. For a live invocation, use only its exposed tool
+definitions and `result_protocol`; old references to `finish` or
+`submit_result` do not define the current handler-bound tool surface.
 
 ## Scope boundaries
 

@@ -67,7 +67,7 @@ func TestInitializeLocalDeploymentProducesValidatedIsolatedInstallation(t *testi
 	if config.Mongo.Database != "teams_test_prod" || config.SMADatabaseIdentity != "sma_test" || config.OpenHands.BaseURL != "http://127.0.0.1:18002" || len(config.Workspaces) != 14 || len(config.Profiles) != 8 {
 		t.Fatalf("config = %#v", config)
 	}
-	if len(config.Organization.Publishers) != 2 || len(config.Planning.TaskMessageRoutes) != 6 || len(config.Organization.WorkflowDefinitions) != 1 || config.Organization.WorkflowDefinitions[0].DefinitionDigest != kernel.Digest(localSoftwareWorkflowDigest) || config.Mongo.MessageWaitTimeout != "1m" {
+	if len(config.Organization.Publishers) != 3 || len(config.Planning.TaskMessageRoutes) != 6 || len(config.Organization.WorkflowDefinitions) != 1 || config.Organization.WorkflowDefinitions[0].DefinitionDigest != kernel.Digest(localSoftwareWorkflowDigest) || config.Mongo.MessageWaitTimeout != "1m" {
 		t.Fatalf("successor organizational-runtime activation is incomplete: publishers=%d routes=%d workflows=%#v message_wait=%q", len(config.Organization.Publishers), len(config.Planning.TaskMessageRoutes), config.Organization.WorkflowDefinitions, config.Mongo.MessageWaitTimeout)
 	}
 	if len(config.Planning.CandidateGates) != 1 || len(config.Planning.CandidateGates[0].Command) == 0 || !filepath.IsAbs(config.Planning.CandidateGates[0].Command[0]) || filepath.Base(config.Planning.CandidateGates[0].Command[0]) != "go" {
@@ -162,7 +162,14 @@ func TestInitializeLocalDeploymentProducesValidatedIsolatedInstallation(t *testi
 		if settings.Condenser.MaximumEvents != wantCondenserMaximumEvents {
 			t.Fatalf("local profile %s condenser maximum events = %d, want %d", profile.RoleFQRN, settings.Condenser.MaximumEvents, wantCondenserMaximumEvents)
 		}
-		charter, err := os.ReadFile(filepath.Join(sourceRoot, "config", "starter-team", "roles-v4", string(profile.RoleFQRN), "ROLE.md"))
+		roleDirectory := string(profile.RoleFQRN)
+		switch profile.RoleFQRN {
+		case "product-owner":
+			roleDirectory = "product-owner-2.0.1"
+		case "project-manager":
+			roleDirectory = "project-manager-2.0.2"
+		}
+		charter, err := os.ReadFile(filepath.Join(sourceRoot, "config", "starter-team", "roles-v4", roleDirectory, "ROLE.md"))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -171,9 +178,9 @@ func TestInitializeLocalDeploymentProducesValidatedIsolatedInstallation(t *testi
 			t.Fatalf("local profile %s did not start from its signed role charter: %v", profile.RoleFQRN, err)
 		}
 		wantTools := map[kernel.RoleFQRN][]string{
-			"operator": {}, "product-owner": {}, "project-manager": {},
-			"architect": {"glob", "repository_search", "repository_view"}, "security": {"terminal", "glob", "repository_search", "repository_view"}, "tester": {"terminal", "glob", "repository_search", "repository_view"},
-			"coder": {"terminal", "glob", "repository_search", "file_editor_commands", "task_tracker"}, "senior-coder": {"terminal", "glob", "repository_search", "file_editor_commands", "task_tracker"},
+			"operator": {}, "product-owner": {"file_read", "list_files", "find_files", "search_file_contents"}, "project-manager": {"file_read", "list_files", "find_files", "search_file_contents"},
+			"architect": {"file_read", "list_files", "find_files", "search_file_contents"}, "security": {"command_operations", "file_read", "list_files", "find_files", "search_file_contents"}, "tester": {"command_operations", "file_read", "list_files", "find_files", "search_file_contents"},
+			"coder": {"command_operations", "file_read", "list_files", "find_files", "search_file_contents", "file_write_commands", "checklist_operations"}, "senior-coder": {"command_operations", "file_read", "list_files", "find_files", "search_file_contents", "file_write_commands", "checklist_operations"},
 		}[profile.RoleFQRN]
 		gotTools := make([]string, len(settings.Tools))
 		for index, tool := range settings.Tools {

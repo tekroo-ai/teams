@@ -1,0 +1,57 @@
+{
+  "schema_version": "2.0.0",
+  "role": "project-manager",
+  "version": "2.1.0",
+  "capabilities": [
+    "planning",
+    "story-management",
+    "task-routing"
+  ],
+  "subscriptions": [
+    {
+      "type": "tekroo.message.feature.refined",
+      "purpose": "story-planning"
+    }
+  ],
+  "permissions": [
+    "evidence.record",
+    "repository.read",
+    "story.plan-propose",
+    "task.assign-propose"
+  ],
+  "charter": {
+    "path": "ROLE.md",
+    "sha256": "1940104f748793a678c211354ffb9ee9a77b7afcde0439163304aa3ed1379b4c",
+    "media_type": "text/markdown"
+  },
+  "handler_bindings": {
+    "tekroo.message.feature.refined": {
+      "subscription_purpose": "story-planning",
+      "message_purpose": "HANDOFF",
+      "disposition": "MODEL_HANDLER",
+      "resource": {
+        "path": "handlers/feature.refined/HANDLER.md",
+        "sha256": "5d6ee068292c54c26b526a3c3f58e3699443991d29904245eaaf50f6db4d436e",
+        "media_type": "text/markdown"
+      },
+      "input_schema": {
+        "path": "handlers/feature.refined/input.schema.json",
+        "sha256": "960e6113c1f72ef5672432a5f06eec244460bc3e6786b1c8e5fde201408249f0",
+        "media_type": "application/schema+json"
+      },
+      "result_schema": {
+        "path": "handlers/feature.refined/result.schema.json",
+        "sha256": "e8f15779b0a9e5fd62af0d194162ec48f3024311dd14aa07b88dcfe99ad350b2",
+        "media_type": "application/schema+json"
+      },
+      "allowed_results": [
+        "blocked",
+        "completed",
+        "failed",
+        "needs_decision"
+      ]
+    }
+  },
+  "publisher_key_id": "tekroo-teams-amendment-20260917",
+  "signature": "EUkgHq3zcPxDbzZmifT2DXKkkAqmmmVkcCXJNOsnSTCZiXS1m+5b5LE2fISHbCheQA/5L2qbMFPVNb6nMeWxDw=="
+}

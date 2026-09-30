@@ -85,7 +85,7 @@ func New(ctx context.Context, config Config) (*Runtime, error) {
 	}
 	client, err := openhands.NewClient(openhands.Config{
 		BaseURL: config.OpenHandsBaseURL, SessionAPIKey: config.OpenHandsSessionAPIKey,
-		HTTPClient: config.HTTPClient, Workspaces: workspaces, Profiles: profiles, Evidence: blobs,
+		HTTPClient: config.HTTPClient, Workspaces: workspaces, Profiles: profiles, Evidence: blobs, EvidenceRoot: config.EvidenceRoot,
 		PollInterval: config.OpenHandsPollInterval, MaximumPages: config.OpenHandsMaximumPages,
 		MaximumEvidenceBytes: config.OpenHandsMaximumEvidence,
 	})

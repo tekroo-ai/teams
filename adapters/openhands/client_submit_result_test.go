@@ -73,7 +73,7 @@ func TestSubmitResultActionOutputSuppliesOnlyMissingFixedVersion(t *testing.T) {
 		ResultSchema:   json.RawMessage(`{"type":"object","additionalProperties":false,"required":["schema_version","outcome","summary","evidence","message_proposals","work_product"],"properties":{"schema_version":{"const":"1.0.0"},"outcome":{"const":"completed"},"summary":{"type":"string"},"evidence":{"type":"array"},"message_proposals":{"type":"array"},"work_product":{"type":"object"}}}`),
 		AllowedResults: []string{"completed"},
 	}
-	base := `{"outcome":"completed","summary":"done","evidence":[],"message_proposals":[],"work_product":{},"kind":"ClientAction_submit_envelope_v2"`
+	base := `{"outcome":"completed","summary":"done","evidence":[],"message_proposals":[],"work_product":{},"kind":"ClientAction_submit_envelope"`
 	for _, test := range []struct {
 		name    string
 		payload string
@@ -83,6 +83,7 @@ func TestSubmitResultActionOutputSuppliesOnlyMissingFixedVersion(t *testing.T) {
 		{"correct", base + `,"schema_version":"1.0.0"}`, true},
 		{"conflicting", base + `,"schema_version":"2.0.0"}`, false},
 		{"null", base + `,"schema_version":null}`, false},
+		{"encoded-work-product", `{"outcome":"completed","summary":"done","evidence":[],"message_proposals":[],"work_product":"{\"answer\":\"not an object\"}","kind":"ClientAction_submit_envelope"}`, false},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			output, ok := submitResultActionOutput(json.RawMessage(test.payload))
@@ -110,14 +111,14 @@ func TestAcceptedSubmitResultNeedsNoModelSuppliedVersion(t *testing.T) {
 	}
 	events := []rawEvent{
 		{Kind: "MessageEvent", Source: "user"},
-		{Kind: "ActionEvent", Source: "agent", ToolName: submitResultToolName, ToolCallID: "call-1", ActionPayload: json.RawMessage(`{"outcome":"completed","work_product":{},"kind":"ClientAction_submit_envelope_v2"}`)},
+		{Kind: "ActionEvent", Source: "agent", ToolName: submitResultToolName, ToolCallID: "call-1", ActionPayload: json.RawMessage(`{"outcome":"completed","work_product":{},"kind":"ClientAction_submit_envelope"}`)},
 		{Kind: "ObservationEvent", Source: "environment", ToolName: submitResultToolName, ToolCallID: "call-1", ObservationKind: "ClientToolObservation"},
 	}
 	output, accepted := acceptedSubmitResult(handler, events, 0)
 	if !accepted || !bytes.Contains(output, []byte(`"schema_version":"1.0.0"`)) {
 		t.Fatalf("version-normalized result not accepted: accepted=%t output=%s", accepted, output)
 	}
-	events[1].ActionPayload = json.RawMessage(`{"outcome":"completed","work_product":{},"schema_version":"2.0.0","kind":"ClientAction_submit_envelope_v2"}`)
+	events[1].ActionPayload = json.RawMessage(`{"outcome":"completed","work_product":{},"schema_version":"2.0.0","kind":"ClientAction_submit_envelope"}`)
 	if _, accepted := acceptedSubmitResult(handler, events, 0); accepted {
 		t.Fatal("conflicting model-supplied version was accepted")
 	}
@@ -128,14 +129,14 @@ func TestAcceptedSubmitResultRequiresSuccessfulDeliveryAndKeepsFirst(t *testing.
 		ResultSchema:   json.RawMessage(`{"type":"object","required":["schema_version","outcome","work_product"],"properties":{"schema_version":{"const":"1.0.0"},"outcome":{"const":"completed"},"work_product":{"type":"object"}}}`),
 		AllowedResults: []string{"completed"},
 	}
-	first := json.RawMessage(`{"outcome":"completed","work_product":{"answer":"first"},"kind":"ClientAction_submit_envelope"}`)
-	second := json.RawMessage(`{"outcome":"completed","work_product":{"answer":"second"},"kind":"ClientAction_submit_envelope"}`)
+	first := json.RawMessage(`{"outcome":"completed","work_product":{"answer":"first"},"kind":"ClientAction_submit_envelope_v2"}`)
+	second := json.RawMessage(`{"outcome":"completed","work_product":{"answer":"second"},"kind":"ClientAction_submit_envelope_v2"}`)
 	events := []rawEvent{
 		{Kind: "MessageEvent", Source: "user"},
-		{Kind: "ActionEvent", Source: "agent", ToolName: legacySubmitResultToolName, ToolCallID: "call-1", ActionPayload: first},
-		{Kind: "ObservationEvent", Source: "environment", ToolName: legacySubmitResultToolName, ToolCallID: "call-1", ObservationKind: "ClientToolObservation"},
-		{Kind: "ActionEvent", Source: "agent", ToolName: legacySubmitResultToolName, ToolCallID: "call-2", ActionPayload: second},
-		{Kind: "ObservationEvent", Source: "environment", ToolName: legacySubmitResultToolName, ToolCallID: "call-2", ObservationKind: "ClientToolObservation"},
+		{Kind: "ActionEvent", Source: "agent", ToolName: historicalSubmitResultToolName, ToolCallID: "call-1", ActionPayload: first},
+		{Kind: "ObservationEvent", Source: "environment", ToolName: historicalSubmitResultToolName, ToolCallID: "call-1", ObservationKind: "ClientToolObservation"},
+		{Kind: "ActionEvent", Source: "agent", ToolName: historicalSubmitResultToolName, ToolCallID: "call-2", ActionPayload: second},
+		{Kind: "ObservationEvent", Source: "environment", ToolName: historicalSubmitResultToolName, ToolCallID: "call-2", ObservationKind: "ClientToolObservation"},
 	}
 	if _, accepted := acceptedSubmitResult(handler, events[:2], 0); accepted {
 		t.Fatal("unobserved client tool call was accepted")
@@ -182,7 +183,7 @@ func TestInspectStopsAfterDeliveredHandlerResult(t *testing.T) {
 		t.Fatal("cannot inject completion tool into test profile")
 	}
 	profileRaw := mustJSON(profile)
-	result := map[string]any{"outcome": "completed", "work_product": map[string]any{"answer": "accepted"}, "kind": "ClientAction_submit_envelope_v2"}
+	result := map[string]any{"outcome": "completed", "work_product": map[string]any{"answer": "accepted"}, "kind": "ClientAction_submit_envelope"}
 	events := []map[string]any{
 		event("prompt", "MessageEvent", "user", prepared.prompt),
 		{"id": "result-action", "kind": "ActionEvent", "source": "agent", "timestamp": "2026-08-31T12:00:02Z", "tool_name": submitResultToolName, "tool_call_id": "result-call", "action": result},
@@ -247,6 +248,10 @@ func TestWithSubmitResultToolInjectsSpecOnce(t *testing.T) {
 	if prompt, ok := injected.(map[string]any)["system_prompt"].(string); !ok || !strings.Contains(prompt, structuredCompletionInstruction) || strings.Contains(prompt, finishCompletionInstruction) {
 		t.Fatal("handler-bound system prompt has conflicting completion instructions")
 	}
+	context := injected.(map[string]any)["agent_context"].(map[string]any)
+	if context["system_message_suffix"] != structuredCompletionSystemSuffix {
+		t.Fatal("read-only execution still advertises terminal instructions")
+	}
 	tools := injected.(map[string]any)["tools"].([]any)
 	if len(tools) != 4 {
 		t.Fatalf("tools = %d", len(tools))
@@ -260,8 +265,8 @@ func TestWithSubmitResultToolInjectsSpecOnce(t *testing.T) {
 		t.Fatalf("spec = %#v", spec)
 	}
 	parameters := spec["parameters"].(map[string]any)
-	if submitResultToolName == legacySubmitResultToolName {
-		t.Fatal("changed client-tool schema reused its process-global OpenHands name")
+	if submitResultToolName != "submit_result" {
+		t.Fatal("public result tool has an unstable or versioned name")
 	}
 	for _, field := range parameters["required"].([]any) {
 		if field == "schema_version" {

@@ -36,28 +36,26 @@ const (
 	maximumPromptEvidenceBytes      = 256 << 10
 	pauseAfterCondensationTag       = "tekroopauseaftercondensation"
 	// submitResultToolName is a client-defined OpenHands tool whose parameters
-	// are the organizational result envelope. Because OpenHands grammar-constrains
-	// tool-call arguments to their declared JSON schema at every depth, emitting
-	// the envelope through this tool makes it structurally valid by construction
-	// even under lossy speculative decoding, unlike the free-text finish.message
-	// carrier. The schema is intentionally universal (work_product unconstrained):
+	// are the organizational result envelope. Structured arguments expose the
+	// outer envelope to tool-schema validation instead of hiding it in a free-text
+	// finish.message string. The schema is intentionally universal (work_product
+	// unconstrained):
 	// OpenHands registers one client-tool action kind process-globally and rejects
 	// a name reused with a different schema, so per-handler result schemas stay
-	// validated daemon-side after extraction. The name must never be reused by
-	// any other client tool in a live agent-server process: a schema collision
-	// there is a permanent 422 until that process restarts.
-	legacySubmitResultToolName             = "submit_envelope"
-	submitResultToolName                   = "submit_envelope_v2"
-	submitResultToolDescription            = "Submit the assigned result envelope. Call this tool exactly once when the result is complete, passing the full envelope as structured parameters. This replaces the finish tool for result submission."
-	submitResultToolSchema                 = `{"type":"object","additionalProperties":false,"required":["outcome","summary","evidence","message_proposals","work_product"],"properties":{"schema_version":{"type":"string","description":"Optional; Teams supplies the fixed outer envelope version 1.0.0 when omitted."},"outcome":{"type":"string"},"summary":{"type":"string"},"evidence":{"type":"array","items":{"type":"string"}},"message_proposals":{"type":"array","items":{"type":"object"}},"work_product":{"type":"object","description":"Use a JSON object, for example {\"key\":\"value\"}; never a JSON-encoded string such as \"{\\\"key\\\":\\\"value\\\"}\". The actual keys must follow the selected handler's result_schema."}}}`
-	structuredCompletionSystemSuffix       = " For this handler-bound invocation, submit_envelope_v2 is the only completion channel: call it exactly once with the structured result; do not call finish or return a prose completion."
-	legacyStructuredCompletionSystemSuffix = " For this handler-bound invocation, submit_envelope is the only completion channel: call it exactly once with the full structured result; do not call finish or return a prose completion."
-	finishCompletionInstruction            = "When the task is complete or blocked by a concrete missing prerequisite, call finish exactly once. The finish message must follow result_protocol exactly; Teams ignores any informal completion claim."
-	structuredCompletionInstruction        = "When the task is complete or blocked by a concrete missing prerequisite, call submit_envelope_v2 exactly once with the result required by result_protocol. Do not return a prose completion."
-	legacyStructuredCompletionInstruction  = "When the task is complete or blocked by a concrete missing prerequisite, call submit_envelope exactly once with the result required by result_protocol. Do not return a prose completion."
-	candidateResultRequirementInstruction  = "Put exactly one object conforming to result_schema in the outer organizational result's work_product field. Copy both candidate identity values exactly."
-	candidateResultProtocolInstruction     = "The OpenHands finish tool message is consumed by Teams. Set finish.message to the marker followed by one outer object conforming to message_handler.result_schema. Put the validation verdict only in work_product, which MUST conform exactly to candidate_result_requirement.result_schema. Outer outcome describes execution completion and uses the message-handler values; work_product.outcome is the validation verdict and uses PASS, FAIL, BLOCKED, or INCONCLUSIVE. Do not flatten, merge, or rename fields from either schema."
-	teamsRoleExecutionSystemPrompt         = `You execute one authorized Tekroo Teams work invocation.
+	// validated daemon-side after extraction. A changed schema requires a fresh
+	// agent-server process, not a version suffix on the public tool name.
+	submitResultToolName                         = "submit_result"
+	legacySubmitResultToolName                   = "submit_envelope"
+	historicalSubmitResultToolName               = "submit_envelope_v2"
+	submitResultToolDescription                  = "Submit the assigned result envelope. Call this tool exactly once when the result is complete, passing the full envelope as structured parameters."
+	submitResultToolSchema                       = `{"type":"object","additionalProperties":false,"required":["outcome","summary","evidence","message_proposals","work_product"],"properties":{"schema_version":{"type":"string","description":"Optional; Teams supplies the fixed outer envelope version 1.0.0 when omitted."},"outcome":{"type":"string"},"summary":{"type":"string"},"evidence":{"type":"array","items":{"type":"string"}},"message_proposals":{"type":"array","items":{"type":"object"}},"work_product":{"type":"object","description":"Use a JSON object, for example {\"key\":\"value\"}; never a JSON-encoded string such as \"{\\\"key\\\":\\\"value\\\"}\". The actual keys must follow the selected handler's result_schema."}}}`
+	structuredCompletionSystemSuffix             = " For this handler-bound invocation, submit_result is the only completion channel: call it exactly once with the structured result; do not call finish or return a prose completion."
+	finishCompletionInstruction                  = "When the task is complete or blocked by a concrete missing prerequisite, call finish exactly once. The finish message must follow result_protocol exactly; Teams ignores any informal completion claim."
+	structuredCompletionInstruction              = "When the task is complete or blocked by a concrete missing prerequisite, call submit_result exactly once with the result required by result_protocol. Do not return a prose completion."
+	candidateResultRequirementInstruction        = "Put exactly one object conforming to result_schema in the outer organizational result's work_product field. Copy both candidate identity values exactly."
+	candidateResultProtocolInstruction           = "The OpenHands finish tool message is consumed by Teams. Set finish.message to the marker followed by one outer organizational result object. Put the validation verdict only in work_product, which MUST conform exactly to candidate_result_requirement.result_schema. Outer outcome describes execution completion; work_product.outcome is the validation verdict and uses PASS, FAIL, BLOCKED, or INCONCLUSIVE. Do not flatten, merge, or rename fields from either schema."
+	candidateStructuredResultProtocolInstruction = "Submit one structured outer envelope through submit_result, conforming to message_handler.result_schema. Put the validation verdict only in work_product, which MUST conform exactly to candidate_result_requirement.result_schema. Outer outcome describes execution completion and uses the message-handler values; work_product.outcome is the validation verdict and uses PASS, FAIL, BLOCKED, or INCONCLUSIVE. Do not flatten, merge, or rename fields from either schema."
+	teamsRoleExecutionSystemPrompt               = `You execute one authorized Tekroo Teams work invocation.
 
 The user message is the authoritative JSON execution brief. The role_grounding object identifies the running actor by FQN and the signed role bundle by FQRN. Perform only that role, within its stated instructions, capabilities, permissions, task scope, and acceptance criteria. Use only the tools exposed for this invocation. For repository work, read AGENTS.md and only the source and tests relevant to the assigned result; do not tour the repository or inspect accepted contract packages unless the task explicitly requires contract analysis. Never delegate, contact another agent, invent operational identities, or perform unrequested external, deployment, Git publishing, or lifecycle actions.
 
@@ -284,35 +282,44 @@ func NewOpenAICompatibleAgentSettings(config AgentSettingsConfig) (json.RawMessa
 
 // ExecutionToolsForPermissions derives the exact OpenHands tool surface from
 // a verified role bundle. A role without repository authority gets no
-// workspace tools. Repository readers receive dedicated glob, grep, and view
-// tools so they can discover code without arbitrary command execution. Explicit
-// test/security execution authority adds the terminal, and only edit-authorized
-// roles receive the task tracker used during implementation.
+// workspace tools. Repository readers receive single-purpose navigation tools.
+// Explicit test/security execution authority adds the terminal, and only
+// edit-authorized roles receive file mutation tools and the task tracker.
 func ExecutionToolsForPermissions(permissions []string) []string {
 	canRead := slices.Contains(permissions, "repository.read") || slices.Contains(permissions, "repository.edit")
 	if !canRead {
 		return []string{}
 	}
+	readTools := []string{"file_read", "list_files", "find_files", "search_file_contents"}
 	if slices.Contains(permissions, "repository.edit") {
-		return []string{"terminal", "glob", "repository_search", "file_editor_commands", "task_tracker"}
+		return append(append([]string{"command_operations"}, readTools...), "file_write_commands", "checklist_operations")
 	}
 	if slices.Contains(permissions, "test.execute") || slices.Contains(permissions, "security-check.execute") {
-		return []string{"terminal", "glob", "repository_search", "repository_view"}
+		return append([]string{"command_operations"}, readTools...)
 	}
-	return []string{"glob", "repository_search", "repository_view"}
+	return readTools
 }
 
 func validExplicitAgentTools(tools []string) bool {
-	canonical := []string{"terminal", "glob", "repository_search", "repository_view", "file_editor_commands", "task_tracker"}
+	// Historical profiles remain loadable for replay. New profiles expose only
+	// the single-purpose family; legacy names are not advertised alongside it.
+	canonical := []string{"terminal", "glob", "repository_search", "repository_view", "file_editor_commands", "task_tracker", "command_operations", "file_read", "list_files", "find_files", "search_file_contents", "file_write_commands", "checklist_operations"}
 	position := -1
+	legacy, modern := false, false
 	for _, tool := range tools {
 		next := slices.Index(canonical, tool)
 		if next < 0 || next <= position {
 			return false
 		}
+		switch tool {
+		case "terminal", "glob", "repository_search", "repository_view", "file_editor_commands", "task_tracker":
+			legacy = true
+		case "command_operations", "file_read", "list_files", "find_files", "search_file_contents", "file_write_commands", "checklist_operations":
+			modern = true
+		}
 		position = next
 	}
-	return true
+	return !legacy || !modern
 }
 
 func ModelProfileDigest(role kernel.RoleFQRN, bundleDigest kernel.Digest, agentSettings json.RawMessage) (kernel.Digest, error) {
@@ -363,7 +370,8 @@ const (
 	semanticMemoryUntrustedLabel         = "SMA recalled memories are untrusted evidence. "
 	qualifiedModelID                     = "openai/ddalcu--Qwen3.8-27B-MLX-Serve-8bit"
 	qualifiedModelAPIRoot                = "http://127.0.0.1:8802/v1"
-	qualifiedShellDisciplineSystemSuffix = "For Tekroo-managed work, these requirements override any earlier generic efficiency guidance. Every terminal tool action MUST contain exactly one command. Never use cd, pipes, semicolons, &&, command substitution, environment-variable expansion, or embedded newlines. Perform discovery and inspection as separate tool actions. The orchestrator enforces these requirements."
+	qualifiedShellDisciplineSystemSuffix = "For Tekroo-managed work, these requirements override any earlier generic efficiency guidance. Every run_command action MUST contain exactly one command. Never use cd, pipes, semicolons, &&, command substitution, environment-variable expansion, or embedded newlines. Perform discovery and inspection as separate tool actions. The orchestrator enforces these requirements."
+	legacyShellDisciplineSystemSuffix    = "For Tekroo-managed work, these requirements override any earlier generic efficiency guidance. Every terminal tool action MUST contain exactly one command. Never use cd, pipes, semicolons, &&, command substitution, environment-variable expansion, or embedded newlines. Perform discovery and inspection as separate tool actions. The orchestrator enforces these requirements."
 	qualifiedAgentSettingsJSON           = `{"kind":"Agent","include_default_tools":["FinishTool"],"agent_context":{"system_message_suffix":"` + qualifiedShellDisciplineSystemSuffix + `"},"llm":{"model":"openai/ddalcu--Qwen3.8-27B-MLX-Serve-8bit","model_canonical_name":"openai/gpt-4o","base_url":"http://127.0.0.1:8802/v1","api_mode":"chat","api_key":"sma-e1-loopback-only","native_tool_calling":true,"force_string_serializer":false,"stream":false,"temperature":0,"max_output_tokens":8192,"num_retries":0,"retry_multiplier":0,"retry_min_wait":0,"retry_max_wait":0,"timeout":1200,"log_completions":false,"litellm_extra_body":{"chat_template_kwargs":{"enable_thinking":false}}},"condenser":{"kind":"LLMSummarizingCondenser","llm":{"model":"openai/ddalcu--Qwen3.8-27B-MLX-Serve-8bit","model_canonical_name":"openai/gpt-4o","base_url":"http://127.0.0.1:8802/v1","api_mode":"chat","api_key":"sma-e1-loopback-only","native_tool_calling":true,"force_string_serializer":false,"stream":false,"temperature":0,"max_output_tokens":8192,"num_retries":0,"retry_multiplier":0,"retry_min_wait":0,"retry_max_wait":0,"timeout":1200,"log_completions":false,"usage_id":"condenser","litellm_extra_body":{"chat_template_kwargs":{"enable_thinking":false}}},"max_size":80,"max_tokens":96000,"keep_first":2}}`
 	qualifiedSMAHookConfigJSON           = `{"hooks":{"UserPromptSubmit":[{"matcher":"*","hooks":[{"type":"command","command":"/usr/bin/python3 ./.openhands/hooks/sma_context_hook.py","timeout":1}]}]}}`
 )
@@ -596,7 +604,7 @@ func qualifiedAgentSettings(raw json.RawMessage) bool {
 	if json.Unmarshal(raw, &settings) != nil || !qualifiedLLM(settings.LLM) || !qualifiedLLM(settings.Condenser.LLM) {
 		return false
 	}
-	return slices.Equal(settings.IncludeDefaultTools, []string{"FinishTool"}) && validQualifiedAgentTools(settings.Tools) && validTeamsSystemPrompt(settings.SystemPrompt) && settings.AgentContext.SystemMessageSuffix == qualifiedShellDisciplineSystemSuffix && settings.Condenser.Kind == "LLMSummarizingCondenser" && settings.Condenser.MaximumEvents == qualifiedCondenserMaximumEvents && settings.Condenser.MaximumTokens == qualifiedCondenserMaximumTokens && settings.Condenser.KeepFirst == 2
+	return slices.Equal(settings.IncludeDefaultTools, []string{"FinishTool"}) && validQualifiedAgentTools(settings.Tools) && validTeamsSystemPrompt(settings.SystemPrompt) && validShellDisciplineSuffix(settings.AgentContext.SystemMessageSuffix) && settings.Condenser.Kind == "LLMSummarizingCondenser" && settings.Condenser.MaximumEvents == qualifiedCondenserMaximumEvents && settings.Condenser.MaximumTokens == qualifiedCondenserMaximumTokens && settings.Condenser.KeepFirst == 2
 }
 
 func configurableAgentSettings(raw json.RawMessage) bool {
@@ -622,7 +630,11 @@ func configurableAgentSettings(raw json.RawMessage) bool {
 		return false
 	}
 	knownCondenser := settings.Condenser.CondenserKind == "teams_checkpoint" || settings.Condenser.Kind == "TeamsCheckpointCondenser" || settings.Condenser.Kind == "LLMSummarizingCondenser"
-	return slices.Equal(settings.IncludeDefaultTools, []string{"FinishTool"}) && validQualifiedAgentTools(settings.Tools) && validTeamsSystemPrompt(settings.SystemPrompt) && settings.AgentContext.SystemMessageSuffix == qualifiedShellDisciplineSystemSuffix && knownCondenser && settings.Condenser.MaximumEvents > 0 && settings.Condenser.MaximumEvents <= 1000 && settings.Condenser.MaximumTokens > 0 && settings.Condenser.MaximumTokens <= 262144 && settings.Condenser.KeepFirst == 2
+	return slices.Equal(settings.IncludeDefaultTools, []string{"FinishTool"}) && validQualifiedAgentTools(settings.Tools) && validTeamsSystemPrompt(settings.SystemPrompt) && validShellDisciplineSuffix(settings.AgentContext.SystemMessageSuffix) && knownCondenser && settings.Condenser.MaximumEvents > 0 && settings.Condenser.MaximumEvents <= 1000 && settings.Condenser.MaximumTokens > 0 && settings.Condenser.MaximumTokens <= 262144 && settings.Condenser.KeepFirst == 2
+}
+
+func validShellDisciplineSuffix(suffix string) bool {
+	return suffix == qualifiedShellDisciplineSystemSuffix || suffix == legacyShellDisciplineSystemSuffix
 }
 
 func configurableLLM(settings qualifiedLLMSettings) bool {
@@ -691,6 +703,7 @@ type Config struct {
 	Workspaces           WorkspaceResolver
 	Profiles             ExecutionProfileResolver
 	Evidence             EvidenceReader
+	EvidenceRoot         string
 	PollInterval         time.Duration
 	MaximumPages         uint32
 	MaximumEvidenceBytes int
@@ -703,6 +716,7 @@ type Client struct {
 	workspaces           WorkspaceResolver
 	profiles             ExecutionProfileResolver
 	evidence             EvidenceReader
+	evidenceRoot         string
 	pollInterval         time.Duration
 	maximumPages         uint32
 	maximumEvidenceBytes int
@@ -721,7 +735,7 @@ func NewClient(config Config) (*Client, error) {
 		return nil, ErrInvalidConfiguration
 	}
 	base.Path = ""
-	return &Client{baseURL: base, sessionAPIKey: config.SessionAPIKey, http: config.HTTPClient, workspaces: config.Workspaces, profiles: config.Profiles, evidence: config.Evidence, pollInterval: config.PollInterval, maximumPages: config.MaximumPages, maximumEvidenceBytes: config.MaximumEvidenceBytes, eventsCache: make(map[string]cachedConversationEvents)}, nil
+	return &Client{baseURL: base, sessionAPIKey: config.SessionAPIKey, http: config.HTTPClient, workspaces: config.Workspaces, profiles: config.Profiles, evidence: config.Evidence, evidenceRoot: config.EvidenceRoot, pollInterval: config.PollInterval, maximumPages: config.MaximumPages, maximumEvidenceBytes: config.MaximumEvidenceBytes, eventsCache: make(map[string]cachedConversationEvents)}, nil
 }
 
 func (client *Client) promptEvidence(ctx context.Context, references []kernel.EvidenceRef) ([]promptEvidenceMaterialization, error) {
@@ -1079,7 +1093,7 @@ func checkpointCompletionGuardApplies(purpose kernel.WorkPurpose) bool {
 // the result terminator, whichever channel this execution uses (submit_envelope
 // for handler-bound executions, finish for the rest).
 func isSubmissionNextAction(nextAction string) bool {
-	return strings.Contains(nextAction, "finish tool") || strings.Contains(nextAction, submitResultToolName+" tool") || strings.Contains(nextAction, legacySubmitResultToolName+" tool")
+	return strings.Contains(nextAction, "finish tool") || strings.Contains(nextAction, submitResultToolName+" tool") || strings.Contains(nextAction, legacySubmitResultToolName+" tool") || strings.Contains(nextAction, historicalSubmitResultToolName+" tool")
 }
 
 // checkpointPurposeArmsCompletion reports whether an automatic compaction
@@ -1153,9 +1167,13 @@ func checkpointCompletionRepositoryViolation(events []rawEvent, promptIndex int)
 	return rawEvent{}, false, false
 }
 
+func commandTool(name string) bool {
+	return name == "terminal" || name == "run_command"
+}
+
 func shellDisciplineViolation(events []rawEvent, promptIndex int) (rawEvent, bool) {
 	for index, event := range events {
-		if index <= promptIndex || event.Kind != "ActionEvent" || event.Source != "agent" || event.ToolName != "terminal" {
+		if index <= promptIndex || event.Kind != "ActionEvent" || event.Source != "agent" || !commandTool(event.ToolName) {
 			continue
 		}
 		command := strings.TrimSpace(event.ActionCommand)
@@ -1216,7 +1234,7 @@ func shellDisciplineCorrectionAllowed(events []rawEvent, promptIndex int, violat
 	for index := lastCorrection + 1; index < violationIndex; index++ {
 		event := events[index]
 		if event.Kind == "ActionEvent" && event.Source == "agent" {
-			if event.ToolName != "terminal" || !violatesShellDiscipline(strings.TrimSpace(event.ActionCommand)) {
+			if !commandTool(event.ToolName) || !violatesShellDiscipline(strings.TrimSpace(event.ActionCommand)) {
 				compliant[event.ToolCallID] = struct{}{}
 			}
 			continue
@@ -1282,7 +1300,7 @@ func repositoryProgressCorrectionAllowed(events []rawEvent, promptIndex int, vio
 	for index := lastCorrection + 1; index < violationIndex; index++ {
 		event := events[index]
 		if event.Kind == "ActionEvent" && event.Source == "agent" {
-			contentRead := event.ToolName != "repository_search" && repositoryContentReadAction(event)
+			contentRead := !repositorySearchTool(event.ToolName) && repositoryContentReadAction(event)
 			if contentRead || mutationAction(event) || deterministicValidationAction(event) {
 				pendingByTool[event.ToolName] = append(pendingByTool[event.ToolName], pendingAction{
 					toolCallID: event.ToolCallID, requiresOutput: contentRead,
@@ -1519,7 +1537,7 @@ func repositoryGroundingViolation(events []rawEvent, promptIndex int, retainedGr
 			// inspect the repository. Ignore it here once its correction is in
 			// the journal; the next compliant repository action still requires
 			// AGENTS.md grounding.
-			if event.ToolName == "terminal" && violatesShellDiscipline(strings.TrimSpace(event.ActionCommand)) && shellDisciplineViolationCorrected(events, index) {
+			if commandTool(event.ToolName) && violatesShellDiscipline(strings.TrimSpace(event.ActionCommand)) && shellDisciplineViolationCorrected(events, index) {
 				continue
 			}
 			return event, true
@@ -1606,7 +1624,7 @@ func workspaceOrientationAction(event rawEvent) bool {
 	// terminal-only allowlist fenced the same information when delivered by
 	// glob, repository_view, or file_editor, producing a false positive in
 	// every stage of every run.
-	if event.ToolName != "terminal" {
+	if !commandTool(event.ToolName) {
 		return repositoryFileListingAction(event)
 	}
 	command := strings.TrimSpace(event.ActionCommand)
@@ -1852,7 +1870,7 @@ func repositorySearchLoopViolation(events []rawEvent, promptIndex int) (rawEvent
 			consecutiveSameSearchResults = 0
 		}
 		if event.Kind == "ActionEvent" && event.Source == "agent" {
-			if event.ToolName != "repository_search" {
+			if !repositorySearchTool(event.ToolName) {
 				lastSearchResult = ""
 				consecutiveSameSearchResults = 0
 			}
@@ -1900,7 +1918,7 @@ func repositorySearchLoopViolation(events []rawEvent, promptIndex int) (rawEvent
 		if !ok {
 			continue
 		}
-		if pending.event.ToolName == "repository_search" {
+		if repositorySearchTool(pending.event.ToolName) {
 			// Different patterns can still be one search loop when every query
 			// returns the same evidence. Ask the agent to reassess after a bounded
 			// streak; a file read, edit, or genuinely new result resets it.
@@ -2003,13 +2021,21 @@ func overlappingRepositoryViewLoopViolation(events []rawEvent, promptIndex int) 
 }
 
 func repositoryViewRange(event rawEvent) (view repositoryViewWindow, ok bool) {
-	if event.ToolName != "file_editor" && event.ToolName != "file_view" && event.ToolName != "repository_view" || !strings.EqualFold(strings.TrimSpace(event.ActionCommand), "view") || event.ActionPath == "" {
+	if event.ToolName != "file_editor" && event.ToolName != "file_view" && event.ToolName != "repository_view" && event.ToolName != "file_read" || !strings.EqualFold(strings.TrimSpace(event.ActionCommand), "view") || event.ActionPath == "" {
 		return view, false
 	}
 	var action struct {
 		ViewRange []int `json:"view_range"`
+		StartLine int   `json:"start_line"`
+		EndLine   int   `json:"end_line"`
 	}
-	if json.Unmarshal(event.ActionPayload, &action) != nil || len(action.ViewRange) != 2 || action.ViewRange[0] < 1 || action.ViewRange[1] < action.ViewRange[0] {
+	if json.Unmarshal(event.ActionPayload, &action) != nil {
+		return view, false
+	}
+	if event.ToolName == "file_read" && action.StartLine > 0 && action.EndLine >= action.StartLine {
+		action.ViewRange = []int{action.StartLine, action.EndLine}
+	}
+	if len(action.ViewRange) != 2 || action.ViewRange[0] < 1 || action.ViewRange[1] < action.ViewRange[0] {
 		return view, false
 	}
 	view.event = event
@@ -2063,7 +2089,7 @@ func repositoryObservationSignature(event rawEvent) (string, bool) {
 }
 
 func repositorySearchResultSignature(event rawEvent) (string, bool) {
-	if event.Kind != "ObservationEvent" || event.ToolName != "repository_search" {
+	if event.Kind != "ObservationEvent" || !repositorySearchTool(event.ToolName) {
 		return "", false
 	}
 	// A no-match response echoes the query pattern in its display text. Ignore
@@ -2086,9 +2112,13 @@ func repositorySearchResultSignature(event rawEvent) (string, bool) {
 	return hex.EncodeToString(digest[:]), true
 }
 
+func repositorySearchTool(name string) bool {
+	return name == "repository_search" || name == "search_file_contents"
+}
+
 func repositoryAction(event rawEvent) bool {
 	switch event.ToolName {
-	case "terminal", "file_editor", "file_view", "file_create", "file_replace", "file_insert", "file_undo", "glob", "repository_search", "repository_view":
+	case "terminal", "run_command", "file_editor", "file_view", "file_create", "file_replace", "file_insert", "file_undo", "replace_text_in_file", "insert_file_text", "undo_file_edit", "file_delete", "file_move", "glob", "repository_search", "repository_view", "file_read", "list_files", "find_files", "search_file_contents", "list_changed_files", "read_file_diff":
 		return true
 	default:
 		return false
@@ -2096,7 +2126,7 @@ func repositoryAction(event rawEvent) bool {
 }
 
 func repositoryFileListingAction(event rawEvent) bool {
-	if event.ToolName == "glob" {
+	if event.ToolName == "glob" || event.ToolName == "list_files" || event.ToolName == "find_files" || event.ToolName == "list_changed_files" {
 		return true
 	}
 	if event.ToolName == "file_editor" || event.ToolName == "file_view" || event.ToolName == "repository_view" {
@@ -2109,7 +2139,7 @@ func repositoryFileListingAction(event rawEvent) bool {
 		}
 		return !probableRepositoryFile(event.ActionPath)
 	}
-	if event.ToolName != "terminal" {
+	if !commandTool(event.ToolName) {
 		return false
 	}
 	fields := strings.Fields(strings.ToLower(strings.TrimSpace(event.ActionCommand)))
@@ -2135,13 +2165,13 @@ func repositoryFileListingAction(event rawEvent) bool {
 }
 
 func repositoryInspectionAction(event rawEvent) bool {
-	if event.ToolName == "repository_search" {
+	if repositorySearchTool(event.ToolName) || event.ToolName == "read_file_diff" || event.ToolName == "file_read" && event.ActionPath != "" {
 		return true
 	}
 	if event.ToolName == "file_editor" || event.ToolName == "file_view" || event.ToolName == "repository_view" {
 		return (event.ToolName == "repository_view" || event.ToolName == "file_view" || strings.EqualFold(strings.TrimSpace(event.ActionCommand), "view")) && event.ActionPath != "" && !repositoryFileListingAction(event)
 	}
-	if event.ToolName != "terminal" {
+	if !commandTool(event.ToolName) {
 		return false
 	}
 	fields := strings.Fields(strings.ToLower(strings.TrimSpace(event.ActionCommand)))
@@ -2159,13 +2189,13 @@ func repositoryInspectionAction(event rawEvent) bool {
 }
 
 func repositoryContentReadAction(event rawEvent) bool {
-	if event.ToolName == "repository_search" {
+	if repositorySearchTool(event.ToolName) || event.ToolName == "read_file_diff" || event.ToolName == "file_read" && event.ActionPath != "" {
 		return true
 	}
 	if event.ToolName == "file_editor" || event.ToolName == "file_view" || event.ToolName == "repository_view" {
 		return (event.ToolName == "repository_view" || event.ToolName == "file_view" || strings.EqualFold(strings.TrimSpace(event.ActionCommand), "view")) && event.ActionPath != "" && !repositoryFileListingAction(event)
 	}
-	if event.ToolName != "terminal" {
+	if !commandTool(event.ToolName) {
 		return false
 	}
 	fields := strings.Fields(strings.ToLower(strings.TrimSpace(event.ActionCommand)))
@@ -2295,7 +2325,7 @@ func equivalentRepositoryActionSignature(event rawEvent) (string, bool) {
 	if !repositoryInspectionAction(event) && !repositoryFileListingAction(event) {
 		return "", false
 	}
-	if event.ToolName == "terminal" && strings.TrimSpace(event.ActionCommand) == "" {
+	if commandTool(event.ToolName) && strings.TrimSpace(event.ActionCommand) == "" {
 		return "", false
 	}
 	payload := event.ActionPayload
@@ -3324,7 +3354,7 @@ func checkpointRepositoryEvidenceAction(event rawEvent) bool {
 	if repositoryContentReadAction(event) {
 		return true
 	}
-	if event.ToolName != "terminal" {
+	if !commandTool(event.ToolName) {
 		return false
 	}
 	fields := strings.Fields(strings.ToLower(strings.TrimSpace(event.ActionCommand)))
@@ -3333,9 +3363,9 @@ func checkpointRepositoryEvidenceAction(event rawEvent) bool {
 
 func checkpointActionIsRepositoryEvidence(action checkpointAction) bool {
 	switch action.Tool {
-	case "repository_view", "repository_search", "file_view":
+	case "repository_view", "repository_search", "file_view", "file_read", "search_file_contents", "read_file_diff", "read_evidence":
 		return true
-	case "terminal":
+	case "terminal", "run_command":
 		fields := strings.Fields(strings.ToLower(strings.TrimSpace(action.Command)))
 		if len(fields) < 2 {
 			return false
@@ -3352,11 +3382,11 @@ func checkpointActionIsRepositoryEvidence(action checkpointAction) bool {
 
 func checkpointActionIsReadOnlyInspection(action checkpointAction) bool {
 	switch action.Tool {
-	case "repository_view", "repository_search", "glob", "file_view":
+	case "repository_view", "repository_search", "glob", "file_view", "file_read", "list_files", "find_files", "search_file_contents", "list_changed_files", "read_file_diff", "read_evidence":
 		return true
 	case "file_editor":
 		return strings.EqualFold(strings.TrimSpace(action.Command), "view")
-	case "terminal":
+	case "terminal", "run_command":
 		fields := strings.Fields(strings.ToLower(strings.TrimSpace(action.Command)))
 		if len(fields) == 0 {
 			return false
@@ -3687,7 +3717,7 @@ func (client *Client) prepare(ctx context.Context, brief application.ExecutionBr
 			envelope["candidate"] = workspace.Candidate
 			envelope["candidate_result_requirement"] = newCandidateResultRequirement(workspace.Candidate)
 			if protocol, ok := envelope["result_protocol"].(map[string]any); ok {
-				protocol["instruction"] = candidateResultProtocolInstruction
+				protocol["instruction"] = candidateResultInstruction(brief.MessageHandler)
 			}
 		}
 		if brief.Purpose == kernel.PurposePromotion {
@@ -3730,6 +3760,13 @@ func (client *Client) prepare(ctx context.Context, brief application.ExecutionBr
 		return preparedExecution{}, errors.Join(ErrProtocol, fmt.Errorf("resolve execution profile: %w", err))
 	}
 	return preparedExecution{prompt: string(prompt), requestDigest: requestDigest, workspace: workspace, profile: profile, recoveryCheckpointPresent: recoveryCheckpointPresent}, nil
+}
+
+func candidateResultInstruction(handler *application.MessageHandlerGrounding) string {
+	if handler != nil {
+		return candidateStructuredResultProtocolInstruction
+	}
+	return candidateResultProtocolInstruction
 }
 
 func containsDelegationTool(raw json.RawMessage) bool {
@@ -3787,7 +3824,9 @@ func submitResultToolSpec() map[string]any {
 }
 
 func isSubmitResultTool(name string) bool {
-	return name == submitResultToolName || name == legacySubmitResultToolName
+	// Historical event inspection still recognizes the old name. New agent
+	// settings and prompts advertise only the unversioned public tool.
+	return name == submitResultToolName || name == legacySubmitResultToolName || name == historicalSubmitResultToolName
 }
 
 // withSubmitResultTool returns a copy of agent settings whose tool surface
@@ -3831,6 +3870,15 @@ func withSubmitResultTool(agentSettings any) (any, bool) {
 	if !ok {
 		return nil, false
 	}
+	hasTerminal := slices.ContainsFunc(tools, func(tool any) bool {
+		entry, isMap := tool.(map[string]any)
+		return isMap && (entry["name"] == "terminal" || entry["name"] == "command_operations")
+	})
+	if !hasTerminal && validShellDisciplineSuffix(suffix) {
+		// The signed profile retains its shell rules, but the execution must not
+		// mention a terminal tool it did not expose.
+		suffix = ""
+	}
 	if !strings.HasSuffix(suffix, structuredCompletionSystemSuffix) {
 		context["system_message_suffix"] = suffix + structuredCompletionSystemSuffix
 	}
@@ -3847,9 +3895,48 @@ func withSubmitResultTool(agentSettings any) (any, bool) {
 	return settings, true
 }
 
+// withInvocationReadTools binds evidence IDs and the Git baseline outside the
+// model-facing schema. The model can choose an admitted ID or file, but cannot
+// select an arbitrary evidence root or comparison commit.
+func withInvocationReadTools(agentSettings any, brief application.ExecutionBrief, evidenceRoot string) (any, bool) {
+	raw, err := json.Marshal(agentSettings)
+	if err != nil {
+		return nil, false
+	}
+	var settings map[string]any
+	if json.Unmarshal(raw, &settings) != nil {
+		return nil, false
+	}
+	tools, ok := settings["tools"].([]any)
+	if !ok {
+		// Historical profiles may rely on OpenHands defaults. Do not synthesize
+		// an explicit list merely to add invocation-local readers.
+		return settings, true
+	}
+	if len(brief.Evidence) > 0 && evidenceRoot != "" {
+		allowed := make(map[string]string, len(brief.Evidence))
+		for _, reference := range brief.Evidence {
+			allowed[string(reference.EvidenceID)] = string(reference.SHA256)
+		}
+		tools = append(tools, map[string]any{"name": "read_evidence", "params": map[string]any{"evidence_root": evidenceRoot, "allowed": allowed}})
+	}
+	if brief.Scope.BaselineSHA != "" && slices.ContainsFunc(tools, func(tool any) bool {
+		entry, isMap := tool.(map[string]any)
+		return isMap && entry["name"] == "file_read"
+	}) {
+		tools = append(tools, map[string]any{"name": "repository_diff_operations", "params": map[string]any{"baseline_commit": brief.Scope.BaselineSHA}})
+	}
+	settings["tools"] = tools
+	return settings, true
+}
+
 func (client *Client) createConversation(ctx context.Context, brief application.ExecutionBrief, prepared preparedExecution) (int, []byte, error) {
 	var agentSettings, hookConfig any
 	if json.Unmarshal(prepared.profile.AgentSettings, &agentSettings) != nil || json.Unmarshal(prepared.profile.HookConfig, &hookConfig) != nil {
+		return 0, nil, ErrProtocol
+	}
+	agentSettings, ok := withInvocationReadTools(agentSettings, brief, client.evidenceRoot)
+	if !ok {
 		return 0, nil, ErrProtocol
 	}
 	payload := map[string]any{
@@ -4015,19 +4102,25 @@ func conversationAgentMatches(info conversationInfo, expectedRaw json.RawMessage
 		Name   string         `json:"name"`
 		Params map[string]any `json:"params"`
 	}) bool {
-		return isSubmitResultTool(tool.Name)
+		return isSubmitResultTool(tool.Name) || tool.Name == "read_evidence" || tool.Name == "repository_diff_operations"
 	})
 	// The structured-completion requirement is injected together with the
 	// client tool and is not part of the signed role profile.
 	info.Agent.RequireToolCallForCompletion = false
 	info.Agent.IncludeDefaultTools = expected.IncludeDefaultTools
 	info.Agent.SystemPrompt = strings.Replace(info.Agent.SystemPrompt, structuredCompletionInstruction, finishCompletionInstruction, 1)
-	info.Agent.SystemPrompt = strings.Replace(info.Agent.SystemPrompt, legacyStructuredCompletionInstruction, finishCompletionInstruction, 1)
 	if expected.SystemPrompt == "" && info.Agent.SystemPrompt == teamsRoleExecutionSystemPrompt {
 		info.Agent.SystemPrompt = ""
 	}
 	info.Agent.AgentContext.SystemMessageSuffix = strings.TrimSuffix(info.Agent.AgentContext.SystemMessageSuffix, structuredCompletionSystemSuffix)
-	info.Agent.AgentContext.SystemMessageSuffix = strings.TrimSuffix(info.Agent.AgentContext.SystemMessageSuffix, legacyStructuredCompletionSystemSuffix)
+	if info.Agent.AgentContext.SystemMessageSuffix == "" && validShellDisciplineSuffix(expected.AgentContext.SystemMessageSuffix) && !slices.ContainsFunc(expected.Tools, func(tool struct {
+		Name   string         `json:"name"`
+		Params map[string]any `json:"params"`
+	}) bool {
+		return tool.Name == "terminal" || tool.Name == "command_operations"
+	}) {
+		info.Agent.AgentContext.SystemMessageSuffix = expected.AgentContext.SystemMessageSuffix
+	}
 	if expected.Tools != nil && !reflect.DeepEqual(info.Agent.Tools, expected.Tools) {
 		return false
 	}
@@ -4233,23 +4326,33 @@ func decodeEvent(raw json.RawMessage) (rawEvent, error) {
 	command := envelope.Action.Command
 	if command == "" {
 		switch envelope.ToolName {
-		case "file_view":
+		case "file_view", "file_read":
 			command = "view"
 		case "file_create":
 			command = "create"
 		case "file_replace":
 			command = "str_replace"
+		case "replace_text_in_file":
+			command = "str_replace"
 		case "file_insert":
+			command = "insert"
+		case "insert_file_text":
 			command = "insert"
 		case "file_undo":
 			command = "undo_edit"
+		case "undo_file_edit":
+			command = "undo_edit"
+		case "file_delete":
+			command = "delete"
+		case "file_move":
+			command = "move"
 		}
 	}
 	return rawEvent{Raw: append(json.RawMessage(nil), raw...), ID: envelope.ID, Kind: envelope.Kind, Source: envelope.Source, ObservationKind: envelope.Observation.Kind, Timestamp: timestamp, Text: text.String(), Summary: envelope.Summary, ToolName: envelope.ToolName, ToolCallID: envelope.ToolCallID, ActionCommand: command, ActionPayload: append(json.RawMessage(nil), actionEnvelope.Action...), ActionPath: envelope.Action.Path, ObservationError: envelope.Observation.IsError, ObservationTimeout: envelope.Observation.Timeout, ObservationExitCode: envelope.Observation.ExitCode, ObservationTruncated: envelope.Observation.Truncated}, nil
 }
 
 func deterministicValidationAction(event rawEvent) bool {
-	if event.ToolName != "terminal" {
+	if !commandTool(event.ToolName) {
 		return false
 	}
 	fields := strings.Fields(strings.ToLower(strings.TrimSpace(event.ActionCommand)))
@@ -4277,13 +4380,13 @@ func deterministicValidationAction(event rawEvent) bool {
 func mutationAction(event rawEvent) bool {
 	command := strings.ToLower(strings.TrimSpace(event.ActionCommand))
 	switch event.ToolName {
-	case "file_create", "file_replace", "file_insert", "file_undo":
+	case "file_create", "file_replace", "file_insert", "file_undo", "replace_text_in_file", "insert_file_text", "undo_file_edit", "file_delete", "file_move":
 		return true
 	}
 	if event.ToolName == "file_editor" {
 		return command != "" && command != "view"
 	}
-	if event.ToolName != "terminal" || command == "" {
+	if !commandTool(event.ToolName) || command == "" {
 		return false
 	}
 	fields := strings.Fields(command)

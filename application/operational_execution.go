@@ -359,22 +359,17 @@ var sharedExecutionGuidance = []string{
 	"Stay inside the authorized workspace and task scope.",
 }
 
-// repositoryExecutionGuidance assumes terminal and file tools and is injected
-// only when the role grounding carries repository authority. A toolless role
-// that follows these sentences issues tool calls it does not have, and the
-// client tool guard hard-fails the invocation.
+// Tool schemas are provided by the selected execution profile. This guidance
+// describes the work without assuming that a particular repository tool exists.
 var repositoryExecutionGuidance = []string{
-	"Your first repository action must be to read AGENTS.md with the file-view tool and follow it; do not run any content search (repository_search) or file read of source before that AGENTS.md read completes. Listing the workspace with glob or checking Git status is allowed before it, but substantive discovery begins only after AGENTS.md is read.",
-	"Search file contents with the repository_search tool (it searches a single file when given a file path, or a directory recursively with an include or exclude pattern) and list files with the glob tool; read a file or a specific line range with the file-view tool. Use the terminal only for commands that have no dedicated tool, such as git and go build or test; never use shell grep, sed, rg, or head to search or read files.",
-	"The authorized workspace is already the terminal working directory. Issue exactly one shell command per terminal action; do not use cd, git -C, make -C, &&, ;, |, backgrounding with &, command substitution or variable expansion with $ or backticks, or multiple commands separated by newlines. Run git and make without a -C path because the terminal already starts in the authorized workspace. Redirection such as 2>&1 is allowed. Split discovery and file inspection into separate actions.",
+	"If repository inspection is needed for this assignment, read AGENTS.md before source files. Use only the repository tools exposed for this invocation; do not inspect the repository merely because tools are available.",
 	"Every inspection must resolve a concrete open question in the assigned task. When a search identifies the relevant implementation and tests, inspect those files and stop discovery; do not enumerate unrelated directories to prove absence.",
 	"Read accepted CONTRACTS packages only when they directly resolve an open question in the assigned task. Never modify accepted CONTRACTS packages.",
 }
 
 var editableExecutionGuidance = []string{
 	"Inspect enough current code and tests to justify the change, then make the smallest cohesive edit. If the task remains ambiguous after the relevant surfaces are exhausted, report the concrete blocker.",
-	"Ground every symbol you rely on by reading it: use glob to list a directory and repository_view to read the actual file before you depend on a name, signature, or field. Treat repository_search as a locator only; never infer that a symbol exists, or reconstruct an interface, from a search hit alone, and never enumerate candidate names by varying a regular expression.",
-	"An empty search result means the symbol or text is absent from the searched scope: change your approach by globbing the directory and reading the candidate files, not by retrying a near-identical pattern hoping for a different result. Repeating a search that already returned nothing is a failure to make progress.",
+	"Ground code decisions in the relevant source and tests. A search result locates evidence but does not replace reading the source before relying on a name, signature, or field.",
 	"Run each focused test once per repository change. Do not re-run an equivalent passing build or test more than twice without an intervening code change, and do not re-run a failing test unchanged: read its output, repair the root cause, then run it again once.",
 	"Map and extend existing interfaces before adding a parallel abstraction.",
 	"When the task requires a new artifact of a kind the repository already contains (a test, fixture, handler, or wiring), locate the closest existing example and adapt it rather than reconstructing it from the internals it depends on.",
@@ -392,15 +387,15 @@ var editableExecutionGuidance = []string{
 var noRepositoryExecutionGuidance = []string{
 	"This invocation grants no repository tools. Every repository inspection, test, and deterministic gate listed in the work profile is executed by later tasks owned by repository-authorized roles; treat that list as a downstream obligation, not a requirement on this result.",
 	"Work only from the admitted request, this brief, and the task's acceptance criteria. Do not claim repository-grounded observations you cannot make, and do not block or request a decision because repository access is absent.",
-	"Return the required structured result through the finish tool.",
+	"Return the required structured result through result_protocol.",
 }
 
 var readOnlyExecutionGuidance = []string{
 	"This task does not authorize repository edits. Do not edit repository files or create implementation artifacts.",
-	"Finish the assigned plan, review, or report from enough observed repository evidence to support it; if the relevant surfaces are exhausted and evidence remains insufficient, report the concrete blocker.",
-	"Inspect current interfaces and relevant tests only as needed to perform the assigned role, then return the required result through the finish tool.",
+	"Use only the repository evidence needed for the assigned result; if relevant surfaces are exhausted and evidence remains insufficient, report the concrete blocker.",
+	"Inspect current interfaces and relevant tests only when needed to perform the assigned role, then return the required result through result_protocol.",
 	"When you write a command, CLI, or API example in planning text, use a placeholder operand (for example <actor-fqn> or <alias>) rather than a concrete agent instance FQN such as teams::coder-2; naming a specific running instance is a routing decision Teams owns, and an invented instance FQN in a plan or refinement is rejected.",
-	"When the task requires a structured result, validate the complete finish message against result_protocol and every required field in the task's result schema before calling finish.",
+	"When the task requires a structured result, validate it against result_protocol and every required field in the task's result schema before submitting it.",
 }
 
 var validationExecutionGuidance = []string{
@@ -417,7 +412,7 @@ var reviewExecutionGuidance = []string{
 
 var sharedRetainedRetryExecutionGuidance = []string{
 	"This is a bounded retry. Reuse the current workspace and retained task evidence; do not restart repository discovery from the beginning.",
-	"The prior OpenHands conversation is retained in this retry. Do not reread AGENTS.md or repeat ls, rg, find, sed, cat, or file-view actions already present in that history.",
+	"The prior OpenHands conversation is retained in this retry. Do not reread AGENTS.md or repeat inspections already present in that history.",
 	"Continue from the retained checkpoint. Distinct, relevant inspections are allowed; exact repeated actions without an intervening state change are rejected.",
 }
 
@@ -436,8 +431,8 @@ var sharedExplicitRecoveryExecutionGuidance = []string{
 
 var editableExplicitRecoveryExecutionGuidance = []string{
 	"Inspect Git status, recent commits, and the focused diff before reading source broadly. The workspace may already contain a completed implementation from the failed invocation.",
-	"Do not restart implementation or force a new edit when the current committed work already satisfies the task. Verify the existing result against the acceptance criteria and finish promptly.",
-	"If the existing workspace does not satisfy the task, make the smallest justified code or test correction, then run focused verification. If it already satisfies the task, run focused verification and finish without changing it.",
+	"Do not restart implementation or force a new edit when the current committed work already satisfies the task. Verify the existing result against the acceptance criteria and submit promptly.",
+	"If the existing workspace does not satisfy the task, make the smallest justified code or test correction, then run focused verification. If it already satisfies the task, run focused verification and submit without changing it.",
 	"Map and extend existing interfaces before adding a parallel abstraction.",
 	"Implement in cohesive increments and run focused tests after each increment.",
 }
@@ -445,8 +440,8 @@ var editableExplicitRecoveryExecutionGuidance = []string{
 var readOnlyExplicitRecoveryExecutionGuidance = []string{
 	"This task does not authorize repository edits. Do not edit repository files or create implementation artifacts.",
 	"Start from the admitted request, recovery directive, task evidence, selected handler, and result schema. Do not inspect the workspace broadly; use repository evidence only when the assigned result specifically requires it.",
-	"If the preceding result was rejected by a deterministic result validator, preserve its supported engineering conclusions and regenerate the complete structured result from the authoritative task schema. Before calling finish, verify every required object field is present and every required value is non-empty.",
-	"Produce the assigned plan, review, or report from the current workspace and task evidence, then return the result through the finish tool.",
+	"If the preceding result was rejected by a deterministic result validator, preserve its supported engineering conclusions and regenerate the complete structured result from the authoritative task schema. Before submitting, verify every required object field is present and every required value is non-empty.",
+	"Produce the assigned plan, review, or report from the current workspace and task evidence, then return the result through result_protocol.",
 }
 
 func hasExecutionPermission(permissions []string, required string) bool {
@@ -662,7 +657,7 @@ func BuildExecutionBriefWithHandler(current OperationalExecutionContext, groundi
 		brief.ResultProtocol = &ExecutionResultProtocol{
 			SchemaVersion: "1.0.0", Marker: OrganizationalResultMarker,
 			Outcomes:    append([]string(nil), handler.AllowedResults...),
-			Instruction: "The submit_envelope_v2 tool is the only result channel Teams consumes for this invocation. Call submit_envelope_v2 exactly once, passing the result envelope as structured parameters. The outer schema_version is fixed at 1.0.0 and Teams supplies it if omitted; any supplied value must match. Put any task-specific structured result required by the admitted work inside work_product, not beside the envelope. Return only results and message proposals allowed by the selected handler. Teams validates the result against message_handler.result_schema and remains the sole authority that records state changes or dispatches successor work.",
+			Instruction: "The submit_result tool is the only result channel Teams consumes for this invocation. Call submit_result exactly once, passing the result envelope as structured parameters. The outer schema_version is fixed at 1.0.0 and Teams supplies it if omitted; any supplied value must match. Put any task-specific structured result required by the admitted work inside work_product, not beside the envelope. Return only results and message proposals allowed by the selected handler. Teams validates the result against message_handler.result_schema and remains the sole authority that records state changes or dispatches successor work.",
 		}
 	} else if invocation.Purpose == kernel.PurposeValidation {
 		brief.ExecutionGuidance = append(brief.ExecutionGuidance, validationExecutionGuidance...)

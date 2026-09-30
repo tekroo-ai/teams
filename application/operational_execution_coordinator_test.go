@@ -40,7 +40,7 @@ func TestOperationalCoordinatorExecutesOneInvocationAndNeverChainsAgentProse(t *
 		t.Fatalf("role grounding = %#v", runtime.lastBrief.RoleGrounding)
 	}
 	guidance := strings.Join(runtime.lastBrief.ExecutionGuidance, "\n")
-	for _, required := range []string{"role_grounding", "role_fqrn", "AGENTS.md", "repository_search tool", "glob tool", "exactly one shell command", "do not use cd", "concrete open question", "stop discovery", "do not enumerate unrelated directories", "accepted CONTRACTS packages", "focused tests"} {
+	for _, required := range []string{"role_grounding", "role_fqrn", "AGENTS.md", "tools exposed for this invocation", "concrete open question", "stop discovery", "do not enumerate unrelated directories", "accepted CONTRACTS packages", "focused tests"} {
 		if !strings.Contains(guidance, required) {
 			t.Fatalf("execution guidance omitted %q: %v", required, runtime.lastBrief.ExecutionGuidance)
 		}
@@ -59,43 +59,41 @@ func TestOperationalCoordinatorExecutesOneInvocationAndNeverChainsAgentProse(t *
 	}
 }
 
-func TestRepositoryGuidanceDirectsSearchToDedicatedTools(t *testing.T) {
+func TestRepositoryGuidanceDoesNotInventTools(t *testing.T) {
 	runtime := newOperationalRuntime(t)
 	brief, _, err := BuildExecutionBrief(runtime.context, testRoleGrounding(runtime.context.Invocation.ActorFQN), 1<<20)
 	if err != nil {
 		t.Fatal(err)
 	}
 	guidance := strings.Join(brief.ExecutionGuidance, "\n")
-	for _, required := range []string{"repository_search tool", "glob tool", "exactly one shell command", "searches a single file", "never use shell grep"} {
+	for _, required := range []string{"AGENTS.md", "tools exposed for this invocation", "concrete open question"} {
 		if !strings.Contains(guidance, required) {
 			t.Fatalf("repository guidance omitted %q: %v", required, brief.ExecutionGuidance)
 		}
 	}
-	// The guidance must not point the agent at a shell grep/rg idiom; that is
-	// what drove the pipe-discipline violation. Discovery belongs to the
-	// dedicated tools, not the terminal.
-	for _, forbidden := range []string{"rg or rg --files", "Use rg"} {
+	// The selected execution profile, not this generic brief, names tools.
+	for _, forbidden := range []string{"repository_search", "repository_view", "glob", "terminal", "file-view tool", "Read tool", "Bash tool"} {
 		if strings.Contains(guidance, forbidden) {
 			t.Fatalf("repository guidance still directs shell discovery %q: %v", forbidden, brief.ExecutionGuidance)
 		}
 	}
 }
 
-func TestRepositoryGuidanceNamesEveryShellDisciplineFenceRule(t *testing.T) {
-	// The shell-discipline fence (violatesShellDiscipline) rejects cd, git -C,
-	// make -C, &&, ;, |, backgrounding &, $, backticks, and embedded newlines,
-	// while exempting >& redirection. The brief must name each rejected form so
-	// the model is not fenced for a construct it was never told about, and must
-	// state the redirection exemption so it does not avoid a legal operator.
+func TestEditableGuidanceUsesSourceEvidenceWithoutNamingTools(t *testing.T) {
 	runtime := newOperationalRuntime(t)
 	brief, _, err := BuildExecutionBrief(runtime.context, testRoleGrounding(runtime.context.Invocation.ActorFQN), 1<<20)
 	if err != nil {
 		t.Fatal(err)
 	}
 	guidance := strings.Join(brief.ExecutionGuidance, "\n")
-	for _, required := range []string{"git -C", "make -C", "2>&1"} {
+	for _, required := range []string{"relevant source and tests", "search result locates evidence", "focused tests"} {
 		if !strings.Contains(guidance, required) {
-			t.Fatalf("repository guidance omitted shell-discipline rule %q: %v", required, brief.ExecutionGuidance)
+			t.Fatalf("editable guidance omitted %q: %v", required, brief.ExecutionGuidance)
+		}
+	}
+	for _, forbidden := range []string{"repository_view", "terminal working directory", "file-view tool"} {
+		if strings.Contains(guidance, forbidden) {
+			t.Fatalf("editable guidance advertises an unbound tool %q: %v", forbidden, brief.ExecutionGuidance)
 		}
 	}
 	// Deterministic-validation discipline: the fence rejects a third equivalent
@@ -301,7 +299,7 @@ func TestToollessPlanningGuidanceScopesGatesAndForbidsFalseBlocking(t *testing.T
 		t.Fatal(err)
 	}
 	guidance := strings.Join(brief.ExecutionGuidance, "\n")
-	for _, required := range []string{"grants no repository tools", "downstream obligation, not a requirement", "do not block or request a decision because repository access is absent", "Return the required structured result through the finish tool"} {
+	for _, required := range []string{"grants no repository tools", "downstream obligation, not a requirement", "do not block or request a decision because repository access is absent", "Return the required structured result through result_protocol"} {
 		if !strings.Contains(guidance, required) {
 			t.Fatalf("toolless guidance omitted %q: %v", required, brief.ExecutionGuidance)
 		}
@@ -331,12 +329,12 @@ func TestReadOnlyRoleGuidanceNeverOrdersEditsAndAppliesToHandoffRetry(t *testing
 		t.Fatal(err)
 	}
 	guidance := strings.Join(brief.ExecutionGuidance, "\n")
-	for _, required := range []string{"does not authorize repository edits", "Do not edit repository files", "Finish the assigned plan", "structured result", "every required field", "bounded retry", "prior OpenHands conversation", "retained checkpoint", "Produce the assigned plan"} {
+	for _, required := range []string{"does not authorize repository edits", "Do not edit repository files", "Use only the repository evidence needed", "structured result", "every required field", "bounded retry", "prior OpenHands conversation", "retained checkpoint", "Produce the assigned plan"} {
 		if !strings.Contains(guidance, required) {
 			t.Fatalf("read-only guidance omitted %q: %v", required, brief.ExecutionGuidance)
 		}
 	}
-	for _, forbidden := range []string{"Make a concrete code or test edit", "Implement in cohesive increments", "Make the smallest justified code or test edit"} {
+	for _, forbidden := range []string{"Make a concrete code or test edit", "Implement in cohesive increments", "Make the smallest justified code or test edit", "Use terminal", "terminal working directory", "file-view tool", "finish tool"} {
 		if strings.Contains(guidance, forbidden) {
 			t.Fatalf("read-only guidance contains %q: %v", forbidden, brief.ExecutionGuidance)
 		}

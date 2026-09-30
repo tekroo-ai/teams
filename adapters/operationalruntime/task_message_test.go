@@ -186,7 +186,15 @@ func loadStarterSuccessorTeam(t *testing.T) organization.LoadedTeam {
 	if err != nil || len(qualificationKey) != ed25519.PublicKeySize {
 		t.Fatalf("qualification key error=%v length=%d", err, len(qualificationKey))
 	}
-	team, err := organization.LoadTeamManifest(manifestPath, kernel.Digest(hex.EncodeToString(manifestHash[:])), map[string]ed25519.PublicKey{"tekroo-message-handlers-20260913": publicKey, "tekroo-message-handlers-qualification-20260913": qualificationKey})
+	amendmentRaw, err := os.ReadFile(filepath.Join(filepath.Dir(manifestPath), "role-amendment-publisher.pub"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	amendmentKey, err := base64.StdEncoding.DecodeString(strings.TrimSpace(string(amendmentRaw)))
+	if err != nil || len(amendmentKey) != ed25519.PublicKeySize {
+		t.Fatalf("amendment key error=%v length=%d", err, len(amendmentKey))
+	}
+	team, err := organization.LoadTeamManifest(manifestPath, kernel.Digest(hex.EncodeToString(manifestHash[:])), map[string]ed25519.PublicKey{"tekroo-message-handlers-20260913": publicKey, "tekroo-message-handlers-qualification-20260913": qualificationKey, "tekroo-teams-amendment-20260917": amendmentKey})
 	if err != nil {
 		t.Fatal(err)
 	}

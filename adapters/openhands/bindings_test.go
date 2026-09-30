@@ -116,9 +116,9 @@ func TestAgentSettingsBindExactToolsDerivedFromRolePermissions(t *testing.T) {
 		want        []string
 	}{
 		{name: "organizational-role", permissions: []string{"feature.refine", "story.propose"}, want: []string{}},
-		{name: "read-only-design-role", permissions: []string{"repository.read", "task.create"}, want: []string{"glob", "repository_search", "repository_view"}},
-		{name: "read-only-test-role", permissions: []string{"repository.read", "test.execute"}, want: []string{"terminal", "glob", "repository_search", "repository_view"}},
-		{name: "implementation-role", permissions: []string{"repository.edit", "task.complete-propose"}, want: []string{"terminal", "glob", "repository_search", "file_editor_commands", "task_tracker"}},
+		{name: "read-only-design-role", permissions: []string{"repository.read", "task.create"}, want: []string{"file_read", "list_files", "find_files", "search_file_contents"}},
+		{name: "read-only-test-role", permissions: []string{"repository.read", "test.execute"}, want: []string{"command_operations", "file_read", "list_files", "find_files", "search_file_contents"}},
+		{name: "implementation-role", permissions: []string{"repository.edit", "task.complete-propose"}, want: []string{"command_operations", "file_read", "list_files", "find_files", "search_file_contents", "file_write_commands", "checklist_operations"}},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
