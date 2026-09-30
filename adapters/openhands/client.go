@@ -3898,27 +3898,39 @@ func withSubmitResultTool(agentSettings any) (any, bool) {
 // withInvocationReadTools binds evidence IDs and the Git baseline outside the
 // model-facing schema. The model can choose an admitted ID or file, but cannot
 // select an arbitrary evidence root or comparison commit.
-func withInvocationReadTools(agentSettings any, brief application.ExecutionBrief, evidenceRoot string) (any, bool) {
+func withInvocationReadTools(ctx context.Context, agentSettings any, brief application.ExecutionBrief, evidenceRoot string, evidence EvidenceReader) (any, error) {
 	raw, err := json.Marshal(agentSettings)
 	if err != nil {
-		return nil, false
+		return nil, err
 	}
 	var settings map[string]any
-	if json.Unmarshal(raw, &settings) != nil {
-		return nil, false
+	if err := json.Unmarshal(raw, &settings); err != nil {
+		return nil, err
 	}
 	tools, ok := settings["tools"].([]any)
 	if !ok {
 		// Historical profiles may rely on OpenHands defaults. Do not synthesize
 		// an explicit list merely to add invocation-local readers.
-		return settings, true
+		return settings, nil
 	}
-	if len(brief.Evidence) > 0 && evidenceRoot != "" {
+	if len(brief.Evidence) > 0 && evidenceRoot != "" && evidence != nil {
 		allowed := make(map[string]string, len(brief.Evidence))
+		allReadable := true
 		for _, reference := range brief.Evidence {
+			if _, err := evidence.Read(ctx, reference.SHA256); errors.Is(err, os.ErrNotExist) {
+				allReadable = false
+				continue
+			} else if err != nil {
+				return nil, err
+			}
 			allowed[string(reference.EvidenceID)] = string(reference.SHA256)
 		}
-		tools = append(tools, map[string]any{"name": "read_evidence", "params": map[string]any{"evidence_root": evidenceRoot, "allowed": allowed}})
+		// Registry evidence may have a Teams locator without a retained blob.
+		// In that case the file-backed reader cannot serve the complete admitted
+		// set, so do not advertise it as an available capability.
+		if allReadable {
+			tools = append(tools, map[string]any{"name": "read_evidence", "params": map[string]any{"evidence_root": evidenceRoot, "allowed": allowed}})
+		}
 	}
 	if brief.Scope.BaselineSHA != "" && slices.ContainsFunc(tools, func(tool any) bool {
 		entry, isMap := tool.(map[string]any)
@@ -3927,7 +3939,7 @@ func withInvocationReadTools(agentSettings any, brief application.ExecutionBrief
 		tools = append(tools, map[string]any{"name": "repository_diff_operations", "params": map[string]any{"baseline_commit": brief.Scope.BaselineSHA}})
 	}
 	settings["tools"] = tools
-	return settings, true
+	return settings, nil
 }
 
 func (client *Client) createConversation(ctx context.Context, brief application.ExecutionBrief, prepared preparedExecution) (int, []byte, error) {
@@ -3935,9 +3947,9 @@ func (client *Client) createConversation(ctx context.Context, brief application.
 	if json.Unmarshal(prepared.profile.AgentSettings, &agentSettings) != nil || json.Unmarshal(prepared.profile.HookConfig, &hookConfig) != nil {
 		return 0, nil, ErrProtocol
 	}
-	agentSettings, ok := withInvocationReadTools(agentSettings, brief, client.evidenceRoot)
-	if !ok {
-		return 0, nil, ErrProtocol
+	agentSettings, err := withInvocationReadTools(ctx, agentSettings, brief, client.evidenceRoot, client.evidence)
+	if err != nil {
+		return 0, nil, err
 	}
 	payload := map[string]any{
 		"conversation_id":        brief.InvocationID,

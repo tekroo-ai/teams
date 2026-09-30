@@ -129,6 +129,9 @@ func (service *ProductionService) preparePlannedTasks(ctx context.Context, featu
 	}
 	planDigest := digestBytes(planBytes)
 	evidenceID := deterministicOperationalUUID("feature-plan-evidence", string(feature.ID), fmt.Sprint(plan.Version), string(planDigest))
+	if err := service.retainPlanningEvidenceBlob(ctx, evidenceID, planBytes, planDigest); err != nil {
+		return err
+	}
 	evidencePayload, err := json.Marshal(map[string]any{
 		"access_partition": feature.Input.WorkspaceID, "availability": "AVAILABLE", "byte_length": len(planBytes), "canonical_digest": planDigest,
 		"computation": nil, "deletion_tombstone": nil, "evidence_kind": "DECISION_RECORD", "integrity_state": "DIGEST_VERIFIED",

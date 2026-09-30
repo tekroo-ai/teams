@@ -1484,6 +1484,9 @@ func (service *ProductionService) ensureFeaturePlanningEvidence(ctx context.Cont
 	}
 	digest := digestBytes(encoded)
 	id := deterministicOperationalUUID("feature-request-evidence", string(feature.ID), string(digest))
+	if err := service.retainPlanningEvidenceBlob(ctx, id, encoded, digest); err != nil {
+		return "", nil, err
+	}
 	ref := kernel.AggregateRef{Kind: kernel.AggregateEvidence, ID: id}
 	snapshot, err := service.Store.LoadDecision(ctx, kernel.KernelCommand{Target: ref})
 	if err != nil {
@@ -1500,6 +1503,20 @@ func (service *ProductionService) ensureFeaturePlanningEvidence(ctx context.Cont
 		return "", nil, err
 	}
 	return id, []kernel.EvidenceRef{{EvidenceID: id, SHA256: digest}}, nil
+}
+
+func (service *ProductionService) retainPlanningEvidenceBlob(ctx context.Context, id kernel.UUIDv7, content []byte, digest kernel.Digest) error {
+	if service == nil || service.Runtime == nil || service.Runtime.evidence == nil {
+		return organization.ErrInvalidFeature
+	}
+	receipt, err := service.Runtime.evidence.Put(ctx, id, content)
+	if err != nil {
+		return err
+	}
+	if receipt.SHA256 != digest {
+		return organization.ErrInvalidFeature
+	}
+	return nil
 }
 
 func (service *ProductionService) validateFeatureStageOutput(feature organization.FeatureRequest, stage featurePlanningStage, output []byte) error {

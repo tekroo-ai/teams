@@ -1,37 +1,70 @@
 package openhands
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
 
+	"github.com/tekroo-ai/teams/adapters/filesystem"
 	"github.com/tekroo-ai/teams/application"
 	"github.com/tekroo-ai/teams/kernel"
 )
 
 func TestInvocationReadersBindEvidenceAndBaselineWithoutModelSelectedPaths(t *testing.T) {
+	root := t.TempDir()
+	store, err := filesystem.NewExecutionEvidenceStore(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := kernel.UUIDv7("00000000-0000-7000-8000-000000000123")
+	receipt, err := store.Put(context.Background(), id, []byte("admitted evidence"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	settings := map[string]any{"tools": []any{map[string]any{"name": "file_read"}}}
 	brief := application.ExecutionBrief{
-		Evidence: []kernel.EvidenceRef{{EvidenceID: kernel.UUIDv7("00000000-0000-7000-8000-000000000123"), SHA256: kernel.Digest("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")}},
+		Evidence: []kernel.EvidenceRef{{EvidenceID: id, SHA256: receipt.SHA256}},
 		Scope:    kernel.TaskOperationalScope{BaselineSHA: "1111111111111111111111111111111111111111"},
 	}
-	bound, ok := withInvocationReadTools(settings, brief, "/private/tekroo/evidence")
-	if !ok {
-		t.Fatal("invocation readers not bound")
+	bound, err := withInvocationReadTools(context.Background(), settings, brief, root, store)
+	if err != nil {
+		t.Fatal(err)
 	}
 	tools := bound.(map[string]any)["tools"].([]any)
 	if len(tools) != 3 {
 		t.Fatalf("bound tools = %#v", tools)
 	}
 	evidence := tools[1].(map[string]any)
-	if evidence["name"] != "read_evidence" || evidence["params"].(map[string]any)["evidence_root"] != "/private/tekroo/evidence" {
+	if evidence["name"] != "read_evidence" || evidence["params"].(map[string]any)["evidence_root"] != root {
 		t.Fatalf("evidence binding = %#v", evidence)
 	}
 	diff := tools[2].(map[string]any)
 	if diff["name"] != "repository_diff_operations" || diff["params"].(map[string]any)["baseline_commit"] != brief.Scope.BaselineSHA {
 		t.Fatalf("diff binding = %#v", diff)
+	}
+}
+
+func TestInvocationDoesNotExposeFileReaderForMetadataOnlyEvidence(t *testing.T) {
+	root := t.TempDir()
+	store, err := filesystem.NewExecutionEvidenceStore(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings := map[string]any{"tools": []any{map[string]any{"name": "file_read"}}}
+	brief := application.ExecutionBrief{Evidence: []kernel.EvidenceRef{{
+		EvidenceID: "00000000-0000-7000-8000-000000000123",
+		SHA256:     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+	}}}
+	bound, err := withInvocationReadTools(context.Background(), settings, brief, root, store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tools := bound.(map[string]any)["tools"].([]any)
+	if len(tools) != 1 || tools[0].(map[string]any)["name"] != "file_read" {
+		t.Fatalf("metadata-only evidence exposed a file reader: %#v", tools)
 	}
 }
 
