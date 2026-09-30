@@ -104,6 +104,7 @@ func TestInitializeLocalDeploymentProducesValidatedIsolatedInstallation(t *testi
 			wantEndpoint = localComplexModelEndpoint
 		}
 		wantThinking := true
+		wantMTP := profile.RoleFQRN != "architect" && profile.RoleFQRN != "senior-coder"
 		wantReasoningEffort := want.reasoningEffort
 		wantReasoningBudgetTokens := uint32(0)
 		wantMaximumOutputTokens := want.maximumOutputTokens
@@ -152,7 +153,7 @@ func TestInitializeLocalDeploymentProducesValidatedIsolatedInstallation(t *testi
 		if err := json.Unmarshal(profile.AgentSettings, &settings); err != nil {
 			t.Fatalf("decode local profile %s: %v", profile.RoleFQRN, err)
 		}
-		if settings.LLM.BaseURL != wantEndpoint || settings.LLM.MaximumInputTokens != 262144 || settings.LLM.MaximumOutputTokens != wantMaximumOutputTokens || settings.LLM.LiteLLMExtraBody.EnableMTP != wantThinking || settings.LLM.LiteLLMExtraBody.ReasoningEffort != wantReasoningEffort || settings.LLM.LiteLLMExtraBody.ReasoningBudgetTokens != wantReasoningBudgetTokens || settings.LLM.LiteLLMExtraBody.ChatTemplateKwargs.EnableThinking != wantThinking || settings.LLM.LiteLLMExtraBody.ChatTemplateKwargs.PreserveThinking != wantThinking {
+		if settings.LLM.BaseURL != wantEndpoint || settings.LLM.MaximumInputTokens != 262144 || settings.LLM.MaximumOutputTokens != wantMaximumOutputTokens || settings.LLM.LiteLLMExtraBody.EnableMTP != wantMTP || settings.LLM.LiteLLMExtraBody.ReasoningEffort != wantReasoningEffort || settings.LLM.LiteLLMExtraBody.ReasoningBudgetTokens != wantReasoningBudgetTokens || settings.LLM.LiteLLMExtraBody.ChatTemplateKwargs.EnableThinking != wantThinking || settings.LLM.LiteLLMExtraBody.ChatTemplateKwargs.PreserveThinking != wantThinking {
 			t.Fatalf("local profile %s endpoint/thinking = %s/%t, want %s/%t", profile.RoleFQRN, settings.LLM.BaseURL, settings.LLM.LiteLLMExtraBody.ChatTemplateKwargs.EnableThinking, wantEndpoint, wantThinking)
 		}
 		if settings.Condenser.LLM.MaximumInputTokens != 262144 || settings.Condenser.LLM.MaximumOutputTokens != localCondenserOutputTokens || settings.Condenser.LLM.LiteLLMExtraBody.EnableMTP || settings.Condenser.LLM.LiteLLMExtraBody.ReasoningEffort != "" || settings.Condenser.LLM.LiteLLMExtraBody.ChatTemplateKwargs.EnableThinking || settings.Condenser.LLM.LiteLLMExtraBody.ChatTemplateKwargs.PreserveThinking {

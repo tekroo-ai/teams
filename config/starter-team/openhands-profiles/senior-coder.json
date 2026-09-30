@@ -4,6 +4,6 @@
   "decision_route": "COMPLEX_REASONING",
   "reasoning_effort": "medium",
   "maximum_output_tokens": 16384,
-  "enable_mtp": true,
+  "enable_mtp": false,
   "condenser_maximum_events": 1000
 }
