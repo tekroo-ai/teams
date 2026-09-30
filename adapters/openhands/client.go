@@ -47,8 +47,8 @@ const (
 	submitResultToolName                         = "submit_result"
 	legacySubmitResultToolName                   = "submit_envelope"
 	historicalSubmitResultToolName               = "submit_envelope_v2"
-	submitResultToolDescription                  = "Submit the assigned result envelope. Call this tool exactly once when the result is complete, passing the full envelope as structured parameters."
-	submitResultToolSchema                       = `{"type":"object","additionalProperties":false,"required":["outcome","summary","evidence","message_proposals","work_product"],"properties":{"schema_version":{"type":"string","description":"Optional; Teams supplies the fixed outer envelope version 1.0.0 when omitted."},"outcome":{"type":"string"},"summary":{"type":"string"},"evidence":{"type":"array","items":{"type":"string"}},"message_proposals":{"type":"array","items":{"type":"object"}},"work_product":{"type":"object","description":"Use a JSON object, for example {\"key\":\"value\"}; never a JSON-encoded string such as \"{\\\"key\\\":\\\"value\\\"}\". The actual keys must follow the selected handler's result_schema."}}}`
+	submitResultToolDescription                  = "Submit the assigned result envelope. The outer outcome reports completion; message_proposals is optional and only for separately authorized directed messages. Omit it when there are no directed messages. Call this tool once when the result is complete."
+	submitResultToolSchema                       = `{"type":"object","additionalProperties":false,"required":["outcome","summary","evidence","work_product"],"properties":{"schema_version":{"type":"string","description":"Optional; Teams supplies the fixed outer envelope version 1.0.0 when omitted."},"outcome":{"type":"string","description":"The handler result, such as completed. This reports completion without a message proposal."},"summary":{"type":"string"},"evidence":{"type":"array","items":{"type":"string"}},"message_proposals":{"type":"array","description":"Optional directed messages only. Omit when none; task completion is reported by outcome.","items":{"type":"object"}},"work_product":{"type":"object","description":"Use a JSON object, for example {\"key\":\"value\"}; never a JSON-encoded string such as \"{\\\"key\\\":\\\"value\\\"}\". The actual keys must follow the selected handler's result_schema."}}}`
 	structuredCompletionSystemSuffix             = " For this handler-bound invocation, submit_result is the only completion channel: call it exactly once with the structured result; do not call finish or return a prose completion."
 	finishCompletionInstruction                  = "When the task is complete or blocked by a concrete missing prerequisite, call finish exactly once. The finish message must follow result_protocol exactly; Teams ignores any informal completion claim."
 	structuredCompletionInstruction              = "When the task is complete or blocked by a concrete missing prerequisite, call submit_result exactly once with the result required by result_protocol. Do not return a prose completion."
@@ -925,6 +925,16 @@ func (client *Client) Inspect(ctx context.Context, brief application.ExecutionBr
 		return application.ExternalExecutionObservation{}, ErrProtocol
 	}
 	currentPromptIndex := executionPromptIndex(events, prepared, brief, requestDigest)
+	if brief.MessageHandler != nil {
+		if _, accepted := acceptedSubmitResult(*brief.MessageHandler, events, currentPromptIndex); !accepted {
+			if violation, reason, previouslyCorrected, rejected := rejectedSubmitResult(*brief.MessageHandler, events, currentPromptIndex); rejected {
+				if previouslyCorrected {
+					return client.failForExecutionPolicyViolation(ctx, brief, requestDigest, info, events, "INVALID_SUBMIT_RESULT_AFTER_CORRECTION", reason, false)
+				}
+				return client.correctInvalidSubmitResult(ctx, brief, requestDigest, info, events, violation, reason)
+			}
+		}
+	}
 	if violation, unresolved := unresolvedModelResponsesWithoutActionOrResult(events, currentPromptIndex); unresolved > 0 {
 		// OpenHands automatically asks the model to continue after one response
 		// that contains neither an action nor a visible result. Do not race that
@@ -1071,6 +1081,7 @@ const editableCandidateCompletionCorrectionPrefix = "TEKROO_CANDIDATE_COMPLETION
 const checkpointCompletionCorrectionPrefix = "TEKROO_CHECKPOINT_COMPLETION_CORRECTION:"
 const deterministicValidationCorrectionPrefix = "TEKROO_DETERMINISTIC_VALIDATION_CORRECTION:"
 const failedDeterministicValidationCorrectionPrefix = "TEKROO_FAILED_DETERMINISTIC_VALIDATION_CORRECTION:"
+const invalidSubmitResultCorrectionPrefix = "TEKROO_INVALID_SUBMIT_RESULT:"
 const compactionCheckpointPrefix = "TEKROO_PROGRESS_CHECKPOINT:"
 const maximumEquivalentSuccessfulValidations = 2
 const maximumCheckpointCompletionReads = 8
@@ -4649,6 +4660,11 @@ func submitResultActionOutput(payload json.RawMessage) ([]byte, bool) {
 	if _, supplied := envelope["schema_version"]; !supplied {
 		envelope["schema_version"] = json.RawMessage(`"1.0.0"`)
 	}
+	// The client tool permits omission; signed handler schemas still validate a
+	// canonical result with an explicit empty array.
+	if _, supplied := envelope["message_proposals"]; !supplied {
+		envelope["message_proposals"] = json.RawMessage(`[]`)
+	}
 	encoded, err := json.Marshal(envelope)
 	if err != nil {
 		return nil, false
@@ -4657,6 +4673,94 @@ func submitResultActionOutput(payload json.RawMessage) ([]byte, bool) {
 	output = append(output, application.OrganizationalResultMarker...)
 	output = append(output, '\n')
 	return append(output, encoded...), true
+}
+
+// OpenHands acknowledges delivery of a client tool before Teams validates the
+// signed handler contract. Find delivered but invalid results so the agent gets
+// a concrete correction instead of mistaking that acknowledgement for success.
+func rejectedSubmitResult(handler application.MessageHandlerGrounding, events []rawEvent, promptIndex int) (rawEvent, string, bool, bool) {
+	type rejection struct {
+		action rawEvent
+		reason string
+		index  int
+	}
+	pending := make(map[string]rejection)
+	var delivered []rejection
+	corrected := make(map[string]bool)
+	correctionIndex := -1
+	for index, event := range events {
+		if index <= promptIndex {
+			continue
+		}
+		if event.Kind == "MessageEvent" && event.Source == "user" && strings.HasPrefix(event.Text, invalidSubmitResultCorrectionPrefix) {
+			correctionIndex = index
+			id := strings.TrimSpace(strings.SplitN(strings.TrimPrefix(event.Text, invalidSubmitResultCorrectionPrefix), "\n", 2)[0])
+			corrected[id] = true
+			continue
+		}
+		if !isSubmitResultTool(event.ToolName) || event.ToolCallID == "" {
+			continue
+		}
+		if event.Kind == "ActionEvent" && event.Source == "agent" {
+			output, ok := submitResultActionOutput(event.ActionPayload)
+			if !ok {
+				pending[event.ToolCallID] = rejection{action: event, reason: "parameters must be one JSON object"}
+			} else if _, err := application.ValidateRoleHandlerResult(handler, output); err != nil {
+				pending[event.ToolCallID] = rejection{action: event, reason: err.Error()}
+			}
+			continue
+		}
+		if event.Kind == "ObservationEvent" && event.ObservationKind == "ClientToolObservation" && !event.ObservationError {
+			if invalid, found := pending[event.ToolCallID]; found {
+				invalid.index = index
+				delivered = append(delivered, invalid)
+			}
+		}
+	}
+	for _, invalid := range delivered {
+		// One correction covers every invalid submission already observed at
+		// that boundary, even if the model made several calls before our poll.
+		if !corrected[invalid.action.ID] && (correctionIndex < 0 || invalid.index > correctionIndex) {
+			return invalid.action, invalid.reason, correctionIndex >= 0 && correctionIndex < invalid.index, true
+		}
+	}
+	return rawEvent{}, "", false, false
+}
+
+func (client *Client) correctInvalidSubmitResult(ctx context.Context, brief application.ExecutionBrief, requestDigest kernel.Digest, info conversationInfo, events []rawEvent, violation rawEvent, reason string) (application.ExternalExecutionObservation, error) {
+	conversationID := string(brief.InvocationID)
+	if executionStillActive(info.ExecutionStatus) {
+		status, _, err := client.request(ctx, http.MethodPost, "/api/conversations/"+url.PathEscape(conversationID)+"/interrupt", nil)
+		if err != nil || status != http.StatusOK && status != http.StatusNoContent && status != http.StatusConflict {
+			return application.ExternalExecutionObservation{}, ErrProtocol
+		}
+	}
+	if refreshed, status, err := client.getConversation(ctx, conversationID); err == nil && status == http.StatusOK {
+		info = refreshed
+	}
+	if refreshed, err := client.events(ctx, conversationID); err == nil {
+		events = refreshed
+	}
+	for _, event := range events {
+		if event.Kind == "MessageEvent" && event.Source == "user" && strings.HasPrefix(event.Text, invalidSubmitResultCorrectionPrefix+violation.ID+"\n") {
+			return client.observation(ctx, brief, requestDigest, info, events, false)
+		}
+	}
+	correction := invalidSubmitResultCorrectionPrefix + violation.ID + "\nsubmit_result was rejected: " + reason + ". The outcome field reports completion; omit message_proposals when no separately authorized directed message is needed. Keep the completed work and submit a corrected result without repeating it."
+	status, _, err := client.request(ctx, http.MethodPost, "/api/conversations/"+url.PathEscape(conversationID)+"/events", map[string]any{
+		"role": "user", "run": true,
+		"content": []map[string]any{{"type": "text", "text": correction}},
+	})
+	if err != nil || status != http.StatusOK {
+		return application.ExternalExecutionObservation{}, ErrProtocol
+	}
+	if refreshed, refreshedStatus, refreshErr := client.getConversation(ctx, conversationID); refreshErr == nil && refreshedStatus == http.StatusOK {
+		info = refreshed
+	}
+	if refreshed, refreshErr := client.events(ctx, conversationID); refreshErr == nil {
+		events = refreshed
+	}
+	return client.observation(ctx, brief, requestDigest, info, events, false)
 }
 
 // acceptedSubmitResult selects the first schema-valid result whose client-tool

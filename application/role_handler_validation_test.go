@@ -3,6 +3,7 @@ package application
 import (
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 )
 
@@ -54,5 +55,16 @@ func TestRoleHandlerProposalRequiresActorFQN(t *testing.T) {
 {"outcome":"completed","message_proposals":[{"type":"tekroo.message.task.review-requested","recipient":"Bob","body":{}}]}`)
 	if _, err := ValidateRoleHandlerResult(handler, output); !errors.Is(err, ErrRoleHandlerSchemaViolation) {
 		t.Fatalf("alias recipient error = %v", err)
+	}
+}
+
+func TestRoleHandlerCompletionRejectsUnauthorizedProposal(t *testing.T) {
+	handler := MessageHandlerGrounding{
+		ResultSchema:   json.RawMessage(`{"type":"object","additionalProperties":false,"required":["outcome","message_proposals"],"properties":{"outcome":{"const":"completed"},"message_proposals":{"type":"array"}}}`),
+		AllowedResults: []string{"completed"},
+	}
+	_, err := ValidateRoleHandlerResult(handler, []byte(OrganizationalResultMarker+`{"outcome":"completed","message_proposals":[{"type":"tekroo.message.task.completed","recipient":"teams::orchestrator-1","body":{}}]}`))
+	if !errors.Is(err, ErrRoleHandlerSchemaViolation) || !strings.Contains(err.Error(), `type "tekroo.message.task.completed" is not allowed`) {
+		t.Fatalf("unauthorized proposal error = %v", err)
 	}
 }

@@ -59,9 +59,15 @@ func ValidateRoleHandlerResult(handler MessageHandlerGrounding, output []byte) (
 	if err := json.Unmarshal(raw, &envelope); err != nil || !slices.Contains(handler.AllowedResults, envelope.Outcome) {
 		return RoleHandlerResult{}, ErrRoleHandlerSchemaViolation
 	}
-	for _, proposal := range envelope.MessageProposals {
-		if !proposal.Recipient.Valid() || len(proposal.Body) == 0 || !slices.Contains(handler.AllowedMessageProposals, proposal.Type) {
-			return RoleHandlerResult{}, ErrRoleHandlerSchemaViolation
+	for index, proposal := range envelope.MessageProposals {
+		if !slices.Contains(handler.AllowedMessageProposals, proposal.Type) {
+			return RoleHandlerResult{}, fmt.Errorf("%w: message_proposals[%d] type %q is not allowed for this handler; allowed types: %v", ErrRoleHandlerSchemaViolation, index, proposal.Type, handler.AllowedMessageProposals)
+		}
+		if !proposal.Recipient.Valid() {
+			return RoleHandlerResult{}, fmt.Errorf("%w: message_proposals[%d] recipient must be an actor FQN", ErrRoleHandlerSchemaViolation, index)
+		}
+		if len(proposal.Body) == 0 {
+			return RoleHandlerResult{}, fmt.Errorf("%w: message_proposals[%d] body is required", ErrRoleHandlerSchemaViolation, index)
 		}
 	}
 	return RoleHandlerResult{Outcome: envelope.Outcome, MessageProposals: envelope.MessageProposals, Raw: append(json.RawMessage(nil), raw...)}, nil

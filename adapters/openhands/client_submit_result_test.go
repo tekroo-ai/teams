@@ -68,6 +68,49 @@ func TestSubmitResultActionOutputStripsKindAndMarks(t *testing.T) {
 	}
 }
 
+func TestSubmitResultToolMakesMessageProposalsOptional(t *testing.T) {
+	var schema struct {
+		Required []string `json:"required"`
+	}
+	if err := json.Unmarshal([]byte(submitResultToolSchema), &schema); err != nil {
+		t.Fatal(err)
+	}
+	if slices.Contains(schema.Required, "message_proposals") || !slices.Contains(schema.Required, "outcome") {
+		t.Fatalf("unexpected required fields: %v", schema.Required)
+	}
+}
+
+func TestRejectedSubmitResultExplainsUnauthorizedProposalOnce(t *testing.T) {
+	handler := application.MessageHandlerGrounding{
+		ResultSchema:   json.RawMessage(`{"type":"object","required":["schema_version","outcome","message_proposals"],"properties":{"schema_version":{"const":"1.0.0"},"outcome":{"const":"completed"},"message_proposals":{"type":"array"}}}`),
+		AllowedResults: []string{"completed"},
+	}
+	action := rawEvent{ID: "rejected-action", Kind: "ActionEvent", Source: "agent", ToolName: submitResultToolName, ToolCallID: "call-1", ActionPayload: json.RawMessage(`{"outcome":"completed","message_proposals":[{"type":"tekroo.message.task.completed","recipient":"teams::orchestrator-1","body":{}}]}`)}
+	observation := rawEvent{Kind: "ObservationEvent", Source: "environment", ToolName: submitResultToolName, ToolCallID: "call-1", ObservationKind: "ClientToolObservation"}
+	events := []rawEvent{{Kind: "MessageEvent", Source: "user"}, action, observation}
+	got, reason, repeated, rejected := rejectedSubmitResult(handler, events, 0)
+	if !rejected || repeated || got.ID != action.ID || !strings.Contains(reason, `type "tekroo.message.task.completed" is not allowed`) {
+		t.Fatalf("rejection = %v %q %v %#v", rejected, reason, repeated, got)
+	}
+	events = append(events, rawEvent{Kind: "MessageEvent", Source: "user", Text: invalidSubmitResultCorrectionPrefix + action.ID + "\n" + reason})
+	if _, _, _, rejected := rejectedSubmitResult(handler, events, 0); rejected {
+		t.Fatal("already corrected result was reported again")
+	}
+	second := action
+	second.ID, second.ToolCallID = "rejected-again", "call-2"
+	events = append(events, second, rawEvent{Kind: "ObservationEvent", Source: "environment", ToolName: submitResultToolName, ToolCallID: "call-2", ObservationKind: "ClientToolObservation"})
+	_, _, repeated, rejected = rejectedSubmitResult(handler, events, 0)
+	if !rejected || !repeated {
+		t.Fatal("repeated invalid result did not reach a bounded failure")
+	}
+	// One correction also covers several invalid calls made before the poll.
+	beforeCorrection := append([]rawEvent(nil), events[:3]...)
+	beforeCorrection = append(beforeCorrection, second, rawEvent{Kind: "ObservationEvent", Source: "environment", ToolName: submitResultToolName, ToolCallID: "call-2", ObservationKind: "ClientToolObservation"}, events[3])
+	if _, _, _, rejected := rejectedSubmitResult(handler, beforeCorrection, 0); rejected {
+		t.Fatal("pre-correction submissions were not covered by one correction")
+	}
+}
+
 func TestSubmitResultActionOutputSuppliesOnlyMissingFixedVersion(t *testing.T) {
 	handler := application.MessageHandlerGrounding{
 		ResultSchema:   json.RawMessage(`{"type":"object","additionalProperties":false,"required":["schema_version","outcome","summary","evidence","message_proposals","work_product"],"properties":{"schema_version":{"const":"1.0.0"},"outcome":{"const":"completed"},"summary":{"type":"string"},"evidence":{"type":"array"},"message_proposals":{"type":"array"},"work_product":{"type":"object"}}}`),
@@ -80,6 +123,7 @@ func TestSubmitResultActionOutputSuppliesOnlyMissingFixedVersion(t *testing.T) {
 		valid   bool
 	}{
 		{"omitted", base + `}`, true},
+		{"omitted-proposals", `{"outcome":"completed","summary":"done","evidence":[],"work_product":{},"kind":"ClientAction_submit_envelope"}`, true},
 		{"correct", base + `,"schema_version":"1.0.0"}`, true},
 		{"conflicting", base + `,"schema_version":"2.0.0"}`, false},
 		{"null", base + `,"schema_version":null}`, false},
@@ -106,7 +150,7 @@ func TestSubmitResultActionOutputSuppliesOnlyMissingFixedVersion(t *testing.T) {
 
 func TestAcceptedSubmitResultNeedsNoModelSuppliedVersion(t *testing.T) {
 	handler := application.MessageHandlerGrounding{
-		ResultSchema:   json.RawMessage(`{"type":"object","required":["schema_version","outcome","work_product"],"properties":{"schema_version":{"const":"1.0.0"},"outcome":{"const":"completed"},"work_product":{"type":"object"}}}`),
+		ResultSchema:   json.RawMessage(`{"type":"object","required":["schema_version","outcome","message_proposals","work_product"],"properties":{"schema_version":{"const":"1.0.0"},"outcome":{"const":"completed"},"message_proposals":{"type":"array"},"work_product":{"type":"object"}}}`),
 		AllowedResults: []string{"completed"},
 	}
 	events := []rawEvent{
@@ -115,7 +159,7 @@ func TestAcceptedSubmitResultNeedsNoModelSuppliedVersion(t *testing.T) {
 		{Kind: "ObservationEvent", Source: "environment", ToolName: submitResultToolName, ToolCallID: "call-1", ObservationKind: "ClientToolObservation"},
 	}
 	output, accepted := acceptedSubmitResult(handler, events, 0)
-	if !accepted || !bytes.Contains(output, []byte(`"schema_version":"1.0.0"`)) {
+	if !accepted || !bytes.Contains(output, []byte(`"schema_version":"1.0.0"`)) || !bytes.Contains(output, []byte(`"message_proposals":[]`)) {
 		t.Fatalf("version-normalized result not accepted: accepted=%t output=%s", accepted, output)
 	}
 	events[1].ActionPayload = json.RawMessage(`{"outcome":"completed","work_product":{},"schema_version":"2.0.0","kind":"ClientAction_submit_envelope"}`)
@@ -222,6 +266,88 @@ func TestInspectStopsAfterDeliveredHandlerResult(t *testing.T) {
 	observation, err := client.Inspect(context.Background(), brief, string(brief.InvocationID), requestDigest)
 	if err != nil || observation.State != application.ExternalSucceeded || interrupts != 1 || !strings.Contains(string(observation.Output), `"answer":"accepted"`) || !strings.Contains(string(observation.Output), `"schema_version":"1.0.0"`) {
 		t.Fatalf("observation=%#v err=%v interrupts=%d", observation, err, interrupts)
+	}
+}
+
+func TestInspectReturnsExplicitFeedbackForRejectedSubmitResult(t *testing.T) {
+	brief, _ := openHandsTestBrief(t)
+	brief.MessageHandler = &application.MessageHandlerGrounding{
+		MessageType:    "tekroo.message.task.assigned",
+		ResultSchema:   json.RawMessage(`{"type":"object","required":["schema_version","outcome","message_proposals"],"properties":{"schema_version":{"const":"1.0.0"},"outcome":{"const":"completed"},"message_proposals":{"type":"array"}}}`),
+		AllowedResults: []string{"completed"},
+	}
+	encoded := mustJSON(brief)
+	hash := sha256.Sum256(encoded)
+	requestDigest := kernel.Digest(hex.EncodeToString(hash[:]))
+	workspace := filepath.Join(t.TempDir(), "workspace")
+	preliminary := newOpenHandsTestClient(t, "http://127.0.0.1", workspace, brief)
+	prepared, err := preliminary.prepare(context.Background(), brief, requestDigest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var profile map[string]any
+	if err := json.Unmarshal([]byte(qualifiedAgentSettingsJSON), &profile); err != nil {
+		t.Fatal(err)
+	}
+	profile["tools"] = []any{map[string]any{"name": "glob", "params": map[string]any{}}}
+	injected, ok := withSubmitResultTool(profile)
+	if !ok {
+		t.Fatal("cannot inject completion tool")
+	}
+	events := []map[string]any{
+		event("prompt", "MessageEvent", "user", prepared.prompt),
+		{"id": "invalid-result", "kind": "ActionEvent", "source": "agent", "timestamp": "2026-08-31T12:00:02Z", "tool_name": submitResultToolName, "tool_call_id": "result-call", "action": map[string]any{"outcome": "completed", "message_proposals": []any{map[string]any{"type": "tekroo.message.task.completed", "recipient": "teams::orchestrator-1", "body": map[string]any{}}}}},
+		{"id": "tool-ack", "kind": "ObservationEvent", "source": "environment", "timestamp": "2026-08-31T12:00:03Z", "tool_name": submitResultToolName, "tool_call_id": "result-call", "observation": map[string]any{"kind": "ClientToolObservation", "is_error": false}},
+	}
+	status := "running"
+	interrupts, corrections := 0, 0
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		path := "/api/conversations/" + string(brief.InvocationID)
+		switch {
+		case request.Method == http.MethodGet && request.URL.Path == path:
+			writeJSON(writer, map[string]any{"id": string(brief.InvocationID), "execution_status": status, "created_at": "2026-08-31T12:00:00Z", "workspace": map[string]any{"kind": "LocalWorkspace", "working_dir": workspace}, "agent": injected, "tags": map[string]string{"tekrooinvocation": string(brief.InvocationID), "tekroorequest": string(requestDigest)}})
+		case request.Method == http.MethodGet && request.URL.Path == path+"/events/search":
+			writeJSON(writer, map[string]any{"items": events, "next_page_id": nil})
+		case request.Method == http.MethodPost && request.URL.Path == path+"/interrupt":
+			interrupts++
+			status = "paused"
+			writer.WriteHeader(http.StatusNoContent)
+		case request.Method == http.MethodPost && request.URL.Path == path+"/events":
+			var payload struct {
+				Content []struct {
+					Text string `json:"text"`
+				} `json:"content"`
+			}
+			if err := json.NewDecoder(request.Body).Decode(&payload); err != nil || len(payload.Content) != 1 || !strings.Contains(payload.Content[0].Text, `type "tekroo.message.task.completed" is not allowed`) {
+				t.Errorf("non-specific correction: %#v err=%v", payload, err)
+			}
+			corrections++
+			events = append(events, event("correction", "MessageEvent", "user", payload.Content[0].Text))
+			status = "running"
+			writer.WriteHeader(http.StatusOK)
+		default:
+			writer.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+	hookConfig := append(json.RawMessage(nil), qualifiedSMAHookConfig...)
+	client, err := NewClient(Config{
+		BaseURL: server.URL, SessionAPIKey: "session-key", HTTPClient: &http.Client{Timeout: time.Second},
+		Workspaces:   staticWorkspace{binding: WorkspaceBinding{WorkspaceID: brief.Scope.WorkspaceID, WorktreeID: brief.Scope.WorktreeID, WorkingDirectory: workspace}},
+		Profiles:     staticProfile{profile: ExecutionProfile{ModelProfileDigest: brief.ModelProfileDigest, RuntimeIdentityDigest: brief.RuntimeIdentityDigest, ToolPolicyDigest: brief.ToolPolicyDigest, EffectPolicyDigest: brief.EffectPolicyDigest, AgentSettings: mustJSON(profile), HookConfig: hookConfig, AgentDelegationDisabled: true, SemanticMemory: acceptedSemanticMemoryBinding(t, hookConfig)}},
+		PollInterval: time.Millisecond, MaximumPages: 4, MaximumEvidenceBytes: 1 << 20,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.Inspect(context.Background(), brief, string(brief.InvocationID), requestDigest); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.Inspect(context.Background(), brief, string(brief.InvocationID), requestDigest); err != nil {
+		t.Fatal(err)
+	}
+	if interrupts != 1 || corrections != 1 {
+		t.Fatalf("interrupts=%d corrections=%d, want one each", interrupts, corrections)
 	}
 }
 
@@ -343,12 +469,15 @@ func TestEveryConfiguredHandlerSchemaMatchesSubmissionBoundary(t *testing.T) {
 			if !slices.Contains(required, "schema_version") {
 				t.Fatal("canonical handler result does not require schema_version")
 			}
-			required = slices.DeleteFunc(required, func(field string) bool { return field == "schema_version" })
+			required = slices.DeleteFunc(required, func(field string) bool { return field == "schema_version" || field == "message_proposals" })
 			slices.Sort(required)
 			if !slices.Equal(required, toolRequired) {
 				t.Fatalf("handler result fields %v differ from tool fields %v", required, toolRequired)
 			}
 			properties := result["properties"].(map[string]any)
+			if _, present := properties["message_proposals"]; !present {
+				t.Fatal("canonical handler result has no message_proposals field")
+			}
 			version := properties["schema_version"].(map[string]any)
 			if version["const"] != "1.0.0" {
 				t.Fatalf("unexpected outer schema version: %#v", version)
