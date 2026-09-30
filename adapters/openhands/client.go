@@ -925,8 +925,10 @@ func (client *Client) Inspect(ctx context.Context, brief application.ExecutionBr
 		return application.ExternalExecutionObservation{}, ErrProtocol
 	}
 	currentPromptIndex := executionPromptIndex(events, prepared, brief, requestDigest)
+	acceptedHandlerResult := false
 	if brief.MessageHandler != nil {
-		if _, accepted := acceptedSubmitResult(*brief.MessageHandler, events, currentPromptIndex); !accepted {
+		_, acceptedHandlerResult = acceptedSubmitResult(*brief.MessageHandler, events, currentPromptIndex)
+		if !acceptedHandlerResult {
 			if violation, reason, previouslyCorrected, rejected := rejectedSubmitResult(*brief.MessageHandler, events, currentPromptIndex); rejected {
 				if previouslyCorrected {
 					return client.failForExecutionPolicyViolation(ctx, brief, requestDigest, info, events, "INVALID_SUBMIT_RESULT_AFTER_CORRECTION", reason, false)
@@ -1001,7 +1003,7 @@ func (client *Client) Inspect(ctx context.Context, brief application.ExecutionBr
 			return client.failForExecutionPolicyViolation(ctx, brief, requestDigest, info, events, reason, "", false)
 		}
 	}
-	if info.ExecutionStatus == "finished" && purposeRequiresEditableCandidate(brief.Purpose) && slices.Contains(brief.RoleGrounding.Permissions, "repository.edit") && prepared.workspace.Candidate == nil {
+	if (info.ExecutionStatus == "finished" || acceptedHandlerResult) && purposeRequiresEditableCandidate(brief.Purpose) && slices.Contains(brief.RoleGrounding.Permissions, "repository.edit") && prepared.workspace.Candidate == nil {
 		if reason := editableCandidateCompletionReason(ctx, prepared.workspace, brief.Scope.Branch, brief.Scope.BaselineSHA); reason != "" {
 			return client.correctEditableCandidateCompletion(ctx, brief, requestDigest, info, events, currentPromptIndex, reason)
 		}
@@ -2938,6 +2940,17 @@ func (client *Client) correctEditableCandidateCompletion(ctx context.Context, br
 	}
 	if refreshed, refreshErr := client.events(ctx, conversationID); refreshErr == nil {
 		events = refreshed
+	}
+	if brief.MessageHandler != nil {
+		// A delivered handler result is not success until its candidate exists.
+		// Do not re-accept the same call while the agent corrects its workspace.
+		observation, err := client.observationAt(brief, requestDigest, info, events, promptIndex, false)
+		if err != nil {
+			return observation, err
+		}
+		observation.State = application.ExternalRunning
+		observation.Output = nil
+		return observation, nil
 	}
 	return client.observation(ctx, brief, requestDigest, info, events, false)
 }

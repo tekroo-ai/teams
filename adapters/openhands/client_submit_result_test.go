@@ -269,6 +269,96 @@ func TestInspectStopsAfterDeliveredHandlerResult(t *testing.T) {
 	}
 }
 
+func TestInspectDoesNotAcceptEditableHandlerResultWithoutCandidate(t *testing.T) {
+	workspace := t.TempDir()
+	runOpenHandsGit(t, workspace, "init", "--initial-branch=task/204")
+	runOpenHandsGit(t, workspace, "config", "user.name", "Tekroo Test")
+	runOpenHandsGit(t, workspace, "config", "user.email", "test@tekroo.invalid")
+	if err := os.WriteFile(filepath.Join(workspace, "base.go"), []byte("package base\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runOpenHandsGit(t, workspace, "add", "base.go")
+	runOpenHandsGit(t, workspace, "commit", "-m", "baseline")
+	baseline := runOpenHandsGit(t, workspace, "rev-parse", "HEAD")
+
+	brief, _ := openHandsTestBrief(t)
+	brief.RoleGrounding.Permissions = []string{"repository.edit"}
+	brief.Scope.Branch = "task/204"
+	brief.Scope.BaselineSHA = baseline
+	brief.SemanticContext.BaselineSHA = baseline
+	brief.MessageHandler = &application.MessageHandlerGrounding{
+		MessageType:    "tekroo.message.task.assigned",
+		ResultSchema:   json.RawMessage(`{"type":"object","required":["schema_version","outcome","work_product"],"properties":{"schema_version":{"const":"1.0.0"},"outcome":{"const":"completed"},"work_product":{"type":"object"}}}`),
+		AllowedResults: []string{"completed"},
+	}
+	encoded := mustJSON(brief)
+	hash := sha256.Sum256(encoded)
+	requestDigest := kernel.Digest(hex.EncodeToString(hash[:]))
+	preliminary := newOpenHandsTestClient(t, "http://127.0.0.1", workspace, brief)
+	prepared, err := preliminary.prepare(context.Background(), brief, requestDigest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var profile map[string]any
+	if err := json.Unmarshal([]byte(qualifiedAgentSettingsJSON), &profile); err != nil {
+		t.Fatal(err)
+	}
+	profile["tools"] = []any{map[string]any{"name": "glob", "params": map[string]any{}}}
+	injected, ok := withSubmitResultTool(profile)
+	if !ok {
+		t.Fatal("cannot inject completion tool")
+	}
+	events := []map[string]any{
+		event("prompt", "MessageEvent", "user", prepared.prompt),
+		{"id": "result-action", "kind": "ActionEvent", "source": "agent", "timestamp": "2026-08-31T12:00:02Z", "tool_name": submitResultToolName, "tool_call_id": "result-call", "action": map[string]any{"outcome": "completed", "work_product": map[string]any{"answer": "uncommitted"}, "kind": "ClientAction_submit_envelope"}},
+		{"id": "result-observation", "kind": "ObservationEvent", "source": "environment", "timestamp": "2026-08-31T12:00:03Z", "tool_name": submitResultToolName, "tool_call_id": "result-call", "observation": map[string]any{"kind": "ClientToolObservation", "is_error": false}},
+	}
+	corrections := 0
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		path := "/api/conversations/" + string(brief.InvocationID)
+		switch {
+		case request.Method == http.MethodGet && request.URL.Path == path:
+			writeJSON(writer, map[string]any{"id": string(brief.InvocationID), "execution_status": "paused", "created_at": "2026-08-31T12:00:00Z", "workspace": map[string]any{"kind": "LocalWorkspace", "working_dir": workspace}, "agent": injected, "tags": map[string]string{"tekrooinvocation": string(brief.InvocationID), "tekroorequest": string(requestDigest)}})
+		case request.Method == http.MethodGet && request.URL.Path == path+"/events/search":
+			writeJSON(writer, map[string]any{"items": events, "next_page_id": nil})
+		case request.Method == http.MethodPost && request.URL.Path == path+"/events":
+			var payload struct {
+				Content []struct {
+					Text string `json:"text"`
+				} `json:"content"`
+			}
+			if json.NewDecoder(request.Body).Decode(&payload) != nil || len(payload.Content) != 1 {
+				writer.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			corrections++
+			events = append(events, event("candidate-correction", "MessageEvent", "user", payload.Content[0].Text))
+			writer.WriteHeader(http.StatusOK)
+		default:
+			writer.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+	hookConfig := append(json.RawMessage(nil), qualifiedSMAHookConfig...)
+	client, err := NewClient(Config{
+		BaseURL: server.URL, SessionAPIKey: "session-key", HTTPClient: &http.Client{Timeout: time.Second},
+		Workspaces:   staticWorkspace{binding: WorkspaceBinding{WorkspaceID: brief.Scope.WorkspaceID, WorktreeID: brief.Scope.WorktreeID, WorkingDirectory: workspace}},
+		Profiles:     staticProfile{profile: ExecutionProfile{ModelProfileDigest: brief.ModelProfileDigest, RuntimeIdentityDigest: brief.RuntimeIdentityDigest, ToolPolicyDigest: brief.ToolPolicyDigest, EffectPolicyDigest: brief.EffectPolicyDigest, AgentSettings: mustJSON(profile), HookConfig: hookConfig, AgentDelegationDisabled: true, SemanticMemory: acceptedSemanticMemoryBinding(t, hookConfig)}},
+		PollInterval: time.Millisecond, MaximumPages: 4, MaximumEvidenceBytes: 1 << 20,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	observation, err := client.Inspect(context.Background(), brief, string(brief.InvocationID), requestDigest)
+	if err != nil || observation.State != application.ExternalRunning || corrections != 1 {
+		t.Fatalf("observation=%#v err=%v corrections=%d", observation, err, corrections)
+	}
+	observation, err = client.Inspect(context.Background(), brief, string(brief.InvocationID), requestDigest)
+	if err != nil || observation.State != application.ExternalFailed || corrections != 1 {
+		t.Fatalf("repeat observation state=%s err=%v corrections=%d", observation.State, err, corrections)
+	}
+}
+
 func TestInspectReturnsExplicitFeedbackForRejectedSubmitResult(t *testing.T) {
 	brief, _ := openHandsTestBrief(t)
 	brief.MessageHandler = &application.MessageHandlerGrounding{
