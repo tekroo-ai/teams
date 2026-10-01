@@ -170,7 +170,10 @@ func (s *Store) ApplyFeaturePlan(ctx context.Context, id kernel.UUIDv7, expected
 		}
 		expectedPlanVersion = feature.Plan.Version + 1
 	}
-	if feature.Revision != expectedRevision || feature.Status != organization.FeatureSpecified || plan.Version != expectedPlanVersion || plan.Validate(feature) != nil || now.Before(feature.UpdatedAt) {
+	// The original flow planned directly from SPECIFIED. The PM-owned graph
+	// flow records the architect's proposal first, leaving the feature DESIGNED.
+	// Match the coordinator's admission states before the revision-CAS write.
+	if feature.Revision != expectedRevision || (feature.Status != organization.FeatureSpecified && feature.Status != organization.FeatureDesigned) || plan.Version != expectedPlanVersion || plan.Validate(feature) != nil || now.Before(feature.UpdatedAt) {
 		return organization.FeatureRequest{}, organization.ErrFeatureRevisionConflict
 	}
 	feature.Revision++
