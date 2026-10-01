@@ -76,7 +76,7 @@ func TestSubmitResultToolMakesMessageProposalsOptional(t *testing.T) {
 	if err := json.Unmarshal([]byte(submitResultToolSchema), &schema); err != nil {
 		t.Fatal(err)
 	}
-	if slices.Contains(schema.Required, "message_proposals") || !slices.Contains(schema.Required, "outcome") {
+	if slices.Contains(schema.Required, "message_proposals") || !slices.Contains(schema.Required, "outcome") || !slices.Contains(schema.Required, "summary") {
 		t.Fatalf("unexpected required fields: %v", schema.Required)
 	}
 }
@@ -250,7 +250,7 @@ func TestInspectStopsAfterDeliveredHandlerResult(t *testing.T) {
 	brief, _ := openHandsTestBrief(t)
 	brief.MessageHandler = &application.MessageHandlerGrounding{
 		MessageType:    "tekroo.message.task.assigned",
-		ResultSchema:   json.RawMessage(`{"type":"object","required":["schema_version","outcome","work_product"],"properties":{"schema_version":{"const":"1.0.0"},"outcome":{"const":"completed"},"work_product":{"type":"object"}}}`),
+		ResultSchema:   json.RawMessage(`{"type":"object","required":["schema_version","outcome","summary","work_product"],"properties":{"schema_version":{"const":"1.0.0"},"outcome":{"const":"completed"},"summary":{"type":"string","minLength":1},"work_product":{"type":"object"}}}`),
 		AllowedResults: []string{"completed"},
 	}
 	encoded := mustJSON(brief)
@@ -272,11 +272,14 @@ func TestInspectStopsAfterDeliveredHandlerResult(t *testing.T) {
 		t.Fatal("cannot inject completion tool into test profile")
 	}
 	profileRaw := mustJSON(profile)
-	result := map[string]any{"outcome": "completed", "work_product": map[string]any{"answer": "accepted"}, "kind": "ClientAction_submit_envelope"}
+	result := map[string]any{"outcome": "completed", "summary": "accepted result", "work_product": map[string]any{"answer": "accepted"}, "kind": "ClientAction_submit_envelope"}
 	events := []map[string]any{
 		event("prompt", "MessageEvent", "user", prepared.prompt),
 		{"id": "result-action", "kind": "ActionEvent", "source": "agent", "timestamp": "2026-08-31T12:00:02Z", "tool_name": submitResultToolName, "tool_call_id": "result-call", "action": result},
 		{"id": "result-observation", "kind": "ObservationEvent", "source": "environment", "timestamp": "2026-08-31T12:00:03Z", "tool_name": submitResultToolName, "tool_call_id": "result-call", "observation": map[string]any{"kind": "ClientToolObservation", "is_error": false}},
+		// A delayed poll can see a later malformed attempt. It must still accept
+		// the first delivered result and stop the conversation.
+		{"id": "later-missing-summary", "kind": "ActionEvent", "source": "agent", "timestamp": "2026-08-31T12:00:04Z", "tool_name": submitResultToolName, "tool_call_id": "later-call", "action": map[string]any{"outcome": "completed", "work_product": map[string]any{"answer": "invalid"}}},
 	}
 	interrupts := 0
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
