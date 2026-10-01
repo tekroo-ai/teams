@@ -1,0 +1,88 @@
+{
+  "schema_version": "2.0.0",
+  "role": "project-manager",
+  "version": "2.2.1",
+  "capabilities": [
+    "planning",
+    "story-management",
+    "task-routing"
+  ],
+  "subscriptions": [
+    {
+      "type": "tekroo.message.feature.design-proposed",
+      "purpose": "execution-planning"
+    },
+    {
+      "type": "tekroo.message.feature.refined",
+      "purpose": "story-planning"
+    }
+  ],
+  "permissions": [
+    "evidence.record",
+    "repository.read",
+    "story.plan-propose",
+    "task.assign-propose",
+    "task.handoff-propose"
+  ],
+  "charter": {
+    "path": "ROLE.md",
+    "sha256": "22f29e013217adbdcaf002311feddf0bf519b4bb4c6c35b3b6ddb78331133637",
+    "media_type": "text/markdown"
+  },
+  "handler_bindings": {
+    "tekroo.message.feature.design-proposed": {
+      "subscription_purpose": "execution-planning",
+      "message_purpose": "HANDOFF",
+      "disposition": "MODEL_HANDLER",
+      "resource": {
+        "path": "handlers/feature.design-proposed/HANDLER.md",
+        "sha256": "2780f7a1bf0e6c6c94139276b705b168ed1dbe4aab2d5b4d4abb8467ec819a3e",
+        "media_type": "text/markdown"
+      },
+      "input_schema": {
+        "path": "handlers/feature.design-proposed/input.schema.json",
+        "sha256": "ab947159340b93a4bee8444238708fe7ca411c429748cc0b9fc65c145a1e010c",
+        "media_type": "application/schema+json"
+      },
+      "result_schema": {
+        "path": "handlers/feature.design-proposed/result.schema.json",
+        "sha256": "f9e4fde67bfd22f1cd66c88e1c3d4881f869a4a0133ceba079d13096be4affe8",
+        "media_type": "application/schema+json"
+      },
+      "allowed_results": [
+        "blocked",
+        "completed",
+        "failed",
+        "needs_decision"
+      ]
+    },
+    "tekroo.message.feature.refined": {
+      "subscription_purpose": "story-planning",
+      "message_purpose": "HANDOFF",
+      "disposition": "MODEL_HANDLER",
+      "resource": {
+        "path": "handlers/feature.refined/HANDLER.md",
+        "sha256": "1c2a7974c51654a80814fb95a29cc6513651264605b82196eddb3eadd4bd881f",
+        "media_type": "text/markdown"
+      },
+      "input_schema": {
+        "path": "handlers/feature.refined/input.schema.json",
+        "sha256": "960e6113c1f72ef5672432a5f06eec244460bc3e6786b1c8e5fde201408249f0",
+        "media_type": "application/schema+json"
+      },
+      "result_schema": {
+        "path": "handlers/feature.refined/result.schema.json",
+        "sha256": "e8f15779b0a9e5fd62af0d194162ec48f3024311dd14aa07b88dcfe99ad350b2",
+        "media_type": "application/schema+json"
+      },
+      "allowed_results": [
+        "blocked",
+        "completed",
+        "failed",
+        "needs_decision"
+      ]
+    }
+  },
+  "publisher_key_id": "tekroo-teams-plan-0131-20261001",
+  "signature": "vP9lS0eE3CGLZXn53WgZkk76g7P3Upce85dQik6qbolIgUBFuJ+q+Mw2q1vYdz8JiQKqVjzMozuHuHOR3sr0DA=="
+}

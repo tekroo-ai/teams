@@ -61,9 +61,9 @@
     },
     {
       "role": "project-manager",
-      "bundle_path": "roles-v4/project-manager-2.2.0/role.json",
-      "bundle_digest": "cd4ba17ff7f37f7b4004bd759f5b801052e5f571e788813528825c76f17ba003",
-      "publisher_key_id": "tekroo-teams-plan-013-20260930",
+      "bundle_path": "roles-v4/project-manager-2.2.1/role.json",
+      "bundle_digest": "775f8eaa0af2f5ff4fd8490f7d3395bc2160159223372d0765e4fb66cdc65429",
+      "publisher_key_id": "tekroo-teams-plan-0131-20261001",
       "initial_instances": 1,
       "maximum_instances": 1,
       "launch_mode": "ON_DEMAND",
