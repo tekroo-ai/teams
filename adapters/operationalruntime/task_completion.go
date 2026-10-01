@@ -654,17 +654,9 @@ func (service *ProductionService) authorizeRepairAfterFailedReview(ctx context.C
 	if digestErr != nil {
 		return false, digestErr
 	}
-	nextRound := uint64(1)
-	for _, invocation := range snapshot.WorkInvocations {
-		if invocation.TaskID != target.ID || invocation.Purpose != kernel.PurposeRepair {
-			continue
-		}
-		if invocation.ConditionDigest == conditionDigest {
-			return false, nil
-		}
-		if invocation.AttemptOrdinal >= nextRound {
-			nextRound = invocation.AttemptOrdinal + 1
-		}
+	nextRound, priorRepair, alreadyAuthorized := nextReviewRepairRound(snapshot.WorkInvocations, target.ID, conditionDigest)
+	if alreadyAuthorized {
+		return false, nil
 	}
 	if nextRound > uint64(target.ReviewRoundLimit) {
 		reviewID := deterministicOperationalUUID("completion-review", string(feature.ID), string(target.ID), string(*implementer.OutputDigest))
@@ -689,10 +681,30 @@ func (service *ProductionService) authorizeRepairAfterFailedReview(ctx context.C
 		return false, err
 	}
 	tracked := &trackedTask{plan: target, revision: state.Revision, last: head, profile: profileSnapshot.Profile, owner: owner}
-	if err := service.authorizeTaskInvocationWithCondition(ctx, feature, tracked, profileConfig, workspace, budget.Revision, kernel.PurposeRepair, nextRound, nil, conditionParts); err != nil {
+	if err := service.authorizeTaskInvocationWithCondition(ctx, feature, tracked, profileConfig, workspace, budget.Revision, kernel.PurposeRepair, nextRound, priorRepair, conditionParts); err != nil {
 		return false, err
 	}
 	return true, nil
+}
+
+func nextReviewRepairRound(invocations map[kernel.AggregateRef]kernel.WorkInvocation, taskID kernel.UUIDv7, conditionDigest kernel.Digest) (uint64, *kernel.WorkInvocation, bool) {
+	var prior *kernel.WorkInvocation
+	for _, invocation := range invocations {
+		if invocation.TaskID != taskID || invocation.Purpose != kernel.PurposeRepair {
+			continue
+		}
+		if invocation.ConditionDigest == conditionDigest {
+			return 0, nil, true
+		}
+		if prior == nil || invocation.AttemptOrdinal > prior.AttemptOrdinal || invocation.AttemptOrdinal == prior.AttemptOrdinal && invocation.Revision > prior.Revision {
+			copy := invocation
+			prior = &copy
+		}
+	}
+	if prior == nil {
+		return 1, nil, false
+	}
+	return prior.AttemptOrdinal + 1, prior, false
 }
 
 func (service *ProductionService) finalizeTaskReview(ctx context.Context, feature organization.FeatureRequest, target organization.PlannedTask, state kernel.AggregateState, head kernel.UUIDv7, implementer kernel.WorkInvocation, validators []taskValidatorResult, snapshot kernel.Snapshot) (string, error) {

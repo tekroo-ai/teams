@@ -745,7 +745,7 @@ func validInvocationContinuation(prior kernel.WorkInvocation, purpose kernel.Wor
 		// non-retryable terminal. Promotion remains limited to its exact
 		// invalid-structured-output recovery path.
 		planningRecovery := purpose == kernel.PurposeHandoff && recoverablePlanningTerminal(prior)
-		return technicalExtension && (recoverableTaskTerminal(prior) || planningRecovery || prior.State == kernel.InvocationSucceeded && (purpose == kernel.PurposeHandoff || purpose == kernel.PurposeValidation || purpose == kernel.PurposeReview || purpose == kernel.PurposeRepair || purpose == kernel.PurposeReplan || purpose == kernel.PurposePromotion)) || !technicalExtension && prior.State == kernel.InvocationSucceeded && (purpose == kernel.PurposeValidation || purpose == kernel.PurposeReview)
+		return technicalExtension && (recoverableTaskTerminal(prior) || planningRecovery || prior.State == kernel.InvocationSucceeded && (purpose == kernel.PurposeHandoff || purpose == kernel.PurposeValidation || purpose == kernel.PurposeReview || purpose == kernel.PurposeRepair || purpose == kernel.PurposeReplan || purpose == kernel.PurposePromotion)) || !technicalExtension && prior.State == kernel.InvocationSucceeded && (purpose == kernel.PurposeValidation || purpose == kernel.PurposeReview || purpose == kernel.PurposeRepair)
 	}
 	if prior.Retryable == nil || !*prior.Retryable {
 		return false

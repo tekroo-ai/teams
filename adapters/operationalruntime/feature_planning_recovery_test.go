@@ -436,6 +436,12 @@ func TestSucceededRepairCanContinueWithChangedCondition(t *testing.T) {
 	if !validInvocationContinuation(prior, kernel.PurposeRepair, 2, true, false) {
 		t.Fatal("succeeded repair could not be superseded by an evidence-bound correction")
 	}
+	if !validInvocationContinuation(prior, kernel.PurposeRepair, 2, false, false) {
+		t.Fatal("ordinary second repair round could not continue a succeeded first round")
+	}
+	if validInvocationContinuation(prior, kernel.PurposeRepair, 3, false, false) {
+		t.Fatal("repair continuation skipped the immediately preceding round")
+	}
 }
 
 func TestExplicitPlanningRecoveryCanRepairNonRetryableHandoffFailure(t *testing.T) {
