@@ -21,7 +21,12 @@ var (
 	ErrFeatureNotFound         = errors.New("feature request not found")
 	ErrFeatureRevisionConflict = errors.New("feature request revision conflict")
 	featureKeyPattern          = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$`)
+	handoffCapabilityPattern   = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9.-]{0,126}[a-z0-9])?$`)
 )
+
+func ValidHandoffCapability(value string) bool {
+	return handoffCapabilityPattern.MatchString(value)
+}
 
 type FeaturePriority string
 
@@ -48,6 +53,7 @@ const (
 	FeatureClarificationRequired FeatureStatus = "CLARIFICATION_REQUIRED"
 	FeatureReadyForPlanning      FeatureStatus = "READY_FOR_PLANNING"
 	FeatureSpecified             FeatureStatus = "SPECIFIED"
+	FeatureDesigned              FeatureStatus = "DESIGNED"
 	FeaturePlanned               FeatureStatus = "PLANNED"
 	FeatureApproved              FeatureStatus = "APPROVED"
 	FeatureAwaitingAcceptance    FeatureStatus = "AWAITING_ACCEPTANCE"
@@ -57,7 +63,7 @@ const (
 
 func (status FeatureStatus) Valid() bool {
 	switch status {
-	case FeatureSubmitted, FeatureClarificationRequired, FeatureReadyForPlanning, FeatureSpecified, FeaturePlanned, FeatureApproved, FeatureAwaitingAcceptance, FeatureAccepted, FeatureCancelled:
+	case FeatureSubmitted, FeatureClarificationRequired, FeatureReadyForPlanning, FeatureSpecified, FeatureDesigned, FeaturePlanned, FeatureApproved, FeatureAwaitingAcceptance, FeatureAccepted, FeatureCancelled:
 		return true
 	default:
 		return false
@@ -113,6 +119,7 @@ type FeatureRequest struct {
 	Clarification           *FeatureClarification           `json:"clarification,omitempty"`
 	Specification           *FeatureSpecification           `json:"specification,omitempty"`
 	SpecificationCorrection *FeatureSpecificationCorrection `json:"specification_correction,omitempty"`
+	Design                  *FeatureDesignCandidate         `json:"design,omitempty"`
 	Plan                    *FeaturePlan                    `json:"plan,omitempty"`
 	PlanSupersession        *FeaturePlanSupersession        `json:"plan_supersession,omitempty"`
 	Acceptance              *FeatureAcceptance              `json:"acceptance,omitempty"`
@@ -128,10 +135,16 @@ func (feature FeatureRequest) Validate() error {
 	if feature.PlanSupersession != nil && feature.PlanSupersession.Validate(feature) != nil {
 		return ErrInvalidFeature
 	}
-	if feature.Status == FeatureSpecified && feature.Plan != nil && feature.PlanSupersession == nil {
+	if (feature.Status == FeatureSpecified || feature.Status == FeatureDesigned) && feature.Plan != nil && feature.PlanSupersession == nil {
 		return ErrInvalidFeature
 	}
-	if feature.PlanSupersession != nil && feature.Status != FeatureSpecified {
+	if feature.PlanSupersession != nil && feature.Status != FeatureSpecified && feature.Status != FeatureDesigned {
+		return ErrInvalidFeature
+	}
+	if feature.Design != nil && feature.Design.Validate(feature) != nil {
+		return ErrInvalidFeature
+	}
+	if feature.Status == FeatureDesigned && feature.Design == nil {
 		return ErrInvalidFeature
 	}
 	if feature.Refinement != nil && feature.Refinement.Validate(feature) != nil {
@@ -172,6 +185,22 @@ type FeaturePlanSupersession struct {
 	DeadlineAt        time.Time            `json:"deadline_at"`
 	RequestedAt       time.Time            `json:"requested_at"`
 	IdempotencyKey    string               `json:"idempotency_key"`
+}
+
+// FeatureDesignCandidate binds the architect's immutable proposal before the
+// project manager assembles the executable plan. It does not dispatch work.
+type FeatureDesignCandidate struct {
+	PreparedBy        kernel.ActorFQN       `json:"prepared_by"`
+	PreparedExecution kernel.ExecutionTuple `json:"prepared_execution"`
+	OutputDigest      kernel.Digest         `json:"output_digest"`
+	PreparedAt        time.Time             `json:"prepared_at"`
+}
+
+func (design FeatureDesignCandidate) Validate(feature FeatureRequest) error {
+	if !design.PreparedBy.Valid() || !design.PreparedExecution.Valid() || !design.OutputDigest.Valid() || design.PreparedAt.Before(feature.CreatedAt) {
+		return ErrInvalidFeature
+	}
+	return nil
 }
 
 func (supersession FeaturePlanSupersession) Validate(feature FeatureRequest) error {
@@ -362,20 +391,37 @@ type PlannedTask struct {
 	ReviewRoundLimit   uint32               `json:"review_round_limit"`
 }
 
+// PlannedHandoff names a capability a predecessor promises to its consumer.
+// Pure ordering dependencies do not require a handoff.
+type PlannedHandoff struct {
+	ProviderTaskID kernel.UUIDv7 `json:"provider_task_id"`
+	ConsumerTaskID kernel.UUIDv7 `json:"consumer_task_id"`
+	Capability     string        `json:"capability"`
+	Contract       string        `json:"contract"`
+}
+
 type FeaturePlan struct {
-	Version           uint64                `json:"version"`
-	PreparedBy        kernel.ActorFQN       `json:"prepared_by"`
-	PreparedExecution kernel.ExecutionTuple `json:"prepared_execution"`
-	Architecture      string                `json:"architecture"`
-	DesignDecisions   []string              `json:"design_decisions"`
-	Assumptions       []string              `json:"assumptions"`
-	Stories           []PlannedStory        `json:"stories"`
-	Tasks             []PlannedTask         `json:"tasks"`
-	CreatedAt         time.Time             `json:"created_at"`
+	Version            uint64                `json:"version"`
+	PreparedBy         kernel.ActorFQN       `json:"prepared_by"`
+	PreparedExecution  kernel.ExecutionTuple `json:"prepared_execution"`
+	Architecture       string                `json:"architecture"`
+	DesignDecisions    []string              `json:"design_decisions"`
+	Assumptions        []string              `json:"assumptions"`
+	SourceDesignDigest kernel.Digest         `json:"source_design_digest,omitempty"`
+	Stories            []PlannedStory        `json:"stories"`
+	Tasks              []PlannedTask         `json:"tasks"`
+	Handoffs           []PlannedHandoff      `json:"handoffs,omitempty"`
+	CreatedAt          time.Time             `json:"created_at"`
 }
 
 func (plan FeaturePlan) Validate(feature FeatureRequest) error {
 	if plan.Version == 0 || !plan.PreparedBy.Valid() || !plan.PreparedExecution.Valid() || plan.Architecture == "" || len(plan.Architecture) > 64<<10 || plan.CreatedAt.Before(feature.CreatedAt) || len(plan.Stories) == 0 || len(plan.Stories) > int(feature.Input.MaximumStories) || len(plan.Tasks) == 0 || len(plan.Tasks) > int(feature.Input.MaximumTasks) || len(plan.DesignDecisions) > 64 || len(plan.Assumptions) > 64 {
+		return ErrInvalidFeature
+	}
+	// During an authorized supersession, the old plan stays visible while a
+	// successor design is recorded. Its digest is historical until ApplyPlan
+	// admits the replacement; do not reinterpret it against the new proposal.
+	if feature.Design != nil && feature.PlanSupersession == nil && plan.SourceDesignDigest != feature.Design.OutputDigest {
 		return ErrInvalidFeature
 	}
 	stories := make(map[kernel.UUIDv7]struct{}, len(plan.Stories))
@@ -470,7 +516,39 @@ func (plan FeaturePlan) Validate(feature FeatureRequest) error {
 			return ErrInvalidFeature
 		}
 	}
+	if len(plan.Handoffs) > len(plan.Tasks)*len(plan.Tasks) {
+		return ErrInvalidFeature
+	}
+	seenHandoffs := make(map[string]struct{}, len(plan.Handoffs))
+	for _, handoff := range plan.Handoffs {
+		provider, providerFound := tasks[handoff.ProviderTaskID]
+		consumer, consumerFound := tasks[handoff.ConsumerTaskID]
+		if !providerFound || !consumerFound || provider.Purpose != kernel.PurposeImplementation || consumer.Purpose != kernel.PurposeImplementation || handoff.ProviderTaskID == handoff.ConsumerTaskID || !ValidHandoffCapability(handoff.Capability) || handoff.Contract == "" || len(handoff.Contract) > 4096 {
+			return ErrInvalidFeature
+		}
+		key := string(handoff.ConsumerTaskID) + "\x00" + handoff.Capability
+		if _, duplicate := seenHandoffs[key]; duplicate {
+			return ErrInvalidFeature
+		}
+		seenHandoffs[key] = struct{}{}
+		if !planTaskDependsTransitively(tasks, handoff.ConsumerTaskID, handoff.ProviderTaskID, make(map[kernel.UUIDv7]bool)) {
+			return ErrInvalidFeature
+		}
+	}
 	return nil
+}
+
+func planTaskDependsTransitively(tasks map[kernel.UUIDv7]PlannedTask, consumer, provider kernel.UUIDv7, visited map[kernel.UUIDv7]bool) bool {
+	if visited[consumer] {
+		return false
+	}
+	visited[consumer] = true
+	for _, dependency := range tasks[consumer].DependsOn {
+		if dependency == provider || planTaskDependsTransitively(tasks, dependency, provider, visited) {
+			return true
+		}
+	}
+	return false
 }
 
 func validPlannedTaskWriteScope(scope []string) bool {

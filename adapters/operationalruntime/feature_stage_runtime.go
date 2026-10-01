@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"sort"
 	"strings"
 	"time"
@@ -21,10 +22,12 @@ const (
 	stageRefinement             featurePlanningStage = "refinement"
 	stageSpecification          featurePlanningStage = "specification"
 	stageArchitecture           featurePlanningStage = "architecture"
+	stagePlanFinalization       featurePlanningStage = "plan-finalization"
 	stageArchitectureTaskReview featurePlanningStage = "architecture-task-review"
 	stageArchitectureReview     featurePlanningStage = "architecture-review"
 
 	invalidPlanningOutputReason         = "planning role returned an invalid structured handoff; a changed-condition recovery is required"
+	planDecisionRequiredReason          = "project manager requested a technical decision"
 	invalidPlanningReviewPolicy         = "operator-or-product-owner-must-amend-scope-or-cancel"
 	failedArchitectureTaskReviewReason  = "independent planned-task feasibility review did not pass"
 	failedArchitectureReviewReason      = "independent architecture feasibility review did not pass"
@@ -56,7 +59,7 @@ func (service *ProductionService) materializeFeatureIntake(ctx context.Context, 
 }
 
 func (service *ProductionService) reconcileFeaturePlanning(ctx context.Context) error {
-	features, err := service.Store.ListFeatures(ctx, []organization.FeatureStatus{organization.FeatureSubmitted, organization.FeatureReadyForPlanning, organization.FeatureSpecified}, 1000)
+	features, err := service.Store.ListFeatures(ctx, []organization.FeatureStatus{organization.FeatureSubmitted, organization.FeatureReadyForPlanning, organization.FeatureSpecified, organization.FeatureDesigned}, 1000)
 	if err != nil {
 		return err
 	}
@@ -134,7 +137,17 @@ func (service *ProductionService) reconcileFeaturePlanning(ctx context.Context) 
 			}
 		}
 		if state.Phase != kernel.PhaseCompleted {
-			if err := service.validateFeatureStageOutput(feature, stage, output); err != nil {
+			if stage == stagePlanFinalization {
+				outcome, summary, recognized := roleHandlerDisposition(output)
+				if recognized && outcome == "needs_decision" {
+					reason := planDecisionRequiredReason + ": " + summary
+					if _, blockErr := service.blockStructuredDecisionTask(ctx, feature, task, state, invocation, snapshot, reason, "plan-decision-required"); blockErr != nil {
+						return fmt.Errorf("feature %s %s decision block: %w", feature.ID, stage, blockErr)
+					}
+					continue
+				}
+			}
+			if err := service.validateFeatureStageOutputWithEvidence(ctx, feature, stage, output); err != nil {
 				if _, blockErr := service.blockStructuredDecisionTask(ctx, feature, task, state, invocation, snapshot, invalidPlanningOutputReason, "invalid-planning-output"); blockErr != nil {
 					return fmt.Errorf("feature %s %s invalid-output block: %w", feature.ID, stage, blockErr)
 				}
@@ -413,7 +426,7 @@ func (service *ProductionService) recoverValidFeatureStageOutput(ctx context.Con
 	if err != nil || !found {
 		return state, head, snapshot, false, err
 	}
-	if !isExactInvalidPlanningOutputBlock(blocked, task, invocation, service.policyAuthority) || service.validateFeatureStageOutput(feature, stage, output) != nil {
+	if !isExactInvalidPlanningOutputBlock(blocked, task, invocation, service.policyAuthority) || service.validateFeatureStageOutputWithEvidence(ctx, feature, stage, output) != nil {
 		return state, head, snapshot, false, nil
 	}
 	evidence, err := evidenceForInvocations(snapshot, invocation)
@@ -462,6 +475,8 @@ func planningStage(status organization.FeatureStatus) (featurePlanningStage, boo
 		return stageSpecification, true
 	case organization.FeatureSpecified:
 		return stageArchitecture, true
+	case organization.FeatureDesigned:
+		return stagePlanFinalization, true
 	default:
 		return "", false
 	}
@@ -477,7 +492,7 @@ func (service *ProductionService) ensureFeaturePlanningTaskFor(ctx context.Conte
 	switch stage {
 	case stageArchitecture:
 		round, err = service.desiredArchitecturePlanRound(ctx, feature)
-	case stageArchitectureTaskReview, stageArchitectureReview:
+	case stagePlanFinalization, stageArchitectureTaskReview, stageArchitectureReview:
 		var invocation kernel.WorkInvocation
 		invocation, _, err = service.featureArchitectureCandidate(ctx, feature)
 		if err == nil {
@@ -497,6 +512,13 @@ func (service *ProductionService) ensureFeaturePlanningTaskForRound(ctx context.
 	}
 	if stage == stageArchitecture {
 		description += " For every implementation task include write_scope: a small JSON array of repository-relative files or directories expected to change. Parallel tasks require disjoint write_scope values; if scopes overlap or are uncertain, declare a dependency so the later task starts from the earlier result."
+	}
+	if stage == stagePlanFinalization {
+		_, architectureOutput, candidateErr := service.featureArchitectureCandidate(ctx, feature)
+		if candidateErr != nil || feature.Design == nil || digestBytes(architectureOutput) != feature.Design.OutputDigest {
+			return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, errors.Join(organization.ErrInvalidFeature, candidateErr)
+		}
+		description += "\n\nARCHITECT_PROPOSAL_JSON:\n" + string(architectureOutput)
 	}
 	taskKey := featurePlanningTaskKey(stage, architectureRound, reviewedTaskIndex)
 	taskID := deterministicOperationalUUID("feature-planning-task", string(feature.ID), taskKey)
@@ -581,7 +603,7 @@ func (service *ProductionService) ensureFeaturePlanningTaskForRound(ctx context.
 		dependsOn = append(dependsOn, priorID)
 		parents = append(parents, kernel.DagParent{ParentEventID: priorHead, EdgeKind: kernel.EdgeCausal})
 	}
-	if stage == stageArchitectureTaskReview || stage == stageArchitectureReview {
+	if stage == stagePlanFinalization || stage == stageArchitectureTaskReview || stage == stageArchitectureReview {
 		architectureTaskID := featurePlanningTaskID(feature.ID, stageArchitecture, architectureRound, nil)
 		architectureState, architectureHead, architectureFound, architectureErr := service.Store.ReadAggregateHead(ctx, kernel.AggregateRef{Kind: kernel.AggregateTask, ID: architectureTaskID})
 		if architectureErr != nil || !architectureFound || architectureState.Phase != kernel.PhaseCompleted {
@@ -749,6 +771,8 @@ func legacyPlanningStageDefinition(stage featurePlanningStage) (string, kernel.W
 		return "project-manager", kernel.PurposeHandoff, kernel.RouteBoundedExecution, "Specify feature stories", "Turn the authoritative request into the smallest complete product specification. Default to one story. Split only when each proposed story would remain independently usable, testable, and releasable from the current baseline if every other proposed story were omitted. Apply that omission test before finish and merge dependent outcomes. A shared capability and its organization, persistence, operator surfaces, tests, documentation, and review are one story, not layer stories. Preserve every submitted acceptance criterion verbatim in a story; add none. Return exactly TEKROO_ORGANIZATIONAL_RESULT: followed by one JSON object with schema_version=1.0.0, result_type=FEATURE_SPECIFICATION, stories [{title, description, acceptance_criteria, priority}]. Teams carries operator constraints; omit design_constraints. Priority is LOW, NORMAL, HIGH, or CRITICAL. Do not add operational identities or delegate. Put only that result in finish.message and call finish once.", []string{"stories are finite, testable, and within the accepted feature scope"}, nil
 	case stageArchitecture:
 		return "architect", kernel.PurposeReplan, kernel.RouteComplexReasoning, "Design executable feature DAG", "Read AGENTS.md and inspect relevant source, interfaces, and tests with read-only repository tools. Cite only repository-relative files actually inspected. Name an external package or API only when inspected repository evidence supports it; a dependency-manifest entry alone is insufficient. Otherwise describe the capability and make API verification an implementation responsibility. Produce the smallest complete acyclic plan. Every task is implementation work, fits one run, and has complexity at most authored_task_policy.maximum_task_complexity. Do not author test, validation, security-review, or product-acceptance tasks; Teams appends those and whole-feature validation independently. Describe the work, dependencies, complexity, and risk; do not select an operational role. Teams applies execution_routing_policy after validating the plan. Give each task measurable, task-specific acceptance criteria. The feature specification remains authoritative, and Teams carries its complete story-level acceptance criteria into independent whole-feature validation and final product acceptance; do not duplicate them across tasks merely for bookkeeping. For stateful or concurrent work identify invariants, ownership boundaries, state transitions, linearization points, and failure or compensation semantics. A read-then-act sequence is not proof of atomicity. Explain partial-failure safety without prescribing a particular implementation unless requirements or inspected architecture demand it. Assign each invariant to exactly one owning component or layer; other tasks consume that owner's abstraction. Lower-level storage and transport must not depend on higher-level workflow, deployment, or team configuration. Compare every task with the architecture and decisions; remove duplicate, conflicting, or inverted ownership. Self-check for one consistent state model and remove unresolved mutually exclusive alternatives. Treat changes that affect identity, authority, credentials, external control surfaces, or routing as HIGH risk. Compute materialized_total=2*len(tasks)+count(HIGH-or-CRITICAL tasks)+2 and keep it within task_budget.maximum_total_tasks. Combine cohesive work and obey maximum_moderate_or_lower_implementation_tasks. Obey authored_task_policy: purpose=IMPLEMENTATION, validates=[], and backward depends_on indexes. story_index is one zero-based integer naming the task's primary story; it is never an array. depends_on and validates contain zero-based task indexes, so a second task depending on the first emits depends_on=[0]. Risk is LOW, MODERATE, HIGH, or CRITICAL. Do not add contract verification unless a normative contract change is requested. Return exactly TEKROO_ORGANIZATIONAL_RESULT: then one JSON object with schema_version=1.0.0, result_type=FEATURE_PLAN, architecture, design_decisions, assumptions, and tasks. Each task has story_index, title, description, acceptance_criteria, depends_on, validates, purpose, complexity, risk, critical_path, attempt_limit, and review_round_limit. Do not edit, invent paths, assign operational identities, or delegate. Put only that result in finish.message and call finish once.", []string{"the result is a repository-grounded finite acyclic task plan with explicit validation"}, nil
+	case stagePlanFinalization:
+		return "project-manager", kernel.PurposeHandoff, kernel.RouteBoundedExecution, "Finalize executable feature DAG", "Inspect the architect's immutable design proposal. Preserve its technical task descriptions and acceptance criteria. Assemble the final DAG by adding only justified dependencies, identify each cross-task capability handoff with its provider, consumer, capability, and precise contract, and check that every required capability is supplied upstream. Return FEATURE_EXECUTION_PLAN with source_design_digest, architecture, design_decisions, assumptions, tasks, and handoffs. If technical design must change, return needs_decision with the exact deficiency instead of silently rewriting it. Do not edit code or expand product scope.", []string{"the project manager owns a complete executable DAG whose cross-task handoffs close"}, nil
 	case stageArchitectureTaskReview:
 		return "", kernel.PurposeReplan, kernel.RouteComplexReasoning, "Review one planned task for feasibility", "Read AGENTS.md, then perform a read-only technical review of the exact planned task in the authoritative state. Evaluate it against the current repository plus the supplied transitive dependency contracts: those dependencies are promised earlier DAG outcomes, so do not reject a task merely because a dependency-provided artifact is absent from the baseline. Do reject a missing or insufficient dependency contract. Independently inspect or execute non-mutating checks needed to test every operation, state mutation, invariant, concurrency or atomicity claim, external API capability, and partial-failure claim prescribed by the task. Review the task exactly as written. An alternative implementation, replacement mechanism, reordered transition, weakened invariant, or modified acceptance criterion means the task requires change and must produce FAIL; it is not evidence for PASS. A component, collection, method, dependency, or extension point existing is not proof that the prescribed transition is legal. Do not rely on remembered external-platform behavior as evidence: when available tools cannot prove a material external semantic claim, list it in unverified_prescriptions and return FAIL. Independently verdict the complete task description and every acceptance criterion. Copy reviewed_dependency_indexes exactly from expected_reviewed_dependency_indexes. Emit exactly one acceptance_criterion_checks entry for each index in expected_acceptance_criterion_indexes, in that order, and emit no other criterion indexes. Set description_requires_task_change or requires_task_change whenever feasibility depends on changing the reviewed text. PASS is valid only when the description and every criterion are SUPPORTED without task changes and unverified_prescriptions is empty. Do not edit files, redesign the task, select operational roles, or delegate. Return exactly TEKROO_ORGANIZATIONAL_RESULT: followed by one JSON object with schema_version=1.0.0, result_type=FEATURE_PLAN_TASK_REVIEW, outcome=PASS or FAIL, reviewed_plan_sha256, reviewed_task_index, reviewed_task_sha256, reviewed_dependency_indexes, description_outcome (SUPPORTED or UNSUPPORTED), description_requires_task_change, acceptance_criterion_checks [{criterion_index, outcome, requires_task_change, reasons, evidence}], verified_operations, unverified_prescriptions, reasons, and evidence. Put only that result in finish.message and call finish once.", []string{"the exact planned-task description and every acceptance criterion are independently verified as implementable without substitution"}, nil
 	case stageArchitectureReview:
@@ -874,6 +898,15 @@ func featurePlanningDescription(feature organization.FeatureRequest, stage featu
 			ExecutionRouting: executionRouting,
 			Specification:    *feature.Specification,
 		}
+	case stagePlanFinalization:
+		if feature.Design == nil || feature.Specification == nil {
+			return "", organization.ErrInvalidFeature
+		}
+		state = struct {
+			FeatureID     kernel.UUIDv7                     `json:"feature_id"`
+			Specification organization.FeatureSpecification `json:"specification"`
+			DesignDigest  kernel.Digest                     `json:"design_digest"`
+		}{feature.ID, *feature.Specification, feature.Design.OutputDigest}
 	default:
 		return "", organization.ErrInvalidFeature
 	}
@@ -1519,6 +1552,69 @@ func (service *ProductionService) retainPlanningEvidenceBlob(ctx context.Context
 	return nil
 }
 
+func (service *ProductionService) validateFeatureStageOutputWithEvidence(ctx context.Context, feature organization.FeatureRequest, stage featurePlanningStage, output []byte) error {
+	if err := service.validateFeatureStageOutput(feature, stage, output); err != nil || stage != stagePlanFinalization {
+		return err
+	}
+	_, architectureOutput, err := service.featureArchitectureCandidate(ctx, feature)
+	if err != nil || feature.Design == nil || digestBytes(architectureOutput) != feature.Design.OutputDigest {
+		return organization.ErrInvalidFeature
+	}
+	proposed, err := parseArchitectureStageResult(architectureOutput, featureInputOperationalMarkers(feature), featureAuthorizedActorFQNs(feature)...)
+	if err != nil {
+		return err
+	}
+	finalized, err := parsePlanFinalizationStageResult(output, featureInputOperationalMarkers(feature), featureAuthorizedActorFQNs(feature)...)
+	if err != nil || finalized.SourceDesignDigest != feature.Design.OutputDigest || !reflect.DeepEqual(finalized.Architecture, proposed.Architecture) || !reflect.DeepEqual(finalized.DesignDecisions, proposed.DesignDecisions) || !reflect.DeepEqual(finalized.Assumptions, proposed.Assumptions) || len(finalized.Tasks) != len(proposed.Tasks) {
+		return organization.ErrInvalidFeature
+	}
+	for index := range proposed.Tasks {
+		finalTask, sourceTask := finalized.Tasks[index], proposed.Tasks[index]
+		for _, required := range sourceTask.DependsOn {
+			found := false
+			for _, actual := range finalTask.DependsOn {
+				found = found || actual == required
+			}
+			if !found {
+				return organization.ErrInvalidFeature
+			}
+		}
+		finalTask.DependsOn = sourceTask.DependsOn
+		finalTask.CriticalPath = sourceTask.CriticalPath
+		if !reflect.DeepEqual(finalTask, sourceTask) {
+			return organization.ErrInvalidFeature
+		}
+	}
+	return validateFinalizedHandoffs(finalized.Tasks, finalized.Handoffs)
+}
+
+func validateFinalizedHandoffs(tasks []architectureTaskResult, handoffs []architectureHandoffResult) error {
+	seen := make(map[string]struct{}, len(handoffs))
+	for _, handoff := range handoffs {
+		provider, consumer := handoff.ProviderTaskIndex, handoff.ConsumerTaskIndex
+		if provider >= uint32(len(tasks)) || consumer >= uint32(len(tasks)) || provider == consumer || tasks[provider].Purpose != kernel.PurposeImplementation || tasks[consumer].Purpose != kernel.PurposeImplementation || !organization.ValidHandoffCapability(handoff.Capability) || handoff.Contract == "" || len(handoff.Contract) > 4096 {
+			return organization.ErrInvalidFeature
+		}
+		key := fmt.Sprintf("%d\x00%s", consumer, handoff.Capability)
+		if _, duplicate := seen[key]; duplicate {
+			return organization.ErrInvalidFeature
+		}
+		seen[key] = struct{}{}
+		dependencies, err := architectureTaskDependencyContracts(tasks, consumer)
+		if err != nil {
+			return err
+		}
+		upstream := false
+		for _, dependency := range dependencies {
+			upstream = upstream || dependency.TaskIndex == provider
+		}
+		if !upstream {
+			return organization.ErrInvalidFeature
+		}
+	}
+	return nil
+}
+
 func (service *ProductionService) validateFeatureStageOutput(feature organization.FeatureRequest, stage featurePlanningStage, output []byte) error {
 	allowedActorFQNs := featureAuthorizedActorFQNs(feature)
 	allowedMarkers := featureInputOperationalMarkers(feature)
@@ -1539,6 +1635,16 @@ func (service *ProductionService) validateFeatureStageOutput(feature organizatio
 		}
 		_, err = normalizeArchitecturePlanTasks(feature, result.Tasks, structuralTaskRoutingPolicy())
 		return err
+	case stagePlanFinalization:
+		result, err := parsePlanFinalizationStageResult(output, allowedMarkers, allowedActorFQNs...)
+		if err != nil || feature.Design == nil || result.SourceDesignDigest != feature.Design.OutputDigest {
+			return organization.ErrInvalidFeature
+		}
+		_, err = normalizeArchitecturePlanTasks(feature, result.Tasks, structuralTaskRoutingPolicy())
+		if err != nil {
+			return err
+		}
+		return validateFinalizedHandoffs(result.Tasks, result.Handoffs)
 	case stageArchitectureTaskReview:
 		_, err := parseArchitectureTaskReviewStageResult(output)
 		return err
@@ -1578,6 +1684,27 @@ func (service *ProductionService) applyFeatureStageOutput(ctx context.Context, f
 		return err
 	case stageArchitecture:
 		result, err := parseArchitectureStageResult(output, allowedMarkers, allowedActorFQNs...)
+		if err != nil {
+			return err
+		}
+		if service.WorkflowLibrary != nil {
+			definition, lookupErr := service.WorkflowLibrary.LookupTrigger("tekroo.message.feature.submitted")
+			if lookupErr != nil {
+				return lookupErr
+			}
+			if _, finalizationEnabled := configuredWorkflowStage(definition, "finalize-plan"); finalizationEnabled {
+				_, err = service.Features.RecordDesign(ctx, feature.ID, feature.Revision, organization.FeatureDesignCandidate{PreparedBy: invocation.ActorFQN, PreparedExecution: invocation.Execution, OutputDigest: *invocation.OutputDigest, PreparedAt: preparedAt})
+				return err
+			}
+		}
+		plan, err := service.buildExecutableFeaturePlan(ctx, feature, invocation, result, preparedAt)
+		if err != nil {
+			return err
+		}
+		_, err = service.Features.ApplyPlan(ctx, feature.ID, feature.Revision, plan)
+		return err
+	case stagePlanFinalization:
+		result, err := parsePlanFinalizationStageResult(output, allowedMarkers, allowedActorFQNs...)
 		if err != nil {
 			return err
 		}
@@ -1669,7 +1796,14 @@ func (service *ProductionService) buildExecutableFeaturePlan(ctx context.Context
 	if err != nil {
 		return organization.FeaturePlan{}, fmt.Errorf("build plan: validation workspace bindings: %w", err)
 	}
-	plan := organization.FeaturePlan{Version: planVersion, PreparedBy: invocation.ActorFQN, PreparedExecution: invocation.Execution, Architecture: string(result.Architecture), DesignDecisions: result.DesignDecisions, Assumptions: result.Assumptions, Stories: planStories, Tasks: tasks, CreatedAt: createdAt}
+	handoffs := make([]organization.PlannedHandoff, 0, len(result.Handoffs))
+	for _, handoff := range result.Handoffs {
+		if int(handoff.ProviderTaskIndex) >= len(taskIDs) || int(handoff.ConsumerTaskIndex) >= len(taskIDs) {
+			return organization.FeaturePlan{}, organization.ErrInvalidFeature
+		}
+		handoffs = append(handoffs, organization.PlannedHandoff{ProviderTaskID: taskIDs[handoff.ProviderTaskIndex], ConsumerTaskID: taskIDs[handoff.ConsumerTaskIndex], Capability: handoff.Capability, Contract: handoff.Contract})
+	}
+	plan := organization.FeaturePlan{Version: planVersion, PreparedBy: invocation.ActorFQN, PreparedExecution: invocation.Execution, Architecture: string(result.Architecture), DesignDecisions: result.DesignDecisions, Assumptions: result.Assumptions, SourceDesignDigest: result.SourceDesignDigest, Stories: planStories, Tasks: tasks, Handoffs: handoffs, CreatedAt: createdAt}
 	if plan.Validate(feature) != nil {
 		return organization.FeaturePlan{}, fmt.Errorf("build plan: assembled plan validation failed: %w", plan.Validate(feature))
 	}

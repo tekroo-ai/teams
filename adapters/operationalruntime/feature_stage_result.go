@@ -63,12 +63,21 @@ type architectureTaskResult struct {
 }
 
 type architectureStageResult struct {
-	SchemaVersion   string                   `json:"schema_version"`
-	ResultType      string                   `json:"result_type"`
-	Architecture    stageText                `json:"architecture"`
-	DesignDecisions stageDecisionList        `json:"design_decisions"`
-	Assumptions     []string                 `json:"assumptions"`
-	Tasks           []architectureTaskResult `json:"tasks"`
+	SchemaVersion      string                      `json:"schema_version"`
+	ResultType         string                      `json:"result_type"`
+	Architecture       stageText                   `json:"architecture"`
+	DesignDecisions    stageDecisionList           `json:"design_decisions"`
+	Assumptions        []string                    `json:"assumptions"`
+	Tasks              []architectureTaskResult    `json:"tasks"`
+	SourceDesignDigest kernel.Digest               `json:"source_design_digest,omitempty"`
+	Handoffs           []architectureHandoffResult `json:"handoffs,omitempty"`
+}
+
+type architectureHandoffResult struct {
+	ProviderTaskIndex uint32 `json:"provider_task_index"`
+	ConsumerTaskIndex uint32 `json:"consumer_task_index"`
+	Capability        string `json:"capability"`
+	Contract          string `json:"contract"`
 }
 
 // stageDecisionList accepts design decisions as plain strings or as
@@ -418,7 +427,30 @@ func parseSpecificationStageResult(output []byte, allowedMarkers []string, allow
 
 func parseArchitectureStageResult(output []byte, allowedMarkers []string, allowedActorFQNs ...kernel.ActorFQN) (architectureStageResult, error) {
 	var result architectureStageResult
-	if decodeOrganizationalStageResult(output, &result) != nil || result.SchemaVersion != "1.0.0" || result.ResultType != "FEATURE_PLAN" || strings.TrimSpace(string(result.Architecture)) == "" || len(result.Architecture) > 64<<10 || !validStageStrings(result.DesignDecisions, false) || !validStageStrings(result.Assumptions, false) || len(result.Tasks) == 0 || len(result.Tasks) > organization.MaximumFeatureTasks {
+	if decodeOrganizationalStageResult(output, &result) != nil || result.ResultType != "FEATURE_PLAN" || result.SourceDesignDigest != "" || len(result.Handoffs) != 0 {
+		return architectureStageResult{}, organization.ErrInvalidFeature
+	}
+	return validateArchitectureStageResult(result, allowedMarkers, allowedActorFQNs...)
+}
+
+func parsePlanFinalizationStageResult(output []byte, allowedMarkers []string, allowedActorFQNs ...kernel.ActorFQN) (architectureStageResult, error) {
+	var result architectureStageResult
+	if decodeOrganizationalStageResult(output, &result) != nil || result.ResultType != "FEATURE_EXECUTION_PLAN" || !result.SourceDesignDigest.Valid() || result.Handoffs == nil {
+		return architectureStageResult{}, organization.ErrInvalidFeature
+	}
+	if len(result.Handoffs) > organization.MaximumFeatureTasks*organization.MaximumFeatureTasks {
+		return architectureStageResult{}, organization.ErrInvalidFeature
+	}
+	for _, handoff := range result.Handoffs {
+		if handoff.ProviderTaskIndex >= uint32(len(result.Tasks)) || handoff.ConsumerTaskIndex >= uint32(len(result.Tasks)) || handoff.Capability == "" || handoff.Contract == "" || len(handoff.Contract) > 4096 {
+			return architectureStageResult{}, organization.ErrInvalidFeature
+		}
+	}
+	return validateArchitectureStageResult(result, allowedMarkers, allowedActorFQNs...)
+}
+
+func validateArchitectureStageResult(result architectureStageResult, allowedMarkers []string, allowedActorFQNs ...kernel.ActorFQN) (architectureStageResult, error) {
+	if result.SchemaVersion != "1.0.0" || strings.TrimSpace(string(result.Architecture)) == "" || len(result.Architecture) > 64<<10 || !validStageStrings(result.DesignDecisions, false) || !validStageStrings(result.Assumptions, false) || len(result.Tasks) == 0 || len(result.Tasks) > organization.MaximumFeatureTasks {
 		return architectureStageResult{}, organization.ErrInvalidFeature
 	}
 	for index := range result.Tasks {

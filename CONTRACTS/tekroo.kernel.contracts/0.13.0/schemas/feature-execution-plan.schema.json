@@ -1,0 +1,265 @@
+{
+  "$id": "tekroo.kernel.contracts/0.13.0/schemas/feature-execution-plan.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "architecture": {
+      "description": "Architecture rationale as prose or ordered paragraphs.",
+      "oneOf": [
+        {
+          "maxLength": 65536,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "type": "array"
+        }
+      ]
+    },
+    "assumptions": {
+      "items": {
+        "maxLength": 4096,
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxItems": 64,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "design_decisions": {
+      "items": {
+        "oneOf": [
+          {
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "decision": {
+                "items": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maxItems": 64,
+                "minItems": 1,
+                "minLength": 1,
+                "type": [
+                  "string",
+                  "array"
+                ]
+              },
+              "rationale": {
+                "items": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maxItems": 64,
+                "minItems": 1,
+                "type": [
+                  "string",
+                  "array"
+                ]
+              }
+            },
+            "required": [
+              "decision"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "maxItems": 64,
+      "type": "array"
+    },
+    "handoffs": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "capability": {
+            "pattern": "^[a-z0-9](?:[a-z0-9.-]{0,126}[a-z0-9])?$",
+            "type": "string"
+          },
+          "consumer_task_index": {
+            "maximum": 127,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "contract": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          },
+          "provider_task_index": {
+            "maximum": 127,
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "provider_task_index",
+          "consumer_task_index",
+          "capability",
+          "contract"
+        ],
+        "type": "object"
+      },
+      "maxItems": 16384,
+      "type": "array"
+    },
+    "result_type": {
+      "const": "FEATURE_EXECUTION_PLAN"
+    },
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "source_design_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "tasks": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "acceptance_criteria": {
+            "items": {
+              "maxLength": 4096,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 64,
+            "minItems": 1,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "attempt_limit": {
+            "maximum": 16,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "complexity": {
+            "maximum": 10,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "covers": {
+            "items": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "maxItems": 64,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "critical_path": {
+            "type": "boolean"
+          },
+          "depends_on": {
+            "items": {
+              "maximum": 127,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "maxItems": 128,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "description": {
+            "maxLength": 65536,
+            "minLength": 1,
+            "type": "string"
+          },
+          "purpose": {
+            "enum": [
+              "INVESTIGATION",
+              "IMPLEMENTATION",
+              "VALIDATION",
+              "REVIEW",
+              "REPAIR",
+              "HANDOFF",
+              "REPLAN",
+              "PROMOTION",
+              "ESCALATION"
+            ]
+          },
+          "review_round_limit": {
+            "maximum": 8,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "risk": {
+            "description": "Classification only; explain the risk in the task description.",
+            "enum": [
+              "LOW",
+              "MODERATE",
+              "HIGH",
+              "CRITICAL"
+            ]
+          },
+          "story_index": {
+            "maximum": 31,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "title": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "validates": {
+            "items": {
+              "maximum": 127,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "maxItems": 128,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "write_scope": {
+            "items": {
+              "maxLength": 1024,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 32,
+            "type": "array",
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "story_index",
+          "title",
+          "description",
+          "acceptance_criteria",
+          "purpose",
+          "complexity",
+          "risk",
+          "attempt_limit",
+          "review_round_limit"
+        ],
+        "type": "object"
+      },
+      "maxItems": 128,
+      "minItems": 1,
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema_version",
+    "result_type",
+    "source_design_digest",
+    "architecture",
+    "tasks",
+    "handoffs"
+  ],
+  "title": "PM-finalized executable feature plan",
+  "type": "object"
+}

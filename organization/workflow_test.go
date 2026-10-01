@@ -133,3 +133,19 @@ func TestShippedSoftwareWorkflowLoadsByFrozenDigest(t *testing.T) {
 		t.Fatalf("unexpected shipped workflow: %+v", definition)
 	}
 }
+
+func TestPlan013WorkflowAddsPMFinalizationWithoutChangingV1(t *testing.T) {
+	workingDirectory, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(filepath.Dir(workingDirectory), "config", "workflows", "software-development.v2.json")
+	digest := kernel.Digest("076b2155772efc1b0caff2fd3c00e1b5af84ec1ec9264b64c1e24e214b366a34")
+	definition, err := LoadWorkflowDefinition(path, digest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if definition.Version != "2.0.0" || len(definition.Stages) != 4 || definition.Stages[3].StageID != "finalize-plan" || len(definition.Stages[3].DependsOn) != 1 || definition.Stages[3].DependsOn[0] != "design" {
+		t.Fatalf("PM finalization stage was not bound after design: %+v", definition.Stages)
+	}
+}

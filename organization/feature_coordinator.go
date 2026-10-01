@@ -116,7 +116,7 @@ func (coordinator *FeatureCoordinator) ApplyPlan(ctx context.Context, featureID 
 	if !found {
 		return FeatureRequest{}, ErrFeatureNotFound
 	}
-	if feature.Revision != expectedRevision || feature.Status != FeatureSpecified || feature.Specification == nil {
+	if feature.Revision != expectedRevision || (feature.Status != FeatureSpecified && feature.Status != FeatureDesigned) || feature.Specification == nil {
 		return FeatureRequest{}, ErrFeatureRevisionConflict
 	}
 	expectedPlanVersion := uint64(1)
@@ -130,7 +130,14 @@ func (coordinator *FeatureCoordinator) ApplyPlan(ctx context.Context, featureID 
 	if feature.Plan != nil {
 		priorStories = feature.Plan.Stories
 	}
-	if plan.Version != expectedPlanVersion || plan.Validate(feature) != nil || !strings.Contains(string(plan.PreparedBy), "::architect-") || !featurePlanStoriesMatchSpecification(plan.Stories, feature.Specification.Stories, priorStories, plan.Version > 1) {
+	if plan.Version != expectedPlanVersion || plan.Validate(feature) != nil || !featurePlanStoriesMatchSpecification(plan.Stories, feature.Specification.Stories, priorStories, plan.Version > 1) {
+		return FeatureRequest{}, ErrInvalidFeature
+	}
+	if feature.Design != nil {
+		if feature.Status != FeatureDesigned || plan.SourceDesignDigest != feature.Design.OutputDigest || !featureActorHasRole(plan.PreparedBy, "project-manager") {
+			return FeatureRequest{}, ErrInvalidFeature
+		}
+	} else if !featureActorHasRole(plan.PreparedBy, "architect") {
 		return FeatureRequest{}, ErrInvalidFeature
 	}
 	planner, found, err := coordinator.host.Status(ctx, plan.PreparedBy)
@@ -153,6 +160,42 @@ func (coordinator *FeatureCoordinator) ApplyPlan(ctx context.Context, featureID 
 		return FeatureRequest{}, err
 	}
 	return coordinator.store.ApplyFeaturePlan(ctx, feature.ID, expectedRevision, plan, coordinator.clock.Now().UTC())
+}
+
+// RecordDesign sends the architect's immutable proposal to the project
+// manager. Only the PM's successor plan may authorize task materialization.
+func (coordinator *FeatureCoordinator) RecordDesign(ctx context.Context, featureID kernel.UUIDv7, expectedRevision uint64, design FeatureDesignCandidate) (FeatureRequest, error) {
+	feature, err := coordinator.currentFeature(ctx, featureID, expectedRevision, FeatureSpecified)
+	if err != nil {
+		return FeatureRequest{}, err
+	}
+	if design.Validate(feature) != nil || !featureActorHasRole(design.PreparedBy, "architect") {
+		return FeatureRequest{}, ErrInvalidFeature
+	}
+	actor, found, err := coordinator.host.Status(ctx, design.PreparedBy)
+	if err != nil || !found || actor.Status != RoleIdle {
+		return FeatureRequest{}, errors.Join(ErrStaleOrganizationalClaim, err)
+	}
+	recipient, err := coordinator.ensurePrimaryRole(ctx, "project-manager")
+	if err != nil {
+		return FeatureRequest{}, err
+	}
+	message, err := coordinator.handoffMessage(feature, design.PreparedBy, design.PreparedExecution, recipient.ActorFQN, "tekroo.message.feature.design-proposed", PurposeHandoff, map[string]any{"feature_id": feature.ID, "design": design})
+	if err != nil {
+		return FeatureRequest{}, err
+	}
+	next := feature
+	next.Revision++
+	next.Status = FeatureDesigned
+	next.Design = &design
+	next.UpdatedAt = coordinator.clock.Now().UTC()
+	next.LastMessageID, next.LastStepID, next.LastHop = message.ID, message.Flow.StepID, message.Flow.Hop
+	return coordinator.store.AdvanceFeature(ctx, next, expectedRevision, &message)
+}
+
+func featureActorHasRole(actor kernel.ActorFQN, expected kernel.RoleFQRN) bool {
+	role, err := kernel.RoleFQRNFromActor(actor)
+	return err == nil && role == expected
 }
 
 func featurePlanStoriesMatchSpecification(planned, specified, prior []PlannedStory, replacement bool) bool {
@@ -195,6 +238,7 @@ func (coordinator *FeatureCoordinator) RequestReplan(ctx context.Context, featur
 	next := feature
 	next.Revision++
 	next.Status = FeatureSpecified
+	next.Design = nil
 	next.ScopeRevision++
 	next.PlanSupersession = &supersession
 	next.Acceptance = nil

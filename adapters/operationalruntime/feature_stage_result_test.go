@@ -21,6 +21,42 @@ func TestFeatureStageParserAcceptsValidatedHandlerEnvelope(t *testing.T) {
 	}
 }
 
+func TestPlan013FinalizationRequiresDesignDigestAndStructuredHandoffs(t *testing.T) {
+	base := `{"schema_version":"1.0.0","result_type":"FEATURE_EXECUTION_PLAN","source_design_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","architecture":"bounded","design_decisions":[],"assumptions":[],"tasks":[{"story_index":0,"title":"Implement","description":"Implement it.","acceptance_criteria":["works"],"depends_on":[],"validates":[],"purpose":"IMPLEMENTATION","complexity":3,"risk":"LOW","critical_path":true,"attempt_limit":2,"review_round_limit":2}],"handoffs":[]}`
+	valid := []byte(application.OrganizationalResultMarker + "\n" + base)
+	result, err := parsePlanFinalizationStageResult(valid, nil)
+	if err != nil || len(result.Tasks) != 1 || result.Handoffs == nil {
+		t.Fatalf("valid PM plan rejected: result=%+v err=%v", result, err)
+	}
+	missingHandoffs := []byte(application.OrganizationalResultMarker + "\n" + strings.Replace(base, `,"handoffs":[]`, "", 1))
+	if _, err := parsePlanFinalizationStageResult(missingHandoffs, nil); err == nil {
+		t.Fatal("PM plan without explicit handoff list accepted")
+	}
+	stringEncoded := []byte(application.OrganizationalResultMarker + "\n" + strings.Replace(base, `"handoffs":[]`, `"handoffs":"[]"`, 1))
+	if _, err := parsePlanFinalizationStageResult(stringEncoded, nil); err == nil {
+		t.Fatal("string-encoded handoff JSON accepted")
+	}
+}
+
+func TestPlan013HandoffClosureRunsBeforePMTaskCompletion(t *testing.T) {
+	tasks := []architectureTaskResult{
+		{Purpose: kernel.PurposeImplementation},
+		{Purpose: kernel.PurposeImplementation, DependsOn: []uint32{0}},
+	}
+	valid := architectureHandoffResult{ProviderTaskIndex: 0, ConsumerTaskIndex: 1, Capability: "alias.remove", Contract: "RemoveActorAlias removes a binding atomically"}
+	if err := validateFinalizedHandoffs(tasks, []architectureHandoffResult{valid}); err != nil {
+		t.Fatalf("upstream provider rejected: %v", err)
+	}
+	tasks[1].DependsOn = nil
+	if validateFinalizedHandoffs(tasks, []architectureHandoffResult{valid}) == nil {
+		t.Fatal("handoff from non-predecessor accepted")
+	}
+	tasks[1].DependsOn = []uint32{0}
+	if validateFinalizedHandoffs(tasks, []architectureHandoffResult{valid, valid}) == nil {
+		t.Fatal("duplicate consumer capability accepted")
+	}
+}
+
 func TestInvalidPlanningOutputBlockMatchingIsExact(t *testing.T) {
 	task := organization.PlannedTask{ID: "00000000-0000-7000-8000-000000000101"}
 	invocation := kernel.WorkInvocation{

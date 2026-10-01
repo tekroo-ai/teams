@@ -1,0 +1,397 @@
+{
+  "contractIdentity": "tekroo.kernel.contracts/0.13.0",
+  "fixtures": [
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "P13-PLAN-001",
+      "given": {
+        "designDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sourceTasks": [
+          {
+            "dependsOn": [],
+            "description": "Implement lookup",
+            "title": "Provide alias lookup"
+          },
+          {
+            "dependsOn": [
+              0
+            ],
+            "description": "Integrate lookup",
+            "title": "Use alias lookup"
+          }
+        ]
+      },
+      "kind": "FEATURE_PLAN_MODEL",
+      "model": "PM_FINALIZATION",
+      "scenario": "PM_FINALIZES_ARCHITECT_PROPOSAL",
+      "then": {
+        "expected": {
+          "admitted": true,
+          "reason": null
+        }
+      },
+      "when": {
+        "authorRole": "project-manager",
+        "finalTasks": [
+          {
+            "dependsOn": [],
+            "description": "Implement lookup",
+            "title": "Provide alias lookup"
+          },
+          {
+            "dependsOn": [
+              0
+            ],
+            "description": "Integrate lookup",
+            "title": "Use alias lookup"
+          }
+        ],
+        "handoffs": [
+          {
+            "capability": "alias.lookup",
+            "consumerTaskIndex": 1,
+            "contract": "Lookup returns a resolved actor.",
+            "providerTaskIndex": 0
+          }
+        ],
+        "sourceDesignDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "P13-PLAN-002",
+      "given": {
+        "designDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sourceTasks": [
+          {
+            "dependsOn": [],
+            "description": "Implement lookup",
+            "title": "Provide alias lookup"
+          },
+          {
+            "dependsOn": [
+              0
+            ],
+            "description": "Integrate lookup",
+            "title": "Use alias lookup"
+          }
+        ]
+      },
+      "kind": "FEATURE_PLAN_MODEL",
+      "model": "PM_FINALIZATION",
+      "scenario": "TECHNICAL_MUTATION_WITHOUT_ARCHITECT",
+      "then": {
+        "expected": {
+          "admitted": false,
+          "reason": "TECHNICAL_MUTATION"
+        }
+      },
+      "when": {
+        "authorRole": "project-manager",
+        "finalTasks": [
+          {
+            "dependsOn": [],
+            "description": "Different design",
+            "title": "Provide alias lookup"
+          },
+          {
+            "dependsOn": [
+              0
+            ],
+            "description": "Integrate lookup",
+            "title": "Use alias lookup"
+          }
+        ],
+        "handoffs": [
+          {
+            "capability": "alias.lookup",
+            "consumerTaskIndex": 1,
+            "contract": "Lookup returns a resolved actor.",
+            "providerTaskIndex": 0
+          }
+        ],
+        "sourceDesignDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "P13-PLAN-003",
+      "given": {
+        "designDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sourceTasks": [
+          {
+            "dependsOn": [],
+            "description": "Implement lookup",
+            "title": "Provide alias lookup"
+          },
+          {
+            "dependsOn": [
+              0
+            ],
+            "description": "Integrate lookup",
+            "title": "Use alias lookup"
+          }
+        ]
+      },
+      "kind": "FEATURE_PLAN_MODEL",
+      "model": "PM_FINALIZATION",
+      "scenario": "PROVIDER_NOT_UPSTREAM",
+      "then": {
+        "expected": {
+          "admitted": false,
+          "reason": "PROVIDER_NOT_UPSTREAM"
+        }
+      },
+      "when": {
+        "authorRole": "project-manager",
+        "finalTasks": [
+          {
+            "dependsOn": [],
+            "description": "Implement lookup",
+            "title": "Provide alias lookup"
+          },
+          {
+            "dependsOn": [
+              0
+            ],
+            "description": "Integrate lookup",
+            "title": "Use alias lookup"
+          }
+        ],
+        "handoffs": [
+          {
+            "capability": "alias.lookup",
+            "consumerTaskIndex": 0,
+            "contract": "Lookup returns a resolved actor.",
+            "providerTaskIndex": 1
+          }
+        ],
+        "sourceDesignDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "P13-PLAN-004",
+      "given": {
+        "designDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sourceTasks": [
+          {
+            "dependsOn": [],
+            "description": "Implement lookup",
+            "title": "Provide alias lookup"
+          },
+          {
+            "dependsOn": [
+              0
+            ],
+            "description": "Integrate lookup",
+            "title": "Use alias lookup"
+          }
+        ]
+      },
+      "kind": "FEATURE_PLAN_MODEL",
+      "model": "PM_FINALIZATION",
+      "scenario": "MISSING_PROVIDER",
+      "then": {
+        "expected": {
+          "admitted": false,
+          "reason": "MISSING_ENDPOINT"
+        }
+      },
+      "when": {
+        "authorRole": "project-manager",
+        "finalTasks": [
+          {
+            "dependsOn": [],
+            "description": "Implement lookup",
+            "title": "Provide alias lookup"
+          },
+          {
+            "dependsOn": [
+              0
+            ],
+            "description": "Integrate lookup",
+            "title": "Use alias lookup"
+          }
+        ],
+        "handoffs": [
+          {
+            "capability": "alias.lookup",
+            "consumerTaskIndex": 1,
+            "contract": "Lookup returns a resolved actor.",
+            "providerTaskIndex": 2
+          }
+        ],
+        "sourceDesignDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "P13-PLAN-005",
+      "given": {
+        "designDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sourceTasks": [
+          {
+            "dependsOn": [],
+            "description": "Implement lookup",
+            "title": "Provide alias lookup"
+          },
+          {
+            "dependsOn": [
+              0
+            ],
+            "description": "Integrate lookup",
+            "title": "Use alias lookup"
+          }
+        ]
+      },
+      "kind": "FEATURE_PLAN_MODEL",
+      "model": "PM_FINALIZATION",
+      "scenario": "DUPLICATE_CONSUMER_CAPABILITY",
+      "then": {
+        "expected": {
+          "admitted": false,
+          "reason": "DUPLICATE_CAPABILITY"
+        }
+      },
+      "when": {
+        "authorRole": "project-manager",
+        "finalTasks": [
+          {
+            "dependsOn": [],
+            "description": "Implement lookup",
+            "title": "Provide alias lookup"
+          },
+          {
+            "dependsOn": [
+              0
+            ],
+            "description": "Integrate lookup",
+            "title": "Use alias lookup"
+          }
+        ],
+        "handoffs": [
+          {
+            "capability": "alias.lookup",
+            "consumerTaskIndex": 1,
+            "contract": "Lookup returns a resolved actor.",
+            "providerTaskIndex": 0
+          },
+          {
+            "capability": "alias.lookup",
+            "consumerTaskIndex": 1,
+            "contract": "Lookup returns a resolved actor.",
+            "providerTaskIndex": 0
+          }
+        ],
+        "sourceDesignDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "P13-PLAN-006",
+      "given": {
+        "designDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sourceTasks": [
+          {
+            "dependsOn": [],
+            "description": "Implement lookup",
+            "title": "Provide alias lookup"
+          },
+          {
+            "dependsOn": [
+              0
+            ],
+            "description": "Integrate lookup",
+            "title": "Use alias lookup"
+          }
+        ]
+      },
+      "kind": "FEATURE_PLAN_MODEL",
+      "model": "PM_FINALIZATION",
+      "scenario": "ORDERING_EDGE_WITHOUT_CAPABILITY",
+      "then": {
+        "expected": {
+          "admitted": true,
+          "reason": null
+        }
+      },
+      "when": {
+        "authorRole": "project-manager",
+        "finalTasks": [
+          {
+            "dependsOn": [],
+            "description": "Implement lookup",
+            "title": "Provide alias lookup"
+          },
+          {
+            "dependsOn": [
+              0
+            ],
+            "description": "Integrate lookup",
+            "title": "Use alias lookup"
+          }
+        ],
+        "handoffs": [],
+        "sourceDesignDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    {
+      "classification": "NORMATIVE_EXAMPLE",
+      "fixtureId": "P13-PLAN-007",
+      "given": {
+        "designDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sourceTasks": [
+          {
+            "dependsOn": [],
+            "description": "Implement lookup",
+            "title": "Provide alias lookup"
+          },
+          {
+            "dependsOn": [
+              0
+            ],
+            "description": "Integrate lookup",
+            "title": "Use alias lookup"
+          }
+        ]
+      },
+      "kind": "FEATURE_PLAN_MODEL",
+      "model": "PM_FINALIZATION",
+      "scenario": "WRONG_DESIGN_DIGEST",
+      "then": {
+        "expected": {
+          "admitted": false,
+          "reason": "DESIGN_DIGEST_MISMATCH"
+        }
+      },
+      "when": {
+        "authorRole": "project-manager",
+        "finalTasks": [
+          {
+            "dependsOn": [],
+            "description": "Implement lookup",
+            "title": "Provide alias lookup"
+          },
+          {
+            "dependsOn": [
+              0
+            ],
+            "description": "Integrate lookup",
+            "title": "Use alias lookup"
+          }
+        ],
+        "handoffs": [
+          {
+            "capability": "alias.lookup",
+            "consumerTaskIndex": 1,
+            "contract": "Lookup returns a resolved actor.",
+            "providerTaskIndex": 0
+          }
+        ],
+        "sourceDesignDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      }
+    }
+  ],
+  "schemaVersion": "1.0.0"
+}

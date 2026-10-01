@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["feature_id", "design"],
+  "properties": {
+    "feature_id": {"type": "string", "format": "uuid"},
+    "design": {
+      "type": "object", "additionalProperties": false,
+      "required": ["prepared_by", "prepared_execution", "output_digest", "prepared_at"],
+      "properties": {
+        "prepared_by": {"type": "string", "minLength": 1},
+        "prepared_execution": {"type": "object"},
+        "output_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "prepared_at": {"type": "string", "format": "date-time"}
+      }
+    }
+  }
+}

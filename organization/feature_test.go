@@ -81,6 +81,40 @@ func TestFeaturePlanRejectsCyclesAndMaterializesFiniteDAG(t *testing.T) {
 	}
 }
 
+func TestPMPlanHandoffRequiresAnUpstreamProvider(t *testing.T) {
+	now := time.Date(2026, 9, 30, 12, 0, 0, 0, time.UTC)
+	storyID, providerID, consumerID := featureUUID(10), featureUUID(11), featureUUID(12)
+	feature := organization.FeatureRequest{Input: featureInput(), CreatedAt: now}
+	owner := activeRole("teams::coder-1", "coder", featureUUID(90), featureDigest('2'))
+	reviewer := activeRole("teams::tester-1", "tester", featureUUID(91), featureDigest('3'))
+	implementation := func(id kernel.UUIDv7, title string, deps []kernel.UUIDv7) organization.PlannedTask {
+		return organization.PlannedTask{ID: id, StoryID: storyID, Title: title, Description: title, AcceptanceCriteria: []string{"works"}, DependsOn: deps, Owner: owner.ActorFQN, ModelProfile: owner.ModelProfile, DecisionRoute: kernel.RouteBoundedExecution, Purpose: kernel.PurposeImplementation, Complexity: 2, Risk: organization.RiskLow, AttemptLimit: 2, ReviewRoundLimit: 1}
+	}
+	validation := func(id, target kernel.UUIDv7) organization.PlannedTask {
+		return organization.PlannedTask{ID: id, StoryID: storyID, Title: "Validate", Description: "Validate", AcceptanceCriteria: []string{"verified"}, DependsOn: []kernel.UUIDv7{target}, Validates: []kernel.UUIDv7{target}, Owner: reviewer.ActorFQN, ModelProfile: reviewer.ModelProfile, DecisionRoute: kernel.RouteBoundedExecution, Purpose: kernel.PurposeValidation, Complexity: 2, Risk: organization.RiskLow, AttemptLimit: 2, ReviewRoundLimit: 1}
+	}
+	plan := organization.FeaturePlan{Version: 1, PreparedBy: "teams::project-manager-1", PreparedExecution: kernel.ExecutionTuple{ExecutionID: featureUUID(92), FencingEpoch: 1}, Architecture: "Small design", Stories: []organization.PlannedStory{{ID: storyID, Title: "Story", Description: "Description", AcceptanceCriteria: []string{"works"}, Priority: organization.PriorityNormal}}, Tasks: []organization.PlannedTask{implementation(providerID, "Provide alias removal", nil), implementation(consumerID, "Use alias removal", []kernel.UUIDv7{providerID}), validation(featureUUID(13), providerID), validation(featureUUID(14), consumerID)}, Handoffs: []organization.PlannedHandoff{{ProviderTaskID: providerID, ConsumerTaskID: consumerID, Capability: "alias.remove", Contract: "RemoveActorAlias removes the bound alias atomically"}}, CreatedAt: now.Add(time.Minute)}
+	if err := plan.Validate(feature); err != nil {
+		t.Fatalf("valid handoff rejected: %v", err)
+	}
+	missing := plan
+	missing.Handoffs = []organization.PlannedHandoff{{ProviderTaskID: featureUUID(99), ConsumerTaskID: consumerID, Capability: "alias.remove", Contract: "remove"}}
+	if missing.Validate(feature) == nil {
+		t.Fatal("missing provider accepted")
+	}
+	nonUpstream := plan
+	nonUpstream.Tasks = append([]organization.PlannedTask(nil), plan.Tasks...)
+	nonUpstream.Tasks[1].DependsOn = nil
+	if nonUpstream.Validate(feature) == nil {
+		t.Fatal("non-upstream provider accepted")
+	}
+	duplicate := plan
+	duplicate.Handoffs = append(append([]organization.PlannedHandoff(nil), plan.Handoffs...), plan.Handoffs[0])
+	if duplicate.Validate(feature) == nil {
+		t.Fatal("duplicate consumer capability accepted")
+	}
+}
+
 func TestFeatureRoleHandoffsFormFiniteProductOwnerProjectManagerArchitectDAG(t *testing.T) {
 	now := time.Date(2026, 8, 31, 12, 0, 0, 0, time.UTC)
 	operator := activeRole("teams::operator-1", "operator", featureUUID(71), featureDigest('3'))
@@ -110,6 +144,70 @@ func TestFeatureRoleHandoffsFormFiniteProductOwnerProjectManagerArchitectDAG(t *
 	specified, err := coordinator.Specify(context.Background(), feature.ID, 2, specification)
 	if err != nil || specified.Status != organization.FeatureSpecified || store.message.Recipient != architect.ActorFQN || store.message.Type != "tekroo.message.story.design-requested" || store.message.Flow.Hop != 3 {
 		t.Fatalf("specify feature=%#v message=%#v err=%v", specified, store.message, err)
+	}
+}
+
+func TestArchitectDesignIsProposedToPMBeforeTaskMaterialization(t *testing.T) {
+	now := time.Date(2026, 9, 30, 12, 0, 0, 0, time.UTC)
+	architect := activeRole("teams::architect-1", "architect", featureUUID(70), featureDigest('1'))
+	manager := activeRole("teams::project-manager-1", "project-manager", featureUUID(71), featureDigest('2'))
+	feature := organization.FeatureRequest{SchemaVersion: organization.FeatureSchemaVersion, ID: featureUUID(1), Revision: 3, SubmittedBy: kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "paul"}, Input: featureInput(), Status: organization.FeatureSpecified, OperatorActor: "teams::operator-1", ProductOwnerActor: "teams::product-owner-1", InitialMessageID: featureUUID(2), LastMessageID: featureUUID(3), LastStepID: featureUUID(4), LastHop: 3, BudgetAccountID: featureUUID(5), LifecycleEpoch: 1, ScopeRevision: 1, CreatedAt: now, UpdatedAt: now}
+	store := &featureStoreFake{feature: feature}
+	host := &featureHostFake{roles: map[kernel.ActorFQN]organization.RoleInstanceState{architect.ActorFQN: architect, manager.ActorFQN: manager}}
+	coordinator, err := organization.NewFeatureCoordinator(store, host, materializerFake{}, fixedClock(now.Add(time.Minute)), &idQueue{ids: []kernel.UUIDv7{featureUUID(20), featureUUID(21)}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	design := organization.FeatureDesignCandidate{PreparedBy: architect.ActorFQN, PreparedExecution: architect.Execution, OutputDigest: featureDigest('a'), PreparedAt: now.Add(time.Minute)}
+	result, err := coordinator.RecordDesign(context.Background(), feature.ID, feature.Revision, design)
+	if err != nil || result.Status != organization.FeatureDesigned || result.Plan != nil || result.Design == nil || store.message.Recipient != manager.ActorFQN || store.message.Type != "tekroo.message.feature.design-proposed" {
+		t.Fatalf("architect proposal was not routed to PM: status=%s message=%s err=%v", result.Status, store.message.Type, err)
+	}
+}
+
+func TestPlan013OnlyPMCanApplyDesignBoundExecutablePlan(t *testing.T) {
+	now := time.Date(2026, 9, 30, 12, 0, 0, 0, time.UTC)
+	manager := activeRole("teams::project-manager-1", "project-manager", featureUUID(71), featureDigest('5'))
+	architect := activeRole("teams::architect-1", "architect", featureUUID(72), featureDigest('1'))
+	coder := activeRole("teams::coder-1", "coder", featureUUID(73), featureDigest('2'))
+	tester := activeRole("teams::tester-1", "tester", featureUUID(74), featureDigest('8'))
+	story := organization.PlannedStory{ID: featureUUID(10), Title: "Story", Description: "Description", AcceptanceCriteria: []string{"works"}, Priority: organization.PriorityNormal}
+	design := organization.FeatureDesignCandidate{PreparedBy: architect.ActorFQN, PreparedExecution: architect.Execution, OutputDigest: featureDigest('a'), PreparedAt: now.Add(time.Minute)}
+	feature := organization.FeatureRequest{SchemaVersion: organization.FeatureSchemaVersion, ID: featureUUID(1), Revision: 4, SubmittedBy: kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "paul"}, Input: featureInput(), Status: organization.FeatureDesigned, OperatorActor: "teams::operator-1", ProductOwnerActor: "teams::product-owner-1", InitialMessageID: featureUUID(2), LastMessageID: featureUUID(3), LastStepID: featureUUID(4), LastHop: 4, BudgetAccountID: featureUUID(5), LifecycleEpoch: 1, ScopeRevision: 1, CreatedAt: now, UpdatedAt: now.Add(time.Minute), Design: &design, Specification: &organization.FeatureSpecification{PreparedBy: manager.ActorFQN, PreparedExecution: manager.Execution, Stories: []organization.PlannedStory{story}, PreparedAt: now}}
+	store := &featureStoreFake{feature: feature}
+	host := &featureHostFake{roles: map[kernel.ActorFQN]organization.RoleInstanceState{manager.ActorFQN: manager, architect.ActorFQN: architect, coder.ActorFQN: coder, tester.ActorFQN: tester}}
+	coordinator, err := organization.NewFeatureCoordinator(store, host, materializerFake{}, fixedClock(now.Add(2*time.Minute)), &idQueue{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	implementationID := featureUUID(11)
+	plan := organization.FeaturePlan{Version: 1, PreparedBy: manager.ActorFQN, PreparedExecution: manager.Execution, SourceDesignDigest: design.OutputDigest, Architecture: "bounded", Stories: []organization.PlannedStory{story}, Tasks: []organization.PlannedTask{
+		{ID: implementationID, StoryID: story.ID, Title: "Implement", Description: "Implement", AcceptanceCriteria: []string{"works"}, Owner: coder.ActorFQN, ModelProfile: coder.ModelProfile, DecisionRoute: kernel.RouteBoundedExecution, Purpose: kernel.PurposeImplementation, Complexity: 2, Risk: organization.RiskLow, AttemptLimit: 2, ReviewRoundLimit: 1},
+		{ID: featureUUID(12), StoryID: story.ID, Title: "Validate", Description: "Validate", AcceptanceCriteria: []string{"verified"}, DependsOn: []kernel.UUIDv7{implementationID}, Validates: []kernel.UUIDv7{implementationID}, Owner: tester.ActorFQN, ModelProfile: tester.ModelProfile, DecisionRoute: kernel.RouteBoundedExecution, Purpose: kernel.PurposeValidation, Complexity: 2, Risk: organization.RiskLow, AttemptLimit: 2, ReviewRoundLimit: 1},
+	}, CreatedAt: now.Add(2 * time.Minute)}
+	wrongAuthor := plan
+	wrongAuthor.PreparedBy = architect.ActorFQN
+	wrongAuthor.PreparedExecution = architect.Execution
+	if _, err := coordinator.ApplyPlan(context.Background(), feature.ID, feature.Revision, wrongAuthor); err == nil {
+		t.Fatal("architect bypassed PM finalization")
+	}
+	wrongDigest := plan
+	wrongDigest.SourceDesignDigest = featureDigest('b')
+	if _, err := coordinator.ApplyPlan(context.Background(), feature.ID, feature.Revision, wrongDigest); err == nil {
+		t.Fatal("PM plan with unrelated design digest was accepted")
+	}
+	if applied, err := coordinator.ApplyPlan(context.Background(), feature.ID, feature.Revision, plan); err != nil || applied.Status != organization.FeaturePlanned {
+		t.Fatalf("valid PM plan was not applied: status=%s err=%v", applied.Status, err)
+	} else {
+		// An authorized replacement keeps the old plan visible while the new
+		// architect proposal awaits PM finalization. The old plan must not be
+		// revalidated against that successor proposal's digest.
+		applied.Status = organization.FeatureDesigned
+		applied.Design = &organization.FeatureDesignCandidate{PreparedBy: architect.ActorFQN, PreparedExecution: architect.Execution, OutputDigest: featureDigest('b'), PreparedAt: now.Add(3 * time.Minute)}
+		applied.PlanSupersession = &organization.FeaturePlanSupersession{PlanVersion: 1, PlanDigest: featureDigest('c'), ArchitectureRound: 1, RequestedBy: applied.SubmittedBy, Reason: "Replace design", EvidenceRefs: []kernel.EvidenceRef{{EvidenceID: featureUUID(31), SHA256: featureDigest('d')}}, RequestedAt: now.Add(2 * time.Minute), DeadlineAt: now.Add(time.Hour), IdempotencyKey: "replacement-1"}
+		if err := applied.Validate(); err != nil {
+			t.Fatalf("successor design invalidated historical plan: %v", err)
+		}
 	}
 }
 

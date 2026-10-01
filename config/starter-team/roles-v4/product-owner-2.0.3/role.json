@@ -1,0 +1,87 @@
+{
+  "schema_version": "2.0.0",
+  "role": "product-owner",
+  "version": "2.0.3",
+  "capabilities": [
+    "acceptance",
+    "feature-intake",
+    "requirements"
+  ],
+  "subscriptions": [
+    {
+      "type": "tekroo.message.feature.submitted",
+      "purpose": "feature-intake"
+    },
+    {
+      "type": "tekroo.message.release.ready",
+      "purpose": "product-acceptance"
+    }
+  ],
+  "permissions": [
+    "evidence.record",
+    "feature.refine-propose",
+    "release.accept-propose",
+    "repository.read"
+  ],
+  "charter": {
+    "path": "ROLE.md",
+    "sha256": "a5e05c447b1450631cc45bc4a2d9f98cae95f3159c70c37e0fd447c628305c77",
+    "media_type": "text/markdown"
+  },
+  "handler_bindings": {
+    "tekroo.message.feature.submitted": {
+      "subscription_purpose": "feature-intake",
+      "message_purpose": "REQUEST",
+      "disposition": "MODEL_HANDLER",
+      "resource": {
+        "path": "handlers/feature.submitted/HANDLER.md",
+        "sha256": "1f1d2dc76dc6ed0d139faa5d56786b6ce35d6d3e173bca050a617c73fe454996",
+        "media_type": "text/markdown"
+      },
+      "input_schema": {
+        "path": "handlers/feature.submitted/input.schema.json",
+        "sha256": "960e6113c1f72ef5672432a5f06eec244460bc3e6786b1c8e5fde201408249f0",
+        "media_type": "application/schema+json"
+      },
+      "result_schema": {
+        "path": "handlers/feature.submitted/result.schema.json",
+        "sha256": "a74ef5cb584192057be6f7569dc6f26985414bd1be44abebaaa41799659cbb18",
+        "media_type": "application/schema+json"
+      },
+      "allowed_results": [
+        "blocked",
+        "completed",
+        "failed",
+        "needs_decision"
+      ]
+    },
+    "tekroo.message.release.ready": {
+      "subscription_purpose": "product-acceptance",
+      "message_purpose": "REQUEST",
+      "disposition": "MODEL_HANDLER",
+      "resource": {
+        "path": "handlers/release.ready/HANDLER.md",
+        "sha256": "5e215246539cddda3038018ad44999c438b37d8a389e128490a7616328f69589",
+        "media_type": "text/markdown"
+      },
+      "input_schema": {
+        "path": "handlers/release.ready/input.schema.json",
+        "sha256": "960e6113c1f72ef5672432a5f06eec244460bc3e6786b1c8e5fde201408249f0",
+        "media_type": "application/schema+json"
+      },
+      "result_schema": {
+        "path": "handlers/release.ready/result.schema.json",
+        "sha256": "96b9620ceb99e7911b6208b50b32e87c276906f9655f3fa43932618b826b79d9",
+        "media_type": "application/schema+json"
+      },
+      "allowed_results": [
+        "blocked",
+        "completed",
+        "failed",
+        "needs_decision"
+      ]
+    }
+  },
+  "publisher_key_id": "tekroo-teams-product-owner-20260925",
+  "signature": "KnoWOIbIk3H8zzO8jIzh4dFAbVaB57Gj7Y0KFbmwMZV2uuKNupu+lD33Hun83owjUtIgo2cyE5tpy+6BEsosBA=="
+}

@@ -57,6 +57,30 @@ func TestWorkflowPlanningStageDefinitionComesFromConfiguredWorkflow(t *testing.T
 	}
 }
 
+func TestPlan013WorkflowBindsPMFinalizationAfterArchitecture(t *testing.T) {
+	workingDirectory, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(filepath.Dir(filepath.Dir(workingDirectory)), "config", "workflows", "software-development.v2.json")
+	definition, err := organization.LoadWorkflowDefinition(path, kernel.Digest("076b2155772efc1b0caff2fd3c00e1b5af84ec1ec9264b64c1e24e214b366a34"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	library := organization.NewWorkflowLibrary()
+	if err := library.Add(definition); err != nil {
+		t.Fatal(err)
+	}
+	service := &ProductionService{WorkflowLibrary: library}
+	role, purpose, _, _, description, _, err := service.workflowPlanningStageDefinition(stagePlanFinalization)
+	if err != nil || role != "project-manager" || purpose != kernel.PurposeHandoff || !strings.Contains(description, "provider/consumer") {
+		t.Fatalf("PM finalization was not bound: role=%q purpose=%q err=%v", role, purpose, err)
+	}
+	if stage, ok := workflowStageForFeatureStatus(organization.FeatureDesigned); !ok || stage != "finalize-plan" {
+		t.Fatal("designed feature did not advance to PM finalization")
+	}
+}
+
 func TestWorkflowInvocationAdmissionFamilyIncludesChangedConditionRetries(t *testing.T) {
 	root := workflowTestInvocation("root")
 	retry := workflowTestInvocation("retry")

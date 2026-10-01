@@ -13,7 +13,7 @@ func (service *ProductionService) workflowPlanningStageDefinition(stage featureP
 	if service == nil || service.WorkflowLibrary == nil {
 		return legacyPlanningStageDefinition(stage)
 	}
-	workflowStageID, ok := map[featurePlanningStage]string{stageRefinement: "refine", stageSpecification: "specify", stageArchitecture: "design"}[stage]
+	workflowStageID, ok := map[featurePlanningStage]string{stageRefinement: "refine", stageSpecification: "specify", stageArchitecture: "design", stagePlanFinalization: "finalize-plan"}[stage]
 	if !ok {
 		return "", "", "", "", "", nil, organization.ErrInvalidFeature
 	}
@@ -95,6 +95,9 @@ func workflowStageInvocationAccepted(feature organization.FeatureRequest, admiss
 	}
 	if invocation.Purpose != kernel.PurposeHandoff || invocation.RetryOfInvocationID != nil || invocation.AttemptOrdinal != 1 {
 		return false
+	}
+	if feature.Status == organization.FeatureDesigned && feature.PlanSupersession != nil {
+		return invocation.TaskID == featurePlanningTaskID(feature.ID, stagePlanFinalization, feature.PlanSupersession.ArchitectureRound, nil)
 	}
 	round, err := architecturePlanRound(feature.ID, invocation.TaskID)
 	return err == nil && round > 0
@@ -205,6 +208,8 @@ func workflowStageForFeatureStatus(status organization.FeatureStatus) (string, b
 		return "specify", true
 	case organization.FeatureSpecified:
 		return "design", true
+	case organization.FeatureDesigned:
+		return "finalize-plan", true
 	default:
 		return "", false
 	}
