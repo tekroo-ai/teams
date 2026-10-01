@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"strings"
@@ -127,5 +128,45 @@ func TestLiveTeamsControlledRoleCanary(t *testing.T) {
 	if protocol := qualification.Brief.ResultProtocol; protocol != nil && !strings.HasPrefix(strings.TrimSpace(string(observation.Output)), protocol.Marker) {
 		t.Fatalf("canary output does not begin with %q: %s", protocol.Marker, observation.Output)
 	}
+	if qualification.Brief.MessageHandler != nil {
+		events, err := client.events(ctx, string(qualification.Brief.InvocationID))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := validateHandlerCanaryEvents(events); err != nil {
+			t.Fatal(err)
+		}
+	}
 	t.Logf("conversation=%s state=%s evidence=%d output=%s", qualification.Brief.InvocationID, observation.State, len(observation.Evidence), observation.Output)
+}
+
+func validateHandlerCanaryEvents(events []rawEvent) error {
+	submissions := 0
+	for _, event := range events {
+		if strings.Contains(string(event.Raw), "Error validating tool") {
+			return fmt.Errorf("canary produced a tool-validation error: %s", event.Raw)
+		}
+		if event.Kind == "ActionEvent" && isSubmitResultTool(event.ToolName) {
+			submissions++
+		}
+	}
+	if submissions != 1 {
+		return fmt.Errorf("canary produced %d submit_result actions; expected exactly one", submissions)
+	}
+	return nil
+}
+
+func TestValidateHandlerCanaryEventsRejectsPostResultError(t *testing.T) {
+	accepted := rawEvent{Kind: "ActionEvent", ToolName: submitResultToolName, Raw: json.RawMessage(`{"kind":"ActionEvent","tool_name":"submit_result"}`)}
+	if err := validateHandlerCanaryEvents([]rawEvent{accepted}); err != nil {
+		t.Fatal(err)
+	}
+	duplicate := []rawEvent{accepted, accepted}
+	if err := validateHandlerCanaryEvents(duplicate); err == nil || !strings.Contains(err.Error(), "2 submit_result actions") {
+		t.Fatalf("duplicate submission was not rejected: %v", err)
+	}
+	invalid := []rawEvent{accepted, {Kind: "ObservationEvent", Raw: json.RawMessage(`{"content":"Error validating tool 'submit_result': summary Field required"}`)}}
+	if err := validateHandlerCanaryEvents(invalid); err == nil || !strings.Contains(err.Error(), "tool-validation error") {
+		t.Fatalf("missing-summary tool error was not rejected: %v", err)
+	}
 }
