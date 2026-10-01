@@ -55,6 +55,26 @@ const (
 )
 
 func (service *ProductionService) reconcileTaskCompletions(ctx context.Context, feature organization.FeatureRequest, plan organization.FeaturePlan, states map[kernel.UUIDv7]kernel.AggregateState, heads map[kernel.UUIDv7]kernel.UUIDv7, invocations map[kernel.UUIDv7]kernel.WorkInvocation, snapshot kernel.Snapshot) (bool, error) {
+	for _, task := range plan.Tasks {
+		state := states[task.ID]
+		invocation, found := invocations[task.ID]
+		if !found || state.Phase != kernel.PhaseActive || state.Condition != kernel.ConditionRunnable || invocation.State != kernel.InvocationSucceeded || invocation.OutputDigest == nil {
+			continue
+		}
+		output, err := service.Runtime.ReadExecutionOutput(ctx, *invocation.OutputDigest)
+		if err != nil {
+			return false, fmt.Errorf("read task %s disposition: %w", task.ID, err)
+		}
+		reason, outcome, reported := reportedTaskNonCompletion(output)
+		if !reported {
+			continue
+		}
+		blocked, err := service.blockStructuredDecisionTask(ctx, feature, task, state, invocation, snapshot, reason, "task-reported-"+outcome)
+		if err != nil {
+			return false, fmt.Errorf("block task %s after reported %s: %w", task.ID, outcome, err)
+		}
+		return blocked, nil
+	}
 	promotionChanged, err := service.reconcilePromotionCompletion(ctx, feature, plan, states, heads, invocations, snapshot)
 	if err != nil || promotionChanged {
 		return promotionChanged, err
@@ -239,6 +259,14 @@ func (service *ProductionService) reconcileTaskCompletions(ctx context.Context, 
 		return changed, err
 	}
 	return changed || featureValidationChanged, nil
+}
+
+func reportedTaskNonCompletion(output []byte) (reason, outcome string, reported bool) {
+	outcome, summary, recognized := roleHandlerDisposition(output)
+	if !recognized || outcome == "completed" {
+		return "", "", false
+	}
+	return "task reported " + outcome + ": " + summary, outcome, true
 }
 
 func (service *ProductionService) reconcileFeatureValidationCompletion(ctx context.Context, feature organization.FeatureRequest, plan organization.FeaturePlan, states map[kernel.UUIDv7]kernel.AggregateState, heads map[kernel.UUIDv7]kernel.UUIDv7, invocations map[kernel.UUIDv7]kernel.WorkInvocation, snapshot kernel.Snapshot) (bool, error) {

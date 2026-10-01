@@ -246,6 +246,63 @@ func TestAcceptedSubmitResultRequiresSuccessfulDeliveryAndKeepsFirst(t *testing.
 	}
 }
 
+func TestInspectRequiresCandidateOnlyForCompletedHandlerResult(t *testing.T) {
+	for _, outcome := range []string{"blocked", "needs_decision", "failed", "completed"} {
+		t.Run(outcome, func(t *testing.T) {
+			workspace := t.TempDir()
+			runOpenHandsGit(t, workspace, "init", "--initial-branch=task/204")
+			runOpenHandsGit(t, workspace, "config", "user.name", "Tekroo Test")
+			runOpenHandsGit(t, workspace, "config", "user.email", "test@tekroo.invalid")
+			if err := os.WriteFile(filepath.Join(workspace, "base.go"), []byte("package base\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			runOpenHandsGit(t, workspace, "add", "base.go")
+			runOpenHandsGit(t, workspace, "commit", "-m", "baseline")
+			baseline := runOpenHandsGit(t, workspace, "rev-parse", "HEAD")
+			brief, _ := openHandsTestBrief(t)
+			brief.RoleGrounding.Permissions = []string{"repository.edit"}
+			brief.Scope.Branch = "task/204"
+			brief.Scope.BaselineSHA = baseline
+			brief.SemanticContext.BaselineSHA = baseline
+			brief.MessageHandler = &application.MessageHandlerGrounding{
+				MessageType:    "tekroo.message.task.assigned",
+				ResultSchema:   json.RawMessage(`{"type":"object","required":["schema_version","outcome","summary","work_product"],"properties":{"schema_version":{"const":"1.0.0"},"outcome":{"enum":["blocked","needs_decision","failed","completed"]},"summary":{"type":"string"},"work_product":{"type":"object"}}}`),
+				AllowedResults: []string{"blocked", "needs_decision", "failed", "completed"},
+			}
+			encoded := mustJSON(brief)
+			hash := sha256.Sum256(encoded)
+			digest := kernel.Digest(hex.EncodeToString(hash[:]))
+			payload := json.RawMessage(`{"outcome":"` + outcome + `","summary":"reported","work_product":{},"kind":"ClientAction_submit_result"}`)
+			state := &progressGuardServerState{
+				prompt: string(encoded), workspace: workspace, finished: true,
+				events: []map[string]any{
+					event("evt-user", "MessageEvent", "user", string(encoded)),
+					{"id": "submit", "kind": "ActionEvent", "source": "agent", "timestamp": "2026-08-31T12:00:01Z", "tool_name": submitResultToolName, "tool_call_id": "call-1", "action": payload},
+					{"id": "delivered", "kind": "ObservationEvent", "source": "environment", "timestamp": "2026-08-31T12:00:02Z", "tool_name": submitResultToolName, "tool_call_id": "call-1", "observation": map[string]any{"kind": "ClientToolObservation", "is_error": false}},
+				},
+			}
+			server := httptest.NewServer(http.HandlerFunc(state.serveHTTP))
+			defer server.Close()
+			client := newOpenHandsTestClient(t, server.URL, workspace, brief)
+			observation, err := client.Inspect(context.Background(), brief, string(brief.InvocationID), digest)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if outcome == "completed" {
+				if observation.State != application.ExternalRunning || state.correctionCalls != 1 {
+					t.Fatalf("completed result without candidate: %#v corrections=%d", observation, state.correctionCalls)
+				}
+				observation, err = client.Inspect(context.Background(), brief, string(brief.InvocationID), digest)
+				if err != nil || observation.State != application.ExternalRunning || state.correctionCalls != 1 {
+					t.Fatalf("repeated inspection: %#v err=%v corrections=%d", observation, err, state.correctionCalls)
+				}
+			} else if observation.State != application.ExternalSucceeded || state.correctionCalls != 0 {
+				t.Fatalf("non-completed result: %#v corrections=%d", observation, state.correctionCalls)
+			}
+		})
+	}
+}
+
 func TestInspectStopsAfterDeliveredHandlerResult(t *testing.T) {
 	brief, _ := openHandsTestBrief(t)
 	brief.MessageHandler = &application.MessageHandlerGrounding{

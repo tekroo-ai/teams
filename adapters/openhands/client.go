@@ -923,8 +923,9 @@ func (client *Client) Inspect(ctx context.Context, brief application.ExecutionBr
 	}
 	currentPromptIndex := executionPromptIndex(events, prepared, brief, requestDigest)
 	acceptedHandlerResult := false
+	var acceptedHandlerOutput []byte
 	if brief.MessageHandler != nil {
-		_, acceptedHandlerResult = acceptedSubmitResult(*brief.MessageHandler, events, currentPromptIndex)
+		acceptedHandlerOutput, acceptedHandlerResult = acceptedSubmitResult(*brief.MessageHandler, events, currentPromptIndex)
 		if !acceptedHandlerResult {
 			if violation, reason, previouslyCorrected, rejected := rejectedSubmitResult(*brief.MessageHandler, events, currentPromptIndex); rejected {
 				if previouslyCorrected {
@@ -1000,7 +1001,20 @@ func (client *Client) Inspect(ctx context.Context, brief application.ExecutionBr
 			return client.failForExecutionPolicyViolation(ctx, brief, requestDigest, info, events, reason, "", false)
 		}
 	}
-	if (info.ExecutionStatus == "finished" || acceptedHandlerResult) && purposeRequiresEditableCandidate(brief.Purpose) && slices.Contains(brief.RoleGrounding.Permissions, "repository.edit") && prepared.workspace.Candidate == nil {
+	candidateCompletion := info.ExecutionStatus == "finished"
+	if brief.MessageHandler != nil {
+		output := acceptedHandlerOutput
+		if !acceptedHandlerResult && info.ExecutionStatus == "finished" {
+			terminal, observationErr := client.observationAt(brief, requestDigest, info, events, currentPromptIndex, false)
+			if observationErr != nil {
+				return application.ExternalExecutionObservation{}, observationErr
+			}
+			output = terminal.Output
+		}
+		result, validationErr := application.ValidateRoleHandlerResult(*brief.MessageHandler, output)
+		candidateCompletion = validationErr == nil && result.Outcome == "completed"
+	}
+	if candidateCompletion && purposeRequiresEditableCandidate(brief.Purpose) && slices.Contains(brief.RoleGrounding.Permissions, "repository.edit") && prepared.workspace.Candidate == nil {
 		if reason := editableCandidateCompletionReason(ctx, prepared.workspace, brief.Scope.Branch, brief.Scope.BaselineSHA); reason != "" {
 			return client.correctEditableCandidateCompletion(ctx, brief, requestDigest, info, events, currentPromptIndex, reason)
 		}
@@ -2128,7 +2142,7 @@ func repositorySearchTool(name string) bool {
 
 func repositoryAction(event rawEvent) bool {
 	switch event.ToolName {
-	case "terminal", "run_command", "file_editor", "file_view", "file_create", "file_replace", "file_insert", "file_undo", "replace_text_in_file", "insert_file_text", "undo_file_edit", "file_delete", "file_move", "glob", "repository_search", "repository_view", "file_read", "list_files", "find_files", "search_file_contents", "list_changed_files", "read_file_diff":
+	case "terminal", "run_command", "file_editor", "file_view", "file_create", "file_replace", "file_insert", "file_undo", "replace_text_in_file", "insert_file_text", "undo_file_edit", "file_delete", "file_move", "glob", "repository_search", "repository_view", "file_read", "list_files", "find_files", "search_file_contents", "repository_status", "list_changed_files", "read_file_diff":
 		return true
 	default:
 		return false
@@ -2918,13 +2932,24 @@ func (client *Client) correctCheckpointCompletionViolation(ctx context.Context, 
 }
 
 func (client *Client) correctEditableCandidateCompletion(ctx context.Context, brief application.ExecutionBrief, requestDigest kernel.Digest, info conversationInfo, events []rawEvent, promptIndex int, reason string) (application.ExternalExecutionObservation, error) {
+	conversationID := string(brief.InvocationID)
+	currentEvents, err := client.events(ctx, conversationID)
+	if err != nil {
+		return application.ExternalExecutionObservation{}, err
+	}
+	events = currentEvents
 	for index, event := range events {
 		if index > promptIndex && event.Kind == "MessageEvent" && event.Source == "user" && strings.HasPrefix(event.Text, editableCandidateCompletionCorrectionPrefix) {
+			if executionStillActive(info.ExecutionStatus) {
+				observation, observationErr := client.observationAt(brief, requestDigest, info, events, promptIndex, false)
+				observation.State = application.ExternalRunning
+				observation.Output = nil
+				return observation, observationErr
+			}
 			return client.failForExecutionPolicyViolation(ctx, brief, requestDigest, info, events, "EDITABLE_CANDIDATE_NOT_COMMITTED", reason, true)
 		}
 	}
-	conversationID := string(brief.InvocationID)
-	correction := editableCandidateCompletionCorrectionPrefix + reason + "\nThe implementation cannot be handed to its independent validator until Git contains an immutable candidate. Continue this same task without repeating completed discovery or implementation. Inspect Git status, stage only the intended source and test files, never stage the Teams-injected .openhands runtime hook, commit the intended candidate on the assigned branch, verify the workspace is clean apart from that injected hook, and then " + submissionInstruction(brief)
+	correction := editableCandidateCompletionCorrectionPrefix + reason + "\nThe implementation cannot be handed to its independent validator until Git contains an immutable candidate. Continue this same task without repeating completed discovery or implementation. Use repository_status to inspect the bound workspace, stage only the intended source and test files, never stage the Teams-injected .openhands runtime hook, commit the intended candidate on the assigned branch, verify the workspace is clean apart from that injected hook, and then " + submissionInstruction(brief)
 	status, _, err := client.request(ctx, http.MethodPost, "/api/conversations/"+url.PathEscape(conversationID)+"/events", map[string]any{
 		"role": "user", "run": true,
 		"content": []map[string]any{{"type": "text", "text": correction}},
@@ -3403,7 +3428,7 @@ func checkpointActionIsRepositoryEvidence(action checkpointAction) bool {
 
 func checkpointActionIsReadOnlyInspection(action checkpointAction) bool {
 	switch action.Tool {
-	case "repository_view", "repository_search", "glob", "file_view", "file_read", "list_files", "find_files", "search_file_contents", "list_changed_files", "read_file_diff", "read_evidence":
+	case "repository_view", "repository_search", "glob", "file_view", "file_read", "list_files", "find_files", "search_file_contents", "repository_status", "list_changed_files", "read_file_diff", "read_evidence":
 		return true
 	case "file_editor":
 		return strings.EqualFold(strings.TrimSpace(action.Command), "view")

@@ -430,7 +430,7 @@ var sharedExplicitRecoveryExecutionGuidance = []string{
 }
 
 var editableExplicitRecoveryExecutionGuidance = []string{
-	"Inspect Git status, recent commits, and the focused diff before reading source broadly. The workspace may already contain a completed implementation from the failed invocation.",
+	"Use the workspace-bound repository_status and read_file_diff tools to inspect the current candidate before reading source broadly. The workspace may already contain a completed implementation from the failed invocation.",
 	"Do not restart implementation or force a new edit when the current committed work already satisfies the task. Verify the existing result against the acceptance criteria and submit promptly.",
 	"If the existing workspace does not satisfy the task, make the smallest justified code or test correction, then run focused verification. If it already satisfies the task, run focused verification and submit without changing it.",
 	"Map and extend existing interfaces before adding a parallel abstraction.",
