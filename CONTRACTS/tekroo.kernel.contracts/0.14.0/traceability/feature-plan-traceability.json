@@ -1,0 +1,35 @@
+{
+  "contractIdentity": "tekroo.kernel.contracts/0.14.0",
+  "requirements": [
+    {
+      "kind": "DECISION",
+      "requirementId": "P13-PLAN-REQ-001",
+      "statement": "The architect proposes technical design; the PM alone prepares the executable plan bound to that immutable proposal.",
+      "testIds": [
+        "P13-PLAN-001",
+        "P13-PLAN-002"
+      ]
+    },
+    {
+      "kind": "DECISION",
+      "requirementId": "P13-PLAN-REQ-002",
+      "statement": "Every declared cross-task capability has one provider on an upstream dependency path.",
+      "testIds": [
+        "P13-PLAN-003",
+        "P13-PLAN-004",
+        "P13-PLAN-005",
+        "P13-PLAN-006"
+      ]
+    },
+    {
+      "kind": "DECISION",
+      "requirementId": "P13-PLAN-REQ-003",
+      "statement": "The PM final plan is bound to the exact immutable architect output digest.",
+      "testIds": [
+        "P13-PLAN-001",
+        "P13-PLAN-007"
+      ]
+    }
+  ],
+  "schemaVersion": "1.0.0"
+}

@@ -120,6 +120,7 @@ type FeatureRequest struct {
 	Specification           *FeatureSpecification           `json:"specification,omitempty"`
 	SpecificationCorrection *FeatureSpecificationCorrection `json:"specification_correction,omitempty"`
 	Design                  *FeatureDesignCandidate         `json:"design,omitempty"`
+	DesignRevision          *FeatureDesignRevision          `json:"design_revision,omitempty"`
 	Plan                    *FeaturePlan                    `json:"plan,omitempty"`
 	PlanSupersession        *FeaturePlanSupersession        `json:"plan_supersession,omitempty"`
 	Acceptance              *FeatureAcceptance              `json:"acceptance,omitempty"`
@@ -142,6 +143,9 @@ func (feature FeatureRequest) Validate() error {
 		return ErrInvalidFeature
 	}
 	if feature.Design != nil && feature.Design.Validate(feature) != nil {
+		return ErrInvalidFeature
+	}
+	if feature.DesignRevision != nil && feature.DesignRevision.Validate(feature) != nil {
 		return ErrInvalidFeature
 	}
 	if feature.Status == FeatureDesigned && feature.Design == nil {
@@ -194,6 +198,22 @@ type FeatureDesignCandidate struct {
 	PreparedExecution kernel.ExecutionTuple `json:"prepared_execution"`
 	OutputDigest      kernel.Digest         `json:"output_digest"`
 	PreparedAt        time.Time             `json:"prepared_at"`
+}
+
+// FeatureDesignRevision records one PM-requested revision of an unmaterialized
+// architecture proposal. The original proposal and PM output remain immutable.
+type FeatureDesignRevision struct {
+	PriorDesignDigest kernel.Digest `json:"prior_design_digest"`
+	DecisionDigest    kernel.Digest `json:"decision_digest"`
+	Reason            string        `json:"reason"`
+	RequestedAt       time.Time     `json:"requested_at"`
+}
+
+func (revision FeatureDesignRevision) Validate(feature FeatureRequest) error {
+	if !revision.PriorDesignDigest.Valid() || !revision.DecisionDigest.Valid() || revision.Reason == "" || len(revision.Reason) > 4096 || revision.RequestedAt.Before(feature.CreatedAt) || feature.Specification == nil {
+		return ErrInvalidFeature
+	}
+	return nil
 }
 
 func (design FeatureDesignCandidate) Validate(feature FeatureRequest) error {

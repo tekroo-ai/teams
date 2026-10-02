@@ -193,6 +193,41 @@ func (coordinator *FeatureCoordinator) RecordDesign(ctx context.Context, feature
 	return coordinator.store.AdvanceFeature(ctx, next, expectedRevision, &message)
 }
 
+// RequestDesignRevision forwards one PM decision to a fresh architect task.
+// This is a new message and task, not a replay of the earlier DAG node.
+func (coordinator *FeatureCoordinator) RequestDesignRevision(ctx context.Context, featureID kernel.UUIDv7, expectedRevision uint64, preparedBy kernel.ActorFQN, execution kernel.ExecutionTuple, revision FeatureDesignRevision) (FeatureRequest, error) {
+	feature, err := coordinator.currentFeature(ctx, featureID, expectedRevision, FeatureDesigned)
+	if err != nil {
+		return FeatureRequest{}, err
+	}
+	if feature.Design == nil || feature.DesignRevision != nil || feature.Plan != nil || uint64(feature.LastHop)+2 > uint64(feature.Input.MaximumHops) || revision.Validate(feature) != nil || revision.PriorDesignDigest != feature.Design.OutputDigest || !featureActorHasRole(preparedBy, "project-manager") || !execution.Valid() {
+		return FeatureRequest{}, ErrInvalidFeature
+	}
+	actor, found, err := coordinator.host.Status(ctx, preparedBy)
+	if err != nil || !found || actor.Status != RoleIdle {
+		return FeatureRequest{}, errors.Join(ErrStaleOrganizationalClaim, err)
+	}
+	recipient, err := coordinator.ensurePrimaryRole(ctx, "architect")
+	if err != nil {
+		return FeatureRequest{}, err
+	}
+	message, err := coordinator.handoffMessage(feature, preparedBy, execution, recipient.ActorFQN, "tekroo.message.story.design-requested", PurposeHandoff, map[string]any{"feature_id": feature.ID, "specification": feature.Specification, "prior_design_digest": revision.PriorDesignDigest, "decision_digest": revision.DecisionDigest, "decision_reason": revision.Reason})
+	if err != nil {
+		return FeatureRequest{}, err
+	}
+	next := feature
+	next.Revision++
+	next.Status = FeatureSpecified
+	next.Design = nil
+	next.DesignRevision = &revision
+	next.UpdatedAt = coordinator.clock.Now().UTC()
+	next.LastMessageID, next.LastStepID, next.LastHop = message.ID, message.Flow.StepID, message.Flow.Hop
+	if next.Validate() != nil {
+		return FeatureRequest{}, ErrInvalidFeature
+	}
+	return coordinator.store.AdvanceFeature(ctx, next, expectedRevision, &message)
+}
+
 func featureActorHasRole(actor kernel.ActorFQN, expected kernel.RoleFQRN) bool {
 	role, err := kernel.RoleFQRNFromActor(actor)
 	return err == nil && role == expected

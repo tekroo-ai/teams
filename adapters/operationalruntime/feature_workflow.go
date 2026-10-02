@@ -10,6 +10,10 @@ import (
 )
 
 func (service *ProductionService) workflowPlanningStageDefinition(stage featurePlanningStage) (string, kernel.WorkPurpose, kernel.DecisionRoute, string, string, []string, error) {
+	return service.workflowPlanningStageDefinitionFor(organization.FeatureRequest{}, stage)
+}
+
+func (service *ProductionService) workflowPlanningStageDefinitionFor(feature organization.FeatureRequest, stage featurePlanningStage) (string, kernel.WorkPurpose, kernel.DecisionRoute, string, string, []string, error) {
 	if service == nil || service.WorkflowLibrary == nil {
 		return legacyPlanningStageDefinition(stage)
 	}
@@ -20,6 +24,13 @@ func (service *ProductionService) workflowPlanningStageDefinition(stage featureP
 	definition, err := service.WorkflowLibrary.LookupTrigger("tekroo.message.feature.submitted")
 	if err != nil {
 		return "", "", "", "", "", nil, err
+	}
+	if activePMDesignRevision(feature) && definition.Version == "2.1.0" {
+		if stage == stageArchitecture {
+			workflowStageID = "revise-design"
+		} else if stage == stagePlanFinalization {
+			workflowStageID = "finalize-plan-revised"
+		}
 	}
 	workflowStage, found := configuredWorkflowStage(definition, workflowStageID)
 	if !found || len(workflowStage.PreferredFQRNs) == 0 || workflowStage.CompletionCondition == "" {
@@ -215,6 +226,27 @@ func workflowStageForFeatureStatus(status organization.FeatureStatus) (string, b
 	}
 }
 
+func workflowStageForFeature(feature organization.FeatureRequest, definition kernel.WorkflowDefinition) (string, bool) {
+	stage, ok := workflowStageForFeatureStatus(feature.Status)
+	if ok && activePMDesignRevision(feature) && definition.Version == "2.1.0" {
+		switch feature.Status {
+		case organization.FeatureSpecified:
+			return "revise-design", true
+		case organization.FeatureDesigned:
+			return "finalize-plan-revised", true
+		}
+	}
+	return stage, ok
+}
+
+func activePMDesignRevision(feature organization.FeatureRequest) bool {
+	return feature.DesignRevision != nil && feature.Plan == nil && feature.PlanSupersession == nil
+}
+
+func mayRoutePMDesignRevision(feature organization.FeatureRequest, stage featurePlanningStage, outcome, summary string) bool {
+	return stage == stagePlanFinalization && feature.DesignRevision == nil && outcome == "needs_decision" && summary != "" && len(summary) <= 4096 && uint64(feature.LastHop)+2 <= uint64(feature.Input.MaximumHops)
+}
+
 func (service *ProductionService) featureWorkflowAdmission(ctx context.Context, feature organization.FeatureRequest) (kernel.WorkAdmissionResult, bool, error) {
 	if service == nil || service.WorkflowLibrary == nil {
 		return kernel.WorkAdmissionResult{}, false, nil
@@ -239,10 +271,6 @@ func (service *ProductionService) bindCurrentFeatureWorkflowStage(ctx context.Co
 	if claim.Message.Work.WorkflowInstanceID != nil {
 		return nil
 	}
-	stageID, ok := workflowStageForFeatureStatus(feature.Status)
-	if !ok {
-		return nil
-	}
 	instance, found, err := service.Store.ReadWorkflowInstanceByBudget(ctx, feature.BudgetAccountID)
 	if err != nil {
 		return err
@@ -253,6 +281,10 @@ func (service *ProductionService) bindCurrentFeatureWorkflowStage(ctx context.Co
 	definition, err := service.WorkflowLibrary.Lookup(instance.DefinitionName, instance.DefinitionVersion)
 	if err != nil || definition.ContentDigest != instance.DefinitionDigest {
 		return errors.Join(kernel.ErrInvalidWorkflowDefinition, err)
+	}
+	stageID, ok := workflowStageForFeature(feature, definition)
+	if !ok {
+		return nil
 	}
 	_, err = service.Store.BindMessageToWorkflow(ctx, feature.LastMessageID, definition, instance, stageID)
 	return err
@@ -314,4 +346,55 @@ func (service *ProductionService) completeFeatureWorkflowStage(ctx context.Conte
 		return err
 	}
 	return kernel.ErrInvalidWorkflowTransition
+}
+
+func (service *ProductionService) featureDesignRevisionEnabled(ctx context.Context, feature organization.FeatureRequest) (bool, error) {
+	if service == nil || service.WorkflowLibrary == nil {
+		return false, nil
+	}
+	instance, found, err := service.Store.ReadWorkflowInstanceByBudget(ctx, feature.BudgetAccountID)
+	if err != nil || !found {
+		return false, errors.Join(kernel.ErrInvalidWorkflowInstance, err)
+	}
+	return instance.DefinitionName == "software-development" && instance.DefinitionVersion == "2.1.0", nil
+}
+
+// A successful first-pass plan has no reason to run the optional revision
+// branch. Skip both untouched nodes so the workflow reaches a terminal state.
+func (service *ProductionService) skipUnusedFeatureRevision(ctx context.Context, feature organization.FeatureRequest) error {
+	for _, stageID := range []string{"revise-design", "finalize-plan-revised"} {
+		instance, found, err := service.Store.ReadWorkflowInstanceByBudget(ctx, feature.BudgetAccountID)
+		if err != nil || !found {
+			return errors.Join(kernel.ErrInvalidWorkflowInstance, err)
+		}
+		if instance.DefinitionName != "software-development" || instance.DefinitionVersion != "2.1.0" {
+			return nil
+		}
+		definition, err := service.WorkflowLibrary.Lookup(instance.DefinitionName, instance.DefinitionVersion)
+		if err != nil || definition.ContentDigest != instance.DefinitionDigest {
+			return errors.Join(kernel.ErrInvalidWorkflowDefinition, err)
+		}
+		var node *kernel.WorkflowNode
+		for index := range instance.Nodes {
+			if instance.Nodes[index].StageID == stageID {
+				node = &instance.Nodes[index]
+				break
+			}
+		}
+		if node == nil {
+			return kernel.ErrInvalidWorkflowDefinition
+		}
+		if node.State == kernel.WorkflowNodeSkipped {
+			continue
+		}
+		if node.State != kernel.WorkflowNodeReady {
+			return kernel.ErrInvalidWorkflowTransition
+		}
+		eventID := deterministicOperationalUUID("workflow-skip", string(instance.InstanceID), string(node.NodeID))
+		_, err = service.Store.ApplyWorkflowTransition(ctx, definition, instance.InstanceID, kernel.WorkflowTransition{Revision: instance.Revision + 1, EventID: eventID, Kind: kernel.WorkflowTransitionSkip, NodeID: node.NodeID, RecordedAt: service.clock.Now().UTC()})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

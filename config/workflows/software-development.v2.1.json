@@ -1,0 +1,189 @@
+{
+  "schema_version": "1.0.0",
+  "name": "software-development",
+  "version": "2.1.0",
+  "content_digest": "55c9018d4726bf54943fd3afb41ed07b1d2395b9d01e89626c693a30ab2dd7b3",
+  "trigger_types": [
+    "tekroo.message.feature.submitted"
+  ],
+  "stages": [
+    {
+      "stage_id": "refine",
+      "depends_on": [],
+      "input_schema": "tekroo.feature-request/1.0.0",
+      "output_schema": "tekroo.feature-refinement/1.0.0",
+      "required_capabilities": [
+        "feature-intake",
+        "requirements"
+      ],
+      "preferred_fqrns": [
+        "product-owner"
+      ],
+      "purpose": "HANDOFF",
+      "risk": "LOW",
+      "concurrency_group": "planning",
+      "maximum_parallelism": 1,
+      "attempt_limit": 2,
+      "allowed_outgoing_purposes": [
+        "HANDOFF"
+      ],
+      "target_selection": "CAPABILITY",
+      "validation_policy": "DETERMINISTIC_ONLY",
+      "completion_condition": "The refinement conforms to the selected handler's result schema and preserves every submitted acceptance criterion verbatim. A clarification question is permitted only when mutually incompatible explicit user-visible interpretations require a needs_decision outcome; completed refinements leave clarification_questions empty. Follow the selected handler's result protocol for the outer envelope."
+    },
+    {
+      "stage_id": "specify",
+      "depends_on": [
+        "refine"
+      ],
+      "input_schema": "tekroo.feature-refinement/1.0.0",
+      "output_schema": "tekroo.feature-specification/1.0.0",
+      "required_capabilities": [
+        "planning",
+        "story-management"
+      ],
+      "preferred_fqrns": [
+        "project-manager"
+      ],
+      "purpose": "HANDOFF",
+      "risk": "LOW",
+      "concurrency_group": "planning",
+      "maximum_parallelism": 1,
+      "attempt_limit": 2,
+      "allowed_outgoing_purposes": [
+        "HANDOFF"
+      ],
+      "target_selection": "CAPABILITY",
+      "validation_policy": "DETERMINISTIC_ONLY",
+      "completion_condition": "The task-specific work_product contains only schema_version=1.0.0, result_type=FEATURE_SPECIFICATION, and stories [{title, description, acceptance_criteria, priority}]. Priority is LOW, NORMAL, HIGH, or CRITICAL. Use the smallest set of independently useful product stories. Every accepted criterion appears verbatim in at least one story, and no story adds a new acceptance criterion. Teams carries operator constraints forward; the architect owns technical design decisions. Follow the selected handler's result protocol for the outer envelope."
+    },
+    {
+      "stage_id": "design",
+      "depends_on": [
+        "specify"
+      ],
+      "input_schema": "tekroo.feature-specification/1.0.0",
+      "output_schema": "tekroo.feature-design/1.0.0",
+      "required_capabilities": [
+        "architecture",
+        "decomposition",
+        "risk-analysis"
+      ],
+      "preferred_fqrns": [
+        "architect"
+      ],
+      "purpose": "HANDOFF",
+      "risk": "MODERATE",
+      "complexity_minimum": 2,
+      "complexity_maximum": 5,
+      "concurrency_group": "planning",
+      "maximum_parallelism": 1,
+      "attempt_limit": 2,
+      "review_round_limit": 1,
+      "allowed_outgoing_purposes": [
+        "HANDOFF"
+      ],
+      "target_selection": "CAPABILITY",
+      "validation_policy": "DETERMINISTIC_ONLY",
+      "completion_condition": "Produce a repository-grounded technical design and proposed implementation tasks. State interface obligations between tasks and genuine dependencies. Do not select actor instances or authorize execution. The project manager receives this immutable proposal and owns the final executable graph. Follow the selected handler's result protocol for the outer envelope."
+    },
+    {
+      "stage_id": "finalize-plan",
+      "depends_on": [
+        "design"
+      ],
+      "input_schema": "tekroo.feature-design/1.0.0",
+      "output_schema": "tekroo.feature-execution-plan/1.0.0",
+      "required_capabilities": [
+        "planning",
+        "story-management"
+      ],
+      "preferred_fqrns": [
+        "project-manager"
+      ],
+      "purpose": "HANDOFF",
+      "risk": "MODERATE",
+      "concurrency_group": "planning",
+      "maximum_parallelism": 1,
+      "attempt_limit": 2,
+      "allowed_outgoing_purposes": [
+        "HANDOFF"
+      ],
+      "target_selection": "CAPABILITY",
+      "validation_policy": "DETERMINISTIC_ONLY",
+      "completion_condition": "Return FEATURE_EXECUTION_PLAN with source_design_digest, unchanged architecture and technical task content, justified added dependencies, and explicit provider/consumer capability handoffs. The project manager owns the final graph and must reject an unresolved technical gap rather than silently change the architect's design. Teams validates handoff closure and dependency paths before materializing tasks. If a material technical gap remains, return needs_decision with a precise reason; in this opt-in workflow Teams forwards that result to exactly one new architect revision node."
+    },
+    {
+      "stage_id": "revise-design",
+      "depends_on": [
+        "finalize-plan"
+      ],
+      "input_schema": "tekroo.feature-specification/1.0.0",
+      "output_schema": "tekroo.feature-design/1.0.0",
+      "required_capabilities": [
+        "architecture",
+        "decomposition",
+        "risk-analysis"
+      ],
+      "preferred_fqrns": [
+        "architect"
+      ],
+      "purpose": "HANDOFF",
+      "risk": "MODERATE",
+      "complexity_minimum": 2,
+      "complexity_maximum": 5,
+      "concurrency_group": "planning",
+      "maximum_parallelism": 1,
+      "attempt_limit": 2,
+      "review_round_limit": 1,
+      "allowed_outgoing_purposes": [
+        "HANDOFF"
+      ],
+      "target_selection": "CAPABILITY",
+      "validation_policy": "DETERMINISTIC_ONLY",
+      "completion_condition": "Produce one corrected repository-grounded design using the PM's exact decision feedback and the unchanged product specification. Preserve justified prior decisions; address the identified gap and state cross-task interface obligations. This is a single forward revision, not a conversation with the PM.",
+      "optional": true
+    },
+    {
+      "stage_id": "finalize-plan-revised",
+      "depends_on": [
+        "revise-design"
+      ],
+      "input_schema": "tekroo.feature-design/1.0.0",
+      "output_schema": "tekroo.feature-execution-plan/1.0.0",
+      "required_capabilities": [
+        "planning",
+        "story-management"
+      ],
+      "preferred_fqrns": [
+        "project-manager"
+      ],
+      "purpose": "HANDOFF",
+      "risk": "MODERATE",
+      "concurrency_group": "planning",
+      "maximum_parallelism": 1,
+      "attempt_limit": 2,
+      "allowed_outgoing_purposes": [
+        "HANDOFF"
+      ],
+      "target_selection": "CAPABILITY",
+      "validation_policy": "DETERMINISTIC_ONLY",
+      "completion_condition": "Validate the revised design and produce the executable FEATURE_EXECUTION_PLAN, preserving its technical content and closing all provider/consumer handoffs. If a material technical gap remains, return needs_decision; Teams stops this branch and does not route another revision.",
+      "optional": true
+    }
+  ],
+  "root_budgets": {
+    "maximum_model_invocations": 28,
+    "maximum_hops": 36,
+    "maximum_attempts": 18,
+    "maximum_tokens": 1000000,
+    "maximum_elapsed_seconds": 86400
+  },
+  "projection_rules": [
+    "FEATURE",
+    "MESSAGE",
+    "STATUS",
+    "STORY",
+    "TASK"
+  ]
+}

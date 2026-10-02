@@ -165,6 +165,34 @@ func TestArchitectDesignIsProposedToPMBeforeTaskMaterialization(t *testing.T) {
 	}
 }
 
+func TestPMDecisionCreatesOneForwardArchitectRevision(t *testing.T) {
+	now := time.Date(2026, 10, 2, 12, 0, 0, 0, time.UTC)
+	architect := activeRole("teams::architect-1", "architect", featureUUID(70), featureDigest('1'))
+	manager := activeRole("teams::project-manager-1", "project-manager", featureUUID(71), featureDigest('2'))
+	design := organization.FeatureDesignCandidate{PreparedBy: architect.ActorFQN, PreparedExecution: architect.Execution, OutputDigest: featureDigest('a'), PreparedAt: now}
+	story := organization.PlannedStory{ID: featureUUID(10), Title: "Story", Description: "Description", AcceptanceCriteria: []string{"works"}, Priority: organization.PriorityNormal}
+	feature := organization.FeatureRequest{SchemaVersion: organization.FeatureSchemaVersion, ID: featureUUID(1), Revision: 4, SubmittedBy: kernel.PrincipalRef{Kind: kernel.PrincipalHuman, ID: "paul"}, Input: featureInput(), Status: organization.FeatureDesigned, OperatorActor: "teams::operator-1", ProductOwnerActor: "teams::product-owner-1", InitialMessageID: featureUUID(2), LastMessageID: featureUUID(3), LastStepID: featureUUID(4), LastHop: 4, BudgetAccountID: featureUUID(5), LifecycleEpoch: 1, ScopeRevision: 1, CreatedAt: now, UpdatedAt: now, Design: &design, Specification: &organization.FeatureSpecification{PreparedBy: manager.ActorFQN, PreparedExecution: manager.Execution, Stories: []organization.PlannedStory{story}, PreparedAt: now}}
+	store := &featureStoreFake{feature: feature}
+	host := &featureHostFake{roles: map[kernel.ActorFQN]organization.RoleInstanceState{architect.ActorFQN: architect, manager.ActorFQN: manager}}
+	coordinator, err := organization.NewFeatureCoordinator(store, host, materializerFake{}, fixedClock(now.Add(time.Minute)), &idQueue{ids: []kernel.UUIDv7{featureUUID(20), featureUUID(21), featureUUID(22), featureUUID(23)}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	revision := organization.FeatureDesignRevision{PriorDesignDigest: design.OutputDigest, DecisionDigest: featureDigest('b'), Reason: "The production wiring file is outside the assigned task scope", RequestedAt: now.Add(time.Minute)}
+	requested, err := coordinator.RequestDesignRevision(context.Background(), feature.ID, feature.Revision, manager.ActorFQN, manager.Execution, revision)
+	if err != nil || requested.Status != organization.FeatureSpecified || requested.Design != nil || requested.DesignRevision == nil || store.message.Recipient != architect.ActorFQN || store.message.Type != "tekroo.message.story.design-requested" || store.message.Flow.Hop != 5 {
+		t.Fatalf("PM decision was not routed forward: feature=%+v message=%+v err=%v", requested, store.message, err)
+	}
+	if _, err := coordinator.RequestDesignRevision(context.Background(), requested.ID, requested.Revision, manager.ActorFQN, manager.Execution, revision); err == nil {
+		t.Fatal("second revision was authorized")
+	}
+	revised := organization.FeatureDesignCandidate{PreparedBy: architect.ActorFQN, PreparedExecution: architect.Execution, OutputDigest: featureDigest('c'), PreparedAt: now.Add(2 * time.Minute)}
+	result, err := coordinator.RecordDesign(context.Background(), requested.ID, requested.Revision, revised)
+	if err != nil || result.Status != organization.FeatureDesigned || result.Design == nil || result.Design.OutputDigest != revised.OutputDigest || result.DesignRevision == nil || store.message.Recipient != manager.ActorFQN {
+		t.Fatalf("revised design did not return to PM: feature=%+v err=%v", result, err)
+	}
+}
+
 func TestPlan013OnlyPMCanApplyDesignBoundExecutablePlan(t *testing.T) {
 	now := time.Date(2026, 9, 30, 12, 0, 0, 0, time.UTC)
 	manager := activeRole("teams::project-manager-1", "project-manager", featureUUID(71), featureDigest('5'))

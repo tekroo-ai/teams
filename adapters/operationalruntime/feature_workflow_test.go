@@ -81,6 +81,55 @@ func TestPlan013WorkflowBindsPMFinalizationAfterArchitecture(t *testing.T) {
 	}
 }
 
+func TestOptInWorkflowRoutesOneRevisionThroughNewNodes(t *testing.T) {
+	workingDirectory, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(filepath.Dir(filepath.Dir(workingDirectory)), "config", "workflows", "software-development.v2.1.json")
+	definition, err := organization.LoadWorkflowDefinition(path, kernel.Digest("55c9018d4726bf54943fd3afb41ed07b1d2395b9d01e89626c693a30ab2dd7b3"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	library := organization.NewWorkflowLibrary()
+	if err := library.Add(definition); err != nil {
+		t.Fatal(err)
+	}
+	service := &ProductionService{WorkflowLibrary: library}
+	feature := organization.FeatureRequest{Status: organization.FeatureSpecified, LastHop: 4, Input: organization.FeatureRequestInput{MaximumHops: 8}}
+	if stage, ok := workflowStageForFeature(feature, definition); !ok || stage != "design" {
+		t.Fatal("initial design stage changed")
+	}
+	feature.DesignRevision = &organization.FeatureDesignRevision{}
+	if stage, ok := workflowStageForFeature(feature, definition); !ok || stage != "revise-design" {
+		t.Fatal("revision did not select a new architect node")
+	}
+	role, _, _, title, _, _, err := service.workflowPlanningStageDefinitionFor(feature, stageArchitecture)
+	if err != nil || role != "architect" || !strings.HasPrefix(title, "revise-design:") {
+		t.Fatalf("architect revision definition mismatch: role=%s title=%s err=%v", role, title, err)
+	}
+	feature.Status = organization.FeatureDesigned
+	if stage, ok := workflowStageForFeature(feature, definition); !ok || stage != "finalize-plan-revised" {
+		t.Fatal("revision did not select a new PM node")
+	}
+	feature.Plan = &organization.FeaturePlan{}
+	if stage, ok := workflowStageForFeature(feature, definition); !ok || stage != "finalize-plan" {
+		t.Fatal("historical revision receipt captured an unrelated later planning round")
+	}
+	feature.Plan = nil
+	if mayRoutePMDesignRevision(feature, stagePlanFinalization, "needs_decision", "another gap") {
+		t.Fatal("second PM decision was allowed to create another revision")
+	}
+	feature.DesignRevision = nil
+	if !mayRoutePMDesignRevision(feature, stagePlanFinalization, "needs_decision", "precise gap") || mayRoutePMDesignRevision(feature, stagePlanFinalization, "completed", "done") || mayRoutePMDesignRevision(feature, stagePlanFinalization, "needs_decision", "") {
+		t.Fatal("first-pass PM disposition routing is incorrect")
+	}
+	feature.Input.MaximumHops = 5
+	if mayRoutePMDesignRevision(feature, stagePlanFinalization, "needs_decision", "precise gap") {
+		t.Fatal("revision route exceeded the message hop budget")
+	}
+}
+
 func TestWorkflowInvocationAdmissionFamilyIncludesChangedConditionRetries(t *testing.T) {
 	root := workflowTestInvocation("root")
 	retry := workflowTestInvocation("retry")

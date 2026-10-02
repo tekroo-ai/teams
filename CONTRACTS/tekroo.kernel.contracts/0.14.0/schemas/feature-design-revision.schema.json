@@ -1,0 +1,32 @@
+{
+  "$id": "tekroo.kernel.contracts/0.14.0/schemas/feature-design-revision.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "decision_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "prior_design_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "reason": {
+      "maxLength": 4096,
+      "minLength": 1,
+      "type": "string"
+    },
+    "requested_at": {
+      "format": "date-time",
+      "type": "string"
+    }
+  },
+  "required": [
+    "prior_design_digest",
+    "decision_digest",
+    "reason",
+    "requested_at"
+  ],
+  "title": "Single-use PM design revision receipt",
+  "type": "object"
+}

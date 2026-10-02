@@ -1,0 +1,9 @@
+# Single-use PM design revision (contract 0.14.0 candidate)
+
+The 0.13.0 path remains `refine -> specify -> design -> finalize-plan`. A PM `needs_decision` still blocks there. This successor is selected only by `software-development/2.1.0` in a fresh, isolated workflow; it does not migrate an active feature.
+
+The opt-in graph is `refine -> specify -> design -> finalize-plan -> revise-design -> finalize-plan-revised`. The final two nodes are optional. A valid first PM plan skips both, completing the workflow without further model calls. If the first PM instead returns a nonempty, bounded `needs_decision` reason, Teams completes that decision task, records its output digest and the prior design digest, sends one new design request to the architect, and executes the two new nodes. The architect receives the prior proposal and exact PM decision as evidence. The PM then reviews that revised proposal. A second `needs_decision` blocks; it cannot create a third architect pass.
+
+The PM cannot silently edit technical task content. The architect revision does not change product requirements and does not authorize implementation. The PM's final plan remains subject to the same digest, task-preservation, handoff-closure, and materialization checks as 0.13. The old task, message, invocation, and design output remain immutable; revision uses distinct workflow nodes and round-derived task IDs. A successful first-pass plan and a one-revision plan each reach a terminal workflow state. Skipping is permitted only for untouched optional nodes and is itself a durable transition.
+
+Activation requires selecting the new workflow digest in a fresh isolated config, with no in-flight feature on another trigger version. Tests of state transitions, branch selection, decision forwarding, and unchanged 0.13 behavior are required before a live qualification. This record does not authorize deployment or a new run.

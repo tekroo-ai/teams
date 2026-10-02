@@ -94,6 +94,7 @@ func (limits WorkflowBudgetLimits) Valid() bool {
 
 type WorkflowStageDefinition struct {
 	StageID                 string                   `json:"stage_id"`
+	Optional                bool                     `json:"optional,omitempty"`
 	DependsOn               []string                 `json:"depends_on"`
 	InputSchema             string                   `json:"input_schema"`
 	OutputSchema            string                   `json:"output_schema"`
@@ -275,13 +276,14 @@ const (
 	WorkflowNodeRunning   WorkflowNodeState = "RUNNING"
 	WorkflowNodeBlocked   WorkflowNodeState = "BLOCKED"
 	WorkflowNodeCompleted WorkflowNodeState = "COMPLETED"
+	WorkflowNodeSkipped   WorkflowNodeState = "SKIPPED"
 	WorkflowNodeFailed    WorkflowNodeState = "FAILED"
 	WorkflowNodeCancelled WorkflowNodeState = "CANCELLED"
 )
 
 func (state WorkflowNodeState) Valid() bool {
 	switch state {
-	case WorkflowNodePending, WorkflowNodeReady, WorkflowNodeAdmitted, WorkflowNodeRunning, WorkflowNodeBlocked, WorkflowNodeCompleted, WorkflowNodeFailed, WorkflowNodeCancelled:
+	case WorkflowNodePending, WorkflowNodeReady, WorkflowNodeAdmitted, WorkflowNodeRunning, WorkflowNodeBlocked, WorkflowNodeCompleted, WorkflowNodeSkipped, WorkflowNodeFailed, WorkflowNodeCancelled:
 		return true
 	default:
 		return false
@@ -382,6 +384,7 @@ func (instance WorkflowInstance) Validate(definition WorkflowDefinition) error {
 	nodeNames := make([]string, 0, len(instance.Nodes))
 	edges := make([]GraphEdge, 0)
 	completedNodes := 0
+	skippedNodes := 0
 	failedNodes := 0
 	cancelledNodes := 0
 	blockedNodes := 0
@@ -401,6 +404,8 @@ func (instance WorkflowInstance) Validate(definition WorkflowDefinition) error {
 		switch node.State {
 		case WorkflowNodeCompleted:
 			completedNodes++
+		case WorkflowNodeSkipped:
+			skippedNodes++
 		case WorkflowNodeFailed:
 			failedNodes++
 		case WorkflowNodeCancelled:
@@ -441,7 +446,10 @@ func (instance WorkflowInstance) Validate(definition WorkflowDefinition) error {
 		if (node.State == WorkflowNodeAdmitted || node.State == WorkflowNodeRunning || node.State == WorkflowNodeCompleted || node.State == WorkflowNodeFailed) && (node.ActorFQN == nil || node.InvocationID == nil || node.Attempt == 0) {
 			return ErrInvalidWorkflowInstance
 		}
-		if (node.State == WorkflowNodePending || node.State == WorkflowNodeReady) && (node.ActorFQN != nil || node.InvocationID != nil || node.Attempt != 0) {
+		if (node.State == WorkflowNodePending || node.State == WorkflowNodeReady || node.State == WorkflowNodeSkipped) && (node.ActorFQN != nil || node.InvocationID != nil || node.Attempt != 0) {
+			return ErrInvalidWorkflowInstance
+		}
+		if node.State == WorkflowNodeSkipped && (!workflowSkippableStage(definition, node.StageID) || node.ProgressDigest != nil || node.CheckpointID != nil || node.ContinuationNodeID != nil || len(node.OutputEvidenceIDs) != 0 || node.FailureClassification != WorkflowFailureNone) {
 			return ErrInvalidWorkflowInstance
 		}
 		if node.State == WorkflowNodeReady && !predecessorsSatisfied(definition, instance, node) || node.State == WorkflowNodePending && predecessorsSatisfied(definition, instance, node) {
@@ -457,7 +465,7 @@ func (instance WorkflowInstance) Validate(definition WorkflowDefinition) error {
 	if !ValidateDAG(nodeNames, edges).Valid {
 		return ErrInvalidWorkflowInstance
 	}
-	if instance.State == WorkflowCompleted && completedNodes != len(instance.Nodes) || completedNodes == len(instance.Nodes) && instance.State != WorkflowCompleted {
+	if instance.State == WorkflowCompleted && completedNodes+skippedNodes != len(instance.Nodes) || completedNodes+skippedNodes == len(instance.Nodes) && instance.State != WorkflowCompleted {
 		return ErrInvalidWorkflowInstance
 	}
 	if instance.State == WorkflowFailed && failedNodes == 0 || instance.State == WorkflowCancelled && completedNodes+cancelledNodes != len(instance.Nodes) || instance.State == WorkflowBlocked && blockedNodes == 0 {
@@ -623,6 +631,7 @@ const (
 	WorkflowTransitionAdmit      WorkflowTransitionKind = "ADMIT"
 	WorkflowTransitionStart      WorkflowTransitionKind = "START"
 	WorkflowTransitionComplete   WorkflowTransitionKind = "COMPLETE"
+	WorkflowTransitionSkip       WorkflowTransitionKind = "SKIP"
 	WorkflowTransitionFail       WorkflowTransitionKind = "FAIL"
 	WorkflowTransitionBlock      WorkflowTransitionKind = "BLOCK"
 	WorkflowTransitionReady      WorkflowTransitionKind = "READY"
@@ -710,6 +719,12 @@ func applyWorkflowTransition(definition WorkflowDefinition, instance *WorkflowIn
 		node.ProgressDigest = &digest
 		node.FailureClassification = WorkflowFailureNone
 		refreshWorkflowReadiness(definition, instance)
+	case WorkflowTransitionSkip:
+		if node.State != WorkflowNodeReady || !workflowSkippableStage(definition, node.StageID) || transition.ActorFQN != "" || transition.InvocationID != "" || transition.ProgressDigest != "" || transition.CheckpointID != "" || transition.FailureClassification != "" || len(transition.EvidenceIDs) != 0 {
+			return ErrInvalidWorkflowTransition
+		}
+		node.State = WorkflowNodeSkipped
+		refreshWorkflowReadiness(definition, instance)
 	case WorkflowTransitionFail:
 		if node.State != WorkflowNodeRunning || node.InvocationID == nil || *node.InvocationID != transition.InvocationID || !transition.ProgressDigest.Valid() || !transition.FailureClassification.Valid() || transition.FailureClassification == WorkflowFailureNone {
 			return ErrInvalidWorkflowTransition
@@ -754,7 +769,7 @@ func refreshWorkflowReadiness(definition WorkflowDefinition, instance *WorkflowI
 	completed := 0
 	for index := range instance.Nodes {
 		node := &instance.Nodes[index]
-		if node.State == WorkflowNodeCompleted {
+		if node.State == WorkflowNodeCompleted || node.State == WorkflowNodeSkipped {
 			completed++
 			continue
 		}
@@ -765,6 +780,11 @@ func refreshWorkflowReadiness(definition WorkflowDefinition, instance *WorkflowI
 	if completed == len(instance.Nodes) {
 		instance.State = WorkflowCompleted
 	}
+}
+
+func workflowSkippableStage(definition WorkflowDefinition, stageID string) bool {
+	stage := workflowStageByID(definition, stageID)
+	return stage != nil && stage.Optional
 }
 
 func predecessorsCompleted(instance WorkflowInstance, node WorkflowNode) bool {
@@ -779,6 +799,15 @@ func predecessorsCompleted(instance WorkflowInstance, node WorkflowNode) bool {
 
 func predecessorsSatisfied(definition WorkflowDefinition, instance WorkflowInstance, node WorkflowNode) bool {
 	stage := workflowStageByID(definition, node.StageID)
+	if stage != nil && stage.Optional {
+		for _, predecessorID := range node.PredecessorNodeIDs {
+			predecessor := workflowNodeByID(&instance, predecessorID)
+			if predecessor == nil || predecessor.State != WorkflowNodeCompleted && predecessor.State != WorkflowNodeSkipped {
+				return false
+			}
+		}
+		return true
+	}
 	if stage == nil || (stage.Purpose != WorkflowPurposeRepair && stage.Purpose != WorkflowPurposeReplan) {
 		return predecessorsCompleted(instance, node)
 	}

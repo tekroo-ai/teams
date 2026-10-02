@@ -1,0 +1,30 @@
+{
+  "$id": "tekroo.kernel.contracts/0.14.0/schemas/feature-design-candidate.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "output_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "prepared_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "prepared_by": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "prepared_execution": {
+      "type": "object"
+    }
+  },
+  "required": [
+    "prepared_by",
+    "prepared_execution",
+    "output_digest",
+    "prepared_at"
+  ],
+  "title": "Immutable architect proposal reference",
+  "type": "object"
+}

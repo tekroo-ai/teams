@@ -1,0 +1,26 @@
+{
+  "additions": [
+    "signed team and role manifests",
+    "role host and liveness state",
+    "exact-directed organizational messages and delivery",
+    "feature intake and planning",
+    "focused operator and human participant surfaces"
+  ],
+  "compatibility": "ADDITIVE",
+  "contractName": "tekroo.kernel.contracts",
+  "contractVersion": "0.9.0",
+  "directions": {
+    "adapter": "NOT_REQUIRED",
+    "reader": "COMPATIBLE",
+    "writer": "SUCCESSOR_IDENTITY_REQUIRED"
+  },
+  "predecessor": {
+    "contractName": "tekroo.kernel.contracts",
+    "contractVersion": "0.8.0",
+    "manifestSha256": "c7eb4baae3a8312e44f9946fabde5a9cddb1937c7a41eb02d9b014ef21027ad1"
+  },
+  "preserved": [
+    "all 0.8.0 kernel commands, events, invariants, negative fixtures, and authority boundaries"
+  ],
+  "schemaVersion": "1.0.0"
+}

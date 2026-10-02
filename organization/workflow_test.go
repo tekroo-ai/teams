@@ -29,6 +29,31 @@ func organizationWorkflowDefinition(t *testing.T, name string) kernel.WorkflowDe
 	return definition
 }
 
+func TestOptionalDesignRevisionWorkflowDefinition(t *testing.T) {
+	path := filepath.Join("..", "config", "workflows", "software-development.v2.1.json")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var definition kernel.WorkflowDefinition
+	if err := json.Unmarshal(raw, &definition); err != nil {
+		t.Fatal(err)
+	}
+	digest, err := definition.CalculatedDigest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if digest != definition.ContentDigest {
+		t.Fatalf("workflow digest mismatch: actual %s", digest)
+	}
+	if err := definition.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if len(definition.Stages) != 6 || !definition.Stages[4].Optional || !definition.Stages[5].Optional {
+		t.Fatal("revision stages must be optional")
+	}
+}
+
 func TestLoadWorkflowDefinitionAndVersionLookup(t *testing.T) {
 	definition := organizationWorkflowDefinition(t, "publication")
 	raw, err := json.Marshal(definition)

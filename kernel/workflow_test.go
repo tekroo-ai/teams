@@ -52,6 +52,39 @@ func workflowTestInstance(t *testing.T) (WorkflowDefinition, WorkflowInstance) {
 	return definition, instance
 }
 
+func TestOptionalWorkflowBranchSkipsToCompletion(t *testing.T) {
+	definition := workflowTestDefinition(t)
+	definition.Stages = []WorkflowStageDefinition{
+		definition.Stages[0],
+		{StageID: "revise", DependsOn: []string{"intake"}, Optional: true, InputSchema: "brief/v1", OutputSchema: "revision/v1", RequiredCapabilities: []string{"revise"}, Purpose: WorkflowPurposeHandoff, Risk: WorkflowRiskLow, ConcurrencyGroup: "intake", MaximumParallelism: 1, AttemptLimit: 1, TargetSelection: WorkflowTargetCapability, ValidationPolicy: WorkflowValidationDeterministic},
+		{StageID: "finalize", DependsOn: []string{"revise"}, Optional: true, InputSchema: "revision/v1", OutputSchema: "final/v1", RequiredCapabilities: []string{"finalize"}, Purpose: WorkflowPurposeHandoff, Risk: WorkflowRiskLow, ConcurrencyGroup: "intake", MaximumParallelism: 1, AttemptLimit: 1, TargetSelection: WorkflowTargetCapability, ValidationPolicy: WorkflowValidationDeterministic},
+	}
+	digest, err := definition.CalculatedDigest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	definition.ContentDigest = digest
+	instance, err := NewWorkflowInstance(definition, workflowTestID(301), AggregateRef{Kind: AggregateTask, ID: workflowTestID(302)}, workflowTestID(303), map[string]UUIDv7{"intake": workflowTestID(310), "revise": workflowTestID(311), "finalize": workflowTestID(312)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, 10, 2, 0, 0, 0, 0, time.UTC)
+	transitions := []WorkflowTransition{
+		{Revision: 2, EventID: workflowTestID(320), Kind: WorkflowTransitionAdmit, NodeID: workflowTestID(310), ActorFQN: ActorFQN("demo::worker-1"), InvocationID: workflowTestID(330), RecordedAt: now},
+		{Revision: 3, EventID: workflowTestID(321), Kind: WorkflowTransitionStart, NodeID: workflowTestID(310), InvocationID: workflowTestID(330), RecordedAt: now},
+		{Revision: 4, EventID: workflowTestID(322), Kind: WorkflowTransitionComplete, NodeID: workflowTestID(310), InvocationID: workflowTestID(330), ProgressDigest: Digest("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), RecordedAt: now},
+		{Revision: 5, EventID: workflowTestID(323), Kind: WorkflowTransitionSkip, NodeID: workflowTestID(311), RecordedAt: now},
+		{Revision: 6, EventID: workflowTestID(324), Kind: WorkflowTransitionSkip, NodeID: workflowTestID(312), RecordedAt: now},
+	}
+	state, err := FoldWorkflowInstance(definition, instance, transitions)
+	if err != nil || state.State != WorkflowCompleted || state.Nodes[1].State != WorkflowNodeSkipped || state.Nodes[2].State != WorkflowNodeSkipped {
+		t.Fatalf("optional branch did not skip: state=%+v err=%v", state, err)
+	}
+	if _, err := FoldWorkflowInstance(definition, instance, append(transitions[:3], WorkflowTransition{Revision: 5, EventID: workflowTestID(325), Kind: WorkflowTransitionSkip, NodeID: workflowTestID(310), RecordedAt: now})); err == nil {
+		t.Fatal("mandatory or completed stage skipped")
+	}
+}
+
 func TestWorkflowDefinitionRejectsCycleAndDigestMismatch(t *testing.T) {
 	definition := workflowTestDefinition(t)
 	if err := definition.Validate(); err != nil {

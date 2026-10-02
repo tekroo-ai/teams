@@ -120,6 +120,17 @@ func (service *ProductionService) reconcileFeaturePlanning(ctx context.Context) 
 		if err != nil {
 			return err
 		}
+		revisionRequested := false
+		if stage == stagePlanFinalization {
+			outcome, summary, recognized := roleHandlerDisposition(output)
+			if recognized && mayRoutePMDesignRevision(feature, stage, outcome, summary) {
+				enabled, revisionErr := service.featureDesignRevisionEnabled(ctx, feature)
+				if revisionErr != nil {
+					return revisionErr
+				}
+				revisionRequested = enabled
+			}
+		}
 		if state.Condition == kernel.ConditionBlocked {
 			// A deployment may repair a deterministic decoder defect after the
 			// model invocation succeeded. Reuse that immutable output only when the
@@ -137,7 +148,7 @@ func (service *ProductionService) reconcileFeaturePlanning(ctx context.Context) 
 			}
 		}
 		if state.Phase != kernel.PhaseCompleted {
-			if stage == stagePlanFinalization {
+			if stage == stagePlanFinalization && !revisionRequested {
 				outcome, summary, recognized := roleHandlerDisposition(output)
 				if recognized && outcome == "needs_decision" {
 					reason := planDecisionRequiredReason + ": " + summary
@@ -147,11 +158,13 @@ func (service *ProductionService) reconcileFeaturePlanning(ctx context.Context) 
 					continue
 				}
 			}
-			if err := service.validateFeatureStageOutputWithEvidence(ctx, feature, stage, output); err != nil {
-				if _, blockErr := service.blockStructuredDecisionTask(ctx, feature, task, state, invocation, snapshot, invalidPlanningOutputReason, "invalid-planning-output"); blockErr != nil {
-					return fmt.Errorf("feature %s %s invalid-output block: %w", feature.ID, stage, blockErr)
+			if !revisionRequested {
+				if err := service.validateFeatureStageOutputWithEvidence(ctx, feature, stage, output); err != nil {
+					if _, blockErr := service.blockStructuredDecisionTask(ctx, feature, task, state, invocation, snapshot, invalidPlanningOutputReason, "invalid-planning-output"); blockErr != nil {
+						return fmt.Errorf("feature %s %s invalid-output block: %w", feature.ID, stage, blockErr)
+					}
+					continue
 				}
-				continue
 			}
 			if err := service.completeEvidenceTask(ctx, feature, task, state, head, invocation, snapshot); err != nil {
 				return err
@@ -161,6 +174,11 @@ func (service *ProductionService) reconcileFeaturePlanning(ctx context.Context) 
 			if err := service.completeFeatureWorkflowStage(ctx, feature, workflowAdmission, *invocation.OutputDigest); err != nil {
 				return fmt.Errorf("feature %s %s workflow completion: %w", feature.ID, stage, err)
 			}
+			if stage == stagePlanFinalization && feature.DesignRevision == nil && !revisionRequested {
+				if err := service.skipUnusedFeatureRevision(ctx, feature); err != nil {
+					return fmt.Errorf("feature %s skip unused revision: %w", feature.ID, err)
+				}
+			}
 		}
 		// The independent second-architect plan review was dropped after
 		// qualification history (59 runs, 130+ recorded review branch results)
@@ -169,10 +187,26 @@ func (service *ProductionService) reconcileFeaturePlanning(ctx context.Context) 
 		// validateFeatureStageOutput above, and plan semantics are verified
 		// downstream by per-story validation, security review, whole-feature
 		// validation, and product acceptance.
-		if err := service.resolveFeatureStageMessage(ctx, feature, invocation); err != nil {
-			return fmt.Errorf("feature %s stage %s resolve handoff: %w", feature.ID, stage, err)
+		var resolveErr error
+		if revisionRequested {
+			resolveErr = service.resolveFeatureStageMessageWithDisposition(ctx, feature, invocation, "STRUCTURED_HANDOFF_REVISION_REQUESTED")
+		} else {
+			resolveErr = service.resolveFeatureStageMessage(ctx, feature, invocation)
 		}
-		if err := service.applyFeatureStageOutput(ctx, feature, stage, invocation, output); err != nil {
+		if resolveErr != nil {
+			return fmt.Errorf("feature %s stage %s resolve handoff: %w", feature.ID, stage, resolveErr)
+		}
+		if revisionRequested {
+			_, summary, _ := roleHandlerDisposition(output)
+			requestedAt := service.clock.Now().UTC()
+			if invocation.FinishedAt != nil {
+				requestedAt = invocation.FinishedAt.UTC()
+			}
+			_, err = service.Features.RequestDesignRevision(ctx, feature.ID, feature.Revision, invocation.ActorFQN, invocation.Execution, organization.FeatureDesignRevision{PriorDesignDigest: feature.Design.OutputDigest, DecisionDigest: *invocation.OutputDigest, Reason: summary, RequestedAt: requestedAt})
+		} else {
+			err = service.applyFeatureStageOutput(ctx, feature, stage, invocation, output)
+		}
+		if err != nil {
 			return fmt.Errorf("feature %s stage %s apply: %w", feature.ID, stage, err)
 		}
 		if service.WorkflowLibrary != nil {
@@ -506,7 +540,7 @@ func (service *ProductionService) ensureFeaturePlanningTaskFor(ctx context.Conte
 }
 
 func (service *ProductionService) ensureFeaturePlanningTaskForRound(ctx context.Context, feature organization.FeatureRequest, stage featurePlanningStage, reviewedTaskIndex *uint32, architectureRound uint32) (organization.PlannedTask, kernel.AggregateState, kernel.UUIDv7, kernel.WorkInvocation, kernel.Snapshot, error) {
-	role, purpose, requiredRoute, title, description, criteria, err := service.workflowPlanningStageDefinition(stage)
+	role, purpose, requiredRoute, title, description, criteria, err := service.workflowPlanningStageDefinitionFor(feature, stage)
 	if err != nil {
 		return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, err
 	}
@@ -618,12 +652,22 @@ func (service *ProductionService) ensureFeaturePlanningTaskForRound(ctx context.
 		rejections, rejected, rejectionErr := service.architecturePlanRejections(ctx, feature, architectureRound-1)
 		operatorCorrection := feature.PlanSupersession != nil && feature.PlanSupersession.ArchitectureRound == architectureRound
 		specificationCorrection := feature.SpecificationCorrection != nil && feature.SpecificationCorrection.ArchitectureRound == architectureRound
+		pmRevision := feature.DesignRevision != nil && architectureRound == 1
 		predecessorReady := predecessorState.Phase == kernel.PhaseCompleted || specificationCorrection && predecessorState.Condition == kernel.ConditionBlocked
-		if predecessorErr != nil || rejectionErr != nil || !predecessorFound || !predecessorReady || !rejected && !operatorCorrection && !specificationCorrection {
+		if predecessorErr != nil || rejectionErr != nil || !predecessorFound || !predecessorReady || !rejected && !operatorCorrection && !specificationCorrection && !pmRevision {
 			return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, errors.Join(organization.ErrFeatureConflict, predecessorErr, rejectionErr)
 		}
 		if predecessorState.Phase == kernel.PhaseCompleted {
 			dependsOn = append(dependsOn, predecessorID)
+		}
+		if pmRevision {
+			pmTaskID := featurePlanningTaskID(feature.ID, stagePlanFinalization, 0, nil)
+			pmState, pmHead, pmFound, pmErr := service.Store.ReadAggregateHead(ctx, kernel.AggregateRef{Kind: kernel.AggregateTask, ID: pmTaskID})
+			if pmErr != nil || !pmFound || pmState.Phase != kernel.PhaseCompleted {
+				return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, errors.Join(organization.ErrFeatureConflict, pmErr)
+			}
+			dependsOn = append(dependsOn, pmTaskID)
+			parents = append(parents, kernel.DagParent{ParentEventID: pmHead, EdgeKind: kernel.EdgeCausal})
 		}
 		parents = append(parents, kernel.DagParent{ParentEventID: predecessorHead, EdgeKind: kernel.EdgeCausal})
 		for _, rejection := range rejections {
@@ -968,6 +1012,9 @@ func (service *ProductionService) desiredArchitecturePlanRound(ctx context.Conte
 	if err != nil {
 		return round, err
 	}
+	if feature.DesignRevision != nil && round == 0 {
+		return 1, nil
+	}
 	maximumAutomaticRound := architectureAutomaticSuccessorLimit
 	if feature.PlanSupersession != nil {
 		if round < feature.PlanSupersession.ArchitectureRound {
@@ -1149,6 +1196,24 @@ func (service *ProductionService) featureArchitectureSuccessorDescription(ctx co
 	predecessorInvocation, predecessorOutput, err := service.featureArchitectureCandidateForRound(ctx, feature, round-1)
 	if err != nil || predecessorInvocation.OutputDigest == nil {
 		return "", errors.Join(organization.ErrInvalidFeature, err)
+	}
+	if revision := feature.DesignRevision; revision != nil && round == 1 {
+		if revision.PriorDesignDigest != *predecessorInvocation.OutputDigest {
+			return "", organization.ErrInvalidFeature
+		}
+		routing, routingErr := service.workflowTaskRoutingPolicy(service.clock.Now().UTC())
+		if routingErr != nil {
+			return "", routingErr
+		}
+		base, baseErr := featurePlanningDescription(feature, stageArchitecture, instruction, routing)
+		if baseErr != nil {
+			return "", baseErr
+		}
+		feedback, marshalErr := json.Marshal(map[string]any{"prior_design_sha256": revision.PriorDesignDigest, "prior_design_output": string(predecessorOutput), "pm_decision_sha256": revision.DecisionDigest, "pm_decision_reason": revision.Reason})
+		if marshalErr != nil || len(base)+len(feedback) > 768<<10 {
+			return "", organization.ErrInvalidFeature
+		}
+		return base + "\n\nThe PM identified a technical design gap. Revise the design once, addressing the precise decision below without changing product scope. The prior proposal is historical evidence.\n\nPM_DESIGN_REVISION_JSON:\n" + string(feedback), nil
 	}
 	rejections, rejected, err := service.architecturePlanRejections(ctx, feature, round-1)
 	operatorCorrection := feature.PlanSupersession != nil && feature.PlanSupersession.ArchitectureRound == round
