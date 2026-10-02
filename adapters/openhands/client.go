@@ -687,6 +687,15 @@ type EvidenceReader interface {
 	Read(context.Context, kernel.Digest) ([]byte, error)
 }
 
+type ReadOnlyToolSession struct {
+	URL         string
+	BearerToken string
+}
+
+type ReadOnlyToolSessionIssuer interface {
+	IssueReadOnlyToolSession(context.Context, kernel.UUIDv7, kernel.Digest) (ReadOnlyToolSession, error)
+}
+
 type promptEvidenceMaterialization struct {
 	EvidenceID kernel.UUIDv7 `json:"evidence_id"`
 	SHA256     kernel.Digest `json:"sha256"`
@@ -701,6 +710,7 @@ type Config struct {
 	Profiles             ExecutionProfileResolver
 	Evidence             EvidenceReader
 	EvidenceRoot         string
+	ToolSessions         ReadOnlyToolSessionIssuer
 	PollInterval         time.Duration
 	MaximumPages         uint32
 	MaximumEvidenceBytes int
@@ -714,6 +724,7 @@ type Client struct {
 	profiles             ExecutionProfileResolver
 	evidence             EvidenceReader
 	evidenceRoot         string
+	toolSessions         ReadOnlyToolSessionIssuer
 	pollInterval         time.Duration
 	maximumPages         uint32
 	maximumEvidenceBytes int
@@ -732,7 +743,7 @@ func NewClient(config Config) (*Client, error) {
 		return nil, ErrInvalidConfiguration
 	}
 	base.Path = ""
-	return &Client{baseURL: base, sessionAPIKey: config.SessionAPIKey, http: config.HTTPClient, workspaces: config.Workspaces, profiles: config.Profiles, evidence: config.Evidence, evidenceRoot: config.EvidenceRoot, pollInterval: config.PollInterval, maximumPages: config.MaximumPages, maximumEvidenceBytes: config.MaximumEvidenceBytes, eventsCache: make(map[string]cachedConversationEvents)}, nil
+	return &Client{baseURL: base, sessionAPIKey: config.SessionAPIKey, http: config.HTTPClient, workspaces: config.Workspaces, profiles: config.Profiles, evidence: config.Evidence, evidenceRoot: config.EvidenceRoot, toolSessions: config.ToolSessions, pollInterval: config.PollInterval, maximumPages: config.MaximumPages, maximumEvidenceBytes: config.MaximumEvidenceBytes, eventsCache: make(map[string]cachedConversationEvents)}, nil
 }
 
 func (client *Client) promptEvidence(ctx context.Context, references []kernel.EvidenceRef) ([]promptEvidenceMaterialization, error) {
@@ -867,6 +878,10 @@ func (client *Client) createOrForkConversation(ctx context.Context, brief applic
 		if agentSettings, ok = withSubmitResultTool(agentSettings, brief.MessageHandler); !ok {
 			return 0, nil, false, ErrProtocol
 		}
+	}
+	agentSettings, err = client.withReadOnlyToolSession(ctx, agentSettings, brief.InvocationID, prepared.requestDigest)
+	if err != nil {
+		return 0, nil, false, err
 	}
 	payload := map[string]any{
 		"id":             brief.InvocationID,
@@ -1641,6 +1656,9 @@ func workspaceOrientationAction(event rawEvent) bool {
 	if event.Kind != "ActionEvent" || event.Source != "agent" {
 		return false
 	}
+	if event.ToolName == "repository_status" || event.ToolName == "teams_git_status" {
+		return true
+	}
 	// Orientation is defined by the information an action exposes, not the tool
 	// that carries it: an action revealing only workspace structure (paths,
 	// names, commit metadata) that mutates nothing is orientation whether it
@@ -2142,7 +2160,7 @@ func repositorySearchTool(name string) bool {
 
 func repositoryAction(event rawEvent) bool {
 	switch event.ToolName {
-	case "terminal", "run_command", "file_editor", "file_view", "file_create", "file_replace", "file_insert", "file_undo", "replace_text_in_file", "insert_file_text", "undo_file_edit", "file_delete", "file_move", "glob", "repository_search", "repository_view", "file_read", "list_files", "find_files", "search_file_contents", "repository_status", "list_changed_files", "read_file_diff":
+	case "terminal", "run_command", "file_editor", "file_view", "file_create", "file_replace", "file_insert", "file_undo", "replace_text_in_file", "insert_file_text", "undo_file_edit", "file_delete", "file_move", "glob", "repository_search", "repository_view", "file_read", "list_files", "find_files", "search_file_contents", "repository_status", "list_changed_files", "read_file_diff", "teams_read_file", "teams_list_files", "teams_git_status", "teams_git_diff":
 		return true
 	default:
 		return false
@@ -2150,7 +2168,7 @@ func repositoryAction(event rawEvent) bool {
 }
 
 func repositoryFileListingAction(event rawEvent) bool {
-	if event.ToolName == "glob" || event.ToolName == "list_files" || event.ToolName == "find_files" || event.ToolName == "list_changed_files" {
+	if event.ToolName == "glob" || event.ToolName == "list_files" || event.ToolName == "teams_list_files" || event.ToolName == "find_files" || event.ToolName == "list_changed_files" {
 		return true
 	}
 	if event.ToolName == "file_editor" || event.ToolName == "file_view" || event.ToolName == "repository_view" {
@@ -2189,7 +2207,7 @@ func repositoryFileListingAction(event rawEvent) bool {
 }
 
 func repositoryInspectionAction(event rawEvent) bool {
-	if repositorySearchTool(event.ToolName) || event.ToolName == "read_file_diff" || event.ToolName == "file_read" && event.ActionPath != "" {
+	if repositorySearchTool(event.ToolName) || event.ToolName == "read_file_diff" || event.ToolName == "file_read" && event.ActionPath != "" || event.ToolName == "teams_read_file" && event.ActionPath != "" || event.ToolName == "teams_git_diff" {
 		return true
 	}
 	if event.ToolName == "file_editor" || event.ToolName == "file_view" || event.ToolName == "repository_view" {
@@ -2213,7 +2231,7 @@ func repositoryInspectionAction(event rawEvent) bool {
 }
 
 func repositoryContentReadAction(event rawEvent) bool {
-	if repositorySearchTool(event.ToolName) || event.ToolName == "read_file_diff" || event.ToolName == "file_read" && event.ActionPath != "" {
+	if repositorySearchTool(event.ToolName) || event.ToolName == "read_file_diff" || event.ToolName == "file_read" && event.ActionPath != "" || event.ToolName == "teams_read_file" && event.ActionPath != "" || event.ToolName == "teams_git_diff" {
 		return true
 	}
 	if event.ToolName == "file_editor" || event.ToolName == "file_view" || event.ToolName == "repository_view" {
@@ -3409,7 +3427,7 @@ func checkpointRepositoryEvidenceAction(event rawEvent) bool {
 
 func checkpointActionIsRepositoryEvidence(action checkpointAction) bool {
 	switch action.Tool {
-	case "repository_view", "repository_search", "file_view", "file_read", "search_file_contents", "read_file_diff", "read_evidence":
+	case "repository_view", "repository_search", "file_view", "file_read", "search_file_contents", "read_file_diff", "read_evidence", "teams_read_file", "teams_git_diff":
 		return true
 	case "terminal", "run_command":
 		fields := strings.Fields(strings.ToLower(strings.TrimSpace(action.Command)))
@@ -3428,7 +3446,7 @@ func checkpointActionIsRepositoryEvidence(action checkpointAction) bool {
 
 func checkpointActionIsReadOnlyInspection(action checkpointAction) bool {
 	switch action.Tool {
-	case "repository_view", "repository_search", "glob", "file_view", "file_read", "list_files", "find_files", "search_file_contents", "repository_status", "list_changed_files", "read_file_diff", "read_evidence":
+	case "repository_view", "repository_search", "glob", "file_view", "file_read", "list_files", "find_files", "search_file_contents", "repository_status", "list_changed_files", "read_file_diff", "read_evidence", "teams_read_file", "teams_list_files", "teams_git_status", "teams_git_diff":
 		return true
 	case "file_editor":
 		return strings.EqualFold(strings.TrimSpace(action.Command), "view")
@@ -4045,12 +4063,51 @@ func withInvocationReadTools(ctx context.Context, agentSettings any, brief appli
 	return settings, nil
 }
 
+func (client *Client) withReadOnlyToolSession(ctx context.Context, agentSettings any, invocationID kernel.UUIDv7, requestDigest kernel.Digest) (any, error) {
+	if client.toolSessions == nil {
+		return agentSettings, nil
+	}
+	session, err := client.toolSessions.IssueReadOnlyToolSession(ctx, invocationID, requestDigest)
+	if err != nil {
+		return nil, err
+	}
+	endpoint, err := url.Parse(session.URL)
+	if err != nil || endpoint.Scheme != "http" || endpoint.Host == "" || endpoint.User != nil || endpoint.Fragment != "" || session.BearerToken == "" {
+		return nil, ErrProtocol
+	}
+	settings, ok := agentSettings.(map[string]any)
+	if !ok {
+		return nil, ErrProtocol
+	}
+	mcpConfig, exists := settings["mcp_config"]
+	if !exists || mcpConfig == nil {
+		mcpConfig = map[string]any{}
+	}
+	servers, ok := mcpConfig.(map[string]any)
+	if !ok {
+		return nil, ErrProtocol
+	}
+	if _, exists := servers["tekroo_agent_tools"]; exists {
+		return nil, ErrProtocol
+	}
+	servers["tekroo_agent_tools"] = map[string]any{
+		"url": session.URL, "transport": "http",
+		"headers": map[string]any{"Authorization": "Bearer " + session.BearerToken},
+	}
+	settings["mcp_config"] = servers
+	return settings, nil
+}
+
 func (client *Client) createConversation(ctx context.Context, brief application.ExecutionBrief, prepared preparedExecution) (int, []byte, error) {
 	var agentSettings, hookConfig any
 	if json.Unmarshal(prepared.profile.AgentSettings, &agentSettings) != nil || json.Unmarshal(prepared.profile.HookConfig, &hookConfig) != nil {
 		return 0, nil, ErrProtocol
 	}
 	agentSettings, err := withInvocationReadTools(ctx, agentSettings, brief, client.evidenceRoot, client.evidence)
+	if err != nil {
+		return 0, nil, err
+	}
+	agentSettings, err = client.withReadOnlyToolSession(ctx, agentSettings, brief.InvocationID, prepared.requestDigest)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -4439,6 +4496,19 @@ func decodeEvent(raw json.RawMessage) (rawEvent, error) {
 		timestamp, _ = time.Parse(time.RFC3339Nano, envelope.Timestamp)
 	}
 	command := envelope.Action.Command
+	actionPath := envelope.Action.Path
+	if actionPath == "" && (envelope.ToolName == "teams_read_file" || envelope.ToolName == "teams_list_files" || envelope.ToolName == "teams_git_diff") {
+		// SDK MCP actions wrap schema fields under action.data rather than
+		// placing path directly on action like built-in file tools do.
+		var mcpAction struct {
+			Data struct {
+				Path string `json:"path"`
+			} `json:"data"`
+		}
+		if json.Unmarshal(actionEnvelope.Action, &mcpAction) == nil {
+			actionPath = mcpAction.Data.Path
+		}
+	}
 	if command == "" {
 		switch envelope.ToolName {
 		case "file_view", "file_read":
@@ -4463,7 +4533,7 @@ func decodeEvent(raw json.RawMessage) (rawEvent, error) {
 			command = "move"
 		}
 	}
-	return rawEvent{Raw: append(json.RawMessage(nil), raw...), ID: envelope.ID, Kind: envelope.Kind, Source: envelope.Source, ObservationKind: envelope.Observation.Kind, Timestamp: timestamp, Text: text.String(), Summary: envelope.Summary, ToolName: envelope.ToolName, ToolCallID: envelope.ToolCallID, ActionCommand: command, ActionPayload: append(json.RawMessage(nil), actionEnvelope.Action...), ActionPath: envelope.Action.Path, ObservationError: envelope.Observation.IsError, ObservationTimeout: envelope.Observation.Timeout, ObservationExitCode: envelope.Observation.ExitCode, ObservationTruncated: envelope.Observation.Truncated}, nil
+	return rawEvent{Raw: append(json.RawMessage(nil), raw...), ID: envelope.ID, Kind: envelope.Kind, Source: envelope.Source, ObservationKind: envelope.Observation.Kind, Timestamp: timestamp, Text: text.String(), Summary: envelope.Summary, ToolName: envelope.ToolName, ToolCallID: envelope.ToolCallID, ActionCommand: command, ActionPayload: append(json.RawMessage(nil), actionEnvelope.Action...), ActionPath: actionPath, ObservationError: envelope.Observation.IsError, ObservationTimeout: envelope.Observation.Timeout, ObservationExitCode: envelope.Observation.ExitCode, ObservationTruncated: envelope.Observation.Truncated}, nil
 }
 
 func deterministicValidationAction(event rawEvent) bool {

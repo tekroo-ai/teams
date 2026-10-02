@@ -11,6 +11,7 @@ import (
 	"github.com/tekroo-ai/teams/adapters/filesystem"
 	"github.com/tekroo-ai/teams/adapters/mongo"
 	"github.com/tekroo-ai/teams/adapters/openhands"
+	"github.com/tekroo-ai/teams/agenttools"
 	"github.com/tekroo-ai/teams/application"
 	"github.com/tekroo-ai/teams/kernel"
 )
@@ -27,6 +28,8 @@ type Config struct {
 	IDs                      kernel.IDSource
 	OpenHandsBaseURL         string
 	OpenHandsSessionAPIKey   string
+	AgentToolBaseURL         string
+	AgentToolSigningKey      []byte
 	HTTPClient               *http.Client
 	WorkspaceBindings        []openhands.WorkspaceBinding
 	WorkspaceResolver        openhands.WorkspaceResolver
@@ -52,6 +55,8 @@ type Runtime struct {
 	worker      *executionruntime.Worker
 	feed        *mongo.IntentFeed
 	evidence    *filesystem.ExecutionEvidenceStore
+	toolGateway agenttools.Gateway
+	toolService *agenttools.HTTPService
 	closeOnce   sync.Once
 	closeErr    error
 }
@@ -83,9 +88,27 @@ func New(ctx context.Context, config Config) (*Runtime, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open execution-evidence store: %w", err)
 	}
+	executionReader := assembleOperationalExecutionReader(config.Store, config.DeadlineExtensionReader)
+	toolGateway := agenttools.Gateway{Bindings: agenttools.ExecutionBindingSource{
+		Reader: executionReader, Roles: config.RoleGrounding,
+		Workspaces:   toolWorkspaceAdapter{resolver: workspaces},
+		MaximumBytes: config.ExecutionPolicy.MaximumBriefBytes, Now: config.Clock.Now,
+	}, Host: agenttools.Host{Timeout: config.ExecutionPolicy.OperationTimeout}}
+	var toolService *agenttools.HTTPService
+	if config.AgentToolBaseURL != "" || len(config.AgentToolSigningKey) != 0 {
+		toolService, err = agenttools.NewHTTPService(toolGateway, config.AgentToolBaseURL, config.AgentToolSigningKey)
+		if err != nil {
+			return nil, fmt.Errorf("create agent-tool service: %w", err)
+		}
+	}
+	var toolSessions openhands.ReadOnlyToolSessionIssuer
+	if toolService != nil {
+		toolSessions = toolSessionAdapter{service: toolService}
+	}
 	client, err := openhands.NewClient(openhands.Config{
 		BaseURL: config.OpenHandsBaseURL, SessionAPIKey: config.OpenHandsSessionAPIKey,
 		HTTPClient: config.HTTPClient, Workspaces: workspaces, Profiles: profiles, Evidence: blobs, EvidenceRoot: config.EvidenceRoot,
+		ToolSessions: toolSessions,
 		PollInterval: config.OpenHandsPollInterval, MaximumPages: config.OpenHandsMaximumPages,
 		MaximumEvidenceBytes: config.OpenHandsMaximumEvidence,
 	})
@@ -96,7 +119,6 @@ func New(ctx context.Context, config Config) (*Runtime, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create evidence recorder: %w", err)
 	}
-	executionReader := assembleOperationalExecutionReader(config.Store, config.DeadlineExtensionReader)
 	coordinator, err := application.NewOperationalExecutionCoordinator(executionReader, handler, client, recorder, config.RoleGrounding, config.Clock, config.ExecutionPolicy)
 	if err != nil {
 		return nil, fmt.Errorf("create execution coordinator: %w", err)
@@ -110,7 +132,7 @@ func New(ctx context.Context, config Config) (*Runtime, error) {
 		_ = feed.Close(context.WithoutCancel(ctx))
 		return nil, fmt.Errorf("create execution worker: %w", err)
 	}
-	return &Runtime{catalogue: config.Catalogue, handler: handler, coordinator: coordinator, worker: worker, feed: feed, evidence: blobs}, nil
+	return &Runtime{catalogue: config.Catalogue, handler: handler, coordinator: coordinator, worker: worker, feed: feed, evidence: blobs, toolGateway: toolGateway, toolService: toolService}, nil
 }
 
 func (runtime *Runtime) ReadExecutionOutput(ctx context.Context, digest kernel.Digest) ([]byte, error) {

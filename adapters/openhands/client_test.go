@@ -2221,6 +2221,25 @@ func TestRepositoryGroundingAllowsWorkspaceOrientationBeforeAgentsRead(t *testin
 	}
 }
 
+func TestRepositoryGroundingAllowsRepositoryStatusBeforeAgentsRead(t *testing.T) {
+	events := []rawEvent{
+		{Kind: "MessageEvent", Source: "user"},
+		{ID: "status", Kind: "ActionEvent", Source: "agent", ToolName: "repository_status", ToolCallID: "status-call"},
+		{Kind: "ObservationEvent", ToolName: "repository_status", ToolCallID: "status-call", Text: "clean worktree"},
+		{ID: "agents-read", Kind: "ActionEvent", Source: "agent", ToolName: "file_read", ToolCallID: "agents-call", ActionPath: "AGENTS.md"},
+		{Kind: "ObservationEvent", ToolName: "file_read", ToolCallID: "agents-call", Text: "# instructions"},
+		{ID: "source", Kind: "ActionEvent", Source: "agent", ToolName: "file_read", ActionPath: "organization/host.go"},
+	}
+	if violation, found := repositoryGroundingViolation(events, 0, false); found {
+		t.Fatalf("metadata-only repository status was fenced: %+v", violation)
+	}
+
+	beforeAgentsRead := append(append([]rawEvent(nil), events[:3]...), events[5])
+	if violation, found := repositoryGroundingViolation(beforeAgentsRead, 0, false); !found || violation.ID != "source" {
+		t.Fatalf("premature source read was not fenced: violation=%+v found=%t", violation, found)
+	}
+}
+
 func TestRepositoryGroundingAllowsGlobBeforeAgentsRead(t *testing.T) {
 	// The project-manager's first action was glob **/AGENTS.md — locating the
 	// instruction file. glob exposes file paths only, so it is orientation, not

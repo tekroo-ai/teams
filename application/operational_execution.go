@@ -748,13 +748,20 @@ type ExternalExecutionObservation struct {
 	Output                []byte
 }
 
-type OpenHandsExecutionBoundary interface {
+// AgentExecutionBoundary is the provider-neutral lifecycle contract for one
+// admitted Teams invocation. OpenHands is the current adapter, not the owner of
+// organizational execution state or a required future runtime.
+type AgentExecutionBoundary interface {
 	Start(context.Context, ExecutionBrief, kernel.Digest) (ExternalExecutionObservation, error)
 	ReconcileStart(context.Context, ExecutionBrief, kernel.Digest) (ExternalExecutionObservation, error)
 	Inspect(context.Context, ExecutionBrief, string, kernel.Digest) (ExternalExecutionObservation, error)
 	ReconcileSuperseded(context.Context, ExecutionBrief, string, kernel.Digest, kernel.Digest) (ExternalExecutionObservation, error)
 	Cancel(context.Context, ExecutionBrief, string, kernel.Digest) (ExternalExecutionObservation, error)
 }
+
+// OpenHandsExecutionBoundary remains an alias for existing integrations while
+// a Teams-native execution adapter is developed and qualified.
+type OpenHandsExecutionBoundary = AgentExecutionBoundary
 
 type ExecutionEvidenceRecorder interface {
 	RecordExecutionEvidence(context.Context, kernel.WorkInvocation, []ExecutionEvidence) ([]kernel.EvidenceRef, error)

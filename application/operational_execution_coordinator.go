@@ -40,14 +40,14 @@ type OperationalExecutionResult struct {
 type OperationalExecutionCoordinator struct {
 	reader   OperationalExecutionReader
 	commands ExecutionCommandService
-	boundary OpenHandsExecutionBoundary
+	boundary AgentExecutionBoundary
 	evidence ExecutionEvidenceRecorder
 	roles    RoleGroundingResolver
 	clock    kernel.Clock
 	policy   OperationalExecutionPolicy
 }
 
-func NewOperationalExecutionCoordinator(reader OperationalExecutionReader, commands ExecutionCommandService, boundary OpenHandsExecutionBoundary, evidence ExecutionEvidenceRecorder, roles RoleGroundingResolver, clock kernel.Clock, policy OperationalExecutionPolicy) (*OperationalExecutionCoordinator, error) {
+func NewOperationalExecutionCoordinator(reader OperationalExecutionReader, commands ExecutionCommandService, boundary AgentExecutionBoundary, evidence ExecutionEvidenceRecorder, roles RoleGroundingResolver, clock kernel.Clock, policy OperationalExecutionPolicy) (*OperationalExecutionCoordinator, error) {
 	if reader == nil || commands == nil || boundary == nil || evidence == nil || roles == nil || clock == nil || !policy.valid() {
 		return nil, ErrInvalidConfiguration
 	}

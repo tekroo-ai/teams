@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -95,12 +96,6 @@ func run(arguments []string, stdout, stderr io.Writer) error {
 		defer closeCancel()
 		_ = service.Close(closeContext)
 	}()
-	startContext, startCancel := context.WithTimeout(context.Background(), startupTimeout)
-	err = service.Start(startContext)
-	startCancel()
-	if err != nil {
-		return fmt.Errorf("start production service: %w", err)
-	}
 	stopRequested := make(chan struct{}, 1)
 	token, operationTimeout, maximumBodyBytes := service.OperatorCredentials()
 	operatorHandler, err := operatorhttp.NewHandler(operatorhttp.Config{Service: service, BearerToken: token, OperatorPrincipal: service.OperatorIdentity().Principal, OperationTimeout: operationTimeout, MaximumBodyBytes: maximumBodyBytes, RequestStop: func() {
@@ -142,11 +137,38 @@ func run(arguments []string, stdout, stderr io.Writer) error {
 		return err
 	}
 	router := http.NewServeMux()
-	router.Handle("/mcp", mcpHandler)
-	router.Handle("/", operatorHandler)
+	if toolHandler := service.Runtime.AgentToolHandler(); toolHandler != nil {
+		router.Handle("/agent-tools/", toolHandler)
+	}
+	var ready atomic.Bool
+	serveWhenReady := func(handler http.Handler) http.Handler {
+		return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			if !ready.Load() {
+				http.Error(writer, "service starting", http.StatusServiceUnavailable)
+				return
+			}
+			handler.ServeHTTP(writer, request)
+		})
+	}
+	router.Handle("/mcp", serveWhenReady(mcpHandler))
+	router.Handle("/", serveWhenReady(operatorHandler))
 	server := &http.Server{Addr: config.Operator.Address, Handler: router, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 15 * time.Second, IdleTimeout: time.Minute}
 	serverResult := make(chan error, 1)
 	go func() { serverResult <- server.Serve(listener) }()
+	defer func() {
+		if !closed {
+			shutdownContext, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+			defer cancel()
+			_ = server.Shutdown(shutdownContext)
+		}
+	}()
+	startContext, startCancel := context.WithTimeout(context.Background(), startupTimeout)
+	err = service.Start(startContext)
+	startCancel()
+	if err != nil {
+		return fmt.Errorf("start production service: %w", err)
+	}
+	ready.Store(true)
 	if federationServer != nil {
 		go func() { federationResult <- federationServer.Serve(federationListener) }()
 	}
