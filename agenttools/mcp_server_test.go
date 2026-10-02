@@ -47,11 +47,11 @@ func TestReadOnlyMCPRoundTripThroughTeamsGateway(t *testing.T) {
 		t.Fatalf("read-only MCP tool count = %d, want 4", len(listed.Tools))
 	}
 	for _, tool := range listed.Tools {
-		if !strings.HasPrefix(tool.Name, "teams_") || !isReadOnlyTool(strings.TrimPrefix(tool.Name, "teams_")) {
+		if !isReadOnlyTool(tool.Name) {
 			t.Fatalf("mutating tool exposed: %s", tool.Name)
 		}
 	}
-	result, err := clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "teams_read_file", Arguments: map[string]any{"path": "note.txt"}})
+	result, err := clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "read_file", Arguments: map[string]any{"path": "note.txt"}})
 	if err != nil || result.IsError || len(result.Content) != 1 {
 		t.Fatalf("MCP read failed: %+v, %v", result, err)
 	}
@@ -59,7 +59,7 @@ func TestReadOnlyMCPRoundTripThroughTeamsGateway(t *testing.T) {
 	if !ok || !strings.Contains(content.Text, "actual Teams workspace content") || binding.called != 2 {
 		t.Fatalf("OpenHands-compatible client did not receive workspace data: %+v", result)
 	}
-	denied, err := clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "teams_read_file", Arguments: map[string]any{"path": "../outside.txt"}})
+	denied, err := clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "read_file", Arguments: map[string]any{"path": "../outside.txt"}})
 	if err != nil || !denied.IsError {
 		t.Fatalf("boundary escape was not a tool error: %+v, %v", denied, err)
 	}

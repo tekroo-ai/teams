@@ -1656,7 +1656,7 @@ func workspaceOrientationAction(event rawEvent) bool {
 	if event.Kind != "ActionEvent" || event.Source != "agent" {
 		return false
 	}
-	if event.ToolName == "repository_status" || event.ToolName == "teams_git_status" {
+	if event.ToolName == "repository_status" || event.ToolName == "git_status" || event.ToolName == "teams_git_status" {
 		return true
 	}
 	// Orientation is defined by the information an action exposes, not the tool
@@ -2160,7 +2160,7 @@ func repositorySearchTool(name string) bool {
 
 func repositoryAction(event rawEvent) bool {
 	switch event.ToolName {
-	case "terminal", "run_command", "file_editor", "file_view", "file_create", "file_replace", "file_insert", "file_undo", "replace_text_in_file", "insert_file_text", "undo_file_edit", "file_delete", "file_move", "glob", "repository_search", "repository_view", "file_read", "list_files", "find_files", "search_file_contents", "repository_status", "list_changed_files", "read_file_diff", "teams_read_file", "teams_list_files", "teams_git_status", "teams_git_diff":
+	case "terminal", "run_command", "file_editor", "file_view", "file_create", "file_replace", "file_insert", "file_undo", "replace_text_in_file", "insert_file_text", "undo_file_edit", "file_delete", "file_move", "glob", "repository_search", "repository_view", "file_read", "read_file", "list_files", "find_files", "search_file_contents", "repository_status", "git_status", "git_diff", "list_changed_files", "read_file_diff", "teams_read_file", "teams_list_files", "teams_git_status", "teams_git_diff":
 		return true
 	default:
 		return false
@@ -2207,7 +2207,7 @@ func repositoryFileListingAction(event rawEvent) bool {
 }
 
 func repositoryInspectionAction(event rawEvent) bool {
-	if repositorySearchTool(event.ToolName) || event.ToolName == "read_file_diff" || event.ToolName == "file_read" && event.ActionPath != "" || event.ToolName == "teams_read_file" && event.ActionPath != "" || event.ToolName == "teams_git_diff" {
+	if repositorySearchTool(event.ToolName) || event.ToolName == "read_file_diff" || event.ToolName == "file_read" && event.ActionPath != "" || event.ToolName == "read_file" && event.ActionPath != "" || event.ToolName == "teams_read_file" && event.ActionPath != "" || event.ToolName == "git_diff" || event.ToolName == "teams_git_diff" {
 		return true
 	}
 	if event.ToolName == "file_editor" || event.ToolName == "file_view" || event.ToolName == "repository_view" {
@@ -2231,7 +2231,7 @@ func repositoryInspectionAction(event rawEvent) bool {
 }
 
 func repositoryContentReadAction(event rawEvent) bool {
-	if repositorySearchTool(event.ToolName) || event.ToolName == "read_file_diff" || event.ToolName == "file_read" && event.ActionPath != "" || event.ToolName == "teams_read_file" && event.ActionPath != "" || event.ToolName == "teams_git_diff" {
+	if repositorySearchTool(event.ToolName) || event.ToolName == "read_file_diff" || event.ToolName == "file_read" && event.ActionPath != "" || event.ToolName == "read_file" && event.ActionPath != "" || event.ToolName == "teams_read_file" && event.ActionPath != "" || event.ToolName == "git_diff" || event.ToolName == "teams_git_diff" {
 		return true
 	}
 	if event.ToolName == "file_editor" || event.ToolName == "file_view" || event.ToolName == "repository_view" {
@@ -3427,7 +3427,7 @@ func checkpointRepositoryEvidenceAction(event rawEvent) bool {
 
 func checkpointActionIsRepositoryEvidence(action checkpointAction) bool {
 	switch action.Tool {
-	case "repository_view", "repository_search", "file_view", "file_read", "search_file_contents", "read_file_diff", "read_evidence", "teams_read_file", "teams_git_diff":
+	case "repository_view", "repository_search", "file_view", "file_read", "read_file", "search_file_contents", "read_file_diff", "read_evidence", "git_diff", "teams_read_file", "teams_git_diff":
 		return true
 	case "terminal", "run_command":
 		fields := strings.Fields(strings.ToLower(strings.TrimSpace(action.Command)))
@@ -3446,7 +3446,7 @@ func checkpointActionIsRepositoryEvidence(action checkpointAction) bool {
 
 func checkpointActionIsReadOnlyInspection(action checkpointAction) bool {
 	switch action.Tool {
-	case "repository_view", "repository_search", "glob", "file_view", "file_read", "list_files", "find_files", "search_file_contents", "repository_status", "list_changed_files", "read_file_diff", "read_evidence", "teams_read_file", "teams_list_files", "teams_git_status", "teams_git_diff":
+	case "repository_view", "repository_search", "glob", "file_view", "file_read", "read_file", "list_files", "find_files", "search_file_contents", "repository_status", "git_status", "git_diff", "list_changed_files", "read_file_diff", "read_evidence", "teams_read_file", "teams_list_files", "teams_git_status", "teams_git_diff":
 		return true
 	case "file_editor":
 		return strings.EqualFold(strings.TrimSpace(action.Command), "view")
@@ -4092,7 +4092,8 @@ func (client *Client) withReadOnlyToolSession(ctx context.Context, agentSettings
 			}
 			switch entry["name"] {
 			case "file_read", "list_files":
-				// teams_read_file and teams_list_files use one path contract.
+				// The Teams MCP surface exposes read_file and list_files with
+				// one path contract; do not advertise native duplicates.
 			case "repository_diff_operations":
 				params, ok := entry["params"].(map[string]any)
 				if !ok {
@@ -4539,7 +4540,7 @@ func decodeEvent(raw json.RawMessage) (rawEvent, error) {
 	}
 	command := envelope.Action.Command
 	actionPath := envelope.Action.Path
-	if actionPath == "" && (envelope.ToolName == "teams_read_file" || envelope.ToolName == "teams_list_files" || envelope.ToolName == "teams_git_diff") {
+	if actionPath == "" && (envelope.ToolName == "read_file" || envelope.ToolName == "list_files" || envelope.ToolName == "git_diff" || envelope.ToolName == "teams_read_file" || envelope.ToolName == "teams_list_files" || envelope.ToolName == "teams_git_diff") {
 		// SDK MCP actions wrap schema fields under action.data rather than
 		// placing path directly on action like built-in file tools do.
 		var mcpAction struct {

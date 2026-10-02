@@ -91,7 +91,7 @@ from openhands.sdk.mcp.utils import create_mcp_tools
 config = {"teams": MCPServer(url=sys.argv[1], transport="http", headers={"Authorization": "Bearer " + sys.argv[2]})}
 client = create_mcp_tools(config, timeout=15.0)
 try:
-    tool = next(tool for tool in client.tools if tool.name == "teams_read_file")
+    tool = next(tool for tool in client.tools if tool.name == "read_file")
     action = tool.action_from_arguments({"path": "note.txt"})
     observation = tool(action)
     print(json.dumps({"is_error": observation.is_error, "texts": [block.text for block in observation.content if hasattr(block, "text")]}))

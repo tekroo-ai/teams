@@ -41,12 +41,8 @@ func NewReadOnlyMCPServer(ctx context.Context, gateway Gateway, invocationID ker
 			continue
 		}
 		name := spec.Name
-		// OpenHands already defines some of these plain tool names (notably
-		// list_files). Namespace the MCP surface so loading it cannot collide
-		// with the agent's existing tools during the transition.
-		exposedName := "teams_" + name
 		mcp.AddTool(server, &mcp.Tool{
-			Name: exposedName, Description: spec.Description,
+			Name: name, Description: spec.Description,
 			InputSchema: json.RawMessage(spec.InputSchema),
 			Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, IdempotentHint: true},
 		}, func(ctx context.Context, _ *mcp.CallToolRequest, input map[string]any) (*mcp.CallToolResult, any, error) {
