@@ -800,7 +800,7 @@ func (client *Client) Start(ctx context.Context, brief application.ExecutionBrie
 			return application.ExternalExecutionObservation{}, ErrProtocol
 		}
 	}
-	if status != http.StatusOK || !conversationMatches(info, conversationID, prepared.workspace.WorkingDirectory, requestDigest) || !conversationAgentMatches(info, prepared.profile.AgentSettings) {
+	if status != http.StatusOK || !conversationMatches(info, conversationID, prepared.workspace.WorkingDirectory, requestDigest) || !conversationAgentMatches(info, prepared.profile.AgentSettings, client.toolSessions != nil) {
 		return application.ExternalExecutionObservation{}, ErrProtocol
 	}
 	if err := client.setConversationTitle(ctx, conversationID, conversationTitle(brief)); err != nil {
@@ -910,7 +910,7 @@ func (client *Client) ReconcileStart(ctx context.Context, brief application.Exec
 	if status == http.StatusNotFound {
 		return absentObservation(brief, requestDigest), nil
 	}
-	if status != http.StatusOK || !conversationMatches(info, conversationID, prepared.workspace.WorkingDirectory, requestDigest) || !conversationAgentMatches(info, prepared.profile.AgentSettings) {
+	if status != http.StatusOK || !conversationMatches(info, conversationID, prepared.workspace.WorkingDirectory, requestDigest) || !conversationAgentMatches(info, prepared.profile.AgentSettings, client.toolSessions != nil) {
 		return application.ExternalExecutionObservation{}, ErrProtocol
 	}
 	events, err := client.eventsAtLeaf(ctx, conversationID, info.LeafEventID)
@@ -929,7 +929,7 @@ func (client *Client) Inspect(ctx context.Context, brief application.ExecutionBr
 		return application.ExternalExecutionObservation{}, ErrProtocol
 	}
 	info, status, err := client.getConversation(ctx, conversationID)
-	if err != nil || status != http.StatusOK || !conversationMatches(info, conversationID, prepared.workspace.WorkingDirectory, requestDigest) || !conversationAgentMatches(info, prepared.profile.AgentSettings) {
+	if err != nil || status != http.StatusOK || !conversationMatches(info, conversationID, prepared.workspace.WorkingDirectory, requestDigest) || !conversationAgentMatches(info, prepared.profile.AgentSettings, client.toolSessions != nil) {
 		return application.ExternalExecutionObservation{}, ErrProtocol
 	}
 	events, err := client.eventsAtLeaf(ctx, conversationID, info.LeafEventID)
@@ -4079,6 +4079,35 @@ func (client *Client) withReadOnlyToolSession(ctx context.Context, agentSettings
 	if !ok {
 		return nil, ErrProtocol
 	}
+	// Keep one model-facing tool for each read operation. Qualified profiles
+	// retain their immutable tool list; only this invocation's copy is changed.
+	// The baseline-relative Git readers are distinct from the Teams working-tree
+	// Git tools, but the composite also advertises a duplicate status reader.
+	if tools, ok := settings["tools"].([]any); ok {
+		unique := make([]any, 0, len(tools)+1)
+		for _, tool := range tools {
+			entry, ok := tool.(map[string]any)
+			if !ok {
+				return nil, ErrProtocol
+			}
+			switch entry["name"] {
+			case "file_read", "list_files":
+				// teams_read_file and teams_list_files use one path contract.
+			case "repository_diff_operations":
+				params, ok := entry["params"].(map[string]any)
+				if !ok {
+					return nil, ErrProtocol
+				}
+				unique = append(unique,
+					map[string]any{"name": "list_changed_files", "params": params},
+					map[string]any{"name": "read_file_diff", "params": params},
+				)
+			default:
+				unique = append(unique, tool)
+			}
+		}
+		settings["tools"] = unique
+	}
 	mcpConfig, exists := settings["mcp_config"]
 	if !exists || mcpConfig == nil {
 		mcpConfig = map[string]any{}
@@ -4248,7 +4277,7 @@ type conversationAgentSettings struct {
 	} `json:"condenser"`
 }
 
-func conversationAgentMatches(info conversationInfo, expectedRaw json.RawMessage) bool {
+func conversationAgentMatches(info conversationInfo, expectedRaw json.RawMessage, allowReadOnlyToolSession ...bool) bool {
 	var expected conversationAgentSettings
 	if json.Unmarshal(expectedRaw, &expected) != nil {
 		return false
@@ -4274,7 +4303,7 @@ func conversationAgentMatches(info conversationInfo, expectedRaw json.RawMessage
 		Name   string         `json:"name"`
 		Params map[string]any `json:"params"`
 	}) bool {
-		return isSubmitResultTool(tool.Name) || tool.Name == "read_evidence" || tool.Name == "repository_diff_operations"
+		return isSubmitResultTool(tool.Name) || tool.Name == "read_evidence" || tool.Name == "repository_diff_operations" || len(allowReadOnlyToolSession) > 0 && allowReadOnlyToolSession[0] && (tool.Name == "list_changed_files" || tool.Name == "read_file_diff")
 	})
 	// The structured-completion requirement is injected together with the
 	// client tool and is not part of the signed role profile.
@@ -4294,7 +4323,20 @@ func conversationAgentMatches(info conversationInfo, expectedRaw json.RawMessage
 		info.Agent.AgentContext.SystemMessageSuffix = expected.AgentContext.SystemMessageSuffix
 	}
 	if expected.Tools != nil && !reflect.DeepEqual(info.Agent.Tools, expected.Tools) {
-		return false
+		if len(allowReadOnlyToolSession) == 0 || !allowReadOnlyToolSession[0] {
+			return false
+		}
+		// Previously created conversations retain the original qualified list.
+		// New ones omit only the two native readers superseded by Teams tools.
+		unique := slices.DeleteFunc(slices.Clone(expected.Tools), func(tool struct {
+			Name   string         `json:"name"`
+			Params map[string]any `json:"params"`
+		}) bool {
+			return tool.Name == "file_read" || tool.Name == "list_files"
+		})
+		if !reflect.DeepEqual(info.Agent.Tools, unique) {
+			return false
+		}
 	}
 	info.Agent.Tools = nil
 	expected.Tools = nil

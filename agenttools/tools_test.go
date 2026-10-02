@@ -6,9 +6,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -96,6 +98,47 @@ func TestReadAndListStayInWorkspace(t *testing.T) {
 	}
 }
 
+func TestListFilesUsesBoundedPagesWithoutDroppingEntries(t *testing.T) {
+	root := t.TempDir()
+	for _, name := range []string{"a.txt", "b.txt", "c.txt"} {
+		if err := os.WriteFile(filepath.Join(root, name), []byte(name), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	authority := Authority{WorkspaceRoot: root, Permissions: []string{"repository.read"}}
+	first, err := testHost().execute(context.Background(), authority, call("list_files", `{"limit":2}`))
+	if err != nil || !reflect.DeepEqual(first.Files, []string{"a.txt", "b.txt"}) || !first.Truncated || first.NextAfter != "b.txt" {
+		t.Fatalf("first page: %+v, %v", first, err)
+	}
+	second, err := testHost().execute(context.Background(), authority, call("list_files", `{"start_after":"b.txt","limit":2}`))
+	if err != nil || !reflect.DeepEqual(second.Files, []string{"c.txt"}) || second.Truncated || second.NextAfter != "" {
+		t.Fatalf("second page: %+v, %v", second, err)
+	}
+	_, err = testHost().execute(context.Background(), authority, call("list_files", `{"limit":0}`))
+	if !errors.Is(err, ErrInvalidCall) {
+		t.Fatalf("zero limit accepted: %v", err)
+	}
+}
+
+func TestListFilesCanTraverseDirectoryBeyondFormerTwoHundredEntryLimit(t *testing.T) {
+	root := t.TempDir()
+	for index := range 201 {
+		name := fmt.Sprintf("file-%03d", index)
+		if err := os.WriteFile(filepath.Join(root, name), nil, 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	authority := Authority{WorkspaceRoot: root, Permissions: []string{"repository.read"}}
+	first, err := testHost().execute(context.Background(), authority, call("list_files", `{}`))
+	if err != nil || len(first.Files) != 200 || !first.Truncated || first.NextAfter != "file-199" {
+		t.Fatalf("first page: %+v, %v", first, err)
+	}
+	second, err := testHost().execute(context.Background(), authority, call("list_files", `{"start_after":"file-199"}`))
+	if err != nil || !reflect.DeepEqual(second.Files, []string{"file-200"}) || second.Truncated {
+		t.Fatalf("second page: %+v, %v", second, err)
+	}
+}
+
 func TestGitInspectionUsesAssignedRepository(t *testing.T) {
 	root := t.TempDir()
 	command := exec.Command("git", "init", "-q")
@@ -123,7 +166,7 @@ func TestGitInspectionUsesAssignedRepository(t *testing.T) {
 	host := testHost()
 	t.Setenv("GIT_DIR", filepath.Join(t.TempDir(), ".git"))
 	status, err := host.execute(context.Background(), authority, call("git_status", `{}`))
-	if err != nil || status.ExitCode != 0 || !strings.Contains(status.Output, "change.txt") {
+	if err != nil || status.ExitCode != 0 || !strings.Contains(status.Output, "change.txt") || len(status.HEAD) != 40 || status.Branch == "" {
 		t.Fatalf("status: %+v, %v", status, err)
 	}
 	diff, err := host.execute(context.Background(), authority, call("git_diff", `{"path":"change.txt"}`))
@@ -133,6 +176,20 @@ func TestGitInspectionUsesAssignedRepository(t *testing.T) {
 	_, err = host.execute(context.Background(), authority, call("git_diff", `{"path":"../elsewhere"}`))
 	if !errors.Is(err, ErrBoundary) {
 		t.Fatalf("out-of-workspace diff: %v", err)
+	}
+}
+
+func TestGitStatusStillWorksBeforeFirstCommit(t *testing.T) {
+	root := t.TempDir()
+	command := exec.Command("git", "init", "-q")
+	command.Dir = root
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v: %s", err, output)
+	}
+	authority := Authority{WorkspaceRoot: root, Permissions: []string{"repository.read"}}
+	status, err := testHost().execute(context.Background(), authority, call("git_status", `{}`))
+	if err != nil || status.ExitCode != 0 || status.HEAD != "UNBORN" || status.Branch == "" {
+		t.Fatalf("unborn Git status: %+v, %v", status, err)
 	}
 }
 

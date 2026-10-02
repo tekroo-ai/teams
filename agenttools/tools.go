@@ -42,8 +42,8 @@ type Spec struct {
 
 var specs = []Spec{
 	{"read_file", "Read bounded lines from one workspace file.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path"],"properties":{"path":{"type":"string","minLength":1},"start_line":{"type":"integer","minimum":1},"end_line":{"type":"integer","minimum":1}}}`), "repository.read"},
-	{"list_files", "List one workspace directory without recursing.", json.RawMessage(`{"type":"object","additionalProperties":false,"properties":{"path":{"type":"string"}}}`), "repository.read"},
-	{"git_status", "Read the worktree's Git status without changing it.", json.RawMessage(`{"type":"object","additionalProperties":false}`), "repository.read"},
+	{"list_files", "List one workspace directory without recursing. If truncated, continue with next_after as start_after.", json.RawMessage(`{"type":"object","additionalProperties":false,"properties":{"path":{"type":"string"},"start_after":{"type":"string"},"limit":{"type":"integer","minimum":1,"maximum":200}}}`), "repository.read"},
+	{"git_status", "Read the worktree's branch, HEAD, and Git status without changing it.", json.RawMessage(`{"type":"object","additionalProperties":false}`), "repository.read"},
 	{"git_diff", "Read the unstaged Git diff, optionally for one path.", json.RawMessage(`{"type":"object","additionalProperties":false,"properties":{"path":{"type":"string","minLength":1}}}`), "repository.read"},
 	{"write_file", "Create or replace one workspace file only when its expected SHA-256 matches.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path","content","expected_sha256"],"properties":{"path":{"type":"string","minLength":1},"content":{"type":"string"},"expected_sha256":{"type":"string","pattern":"^$|^[0-9a-f]{64}$"}}}`), "repository.edit"},
 	{"run_go_tests", "Run Go tests for one workspace package pattern, without shell expansion or network dependency downloads.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["package"],"properties":{"package":{"type":"string","pattern":"^\\./(?:\\.\\.|[A-Za-z0-9_./-]+)$"}}}`), "test.execute"},
@@ -60,11 +60,15 @@ type Call struct {
 }
 
 type Result struct {
-	Name     string   `json:"name"`
-	Output   string   `json:"output,omitempty"`
-	Files    []string `json:"files,omitempty"`
-	SHA256   string   `json:"sha256,omitempty"`
-	ExitCode int      `json:"exit_code,omitempty"`
+	Name      string   `json:"name"`
+	Output    string   `json:"output,omitempty"`
+	Files     []string `json:"files,omitempty"`
+	Truncated bool     `json:"truncated,omitempty"`
+	NextAfter string   `json:"next_after,omitempty"`
+	HEAD      string   `json:"head,omitempty"`
+	Branch    string   `json:"branch,omitempty"`
+	SHA256    string   `json:"sha256,omitempty"`
+	ExitCode  int      `json:"exit_code,omitempty"`
 }
 
 type Host struct {
@@ -138,12 +142,18 @@ func (host Host) execute(ctx context.Context, authority Authority, call Call) (R
 		result.Output, err = readFile(root, args.Path, start, end)
 	case "list_files":
 		var args struct {
-			Path string `json:"path"`
+			Path       string `json:"path"`
+			StartAfter string `json:"start_after"`
+			Limit      *int   `json:"limit"`
 		}
-		if decode(call.Arguments, &args) != nil {
+		if decode(call.Arguments, &args) != nil || args.Limit != nil && (*args.Limit < 1 || *args.Limit > 200) {
 			return Result{}, ErrInvalidCall
 		}
-		result.Files, err = listFiles(root, args.Path)
+		limit := 200
+		if args.Limit != nil {
+			limit = *args.Limit
+		}
+		result.Files, result.Truncated, result.NextAfter, err = listFiles(root, args.Path, args.StartAfter, limit)
 	case "git_status":
 		var args struct{}
 		if decode(call.Arguments, &args) != nil {
@@ -153,6 +163,23 @@ func (host Host) execute(ctx context.Context, authority Authority, call Call) (R
 			return Result{}, err
 		}
 		result, err = host.command(ctx, root, call.Name, host.gitBinary(), []string{"-c", "core.hooksPath=/dev/null", "-c", "credential.interactive=never", "status", "--porcelain=v1", "--untracked-files=normal"})
+		if err == nil && result.ExitCode == 0 {
+			var head, branch Result
+			head, err = host.command(ctx, root, call.Name, host.gitBinary(), []string{"rev-parse", "HEAD"})
+			if err == nil {
+				branch, err = host.command(ctx, root, call.Name, host.gitBinary(), []string{"branch", "--show-current"})
+			}
+			if err == nil && branch.ExitCode == 0 {
+				result.Branch = strings.TrimSpace(branch.Output)
+				if head.ExitCode == 0 {
+					result.HEAD = strings.TrimSpace(head.Output)
+				} else {
+					result.HEAD = "UNBORN"
+				}
+			} else if err == nil {
+				err = ErrInvalidCall
+			}
+		}
 	case "git_diff":
 		var args struct {
 			Path string `json:"path"`
@@ -291,27 +318,32 @@ func readFile(root, relative string, start, end int) (string, error) {
 	return selected, nil
 }
 
-func listFiles(root, relative string) ([]string, error) {
+func listFiles(root, relative, startAfter string, limit int) ([]string, bool, string, error) {
 	path, err := existingPath(root, relative)
 	if err != nil {
-		return nil, err
+		return nil, false, "", err
 	}
 	entries, err := os.ReadDir(path)
 	if err != nil {
-		return nil, err
+		return nil, false, "", err
 	}
-	if len(entries) > 200 {
-		return nil, ErrTooLarge
-	}
-	files := make([]string, 0, len(entries))
+	files := make([]string, 0, min(limit, len(entries)))
+	var lastName string
 	for _, entry := range entries {
 		name := entry.Name()
+		if name <= startAfter {
+			continue
+		}
+		if len(files) == limit {
+			return files, true, lastName, nil
+		}
+		lastName = name
 		if entry.IsDir() {
 			name += "/"
 		}
 		files = append(files, name)
 	}
-	return files, nil
+	return files, false, "", nil
 }
 
 func validExpectedSHA(value string) bool {

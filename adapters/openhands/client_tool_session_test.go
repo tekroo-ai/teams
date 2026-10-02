@@ -2,6 +2,7 @@ package openhands
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"reflect"
 	"testing"
@@ -14,6 +15,68 @@ type fixedToolSessionIssuer struct {
 	err     error
 	id      kernel.UUIDv7
 	digest  kernel.Digest
+}
+
+func TestReadOnlyToolSessionExposesOneReaderPerOperation(t *testing.T) {
+	id := kernel.UUIDv7("00000000-0000-7000-8000-000000000952")
+	digest := kernel.Digest("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+	profile, err := NewOpenAICompatibleAgentSettings(AgentSettingsConfig{
+		Model: "openai/local", ModelCanonicalName: "openai/gpt-4o", BaseURL: "http://127.0.0.1:8800/v1", APIKey: "fixture",
+		Tools:               []string{"file_read", "list_files", "find_files", "search_file_contents"},
+		MaximumOutputTokens: 8192, CondenserOutputTokens: 4096, TimeoutSeconds: 1200,
+		CondenserMaximumEvents: 80, CondenserMaximumTokens: 96000,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var settings map[string]any
+	if err := json.Unmarshal(profile, &settings); err != nil {
+		t.Fatal(err)
+	}
+	baseline := "1111111111111111111111111111111111111111"
+	settings["tools"] = append(settings["tools"].([]any), map[string]any{
+		"name": "repository_diff_operations", "params": map[string]any{"baseline_commit": baseline},
+	})
+	client := &Client{toolSessions: &fixedToolSessionIssuer{session: ReadOnlyToolSession{
+		URL: "http://127.0.0.1:8787/agent-tools/session", BearerToken: "scoped-test-token",
+	}}}
+	bound, err := client.withReadOnlyToolSession(context.Background(), settings, id, digest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tools := bound.(map[string]any)["tools"].([]any)
+	names := make([]string, len(tools))
+	for index, tool := range tools {
+		names[index] = tool.(map[string]any)["name"].(string)
+	}
+	want := []string{"find_files", "search_file_contents", "list_changed_files", "read_file_diff"}
+	if !reflect.DeepEqual(names, want) {
+		t.Fatalf("model-facing native tools = %q, want %q", names, want)
+	}
+	for _, tool := range tools[2:] {
+		params := tool.(map[string]any)["params"].(map[string]any)
+		if params["baseline_commit"] != baseline {
+			t.Fatalf("baseline binding lost: %#v", tool)
+		}
+	}
+	var info conversationInfo
+	if err := json.Unmarshal(mustJSON(map[string]any{"agent": bound}), &info); err != nil {
+		t.Fatal(err)
+	}
+	if !conversationAgentMatches(info, profile, true) || conversationAgentMatches(info, profile) {
+		t.Fatal("deduplicated conversation was not limited to an MCP-bound session")
+	}
+	var legacy conversationInfo
+	if err := json.Unmarshal(mustJSON(map[string]any{"agent": json.RawMessage(profile)}), &legacy); err != nil {
+		t.Fatal(err)
+	}
+	if !conversationAgentMatches(legacy, profile, true) {
+		t.Fatal("existing conversation with the qualified native tools was rejected")
+	}
+	info.Agent.Tools = info.Agent.Tools[1:]
+	if conversationAgentMatches(info, profile, true) {
+		t.Fatal("missing non-overlapping tool was accepted")
+	}
 }
 
 func (issuer *fixedToolSessionIssuer) IssueReadOnlyToolSession(_ context.Context, id kernel.UUIDv7, digest kernel.Digest) (ReadOnlyToolSession, error) {
