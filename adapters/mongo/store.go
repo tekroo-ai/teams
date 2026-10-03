@@ -281,6 +281,9 @@ func (s *Store) ensureIndexes(ctx context.Context) error {
 		"events": {
 			{Keys: bson.D{{Key: "aggregate_key", Value: 1}, {Key: "revision", Value: 1}}, Options: options.Index().SetName("aggregate_revision_unique").SetUnique(true)},
 		},
+		"agent_turn_entries": {
+			{Keys: bson.D{{Key: "invocation_id", Value: 1}, {Key: "sequence", Value: 1}}, Options: options.Index().SetName("agent_turn_sequence_unique").SetUnique(true)},
+		},
 		"receipts": {
 			{Keys: bson.D{{Key: "scope", Value: 1}}, Options: options.Index().SetName("idempotency_scope_unique").SetUnique(true)},
 		},

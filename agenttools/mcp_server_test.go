@@ -43,8 +43,8 @@ func TestReadOnlyMCPRoundTripThroughTeamsGateway(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(listed.Tools) != 4 {
-		t.Fatalf("read-only MCP tool count = %d, want 4", len(listed.Tools))
+	if len(listed.Tools) != 9 {
+		t.Fatalf("read-only MCP tool count = %d, want 9", len(listed.Tools))
 	}
 	for _, tool := range listed.Tools {
 		if !isReadOnlyTool(tool.Name) {
@@ -58,6 +58,14 @@ func TestReadOnlyMCPRoundTripThroughTeamsGateway(t *testing.T) {
 	content, ok := result.Content[0].(*mcp.TextContent)
 	if !ok || !strings.Contains(content.Text, "actual Teams workspace content") || binding.called != 2 {
 		t.Fatalf("OpenHands-compatible client did not receive workspace data: %+v", result)
+	}
+	found, err := clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "find_files", Arguments: map[string]any{"filename_glob": "*.txt"}})
+	if err != nil || found.IsError || !strings.Contains(found.Content[0].(*mcp.TextContent).Text, "note.txt") {
+		t.Fatalf("MCP file discovery failed: %+v, %v", found, err)
+	}
+	searched, err := clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "search_file_contents", Arguments: map[string]any{"regex": "Teams", "filename_glob": "*.txt"}})
+	if err != nil || searched.IsError || !strings.Contains(searched.Content[0].(*mcp.TextContent).Text, "actual Teams workspace content") {
+		t.Fatalf("MCP content search failed: %+v, %v", searched, err)
 	}
 	denied, err := clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "read_file", Arguments: map[string]any{"path": "../outside.txt"}})
 	if err != nil || !denied.IsError {

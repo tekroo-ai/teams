@@ -51,10 +51,22 @@ func TestGatewayBindsReadToInvocationAndReceipts(t *testing.T) {
 	if receipt.ArgumentsHash != hex.EncodeToString(argumentSum[:]) || len(receipt.ResultHash) != 64 {
 		t.Fatalf("unbound receipt hashes: %+v", receipt)
 	}
+	request.ToolCallID = "call-2"
+	request.Call = Call{Name: "search_file_contents", Arguments: json.RawMessage(`{"regex":"second","filename_glob":"*.txt"}`)}
+	searched, err := gateway.ExecuteReadOnly(context.Background(), request)
+	if err != nil || len(searched.Result.Matches) != 1 || searched.Result.Matches[0].Line != 2 || binding.called != 2 {
+		t.Fatalf("invocation-bound search: %+v, %v", searched, err)
+	}
 
 	request.Call = Call{Name: "write_file", Arguments: json.RawMessage(`{"path":"note.txt","content":"changed","expected_sha256":""}`)}
-	if _, err := gateway.ExecuteReadOnly(context.Background(), request); !errors.Is(err, ErrForbidden) || binding.called != 1 {
+	if _, err := gateway.ExecuteReadOnly(context.Background(), request); !errors.Is(err, ErrForbidden) || binding.called != 2 {
 		t.Fatalf("mutation reached binder: %v", err)
+	}
+	for _, name := range []string{"git_stage_files", "git_commit"} {
+		request.Call = Call{Name: name, Arguments: json.RawMessage(`{}`)}
+		if _, err := gateway.ExecuteReadOnly(context.Background(), request); !errors.Is(err, ErrForbidden) || binding.called != 2 {
+			t.Fatalf("%s crossed read-only gateway: %v", name, err)
+		}
 	}
 	content, err := os.ReadFile(filepath.Join(root, "note.txt"))
 	if err != nil || string(content) != "first\nsecond\n" {

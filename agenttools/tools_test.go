@@ -7,11 +7,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -28,7 +30,7 @@ func TestAvailableAndAuthorization(t *testing.T) {
 		t.Fatalf("unprivileged tools: %v", got)
 	}
 	read := Available([]string{"repository.read"})
-	if len(read) != 4 || !slices.ContainsFunc(read, func(spec Spec) bool { return spec.Name == "git_status" }) {
+	if len(read) != 9 || !slices.ContainsFunc(read, func(spec Spec) bool { return spec.Name == "git_status" }) {
 		t.Fatalf("read-only surface: %v", read)
 	}
 	for _, spec := range read {
@@ -173,9 +175,64 @@ func TestGitInspectionUsesAssignedRepository(t *testing.T) {
 	if err != nil || diff.ExitCode != 0 || !strings.Contains(diff.Output, "+after") {
 		t.Fatalf("diff: %+v, %v", diff, err)
 	}
+	log, err := host.execute(context.Background(), authority, call("git_log", `{"limit":1,"format":"message"}`))
+	if err != nil || log.ExitCode != 0 || strings.TrimSpace(log.Output) != "baseline" {
+		t.Fatalf("log: %+v, %v", log, err)
+	}
+	show, err := host.execute(context.Background(), authority, call("git_show", `{"commit":"HEAD","path":"change.txt"}`))
+	if err != nil || show.ExitCode != 0 || !strings.Contains(show.Output, "+before") {
+		t.Fatalf("show: %+v, %v", show, err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".gitignore"), []byte(".openhands/\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	ignored, err := host.execute(context.Background(), authority, call("git_check_ignore", `{"path":".openhands/"}`))
+	if err != nil || ignored.Ignored == nil || !*ignored.Ignored || ignored.ExitCode != 0 {
+		t.Fatalf("ignored path: %+v, %v", ignored, err)
+	}
+	notIgnored, err := host.execute(context.Background(), authority, call("git_check_ignore", `{"path":"change.txt"}`))
+	if err != nil || notIgnored.Ignored == nil || *notIgnored.Ignored || notIgnored.ExitCode != 0 {
+		t.Fatalf("non-ignored path: %+v, %v", notIgnored, err)
+	}
+	for _, invalid := range []Call{
+		call("git_diff", `{"from_commit":"--output=/tmp/out"}`),
+		call("git_diff", `{"to_commit":"HEAD"}`),
+		call("git_diff", `{"staged":true,"from_commit":"HEAD"}`),
+		call("git_diff", `{"format":"unsafe"}`),
+		call("git_log", `{"limit":21}`),
+		call("git_show", `{"commit":"--exec=bad"}`),
+		call("git_show", `{"commit":"HEAD","path":"../elsewhere"}`),
+		call("git_check_ignore", `{"path":"../elsewhere"}`),
+	} {
+		if _, err := host.execute(context.Background(), authority, invalid); err == nil {
+			t.Fatalf("invalid Git inspection accepted: %+v", invalid)
+		}
+	}
 	_, err = host.execute(context.Background(), authority, call("git_diff", `{"path":"../elsewhere"}`))
 	if !errors.Is(err, ErrBoundary) {
 		t.Fatalf("out-of-workspace diff: %v", err)
+	}
+	command = exec.Command("git", "add", "--", "change.txt")
+	command.Dir, command.Env = root, toolEnvironment()
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("git add for staged inspection: %v: %s", err, output)
+	}
+	staged, err := host.execute(context.Background(), authority, call("git_diff", `{"staged":true,"format":"name_only"}`))
+	if err != nil || staged.ExitCode != 0 || strings.TrimSpace(staged.Output) != "change.txt" {
+		t.Fatalf("staged diff: %+v, %v", staged, err)
+	}
+	command = exec.Command("git", "-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "successor")
+	command.Dir, command.Env = root, toolEnvironment()
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("successor commit: %v: %s", err, output)
+	}
+	commits, err := host.execute(context.Background(), authority, call("git_log", `{"limit":2}`))
+	if err != nil || commits.ExitCode != 0 || !strings.Contains(commits.Output, "baseline") || !strings.Contains(commits.Output, "successor") {
+		t.Fatalf("two-commit log: %+v, %v", commits, err)
+	}
+	between, err := host.execute(context.Background(), authority, Call{Name: "git_diff", Arguments: json.RawMessage(fmt.Sprintf(`{"from_commit":%q,"to_commit":"HEAD","format":"stat"}`, status.HEAD))})
+	if err != nil || between.ExitCode != 0 || !strings.Contains(between.Output, "change.txt") {
+		t.Fatalf("commit-to-commit diff: %+v, %v", between, err)
 	}
 }
 
@@ -201,8 +258,19 @@ func TestGoTestsAreTypedAndBounded(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "sample_test.go"), []byte("package sample\nimport \"testing\"\nfunc TestSample(t *testing.T) {}\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
+	for _, arguments := range [][]string{{"init", "-q"}, {"add", "go.mod", "sample_test.go"}, {"-c", "user.name=Test", "-c", "user.email=test@example.test", "commit", "-qm", "test fixture"}} {
+		command := exec.Command("git", arguments...)
+		command.Dir = root
+		if output, err := command.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v: %s", arguments, err, output)
+		}
+	}
+	// A later uncommitted edit must not change what the test runner executes.
+	if err := os.WriteFile(filepath.Join(root, "sample_test.go"), []byte("not valid Go"), 0600); err != nil {
+		t.Fatal(err)
+	}
 	authority := Authority{WorkspaceRoot: root, Permissions: []string{"repository.read", "test.execute"}}
-	host := testHost()
+	host := Host{Timeout: 2 * time.Minute}
 	result, err := host.execute(context.Background(), authority, call("run_go_tests", `{"package":"./..."}`))
 	if err != nil || result.ExitCode != 0 || !strings.Contains(result.Output, "ok") {
 		t.Fatalf("go test: %+v, %v", result, err)
@@ -218,6 +286,89 @@ func TestGoTestsAreTypedAndBounded(t *testing.T) {
 	_, err = host.execute(cancelled, authority, call("run_go_tests", `{"package":"./..."}`))
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("cancelled test execution: %v", err)
+	}
+}
+
+func TestGoTestsCannotReadWriteOutsideSnapshotOrConnect(t *testing.T) {
+	root := t.TempDir()
+	outside := t.TempDir()
+	secret := filepath.Join(outside, "secret")
+	if err := os.WriteFile(secret, []byte("hidden"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	source := "package sample\nimport (\"net\"; \"os\"; \"os/exec\"; \"testing\"; \"time\")\n" +
+		"func TestBoundary(t *testing.T) {\n" +
+		" if _, err := os.ReadFile(" + strconv.Quote(secret) + "); err == nil { t.Error(\"outside read succeeded\") }\n" +
+		" if err := os.Symlink(" + strconv.Quote(secret) + ", \"escaped-link\"); err == nil { if _, readErr := os.ReadFile(\"escaped-link\"); readErr == nil { t.Error(\"symlink escaped\") } }\n" +
+		" if err := os.WriteFile(" + strconv.Quote(filepath.Join(outside, "write")) + ", []byte(\"bad\"), 0600); err == nil { t.Error(\"outside write succeeded\") }\n" +
+		" if conn, err := net.DialTimeout(\"tcp\", " + strconv.Quote(listener.Addr().String()) + ", time.Second); err == nil { conn.Close(); t.Error(\"network succeeded\") }\n" +
+		" if err := exec.Command(\"/usr/bin/true\").Run(); err == nil { t.Error(\"system executable succeeded\") }\n" +
+		"}\n"
+	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module example.test/boundary\n\ngo 1.26.0\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "boundary_test.go"), []byte(source), 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, arguments := range [][]string{{"init", "-q"}, {"add", "go.mod", "boundary_test.go"}, {"-c", "user.name=Test", "-c", "user.email=test@example.test", "commit", "-qm", "boundary fixture"}} {
+		command := exec.Command("git", arguments...)
+		command.Dir = root
+		if output, err := command.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v: %s", arguments, err, output)
+		}
+	}
+	host := Host{Timeout: 2 * time.Minute}
+	result, err := host.execute(context.Background(), Authority{WorkspaceRoot: root, Permissions: []string{"repository.read", "test.execute"}}, call("run_go_tests", `{"package":"./..."}`))
+	if err != nil || result.ExitCode != 0 || !strings.Contains(result.Output, "ok") {
+		t.Fatalf("sandbox boundary: %+v, %v", result, err)
+	}
+	if _, err := os.Stat(filepath.Join(outside, "write")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("outside file was created: %v", err)
+	}
+}
+
+func TestGoTestsStopAtDeadline(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module example.test/deadline\n\ngo 1.26.0\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "slow_test.go"), []byte("package slow\nimport (\"testing\"; \"time\")\nfunc TestSlow(t *testing.T) { time.Sleep(time.Minute) }\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, arguments := range [][]string{{"init", "-q"}, {"add", "go.mod", "slow_test.go"}, {"-c", "user.name=Test", "-c", "user.email=test@example.test", "commit", "-qm", "deadline fixture"}} {
+		command := exec.Command("git", arguments...)
+		command.Dir = root
+		if output, err := command.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v: %s", arguments, err, output)
+		}
+	}
+	host := Host{Timeout: 5 * time.Second}
+	started := time.Now()
+	_, err := host.execute(context.Background(), Authority{WorkspaceRoot: root, Permissions: []string{"repository.read", "test.execute"}}, call("run_go_tests", `{"package":"./..."}`))
+	if !errors.Is(err, context.DeadlineExceeded) || time.Since(started) > 15*time.Second {
+		t.Fatalf("test did not stop at deadline after %s: %v", time.Since(started), err)
+	}
+}
+
+func TestGoTestWorkspaceBudget(t *testing.T) {
+	root := t.TempDir()
+	file, err := os.Create(filepath.Join(root, "sparse"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Truncate(maxTestWorkspaceBytes + 1); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := boundedWorkspace(root); !errors.Is(err, ErrTooLarge) {
+		t.Fatalf("oversized workspace: %v", err)
 	}
 }
 

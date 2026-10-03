@@ -119,7 +119,7 @@ func (source ExecutionBindingSource) BindToolInvocation(ctx context.Context, id 
 	if workspace.ReadOnly {
 		permissions = readOnlyPermissions(grounding.Permissions)
 	}
-	return Authority{WorkspaceRoot: workspace.Root, Permissions: permissions}, nil
+	return Authority{WorkspaceRoot: workspace.Root, Permissions: permissions, Purpose: invocation.Purpose, EffectPolicyDigest: invocation.EffectPolicyDigest}, nil
 }
 
 func readOnlyPermissions(permissions []string) []string {
@@ -137,9 +137,9 @@ type Request struct {
 	Call          Call          `json:"call"`
 }
 
-// Receipt binds a read result to the exact invocation, arguments, and tool
-// call. Mutation is intentionally unavailable until durable replay protection
-// and effect-policy enforcement are implemented.
+// Receipt binds a tool result to the exact invocation, arguments, and call.
+// The read-only gateway returns it directly; the separate mutation gateway
+// first reserves and reconciles a durable effect intent.
 type Receipt struct {
 	InvocationID  kernel.UUIDv7 `json:"invocation_id"`
 	RequestDigest kernel.Digest `json:"request_digest"`
@@ -161,7 +161,7 @@ func (gateway Gateway) ExecuteReadOnly(ctx context.Context, request Request) (Re
 	operation, cancel := context.WithTimeout(ctx, gateway.Host.Timeout)
 	defer cancel()
 	switch request.Call.Name {
-	case "read_file", "list_files", "git_status", "git_diff":
+	case "read_file", "list_files", "find_files", "search_file_contents", "git_status", "git_diff", "git_log", "git_show", "git_check_ignore":
 	default:
 		return Receipt{}, ErrForbidden
 	}

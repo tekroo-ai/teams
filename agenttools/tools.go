@@ -20,6 +20,8 @@ import (
 	"sync"
 	"time"
 	"unicode/utf8"
+
+	"github.com/tekroo-ai/teams/kernel"
 )
 
 var (
@@ -41,17 +43,26 @@ type Spec struct {
 }
 
 var specs = []Spec{
-	{"read_file", "Read bounded lines from one workspace file.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path"],"properties":{"path":{"type":"string","minLength":1},"start_line":{"type":"integer","minimum":1},"end_line":{"type":"integer","minimum":1}}}`), "repository.read"},
+	{"read_file", "Read bounded lines from one workspace file; start_line and end_line select the same inclusive range as sed -n start,endp.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path"],"properties":{"path":{"type":"string","minLength":1},"start_line":{"type":"integer","minimum":1},"end_line":{"type":"integer","minimum":1}}}`), "repository.read"},
 	{"list_files", "List one workspace directory without recursing. If truncated, continue with next_after as start_after.", json.RawMessage(`{"type":"object","additionalProperties":false,"properties":{"path":{"type":"string"},"start_after":{"type":"string"},"limit":{"type":"integer","minimum":1,"maximum":200}}}`), "repository.read"},
+	{"find_files", "Find workspace files matching a filename glob; ** matches directories. Results are bounded and sorted.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["filename_glob"],"properties":{"filename_glob":{"type":"string","minLength":1,"maxLength":256},"directory":{"type":"string"},"start_after":{"type":"string"},"limit":{"type":"integer","minimum":1,"maximum":200},"summary":{"type":"string"}}}`), "repository.read"},
+	{"search_file_contents", "Search workspace text files with a RE2 regular expression (use | for alternatives). Select matching lines, filenames, or a total count; optionally include following lines. Results are bounded and skipped files reported.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["regex"],"properties":{"regex":{"type":"string","minLength":1,"maxLength":4096},"path":{"type":"string"},"filename_glob":{"type":"string","maxLength":256},"exclude_glob":{"type":"string","maxLength":256},"ignore_case":{"type":"boolean"},"result_mode":{"type":"string","enum":["lines","filenames","count"]},"after_lines":{"type":"integer","minimum":0,"maximum":40},"max_results":{"type":"integer","minimum":1,"maximum":100},"summary":{"type":"string"}}}`), "repository.read"},
 	{"git_status", "Read the worktree's branch, HEAD, and Git status without changing it.", json.RawMessage(`{"type":"object","additionalProperties":false}`), "repository.read"},
-	{"git_diff", "Read the unstaged Git diff, optionally for one path.", json.RawMessage(`{"type":"object","additionalProperties":false,"properties":{"path":{"type":"string","minLength":1}}}`), "repository.read"},
+	{"git_diff", "Read a bounded Git diff for the worktree, index, or specified commits; optionally narrow it to one path.", json.RawMessage(`{"type":"object","additionalProperties":false,"properties":{"path":{"type":"string","minLength":1},"from_commit":{"type":"string","pattern":"^(HEAD|[0-9a-f]{7,40})$"},"to_commit":{"type":"string","pattern":"^(HEAD|[0-9a-f]{7,40})$"},"staged":{"type":"boolean"},"format":{"type":"string","enum":["patch","stat","name_status","numstat","name_only"]}}}`), "repository.read"},
+	{"git_log", "Read up to 20 recent commits without changing the repository.", json.RawMessage(`{"type":"object","additionalProperties":false,"properties":{"limit":{"type":"integer","minimum":1,"maximum":20},"format":{"type":"string","enum":["oneline","message"]}}}`), "repository.read"},
+	{"git_show", "Read a bounded commit patch or summary, optionally for one path.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["commit"],"properties":{"commit":{"type":"string","pattern":"^(HEAD|[0-9a-f]{7,40})$"},"path":{"type":"string","minLength":1},"format":{"type":"string","enum":["patch","stat"]}}}`), "repository.read"},
+	{"git_check_ignore", "Check whether one workspace path is ignored by Git.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path"],"properties":{"path":{"type":"string","minLength":1}}}`), "repository.read"},
 	{"write_file", "Create or replace one workspace file only when its expected SHA-256 matches.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path","content","expected_sha256"],"properties":{"path":{"type":"string","minLength":1},"content":{"type":"string"},"expected_sha256":{"type":"string","pattern":"^$|^[0-9a-f]{64}$"}}}`), "repository.edit"},
-	{"run_go_tests", "Run Go tests for one workspace package pattern, without shell expansion or network dependency downloads.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["package"],"properties":{"package":{"type":"string","pattern":"^\\./(?:\\.\\.|[A-Za-z0-9_./-]+)$"}}}`), "test.execute"},
+	{"git_stage_files", "Stage only the named workspace paths when HEAD still matches the expected commit. Never stages the injected .openhands runtime files.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["paths","expected_head"],"properties":{"paths":{"type":"array","minItems":1,"maxItems":32,"uniqueItems":true,"items":{"type":"string","minLength":1}},"expected_head":{"type":"string","pattern":"^[0-9a-f]{40}$"}}}`), "repository.edit"},
+	{"git_commit", "Commit the exact staged tree against an expected HEAD. A retry after a completed identical commit returns that commit instead of creating another.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["expected_head","expected_index_tree","subject"],"properties":{"expected_head":{"type":"string","pattern":"^[0-9a-f]{40}$"},"expected_index_tree":{"type":"string","pattern":"^[0-9a-f]{40}$"},"subject":{"type":"string","minLength":1,"maxLength":200},"body":{"type":"string","maxLength":5000}}}`), "repository.edit"},
+	{"run_go_tests", "Run Go tests for one package pattern from committed HEAD in a disposable macOS sandbox; no network, host writes, shell expansion, or CGO.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["package"],"properties":{"package":{"type":"string","pattern":"^\\./(?:\\.\\.|[A-Za-z0-9_./-]+)$"}}}`), "test.execute"},
 }
 
 type Authority struct {
-	WorkspaceRoot string
-	Permissions   []string
+	WorkspaceRoot      string
+	Permissions        []string
+	Purpose            kernel.WorkPurpose
+	EffectPolicyDigest kernel.Digest
 }
 
 type Call struct {
@@ -60,15 +71,21 @@ type Call struct {
 }
 
 type Result struct {
-	Name      string   `json:"name"`
-	Output    string   `json:"output,omitempty"`
-	Files     []string `json:"files,omitempty"`
-	Truncated bool     `json:"truncated,omitempty"`
-	NextAfter string   `json:"next_after,omitempty"`
-	HEAD      string   `json:"head,omitempty"`
-	Branch    string   `json:"branch,omitempty"`
-	SHA256    string   `json:"sha256,omitempty"`
-	ExitCode  int      `json:"exit_code,omitempty"`
+	Name         string        `json:"name"`
+	Output       string        `json:"output,omitempty"`
+	Files        []string      `json:"files,omitempty"`
+	Matches      []SearchMatch `json:"matches,omitempty"`
+	MatchCount   *int          `json:"match_count,omitempty"`
+	Ignored      *bool         `json:"ignored,omitempty"`
+	IndexTree    string        `json:"index_tree,omitempty"`
+	CommitSHA    string        `json:"commit_sha,omitempty"`
+	Truncated    bool          `json:"truncated,omitempty"`
+	SkippedFiles int           `json:"skipped_files,omitempty"`
+	NextAfter    string        `json:"next_after,omitempty"`
+	HEAD         string        `json:"head,omitempty"`
+	Branch       string        `json:"branch,omitempty"`
+	SHA256       string        `json:"sha256,omitempty"`
+	ExitCode     int           `json:"exit_code,omitempty"`
 }
 
 type Host struct {
@@ -154,6 +171,48 @@ func (host Host) execute(ctx context.Context, authority Authority, call Call) (R
 			limit = *args.Limit
 		}
 		result.Files, result.Truncated, result.NextAfter, err = listFiles(root, args.Path, args.StartAfter, limit)
+	case "find_files":
+		var args struct {
+			FilenameGlob string `json:"filename_glob"`
+			Directory    string `json:"directory"`
+			StartAfter   string `json:"start_after"`
+			Limit        *int   `json:"limit"`
+			Summary      string `json:"summary"`
+		}
+		if decode(call.Arguments, &args) != nil || args.Limit != nil && (*args.Limit < 1 || *args.Limit > 200) {
+			return Result{}, ErrInvalidCall
+		}
+		limit := 200
+		if args.Limit != nil {
+			limit = *args.Limit
+		}
+		result.Files, result.Truncated, result.NextAfter, err = findFiles(ctx, root, args.Directory, args.FilenameGlob, args.StartAfter, limit)
+	case "search_file_contents":
+		var args struct {
+			Regex        string `json:"regex"`
+			Path         string `json:"path"`
+			FilenameGlob string `json:"filename_glob"`
+			ExcludeGlob  string `json:"exclude_glob"`
+			IgnoreCase   bool   `json:"ignore_case"`
+			ResultMode   string `json:"result_mode"`
+			AfterLines   *int   `json:"after_lines"`
+			MaxResults   *int   `json:"max_results"`
+			Summary      string `json:"summary"`
+		}
+		if decode(call.Arguments, &args) != nil || args.MaxResults != nil && (*args.MaxResults < 1 || *args.MaxResults > 100) || args.AfterLines != nil && (*args.AfterLines < 0 || *args.AfterLines > 40) {
+			return Result{}, ErrInvalidCall
+		}
+		limit := 100
+		if args.MaxResults != nil {
+			limit = *args.MaxResults
+		}
+		after := 0
+		if args.AfterLines != nil {
+			after = *args.AfterLines
+		}
+		var searchResult contentSearchResult
+		searchResult, err = searchFileContents(ctx, root, contentSearchQuery{Path: args.Path, FilenameGlob: args.FilenameGlob, ExcludeGlob: args.ExcludeGlob, Regex: args.Regex, IgnoreCase: args.IgnoreCase, ResultMode: args.ResultMode, AfterLines: after, MaxResults: limit})
+		result.Matches, result.Files, result.MatchCount, result.Truncated, result.SkippedFiles = searchResult.Matches, searchResult.Files, searchResult.MatchCount, searchResult.Truncated, searchResult.SkippedFiles
 	case "git_status":
 		var args struct{}
 		if decode(call.Arguments, &args) != nil {
@@ -182,15 +241,42 @@ func (host Host) execute(ctx context.Context, authority Authority, call Call) (R
 		}
 	case "git_diff":
 		var args struct {
-			Path string `json:"path"`
+			Path       string `json:"path"`
+			FromCommit string `json:"from_commit"`
+			ToCommit   string `json:"to_commit"`
+			Staged     bool   `json:"staged"`
+			Format     string `json:"format"`
 		}
-		if decode(call.Arguments, &args) != nil {
+		if decode(call.Arguments, &args) != nil || args.ToCommit != "" && args.FromCommit == "" || args.Staged && (args.FromCommit != "" || args.ToCommit != "") ||
+			args.FromCommit != "" && !validGitRevision(args.FromCommit) || args.ToCommit != "" && !validGitRevision(args.ToCommit) {
 			return Result{}, ErrInvalidCall
 		}
 		if err := host.requireGitRoot(ctx, root); err != nil {
 			return Result{}, err
 		}
 		arguments := []string{"-c", "core.hooksPath=/dev/null", "-c", "credential.interactive=never", "diff", "--no-ext-diff", "--no-textconv"}
+		if args.Staged {
+			arguments = append(arguments, "--cached")
+		}
+		switch args.Format {
+		case "", "patch":
+		case "stat":
+			arguments = append(arguments, "--stat")
+		case "name_status":
+			arguments = append(arguments, "--name-status")
+		case "numstat":
+			arguments = append(arguments, "--numstat")
+		case "name_only":
+			arguments = append(arguments, "--name-only")
+		default:
+			return Result{}, ErrInvalidCall
+		}
+		if args.FromCommit != "" {
+			arguments = append(arguments, args.FromCommit)
+		}
+		if args.ToCommit != "" {
+			arguments = append(arguments, args.ToCommit)
+		}
 		if args.Path != "" {
 			if _, err = relativePath(args.Path); err != nil {
 				return Result{}, err
@@ -198,6 +284,101 @@ func (host Host) execute(ctx context.Context, authority Authority, call Call) (R
 			arguments = append(arguments, "--", ":(literal)"+args.Path)
 		}
 		result, err = host.command(ctx, root, call.Name, host.gitBinary(), arguments)
+	case "git_log":
+		var args struct {
+			Limit  *int   `json:"limit"`
+			Format string `json:"format"`
+		}
+		if decode(call.Arguments, &args) != nil || args.Limit != nil && (*args.Limit < 1 || *args.Limit > 20) {
+			return Result{}, ErrInvalidCall
+		}
+		if err := host.requireGitRoot(ctx, root); err != nil {
+			return Result{}, err
+		}
+		limit := 5
+		if args.Limit != nil {
+			limit = *args.Limit
+		}
+		format := "--format=%h %s"
+		switch args.Format {
+		case "", "oneline":
+		case "message":
+			format = "--format=%B"
+		default:
+			return Result{}, ErrInvalidCall
+		}
+		result, err = host.command(ctx, root, call.Name, host.gitBinary(), []string{"-c", "core.hooksPath=/dev/null", "-c", "credential.interactive=never", "log", "-n", fmt.Sprint(limit), format})
+	case "git_show":
+		var args struct {
+			Commit string `json:"commit"`
+			Path   string `json:"path"`
+			Format string `json:"format"`
+		}
+		if decode(call.Arguments, &args) != nil || !validGitRevision(args.Commit) {
+			return Result{}, ErrInvalidCall
+		}
+		if err := host.requireGitRoot(ctx, root); err != nil {
+			return Result{}, err
+		}
+		arguments := []string{"-c", "core.hooksPath=/dev/null", "-c", "credential.interactive=never", "show", "--no-ext-diff", "--no-textconv"}
+		switch args.Format {
+		case "", "patch":
+		case "stat":
+			arguments = append(arguments, "--stat")
+		default:
+			return Result{}, ErrInvalidCall
+		}
+		arguments = append(arguments, args.Commit)
+		if args.Path != "" {
+			if _, err = relativePath(args.Path); err != nil {
+				return Result{}, err
+			}
+			arguments = append(arguments, "--", ":(literal)"+args.Path)
+		}
+		result, err = host.command(ctx, root, call.Name, host.gitBinary(), arguments)
+	case "git_check_ignore":
+		var args struct {
+			Path string `json:"path"`
+		}
+		if decode(call.Arguments, &args) != nil {
+			return Result{}, ErrInvalidCall
+		}
+		if _, err = relativePath(strings.TrimSuffix(args.Path, string(filepath.Separator))); err != nil {
+			return Result{}, err
+		}
+		if err := host.requireGitRoot(ctx, root); err != nil {
+			return Result{}, err
+		}
+		result, err = host.command(ctx, root, call.Name, host.gitBinary(), []string{"-c", "core.hooksPath=/dev/null", "-c", "credential.interactive=never", "check-ignore", "-q", "--", args.Path})
+		if err == nil {
+			if result.ExitCode > 1 {
+				err = ErrInvalidCall
+			} else {
+				ignored := result.ExitCode == 0
+				result.Ignored = &ignored
+				result.ExitCode = 0
+			}
+		}
+	case "git_stage_files":
+		var args struct {
+			Paths        []string `json:"paths"`
+			ExpectedHead string   `json:"expected_head"`
+		}
+		if decode(call.Arguments, &args) != nil || !validFullGitSHA(args.ExpectedHead) || len(args.Paths) < 1 || len(args.Paths) > 32 {
+			return Result{}, ErrInvalidCall
+		}
+		result, err = host.gitStageFiles(ctx, root, args.Paths, args.ExpectedHead)
+	case "git_commit":
+		var args struct {
+			ExpectedHead      string `json:"expected_head"`
+			ExpectedIndexTree string `json:"expected_index_tree"`
+			Subject           string `json:"subject"`
+			Body              string `json:"body"`
+		}
+		if decode(call.Arguments, &args) != nil || !validFullGitSHA(args.ExpectedHead) || !validFullGitSHA(args.ExpectedIndexTree) || !validCommitMessage(args.Subject, args.Body) {
+			return Result{}, ErrInvalidCall
+		}
+		result, err = host.gitCommit(ctx, root, args.ExpectedHead, args.ExpectedIndexTree, args.Subject, args.Body)
 	case "run_go_tests":
 		var args struct {
 			Package string `json:"package"`
@@ -205,7 +386,7 @@ func (host Host) execute(ctx context.Context, authority Authority, call Call) (R
 		if decode(call.Arguments, &args) != nil || !validGoPackage(args.Package) {
 			return Result{}, ErrInvalidCall
 		}
-		result, err = host.command(ctx, root, call.Name, host.goBinary(), []string{"test", "-count=1", args.Package})
+		result, err = host.runIsolatedGoTests(ctx, root, args.Package)
 	case "write_file":
 		var args struct {
 			Path           string `json:"path"`
@@ -355,6 +536,29 @@ func validExpectedSHA(value string) bool {
 	}
 	_, err := hex.DecodeString(value)
 	return err == nil && value == strings.ToLower(value)
+}
+
+func validGitRevision(value string) bool {
+	if value == "HEAD" {
+		return true
+	}
+	if len(value) < 7 || len(value) > 40 {
+		return false
+	}
+	for _, char := range value {
+		if !(char >= '0' && char <= '9' || char >= 'a' && char <= 'f') {
+			return false
+		}
+	}
+	return true
+}
+
+func validFullGitSHA(value string) bool {
+	return len(value) == 40 && validGitRevision(value)
+}
+
+func validCommitMessage(subject, body string) bool {
+	return subject != "" && len(subject) <= 200 && !strings.ContainsAny(subject, "\r\n\x00") && len(body) <= 5000 && !strings.ContainsAny(body, "\r\x00") && !strings.HasSuffix(body, "\n")
 }
 
 func writeFile(root, relative string, content []byte, expectedSHA string) (string, error) {

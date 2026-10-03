@@ -22,18 +22,21 @@ const workInvocationAuthorized = "WORK_INVOCATION_AUTHORIZED"
 // task execution. The caller owns Store; Runtime owns only the intent feed it
 // opens while assembling this graph.
 type Config struct {
-	Store                    *mongo.Store
-	Catalogue                kernel.CatalogueSnapshot
-	Clock                    kernel.Clock
-	IDs                      kernel.IDSource
-	OpenHandsBaseURL         string
-	OpenHandsSessionAPIKey   string
-	AgentToolBaseURL         string
-	AgentToolSigningKey      []byte
-	HTTPClient               *http.Client
-	WorkspaceBindings        []openhands.WorkspaceBinding
-	WorkspaceResolver        openhands.WorkspaceResolver
-	ExecutionProfiles        []openhands.ExecutionProfile
+	Store                  *mongo.Store
+	Catalogue              kernel.CatalogueSnapshot
+	Clock                  kernel.Clock
+	IDs                    kernel.IDSource
+	OpenHandsBaseURL       string
+	OpenHandsSessionAPIKey string
+	AgentToolBaseURL       string
+	AgentToolSigningKey    []byte
+	HTTPClient             *http.Client
+	WorkspaceBindings      []openhands.WorkspaceBinding
+	WorkspaceResolver      openhands.WorkspaceResolver
+	ExecutionProfiles      []openhands.ExecutionProfile
+	// ExecutionBoundary is an explicit opt-in for a qualified Teams-native
+	// boundary. Nil retains the deployed OpenHands path.
+	ExecutionBoundary        application.AgentExecutionBoundary
 	RoleGrounding            application.RoleGroundingResolver
 	DeadlineExtensionReader  application.OperationalDeadlineExtensionReader
 	OpenHandsPollInterval    time.Duration
@@ -80,10 +83,6 @@ func New(ctx context.Context, config Config) (*Runtime, error) {
 			return nil, fmt.Errorf("create workspace resolver: %w", err)
 		}
 	}
-	profiles, err := openhands.NewBoundExecutionProfileResolver(config.ExecutionProfiles)
-	if err != nil {
-		return nil, fmt.Errorf("create execution-profile resolver: %w", err)
-	}
 	blobs, err := filesystem.NewExecutionEvidenceStore(config.EvidenceRoot)
 	if err != nil {
 		return nil, fmt.Errorf("open execution-evidence store: %w", err)
@@ -105,21 +104,28 @@ func New(ctx context.Context, config Config) (*Runtime, error) {
 	if toolService != nil {
 		toolSessions = toolSessionAdapter{service: toolService}
 	}
-	client, err := openhands.NewClient(openhands.Config{
-		BaseURL: config.OpenHandsBaseURL, SessionAPIKey: config.OpenHandsSessionAPIKey,
-		HTTPClient: config.HTTPClient, Workspaces: workspaces, Profiles: profiles, Evidence: blobs, EvidenceRoot: config.EvidenceRoot,
-		ToolSessions: toolSessions,
-		PollInterval: config.OpenHandsPollInterval, MaximumPages: config.OpenHandsMaximumPages,
-		MaximumEvidenceBytes: config.OpenHandsMaximumEvidence,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("create OpenHands client: %w", err)
+	boundary := config.ExecutionBoundary
+	if boundary == nil {
+		profiles, err := openhands.NewBoundExecutionProfileResolver(config.ExecutionProfiles)
+		if err != nil {
+			return nil, fmt.Errorf("create execution-profile resolver: %w", err)
+		}
+		boundary, err = openhands.NewClient(openhands.Config{
+			BaseURL: config.OpenHandsBaseURL, SessionAPIKey: config.OpenHandsSessionAPIKey,
+			HTTPClient: config.HTTPClient, Workspaces: workspaces, Profiles: profiles, Evidence: blobs, EvidenceRoot: config.EvidenceRoot,
+			ToolSessions: toolSessions,
+			PollInterval: config.OpenHandsPollInterval, MaximumPages: config.OpenHandsMaximumPages,
+			MaximumEvidenceBytes: config.OpenHandsMaximumEvidence,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("create OpenHands client: %w", err)
+		}
 	}
 	recorder, err := application.NewCommandEvidenceRecorder(handler, blobs, config.EvidencePolicy)
 	if err != nil {
 		return nil, fmt.Errorf("create evidence recorder: %w", err)
 	}
-	coordinator, err := application.NewOperationalExecutionCoordinator(executionReader, handler, client, recorder, config.RoleGrounding, config.Clock, config.ExecutionPolicy)
+	coordinator, err := application.NewOperationalExecutionCoordinator(executionReader, handler, boundary, recorder, config.RoleGrounding, config.Clock, config.ExecutionPolicy)
 	if err != nil {
 		return nil, fmt.Errorf("create execution coordinator: %w", err)
 	}
