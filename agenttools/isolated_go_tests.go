@@ -282,6 +282,6 @@ func goTestSandboxProfile(workspace, goBinary, modCache string) (string, error) 
   (subpath ` + strconv.Quote(filepath.Dir(goBinary)) + `)
   (subpath ` + strconv.Quote(modCache) + `)
   (subpath ` + strconv.Quote(workspace) + `))
-(allow file-write* (subpath ` + strconv.Quote(workspace) + `))`
+(allow file-write* (subpath ` + strconv.Quote(workspace) + `) (literal "/dev/null"))`
 	return profile, nil
 }

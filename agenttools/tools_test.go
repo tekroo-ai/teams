@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -69,7 +70,8 @@ func TestReadAndListStayInWorkspace(t *testing.T) {
 	authority := Authority{WorkspaceRoot: root, Permissions: []string{"repository.read"}}
 	host := testHost()
 	result, err := host.execute(context.Background(), authority, call("read_file", `{"path":"source.txt","start_line":2,"end_line":3}`))
-	if err != nil || result.Output != "two\nthree" {
+	fullFileHash := sha256.Sum256([]byte("one\ntwo\nthree\n"))
+	if err != nil || result.Output != "two\nthree" || result.SHA256 != hex.EncodeToString(fullFileHash[:]) {
 		t.Fatalf("bounded file read: %+v, %v", result, err)
 	}
 	result, err = host.execute(context.Background(), authority, call("list_files", `{}`))
@@ -308,6 +310,7 @@ func TestGoTestsCannotReadWriteOutsideSnapshotOrConnect(t *testing.T) {
 		" if err := os.WriteFile(" + strconv.Quote(filepath.Join(outside, "write")) + ", []byte(\"bad\"), 0600); err == nil { t.Error(\"outside write succeeded\") }\n" +
 		" if conn, err := net.DialTimeout(\"tcp\", " + strconv.Quote(listener.Addr().String()) + ", time.Second); err == nil { conn.Close(); t.Error(\"network succeeded\") }\n" +
 		" if err := exec.Command(\"/usr/bin/true\").Run(); err == nil { t.Error(\"system executable succeeded\") }\n" +
+		" if sink, err := os.OpenFile(\"/dev/null\", os.O_WRONLY, 0); err != nil { t.Errorf(\"/dev/null unavailable: %v\", err) } else { sink.Close() }\n" +
 		"}\n"
 	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module example.test/boundary\n\ngo 1.26.0\n"), 0600); err != nil {
 		t.Fatal(err)
@@ -369,6 +372,36 @@ func TestGoTestWorkspaceBudget(t *testing.T) {
 	}
 	if err := boundedWorkspace(root); !errors.Is(err, ErrTooLarge) {
 		t.Fatalf("oversized workspace: %v", err)
+	}
+}
+
+func TestGoPackageSchemaMatchesHostValidation(t *testing.T) {
+	var schema struct {
+		Properties map[string]struct {
+			Pattern string `json:"pattern"`
+		} `json:"properties"`
+	}
+	for _, spec := range Available([]string{"repository.read", "test.execute"}) {
+		if spec.Name == "run_go_tests" {
+			if err := json.Unmarshal(spec.InputSchema, &schema); err != nil {
+				t.Fatal(err)
+			}
+			break
+		}
+	}
+	pattern, err := regexp.Compile(schema.Properties["package"].Pattern)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, candidate := range []string{"./", "./...", "./foo", "./foo/bar", "./foo-bar"} {
+		if !pattern.MatchString(candidate) || !validGoPackage(candidate) {
+			t.Fatalf("supported package %q rejected", candidate)
+		}
+	}
+	for _, candidate := range []string{".", "./.", "./..", "./../other", "./foo/", "./.hidden", "./foo;echo"} {
+		if pattern.MatchString(candidate) || validGoPackage(candidate) {
+			t.Fatalf("unsupported package %q accepted", candidate)
+		}
 	}
 }
 

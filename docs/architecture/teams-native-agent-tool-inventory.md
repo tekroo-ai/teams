@@ -6,11 +6,11 @@ MongoDB turn journal. It is not a claim that OpenHands can already be removed.
 
 | Tool/function | Teams implementation | Live native-runner exposure | Remaining work |
 | --- | --- | --- | --- |
-| `read_file`, `list_files`, `find_files`, `search_file_contents` | `agenttools` host and read-only gateway | Available to the new read-only turn adapter | Exercise with a real model and authorized workspace. |
-| `git_status`, `git_diff`, `git_log`, `git_show`, `git_check_ignore` | `agenttools` host and read-only gateway | Available to the new read-only turn adapter | Exercise with a real model and authorized workspace. |
-| `write_file` | Host implementation plus MongoDB effect-intent ledger | Available through explicit effectful native session and opt-in native lifecycle | Qualify with a real model and a disposable task workspace before production selection. |
-| `git_stage_files`, `git_commit` | Host implementations plus effect-intent and read-only Git reconciliation | Available only through explicit effectful profile allowlist | Qualify staging, lost acknowledgment, cancellation, and commit replay against a disposable task branch. |
-| `run_go_tests` | Committed-HEAD snapshot, macOS Seatbelt runner, and durable test-effect receipt implemented | Opt-in native session only; **not deployed** | Local tests cover external-file and network denial, arbitrary executable denial, timeout, a periodic 2 GiB workspace cap, and receipt replay. CGO is disabled. Role-package authority and disposable end-to-end workflow qualification remain before production exposure. |
+| `read_file`, `list_files`, `find_files`, `search_file_contents` | `agenttools` host and read-only gateway | Available to the new read-only turn adapter | `read_file` now returns a full-file SHA-256 for guarded writes; qualify all tools in the assembled workflow. |
+| `git_status`, `git_diff`, `git_log`, `git_show`, `git_check_ignore` | `agenttools` host and read-only gateway | Available to the new read-only turn adapter | Qualify all tools in the assembled workflow. |
+| `write_file` | Host implementation plus MongoDB effect-intent ledger | Available through explicit effectful native session and opt-in native lifecycle | Coder exercised it in a disposable real-model canary; qualify the assembled workflow before production selection. |
+| `git_stage_files`, `git_commit` | Host implementations plus effect-intent and read-only Git reconciliation | Available only through explicit effectful profile allowlist | Coder committed one disposable candidate in the real-model canary; qualify lost acknowledgment, cancellation, and replay in the assembled workflow. |
+| `run_go_tests` | Committed-HEAD snapshot, macOS Seatbelt runner, and durable test-effect receipt implemented | Opt-in native session only; **not deployed** | Tester exercised it in a disposable real-model canary. Local tests cover external-file and network denial, arbitrary executable denial, timeout, a periodic 2 GiB workspace cap, and receipt replay. CGO is disabled. The tester role bundle already grants `test.execute`; native profile allowlisting and assembled workflow qualification remain before production exposure. |
 | Editing by patch or targeted replacement | **Not implemented as a distinct native tool** | No | Decide whether SHA-guarded `write_file` suffices for large files; add only if real agent use shows a need. |
 | Non-Go build, format, lint, and test operations | **Not implemented** | No | Inventory actual role/task requirements before adding narrow typed tools. |
 | Other formerly used shell operations | **Not fully inventoried** | No | Classify actual OpenHands command history; add typed tools only for demonstrated workflows, not a disguised general shell. |
@@ -39,10 +39,11 @@ an applied write with a lost receipt; MongoDB tests cover lease ownership,
 journal persistence, and the effect ledger. An opt-in Go client now mirrors
 the accepted local SMA prompt-context bridge, and the first retrieval result
 is journaled so restart does not silently change the model's working context.
-It still needs production configuration, end-to-end qualification, context
-reduction, configured schema documents and per-invocation resolver wiring,
-and real-model qualification
-before a feature run can use it. No automatic
+It still needs production configuration, assembled end-to-end qualification,
+context reduction, configured schema documents and per-invocation resolver
+wiring before a feature run can use it. A disposable real-model coder/tester
+canary passed, but used synthetic invocation bindings rather than the
+organizational coordinator and MongoDB stores. No automatic
 turn-count limit is imposed when `MaxTurns` is zero; the invocation deadline
 remains binding.
 
@@ -57,7 +58,8 @@ file hash or Git state without reissuing a model turn. Cancellation reconciles
 recorded effects before publishing a terminal outcome. The opt-in native
 boundary now accepts the effectful session, but production still selects
 OpenHands. Go tests are eligible only in an explicitly authorized opt-in
-native session; they are not present in any current production role profile.
+native session; the deployed tester role grants `test.execute`, but the
+production execution path still selects OpenHands.
 None of these execution records belongs to SMA's semantic-memory state. Any
 future SMA intake should consume an explicit authorized projection, not read
 the private turn collection directly.

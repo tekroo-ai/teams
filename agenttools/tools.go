@@ -43,7 +43,7 @@ type Spec struct {
 }
 
 var specs = []Spec{
-	{"read_file", "Read bounded lines from one workspace file; start_line and end_line select the same inclusive range as sed -n start,endp.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path"],"properties":{"path":{"type":"string","minLength":1},"start_line":{"type":"integer","minimum":1},"end_line":{"type":"integer","minimum":1}}}`), "repository.read"},
+	{"read_file", "Read bounded lines from one workspace file and return the full file's SHA-256 for a later write_file precondition; start_line and end_line select the same inclusive range as sed -n start,endp.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path"],"properties":{"path":{"type":"string","minLength":1},"start_line":{"type":"integer","minimum":1},"end_line":{"type":"integer","minimum":1}}}`), "repository.read"},
 	{"list_files", "List one workspace directory without recursing. If truncated, continue with next_after as start_after.", json.RawMessage(`{"type":"object","additionalProperties":false,"properties":{"path":{"type":"string"},"start_after":{"type":"string"},"limit":{"type":"integer","minimum":1,"maximum":200}}}`), "repository.read"},
 	{"find_files", "Find workspace files matching a filename glob; ** matches directories. Results are bounded and sorted.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["filename_glob"],"properties":{"filename_glob":{"type":"string","minLength":1,"maxLength":256},"directory":{"type":"string"},"start_after":{"type":"string"},"limit":{"type":"integer","minimum":1,"maximum":200},"summary":{"type":"string"}}}`), "repository.read"},
 	{"search_file_contents", "Search workspace text files with a RE2 regular expression (use | for alternatives). Select matching lines, filenames, or a total count; optionally include following lines. Results are bounded and skipped files reported.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["regex"],"properties":{"regex":{"type":"string","minLength":1,"maxLength":4096},"path":{"type":"string"},"filename_glob":{"type":"string","maxLength":256},"exclude_glob":{"type":"string","maxLength":256},"ignore_case":{"type":"boolean"},"result_mode":{"type":"string","enum":["lines","filenames","count"]},"after_lines":{"type":"integer","minimum":0,"maximum":40},"max_results":{"type":"integer","minimum":1,"maximum":100},"summary":{"type":"string"}}}`), "repository.read"},
@@ -55,7 +55,7 @@ var specs = []Spec{
 	{"write_file", "Create or replace one workspace file only when its expected SHA-256 matches.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path","content","expected_sha256"],"properties":{"path":{"type":"string","minLength":1},"content":{"type":"string"},"expected_sha256":{"type":"string","pattern":"^$|^[0-9a-f]{64}$"}}}`), "repository.edit"},
 	{"git_stage_files", "Stage only the named workspace paths when HEAD still matches the expected commit. Never stages the injected .openhands runtime files.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["paths","expected_head"],"properties":{"paths":{"type":"array","minItems":1,"maxItems":32,"uniqueItems":true,"items":{"type":"string","minLength":1}},"expected_head":{"type":"string","pattern":"^[0-9a-f]{40}$"}}}`), "repository.edit"},
 	{"git_commit", "Commit the exact staged tree against an expected HEAD. A retry after a completed identical commit returns that commit instead of creating another.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["expected_head","expected_index_tree","subject"],"properties":{"expected_head":{"type":"string","pattern":"^[0-9a-f]{40}$"},"expected_index_tree":{"type":"string","pattern":"^[0-9a-f]{40}$"},"subject":{"type":"string","minLength":1,"maxLength":200},"body":{"type":"string","maxLength":5000}}}`), "repository.edit"},
-	{"run_go_tests", "Run Go tests for one package pattern from committed HEAD in a disposable macOS sandbox; no network, host writes, shell expansion, or CGO.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["package"],"properties":{"package":{"type":"string","pattern":"^\\./(?:\\.\\.|[A-Za-z0-9_./-]+)$"}}}`), "test.execute"},
+	{"run_go_tests", "Run Go tests from committed HEAD in a disposable macOS sandbox. Use ./ for the module root or ./... for all packages; no network, host writes, shell expansion, or CGO.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["package"],"properties":{"package":{"type":"string","pattern":"^\\./(?:\\.\\.\\.|[A-Za-z0-9_-][A-Za-z0-9_.-]*(?:/[A-Za-z0-9_-][A-Za-z0-9_.-]*)*)?$"}}}`), "test.execute"},
 }
 
 type Authority struct {
@@ -156,7 +156,7 @@ func (host Host) execute(ctx context.Context, authority Authority, call Call) (R
 				return Result{}, ErrInvalidCall
 			}
 		}
-		result.Output, err = readFile(root, args.Path, start, end)
+		result.Output, result.SHA256, err = readFile(root, args.Path, start, end)
 	case "list_files":
 		var args struct {
 			Path       string `json:"path"`
@@ -463,25 +463,26 @@ func existingPath(root, relative string) (string, error) {
 	return resolved, nil
 }
 
-func readFile(root, relative string, start, end int) (string, error) {
+func readFile(root, relative string, start, end int) (string, string, error) {
 	path, err := existingPath(root, relative)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	info, err := os.Stat(path)
 	if err != nil || !info.Mode().IsRegular() {
-		return "", ErrInvalidCall
+		return "", "", ErrInvalidCall
 	}
 	if info.Size() > 1<<20 {
-		return "", ErrTooLarge
+		return "", "", ErrTooLarge
 	}
 	content, err := os.ReadFile(path)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	if !utf8.Valid(content) {
-		return "", ErrInvalidCall
+		return "", "", ErrInvalidCall
 	}
+	fullHash := sha256.Sum256(content)
 	lines := strings.Split(strings.TrimSuffix(string(content), "\n"), "\n")
 	if start == 0 {
 		start = 1
@@ -490,13 +491,13 @@ func readFile(root, relative string, start, end int) (string, error) {
 		end = min(len(lines), start+399)
 	}
 	if start < 1 || end < start || end-start >= 400 || start > len(lines) || end > len(lines) {
-		return "", ErrInvalidCall
+		return "", "", ErrInvalidCall
 	}
 	selected := strings.Join(lines[start-1:end], "\n")
 	if len(selected) > 64<<10 {
-		return "", ErrTooLarge
+		return "", "", ErrTooLarge
 	}
-	return selected, nil
+	return selected, hex.EncodeToString(fullHash[:]), nil
 }
 
 func listFiles(root, relative, startAfter string, limit int) ([]string, bool, string, error) {
@@ -628,14 +629,14 @@ func writeFile(root, relative string, content []byte, expectedSHA string) (strin
 }
 
 func validGoPackage(value string) bool {
-	if value == "./..." {
+	if value == "./..." || value == "./" {
 		return true
 	}
-	if !strings.HasPrefix(value, "./") || value == "./" {
+	if !strings.HasPrefix(value, "./") {
 		return false
 	}
 	for _, part := range strings.Split(strings.TrimPrefix(value, "./"), "/") {
-		if part == "" || part == "." || part == ".." {
+		if part == "" || part[0] == '.' {
 			return false
 		}
 		for _, char := range part {
