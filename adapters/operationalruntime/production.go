@@ -66,6 +66,9 @@ type ProductionConfig struct {
 	Planning                ProductionPlanning        `json:"planning"`
 	Git                     *ProductionGitConfig      `json:"git,omitempty"`
 	Federation              *ProductionFederation     `json:"federation,omitempty"`
+	// QualificationExecutionBoundary is a process-local test seam. It is never
+	// decoded from a deployment file; production continues to select OpenHands.
+	QualificationExecutionBoundary application.AgentExecutionBoundary `json:"-"`
 }
 
 type ProductionFederation struct {
@@ -798,6 +801,7 @@ type ProductionService struct {
 	roleReconciliation     time.Duration
 	roleMaximumRestarts    uint32
 	messageMaximumAttempts uint32
+	qualificationNative    bool
 	startPaused            bool
 	suspendNewInvocations  bool
 	admissionMu            sync.Mutex
@@ -836,8 +840,10 @@ func NewProductionService(ctx context.Context, config ProductionConfig) (*Produc
 	if err := ValidateOperationalProfileQualifications(config.Profiles, time.Now().UTC()); err != nil {
 		return nil, err
 	}
-	if err := ensureConfiguredRuntimeHooks(config.Workspaces); err != nil {
-		return nil, fmt.Errorf("prepare workspace runtime hooks: %w", err)
+	if config.QualificationExecutionBoundary == nil {
+		if err := ensureConfiguredRuntimeHooks(config.Workspaces); err != nil {
+			return nil, fmt.Errorf("prepare workspace runtime hooks: %w", err)
+		}
 	}
 	if err := os.MkdirAll(config.EvidenceRoot, 0o700); err != nil {
 		return nil, fmt.Errorf("create evidence root: %w", err)
@@ -878,11 +884,11 @@ func NewProductionService(ctx context.Context, config ProductionConfig) (*Produc
 		}
 		candidateTimeout = resolved.gitOperationTimeout
 	}
-	taskWorkspaces, err := newTaskWorkspaceManagerWithContext(ctx, config.EvidenceRoot, gitBinary, candidateTimeout, workspaceResolver)
+	taskWorkspaces, err := newTaskWorkspaceManagerWithMode(ctx, config.EvidenceRoot, gitBinary, candidateTimeout, workspaceResolver, config.QualificationExecutionBoundary == nil)
 	if err != nil {
 		return fail(fmt.Errorf("create task workspace manager: %w", err))
 	}
-	candidates, err := newCandidateWorkspaceManagerWithContext(ctx, config.EvidenceRoot, gitBinary, candidateTimeout, config.Planning.CandidateGates, workspaceResolver)
+	candidates, err := newCandidateWorkspaceManagerWithMode(ctx, config.EvidenceRoot, gitBinary, candidateTimeout, config.Planning.CandidateGates, workspaceResolver, config.QualificationExecutionBoundary == nil)
 	if err != nil {
 		return fail(fmt.Errorf("create candidate workspace manager: %w", err))
 	}
@@ -904,7 +910,7 @@ func NewProductionService(ctx context.Context, config ProductionConfig) (*Produc
 		Store: store, Catalogue: catalogue, Clock: clock, IDs: ids,
 		OpenHandsBaseURL: config.OpenHands.BaseURL, OpenHandsSessionAPIKey: resolved.sessionAPIKey,
 		AgentToolBaseURL: "http://" + config.Operator.Address, AgentToolSigningKey: []byte(resolved.operatorBearerToken),
-		HTTPClient: &http.Client{Timeout: resolved.requestTimeout}, WorkspaceBindings: workspaces, WorkspaceResolver: workspaceResolver, ExecutionProfiles: profiles, RoleGrounding: roleGrounding, DeadlineExtensionReader: store,
+		HTTPClient: &http.Client{Timeout: resolved.requestTimeout}, WorkspaceBindings: workspaces, WorkspaceResolver: workspaceResolver, ExecutionProfiles: profiles, ExecutionBoundary: config.QualificationExecutionBoundary, RoleGrounding: roleGrounding, DeadlineExtensionReader: store,
 		OpenHandsPollInterval: resolved.pollInterval, OpenHandsMaximumPages: config.OpenHands.MaximumPages,
 		OpenHandsMaximumEvidence: config.OpenHands.MaximumEvidenceBytes, EvidenceRoot: config.EvidenceRoot,
 		ExecutionPolicy: application.OperationalExecutionPolicy{OperationTimeout: resolved.operationTimeout, MaximumBriefBytes: config.Execution.MaximumBriefBytes, ConsumerID: config.Execution.ConsumerID, PolicyRevision: config.Execution.PolicyRevision, ServiceAuthority: config.ServiceAuthority, ExpiryAuthority: config.ExpiryAuthority, Provenance: resolved.provenance},
@@ -960,7 +966,7 @@ func NewProductionService(ctx context.Context, config ProductionConfig) (*Produc
 	for key, value := range resolved.trustedRolePublishers {
 		trustedPublishers[key] = append(ed25519.PublicKey(nil), value...)
 	}
-	service := &ProductionService{Store: store, Runtime: runtime, Controller: controller, RoleHost: roleHost, RoleRuntime: roleRuntime, MessageBus: messageBus, RoleInbox: roleInbox, RoleLibrary: roleLibrary, WorkflowLibrary: resolved.workflowLibrary, projectionInterval: resolved.projectionInterval, projectionTimeout: resolved.projectionTimeout, recoveryInterval: resolved.reconciliation, recoveryTimeout: resolved.leaseOperationTimeout, recoveryAttempts: config.Worker.MaximumReconciliations, failures: make(chan error, 4), featureWake: featureWake, provenance: resolved.provenance, operatorToken: resolved.operatorBearerToken, operatorIdentity: protocol.AuthenticatedContext{Principal: config.Operator.Principal}, humanCredentials: append([]HumanTransportCredential(nil), resolved.humanCredentials...), operatorTimeout: resolved.operatorTimeout, operatorMaxBody: config.Operator.MaximumBodyBytes, roleReconciliation: resolved.roleReconciliation, roleMaximumRestarts: config.Organization.MaximumRestarts, messageMaximumAttempts: config.Organization.MaximumDeliveryAttempts, startPaused: config.Worker.StartPaused, suspendNewInvocations: config.Worker.SuspendNewInvocations, admissionLimitEnabled: config.Worker.NewInvocationAdmissionLimit > 0, admissionRemaining: config.Worker.NewInvocationAdmissionLimit, recoveryFaults: make(map[string]RecoveryFault), requestTimeout: resolved.requestTimeout, clock: clock, ids: ids, deploymentIdentity: config.DeploymentIdentity, continuityHeartbeat: resolved.continuityHeartbeat, continuityThreshold: resolved.continuityThreshold, planningDeadline: resolved.planningDeadline, planning: config.Planning, profilesByModel: profilesByModel, workspacesByID: workspacesByID, workspaceResolver: workspaceResolver, taskWorkspaces: taskWorkspaces, candidates: candidates, serviceAuthority: config.ServiceAuthority, policyAuthority: config.ExpiryAuthority, librarySources: librarySources, trustedRolePublishers: trustedPublishers, roleGrounding: roleGrounding}
+	service := &ProductionService{Store: store, Runtime: runtime, Controller: controller, RoleHost: roleHost, RoleRuntime: roleRuntime, MessageBus: messageBus, RoleInbox: roleInbox, RoleLibrary: roleLibrary, WorkflowLibrary: resolved.workflowLibrary, projectionInterval: resolved.projectionInterval, projectionTimeout: resolved.projectionTimeout, recoveryInterval: resolved.reconciliation, recoveryTimeout: resolved.leaseOperationTimeout, recoveryAttempts: config.Worker.MaximumReconciliations, failures: make(chan error, 4), featureWake: featureWake, provenance: resolved.provenance, operatorToken: resolved.operatorBearerToken, operatorIdentity: protocol.AuthenticatedContext{Principal: config.Operator.Principal}, humanCredentials: append([]HumanTransportCredential(nil), resolved.humanCredentials...), operatorTimeout: resolved.operatorTimeout, operatorMaxBody: config.Operator.MaximumBodyBytes, roleReconciliation: resolved.roleReconciliation, roleMaximumRestarts: config.Organization.MaximumRestarts, messageMaximumAttempts: config.Organization.MaximumDeliveryAttempts, qualificationNative: config.QualificationExecutionBoundary != nil, startPaused: config.Worker.StartPaused, suspendNewInvocations: config.Worker.SuspendNewInvocations, admissionLimitEnabled: config.Worker.NewInvocationAdmissionLimit > 0, admissionRemaining: config.Worker.NewInvocationAdmissionLimit, recoveryFaults: make(map[string]RecoveryFault), requestTimeout: resolved.requestTimeout, clock: clock, ids: ids, deploymentIdentity: config.DeploymentIdentity, continuityHeartbeat: resolved.continuityHeartbeat, continuityThreshold: resolved.continuityThreshold, planningDeadline: resolved.planningDeadline, planning: config.Planning, profilesByModel: profilesByModel, workspacesByID: workspacesByID, workspaceResolver: workspaceResolver, taskWorkspaces: taskWorkspaces, candidates: candidates, serviceAuthority: config.ServiceAuthority, policyAuthority: config.ExpiryAuthority, librarySources: librarySources, trustedRolePublishers: trustedPublishers, roleGrounding: roleGrounding}
 	if config.Federation != nil {
 		federationIngress, ingressErr := organization.NewFederationIngress(resolved.federationRegistry, store, config.DeploymentIdentity, resolved.federationFutureSkew)
 		if ingressErr != nil {

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
@@ -118,5 +119,18 @@ func TestReadOnlyWorkspaceNeverGrantsMissingPermission(t *testing.T) {
 	}
 	if got := readOnlyPermissions([]string{"repository.edit", "test.execute"}); len(got) != 1 || got[0] != "repository.read" {
 		t.Fatalf("read-only workspace did not narrow permissions: %v", got)
+	}
+}
+
+func TestReadOnlyValidationRetainsOnlyIsolatedTestCapability(t *testing.T) {
+	permissions := []string{"repository.read", "repository.edit", "test.execute", "task.validation-propose"}
+	if got := readOnlyPermissionsForPurpose(permissions, kernel.PurposeValidation); !slices.Equal(got, []string{"repository.read", "test.execute"}) {
+		t.Fatalf("read-only validation permissions = %v", got)
+	}
+	if got := readOnlyPermissionsForPurpose(permissions, kernel.PurposeReview); !slices.Equal(got, []string{"repository.read"}) {
+		t.Fatalf("read-only review permissions = %v", got)
+	}
+	if got := readOnlyPermissionsForPurpose([]string{"repository.read"}, kernel.PurposeValidation); !slices.Equal(got, []string{"repository.read"}) {
+		t.Fatalf("test capability was invented: %v", got)
 	}
 }

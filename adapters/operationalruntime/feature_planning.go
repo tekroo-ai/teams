@@ -50,6 +50,9 @@ func (service *ProductionService) SubmitFeature(ctx context.Context, principal k
 // A workspace may be replaced after daemon startup. Re-check and install its
 // fixture before creating any durable feature work.
 func (service *ProductionService) ensureConfiguredRuntimeHooks() error {
+	if service.qualificationNative {
+		return nil
+	}
 	workspaces := make([]ProductionWorkspace, 0, len(service.workspacesByID))
 	for _, workspace := range service.workspacesByID {
 		workspaces = append(workspaces, workspace)

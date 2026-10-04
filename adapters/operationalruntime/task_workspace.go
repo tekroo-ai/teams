@@ -19,6 +19,7 @@ import (
 )
 
 const taskWorkspaceReceiptSchema = "tekroo.teams.task-workspace-receipt/1.0.0"
+const nativeTaskWorkspaceReceiptSchema = "tekroo.teams.task-workspace-receipt/1.1.0"
 
 var (
 	errInvalidTaskWorkspace       = errors.New("invalid task workspace")
@@ -59,20 +60,25 @@ type taskWorkspaceReceipt struct {
 }
 
 type taskWorkspaceManager struct {
-	root      string
-	gitBinary string
-	timeout   time.Duration
-	resolver  *openhands.BoundWorkspaceResolver
+	root               string
+	gitBinary          string
+	timeout            time.Duration
+	resolver           *openhands.BoundWorkspaceResolver
+	requireRuntimeHook bool
 }
 
 func newTaskWorkspaceManagerWithContext(ctx context.Context, evidenceRoot, gitBinary string, timeout time.Duration, resolver *openhands.BoundWorkspaceResolver) (*taskWorkspaceManager, error) {
+	return newTaskWorkspaceManagerWithMode(ctx, evidenceRoot, gitBinary, timeout, resolver, true)
+}
+
+func newTaskWorkspaceManagerWithMode(ctx context.Context, evidenceRoot, gitBinary string, timeout time.Duration, resolver *openhands.BoundWorkspaceResolver, requireRuntimeHook bool) (*taskWorkspaceManager, error) {
 	if ctx == nil || evidenceRoot == "" || !filepath.IsAbs(evidenceRoot) || gitBinary == "" || timeout <= 0 || resolver == nil {
 		return nil, errInvalidTaskWorkspace
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, errors.Join(errInvalidTaskWorkspace, err)
 	}
-	manager := &taskWorkspaceManager{root: filepath.Join(filepath.Clean(evidenceRoot), "task-workspaces"), gitBinary: gitBinary, timeout: timeout, resolver: resolver}
+	manager := &taskWorkspaceManager{root: filepath.Join(filepath.Clean(evidenceRoot), "task-workspaces"), gitBinary: gitBinary, timeout: timeout, resolver: resolver, requireRuntimeHook: requireRuntimeHook}
 	if err := os.MkdirAll(manager.receiptRoot(), 0o700); err != nil {
 		return nil, err
 	}
@@ -185,16 +191,22 @@ func (manager *taskWorkspaceManager) prepareObserved(ctx context.Context, kind t
 			return ProductionWorkspace{}, taskWorkspaceReceipt{}, err
 		}
 	}
-	hook, err := os.ReadFile(filepath.Join(root.WorkingDirectory, ".openhands", "hooks", "sma_context_hook.py"))
-	if err != nil || len(hook) == 0 {
+	var hookDigest kernel.Digest
+	if manager.requireRuntimeHook {
+		hook, err := os.ReadFile(filepath.Join(root.WorkingDirectory, ".openhands", "hooks", "sma_context_hook.py"))
+		if err != nil || len(hook) == 0 {
+			return ProductionWorkspace{}, taskWorkspaceReceipt{}, errors.Join(errInvalidTaskWorkspace, err)
+		}
+		hookPath := filepath.Join(temporary, ".openhands", "hooks", "sma_context_hook.py")
+		if err := os.MkdirAll(filepath.Dir(hookPath), 0o700); err != nil {
+			return ProductionWorkspace{}, taskWorkspaceReceipt{}, err
+		}
+		if err := os.WriteFile(hookPath, hook, 0o700); err != nil {
+			return ProductionWorkspace{}, taskWorkspaceReceipt{}, err
+		}
+		hookDigest = digestBytes(hook)
+	} else if _, err := os.Lstat(filepath.Join(root.WorkingDirectory, ".openhands", "hooks", "sma_context_hook.py")); !errors.Is(err, os.ErrNotExist) {
 		return ProductionWorkspace{}, taskWorkspaceReceipt{}, errors.Join(errInvalidTaskWorkspace, err)
-	}
-	hookPath := filepath.Join(temporary, ".openhands", "hooks", "sma_context_hook.py")
-	if err := os.MkdirAll(filepath.Dir(hookPath), 0o700); err != nil {
-		return ProductionWorkspace{}, taskWorkspaceReceipt{}, err
-	}
-	if err := os.WriteFile(hookPath, hook, 0o700); err != nil {
-		return ProductionWorkspace{}, taskWorkspaceReceipt{}, err
 	}
 	preparedCommit, err := manager.gitText(ctx, temporary, "rev-parse", "HEAD")
 	if err != nil {
@@ -204,11 +216,15 @@ func (manager *taskWorkspaceManager) prepareObserved(ctx context.Context, kind t
 	if err != nil {
 		return ProductionWorkspace{}, taskWorkspaceReceipt{}, err
 	}
+	schemaVersion := taskWorkspaceReceiptSchema
+	if !manager.requireRuntimeHook {
+		schemaVersion = nativeTaskWorkspaceReceiptSchema
+	}
 	receipt := taskWorkspaceReceipt{
-		SchemaVersion: taskWorkspaceReceiptSchema, Kind: kind, FeatureID: feature.ID, WorkID: workID,
+		SchemaVersion: schemaVersion, Kind: kind, FeatureID: feature.ID, WorkID: workID,
 		WorkspaceID: workspaceID, WorktreeID: worktreeID, WorkingDirectory: path, Branch: branch,
 		RootSource: filepath.Clean(root.WorkingDirectory), RootBaselineCommit: root.BaselineSHA,
-		PreparedCommit: preparedCommit, PreparedTree: preparedTree, RuntimeHookSHA256: digestBytes(hook),
+		PreparedCommit: preparedCommit, PreparedTree: preparedTree, RuntimeHookSHA256: hookDigest,
 		Components: observed,
 	}
 	receiptBytes, err := json.MarshalIndent(receipt, "", "  ")
@@ -370,11 +386,18 @@ func (receipt taskWorkspaceReceipt) productionWorkspace() ProductionWorkspace {
 }
 
 func (manager *taskWorkspaceManager) receiptMatches(receipt taskWorkspaceReceipt, kind taskWorkspaceKind, featureID, workID kernel.UUIDv7, workspaceID string, root ProductionWorkspace, components []taskWorkspaceComponent, branch, path string) bool {
-	return receipt.SchemaVersion == taskWorkspaceReceiptSchema && receipt.Kind == kind && receipt.FeatureID == featureID && receipt.WorkID == workID && receipt.WorkspaceID == workspaceID && receipt.WorktreeID == filepath.Base(path) && receipt.WorkingDirectory == path && receipt.Branch == branch && receipt.RootSource == filepath.Clean(root.WorkingDirectory) && receipt.RootBaselineCommit == root.BaselineSHA && receipt.PreparedCommit != "" && receipt.PreparedTree != "" && receipt.RuntimeHookSHA256.Valid() && slices.Equal(receipt.Components, components)
+	return manager.validRuntimeHookReceipt(receipt) && receipt.Kind == kind && receipt.FeatureID == featureID && receipt.WorkID == workID && receipt.WorkspaceID == workspaceID && receipt.WorktreeID == filepath.Base(path) && receipt.WorkingDirectory == path && receipt.Branch == branch && receipt.RootSource == filepath.Clean(root.WorkingDirectory) && receipt.RootBaselineCommit == root.BaselineSHA && receipt.PreparedCommit != "" && receipt.PreparedTree != "" && slices.Equal(receipt.Components, components)
+}
+
+func (manager *taskWorkspaceManager) validRuntimeHookReceipt(receipt taskWorkspaceReceipt) bool {
+	if manager.requireRuntimeHook {
+		return receipt.SchemaVersion == taskWorkspaceReceiptSchema && receipt.RuntimeHookSHA256.Valid()
+	}
+	return receipt.SchemaVersion == nativeTaskWorkspaceReceiptSchema && receipt.RuntimeHookSHA256 == ""
 }
 
 func (manager *taskWorkspaceManager) verify(ctx context.Context, receipt taskWorkspaceReceipt) error {
-	if receipt.SchemaVersion != taskWorkspaceReceiptSchema || receipt.Kind != taskWorkspaceEditable && receipt.Kind != taskWorkspaceAssembly || !receipt.FeatureID.Valid() || !receipt.WorkID.Valid() || receipt.WorkspaceID == "" || receipt.WorktreeID == "" || !filepath.IsAbs(receipt.WorkingDirectory) || filepath.Clean(receipt.WorkingDirectory) != filepath.Join(manager.workspaceRoot(), receipt.WorktreeID) || receipt.Branch == "" || !filepath.IsAbs(receipt.RootSource) || !validGitCommit(receipt.RootBaselineCommit) || !validGitCommit(receipt.PreparedCommit) || !validGitCommit(receipt.PreparedTree) || !receipt.RuntimeHookSHA256.Valid() {
+	if !manager.validRuntimeHookReceipt(receipt) || receipt.Kind != taskWorkspaceEditable && receipt.Kind != taskWorkspaceAssembly || !receipt.FeatureID.Valid() || !receipt.WorkID.Valid() || receipt.WorkspaceID == "" || receipt.WorktreeID == "" || !filepath.IsAbs(receipt.WorkingDirectory) || filepath.Clean(receipt.WorkingDirectory) != filepath.Join(manager.workspaceRoot(), receipt.WorktreeID) || receipt.Branch == "" || !filepath.IsAbs(receipt.RootSource) || !validGitCommit(receipt.RootBaselineCommit) || !validGitCommit(receipt.PreparedCommit) || !validGitCommit(receipt.PreparedTree) {
 		return errInvalidTaskWorkspace
 	}
 	branch, err := manager.gitText(ctx, receipt.WorkingDirectory, "symbolic-ref", "--quiet", "--short", "HEAD")
@@ -396,8 +419,13 @@ func (manager *taskWorkspaceManager) verify(ctx context.Context, receipt taskWor
 	if err != nil || preparedTree != receipt.PreparedTree {
 		return errors.Join(errInvalidTaskWorkspace, err)
 	}
-	hook, err := os.ReadFile(filepath.Join(receipt.WorkingDirectory, ".openhands", "hooks", "sma_context_hook.py"))
-	if err != nil || digestBytes(hook) != receipt.RuntimeHookSHA256 {
+	hookPath := filepath.Join(receipt.WorkingDirectory, ".openhands", "hooks", "sma_context_hook.py")
+	if manager.requireRuntimeHook {
+		hook, err := os.ReadFile(hookPath)
+		if err != nil || digestBytes(hook) != receipt.RuntimeHookSHA256 {
+			return errors.Join(errInvalidTaskWorkspace, err)
+		}
+	} else if _, err := os.Lstat(hookPath); !errors.Is(err, os.ErrNotExist) {
 		return errors.Join(errInvalidTaskWorkspace, err)
 	}
 	if receipt.Kind == taskWorkspaceAssembly {

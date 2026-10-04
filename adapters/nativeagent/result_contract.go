@@ -62,7 +62,7 @@ func nativeOrganizationalResult(brief application.ExecutionBrief, contract Resul
 	if err != nil {
 		return agentruntime.ToolDefinition{}, nil, errors.Join(ErrInvalidBinding, err)
 	}
-	definition := agentruntime.ToolDefinition{Name: "submit_result", Description: "Submit the structured result required by the admitted workflow stage.", Parameters: append(json.RawMessage(nil), contract.Schema...)}
+	definition := agentruntime.ToolDefinition{Name: "submit_result", Description: "Submit the structured result required by the admitted workflow stage.", Parameters: append(json.RawMessage(nil), contract.Schema...), Strict: true}
 	return definition, func(arguments json.RawMessage) (string, error) {
 		instance, err := jsonschema.UnmarshalJSON(bytes.NewReader(arguments))
 		if err != nil {

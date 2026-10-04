@@ -1623,15 +1623,24 @@ func (service *ProductionService) validateFeatureStageOutputWithEvidence(ctx con
 	}
 	_, architectureOutput, err := service.featureArchitectureCandidate(ctx, feature)
 	if err != nil || feature.Design == nil || digestBytes(architectureOutput) != feature.Design.OutputDigest {
-		return organization.ErrInvalidFeature
+		return fmt.Errorf("%w: accepted architecture evidence is unavailable or has changed: %v", organization.ErrInvalidFeature, err)
 	}
 	proposed, err := parseArchitectureStageResult(architectureOutput, featureInputOperationalMarkers(feature), featureAuthorizedActorFQNs(feature)...)
 	if err != nil {
 		return err
 	}
 	finalized, err := parsePlanFinalizationStageResult(output, featureInputOperationalMarkers(feature), featureAuthorizedActorFQNs(feature)...)
-	if err != nil || finalized.SourceDesignDigest != feature.Design.OutputDigest || !reflect.DeepEqual(finalized.Architecture, proposed.Architecture) || !reflect.DeepEqual(finalized.DesignDecisions, proposed.DesignDecisions) || !reflect.DeepEqual(finalized.Assumptions, proposed.Assumptions) || len(finalized.Tasks) != len(proposed.Tasks) {
-		return organization.ErrInvalidFeature
+	if err != nil {
+		return fmt.Errorf("%w: finalized plan could not be parsed: %v", organization.ErrInvalidFeature, err)
+	}
+	if finalized.SourceDesignDigest != feature.Design.OutputDigest {
+		return fmt.Errorf("%w: finalized plan does not reference the accepted architecture", organization.ErrInvalidFeature)
+	}
+	if !reflect.DeepEqual(finalized.Architecture, proposed.Architecture) || !reflect.DeepEqual(finalized.DesignDecisions, proposed.DesignDecisions) || !reflect.DeepEqual(finalized.Assumptions, proposed.Assumptions) {
+		return fmt.Errorf("%w: finalized plan changed accepted architecture, decisions, or assumptions", organization.ErrInvalidFeature)
+	}
+	if len(finalized.Tasks) != len(proposed.Tasks) {
+		return fmt.Errorf("%w: finalized plan changed accepted task count from %d to %d", organization.ErrInvalidFeature, len(proposed.Tasks), len(finalized.Tasks))
 	}
 	for index := range proposed.Tasks {
 		finalTask, sourceTask := finalized.Tasks[index], proposed.Tasks[index]
@@ -1647,7 +1656,7 @@ func (service *ProductionService) validateFeatureStageOutputWithEvidence(ctx con
 		finalTask.DependsOn = sourceTask.DependsOn
 		finalTask.CriticalPath = sourceTask.CriticalPath
 		if !reflect.DeepEqual(finalTask, sourceTask) {
-			return organization.ErrInvalidFeature
+			return fmt.Errorf("%w: finalized task %d changed the accepted design beyond adding dependencies", organization.ErrInvalidFeature, index)
 		}
 	}
 	return validateFinalizedHandoffs(finalized.Tasks, finalized.Handoffs)
@@ -1702,14 +1711,23 @@ func (service *ProductionService) validateFeatureStageOutput(feature organizatio
 		return err
 	case stagePlanFinalization:
 		result, err := parsePlanFinalizationStageResult(output, allowedMarkers, allowedActorFQNs...)
-		if err != nil || feature.Design == nil || result.SourceDesignDigest != feature.Design.OutputDigest {
-			return organization.ErrInvalidFeature
+		if err != nil {
+			return fmt.Errorf("%w: final plan result could not be parsed: %v", organization.ErrInvalidFeature, err)
+		}
+		if feature.Design == nil {
+			return fmt.Errorf("%w: final plan has no accepted design", organization.ErrInvalidFeature)
+		}
+		if result.SourceDesignDigest != feature.Design.OutputDigest {
+			return fmt.Errorf("%w: final plan source_design_digest %s does not match accepted design %s", organization.ErrInvalidFeature, result.SourceDesignDigest, feature.Design.OutputDigest)
 		}
 		_, err = normalizeArchitecturePlanTasks(feature, result.Tasks, structuralTaskRoutingPolicy())
 		if err != nil {
-			return err
+			return fmt.Errorf("%w: final plan task graph: %v", organization.ErrInvalidFeature, err)
 		}
-		return validateFinalizedHandoffs(result.Tasks, result.Handoffs)
+		if err := validateFinalizedHandoffs(result.Tasks, result.Handoffs); err != nil {
+			return fmt.Errorf("%w: final plan handoffs: %v", organization.ErrInvalidFeature, err)
+		}
+		return nil
 	case stageArchitectureTaskReview:
 		_, err := parseArchitectureTaskReviewStageResult(output)
 		return err
@@ -1876,8 +1894,11 @@ func (service *ProductionService) buildExecutableFeaturePlan(ctx context.Context
 }
 
 func normalizeArchitecturePlanTasks(feature organization.FeatureRequest, tasks []architectureTaskResult, routing workflowTaskRoutingPolicy) ([]architectureTaskResult, error) {
-	if feature.Specification == nil || requiredMaterializedTaskCount(tasks) > int(feature.Input.MaximumTasks) {
+	if feature.Specification == nil {
 		return nil, organization.ErrInvalidFeature
+	}
+	if materialized := requiredMaterializedTaskCount(tasks); materialized > int(feature.Input.MaximumTasks) {
+		return nil, fmt.Errorf("%w: authored task plan materializes %d tasks, maximum %d; Teams adds required validation and acceptance, so reduce authored implementation tasks", organization.ErrInvalidFeature, materialized, feature.Input.MaximumTasks)
 	}
 	normalizedTasks, err := normalizeArchitectureTaskCriteria(*feature.Specification, tasks)
 	if err != nil {
@@ -1936,10 +1957,10 @@ func normalizeArchitectureTaskCriteria(specification organization.FeatureSpecifi
 		result[index].AcceptanceCriteria = append([]string(nil), task.AcceptanceCriteria...)
 		result[index].Covers = nil
 		if int(task.StoryIndex) >= len(specification.Stories) {
-			return nil, organization.ErrInvalidFeature
+			return nil, fmt.Errorf("%w: task %d story_index %d is outside %d specified stories", organization.ErrInvalidFeature, index, task.StoryIndex, len(specification.Stories))
 		}
 		if !validStageStrings(result[index].AcceptanceCriteria, true) {
-			return nil, organization.ErrInvalidFeature
+			return nil, fmt.Errorf("%w: task %d acceptance_criteria must be nonempty unique strings", organization.ErrInvalidFeature, index)
 		}
 	}
 	return result, nil
@@ -2064,8 +2085,11 @@ func normalizeArchitectureTaskRelations(tasks []architectureTaskResult, policy w
 		result[index].DependsOn = append([]uint32(nil), result[index].DependsOn...)
 		result[index].Validates = append([]uint32(nil), result[index].Validates...)
 		route, found := routes[result[index].Purpose]
-		if !found || result[index].Complexity > route.MaximumTaskComplexity || !route.MayAuthorValidationLinks && len(result[index].Validates) != 0 {
-			return nil, organization.ErrInvalidFeature
+		if !found || result[index].Complexity > route.MaximumTaskComplexity {
+			return nil, fmt.Errorf("%w: task %d purpose %s or complexity %d is not admitted by routing policy", organization.ErrInvalidFeature, index, result[index].Purpose, result[index].Complexity)
+		}
+		if !route.MayAuthorValidationLinks && len(result[index].Validates) != 0 {
+			return nil, fmt.Errorf("%w: task %d authored validates=%v but this workflow reserves validation for Teams; remove the authored validation link and verification-only task", organization.ErrInvalidFeature, index, result[index].Validates)
 		}
 		if result[index].Complexity > maximumComplexity[result[index].Purpose] {
 			maximumComplexity[result[index].Purpose] = result[index].Complexity

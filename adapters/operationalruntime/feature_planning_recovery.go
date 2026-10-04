@@ -595,7 +595,7 @@ func containsEveryUUID(values, required []kernel.UUIDv7) bool {
 }
 
 func (service *ProductionService) planningFeatureForTask(ctx context.Context, taskID kernel.UUIDv7) (organization.FeatureRequest, featurePlanningStage, *uint32, uint32, bool, error) {
-	statuses := []organization.FeatureStatus{organization.FeatureSubmitted, organization.FeatureReadyForPlanning, organization.FeatureSpecified}
+	statuses := []organization.FeatureStatus{organization.FeatureSubmitted, organization.FeatureReadyForPlanning, organization.FeatureSpecified, organization.FeatureDesigned}
 	features, err := service.Store.ListFeatures(ctx, statuses, 1000)
 	if err != nil {
 		return organization.FeatureRequest{}, "", nil, 0, false, err

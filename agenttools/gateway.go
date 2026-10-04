@@ -117,7 +117,7 @@ func (source ExecutionBindingSource) BindToolInvocation(ctx context.Context, id 
 	}
 	permissions := append([]string(nil), grounding.Permissions...)
 	if workspace.ReadOnly {
-		permissions = readOnlyPermissions(grounding.Permissions)
+		permissions = readOnlyPermissionsForPurpose(grounding.Permissions, invocation.Purpose)
 	}
 	return Authority{WorkspaceRoot: workspace.Root, Permissions: permissions, Purpose: invocation.Purpose, EffectPolicyDigest: invocation.EffectPolicyDigest}, nil
 }
@@ -127,6 +127,16 @@ func readOnlyPermissions(permissions []string) []string {
 		return []string{"repository.read"}
 	}
 	return nil
+}
+
+func readOnlyPermissionsForPurpose(permissions []string, purpose kernel.WorkPurpose) []string {
+	result := readOnlyPermissions(permissions)
+	// Validation runs committed code in a disposable sandbox. It does not
+	// write to the read-only candidate workspace, so keep this one capability.
+	if purpose == kernel.PurposeValidation && permitted(permissions, "test.execute") {
+		result = append(result, "test.execute")
+	}
+	return result
 }
 
 // Request has no caller-supplied workspace, actor, or permission fields.

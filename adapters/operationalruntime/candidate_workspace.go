@@ -24,6 +24,7 @@ import (
 
 const (
 	candidateReceiptSchema        = "tekroo.teams.candidate-receipt/1.1.0"
+	nativeCandidateReceiptSchema  = "tekroo.teams.candidate-receipt/1.2.0"
 	legacyCandidateReceiptSchema  = "tekroo.teams.candidate-receipt/1.0.0"
 	candidateRehydrateParallelism = 4
 )
@@ -75,11 +76,12 @@ type candidateReceipt struct {
 }
 
 type candidateWorkspaceManager struct {
-	root      string
-	gitBinary string
-	timeout   time.Duration
-	gates     map[string]ProductionCandidateGate
-	resolver  *openhands.BoundWorkspaceResolver
+	root               string
+	gitBinary          string
+	timeout            time.Duration
+	gates              map[string]ProductionCandidateGate
+	resolver           *openhands.BoundWorkspaceResolver
+	requireRuntimeHook bool
 }
 
 func newCandidateWorkspaceManager(evidenceRoot, gitBinary string, timeout time.Duration, gates []ProductionCandidateGate, resolver *openhands.BoundWorkspaceResolver) (*candidateWorkspaceManager, error) {
@@ -87,6 +89,10 @@ func newCandidateWorkspaceManager(evidenceRoot, gitBinary string, timeout time.D
 }
 
 func newCandidateWorkspaceManagerWithContext(ctx context.Context, evidenceRoot, gitBinary string, timeout time.Duration, gates []ProductionCandidateGate, resolver *openhands.BoundWorkspaceResolver) (*candidateWorkspaceManager, error) {
+	return newCandidateWorkspaceManagerWithMode(ctx, evidenceRoot, gitBinary, timeout, gates, resolver, true)
+}
+
+func newCandidateWorkspaceManagerWithMode(ctx context.Context, evidenceRoot, gitBinary string, timeout time.Duration, gates []ProductionCandidateGate, resolver *openhands.BoundWorkspaceResolver, requireRuntimeHook bool) (*candidateWorkspaceManager, error) {
 	if ctx == nil {
 		return nil, errInvalidCandidateWorkspace
 	}
@@ -99,7 +105,7 @@ func newCandidateWorkspaceManagerWithContext(ctx context.Context, evidenceRoot, 
 	manager := &candidateWorkspaceManager{
 		root:      filepath.Join(filepath.Clean(evidenceRoot), "candidate-workspaces"),
 		gitBinary: gitBinary, timeout: timeout,
-		gates: make(map[string]ProductionCandidateGate, len(gates)), resolver: resolver,
+		gates: make(map[string]ProductionCandidateGate, len(gates)), resolver: resolver, requireRuntimeHook: requireRuntimeHook,
 	}
 	for _, gate := range gates {
 		invalidArgument := false
@@ -193,8 +199,12 @@ func (manager *candidateWorkspaceManager) Prepare(ctx context.Context, feature o
 	if err != nil || !rechecked.equal(state) {
 		return ProductionWorkspace{}, candidateReceipt{}, "", errors.Join(errInvalidCandidateWorkspace, err)
 	}
+	schemaVersion := candidateReceiptSchema
+	if !manager.requireRuntimeHook {
+		schemaVersion = nativeCandidateReceiptSchema
+	}
 	receipt := candidateReceipt{
-		SchemaVersion: candidateReceiptSchema, CandidateID: candidateID, FeatureID: feature.ID, ConsumerTaskID: consumer.ID, ConsumerWorkspaceID: consumerWorkspaceID,
+		SchemaVersion: schemaVersion, CandidateID: candidateID, FeatureID: feature.ID, ConsumerTaskID: consumer.ID, ConsumerWorkspaceID: consumerWorkspaceID,
 		SourceWorkspaceID: source.WorkspaceID, SourceWorktreeID: source.WorktreeID, SourceWorkingDirectory: filepath.Clean(source.WorkingDirectory), SourceBranch: source.Branch,
 		RepositoryDigest: state.repositoryDigest, BaselineCommit: source.BaselineSHA, CandidateCommit: state.commit, CandidateTree: state.tree,
 		ChangedFileInventory: state.changedFiles, ChangedFileInventoryDigest: state.changedFilesDigest, DiffSHA256: state.diffDigest, RuntimeHookSHA256: state.runtimeHookDigest,
@@ -474,14 +484,21 @@ func (manager *candidateWorkspaceManager) inspectSource(ctx context.Context, sou
 	if err != nil || len(diff) == 0 {
 		return inspectedCandidateSource{}, fmt.Errorf("%w: candidate diff is empty or unavailable: %v", errInvalidCandidateWorkspace, err)
 	}
-	runtimeHook, err := os.ReadFile(filepath.Join(source.WorkingDirectory, ".openhands", "hooks", "sma_context_hook.py"))
-	if err != nil || len(runtimeHook) == 0 {
-		return inspectedCandidateSource{}, fmt.Errorf("%w: required OpenHands runtime hook is unavailable: %v", errInvalidCandidateWorkspace, err)
+	var runtimeHookDigest kernel.Digest
+	hookPath := filepath.Join(source.WorkingDirectory, ".openhands", "hooks", "sma_context_hook.py")
+	if manager.requireRuntimeHook {
+		runtimeHook, err := os.ReadFile(hookPath)
+		if err != nil || len(runtimeHook) == 0 {
+			return inspectedCandidateSource{}, fmt.Errorf("%w: required OpenHands runtime hook is unavailable: %v", errInvalidCandidateWorkspace, err)
+		}
+		runtimeHookDigest = digestBytes(runtimeHook)
+	} else if _, err := os.Lstat(hookPath); !errors.Is(err, os.ErrNotExist) {
+		return inspectedCandidateSource{}, errors.Join(errInvalidCandidateWorkspace, err)
 	}
 	changedFiles := strings.Split(strings.TrimSuffix(string(changed), "\x00"), "\x00")
 	return inspectedCandidateSource{
 		repositoryDigest: digestBytes([]byte(commonPath)), commit: commitText, tree: strings.TrimSpace(string(tree)), changedFiles: changedFiles,
-		changedFilesDigest: digestBytes(changed), diffDigest: digestBytes(diff), runtimeHookDigest: digestBytes(runtimeHook),
+		changedFilesDigest: digestBytes(changed), diffDigest: digestBytes(diff), runtimeHookDigest: runtimeHookDigest,
 	}, nil
 }
 
@@ -588,16 +605,18 @@ func (manager *candidateWorkspaceManager) materialize(ctx context.Context, sourc
 	if _, err := manager.git(ctx, temporary, "checkout", "-b", branch, receipt.CandidateCommit); err != nil {
 		return err
 	}
-	hook, err := os.ReadFile(filepath.Join(source, ".openhands", "hooks", "sma_context_hook.py"))
-	if err != nil || digestBytes(hook) != receipt.RuntimeHookSHA256 {
-		return errors.Join(errInvalidCandidateWorkspace, err)
-	}
-	hookPath := filepath.Join(temporary, ".openhands", "hooks", "sma_context_hook.py")
-	if err := os.MkdirAll(filepath.Dir(hookPath), 0o700); err != nil {
-		return err
-	}
-	if err := os.WriteFile(hookPath, hook, 0o700); err != nil {
-		return err
+	if manager.requireRuntimeHook {
+		hook, err := os.ReadFile(filepath.Join(source, ".openhands", "hooks", "sma_context_hook.py"))
+		if err != nil || digestBytes(hook) != receipt.RuntimeHookSHA256 {
+			return errors.Join(errInvalidCandidateWorkspace, err)
+		}
+		hookPath := filepath.Join(temporary, ".openhands", "hooks", "sma_context_hook.py")
+		if err := os.MkdirAll(filepath.Dir(hookPath), 0o700); err != nil {
+			return err
+		}
+		if err := os.WriteFile(hookPath, hook, 0o700); err != nil {
+			return err
+		}
 	}
 	if err := os.Rename(temporary, workspacePath); err != nil {
 		return err
@@ -668,6 +687,8 @@ func (manager *candidateWorkspaceManager) verifyMaterializedWithFingerprint(ctx 
 		if readErr != nil || digestBytes(hook) != receipt.RuntimeHookSHA256 {
 			return errors.Join(errInvalidCandidateWorkspace, readErr)
 		}
+	} else if _, readErr := os.Lstat(filepath.Join(receipt.MaterializedWorkspace, ".openhands", "hooks", "sma_context_hook.py")); !errors.Is(readErr, os.ErrNotExist) {
+		return errors.Join(errInvalidCandidateWorkspace, readErr)
 	}
 	if _, err := manager.git(ctx, receipt.MaterializedWorkspace, "merge-base", "--is-ancestor", receipt.BaselineCommit, receipt.CandidateCommit); err != nil || receipt.BaselineCommit == receipt.CandidateCommit {
 		return errors.Join(errInvalidCandidateWorkspace, err)
@@ -804,7 +825,8 @@ func (manager *candidateWorkspaceManager) rehydrate(ctx context.Context) error {
 func (manager *candidateWorkspaceManager) validReceipt(receipt candidateReceipt) bool {
 	legacy := receipt.SchemaVersion == legacyCandidateReceiptSchema && receipt.RuntimeHookSHA256 == ""
 	current := receipt.SchemaVersion == candidateReceiptSchema && receipt.RuntimeHookSHA256.Valid()
-	if !legacy && !current || !receipt.CandidateID.Valid() || !receipt.FeatureID.Valid() || !receipt.ConsumerTaskID.Valid() || receipt.ConsumerWorkspaceID == "" || receipt.SourceWorkspaceID == "" || receipt.SourceWorktreeID == "" || !filepath.IsAbs(receipt.SourceWorkingDirectory) || receipt.SourceBranch == "" || !receipt.RepositoryDigest.Valid() || !validGitCommit(receipt.BaselineCommit) || !validGitCommit(receipt.CandidateCommit) || !validGitCommit(receipt.CandidateTree) || !receipt.ChangedFileInventoryDigest.Valid() || !receipt.DiffSHA256.Valid() || len(receipt.ChangedFileInventory) == 0 || len(receipt.Targets) == 0 || len(receipt.GateReceipts) == 0 {
+	native := receipt.SchemaVersion == nativeCandidateReceiptSchema && receipt.RuntimeHookSHA256 == ""
+	if manager.requireRuntimeHook && !legacy && !current || !manager.requireRuntimeHook && !native || !receipt.CandidateID.Valid() || !receipt.FeatureID.Valid() || !receipt.ConsumerTaskID.Valid() || receipt.ConsumerWorkspaceID == "" || receipt.SourceWorkspaceID == "" || receipt.SourceWorktreeID == "" || !filepath.IsAbs(receipt.SourceWorkingDirectory) || receipt.SourceBranch == "" || !receipt.RepositoryDigest.Valid() || !validGitCommit(receipt.BaselineCommit) || !validGitCommit(receipt.CandidateCommit) || !validGitCommit(receipt.CandidateTree) || !receipt.ChangedFileInventoryDigest.Valid() || !receipt.DiffSHA256.Valid() || len(receipt.ChangedFileInventory) == 0 || len(receipt.Targets) == 0 || len(receipt.GateReceipts) == 0 {
 		return false
 	}
 	if filepath.Clean(receipt.MaterializedWorkspace) != filepath.Join(manager.workspaceRoot(), candidateViewID(receipt.CandidateID, receipt.ConsumerTaskID)) || receipt.MaterializedReference != "refs/heads/candidate/"+string(receipt.CandidateID) {

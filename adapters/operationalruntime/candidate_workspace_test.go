@@ -408,6 +408,55 @@ func candidateRepository(t *testing.T) (string, string, string) {
 	return repository, baseline, candidateGit(t, repository, "rev-parse", "HEAD")
 }
 
+func TestNativeCandidateSourceHasNoOpenHandsHook(t *testing.T) {
+	repository, baseline, commit := candidateRepository(t)
+	if err := os.Remove(filepath.Join(repository, ".openhands", "hooks", "sma_context_hook.py")); err != nil {
+		t.Fatal(err)
+	}
+	manager := &candidateWorkspaceManager{gitBinary: "git", timeout: time.Minute, requireRuntimeHook: false}
+	source := ProductionWorkspace{WorkspaceID: "coder-1", WorktreeID: "coder-1", WorkingDirectory: repository, Branch: "source", BaselineSHA: baseline, WritablePaths: []string{"."}}
+	observed, err := manager.inspectSource(context.Background(), source)
+	if err != nil || observed.commit != commit || observed.runtimeHookDigest != "" {
+		t.Fatalf("native source=%+v err=%v", observed, err)
+	}
+}
+
+func TestNativeCandidateMaterializesWithoutOpenHandsHook(t *testing.T) {
+	repository, baseline, candidate := candidateRepository(t)
+	if err := os.Remove(filepath.Join(repository, ".openhands", "hooks", "sma_context_hook.py")); err != nil {
+		t.Fatal(err)
+	}
+	resolver, err := openhands.NewBoundWorkspaceResolver([]openhands.WorkspaceBinding{{WorkspaceID: "tester-1", WorktreeID: "tester-default", WorkingDirectory: t.TempDir()}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	gates := []ProductionCandidateGate{{GateID: "candidate-head", Command: []string{"git", "rev-parse", "HEAD"}, Timeout: "10s"}}
+	evidenceRoot := t.TempDir()
+	t.Cleanup(func() { makeWritableForCleanup(t, evidenceRoot) })
+	manager, err := newCandidateWorkspaceManagerWithMode(context.Background(), evidenceRoot, "git", time.Minute, gates, resolver, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	feature := organization.FeatureRequest{ID: candidateTestUUID(1911)}
+	consumer := organization.PlannedTask{ID: candidateTestUUID(1912), Owner: "teams::tester-1"}
+	targets := []candidateTargetReceipt{{TaskID: candidateTestUUID(1913), InvocationID: candidateTestUUID(1914), OutputSHA256: candidateTestDigest('a'), TerminalEvidenceIDs: []kernel.UUIDv7{candidateTestUUID(1915)}}}
+	source := ProductionWorkspace{WorkspaceID: "coder-1", WorktreeID: "coder-source", WorkingDirectory: repository, Branch: "source", BaselineSHA: baseline, WritablePaths: []string{"."}}
+	workspace, receipt, _, err := manager.Prepare(context.Background(), feature, consumer, "tester-1", source, targets, []string{"candidate-head"})
+	if err != nil || receipt.SchemaVersion != nativeCandidateReceiptSchema || receipt.CandidateCommit != candidate || receipt.RuntimeHookSHA256 != "" {
+		t.Fatalf("native candidate workspace=%+v receipt=%+v err=%v", workspace, receipt, err)
+	}
+	if _, err := os.Lstat(filepath.Join(workspace.WorkingDirectory, ".openhands", "hooks", "sma_context_hook.py")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("OpenHands hook leaked into native candidate: %v", err)
+	}
+	restartedResolver, err := openhands.NewBoundWorkspaceResolver([]openhands.WorkspaceBinding{{WorkspaceID: "tester-1", WorktreeID: "tester-default", WorkingDirectory: t.TempDir()}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := newCandidateWorkspaceManagerWithMode(context.Background(), evidenceRoot, "git", time.Minute, gates, restartedResolver, false); err != nil {
+		t.Fatalf("native candidate rehydrate: %v", err)
+	}
+}
+
 func candidateGit(t *testing.T, directory string, arguments ...string) string {
 	t.Helper()
 	command := exec.Command("git", arguments...)

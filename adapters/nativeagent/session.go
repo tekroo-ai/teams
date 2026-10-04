@@ -21,6 +21,7 @@ import (
 )
 
 var ErrInvalidBinding = errors.New("native agent invocation binding changed or is invalid")
+var ErrRequiredTestToolUnavailable = errors.New("native agent task requires go-test but the signed role lacks test.execute permission")
 
 // Profile is the native runner's model configuration. The digest/role fields
 // must match the admitted execution brief; no model-supplied identity is used.
@@ -47,8 +48,27 @@ type Config struct {
 	Effects         agenttools.EffectLedger
 	SemanticContext agentruntime.SemanticContextProvider
 	ResultContract  *ResultContract
-	HTTP            *http.Client
-	Profile         Profile
+	// Candidate is resolved by Teams from the immutable workspace binding, not
+	// supplied by the model. It binds a validation result to the exact receipt.
+	Candidate *CandidateBinding
+	// PlanFinalization carries the accepted architect output so the model only
+	// authors dependencies and handoffs, not copies of immutable design fields.
+	PlanFinalization *PlanFinalizationBinding
+	// ValidateFinalResult applies workflow-level semantics before the native
+	// runner commits a final result, while the same model turn can still repair it.
+	ValidateFinalResult func(context.Context, []byte) error
+	HTTP                *http.Client
+	Profile             Profile
+}
+
+type CandidateBinding struct {
+	ID            kernel.UUIDv7
+	ReceiptSHA256 kernel.Digest
+}
+
+type PlanFinalizationBinding struct {
+	SourceOutput []byte
+	SourceDigest kernel.Digest
 }
 
 type Session struct {
@@ -103,6 +123,24 @@ func prepare(ctx context.Context, brief application.ExecutionBrief, requestDiges
 	if config.ResultContract != nil && (brief.MessageHandler != nil || brief.ResultProtocol == nil || brief.ResultProtocol.Marker != application.OrganizationalResultMarker) {
 		return Session{}, ErrInvalidBinding
 	}
+	if candidate := config.Candidate; candidate != nil {
+		if !candidate.ID.Valid() || !candidate.ReceiptSHA256.Valid() ||
+			!strings.HasPrefix(brief.Scope.WorktreeID, "candidate-"+string(candidate.ID)+"-") ||
+			!slices.ContainsFunc(brief.Evidence, func(item kernel.EvidenceRef) bool { return item.SHA256 == candidate.ReceiptSHA256 }) ||
+			(brief.Purpose != kernel.PurposeValidation && brief.Purpose != kernel.PurposeReview && brief.Purpose != kernel.PurposePromotion) {
+			return Session{}, ErrInvalidBinding
+		}
+	}
+	if plan := config.PlanFinalization; plan != nil {
+		sourceHash := sha256.Sum256(plan.SourceOutput)
+		if brief.Purpose != kernel.PurposeHandoff || brief.MessageHandler == nil || !plan.SourceDigest.Valid() ||
+			kernel.Digest(hex.EncodeToString(sourceHash[:])) != plan.SourceDigest {
+			return Session{}, ErrInvalidBinding
+		}
+		if _, _, err := acceptedPlanWorkProduct(plan); err != nil {
+			return Session{}, errors.Join(ErrInvalidBinding, err)
+		}
+	}
 	for index, name := range profile.AllowedReadTools {
 		if name == "" || index > 0 && name == profile.AllowedReadTools[index-1] {
 			return Session{}, ErrInvalidBinding
@@ -119,6 +157,9 @@ func prepare(ctx context.Context, brief application.ExecutionBrief, requestDiges
 	}
 	if allowEffects && (initial.Purpose != brief.Purpose || initial.EffectPolicyDigest != brief.EffectPolicyDigest) {
 		return Session{}, ErrInvalidBinding
+	}
+	if brief.Purpose == kernel.PurposeImplementation && slices.Contains(brief.WorkProfile.RequiredDeterministicGateIDs, "go-test") && !slices.Contains(initial.Permissions, "test.execute") {
+		return Session{}, errors.Join(ErrInvalidBinding, ErrRequiredTestToolUnavailable)
 	}
 	stable := stableBinding{source: config.Bindings, initial: initial}
 	// Both model turns and tool calls pass through the same stability check.
@@ -189,11 +230,37 @@ func prepare(ctx context.Context, brief application.ExecutionBrief, requestDiges
 			return Session{}, ErrInvalidBinding
 		}
 		finalTool = "submit_result"
+		modelSchema, err := modelFacingHandlerSchema(*handler, brief.Purpose)
+		if err != nil {
+			return Session{}, ErrInvalidBinding
+		}
+		if config.PlanFinalization != nil {
+			modelSchema, err = modelFacingPlanSchema(modelSchema)
+			if err != nil {
+				return Session{}, errors.Join(ErrInvalidBinding, err)
+			}
+		}
 		definitions = append(definitions, agentruntime.ToolDefinition{
 			Name: finalTool, Description: "Submit the structured result for this admitted Teams message handler.",
-			Parameters: append(json.RawMessage(nil), handler.ResultSchema...),
+			Parameters: modelSchema,
+			Strict:     true,
 		})
 		finalize = func(arguments json.RawMessage) (string, error) {
+			arguments = canonicalizeEmptyProposals(arguments, *handler)
+			if config.PlanFinalization != nil {
+				var err error
+				arguments, err = bindHandlerPlanResult(arguments, config.PlanFinalization)
+				if err != nil {
+					return "", err
+				}
+			}
+			if validationPurpose(brief.Purpose) {
+				var err error
+				arguments, err = bindHandlerValidationResult(arguments, config.Candidate)
+				if err != nil {
+					return "", err
+				}
+			}
 			output := application.OrganizationalResultMarker + "\n" + string(arguments)
 			if _, err := application.ValidateRoleHandlerResult(*handler, []byte(output)); err != nil {
 				return "", err
@@ -235,6 +302,10 @@ func prepare(ctx context.Context, brief application.ExecutionBrief, requestDiges
 		APIKey: profile.APIKey, MaxTokens: profile.MaxOutputTokens,
 		Tools: definitions,
 	}
+	if finalTool != "" {
+		model.FinalTool = finalTool
+		model.FinalSchema = append(json.RawMessage(nil), definitions[len(definitions)-1].Parameters...)
+	}
 	return Session{
 		Runner: agentruntime.Runner{
 			Journal:         config.Journal,
@@ -247,10 +318,12 @@ func prepare(ctx context.Context, brief application.ExecutionBrief, requestDiges
 				inner:   agenttools.ReadOnlyTurnAdapter{Gateway: config.Gateway, InvocationID: brief.InvocationID, RequestDigest: requestDigest},
 				allowed: allowed,
 			},
-			SystemPrompt: brief.RoleGrounding.Instructions,
-			FinalTool:    finalTool,
-			Finalize:     finalize,
-			MaxTurns:     profile.MaxTurns,
+			SystemPrompt:        brief.RoleGrounding.Instructions,
+			FinalTool:           finalTool,
+			Finalize:            finalize,
+			ValidateFinalResult: config.ValidateFinalResult,
+			MaxFinalSubmissions: 3,
+			MaxTurns:            profile.MaxTurns,
 		},
 		InvocationID: string(brief.InvocationID), RequestDigest: string(requestDigest), Prompt: prompt,
 	}, nil

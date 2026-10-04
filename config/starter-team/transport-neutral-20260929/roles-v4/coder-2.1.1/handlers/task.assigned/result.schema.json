@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "outcome",
+    "summary",
+    "evidence",
+    "message_proposals",
+    "work_product"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "outcome": {
+      "enum": [
+        "blocked",
+        "completed",
+        "failed",
+        "needs_decision"
+      ]
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "message_proposals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "type",
+          "recipient",
+          "body"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "pattern": "^tekroo\\.message\\."
+          },
+          "recipient": {
+            "type": "string",
+            "minLength": 1
+          },
+          "body": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    "work_product": {
+      "type": "object"
+    }
+  }
+}

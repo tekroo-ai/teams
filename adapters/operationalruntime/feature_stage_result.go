@@ -3,6 +3,7 @@ package operationalruntime
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"path"
 	"strconv"
 	"strings"
@@ -227,8 +228,8 @@ func decodeOrganizationalStageResult(output []byte, target any) error {
 	}
 	decoder := json.NewDecoder(bytes.NewReader(payload))
 	decoder.DisallowUnknownFields()
-	if decoder.Decode(target) != nil {
-		return errInvalidValidationResult
+	if err := decoder.Decode(target); err != nil {
+		return fmt.Errorf("%w: stage work_product decode: %v", errInvalidValidationResult, err)
 	}
 	trailing := bytes.TrimSpace(payload[decoder.InputOffset():])
 	// Some native tool-call serializers emit one redundant root-closing brace
@@ -435,8 +436,17 @@ func parseArchitectureStageResult(output []byte, allowedMarkers []string, allowe
 
 func parsePlanFinalizationStageResult(output []byte, allowedMarkers []string, allowedActorFQNs ...kernel.ActorFQN) (architectureStageResult, error) {
 	var result architectureStageResult
-	if decodeOrganizationalStageResult(output, &result) != nil || result.ResultType != "FEATURE_EXECUTION_PLAN" || !result.SourceDesignDigest.Valid() || result.Handoffs == nil {
-		return architectureStageResult{}, organization.ErrInvalidFeature
+	if err := decodeOrganizationalStageResult(output, &result); err != nil {
+		return architectureStageResult{}, fmt.Errorf("%w: final plan envelope: %v", organization.ErrInvalidFeature, err)
+	}
+	if result.ResultType != "FEATURE_EXECUTION_PLAN" {
+		return architectureStageResult{}, fmt.Errorf("%w: final plan result_type must be FEATURE_EXECUTION_PLAN, got %q", organization.ErrInvalidFeature, result.ResultType)
+	}
+	if !result.SourceDesignDigest.Valid() {
+		return architectureStageResult{}, fmt.Errorf("%w: final plan source_design_digest must identify the accepted design", organization.ErrInvalidFeature)
+	}
+	if result.Handoffs == nil {
+		return architectureStageResult{}, fmt.Errorf("%w: final plan handoffs must be an array; use [] when there are none", organization.ErrInvalidFeature)
 	}
 	if len(result.Handoffs) > organization.MaximumFeatureTasks*organization.MaximumFeatureTasks {
 		return architectureStageResult{}, organization.ErrInvalidFeature
@@ -451,7 +461,7 @@ func parsePlanFinalizationStageResult(output []byte, allowedMarkers []string, al
 
 func validateArchitectureStageResult(result architectureStageResult, allowedMarkers []string, allowedActorFQNs ...kernel.ActorFQN) (architectureStageResult, error) {
 	if result.SchemaVersion != "1.0.0" || strings.TrimSpace(string(result.Architecture)) == "" || len(result.Architecture) > 64<<10 || !validStageStrings(result.DesignDecisions, false) || !validStageStrings(result.Assumptions, false) || len(result.Tasks) == 0 || len(result.Tasks) > organization.MaximumFeatureTasks {
-		return architectureStageResult{}, organization.ErrInvalidFeature
+		return architectureStageResult{}, fmt.Errorf("%w: design metadata must include schema_version=1.0.0, nonempty architecture, valid decisions and assumptions, and 1..%d tasks", organization.ErrInvalidFeature, organization.MaximumFeatureTasks)
 	}
 	for index := range result.Tasks {
 		task := &result.Tasks[index]
@@ -463,11 +473,11 @@ func validateArchitectureStageResult(result architectureStageResult, allowedMark
 			task.Risk = organization.RiskModerate
 		}
 		if task.StoryIndex >= organization.MaximumFeatureStories || strings.TrimSpace(task.Title) == "" || len(task.Title) > 256 || strings.TrimSpace(task.Description) == "" || len(task.Description) > 64<<10 || !validStageStrings(task.AcceptanceCriteria, true) || !validArchitectureWriteScope(task.WriteScope) || containsPreAssignmentOperationalIdentityExcept(allowedActorFQNs, allowedMarkers, append([]string{task.Title, task.Description}, task.AcceptanceCriteria...)...) || !task.Purpose.Valid() || task.Complexity == 0 || task.Complexity > 10 || !task.Risk.Valid() || task.AttemptLimit == 0 || task.AttemptLimit > 16 || task.ReviewRoundLimit == 0 || task.ReviewRoundLimit > 8 {
-			return architectureStageResult{}, organization.ErrInvalidFeature
+			return architectureStageResult{}, fmt.Errorf("%w: task %d has invalid required fields, write scope, risk, or attempt limits", organization.ErrInvalidFeature, index)
 		}
 		for _, dependency := range append(append([]uint32(nil), task.DependsOn...), task.Validates...) {
 			if dependency >= uint32(index) {
-				return architectureStageResult{}, organization.ErrInvalidFeature
+				return architectureStageResult{}, fmt.Errorf("%w: task %d references non-prior dependency or validation index %d", organization.ErrInvalidFeature, index, dependency)
 			}
 		}
 	}

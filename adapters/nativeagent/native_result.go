@@ -30,41 +30,53 @@ func nativeValidationResult(brief application.ExecutionBrief) (agentruntime.Tool
 	definition := agentruntime.ToolDefinition{
 		Name: "submit_result", Description: "Submit the structured validation, review, or acceptance result for this Teams invocation.",
 		Parameters: append(json.RawMessage(nil), validationResultToolSchema...),
+		Strict:     true,
 	}
 	return definition, func(arguments json.RawMessage) (string, error) {
-		decoder := json.NewDecoder(bytes.NewReader(arguments))
-		decoder.DisallowUnknownFields()
-		var result struct {
-			SchemaVersion          string        `json:"schema_version"`
-			Outcome                string        `json:"outcome"`
-			Reasons                []string      `json:"reasons"`
-			CandidateID            kernel.UUIDv7 `json:"candidate_id"`
-			CandidateReceiptSHA256 kernel.Digest `json:"candidate_receipt_sha256"`
-			TestEvidence           []string      `json:"test_evidence"`
-		}
-		if decoder.Decode(&result) != nil || decoder.Decode(new(any)) != io.EOF || result.SchemaVersion != "1.0.0" || len(result.Reasons) < 1 || len(result.Reasons) > 64 || len(result.TestEvidence) > 256 {
-			return "", ErrInvalidBinding
-		}
-		switch result.Outcome {
-		case "PASS", "FAIL", "BLOCKED", "INCONCLUSIVE":
-		default:
-			return "", ErrInvalidBinding
-		}
-		seen := make(map[string]bool, len(result.Reasons))
-		for _, reason := range result.Reasons {
-			if strings.TrimSpace(reason) != reason || reason == "" || len(reason) > 4096 || seen[reason] {
-				return "", ErrInvalidBinding
-			}
-			seen[reason] = true
-		}
-		if (result.CandidateID == "") != (result.CandidateReceiptSHA256 == "") || result.CandidateID != "" && (!result.CandidateID.Valid() || !result.CandidateReceiptSHA256.Valid()) {
-			return "", ErrInvalidBinding
-		}
-		for _, evidence := range result.TestEvidence {
-			if strings.TrimSpace(evidence) != evidence || evidence == "" || len(evidence) > 4096 || strings.ContainsAny(evidence, "\r\n\t") {
-				return "", ErrInvalidBinding
-			}
+		if err := validateNativeValidationPayload(arguments); err != nil {
+			return "", err
 		}
 		return application.ValidationResultMarker + "\n" + string(arguments), nil
 	}, true
+}
+
+func validationPurpose(purpose kernel.WorkPurpose) bool {
+	return purpose == kernel.PurposeValidation || purpose == kernel.PurposeReview || purpose == kernel.PurposePromotion
+}
+
+func validateNativeValidationPayload(arguments json.RawMessage) error {
+	decoder := json.NewDecoder(bytes.NewReader(arguments))
+	decoder.DisallowUnknownFields()
+	var result struct {
+		SchemaVersion          string        `json:"schema_version"`
+		Outcome                string        `json:"outcome"`
+		Reasons                []string      `json:"reasons"`
+		CandidateID            kernel.UUIDv7 `json:"candidate_id"`
+		CandidateReceiptSHA256 kernel.Digest `json:"candidate_receipt_sha256"`
+		TestEvidence           []string      `json:"test_evidence"`
+	}
+	if decoder.Decode(&result) != nil || decoder.Decode(new(any)) != io.EOF || result.SchemaVersion != "1.0.0" || len(result.Reasons) < 1 || len(result.Reasons) > 64 || len(result.TestEvidence) > 256 {
+		return ErrInvalidBinding
+	}
+	switch result.Outcome {
+	case "PASS", "FAIL", "BLOCKED", "INCONCLUSIVE":
+	default:
+		return ErrInvalidBinding
+	}
+	seen := make(map[string]bool, len(result.Reasons))
+	for _, reason := range result.Reasons {
+		if strings.TrimSpace(reason) != reason || reason == "" || len(reason) > 4096 || seen[reason] {
+			return ErrInvalidBinding
+		}
+		seen[reason] = true
+	}
+	if (result.CandidateID == "") != (result.CandidateReceiptSHA256 == "") || result.CandidateID != "" && (!result.CandidateID.Valid() || !result.CandidateReceiptSHA256.Valid()) {
+		return ErrInvalidBinding
+	}
+	for _, evidence := range result.TestEvidence {
+		if strings.TrimSpace(evidence) != evidence || evidence == "" || len(evidence) > 4096 || strings.ContainsAny(evidence, "\r\n\t") {
+			return ErrInvalidBinding
+		}
+	}
+	return nil
 }

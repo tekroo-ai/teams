@@ -189,3 +189,55 @@ func TestRunnerStructuredFinalToolIsTheOnlyCompletion(t *testing.T) {
 		t.Fatalf("final replay output=%q err=%v model_calls=%d", output, err, len(model.seen))
 	}
 }
+
+func TestRunnerCorrectsInvalidStructuredResultWithoutRestart(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	journal := &memoryJournal{}
+	model := &scriptedModel{responses: []Completion{
+		{ToolCalls: []ToolCall{{ID: "bad", Name: "submit_result", Arguments: json.RawMessage(`{"outcome":"completed","extra":true}`)}}},
+		{ToolCalls: []ToolCall{{ID: "good", Name: "submit_result", Arguments: json.RawMessage(`{"outcome":"completed"}`)}}},
+	}}
+	runner := Runner{Journal: journal, Model: model, Tools: &countingTool{}, FinalTool: "submit_result", MaxTurns: 3, MaxFinalSubmissions: 3,
+		Finalize: func(raw json.RawMessage) (string, error) {
+			if strings.Contains(string(raw), `"extra"`) {
+				return "", errors.New("additional property extra is forbidden")
+			}
+			return "RESULT:" + string(raw), nil
+		},
+	}
+	output, err := runner.Run(ctx, "corrected", testRequestDigest, "Do the work")
+	if err != nil || output != `RESULT:{"outcome":"completed"}` || len(model.seen) != 2 || len(journal.entries) != 5 || journal.entries[2].Kind != ToolDone || journal.entries[4].Kind != Finished {
+		t.Fatalf("correction output=%q err=%v model=%d entries=%+v", output, err, len(model.seen), journal.entries)
+	}
+	if got := model.seen[1][len(model.seen[1])-1]; got.Role != "tool" || !strings.Contains(got.Content, "additional property extra") {
+		t.Fatalf("validation error not returned to model: %+v", got)
+	}
+	if _, err := runner.Run(ctx, "corrected", testRequestDigest, "Do the work"); err != nil || len(model.seen) != 2 {
+		t.Fatalf("replayed corrected result err=%v calls=%d", err, len(model.seen))
+	}
+}
+
+func TestRunnerValidatesFinalResultWithLiveRunContextAndNotOnReplay(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	journal := &memoryJournal{}
+	model := &scriptedModel{responses: []Completion{{ToolCalls: []ToolCall{{ID: "final", Name: "submit_result", Arguments: json.RawMessage(`{"outcome":"completed"}`)}}}}}
+	validations := 0
+	runner := Runner{Journal: journal, Model: model, Tools: &countingTool{}, FinalTool: "submit_result", MaxTurns: 2,
+		Finalize: func(raw json.RawMessage) (string, error) { return "RESULT:" + string(raw), nil },
+		ValidateFinalResult: func(live context.Context, output []byte) error {
+			validations++
+			if live != ctx || live.Err() != nil || string(output) != `RESULT:{"outcome":"completed"}` {
+				return errors.New("final result was not validated with the live run context")
+			}
+			return nil
+		},
+	}
+	if _, err := runner.Run(ctx, "live-final", testRequestDigest, "Do the work"); err != nil || validations != 1 {
+		t.Fatalf("live validation err=%v count=%d", err, validations)
+	}
+	if _, err := runner.Run(ctx, "live-final", testRequestDigest, "Do the work"); err != nil || validations != 1 || len(model.seen) != 1 {
+		t.Fatalf("replay err=%v validations=%d model_calls=%d", err, validations, len(model.seen))
+	}
+}

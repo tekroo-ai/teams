@@ -117,6 +117,12 @@ type Runner struct {
 	// validates its structured arguments and returns Teams' result text.
 	FinalTool string
 	Finalize  func(json.RawMessage) (string, error)
+	// ValidateFinalResult checks live workflow state before a result is
+	// committed. Unlike Finalize, it is not replayed after completion.
+	ValidateFinalResult func(context.Context, []byte) error
+	// MaxFinalSubmissions bounds schema correction within one invocation.
+	// Zero preserves the original fail-fast behavior.
+	MaxFinalSubmissions int
 	// Zero leaves turn count unbounded; the caller's deadline still bounds work.
 	MaxTurns int
 }
@@ -142,7 +148,7 @@ type EffectAuthority struct {
 // read-only or effect-reconciliation adapter after a crash.
 func (runner Runner) Run(ctx context.Context, invocationID, requestDigest, prompt string) (string, error) {
 	decodedDigest, digestErr := hex.DecodeString(requestDigest)
-	if runner.Journal == nil || runner.Model == nil || runner.Tools == nil || runner.MaxTurns < 0 || strings.TrimSpace(invocationID) == "" || strings.TrimSpace(prompt) == "" || digestErr != nil || len(decodedDigest) != 32 || requestDigest != strings.ToLower(requestDigest) || (runner.FinalTool == "") != (runner.Finalize == nil) {
+	if runner.Journal == nil || runner.Model == nil || runner.Tools == nil || runner.MaxTurns < 0 || runner.MaxFinalSubmissions < 0 || strings.TrimSpace(invocationID) == "" || strings.TrimSpace(prompt) == "" || digestErr != nil || len(decodedDigest) != 32 || requestDigest != strings.ToLower(requestDigest) || (runner.FinalTool == "") != (runner.Finalize == nil) {
 		return "", ErrInvalidTurn
 	}
 	if _, ok := ctx.Deadline(); !ok {
@@ -184,8 +190,19 @@ func (runner Runner) Run(ctx context.Context, invocationID, requestDigest, promp
 			call := pending[0]
 			if call.Name == runner.FinalTool && runner.FinalTool != "" {
 				output, finalizeErr := runner.Finalize(call.Arguments)
+				if finalizeErr == nil && runner.ValidateFinalResult != nil {
+					finalizeErr = runner.ValidateFinalResult(ctx, []byte(output))
+				}
 				if finalizeErr != nil {
-					return "", finalizeErr
+					if runner.MaxFinalSubmissions <= 1 {
+						return "", finalizeErr
+					}
+					payload, _ := json.Marshal(ToolResult{CallID: call.ID, Name: call.Name, Output: json.RawMessage("null"), Error: finalizeErr.Error()})
+					entries, err = runner.append(ctx, invocationID, entries, ToolDone, payload)
+					if err != nil {
+						return "", err
+					}
+					continue
 				}
 				entries, err = runner.append(ctx, invocationID, entries, Finished, json.RawMessage(strJSON(output)))
 				if err != nil {
@@ -217,6 +234,9 @@ func (runner Runner) Run(ctx context.Context, invocationID, requestDigest, promp
 			}
 			continue
 		}
+		if count, last := finalSubmissionErrors(entries, runner.FinalTool); runner.FinalTool != "" && runner.MaxFinalSubmissions > 1 && count >= runner.MaxFinalSubmissions {
+			return "", fmt.Errorf("final result contract failed after %d submissions: %s", count, last)
+		}
 		if turns > 0 && runner.FinalTool == "" {
 			var last Completion
 			if err := json.Unmarshal(entries[len(entries)-1].Payload, &last); err == nil && entries[len(entries)-1].Kind == ModelTurn && len(last.ToolCalls) == 0 {
@@ -244,6 +264,22 @@ func (runner Runner) Run(ctx context.Context, invocationID, requestDigest, promp
 			return "", err
 		}
 	}
+}
+
+func finalSubmissionErrors(entries []Entry, finalTool string) (int, string) {
+	var count int
+	var last string
+	for _, entry := range entries {
+		if entry.Kind != ToolDone {
+			continue
+		}
+		var result ToolResult
+		if json.Unmarshal(entry.Payload, &result) == nil && result.Name == finalTool && result.Error != "" {
+			count++
+			last = result.Error
+		}
+	}
+	return count, last
 }
 
 func validSemanticContext(memory SemanticContext) bool {

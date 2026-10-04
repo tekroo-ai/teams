@@ -110,6 +110,36 @@ func TestTaskWorkspacesIsolateBranchesAndAssembleTheDAGDeterministically(t *test
 	}
 }
 
+func TestNativeTaskWorkspaceDoesNotRequireOrCopyOpenHandsHook(t *testing.T) {
+	rootDirectory, _, baseline := candidateRepository(t)
+	hookPath := filepath.Join(rootDirectory, ".openhands", "hooks", "sma_context_hook.py")
+	if err := os.Remove(hookPath); err != nil {
+		t.Fatal(err)
+	}
+	root := ProductionWorkspace{WorkspaceID: "repository", WorktreeID: "main", WorkingDirectory: rootDirectory, Branch: "source", BaselineSHA: baseline, WritablePaths: []string{"."}}
+	resolver, err := openhands.NewBoundWorkspaceResolver([]openhands.WorkspaceBinding{{WorkspaceID: root.WorkspaceID, WorktreeID: root.WorktreeID, WorkingDirectory: root.WorkingDirectory}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	evidenceRoot := t.TempDir()
+	manager, err := newTaskWorkspaceManagerWithMode(context.Background(), evidenceRoot, "git", time.Minute, resolver, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	feature := organization.FeatureRequest{ID: candidateTestUUID(1901)}
+	task := organization.PlannedTask{ID: candidateTestUUID(1902), Purpose: kernel.PurposeImplementation}
+	workspace, receipt, err := manager.PrepareTask(context.Background(), feature, task, "coder-1", root, nil)
+	if err != nil || receipt.SchemaVersion != nativeTaskWorkspaceReceiptSchema || receipt.RuntimeHookSHA256 != "" {
+		t.Fatalf("native task workspace=%+v receipt=%+v err=%v", workspace, receipt, err)
+	}
+	if _, err := os.Lstat(filepath.Join(workspace.WorkingDirectory, ".openhands", "hooks", "sma_context_hook.py")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("OpenHands hook leaked into native workspace: %v", err)
+	}
+	if _, _, err := manager.PrepareTask(context.Background(), feature, task, "coder-1", root, nil); err != nil {
+		t.Fatalf("native task workspace replay: %v", err)
+	}
+}
+
 func TestTaskWorkspaceAssemblyStopsOnSiblingMergeConflict(t *testing.T) {
 	rootDirectory, _, baseline := candidateRepository(t)
 	root := ProductionWorkspace{WorkspaceID: "repository", WorktreeID: "main", WorkingDirectory: rootDirectory, Branch: "source", BaselineSHA: baseline, WritablePaths: []string{"."}}

@@ -15,6 +15,7 @@ type ToolDefinition struct {
 	Name        string          `json:"name"`
 	Description string          `json:"description"`
 	Parameters  json.RawMessage `json:"parameters"`
+	Strict      bool            `json:"strict,omitempty"`
 }
 
 // OpenAIModel talks directly to an OpenAI-compatible /v1/chat/completions
@@ -26,6 +27,10 @@ type OpenAIModel struct {
 	APIKey    string
 	Tools     []ToolDefinition
 	MaxTokens int
+	// A rejected final tool call is retried through the server's constrained
+	// JSON response channel, then presented to the runner as a final tool call.
+	FinalTool   string
+	FinalSchema json.RawMessage
 }
 
 func (model OpenAIModel) Complete(ctx context.Context, transcript []Message) (Completion, error) {
@@ -57,14 +62,26 @@ func (model OpenAIModel) Complete(ctx context.Context, transcript []Message) (Co
 		}
 		messages = append(messages, wire)
 	}
+	repairFinal := len(transcript) > 0 && model.FinalTool != "" && transcript[len(transcript)-1].Role == "tool" && transcript[len(transcript)-1].Name == model.FinalTool
 	request := map[string]any{"model": model.Model, "messages": messages, "stream": false, "max_tokens": model.MaxTokens}
-	if len(model.Tools) > 0 {
+	if repairFinal {
+		if !json.Valid(model.FinalSchema) {
+			return Completion{}, ErrInvalidTurn
+		}
+		messages = append(messages, map[string]any{"role": "user", "content": "Return the corrected final-result arguments as one JSON object matching the response schema."})
+		request["messages"] = messages
+		request["response_format"] = map[string]any{"type": "json_schema", "json_schema": map[string]any{"name": "tekroo_final_result", "strict": true, "schema": model.FinalSchema}}
+	} else if len(model.Tools) > 0 {
 		tools := make([]map[string]any, 0, len(model.Tools))
 		for _, tool := range model.Tools {
 			if tool.Name == "" || !json.Valid(tool.Parameters) {
 				return Completion{}, ErrInvalidTurn
 			}
-			tools = append(tools, map[string]any{"type": "function", "function": map[string]any{"name": tool.Name, "description": tool.Description, "parameters": tool.Parameters}})
+			function := map[string]any{"name": tool.Name, "description": tool.Description, "parameters": tool.Parameters}
+			if tool.Strict {
+				function["strict"] = true
+			}
+			tools = append(tools, map[string]any{"type": "function", "function": function})
 		}
 		request["tools"] = tools
 	}
@@ -112,6 +129,16 @@ func (model OpenAIModel) Complete(ctx context.Context, transcript []Message) (Co
 		return Completion{}, fmt.Errorf("%w: malformed model completion", ErrInvalidTurn)
 	}
 	message := decoded.Choices[0].Message
+	if repairFinal {
+		if decoded.Choices[0].FinishReason != "stop" || len(message.ToolCalls) != 0 || !json.Valid([]byte(message.Content)) {
+			return Completion{}, fmt.Errorf("%w: constrained final result was not one JSON object", ErrInvalidTurn)
+		}
+		var object map[string]json.RawMessage
+		if json.Unmarshal([]byte(message.Content), &object) != nil || object == nil {
+			return Completion{}, fmt.Errorf("%w: constrained final result was not one JSON object", ErrInvalidTurn)
+		}
+		return Completion{ToolCalls: []ToolCall{{ID: fmt.Sprintf("final-json-%d", len(transcript)), Name: model.FinalTool, Arguments: json.RawMessage(message.Content)}}}, nil
+	}
 	if reason := decoded.Choices[0].FinishReason; reason != "stop" && reason != "tool_calls" {
 		return Completion{}, fmt.Errorf("%w: incomplete model response (finish_reason=%q)", ErrInvalidTurn, reason)
 	}

@@ -153,7 +153,8 @@ func TestPreparedHandlerSessionAcceptsOnlyValidatedStructuredResult(t *testing.T
 		var body struct {
 			Tools []struct {
 				Function struct {
-					Name string `json:"name"`
+					Name   string `json:"name"`
+					Strict bool   `json:"strict"`
 				} `json:"function"`
 			} `json:"tools"`
 		}
@@ -162,7 +163,7 @@ func TestPreparedHandlerSessionAcceptsOnlyValidatedStructuredResult(t *testing.T
 		}
 		found := false
 		for _, tool := range body.Tools {
-			found = found || tool.Function.Name == "submit_result"
+			found = found || tool.Function.Name == "submit_result" && tool.Function.Strict
 		}
 		if !found {
 			t.Error("handler result schema not exposed")
@@ -199,6 +200,7 @@ func TestPreparedHandlerSessionAcceptsOnlyValidatedStructuredResult(t *testing.T
 type nativeEffectBinding struct {
 	root   string
 	policy kernel.Digest
+	tests  bool
 }
 
 type nativeTestBinding struct {
@@ -212,7 +214,40 @@ func (binding nativeTestBinding) BindToolInvocation(context.Context, kernel.UUID
 }
 
 func (binding nativeEffectBinding) BindToolInvocation(context.Context, kernel.UUIDv7, kernel.Digest) (agenttools.Authority, error) {
-	return agenttools.Authority{WorkspaceRoot: binding.root, Permissions: []string{"repository.edit"}, Purpose: kernel.PurposeImplementation, EffectPolicyDigest: binding.policy}, nil
+	permissions := []string{"repository.edit"}
+	if binding.tests {
+		permissions = append(permissions, "test.execute")
+	}
+	return agenttools.Authority{WorkspaceRoot: binding.root, Permissions: permissions, Purpose: kernel.PurposeImplementation, EffectPolicyDigest: binding.policy}, nil
+}
+
+func TestImplementationWithGoTestGateRequiresSignedTestPermission(t *testing.T) {
+	brief, _, profile := testBriefAndProfile()
+	brief.Purpose = kernel.PurposeImplementation
+	brief.WorkProfile.RequiredDeterministicGateIDs = []string{"go-test"}
+	brief.RoleGrounding.Permissions = []string{"repository.edit"}
+	profile.BaseURL = "http://127.0.0.1:1/v1"
+	profile.AllowedEffectTools = []string{"write_file"}
+	encoded, _ := json.Marshal(brief)
+	sum := sha256.Sum256(encoded)
+	digest := kernel.Digest(hex.EncodeToString(sum[:]))
+	binding := nativeEffectBinding{root: t.TempDir(), policy: brief.EffectPolicyDigest}
+	config := Config{Bindings: binding, Gateway: agenttools.Gateway{Bindings: binding, Host: agenttools.Host{Timeout: time.Second}},
+		Journal: &testJournal{}, Effects: &nativeEffectLedger{}, HTTP: http.DefaultClient, Profile: profile}
+	if _, err := PrepareWithEffects(context.Background(), brief, digest, config); !errors.Is(err, ErrRequiredTestToolUnavailable) {
+		t.Fatalf("missing required test permission: %v", err)
+	}
+	brief.RoleGrounding.Permissions = []string{"repository.edit", "test.execute"}
+	encoded, _ = json.Marshal(brief)
+	sum = sha256.Sum256(encoded)
+	digest = kernel.Digest(hex.EncodeToString(sum[:]))
+	profile.AllowedEffectTools = []string{"run_go_tests", "write_file"}
+	binding.tests = true
+	config.Bindings, config.Gateway.Bindings, config.Profile = binding, binding, profile
+	session, err := PrepareWithEffects(context.Background(), brief, digest, config)
+	if err != nil || !session.Runner.Effects.Handles("run_go_tests") {
+		t.Fatalf("signed test permission did not enable required tool: %v", err)
+	}
 }
 
 type nativeEffectLedger struct {
