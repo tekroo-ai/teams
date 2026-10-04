@@ -92,3 +92,10 @@ func TestNativeValidationResultRejectsInvalidShapes(t *testing.T) {
 		}
 	}
 }
+
+func TestNativeValidationAcceptsNormalTestOutputWhitespace(t *testing.T) {
+	value := json.RawMessage(`{"schema_version":"1.0.0","outcome":"PASS","reasons":["The test passed."],"test_evidence":["ok  example.test/nativequalification\t1.203s\nPASS"]}`)
+	if err := validateNativeValidationPayload(value); err != nil {
+		t.Fatalf("JSON Schema-valid test output was rejected by the host: %v", err)
+	}
+}

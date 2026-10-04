@@ -23,8 +23,10 @@ import (
 	"github.com/tekroo-ai/teams/adapters/federationhttp"
 	"github.com/tekroo-ai/teams/adapters/gitprovider"
 	"github.com/tekroo-ai/teams/adapters/mongo"
+	"github.com/tekroo-ai/teams/adapters/nativeagent"
 	"github.com/tekroo-ai/teams/adapters/openhands"
 	"github.com/tekroo-ai/teams/adapters/protocol"
+	"github.com/tekroo-ai/teams/agenttools"
 	"github.com/tekroo-ai/teams/application"
 	"github.com/tekroo-ai/teams/contract"
 	"github.com/tekroo-ai/teams/kernel"
@@ -46,6 +48,8 @@ type ProductionConfig struct {
 	ContractRoot            string                    `json:"contract_root"`
 	Mongo                   ProductionMongoConfig     `json:"mongo"`
 	OpenHands               ProductionOpenHandsConfig `json:"openhands"`
+	ExecutionBackend        string                    `json:"execution_backend,omitempty"`
+	Native                  *ProductionNativeConfig   `json:"native,omitempty"`
 	Operator                ProductionOperatorConfig  `json:"operator"`
 	TeamsDatabaseIdentity   string                    `json:"teams_database_identity"`
 	SMADatabaseIdentity     string                    `json:"sma_database_identity"`
@@ -67,7 +71,8 @@ type ProductionConfig struct {
 	Git                     *ProductionGitConfig      `json:"git,omitempty"`
 	Federation              *ProductionFederation     `json:"federation,omitempty"`
 	// QualificationExecutionBoundary is a process-local test seam. It is never
-	// decoded from a deployment file; production continues to select OpenHands.
+	// decoded from a deployment file; execution_backend selects the file-backed
+	// production boundary.
 	QualificationExecutionBoundary application.AgentExecutionBoundary `json:"-"`
 }
 
@@ -107,6 +112,23 @@ type ProductionOpenHandsConfig struct {
 	MaximumEvidenceBytes int    `json:"maximum_evidence_bytes"`
 }
 
+// ProductionNativeConfig is an explicit file-backed opt-in. Omitting
+// execution_backend retains the established OpenHands path.
+type ProductionNativeConfig struct {
+	Owner            string                         `json:"owner"`
+	LeaseDuration    string                         `json:"lease_duration"`
+	Heartbeat        string                         `json:"heartbeat"`
+	RequestTimeout   string                         `json:"request_timeout"`
+	WorkflowTriggers []string                       `json:"workflow_triggers"`
+	ResultSchemas    []ProductionNativeResultSchema `json:"result_schemas"`
+}
+
+type ProductionNativeResultSchema struct {
+	Reference string        `json:"reference"`
+	Path      string        `json:"path"`
+	SHA256    kernel.Digest `json:"sha256"`
+}
+
 type ProductionOperatorConfig struct {
 	Address          string                      `json:"address"`
 	BearerTokenFile  string                      `json:"bearer_token_file"`
@@ -143,7 +165,8 @@ type ProductionProfile struct {
 	RuntimeIdentityDigest kernel.Digest                              `json:"runtime_identity_digest"`
 	ToolPolicyDigest      kernel.Digest                              `json:"tool_policy_digest"`
 	EffectPolicyDigest    kernel.Digest                              `json:"effect_policy_digest"`
-	AgentSettings         json.RawMessage                            `json:"agent_settings"`
+	AgentSettings         json.RawMessage                            `json:"agent_settings,omitempty"`
+	NativeSettings        *nativeagent.ProfileSettings               `json:"native_settings,omitempty"`
 	MaximumIterations     uint32                                     `json:"maximum_iterations"`
 	QualificationCorpus   *application.QualificationCorpusDefinition `json:"qualification_corpus,omitempty"`
 	Qualification         *kernel.ModelProfileQualification          `json:"qualification,omitempty"`
@@ -361,6 +384,10 @@ type resolvedProductionConfig struct {
 	provenance            kernel.ProvenanceBasis
 	requestTimeout        time.Duration
 	pollInterval          time.Duration
+	nativeLease           time.Duration
+	nativeHeartbeat       time.Duration
+	nativeResultSchemas   map[string]NativeResultSchema
+	nativeWorkflows       []kernel.WorkflowDefinition
 	messageWaitTimeout    time.Duration
 	operationTimeout      time.Duration
 	leaseDuration         time.Duration
@@ -411,6 +438,11 @@ func LoadProductionConfig(path string) (ProductionConfig, error) {
 	config.ContractRoot = absoluteFrom(base, config.ContractRoot)
 	config.Mongo.URIFile = absoluteFrom(base, config.Mongo.URIFile)
 	config.OpenHands.SessionAPIKeyFile = absoluteFrom(base, config.OpenHands.SessionAPIKeyFile)
+	if config.Native != nil {
+		for index := range config.Native.ResultSchemas {
+			config.Native.ResultSchemas[index].Path = absoluteFrom(base, config.Native.ResultSchemas[index].Path)
+		}
+	}
 	config.Operator.BearerTokenFile = absoluteFrom(base, config.Operator.BearerTokenFile)
 	for index := range config.Operator.HumanCredentials {
 		config.Operator.HumanCredentials[index].BearerTokenFile = absoluteFrom(base, config.Operator.HumanCredentials[index].BearerTokenFile)
@@ -444,13 +476,17 @@ func LoadProductionConfig(path string) (ProductionConfig, error) {
 }
 
 func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig, error) {
+	nativeSelected := config.ExecutionBackend == "native"
+	if !nativeSelected && config.ExecutionBackend != "" && config.ExecutionBackend != "openhands" || nativeSelected != (config.Native != nil) || nativeSelected && config.QualificationExecutionBoundary != nil {
+		return resolvedProductionConfig{}, invalidConfig("execution backend configuration is invalid")
+	}
 	if config.ContractRoot == "" || config.Mongo.Database == "" || config.Mongo.Database != config.TeamsDatabaseIdentity || config.SMADatabaseIdentity == "" || config.SMADatabaseIdentity == config.TeamsDatabaseIdentity || !config.DeploymentIdentity.Valid() || config.Mongo.BacklogLimit <= 0 || config.Mongo.DeliveryPolicyRevision == 0 || config.EvidenceRoot == "" || !filepath.IsAbs(config.EvidenceRoot) || len(config.Workspaces) == 0 || len(config.Profiles) == 0 {
 		return resolvedProductionConfig{}, invalidConfig("required identity, storage, workspace, or profile binding is missing")
 	}
 	if info, err := os.Stat(filepath.Join(config.ContractRoot, ContractPackagePath, "manifest.json")); err != nil || !info.Mode().IsRegular() {
 		return resolvedProductionConfig{}, invalidConfig("contract root does not contain contract 0.12.0")
 	}
-	if !loopbackHTTPURL(config.OpenHands.BaseURL) {
+	if !nativeSelected && !loopbackHTTPURL(config.OpenHands.BaseURL) {
 		return resolvedProductionConfig{}, invalidConfig("OpenHands base URL must be an explicit loopback HTTP endpoint with no path")
 	}
 	if !loopbackAddress(config.Operator.Address) || !config.Operator.Principal.Valid() || config.Operator.Principal.Kind != kernel.PrincipalHuman || config.Operator.MaximumBodyBytes <= 0 || config.Operator.MaximumBodyBytes > 1<<20 {
@@ -460,9 +496,12 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 	if err != nil || !loopbackMongoURI(mongoURI) {
 		return resolvedProductionConfig{}, invalidConfig("Mongo URI file must contain one loopback MongoDB endpoint")
 	}
-	sessionKey, err := readSecret(config.OpenHands.SessionAPIKeyFile)
-	if err != nil || sessionKey == "" {
-		return resolvedProductionConfig{}, invalidConfig("OpenHands session API key file is missing or empty")
+	var sessionKey string
+	if !nativeSelected {
+		sessionKey, err = readSecret(config.OpenHands.SessionAPIKeyFile)
+		if err != nil || sessionKey == "" {
+			return resolvedProductionConfig{}, invalidConfig("OpenHands session API key file is missing or empty")
+		}
 	}
 	operatorToken, err := readSecret(config.Operator.BearerTokenFile)
 	if err != nil || len(operatorToken) < 32 {
@@ -487,13 +526,37 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 		seenTokens[tokenDigest] = struct{}{}
 		humanCredentials[index] = HumanTransportCredential{Principal: credential.Principal, Token: token}
 	}
-	requestTimeout, err := positiveDuration("openhands.request_timeout", config.OpenHands.RequestTimeout)
-	if err != nil {
-		return resolvedProductionConfig{}, err
-	}
-	pollInterval, err := positiveDuration("openhands.poll_interval", config.OpenHands.PollInterval)
-	if err != nil {
-		return resolvedProductionConfig{}, err
+	var requestTimeout, pollInterval, nativeLease, nativeHeartbeat time.Duration
+	var nativeResultSchemas map[string]NativeResultSchema
+	if nativeSelected {
+		if config.Native.Owner == "" || len(config.Native.Owner) > 256 {
+			return resolvedProductionConfig{}, invalidConfig("native run owner is invalid")
+		}
+		requestTimeout, err = positiveDuration("native.request_timeout", config.Native.RequestTimeout)
+		if err != nil {
+			return resolvedProductionConfig{}, err
+		}
+		nativeLease, err = positiveDuration("native.lease_duration", config.Native.LeaseDuration)
+		if err != nil {
+			return resolvedProductionConfig{}, err
+		}
+		nativeHeartbeat, err = positiveDuration("native.heartbeat", config.Native.Heartbeat)
+		if err != nil || nativeHeartbeat >= nativeLease {
+			return resolvedProductionConfig{}, invalidConfig("native heartbeat must be shorter than its lease")
+		}
+		nativeResultSchemas, err = loadProductionNativeResultSchemas(config.Native.ResultSchemas)
+		if err != nil {
+			return resolvedProductionConfig{}, err
+		}
+	} else {
+		requestTimeout, err = positiveDuration("openhands.request_timeout", config.OpenHands.RequestTimeout)
+		if err != nil {
+			return resolvedProductionConfig{}, err
+		}
+		pollInterval, err = positiveDuration("openhands.poll_interval", config.OpenHands.PollInterval)
+		if err != nil {
+			return resolvedProductionConfig{}, err
+		}
 	}
 	messageWaitTimeout := time.Minute
 	if config.Mongo.MessageWaitTimeout != "" {
@@ -633,7 +696,7 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 			}
 		}
 	}
-	if config.OpenHands.MaximumPages == 0 || config.OpenHands.MaximumPages > 1000 || config.OpenHands.MaximumEvidenceBytes <= 0 || config.OpenHands.MaximumEvidenceBytes > 16<<20 || config.Execution.ConsumerID == "" || len(config.Execution.ConsumerID) > 256 || config.Execution.MaximumBriefBytes <= 0 || config.Execution.MaximumBriefBytes > 1<<20 || config.Execution.PolicyRevision == 0 || config.Evidence.PolicyRevision == 0 || config.Evidence.ProducingVersion == "" || config.Evidence.RetentionPolicy == "" || config.Worker.MaximumReconciliations == 0 || config.Worker.MaximumConcurrentInvocations == 0 || config.Worker.MaximumConcurrentInvocations > 64 || reconciliation >= leaseDuration {
+	if !nativeSelected && (config.OpenHands.MaximumPages == 0 || config.OpenHands.MaximumPages > 1000 || config.OpenHands.MaximumEvidenceBytes <= 0 || config.OpenHands.MaximumEvidenceBytes > 16<<20) || config.Execution.ConsumerID == "" || len(config.Execution.ConsumerID) > 256 || config.Execution.MaximumBriefBytes <= 0 || config.Execution.MaximumBriefBytes > 1<<20 || config.Execution.PolicyRevision == 0 || config.Evidence.PolicyRevision == 0 || config.Evidence.ProducingVersion == "" || config.Evidence.RetentionPolicy == "" || config.Worker.MaximumReconciliations == 0 || config.Worker.MaximumConcurrentInvocations == 0 || config.Worker.MaximumConcurrentInvocations > 64 || reconciliation >= leaseDuration {
 		return resolvedProductionConfig{}, invalidConfig("execution, evidence, OpenHands, or worker limits are invalid")
 	}
 	if config.ServiceAuthority.Kind != kernel.PrincipalService || !config.ServiceAuthority.Valid() || config.ExpiryAuthority.Kind != kernel.PrincipalPolicy || !config.ExpiryAuthority.Valid() {
@@ -657,17 +720,29 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 	}
 	profiles := make([]openhands.ExecutionProfile, 0, len(config.Profiles))
 	for _, profile := range config.Profiles {
-		resolved, profileErr := openhands.NewBoundExecutionProfile(profile.ModelProfileDigest, profile.RoleFQRN, profile.RoleBundleDigest, profile.RuntimeIdentityDigest, profile.ToolPolicyDigest, profile.EffectPolicyDigest, profile.AgentSettings, profile.MaximumIterations, config.TeamsDatabaseIdentity, config.SMADatabaseIdentity)
-		if profileErr != nil || !profile.DecisionRoute.ModelExecutable() {
-			return resolvedProductionConfig{}, invalidConfig("execution profile is invalid")
+		if nativeSelected {
+			if profile.NativeSettings == nil || len(profile.AgentSettings) != 0 || profile.MaximumIterations != 0 || !profile.RuntimeIdentityDigest.Valid() || !profile.ToolPolicyDigest.Valid() || !profile.EffectPolicyDigest.Valid() {
+				return resolvedProductionConfig{}, invalidConfig("native execution profile is invalid")
+			}
+			digest, digestErr := nativeagent.ModelProfileDigest(profile.RoleFQRN, profile.RoleBundleDigest, *profile.NativeSettings)
+			if digestErr != nil || digest != profile.ModelProfileDigest || !profile.DecisionRoute.ModelExecutable() {
+				return resolvedProductionConfig{}, invalidConfig("native execution profile digest is invalid")
+			}
+		} else {
+			resolved, profileErr := openhands.NewBoundExecutionProfile(profile.ModelProfileDigest, profile.RoleFQRN, profile.RoleBundleDigest, profile.RuntimeIdentityDigest, profile.ToolPolicyDigest, profile.EffectPolicyDigest, profile.AgentSettings, profile.MaximumIterations, config.TeamsDatabaseIdentity, config.SMADatabaseIdentity)
+			if profile.NativeSettings != nil || profileErr != nil || !profile.DecisionRoute.ModelExecutable() {
+				return resolvedProductionConfig{}, invalidConfig("execution profile is invalid")
+			}
+			profiles = append(profiles, resolved)
 		}
 		if (profile.Qualification == nil) != (profile.QualificationCorpus == nil) || profile.Qualification != nil && !profile.qualificationDefinitionValid() {
 			return resolvedProductionConfig{}, invalidConfig("execution profile is invalid")
 		}
-		profiles = append(profiles, resolved)
 	}
-	if _, err := openhands.NewBoundExecutionProfileResolver(profiles); err != nil {
-		return resolvedProductionConfig{}, invalidConfig("execution profiles are not unique and exact")
+	if !nativeSelected {
+		if _, err := openhands.NewBoundExecutionProfileResolver(profiles); err != nil {
+			return resolvedProductionConfig{}, invalidConfig("execution profiles are not unique and exact")
+		}
 	}
 	trustedKeys := make(map[string]ed25519.PublicKey, len(config.Organization.Publishers))
 	for _, publisher := range config.Organization.Publishers {
@@ -704,6 +779,12 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 		if roleErr != nil || !found || profile.ModelProfileDigest != loaded.Binding.ModelProfileDigest || profile.RoleBundleDigest != loaded.Binding.BundleDigest {
 			return resolvedProductionConfig{}, invalidConfig("execution profile does not bind the signed team role")
 		}
+		if nativeSelected {
+			surface, surfaceErr := agenttools.NativeToolSurfaceDigest(loaded.Bundle.Permissions)
+			if surfaceErr != nil || surface != profile.ToolPolicyDigest {
+				return resolvedProductionConfig{}, invalidConfig("native execution profile does not bind the signed role tool surface")
+			}
+		}
 	}
 	if config.Federation != nil {
 		for _, route := range config.Federation.Routes {
@@ -736,6 +817,32 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 			}
 		}
 	}
+	var nativeWorkflows []kernel.WorkflowDefinition
+	if nativeSelected {
+		if workflowLibrary == nil || len(config.Native.WorkflowTriggers) == 0 {
+			return resolvedProductionConfig{}, invalidConfig("native workflow binding is missing")
+		}
+		seenTriggers := make(map[string]struct{}, len(config.Native.WorkflowTriggers))
+		for _, trigger := range config.Native.WorkflowTriggers {
+			if trigger == "" {
+				return resolvedProductionConfig{}, invalidConfig("native workflow trigger is empty")
+			}
+			if _, duplicate := seenTriggers[trigger]; duplicate {
+				return resolvedProductionConfig{}, invalidConfig("native workflow trigger is duplicated")
+			}
+			definition, lookupErr := workflowLibrary.LookupTrigger(trigger)
+			if lookupErr != nil {
+				return resolvedProductionConfig{}, invalidConfig("native workflow trigger is not configured")
+			}
+			for _, stage := range definition.Stages {
+				if _, found := nativeResultSchemas[stage.OutputSchema]; !found {
+					return resolvedProductionConfig{}, invalidConfig("native workflow result schema is missing")
+				}
+			}
+			seenTriggers[trigger] = struct{}{}
+			nativeWorkflows = append(nativeWorkflows, definition)
+		}
+	}
 	var policy kernel.AuthorizationPolicy
 	if err := readStrictJSONFile(config.AuthorizationPolicyFile, &policy); err != nil || !productionPolicyValid(policy, config.ServiceAuthority, config.ExpiryAuthority) || config.Execution.PolicyRevision != policy.Revision || config.Evidence.PolicyRevision != policy.Revision {
 		return resolvedProductionConfig{}, invalidConfig("authorization policy file is invalid")
@@ -744,7 +851,7 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 	if err := readStrictJSONFile(config.ProvenanceFile, &provenance); err != nil || !provenance.Valid() || provenance.PolicyDigest != policy.PolicyDigest || provenance.PolicyRevision != policy.Revision {
 		return resolvedProductionConfig{}, invalidConfig("provenance file is invalid or does not bind the authorization policy")
 	}
-	return resolvedProductionConfig{ProductionConfig: config, mongoURI: mongoURI, sessionAPIKey: sessionKey, operatorBearerToken: operatorToken, humanCredentials: humanCredentials, authorizationPolicy: policy, provenance: provenance, requestTimeout: requestTimeout, pollInterval: pollInterval, messageWaitTimeout: messageWaitTimeout, operationTimeout: operationTimeout, leaseDuration: leaseDuration, reconciliation: reconciliation, leaseOperationTimeout: leaseOperationTimeout, projectionInterval: projectionInterval, projectionTimeout: projectionTimeout, continuityHeartbeat: continuityHeartbeat, continuityThreshold: continuityThreshold, operatorTimeout: operatorTimeout, team: team, libraryTeams: libraryTeams, trustedRolePublishers: trustedKeys, workflowLibrary: workflowLibrary, roleReconciliation: roleReconciliation, planningDeadline: planningDeadline, gitOperationTimeout: gitOperationTimeout, federationRegistry: federationRegistry, federationPrivateKey: federationPrivateKey, federationTimeout: federationTimeout, federationFutureSkew: federationFutureSkew, federationTTL: federationTTL}, nil
+	return resolvedProductionConfig{ProductionConfig: config, mongoURI: mongoURI, sessionAPIKey: sessionKey, operatorBearerToken: operatorToken, humanCredentials: humanCredentials, authorizationPolicy: policy, provenance: provenance, requestTimeout: requestTimeout, pollInterval: pollInterval, nativeLease: nativeLease, nativeHeartbeat: nativeHeartbeat, nativeResultSchemas: nativeResultSchemas, nativeWorkflows: nativeWorkflows, messageWaitTimeout: messageWaitTimeout, operationTimeout: operationTimeout, leaseDuration: leaseDuration, reconciliation: reconciliation, leaseOperationTimeout: leaseOperationTimeout, projectionInterval: projectionInterval, projectionTimeout: projectionTimeout, continuityHeartbeat: continuityHeartbeat, continuityThreshold: continuityThreshold, operatorTimeout: operatorTimeout, team: team, libraryTeams: libraryTeams, trustedRolePublishers: trustedKeys, workflowLibrary: workflowLibrary, roleReconciliation: roleReconciliation, planningDeadline: planningDeadline, gitOperationTimeout: gitOperationTimeout, federationRegistry: federationRegistry, federationPrivateKey: federationPrivateKey, federationTimeout: federationTimeout, federationFutureSkew: federationFutureSkew, federationTTL: federationTTL}, nil
 }
 
 func loadedTeamHasActor(team organization.LoadedTeam, actor kernel.ActorFQN) bool {
@@ -815,6 +922,7 @@ type ProductionService struct {
 	profilesByModel        map[kernel.Digest]ProductionProfile
 	workspacesByID         map[string]ProductionWorkspace
 	workspaceResolver      *openhands.BoundWorkspaceResolver
+	evidenceRoot           string
 	taskWorkspaces         *taskWorkspaceManager
 	candidates             *candidateWorkspaceManager
 	serviceAuthority       kernel.PrincipalRef
@@ -837,10 +945,12 @@ func NewProductionService(ctx context.Context, config ProductionConfig) (*Produc
 	if err != nil {
 		return nil, err
 	}
+	nativeSelected := config.ExecutionBackend == "native"
+	useOpenHands := !nativeSelected && config.QualificationExecutionBoundary == nil
 	if err := ValidateOperationalProfileQualifications(config.Profiles, time.Now().UTC()); err != nil {
 		return nil, err
 	}
-	if config.QualificationExecutionBoundary == nil {
+	if useOpenHands {
 		if err := ensureConfiguredRuntimeHooks(config.Workspaces); err != nil {
 			return nil, fmt.Errorf("prepare workspace runtime hooks: %w", err)
 		}
@@ -884,33 +994,50 @@ func NewProductionService(ctx context.Context, config ProductionConfig) (*Produc
 		}
 		candidateTimeout = resolved.gitOperationTimeout
 	}
-	taskWorkspaces, err := newTaskWorkspaceManagerWithMode(ctx, config.EvidenceRoot, gitBinary, candidateTimeout, workspaceResolver, config.QualificationExecutionBoundary == nil)
+	taskWorkspaces, err := newTaskWorkspaceManagerWithMode(ctx, config.EvidenceRoot, gitBinary, candidateTimeout, workspaceResolver, useOpenHands)
 	if err != nil {
 		return fail(fmt.Errorf("create task workspace manager: %w", err))
 	}
-	candidates, err := newCandidateWorkspaceManagerWithMode(ctx, config.EvidenceRoot, gitBinary, candidateTimeout, config.Planning.CandidateGates, workspaceResolver, config.QualificationExecutionBoundary == nil)
+	candidates, err := newCandidateWorkspaceManagerWithMode(ctx, config.EvidenceRoot, gitBinary, candidateTimeout, config.Planning.CandidateGates, workspaceResolver, useOpenHands)
 	if err != nil {
 		return fail(fmt.Errorf("create candidate workspace manager: %w", err))
 	}
 	profiles := make([]openhands.ExecutionProfile, 0, len(config.Profiles))
 	profilesByModel := make(map[kernel.Digest]ProductionProfile, len(config.Profiles))
 	for _, item := range config.Profiles {
-		profile, profileErr := openhands.NewBoundExecutionProfile(item.ModelProfileDigest, item.RoleFQRN, item.RoleBundleDigest, item.RuntimeIdentityDigest, item.ToolPolicyDigest, item.EffectPolicyDigest, item.AgentSettings, item.MaximumIterations, config.TeamsDatabaseIdentity, config.SMADatabaseIdentity)
-		if profileErr != nil {
-			return fail(profileErr)
+		if !nativeSelected {
+			profile, profileErr := openhands.NewBoundExecutionProfile(item.ModelProfileDigest, item.RoleFQRN, item.RoleBundleDigest, item.RuntimeIdentityDigest, item.ToolPolicyDigest, item.EffectPolicyDigest, item.AgentSettings, item.MaximumIterations, config.TeamsDatabaseIdentity, config.SMADatabaseIdentity)
+			if profileErr != nil {
+				return fail(profileErr)
+			}
+			profiles = append(profiles, profile)
 		}
-		profiles = append(profiles, profile)
 		profilesByModel[item.ModelProfileDigest] = item
 	}
 	roleGrounding, err := newBoundRoleGroundingResolver(resolved.team)
 	if err != nil {
 		return fail(fmt.Errorf("create role-grounding resolver: %w", err))
 	}
+	boundary := config.QualificationExecutionBoundary
+	var liveService *ProductionService
+	if nativeSelected {
+		nativeBoundary := &nativeagent.Boundary{Control: store, Journal: store, Owner: config.Native.Owner, LeaseTTL: resolved.nativeLease, Heartbeat: resolved.nativeHeartbeat}
+		nativeBoundary.Configure = func(configureCtx context.Context, brief application.ExecutionBrief) (nativeagent.Config, error) {
+			return configuredNativeSession(configureCtx, liveService, profilesByModel, resolved.nativeWorkflows, resolved.nativeResultSchemas, resolved.requestTimeout, brief)
+		}
+		boundary = nativeBoundary
+	}
+	agentToolBaseURL := ""
+	var agentToolSigningKey []byte
+	if useOpenHands {
+		agentToolBaseURL = "http://" + config.Operator.Address
+		agentToolSigningKey = []byte(resolved.operatorBearerToken)
+	}
 	runtime, err := New(ctx, Config{
 		Store: store, Catalogue: catalogue, Clock: clock, IDs: ids,
 		OpenHandsBaseURL: config.OpenHands.BaseURL, OpenHandsSessionAPIKey: resolved.sessionAPIKey,
-		AgentToolBaseURL: "http://" + config.Operator.Address, AgentToolSigningKey: []byte(resolved.operatorBearerToken),
-		HTTPClient: &http.Client{Timeout: resolved.requestTimeout}, WorkspaceBindings: workspaces, WorkspaceResolver: workspaceResolver, ExecutionProfiles: profiles, ExecutionBoundary: config.QualificationExecutionBoundary, RoleGrounding: roleGrounding, DeadlineExtensionReader: store,
+		AgentToolBaseURL: agentToolBaseURL, AgentToolSigningKey: agentToolSigningKey,
+		HTTPClient: &http.Client{Timeout: resolved.requestTimeout}, WorkspaceBindings: workspaces, WorkspaceResolver: workspaceResolver, ExecutionProfiles: profiles, ExecutionBoundary: boundary, RoleGrounding: roleGrounding, DeadlineExtensionReader: store,
 		OpenHandsPollInterval: resolved.pollInterval, OpenHandsMaximumPages: config.OpenHands.MaximumPages,
 		OpenHandsMaximumEvidence: config.OpenHands.MaximumEvidenceBytes, EvidenceRoot: config.EvidenceRoot,
 		ExecutionPolicy: application.OperationalExecutionPolicy{OperationTimeout: resolved.operationTimeout, MaximumBriefBytes: config.Execution.MaximumBriefBytes, ConsumerID: config.Execution.ConsumerID, PolicyRevision: config.Execution.PolicyRevision, ServiceAuthority: config.ServiceAuthority, ExpiryAuthority: config.ExpiryAuthority, Provenance: resolved.provenance},
@@ -966,7 +1093,8 @@ func NewProductionService(ctx context.Context, config ProductionConfig) (*Produc
 	for key, value := range resolved.trustedRolePublishers {
 		trustedPublishers[key] = append(ed25519.PublicKey(nil), value...)
 	}
-	service := &ProductionService{Store: store, Runtime: runtime, Controller: controller, RoleHost: roleHost, RoleRuntime: roleRuntime, MessageBus: messageBus, RoleInbox: roleInbox, RoleLibrary: roleLibrary, WorkflowLibrary: resolved.workflowLibrary, projectionInterval: resolved.projectionInterval, projectionTimeout: resolved.projectionTimeout, recoveryInterval: resolved.reconciliation, recoveryTimeout: resolved.leaseOperationTimeout, recoveryAttempts: config.Worker.MaximumReconciliations, failures: make(chan error, 4), featureWake: featureWake, provenance: resolved.provenance, operatorToken: resolved.operatorBearerToken, operatorIdentity: protocol.AuthenticatedContext{Principal: config.Operator.Principal}, humanCredentials: append([]HumanTransportCredential(nil), resolved.humanCredentials...), operatorTimeout: resolved.operatorTimeout, operatorMaxBody: config.Operator.MaximumBodyBytes, roleReconciliation: resolved.roleReconciliation, roleMaximumRestarts: config.Organization.MaximumRestarts, messageMaximumAttempts: config.Organization.MaximumDeliveryAttempts, qualificationNative: config.QualificationExecutionBoundary != nil, startPaused: config.Worker.StartPaused, suspendNewInvocations: config.Worker.SuspendNewInvocations, admissionLimitEnabled: config.Worker.NewInvocationAdmissionLimit > 0, admissionRemaining: config.Worker.NewInvocationAdmissionLimit, recoveryFaults: make(map[string]RecoveryFault), requestTimeout: resolved.requestTimeout, clock: clock, ids: ids, deploymentIdentity: config.DeploymentIdentity, continuityHeartbeat: resolved.continuityHeartbeat, continuityThreshold: resolved.continuityThreshold, planningDeadline: resolved.planningDeadline, planning: config.Planning, profilesByModel: profilesByModel, workspacesByID: workspacesByID, workspaceResolver: workspaceResolver, taskWorkspaces: taskWorkspaces, candidates: candidates, serviceAuthority: config.ServiceAuthority, policyAuthority: config.ExpiryAuthority, librarySources: librarySources, trustedRolePublishers: trustedPublishers, roleGrounding: roleGrounding}
+	service := &ProductionService{Store: store, Runtime: runtime, Controller: controller, RoleHost: roleHost, RoleRuntime: roleRuntime, MessageBus: messageBus, RoleInbox: roleInbox, RoleLibrary: roleLibrary, WorkflowLibrary: resolved.workflowLibrary, projectionInterval: resolved.projectionInterval, projectionTimeout: resolved.projectionTimeout, recoveryInterval: resolved.reconciliation, recoveryTimeout: resolved.leaseOperationTimeout, recoveryAttempts: config.Worker.MaximumReconciliations, failures: make(chan error, 4), featureWake: featureWake, provenance: resolved.provenance, operatorToken: resolved.operatorBearerToken, operatorIdentity: protocol.AuthenticatedContext{Principal: config.Operator.Principal}, humanCredentials: append([]HumanTransportCredential(nil), resolved.humanCredentials...), operatorTimeout: resolved.operatorTimeout, operatorMaxBody: config.Operator.MaximumBodyBytes, roleReconciliation: resolved.roleReconciliation, roleMaximumRestarts: config.Organization.MaximumRestarts, messageMaximumAttempts: config.Organization.MaximumDeliveryAttempts, qualificationNative: !useOpenHands, startPaused: config.Worker.StartPaused, suspendNewInvocations: config.Worker.SuspendNewInvocations, admissionLimitEnabled: config.Worker.NewInvocationAdmissionLimit > 0, admissionRemaining: config.Worker.NewInvocationAdmissionLimit, recoveryFaults: make(map[string]RecoveryFault), requestTimeout: resolved.requestTimeout, clock: clock, ids: ids, deploymentIdentity: config.DeploymentIdentity, continuityHeartbeat: resolved.continuityHeartbeat, continuityThreshold: resolved.continuityThreshold, planningDeadline: resolved.planningDeadline, planning: config.Planning, profilesByModel: profilesByModel, workspacesByID: workspacesByID, workspaceResolver: workspaceResolver, evidenceRoot: config.EvidenceRoot, taskWorkspaces: taskWorkspaces, candidates: candidates, serviceAuthority: config.ServiceAuthority, policyAuthority: config.ExpiryAuthority, librarySources: librarySources, trustedRolePublishers: trustedPublishers, roleGrounding: roleGrounding}
+	liveService = service
 	if config.Federation != nil {
 		federationIngress, ingressErr := organization.NewFederationIngress(resolved.federationRegistry, store, config.DeploymentIdentity, resolved.federationFutureSkew)
 		if ingressErr != nil {

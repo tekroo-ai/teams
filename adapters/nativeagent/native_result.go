@@ -74,7 +74,7 @@ func validateNativeValidationPayload(arguments json.RawMessage) error {
 		return ErrInvalidBinding
 	}
 	for _, evidence := range result.TestEvidence {
-		if strings.TrimSpace(evidence) != evidence || evidence == "" || len(evidence) > 4096 || strings.ContainsAny(evidence, "\r\n\t") {
+		if strings.TrimSpace(evidence) == "" || len(evidence) > 4096 {
 			return ErrInvalidBinding
 		}
 	}

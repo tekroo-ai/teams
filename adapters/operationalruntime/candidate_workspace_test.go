@@ -441,7 +441,7 @@ func TestNativeCandidateMaterializesWithoutOpenHandsHook(t *testing.T) {
 	consumer := organization.PlannedTask{ID: candidateTestUUID(1912), Owner: "teams::tester-1"}
 	targets := []candidateTargetReceipt{{TaskID: candidateTestUUID(1913), InvocationID: candidateTestUUID(1914), OutputSHA256: candidateTestDigest('a'), TerminalEvidenceIDs: []kernel.UUIDv7{candidateTestUUID(1915)}}}
 	source := ProductionWorkspace{WorkspaceID: "coder-1", WorktreeID: "coder-source", WorkingDirectory: repository, Branch: "source", BaselineSHA: baseline, WritablePaths: []string{"."}}
-	workspace, receipt, _, err := manager.Prepare(context.Background(), feature, consumer, "tester-1", source, targets, []string{"candidate-head"})
+	workspace, receipt, digest, err := manager.Prepare(context.Background(), feature, consumer, "tester-1", source, targets, []string{"candidate-head"})
 	if err != nil || receipt.SchemaVersion != nativeCandidateReceiptSchema || receipt.CandidateCommit != candidate || receipt.RuntimeHookSHA256 != "" {
 		t.Fatalf("native candidate workspace=%+v receipt=%+v err=%v", workspace, receipt, err)
 	}
@@ -452,8 +452,15 @@ func TestNativeCandidateMaterializesWithoutOpenHandsHook(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := newCandidateWorkspaceManagerWithMode(context.Background(), evidenceRoot, "git", time.Minute, gates, restartedResolver, false); err != nil {
+	restarted, err := newCandidateWorkspaceManagerWithMode(context.Background(), evidenceRoot, "git", time.Minute, gates, restartedResolver, false)
+	if err != nil {
 		t.Fatalf("native candidate rehydrate: %v", err)
+	}
+	for _, current := range []*candidateWorkspaceManager{manager, restarted} {
+		reusedWorkspace, reusedReceipt, reusedDigest, err := current.Prepare(context.Background(), feature, consumer, "tester-1", source, targets, []string{"candidate-head"})
+		if err != nil || reusedWorkspace.WorkingDirectory != workspace.WorkingDirectory || reusedReceipt.SchemaVersion != nativeCandidateReceiptSchema || reusedDigest != digest {
+			t.Fatalf("native candidate repeat workspace=%+v receipt=%+v digest=%s err=%v", reusedWorkspace, reusedReceipt, reusedDigest, err)
+		}
 	}
 }
 

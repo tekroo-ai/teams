@@ -199,12 +199,8 @@ func (manager *candidateWorkspaceManager) Prepare(ctx context.Context, feature o
 	if err != nil || !rechecked.equal(state) {
 		return ProductionWorkspace{}, candidateReceipt{}, "", errors.Join(errInvalidCandidateWorkspace, err)
 	}
-	schemaVersion := candidateReceiptSchema
-	if !manager.requireRuntimeHook {
-		schemaVersion = nativeCandidateReceiptSchema
-	}
 	receipt := candidateReceipt{
-		SchemaVersion: schemaVersion, CandidateID: candidateID, FeatureID: feature.ID, ConsumerTaskID: consumer.ID, ConsumerWorkspaceID: consumerWorkspaceID,
+		SchemaVersion: manager.receiptSchema(), CandidateID: candidateID, FeatureID: feature.ID, ConsumerTaskID: consumer.ID, ConsumerWorkspaceID: consumerWorkspaceID,
 		SourceWorkspaceID: source.WorkspaceID, SourceWorktreeID: source.WorktreeID, SourceWorkingDirectory: filepath.Clean(source.WorkingDirectory), SourceBranch: source.Branch,
 		RepositoryDigest: state.repositoryDigest, BaselineCommit: source.BaselineSHA, CandidateCommit: state.commit, CandidateTree: state.tree,
 		ChangedFileInventory: state.changedFiles, ChangedFileInventoryDigest: state.changedFilesDigest, DiffSHA256: state.diffDigest, RuntimeHookSHA256: state.runtimeHookDigest,
@@ -357,7 +353,7 @@ func (manager *candidateWorkspaceManager) existing(ctx context.Context, feature 
 	switch {
 	case json.Unmarshal(content, &receipt) != nil || !manager.validReceipt(receipt):
 		mismatch = "receipt-unreadable"
-	case receipt.SchemaVersion != candidateReceiptSchema:
+	case receipt.SchemaVersion != manager.receiptSchema():
 		mismatch = "schema"
 	case receipt.CandidateID != candidateID:
 		mismatch = "candidate-id"
@@ -407,6 +403,13 @@ func (manager *candidateWorkspaceManager) existing(ctx context.Context, feature 
 		return candidateReceipt{}, "", false, err
 	}
 	return receipt, digestBytes(content), true, nil
+}
+
+func (manager *candidateWorkspaceManager) receiptSchema() string {
+	if manager.requireRuntimeHook {
+		return candidateReceiptSchema
+	}
+	return nativeCandidateReceiptSchema
 }
 
 func candidateTargetsEqual(left, right []candidateTargetReceipt) bool {

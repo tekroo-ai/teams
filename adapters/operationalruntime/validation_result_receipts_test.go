@@ -51,7 +51,7 @@ func TestStructuredValidationResultReceiptBoundary(t *testing.T) {
 		t.Fatal("unbounded test_evidence accepted")
 	}
 
-	for _, receipt := range []string{"", " ok", "ok ", "first\nsecond", "first\tsecond", strings.Repeat("r", 4097)} {
+	for _, receipt := range []string{"", " ok", "ok ", strings.Repeat("r", 4097)} {
 		encoded, err := json.Marshal(map[string]any{
 			"schema_version": "1.0.0",
 			"outcome":        "PASS",

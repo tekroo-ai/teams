@@ -10,7 +10,11 @@ import (
 
 var planDeltaToolSchema = json.RawMessage(`{"type":"object","description":"Native plan result: supply only new dependency edges and handoffs. Teams carries the accepted architecture, decisions, assumptions, tasks, and source digest into the stored result.","additionalProperties":false,"required":["task_dependencies","handoffs"],"properties":{"task_dependencies":{"type":"array","description":"Additional task dependencies only; use [] when none are needed. Do not repeat existing dependencies.","maxItems":64,"items":{"type":"object","additionalProperties":false,"required":["task_index","depends_on"],"properties":{"task_index":{"type":"integer","minimum":0},"depends_on":{"type":"array","uniqueItems":true,"items":{"type":"integer","minimum":0}}}}},"handoffs":{"type":"array","description":"Cross-task capability handoffs; use [] when none are needed.","maxItems":4096,"items":{"type":"object","additionalProperties":false,"required":["provider_task_index","consumer_task_index","capability","contract"],"properties":{"provider_task_index":{"type":"integer","minimum":0},"consumer_task_index":{"type":"integer","minimum":0},"capability":{"type":"string","minLength":1},"contract":{"type":"string","minLength":1,"maxLength":4096}}}}}}`)
 
-func modelFacingPlanSchema(handlerSchema json.RawMessage) (json.RawMessage, error) {
+func modelFacingPlanSchema(handlerSchema json.RawMessage, plan *PlanFinalizationBinding) (json.RawMessage, error) {
+	_, tasks, err := acceptedPlanWorkProduct(plan)
+	if err != nil {
+		return nil, err
+	}
 	var schema map[string]json.RawMessage
 	if json.Unmarshal(handlerSchema, &schema) != nil {
 		return nil, ErrInvalidBinding
@@ -19,7 +23,32 @@ func modelFacingPlanSchema(handlerSchema json.RawMessage) (json.RawMessage, erro
 	if json.Unmarshal(schema["properties"], &properties) != nil || properties["work_product"] == nil {
 		return nil, ErrInvalidBinding
 	}
-	properties["work_product"] = append(json.RawMessage(nil), planDeltaToolSchema...)
+	var work map[string]json.RawMessage
+	if json.Unmarshal(planDeltaToolSchema, &work) != nil {
+		return nil, ErrInvalidBinding
+	}
+	var workProperties map[string]json.RawMessage
+	if json.Unmarshal(work["properties"], &workProperties) != nil {
+		return nil, ErrInvalidBinding
+	}
+	implementationTasks := 0
+	for _, task := range tasks {
+		var purpose string
+		if raw := task["purpose"]; raw == nil || json.Unmarshal(raw, &purpose) != nil || purpose == "IMPLEMENTATION" {
+			implementationTasks++
+		}
+	}
+	if implementationTasks < 2 {
+		var handoffs map[string]json.RawMessage
+		if json.Unmarshal(workProperties["handoffs"], &handoffs) != nil {
+			return nil, ErrInvalidBinding
+		}
+		handoffs["maxItems"] = json.RawMessage(`0`)
+		handoffs["description"] = json.RawMessage(`"No cross-task handoff is possible with fewer than two implementation tasks; submit []."`)
+		workProperties["handoffs"], _ = json.Marshal(handoffs)
+	}
+	work["properties"], _ = json.Marshal(workProperties)
+	properties["work_product"], _ = json.Marshal(work)
 	schema["properties"], _ = json.Marshal(properties)
 	return json.Marshal(schema)
 }

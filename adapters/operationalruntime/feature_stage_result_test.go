@@ -47,6 +47,10 @@ func TestPlan013HandoffClosureRunsBeforePMTaskCompletion(t *testing.T) {
 	if err := validateFinalizedHandoffs(tasks, []architectureHandoffResult{valid}); err != nil {
 		t.Fatalf("upstream provider rejected: %v", err)
 	}
+	self := architectureHandoffResult{ProviderTaskIndex: 0, ConsumerTaskIndex: 0, Capability: "go-test", Contract: "same task"}
+	if err := validateFinalizedHandoffs(tasks, []architectureHandoffResult{self}); err == nil || !strings.Contains(err.Error(), "cannot hand off to itself") {
+		t.Fatalf("self-handoff error not actionable: %v", err)
+	}
 	tasks[1].DependsOn = nil
 	if validateFinalizedHandoffs(tasks, []architectureHandoffResult{valid}) == nil {
 		t.Fatal("handoff from non-predecessor accepted")

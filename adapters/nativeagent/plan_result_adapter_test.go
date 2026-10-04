@@ -19,7 +19,7 @@ func TestPlanFinalizationAuthorsOnlyDependenciesAndHandoffs(t *testing.T) {
 {"outcome":"completed","work_product":{"schema_version":"1.0.0","result_type":"FEATURE_PLAN","architecture":"accepted design","design_decisions":["accepted decision"],"assumptions":["accepted assumption"],"tasks":[{"title":"first","depends_on":[]},{"title":"second","depends_on":[]}]}}`)
 	hash := sha256.Sum256(source)
 	plan := &PlanFinalizationBinding{SourceOutput: source, SourceDigest: kernel.Digest(fmt.Sprintf("%x", hash[:]))}
-	modelSchema, err := modelFacingPlanSchema(json.RawMessage(`{"type":"object","properties":{"work_product":{"type":"object"},"outcome":{"type":"string"}}}`))
+	modelSchema, err := modelFacingPlanSchema(json.RawMessage(`{"type":"object","properties":{"work_product":{"type":"object"},"outcome":{"type":"string"}}}`), plan)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,6 +62,28 @@ func TestPlanFinalizationAuthorsOnlyDependenciesAndHandoffs(t *testing.T) {
 		if _, err := bindHandlerPlanResult(json.RawMessage(invalid), plan); err == nil {
 			t.Fatalf("invalid plan delta accepted: %s", invalid)
 		}
+	}
+}
+
+func TestPlanFinalizationSchemaForbidsHandoffsWithOneImplementationTask(t *testing.T) {
+	source := []byte(application.OrganizationalResultMarker + `
+{"work_product":{"result_type":"FEATURE_PLAN","tasks":[{"purpose":"IMPLEMENTATION","depends_on":[]},{"purpose":"VALIDATION","depends_on":[0]}]}}`)
+	plan := &PlanFinalizationBinding{SourceOutput: source}
+	modelSchema, err := modelFacingPlanSchema(json.RawMessage(`{"type":"object","properties":{"work_product":{"type":"object"}}}`), plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var schema struct {
+		Properties map[string]json.RawMessage `json:"properties"`
+	}
+	var work struct {
+		Properties map[string]json.RawMessage `json:"properties"`
+	}
+	var handoffs struct {
+		MaxItems *int `json:"maxItems"`
+	}
+	if json.Unmarshal(modelSchema, &schema) != nil || json.Unmarshal(schema.Properties["work_product"], &work) != nil || json.Unmarshal(work.Properties["handoffs"], &handoffs) != nil || handoffs.MaxItems == nil || *handoffs.MaxItems != 0 {
+		t.Fatalf("single implementation task must admit no cross-task handoffs: %s", modelSchema)
 	}
 }
 

@@ -15,6 +15,15 @@ func TestParseStructuredValidationResultAcceptsValidatedHandlerEnvelope(t *testi
 	}
 }
 
+func TestParseStructuredValidationResultRetainsGoTestSpacing(t *testing.T) {
+	output := []byte(application.OrganizationalResultMarker + `
+{"schema_version":"1.0.0","outcome":"completed","summary":"validated","evidence":[],"message_proposals":[],"work_product":{"schema_version":"1.0.0","outcome":"PASS","reasons":["criterion verified"],"test_evidence":["go test ./...: ok  \texample.test/nativequalification\t0.120s"]}}`)
+	result, err := parseStructuredValidationResult(output)
+	if err != nil || len(result.TestEvidence) != 1 || result.TestEvidence[0] != "go test ./...: ok  \texample.test/nativequalification\t0.120s" {
+		t.Fatalf("go test evidence rejected: result=%#v err=%v", result, err)
+	}
+}
+
 func TestStructuredValidationResultFailsClosed(t *testing.T) {
 	valid := []byte("Validated with repository tests.\n" + application.ValidationResultMarker + "\n{\"schema_version\":\"1.0.0\",\"outcome\":\"PASS\",\"reasons\":[\"go test passed\"]}")
 	if result, err := parseStructuredValidationResult(valid); err != nil || result.Outcome != "PASS" {

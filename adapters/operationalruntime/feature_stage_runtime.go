@@ -1666,12 +1666,21 @@ func validateFinalizedHandoffs(tasks []architectureTaskResult, handoffs []archit
 	seen := make(map[string]struct{}, len(handoffs))
 	for _, handoff := range handoffs {
 		provider, consumer := handoff.ProviderTaskIndex, handoff.ConsumerTaskIndex
-		if provider >= uint32(len(tasks)) || consumer >= uint32(len(tasks)) || provider == consumer || tasks[provider].Purpose != kernel.PurposeImplementation || tasks[consumer].Purpose != kernel.PurposeImplementation || !organization.ValidHandoffCapability(handoff.Capability) || handoff.Contract == "" || len(handoff.Contract) > 4096 {
-			return organization.ErrInvalidFeature
+		if provider >= uint32(len(tasks)) || consumer >= uint32(len(tasks)) {
+			return fmt.Errorf("%w: handoff task index out of range: provider=%d consumer=%d tasks=%d", organization.ErrInvalidFeature, provider, consumer, len(tasks))
+		}
+		if provider == consumer {
+			return fmt.Errorf("%w: task %d cannot hand off to itself; omit this handoff", organization.ErrInvalidFeature, provider)
+		}
+		if tasks[provider].Purpose != kernel.PurposeImplementation || tasks[consumer].Purpose != kernel.PurposeImplementation {
+			return fmt.Errorf("%w: handoff %d -> %d must connect implementation tasks", organization.ErrInvalidFeature, provider, consumer)
+		}
+		if !organization.ValidHandoffCapability(handoff.Capability) || handoff.Contract == "" || len(handoff.Contract) > 4096 {
+			return fmt.Errorf("%w: handoff %d -> %d has invalid capability or contract", organization.ErrInvalidFeature, provider, consumer)
 		}
 		key := fmt.Sprintf("%d\x00%s", consumer, handoff.Capability)
 		if _, duplicate := seen[key]; duplicate {
-			return organization.ErrInvalidFeature
+			return fmt.Errorf("%w: duplicate handoff capability %q for consumer task %d", organization.ErrInvalidFeature, handoff.Capability, consumer)
 		}
 		seen[key] = struct{}{}
 		dependencies, err := architectureTaskDependencyContracts(tasks, consumer)
@@ -1683,7 +1692,7 @@ func validateFinalizedHandoffs(tasks []architectureTaskResult, handoffs []archit
 			upstream = upstream || dependency.TaskIndex == provider
 		}
 		if !upstream {
-			return organization.ErrInvalidFeature
+			return fmt.Errorf("%w: handoff provider task %d is not upstream of consumer task %d", organization.ErrInvalidFeature, provider, consumer)
 		}
 	}
 	return nil

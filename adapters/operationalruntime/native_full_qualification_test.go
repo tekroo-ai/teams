@@ -9,7 +9,6 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -97,115 +96,13 @@ func TestNativeFullFeatureQualification(t *testing.T) {
 	config.Execution.ConsumerID = "native-qualification"
 	config.Worker.ReconciliationInterval = "250ms"
 	config.Planning.Deadline = "90m"
-	schemas := nativeQualificationSchemas(t, config.Organization.ManifestFile)
-	profiles := make(map[kernel.Digest]ProductionProfile, len(config.Profiles))
-	for _, profile := range config.Profiles {
-		profiles[profile.ModelProfileDigest] = profile
-	}
-	boundary := &nativeagent.Boundary{Owner: "native-qualification", LeaseTTL: 90 * time.Second, Heartbeat: 15 * time.Second}
-	var service *ProductionService
-	boundary.Configure = func(ctx context.Context, brief application.ExecutionBrief) (nativeagent.Config, error) {
-		profile, found := profiles[brief.ModelProfileDigest]
-		if !found || service == nil {
-			return nativeagent.Config{}, nativeagent.ErrInvalidBinding
-		}
-		permissions := brief.RoleGrounding.Permissions
-		readTools := make([]string, 0)
-		for _, definition := range agenttools.ReadOnlyDefinitions(permissions) {
-			readTools = append(readTools, definition.Name)
-		}
-		slices.Sort(readTools)
-		effectTools := make([]string, 0)
-		if brief.Purpose == kernel.PurposeImplementation || brief.Purpose == kernel.PurposeRepair {
-			for _, definition := range agenttools.MutationDefinitions(permissions) {
-				effectTools = append(effectTools, definition.Name)
-			}
-		}
-		if brief.Purpose == kernel.PurposeValidation || brief.Purpose == kernel.PurposeImplementation || brief.Purpose == kernel.PurposeRepair {
-			for _, definition := range agenttools.TestDefinitions(permissions) {
-				effectTools = append(effectTools, definition.Name)
-			}
-		}
-		slices.Sort(effectTools)
-		var resultContract *nativeagent.ResultContract
-		if brief.MessageHandler == nil && brief.ResultProtocol != nil && (brief.Purpose == kernel.PurposeHandoff || brief.Purpose == kernel.PurposeReplan) {
-			definition, lookupErr := service.WorkflowLibrary.LookupTrigger("tekroo.message.feature.submitted")
-			if lookupErr != nil {
-				return nativeagent.Config{}, lookupErr
-			}
-			resultContract, lookupErr = ResolveNativeWorkflowResultContract(brief, definition, schemas)
-			if lookupErr != nil {
-				return nativeagent.Config{}, lookupErr
-			}
-		}
-		maximumOutput := 8192
-		var settings struct {
-			LLM struct {
-				MaximumOutput int `json:"max_output_tokens"`
-			} `json:"llm"`
-		}
-		if json.Unmarshal(profile.AgentSettings, &settings) == nil && settings.LLM.MaximumOutput > 0 {
-			maximumOutput = settings.LLM.MaximumOutput
-		}
-		// An 8192-token project-manager response ended with finish_reason=length
-		// during qualification. Give signed planning results enough output
-		// headroom without changing the existing production profile.
-		if (brief.Purpose == kernel.PurposeHandoff || brief.Purpose == kernel.PurposeReplan) && maximumOutput < 32768 {
-			maximumOutput = 32768
-		}
-		result := nativeagent.Config{
-			Bindings: service.Runtime.toolGateway.Bindings,
-			Gateway:  service.Runtime.toolGateway,
-			HTTP:     &http.Client{Timeout: 20 * time.Minute},
-			Profile: nativeagent.Profile{
-				RoleFQRN: profile.RoleFQRN, RoleBundleDigest: profile.RoleBundleDigest,
-				ModelProfileDigest: profile.ModelProfileDigest, RuntimeIdentityDigest: profile.RuntimeIdentityDigest,
-				ToolPolicyDigest: profile.ToolPolicyDigest, EffectPolicyDigest: profile.EffectPolicyDigest,
-				BaseURL: baseURL, Model: model, MaxOutputTokens: maximumOutput,
-				AllowedReadTools: readTools, AllowedEffectTools: effectTools,
-			},
-			ResultContract: resultContract,
-		}
-		if len(effectTools) > 0 {
-			result.Effects = service.Store
-		}
-		if strings.HasPrefix(brief.Scope.WorktreeID, "candidate-") {
-			workspace, resolveErr := service.workspaceResolver.ResolveWorkspace(ctx, brief.Scope)
-			if resolveErr != nil || workspace.Candidate == nil {
-				return nativeagent.Config{}, nativeagent.ErrInvalidBinding
-			}
-			result.Candidate = &nativeagent.CandidateBinding{
-				ID: kernel.UUIDv7(workspace.Candidate.CandidateID), ReceiptSHA256: workspace.Candidate.ReceiptSHA256,
-			}
-		}
-		feature, stage, _, _, planning, lookupErr := service.planningFeatureForTask(ctx, brief.Task.TaskID)
-		if lookupErr != nil {
-			return nativeagent.Config{}, lookupErr
-		}
-		if planning && stage == stagePlanFinalization {
-			_, architectureOutput, sourceErr := service.featureArchitectureCandidate(ctx, feature)
-			if sourceErr != nil || feature.Design == nil || digestBytes(architectureOutput) != feature.Design.OutputDigest {
-				return nativeagent.Config{}, errors.Join(nativeagent.ErrInvalidBinding, sourceErr)
-			}
-			result.PlanFinalization = &nativeagent.PlanFinalizationBinding{
-				SourceOutput: append([]byte(nil), architectureOutput...), SourceDigest: feature.Design.OutputDigest,
-			}
-		}
-		if planning {
-			result.ValidateFinalResult = func(finalCtx context.Context, output []byte) error {
-				return service.validateFeatureStageOutputWithEvidence(finalCtx, feature, stage, output)
-			}
-		}
-		return result, nil
-	}
-	config.QualificationExecutionBoundary = boundary
+	nativeQualificationBindNativeProfiles(t, &config, root, baseURL, model)
 	startup, cancelStartup := context.WithTimeout(context.Background(), 30*time.Second)
-	service, err = NewProductionService(startup, config)
+	service, err := NewProductionService(startup, config)
 	cancelStartup()
 	if err != nil {
 		t.Fatal(err)
 	}
-	boundary.Control, boundary.Journal = service.Store, service.Store
 	defer func() {
 		closeCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
@@ -253,6 +150,16 @@ func TestNativeFullFeatureQualification(t *testing.T) {
 		}
 		if current.Plan != nil {
 			for _, planned := range current.Plan.Tasks {
+				state, _, foundTask, stateErr := service.Store.ReadAggregateHead(featureCtx, kernel.AggregateRef{Kind: kernel.AggregateTask, ID: planned.ID})
+				if stateErr != nil {
+					t.Fatalf("read task %s state: %v", planned.ID, stateErr)
+				}
+				if foundTask && state.Condition == kernel.ConditionBlocked {
+					if output := os.Getenv("TEKROO_NATIVE_QUAL_OUTPUT"); output != "" {
+						retainNativeQualificationEvidence(t, featureCtx, service, config, current, baseline, output)
+					}
+					t.Fatalf("native task %s purpose=%s reached BLOCKED; feature remains %s", planned.ID, planned.Purpose, current.Status)
+				}
 				decision, decisionErr := service.Store.LoadDecision(featureCtx, kernel.KernelCommand{Target: kernel.AggregateRef{Kind: kernel.AggregateTask, ID: planned.ID}})
 				if decisionErr != nil {
 					continue
@@ -333,6 +240,9 @@ func TestNativeFullFeatureQualification(t *testing.T) {
 			if current.Plan == nil || current.Acceptance == nil {
 				t.Fatalf("incomplete final feature state: %#v", current)
 			}
+			if output := os.Getenv("TEKROO_NATIVE_QUAL_OUTPUT"); output != "" {
+				retainNativeQualificationEvidence(t, featureCtx, service, config, current, baseline, output)
+			}
 			t.Logf("native full feature reached acceptance review: %s", current.ID)
 			return
 		}
@@ -342,6 +252,92 @@ func TestNativeFullFeatureQualification(t *testing.T) {
 		time.Sleep(2 * time.Second)
 	}
 	t.Fatalf("native feature did not finish before bounded deadline; last status=%s", lastStatus)
+}
+
+// Retain the raw native journal and execution outputs before the disposable
+// MongoDB and workspaces are removed. This is a measurement receipt, not a
+// production model qualification: admission above uses synthetic fixtures.
+func retainNativeQualificationEvidence(t *testing.T, ctx context.Context, service *ProductionService, config ProductionConfig, feature organization.FeatureRequest, baseline, output string) {
+	t.Helper()
+	if !filepath.IsAbs(output) {
+		t.Fatal("native qualification output must be an absolute new directory")
+	}
+	if err := os.Mkdir(output, 0700); err != nil {
+		t.Fatalf("create new native qualification output: %v", err)
+	}
+	type invocationEvidence struct {
+		Invocation kernel.WorkInvocation `json:"invocation"`
+		Journal    any                   `json:"journal"`
+		Output     any                   `json:"output,omitempty"`
+	}
+	type taskEvidence struct {
+		TaskID      kernel.UUIDv7         `json:"task_id"`
+		StateFound  bool                  `json:"state_found"`
+		State       kernel.AggregateState `json:"state"`
+		Invocations []invocationEvidence  `json:"invocations"`
+	}
+	tasks := make([]taskEvidence, 0, 4+len(feature.Plan.Tasks))
+	collect := func(taskID kernel.UUIDv7) {
+		t.Helper()
+		decision, err := service.Store.LoadDecision(ctx, kernel.KernelCommand{Target: kernel.AggregateRef{Kind: kernel.AggregateTask, ID: taskID}})
+		if err != nil {
+			t.Fatalf("load task %s for raw native evidence: %v", taskID, err)
+		}
+		state, _, found, stateErr := service.Store.ReadAggregateHead(ctx, kernel.AggregateRef{Kind: kernel.AggregateTask, ID: taskID})
+		if stateErr != nil {
+			t.Fatalf("read task %s state for raw native evidence: %v", taskID, stateErr)
+		}
+		item := taskEvidence{TaskID: taskID, StateFound: found, State: state}
+		for _, invocation := range decision.WorkInvocations {
+			if invocation.TaskID != taskID {
+				continue
+			}
+			journal, err := service.Store.Load(ctx, string(invocation.ID))
+			if err != nil {
+				t.Fatalf("load native journal %s: %v", invocation.ID, err)
+			}
+			entry := invocationEvidence{Invocation: invocation, Journal: journal}
+			if invocation.OutputDigest != nil {
+				value, err := service.Runtime.ReadExecutionOutput(ctx, *invocation.OutputDigest)
+				if err != nil {
+					t.Fatalf("load native output %s: %v", invocation.ID, err)
+				}
+				entry.Output = value
+			}
+			item.Invocations = append(item.Invocations, entry)
+		}
+		slices.SortFunc(item.Invocations, func(a, b invocationEvidence) int {
+			return strings.Compare(string(a.Invocation.ID), string(b.Invocation.ID))
+		})
+		tasks = append(tasks, item)
+	}
+	for _, stage := range []featurePlanningStage{stageRefinement, stageSpecification, stageArchitecture, stagePlanFinalization} {
+		collect(featurePlanningTaskID(feature.ID, stage, 0, nil))
+	}
+	for _, planned := range feature.Plan.Tasks {
+		collect(planned.ID)
+	}
+	receipt := struct {
+		SchemaVersion string                      `json:"schema_version"`
+		MeasuredAt    time.Time                   `json:"measured_at"`
+		Baseline      string                      `json:"baseline"`
+		Model         string                      `json:"model"`
+		Manifest      kernel.Digest               `json:"manifest_digest"`
+		Profiles      []ProductionProfile         `json:"profiles"`
+		Feature       organization.FeatureRequest `json:"feature"`
+		Tasks         []taskEvidence              `json:"tasks"`
+	}{"native-feature-measurement/1", time.Now().UTC(), baseline, config.Profiles[0].NativeSettings.Model, config.Organization.ManifestDigest, config.Profiles, feature, tasks}
+	raw, err := json.MarshalIndent(receipt, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw = append(raw, '\n')
+	path := filepath.Join(output, "native-evidence.json")
+	if err := os.WriteFile(path, raw, 0600); err != nil {
+		t.Fatalf("retain native qualification evidence: %v", err)
+	}
+	digest := sha256.Sum256(raw)
+	t.Logf("native raw evidence path=%s sha256=%x", path, digest)
 }
 
 func nativeQualificationWorkspaces(t *testing.T, root string, original []ProductionWorkspace) ([]ProductionWorkspace, string, string) {
@@ -519,6 +515,130 @@ func nativeQualificationBindSignedCoderSuccessor(t *testing.T, config *Productio
 	config.Organization.ManifestDigest = kernel.Digest(hex.EncodeToString(manifestDigest[:]))
 	config.Organization.Publishers = append(config.Organization.Publishers, ProductionPublisher{KeyID: bundle.PublisherKeyID, PublicKeyFile: publicPath})
 	t.Logf("isolated signed coder successor bundle=%s manifest=%s profile=%s synthetic_admission=true", bundleDigest, config.Organization.ManifestDigest, modelDigest)
+}
+
+// The model-admission records below are test-only bootstrap fixtures. The
+// measured run must publish its own raw receipts before any native profile can
+// be treated as qualified outside this disposable namespace.
+func nativeQualificationBindNativeProfiles(t *testing.T, config *ProductionConfig, root, baseURL, model string) {
+	t.Helper()
+	manifestPath := config.Organization.ManifestFile
+	var manifest organization.TeamManifest
+	if err := readStrictJSONFile(manifestPath, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	ids, err := NewUUIDv7Source(SystemClock{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for index := range config.Profiles {
+		profile := &config.Profiles[index]
+		var old struct {
+			LLM struct {
+				MaximumOutput int `json:"max_output_tokens"`
+			} `json:"llm"`
+		}
+		if err := json.Unmarshal(profile.AgentSettings, &old); err != nil {
+			t.Fatal(err)
+		}
+		maximumOutput := old.LLM.MaximumOutput
+		if maximumOutput < 8192 {
+			maximumOutput = 8192
+		}
+		if profile.RoleFQRN == "project-manager" && maximumOutput < 32768 {
+			maximumOutput = 32768
+		}
+		settings := nativeagent.ProfileSettings{SchemaVersion: nativeagent.ProfileSettingsVersion, BaseURL: baseURL, Model: model, MaxOutputTokens: maximumOutput}
+		modelDigest, err := nativeagent.ModelProfileDigest(profile.RoleFQRN, profile.RoleBundleDigest, settings)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var permissions []string
+		for bindingIndex := range manifest.Roles {
+			if manifest.Roles[bindingIndex].Role != string(profile.RoleFQRN) {
+				continue
+			}
+			bundlePath := filepath.Join(filepath.Dir(manifestPath), manifest.Roles[bindingIndex].BundlePath)
+			var bundle organization.RoleBundle
+			if err := readStrictJSONFile(bundlePath, &bundle); err != nil {
+				t.Fatal(err)
+			}
+			permissions = bundle.Permissions
+			manifest.Roles[bindingIndex].ModelProfileDigest = modelDigest
+			break
+		}
+		if permissions == nil {
+			t.Fatalf("native qualification role %s is absent from signed manifest", profile.RoleFQRN)
+		}
+		surface, err := agenttools.NativeToolSurfaceDigest(permissions)
+		if err != nil {
+			t.Fatal(err)
+		}
+		profile.ModelProfileDigest = modelDigest
+		profile.ToolPolicyDigest = surface
+		profile.NativeSettings = &settings
+		profile.AgentSettings = nil
+		profile.MaximumIterations = 0
+		if profile.Qualification == nil || profile.QualificationCorpus == nil {
+			continue
+		}
+		corpus := *profile.QualificationCorpus
+		corpus.ToolSurfaceDigest = surface
+		corpusDigest, err := corpus.Digest()
+		if err != nil {
+			t.Fatal(err)
+		}
+		qualification := profile.Qualification.Clone()
+		qualification.QualificationID, err = ids.Next()
+		if err != nil {
+			t.Fatal(err)
+		}
+		evidenceID, err := ids.Next()
+		if err != nil {
+			t.Fatal(err)
+		}
+		qualification.EvidenceIDs = []kernel.UUIDv7{evidenceID}
+		qualification.ModelProfileDigest = modelDigest
+		qualification.QualificationCorpusDigest = corpusDigest
+		qualification.ObservedAt = time.Now().UTC().Add(-time.Second)
+		expires := qualification.ObservedAt.Add(2 * time.Hour)
+		qualification.ExpiresAt = &expires
+		qualification.RevokedAt = nil
+		qualification.QualificationDigest, err = application.QualificationDigest(qualification)
+		if err != nil {
+			t.Fatal(err)
+		}
+		profile.QualificationCorpus = &corpus
+		profile.Qualification = &qualification
+	}
+	encoded, err := json.MarshalIndent(manifest, "", "  ")
+	if err != nil || manifest.Validate() != nil {
+		t.Fatalf("native qualification manifest: %v", err)
+	}
+	encoded = append(encoded, '\n')
+	if err := os.WriteFile(manifestPath, encoded, 0600); err != nil {
+		t.Fatal(err)
+	}
+	manifestDigest := sha256.Sum256(encoded)
+	config.Organization.ManifestDigest = kernel.Digest(hex.EncodeToString(manifestDigest[:]))
+	schemas := nativeQualificationSchemas(t, manifestPath)
+	refs := make([]string, 0, len(schemas))
+	for ref := range schemas {
+		refs = append(refs, ref)
+	}
+	slices.Sort(refs)
+	bound := make([]ProductionNativeResultSchema, 0, len(refs))
+	for index, ref := range refs {
+		path := filepath.Join(root, fmt.Sprintf("native-result-%d.schema.json", index))
+		if err := os.WriteFile(path, schemas[ref].JSON, 0600); err != nil {
+			t.Fatal(err)
+		}
+		bound = append(bound, ProductionNativeResultSchema{Reference: ref, Path: path, SHA256: schemas[ref].SHA256})
+	}
+	config.ExecutionBackend = "native"
+	config.Native = &ProductionNativeConfig{Owner: "native-qualification", LeaseDuration: "90s", Heartbeat: "15s", RequestTimeout: "20m", WorkflowTriggers: []string{"tekroo.message.feature.submitted"}, ResultSchemas: bound}
+	config.OpenHands = ProductionOpenHandsConfig{}
+	t.Logf("isolated native profile manifest=%s bootstrap_admission=synthetic", config.Organization.ManifestDigest)
 }
 
 func nativeQualificationRequireCoderTestPermission(t *testing.T, manifestPath string) {

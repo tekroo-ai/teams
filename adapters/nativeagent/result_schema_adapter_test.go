@@ -68,6 +68,10 @@ func TestValidationHandlerNestsExactVerdictAndBindsCandidate(t *testing.T) {
 	if json.Unmarshal(bound, &result) != nil || result.WorkProduct.CandidateID != candidate.ID || result.WorkProduct.CandidateReceiptSHA256 != candidate.ReceiptSHA256 {
 		t.Fatalf("candidate not bound: %s", bound)
 	}
+	withTestOutput := json.RawMessage(`{"outcome":"completed","work_product":{"schema_version":"1.0.0","outcome":"PASS","reasons":["independent validation passed"],"test_evidence":["ok example.test/nativequalification\t1.203s\nPASS"]}}`)
+	if _, err := bindHandlerValidationResult(withTestOutput, candidate); err != nil {
+		t.Fatalf("JSON Schema-valid go test output could not be submitted: %v", err)
+	}
 	for _, invalid := range []string{
 		`{"outcome":"completed","work_product":{"schema_version":"1.0.0","outcome":"FAIL","reasons":["failure"]}}`,
 		`{"outcome":"completed","work_product":{"schema_version":"1.0.0","outcome":"PASS","reasons":["ok"],"extra":1}}`,

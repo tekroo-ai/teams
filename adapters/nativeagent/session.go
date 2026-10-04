@@ -1,6 +1,5 @@
 // Package nativeagent binds the Teams-owned turn runner to one admitted
-// invocation. It is opt-in and does not replace the production OpenHands
-// execution boundary yet.
+// invocation. The file-backed production backend selects it explicitly.
 package nativeagent
 
 import (
@@ -47,6 +46,7 @@ type Config struct {
 	Journal         agentruntime.Journal
 	Effects         agenttools.EffectLedger
 	SemanticContext agentruntime.SemanticContextProvider
+	EvidenceReader  EvidenceReader
 	ResultContract  *ResultContract
 	// Candidate is resolved by Teams from the immutable workspace binding, not
 	// supplied by the model. It binds a validation result to the exact receipt.
@@ -170,7 +170,7 @@ func prepare(ctx context.Context, brief application.ExecutionBrief, requestDiges
 	for _, name := range profile.AllowedReadTools {
 		allowed[name] = struct{}{}
 	}
-	definitions := make([]agentruntime.ToolDefinition, 0, len(allowed)+1)
+	definitions := make([]agentruntime.ToolDefinition, 0, len(allowed)+len(profile.AllowedEffectTools)+2)
 	for _, definition := range canonical {
 		if _, ok := allowed[definition.Name]; ok {
 			definitions = append(definitions, definition)
@@ -183,6 +183,15 @@ func prepare(ctx context.Context, brief application.ExecutionBrief, requestDiges
 	for _, name := range profile.AllowedReadTools {
 		allowed[name] = struct{}{}
 	}
+	var evidenceTool *admittedEvidenceTool
+	if len(brief.Evidence) > 0 && config.EvidenceReader != nil {
+		evidenceTool, err = newAdmittedEvidenceTool(config.EvidenceReader, brief.Evidence)
+		if err != nil {
+			return Session{}, err
+		}
+		definitions = append(definitions, evidenceTool.definition())
+	}
+	readDefinitionCount := len(definitions)
 	var effects agentruntime.Effects
 	var effectAuthority *agentruntime.EffectAuthority
 	if allowEffects {
@@ -208,7 +217,7 @@ func prepare(ctx context.Context, brief application.ExecutionBrief, requestDiges
 				delete(selected, definition.Name)
 			}
 		}
-		if len(selected) != 0 || len(definitions) != len(profile.AllowedReadTools)+len(profile.AllowedEffectTools) {
+		if len(selected) != 0 || len(definitions) != readDefinitionCount+len(profile.AllowedEffectTools) {
 			return Session{}, ErrInvalidBinding
 		}
 		mutation := agenttools.MutationTurnAdapter{Gateway: agenttools.MutationGateway{
@@ -235,7 +244,7 @@ func prepare(ctx context.Context, brief application.ExecutionBrief, requestDiges
 			return Session{}, ErrInvalidBinding
 		}
 		if config.PlanFinalization != nil {
-			modelSchema, err = modelFacingPlanSchema(modelSchema)
+			modelSchema, err = modelFacingPlanSchema(modelSchema, config.PlanFinalization)
 			if err != nil {
 				return Session{}, errors.Join(ErrInvalidBinding, err)
 			}
@@ -315,8 +324,9 @@ func prepare(ctx context.Context, brief application.ExecutionBrief, requestDiges
 			ContextProvider: config.SemanticContext,
 			WorkspaceRoot:   initial.WorkspaceRoot,
 			Tools: allowedReadTools{
-				inner:   agenttools.ReadOnlyTurnAdapter{Gateway: config.Gateway, InvocationID: brief.InvocationID, RequestDigest: requestDigest},
-				allowed: allowed,
+				inner:    agenttools.ReadOnlyTurnAdapter{Gateway: config.Gateway, InvocationID: brief.InvocationID, RequestDigest: requestDigest},
+				allowed:  allowed,
+				evidence: evidenceTool,
 			},
 			SystemPrompt:        brief.RoleGrounding.Instructions,
 			FinalTool:           finalTool,
@@ -330,8 +340,9 @@ func prepare(ctx context.Context, brief application.ExecutionBrief, requestDiges
 }
 
 type allowedReadTools struct {
-	inner   agentruntime.ReadOnlyTools
-	allowed map[string]struct{}
+	inner    agentruntime.ReadOnlyTools
+	allowed  map[string]struct{}
+	evidence *admittedEvidenceTool
 }
 
 type allowedEffects struct {
@@ -365,6 +376,9 @@ func (effects allowedEffects) ReconcileEffect(ctx context.Context, call agentrun
 }
 
 func (tools allowedReadTools) ExecuteReadOnly(ctx context.Context, call agentruntime.ToolCall) (json.RawMessage, error) {
+	if call.Name == "read_evidence" && tools.evidence != nil {
+		return tools.evidence.read(ctx, call.Arguments)
+	}
 	if _, ok := tools.allowed[call.Name]; !ok {
 		return nil, agenttools.ErrForbidden
 	}

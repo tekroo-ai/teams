@@ -71,7 +71,7 @@ func parseStructuredValidationResult(output []byte) (structuredValidationResult,
 		return structuredValidationResult{}, errInvalidValidationResult
 	}
 	for _, receipt := range result.TestEvidence {
-		if strings.TrimSpace(receipt) != receipt || receipt == "" || len(receipt) > 4096 || strings.ContainsAny(receipt, "\r\n\t") {
+		if strings.TrimSpace(receipt) != receipt || receipt == "" || len(receipt) > 4096 {
 			return structuredValidationResult{}, errInvalidValidationResult
 		}
 	}
