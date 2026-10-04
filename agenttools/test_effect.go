@@ -25,7 +25,7 @@ type TestGateway struct {
 func (gateway TestGateway) Execute(ctx context.Context, request Request) (Receipt, error) {
 	if gateway.Bindings == nil || gateway.Ledger == nil || gateway.Host.Timeout <= 0 || !gateway.Policy.Valid() ||
 		!request.InvocationID.Valid() || !request.RequestDigest.Valid() || strings.TrimSpace(request.ToolCallID) == "" || len(request.ToolCallID) > 256 ||
-		request.Call.Name != "run_go_tests" {
+		!isGoTestTool(request.Call.Name) {
 		return Receipt{}, ErrInvalidCall
 	}
 	var args struct {
@@ -41,7 +41,7 @@ func (gateway TestGateway) Execute(ctx context.Context, request Request) (Receip
 		return Receipt{}, err
 	}
 	if authority.EffectPolicyDigest != gateway.Policy || !permitted(authority.Permissions, "test.execute") ||
-		authority.Purpose != kernel.PurposeValidation && authority.Purpose != kernel.PurposeImplementation && authority.Purpose != kernel.PurposeRepair {
+		!goTestPurposeAllowed(request.Call.Name, authority.Purpose) {
 		return Receipt{}, ErrForbidden
 	}
 	root, err := canonicalRoot(authority.WorkspaceRoot)
@@ -78,7 +78,7 @@ func (gateway TestGateway) Execute(ctx context.Context, request Request) (Receip
 
 func (gateway TestGateway) Reconcile(ctx context.Context, request Request) (Receipt, bool, error) {
 	if gateway.Bindings == nil || gateway.Ledger == nil || !gateway.Policy.Valid() || !request.InvocationID.Valid() ||
-		!request.RequestDigest.Valid() || request.Call.Name != "run_go_tests" || strings.TrimSpace(request.ToolCallID) == "" {
+		!request.RequestDigest.Valid() || !isGoTestTool(request.Call.Name) || strings.TrimSpace(request.ToolCallID) == "" {
 		return Receipt{}, false, ErrInvalidCall
 	}
 	var args struct {
@@ -92,7 +92,7 @@ func (gateway TestGateway) Reconcile(ctx context.Context, request Request) (Rece
 		return Receipt{}, false, err
 	}
 	if authority.EffectPolicyDigest != gateway.Policy || !permitted(authority.Permissions, "test.execute") ||
-		authority.Purpose != kernel.PurposeValidation && authority.Purpose != kernel.PurposeImplementation && authority.Purpose != kernel.PurposeRepair {
+		!goTestPurposeAllowed(request.Call.Name, authority.Purpose) {
 		return Receipt{}, false, ErrForbidden
 	}
 	root, err := canonicalRoot(authority.WorkspaceRoot)
@@ -121,8 +121,21 @@ func testEffectReceipt(request Request, argumentsHash string, stored EffectRecor
 		return Receipt{}, ErrEffectUncertain
 	}
 	var result Result
-	if json.Unmarshal(stored.Result, &result) != nil || result.Name != "run_go_tests" || !validFullGitSHA(result.CommitSHA) || result.SHA256 == "" || !validExpectedSHA(result.SHA256) {
+	if json.Unmarshal(stored.Result, &result) != nil || result.Name != request.Call.Name || !validFullGitSHA(result.CommitSHA) || !validExpectedSHA(result.SHA256) ||
+		request.Call.Name == "run_go_tests_worktree" && !validExpectedSHA(result.SnapshotSHA256) ||
+		request.Call.Name == "run_go_tests" && result.SnapshotSHA256 != "" {
 		return Receipt{}, ErrEffectUncertain
 	}
 	return effectReceipt(request, argumentsHash, result)
+}
+
+func isGoTestTool(name string) bool {
+	return name == "run_go_tests" || name == "run_go_tests_worktree"
+}
+
+func goTestPurposeAllowed(name string, purpose kernel.WorkPurpose) bool {
+	if name == "run_go_tests_worktree" {
+		return purpose == kernel.PurposeImplementation || purpose == kernel.PurposeRepair
+	}
+	return name == "run_go_tests" && (purpose == kernel.PurposeValidation || purpose == kernel.PurposeImplementation || purpose == kernel.PurposeRepair)
 }

@@ -2,6 +2,8 @@ package nativeagent
 
 import (
 	"encoding/json"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/tekroo-ai/teams/application"
@@ -32,6 +34,30 @@ func TestNoProposalHandlerHasZeroItemModelSchemaAndCanonicalEmptyList(t *testing
 	withProposal := json.RawMessage(`{"message_proposals":[{"type":"x"}]}`)
 	if got := canonicalizeEmptyProposals(withProposal, handler); string(got) != string(withProposal) {
 		t.Fatalf("nonempty proposals were silently changed: %s", got)
+	}
+}
+
+func TestFixedHandlerEnvelopeVersionIsTeamsOwned(t *testing.T) {
+	handler := application.MessageHandlerGrounding{ResultSchema: json.RawMessage(`{"type":"object","additionalProperties":false,"required":["schema_version","outcome"],"properties":{"schema_version":{"const":"1.0.0"},"outcome":{"const":"completed"}}}`)}
+	modelSchema, err := modelFacingHandlerSchema(handler, kernel.PurposeHandoff)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var exposed struct {
+		Required   []string                   `json:"required"`
+		Properties map[string]json.RawMessage `json:"properties"`
+	}
+	if json.Unmarshal(modelSchema, &exposed) != nil || slices.Contains(exposed.Required, "schema_version") || exposed.Properties["schema_version"] != nil {
+		t.Fatalf("transport-owned version still exposed to model: %s", modelSchema)
+	}
+	bound := bindHandlerResultVersion(json.RawMessage(`{"outcome":"completed"}`), handler)
+	var result map[string]any
+	if json.Unmarshal(bound, &result) != nil || result["schema_version"] != "1.0.0" {
+		t.Fatalf("fixed version not bound: %s", bound)
+	}
+	wrong := json.RawMessage(`{"schema_version":"2.0.0","outcome":"completed"}`)
+	if got := bindHandlerResultVersion(wrong, handler); string(got) != string(wrong) {
+		t.Fatalf("incorrect supplied version silently rewritten: %s", got)
 	}
 }
 
@@ -80,5 +106,8 @@ func TestValidationHandlerNestsExactVerdictAndBindsCandidate(t *testing.T) {
 		if _, err := bindHandlerValidationResult(json.RawMessage(invalid), candidate); err == nil {
 			t.Fatalf("invalid verdict accepted: %s", invalid)
 		}
+	}
+	if _, err := bindHandlerValidationResult(json.RawMessage(`{"outcome":"completed","work_product":{"schema_version":"1.0.0","outcome":"PASS","reasons":["ok"],"criteria":[]}}`), candidate); err == nil || !strings.Contains(err.Error(), `unsupported field "criteria"`) {
+		t.Fatalf("unsupported acceptance field was not identified: %v", err)
 	}
 }

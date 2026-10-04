@@ -27,10 +27,23 @@ const (
 
 // runIsolatedGoTests executes only committed source. The disposable checkout is
 // deliberately not a Git worktree: test code cannot modify the candidate or
-// gain a writable .git directory. No live tool adapter exposes this operation
-// until its effect lifecycle is also bound to the turn journal.
+// gain a writable .git directory.
 func (host Host) runIsolatedGoTests(ctx context.Context, root, pattern string) (Result, error) {
+	return host.runIsolatedGoTestsFrom(ctx, root, pattern, false)
+}
+
+// runIsolatedGoTestsWorktree copies admitted workspace files into the same
+// sandbox, so implementation can observe red/green tests before one commit.
+// The committed-HEAD validation tool remains a separate operation.
+func (host Host) runIsolatedGoTestsWorktree(ctx context.Context, root, pattern string) (Result, error) {
+	return host.runIsolatedGoTestsFrom(ctx, root, pattern, true)
+}
+
+func (host Host) runIsolatedGoTestsFrom(ctx context.Context, root, pattern string, worktree bool) (Result, error) {
 	result := Result{Name: "run_go_tests"}
+	if worktree {
+		result.Name = "run_go_tests_worktree"
+	}
 	if err := ctx.Err(); err != nil {
 		return result, err
 	}
@@ -62,7 +75,12 @@ func (host Host) runIsolatedGoTests(ctx context.Context, root, pattern string) (
 			return result, err
 		}
 	}
-	if err := archiveCommittedTree(operation, root, result.CommitSHA, source, host.gitBinary()); err != nil {
+	if worktree {
+		result.SnapshotSHA256, err = snapshotWorkingTree(operation, root, source, host.gitBinary())
+	} else {
+		err = archiveCommittedTree(operation, root, result.CommitSHA, source, host.gitBinary())
+	}
+	if err != nil {
 		return result, err
 	}
 	goBinary, err := exec.LookPath(host.goBinary())

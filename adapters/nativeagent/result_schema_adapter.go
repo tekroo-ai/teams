@@ -2,6 +2,7 @@ package nativeagent
 
 import (
 	"encoding/json"
+	"fmt"
 	"slices"
 
 	"github.com/tekroo-ai/teams/application"
@@ -21,6 +22,16 @@ func modelFacingHandlerSchema(handler application.MessageHandlerGrounding, purpo
 	}
 	if properties == nil {
 		return nil, ErrInvalidBinding
+	}
+	// The signed envelope retains its fixed version, but it is transport
+	// metadata supplied by Teams, not a decision the model must make.
+	if fixedHandlerResultVersion(handler.ResultSchema) {
+		delete(properties, "schema_version")
+		var required []string
+		if err := json.Unmarshal(schema["required"], &required); err != nil {
+			return nil, ErrInvalidBinding
+		}
+		schema["required"], _ = json.Marshal(slices.DeleteFunc(required, func(name string) bool { return name == "schema_version" }))
 	}
 	if validationPurpose(purpose) {
 		// The signed envelope allows an object here, while downstream Teams
@@ -60,6 +71,35 @@ func modelFacingHandlerSchema(handler application.MessageHandlerGrounding, purpo
 	return json.Marshal(schema)
 }
 
+func fixedHandlerResultVersion(raw json.RawMessage) bool {
+	var schema struct {
+		Required   []string `json:"required"`
+		Properties map[string]struct {
+			Const string `json:"const"`
+		} `json:"properties"`
+	}
+	return json.Unmarshal(raw, &schema) == nil && slices.Contains(schema.Required, "schema_version") &&
+		schema.Properties["schema_version"].Const == "1.0.0"
+}
+
+func bindHandlerResultVersion(arguments json.RawMessage, handler application.MessageHandlerGrounding) json.RawMessage {
+	if !fixedHandlerResultVersion(handler.ResultSchema) {
+		return arguments
+	}
+	var envelope map[string]json.RawMessage
+	if json.Unmarshal(arguments, &envelope) != nil || envelope == nil {
+		return arguments
+	}
+	if _, supplied := envelope["schema_version"]; !supplied {
+		envelope["schema_version"] = json.RawMessage(`"1.0.0"`)
+		encoded, err := json.Marshal(envelope)
+		if err == nil {
+			return encoded
+		}
+	}
+	return arguments
+}
+
 func bindHandlerValidationResult(arguments json.RawMessage, candidate *CandidateBinding) (json.RawMessage, error) {
 	var envelope map[string]json.RawMessage
 	if json.Unmarshal(arguments, &envelope) != nil || envelope == nil {
@@ -72,6 +112,18 @@ func bindHandlerValidationResult(arguments json.RawMessage, candidate *Candidate
 	var workProduct map[string]json.RawMessage
 	if json.Unmarshal(envelope["work_product"], &workProduct) != nil || workProduct == nil {
 		return nil, ErrInvalidBinding
+	}
+	keys := make([]string, 0, len(workProduct))
+	for name := range workProduct {
+		keys = append(keys, name)
+	}
+	slices.Sort(keys)
+	for _, name := range keys {
+		switch name {
+		case "schema_version", "outcome", "reasons", "candidate_id", "candidate_receipt_sha256", "test_evidence":
+		default:
+			return nil, fmt.Errorf("%w: submit_result.work_product contains unsupported field %q", ErrInvalidBinding, name)
+		}
 	}
 	if candidate != nil {
 		for name, value := range map[string]string{

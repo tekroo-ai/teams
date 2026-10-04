@@ -246,8 +246,12 @@ func TestFeatureStageResultsAreStrictAndBounded(t *testing.T) {
 		}
 	}
 	unknownRisk := []byte(strings.Replace(string(plan), `"risk":"LOW"`, `"risk":"SEVERE"`, 1))
-	if _, err := parseArchitectureStageResult(unknownRisk, nil); err == nil {
-		t.Fatal("unknown risk value was accepted")
+	if _, err := parseArchitectureStageResult(unknownRisk, nil); err == nil || !strings.Contains(err.Error(), "task 0 has invalid risk") {
+		t.Fatalf("unknown risk did not identify its field: %v", err)
+	}
+	invalidScope := []byte(strings.Replace(string(plan), `"purpose":"IMPLEMENTATION"`, `"write_scope":["."],"purpose":"IMPLEMENTATION"`, 1))
+	if _, err := parseArchitectureStageResult(invalidScope, nil); err == nil || !strings.Contains(err.Error(), "task 0 has invalid write_scope") {
+		t.Fatalf("invalid write scope did not identify its field: %v", err)
 	}
 	invalid := append([]byte(nil), plan...)
 	invalid = append(invalid, []byte("{}")...)

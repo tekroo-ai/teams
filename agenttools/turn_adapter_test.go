@@ -36,8 +36,23 @@ func TestReadOnlyTurnAdapterUsesBoundGatewayAndCanonicalSchema(t *testing.T) {
 		t.Fatal("no read-only model-facing definitions")
 	}
 	for _, definition := range definitions {
-		if definition.Name == "write_file" || definition.Name == "run_go_tests" || !json.Valid(definition.Parameters) {
+		if definition.Name == "write_file" || isGoTestTool(definition.Name) || !json.Valid(definition.Parameters) {
 			t.Fatalf("unsafe model-facing definition: %+v", definition)
 		}
+	}
+}
+
+func TestTestDefinitionsExposeBothIsolatedPaths(t *testing.T) {
+	definitions := TestDefinitions([]string{"repository.read", "test.execute"})
+	if len(definitions) != 2 || definitions[0].Name != "run_go_tests" || definitions[1].Name != "run_go_tests_worktree" {
+		t.Fatalf("test tool definitions: %+v", definitions)
+	}
+	for _, definition := range definitions {
+		if !json.Valid(definition.Parameters) {
+			t.Fatalf("invalid test schema: %s", definition.Name)
+		}
+	}
+	if len(TestDefinitions(nil)) != 0 {
+		t.Fatal("unprivileged test definitions exposed")
 	}
 }

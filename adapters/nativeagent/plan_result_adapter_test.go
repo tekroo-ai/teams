@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -63,6 +64,9 @@ func TestPlanFinalizationAuthorsOnlyDependenciesAndHandoffs(t *testing.T) {
 			t.Fatalf("invalid plan delta accepted: %s", invalid)
 		}
 	}
+	if _, err := bindHandlerPlanResult(json.RawMessage(`{"outcome":"completed","work_product":{"task_dependencies":[],"handoffs":[],"architecture":"changed"}}`), plan); err == nil || !strings.Contains(err.Error(), `unknown field "architecture"`) {
+		t.Fatalf("invalid plan field was not identified: %v", err)
+	}
 }
 
 func TestPlanFinalizationSchemaForbidsHandoffsWithOneImplementationTask(t *testing.T) {
@@ -87,7 +91,7 @@ func TestPlanFinalizationSchemaForbidsHandoffsWithOneImplementationTask(t *testi
 	}
 }
 
-func TestPlanFinalizationKeepsSourceBriefAsJournalPrompt(t *testing.T) {
+func TestPlanFinalizationPreservesSourceBriefAndExplainsNativeDelta(t *testing.T) {
 	brief, _, profile := testBriefAndProfile()
 	brief.Purpose = kernel.PurposeHandoff
 	brief.MessageHandler = &application.MessageHandlerGrounding{ResultSchema: json.RawMessage(`{"type":"object","properties":{"work_product":{"type":"object"}}}`)}
@@ -107,7 +111,15 @@ func TestPlanFinalizationKeepsSourceBriefAsJournalPrompt(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	session, err := PrepareReadOnly(ctx, brief, kernel.Digest(fmt.Sprintf("%x", requestHash[:])), config)
-	if err != nil || session.Prompt != string(encodedBrief) {
-		t.Fatalf("plan adapter changed replay-bound prompt: err=%v prompt=%q", err, session.Prompt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var prompt struct {
+		SourceRequestDigest  kernel.Digest   `json:"source_request_digest"`
+		ExecutionBrief       json.RawMessage `json:"execution_brief"`
+		NativeResultGuidance string          `json:"native_result_guidance"`
+	}
+	if json.Unmarshal([]byte(session.Prompt), &prompt) != nil || prompt.SourceRequestDigest != kernel.Digest(fmt.Sprintf("%x", requestHash[:])) || string(prompt.ExecutionBrief) != string(encodedBrief) || !strings.Contains(prompt.NativeResultGuidance, "only task_dependencies and handoffs") {
+		t.Fatalf("native prompt did not preserve source and explain plan delta: %q", session.Prompt)
 	}
 }

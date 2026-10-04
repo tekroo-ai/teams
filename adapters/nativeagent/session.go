@@ -213,6 +213,9 @@ func prepare(ctx context.Context, brief application.ExecutionBrief, requestDiges
 				if brief.Purpose != kernel.PurposeValidation && brief.Purpose != kernel.PurposeImplementation && brief.Purpose != kernel.PurposeRepair {
 					return Session{}, ErrInvalidBinding
 				}
+				if definition.Name == "run_go_tests_worktree" && brief.Purpose == kernel.PurposeValidation {
+					return Session{}, ErrInvalidBinding
+				}
 				definitions = append(definitions, definition)
 				delete(selected, definition.Name)
 			}
@@ -249,12 +252,20 @@ func prepare(ctx context.Context, brief application.ExecutionBrief, requestDiges
 				return Session{}, errors.Join(ErrInvalidBinding, err)
 			}
 		}
+		// Preserve exact source-brief binding while distinguishing the fields
+		// authored by the model from Teams' assembled signed result.
+		adapted, err := nativeHandlerPrompt(brief, requestDigest, encoded, config.PlanFinalization != nil)
+		if err != nil {
+			return Session{}, err
+		}
+		prompt = adapted
 		definitions = append(definitions, agentruntime.ToolDefinition{
 			Name: finalTool, Description: "Submit the structured result for this admitted Teams message handler.",
 			Parameters: modelSchema,
 			Strict:     true,
 		})
 		finalize = func(arguments json.RawMessage) (string, error) {
+			arguments = bindHandlerResultVersion(arguments, *handler)
 			arguments = canonicalizeEmptyProposals(arguments, *handler)
 			if config.PlanFinalization != nil {
 				var err error

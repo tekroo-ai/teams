@@ -472,8 +472,33 @@ func validateArchitectureStageResult(result architectureStageResult, allowedMark
 		if task.Risk == organization.RiskLevel("MEDIUM") {
 			task.Risk = organization.RiskModerate
 		}
-		if task.StoryIndex >= organization.MaximumFeatureStories || strings.TrimSpace(task.Title) == "" || len(task.Title) > 256 || strings.TrimSpace(task.Description) == "" || len(task.Description) > 64<<10 || !validStageStrings(task.AcceptanceCriteria, true) || !validArchitectureWriteScope(task.WriteScope) || containsPreAssignmentOperationalIdentityExcept(allowedActorFQNs, allowedMarkers, append([]string{task.Title, task.Description}, task.AcceptanceCriteria...)...) || !task.Purpose.Valid() || task.Complexity == 0 || task.Complexity > 10 || !task.Risk.Valid() || task.AttemptLimit == 0 || task.AttemptLimit > 16 || task.ReviewRoundLimit == 0 || task.ReviewRoundLimit > 8 {
-			return architectureStageResult{}, fmt.Errorf("%w: task %d has invalid required fields, write scope, risk, or attempt limits", organization.ErrInvalidFeature, index)
+		invalid := ""
+		switch {
+		case task.StoryIndex >= organization.MaximumFeatureStories:
+			invalid = "story_index"
+		case strings.TrimSpace(task.Title) == "" || len(task.Title) > 256:
+			invalid = "title"
+		case strings.TrimSpace(task.Description) == "" || len(task.Description) > 64<<10:
+			invalid = "description"
+		case !validStageStrings(task.AcceptanceCriteria, true):
+			invalid = "acceptance_criteria"
+		case !validArchitectureWriteScope(task.WriteScope):
+			invalid = "write_scope"
+		case containsPreAssignmentOperationalIdentityExcept(allowedActorFQNs, allowedMarkers, append([]string{task.Title, task.Description}, task.AcceptanceCriteria...)...):
+			invalid = "pre-assignment operational identity in task text"
+		case !task.Purpose.Valid():
+			invalid = "purpose"
+		case task.Complexity == 0 || task.Complexity > 10:
+			invalid = "complexity"
+		case !task.Risk.Valid():
+			invalid = "risk"
+		case task.AttemptLimit == 0 || task.AttemptLimit > 16:
+			invalid = "attempt_limit"
+		case task.ReviewRoundLimit == 0 || task.ReviewRoundLimit > 8:
+			invalid = "review_round_limit"
+		}
+		if invalid != "" {
+			return architectureStageResult{}, fmt.Errorf("%w: task %d has invalid %s", organization.ErrInvalidFeature, index, invalid)
 		}
 		for _, dependency := range append(append([]uint32(nil), task.DependsOn...), task.Validates...) {
 			if dependency >= uint32(index) {

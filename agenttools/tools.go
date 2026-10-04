@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"go/format"
 	"io"
 	"os"
 	"os/exec"
@@ -43,11 +44,12 @@ type Spec struct {
 }
 
 var specs = []Spec{
-	{"read_file", "Read bounded lines from one workspace file and return the full file's SHA-256 for a later write_file precondition; start_line and end_line select the same inclusive range as sed -n start,endp.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path"],"properties":{"path":{"type":"string","minLength":1},"start_line":{"type":"integer","minimum":1},"end_line":{"type":"integer","minimum":1}}}`), "repository.read"},
+	{"read_file", "Read bounded lines from one workspace file; return its total line_count and full-file SHA-256. start_line and end_line select an inclusive range; an end_line beyond EOF stops at EOF.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path"],"properties":{"path":{"type":"string","minLength":1},"start_line":{"type":"integer","minimum":1},"end_line":{"type":"integer","minimum":1}}}`), "repository.read"},
+	{"check_go_format", "Check whether named workspace Go files are gofmt-clean without changing them; format_clean is true only when all named files match gofmt output.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["paths"],"properties":{"paths":{"type":"array","minItems":1,"maxItems":32,"uniqueItems":true,"items":{"type":"string","minLength":1}}}}`), "repository.read"},
 	{"list_files", "List one workspace directory without recursing. If truncated, continue with next_after as start_after.", json.RawMessage(`{"type":"object","additionalProperties":false,"properties":{"path":{"type":"string"},"start_after":{"type":"string"},"limit":{"type":"integer","minimum":1,"maximum":200}}}`), "repository.read"},
 	{"find_files", "Find workspace files matching a filename glob; ** matches directories. Results are bounded and sorted.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["filename_glob"],"properties":{"filename_glob":{"type":"string","minLength":1,"maxLength":256},"directory":{"type":"string"},"start_after":{"type":"string"},"limit":{"type":"integer","minimum":1,"maximum":200},"summary":{"type":"string"}}}`), "repository.read"},
 	{"search_file_contents", "Search workspace text files with a RE2 regular expression (use | for alternatives). Select matching lines, filenames, or a total count; optionally include following lines. Results are bounded and skipped files reported.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["regex"],"properties":{"regex":{"type":"string","minLength":1,"maxLength":4096},"path":{"type":"string"},"filename_glob":{"type":"string","maxLength":256},"exclude_glob":{"type":"string","maxLength":256},"ignore_case":{"type":"boolean"},"result_mode":{"type":"string","enum":["lines","filenames","count"]},"after_lines":{"type":"integer","minimum":0,"maximum":40},"max_results":{"type":"integer","minimum":1,"maximum":100},"summary":{"type":"string"}}}`), "repository.read"},
-	{"git_status", "Read the worktree's branch, HEAD, and Git status without changing it.", json.RawMessage(`{"type":"object","additionalProperties":false}`), "repository.read"},
+	{"git_status", "Read the worktree's branch, HEAD, and Git status without changing it; clean reports whether porcelain status has no tracked or untracked file entries.", json.RawMessage(`{"type":"object","additionalProperties":false}`), "repository.read"},
 	{"git_diff", "Read a bounded Git diff for the worktree, index, or specified commits; optionally narrow it to one path.", json.RawMessage(`{"type":"object","additionalProperties":false,"properties":{"path":{"type":"string","minLength":1},"from_commit":{"type":"string","pattern":"^(HEAD|[0-9a-f]{7,40})$"},"to_commit":{"type":"string","pattern":"^(HEAD|[0-9a-f]{7,40})$"},"staged":{"type":"boolean"},"format":{"type":"string","enum":["patch","stat","name_status","numstat","name_only"]}}}`), "repository.read"},
 	{"git_log", "Read up to 20 recent commits without changing the repository.", json.RawMessage(`{"type":"object","additionalProperties":false,"properties":{"limit":{"type":"integer","minimum":1,"maximum":20},"format":{"type":"string","enum":["oneline","message"]}}}`), "repository.read"},
 	{"git_show", "Read a bounded commit patch or summary, optionally for one path.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["commit"],"properties":{"commit":{"type":"string","pattern":"^(HEAD|[0-9a-f]{7,40})$"},"path":{"type":"string","minLength":1},"format":{"type":"string","enum":["patch","stat"]}}}`), "repository.read"},
@@ -56,6 +58,7 @@ var specs = []Spec{
 	{"git_stage_files", "Stage only the named workspace paths when HEAD still matches the expected commit. Never stages the injected .openhands runtime files.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["paths","expected_head"],"properties":{"paths":{"type":"array","minItems":1,"maxItems":32,"uniqueItems":true,"items":{"type":"string","minLength":1}},"expected_head":{"type":"string","pattern":"^[0-9a-f]{40}$"}}}`), "repository.edit"},
 	{"git_commit", "Commit the exact staged tree against an expected HEAD. A retry after a completed identical commit returns that commit instead of creating another.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["expected_head","expected_index_tree","subject"],"properties":{"expected_head":{"type":"string","pattern":"^[0-9a-f]{40}$"},"expected_index_tree":{"type":"string","pattern":"^[0-9a-f]{40}$"},"subject":{"type":"string","minLength":1,"maxLength":200},"body":{"type":"string","maxLength":5000}}}`), "repository.edit"},
 	{"run_go_tests", "Run Go tests from committed HEAD in a disposable macOS sandbox. Use ./ for the module root or ./... for all packages; no network, host writes, shell expansion, or CGO.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["package"],"properties":{"package":{"type":"string","pattern":"^\\./(?:\\.\\.\\.|[A-Za-z0-9_-][A-Za-z0-9_.-]*(?:/[A-Za-z0-9_-][A-Za-z0-9_.-]*)*)?$"}}}`), "test.execute"},
+	{"run_go_tests_worktree", "Run Go tests against a captured tracked-and-untracked workspace snapshot in a disposable macOS sandbox before committing. Returns snapshot_sha256; the independent validation gate still uses run_go_tests on committed HEAD.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["package"],"properties":{"package":{"type":"string","pattern":"^\\./(?:\\.\\.\\.|[A-Za-z0-9_-][A-Za-z0-9_.-]*(?:/[A-Za-z0-9_-][A-Za-z0-9_.-]*)*)?$"}}}`), "test.execute"},
 }
 
 type Authority struct {
@@ -71,21 +74,25 @@ type Call struct {
 }
 
 type Result struct {
-	Name         string        `json:"name"`
-	Output       string        `json:"output,omitempty"`
-	Files        []string      `json:"files,omitempty"`
-	Matches      []SearchMatch `json:"matches,omitempty"`
-	MatchCount   *int          `json:"match_count,omitempty"`
-	Ignored      *bool         `json:"ignored,omitempty"`
-	IndexTree    string        `json:"index_tree,omitempty"`
-	CommitSHA    string        `json:"commit_sha,omitempty"`
-	Truncated    bool          `json:"truncated,omitempty"`
-	SkippedFiles int           `json:"skipped_files,omitempty"`
-	NextAfter    string        `json:"next_after,omitempty"`
-	HEAD         string        `json:"head,omitempty"`
-	Branch       string        `json:"branch,omitempty"`
-	SHA256       string        `json:"sha256,omitempty"`
-	ExitCode     int           `json:"exit_code,omitempty"`
+	Name           string        `json:"name"`
+	Output         string        `json:"output,omitempty"`
+	Files          []string      `json:"files,omitempty"`
+	Matches        []SearchMatch `json:"matches,omitempty"`
+	MatchCount     *int          `json:"match_count,omitempty"`
+	Ignored        *bool         `json:"ignored,omitempty"`
+	IndexTree      string        `json:"index_tree,omitempty"`
+	CommitSHA      string        `json:"commit_sha,omitempty"`
+	Truncated      bool          `json:"truncated,omitempty"`
+	SkippedFiles   int           `json:"skipped_files,omitempty"`
+	NextAfter      string        `json:"next_after,omitempty"`
+	HEAD           string        `json:"head,omitempty"`
+	Branch         string        `json:"branch,omitempty"`
+	SHA256         string        `json:"sha256,omitempty"`
+	SnapshotSHA256 string        `json:"snapshot_sha256,omitempty"`
+	LineCount      *int          `json:"line_count,omitempty"`
+	FormatClean    *bool         `json:"format_clean,omitempty"`
+	Clean          *bool         `json:"clean,omitempty"`
+	ExitCode       int           `json:"exit_code,omitempty"`
 }
 
 type Host struct {
@@ -156,7 +163,23 @@ func (host Host) execute(ctx context.Context, authority Authority, call Call) (R
 				return Result{}, ErrInvalidCall
 			}
 		}
-		result.Output, result.SHA256, err = readFile(root, args.Path, start, end)
+		var lineCount int
+		result.Output, result.SHA256, lineCount, err = readFile(root, args.Path, start, end)
+		if err == nil {
+			result.LineCount = &lineCount
+		}
+	case "check_go_format":
+		var args struct {
+			Paths []string `json:"paths"`
+		}
+		if decode(call.Arguments, &args) != nil || len(args.Paths) < 1 || len(args.Paths) > 32 {
+			return Result{}, ErrInvalidCall
+		}
+		result.Files, err = checkGoFormat(root, args.Paths)
+		if err == nil {
+			clean := len(result.Files) == 0
+			result.FormatClean = &clean
+		}
 	case "list_files":
 		var args struct {
 			Path       string `json:"path"`
@@ -223,6 +246,8 @@ func (host Host) execute(ctx context.Context, authority Authority, call Call) (R
 		}
 		result, err = host.command(ctx, root, call.Name, host.gitBinary(), []string{"-c", "core.hooksPath=/dev/null", "-c", "credential.interactive=never", "status", "--porcelain=v1", "--untracked-files=normal"})
 		if err == nil && result.ExitCode == 0 {
+			clean := strings.TrimSpace(result.Output) == ""
+			result.Clean = &clean
 			var head, branch Result
 			head, err = host.command(ctx, root, call.Name, host.gitBinary(), []string{"rev-parse", "HEAD"})
 			if err == nil {
@@ -387,6 +412,17 @@ func (host Host) execute(ctx context.Context, authority Authority, call Call) (R
 			return Result{}, ErrInvalidCall
 		}
 		result, err = host.runIsolatedGoTests(ctx, root, args.Package)
+	case "run_go_tests_worktree":
+		var args struct {
+			Package string `json:"package"`
+		}
+		if decode(call.Arguments, &args) != nil || !validGoPackage(args.Package) {
+			return Result{}, ErrInvalidCall
+		}
+		if authority.Purpose != kernel.PurposeImplementation && authority.Purpose != kernel.PurposeRepair {
+			return Result{}, ErrForbidden
+		}
+		result, err = host.runIsolatedGoTestsWorktree(ctx, root, args.Package)
 	case "write_file":
 		var args struct {
 			Path           string `json:"path"`
@@ -463,41 +499,86 @@ func existingPath(root, relative string) (string, error) {
 	return resolved, nil
 }
 
-func readFile(root, relative string, start, end int) (string, string, error) {
+func readFile(root, relative string, start, end int) (string, string, int, error) {
 	path, err := existingPath(root, relative)
 	if err != nil {
-		return "", "", err
+		return "", "", 0, err
 	}
 	info, err := os.Stat(path)
 	if err != nil || !info.Mode().IsRegular() {
-		return "", "", ErrInvalidCall
+		return "", "", 0, ErrInvalidCall
 	}
 	if info.Size() > 1<<20 {
-		return "", "", ErrTooLarge
+		return "", "", 0, ErrTooLarge
 	}
 	content, err := os.ReadFile(path)
 	if err != nil {
-		return "", "", err
+		return "", "", 0, err
 	}
 	if !utf8.Valid(content) {
-		return "", "", ErrInvalidCall
+		return "", "", 0, ErrInvalidCall
 	}
 	fullHash := sha256.Sum256(content)
+	if len(content) == 0 {
+		if end != 0 && end < start {
+			return "", "", 0, ErrInvalidCall
+		}
+		return "", hex.EncodeToString(fullHash[:]), 0, nil
+	}
 	lines := strings.Split(strings.TrimSuffix(string(content), "\n"), "\n")
+	lineCount := len(lines)
 	if start == 0 {
 		start = 1
 	}
 	if end == 0 {
 		end = min(len(lines), start+399)
 	}
-	if start < 1 || end < start || end-start >= 400 || start > len(lines) || end > len(lines) {
-		return "", "", ErrInvalidCall
+	if start < 1 || end < start || end-start >= 400 {
+		return "", "", 0, ErrInvalidCall
 	}
+	if start > lineCount {
+		return "", hex.EncodeToString(fullHash[:]), lineCount, nil
+	}
+	end = min(end, lineCount)
 	selected := strings.Join(lines[start-1:end], "\n")
 	if len(selected) > 64<<10 {
-		return "", "", ErrTooLarge
+		return "", "", 0, ErrTooLarge
 	}
-	return selected, hex.EncodeToString(fullHash[:]), nil
+	return selected, hex.EncodeToString(fullHash[:]), lineCount, nil
+}
+
+func checkGoFormat(root string, paths []string) ([]string, error) {
+	unformatted := make([]string, 0)
+	seen := make(map[string]bool, len(paths))
+	for _, relative := range paths {
+		if seen[relative] || filepath.Ext(relative) != ".go" {
+			return nil, ErrInvalidCall
+		}
+		seen[relative] = true
+		path, err := existingPath(root, relative)
+		if err != nil {
+			return nil, err
+		}
+		info, err := os.Stat(path)
+		if err != nil || !info.Mode().IsRegular() {
+			return nil, ErrInvalidCall
+		}
+		if info.Size() > 1<<20 {
+			return nil, ErrTooLarge
+		}
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return nil, err
+		}
+		formatted, err := format.Source(content)
+		if err != nil {
+			return nil, fmt.Errorf("gofmt %s: %w", relative, err)
+		}
+		if !bytes.Equal(content, formatted) {
+			unformatted = append(unformatted, relative)
+		}
+	}
+	return unformatted, nil
 }
 
 func listFiles(root, relative, startAfter string, limit int) ([]string, bool, string, error) {

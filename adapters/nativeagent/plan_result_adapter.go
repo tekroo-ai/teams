@@ -3,6 +3,7 @@ package nativeagent
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 
 	"github.com/tekroo-ai/teams/application"
@@ -105,7 +106,10 @@ func bindHandlerPlanResult(arguments json.RawMessage, plan *PlanFinalizationBind
 	}
 	decoder := json.NewDecoder(bytes.NewReader(envelope["work_product"]))
 	decoder.DisallowUnknownFields()
-	if decoder.Decode(&delta) != nil || decoder.Decode(&struct{}{}) != io.EOF || delta.TaskDependencies == nil || delta.Handoffs == nil {
+	if err := decoder.Decode(&delta); err != nil {
+		return nil, fmt.Errorf("%w: submit_result.work_product: %v", ErrInvalidBinding, err)
+	}
+	if decoder.Decode(&struct{}{}) != io.EOF || delta.TaskDependencies == nil || delta.Handoffs == nil {
 		return nil, ErrInvalidBinding
 	}
 	seen := make(map[uint32]bool, len(delta.TaskDependencies))

@@ -174,7 +174,7 @@ func TestPreparedHandlerSessionAcceptsOnlyValidatedStructuredResult(t *testing.T
 	defer server.Close()
 	brief, _, profile := testBriefAndProfile()
 	brief.MessageHandler = &application.MessageHandlerGrounding{
-		ResultSchema:   json.RawMessage(`{"type":"object","additionalProperties":false,"required":["outcome"],"properties":{"outcome":{"const":"completed"}}}`),
+		ResultSchema:   json.RawMessage(`{"type":"object","additionalProperties":false,"required":["schema_version","outcome"],"properties":{"schema_version":{"const":"1.0.0"},"outcome":{"const":"completed"}}}`),
 		AllowedResults: []string{"completed"},
 	}
 	brief.ResultProtocol = &application.ExecutionResultProtocol{Marker: application.OrganizationalResultMarker}
@@ -192,7 +192,7 @@ func TestPreparedHandlerSessionAcceptsOnlyValidatedStructuredResult(t *testing.T
 		t.Fatal(err)
 	}
 	result, err := session.Run(ctx)
-	if err != nil || result != application.OrganizationalResultMarker+"\n"+`{"outcome":"completed"}` || len(journal.entries) != 3 {
+	if err != nil || result != application.OrganizationalResultMarker+"\n"+`{"outcome":"completed","schema_version":"1.0.0"}` || len(journal.entries) != 3 {
 		t.Fatalf("handler result=%q err=%v journal=%d", result, err, len(journal.entries))
 	}
 }
@@ -241,12 +241,16 @@ func TestImplementationWithGoTestGateRequiresSignedTestPermission(t *testing.T) 
 	encoded, _ = json.Marshal(brief)
 	sum = sha256.Sum256(encoded)
 	digest = kernel.Digest(hex.EncodeToString(sum[:]))
-	profile.AllowedEffectTools = []string{"run_go_tests", "write_file"}
+	profile.AllowedEffectTools = []string{"run_go_tests", "run_go_tests_worktree", "write_file"}
 	binding.tests = true
 	config.Bindings, config.Gateway.Bindings, config.Profile = binding, binding, profile
 	session, err := PrepareWithEffects(context.Background(), brief, digest, config)
-	if err != nil || !session.Runner.Effects.Handles("run_go_tests") {
+	if err != nil || !session.Runner.Effects.Handles("run_go_tests") || !session.Runner.Effects.Handles("run_go_tests_worktree") {
 		t.Fatalf("signed test permission did not enable required tool: %v", err)
+	}
+	model := session.Runner.Model.(boundModel).model.(agentruntime.OpenAIModel)
+	if !slices.ContainsFunc(model.Tools, func(tool agentruntime.ToolDefinition) bool { return tool.Name == "run_go_tests_worktree" }) {
+		t.Fatal("implementation session did not expose working-tree test schema")
 	}
 }
 
@@ -410,12 +414,20 @@ func TestValidationSessionBindsOnlyExplicitTestTool(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !session.Runner.Effects.Handles("run_go_tests") || session.Runner.Effects.Handles("write_file") {
+	if !session.Runner.Effects.Handles("run_go_tests") || session.Runner.Effects.Handles("run_go_tests_worktree") || session.Runner.Effects.Handles("write_file") {
 		t.Fatal("validation session effect boundary is wrong")
 	}
 	model := session.Runner.Model.(boundModel).model.(agentruntime.OpenAIModel)
 	if !slices.ContainsFunc(model.Tools, func(tool agentruntime.ToolDefinition) bool { return tool.Name == "run_go_tests" }) {
 		t.Fatal("bound test schema not exposed")
+	}
+	if slices.ContainsFunc(model.Tools, func(tool agentruntime.ToolDefinition) bool { return tool.Name == "run_go_tests_worktree" }) {
+		t.Fatal("validation session exposed working-tree test schema")
+	}
+	profile.AllowedEffectTools = []string{"run_go_tests", "run_go_tests_worktree"}
+	config.Profile = profile
+	if _, err := PrepareWithEffects(context.Background(), brief, digest, config); !errors.Is(err, ErrInvalidBinding) {
+		t.Fatalf("validation role acquired working-tree test effect: %v", err)
 	}
 	profile.AllowedEffectTools = []string{"write_file"}
 	config.Profile = profile

@@ -71,6 +71,9 @@ func configuredNativeSession(ctx context.Context, service *ProductionService, pr
 	}
 	if brief.Purpose == kernel.PurposeValidation || brief.Purpose == kernel.PurposeImplementation || brief.Purpose == kernel.PurposeRepair {
 		for _, definition := range agenttools.TestDefinitions(permissions) {
+			if brief.Purpose == kernel.PurposeValidation && definition.Name == "run_go_tests_worktree" {
+				continue
+			}
 			effectTools = append(effectTools, definition.Name)
 		}
 	}

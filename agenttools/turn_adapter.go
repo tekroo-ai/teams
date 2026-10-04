@@ -33,7 +33,7 @@ type TestTurnAdapter struct {
 	RequestDigest kernel.Digest
 }
 
-func (adapter TestTurnAdapter) Handles(name string) bool { return name == "run_go_tests" }
+func (adapter TestTurnAdapter) Handles(name string) bool { return isGoTestTool(name) }
 
 func (adapter TestTurnAdapter) ExecuteEffect(ctx context.Context, call agentruntime.ToolCall) (json.RawMessage, error) {
 	if !adapter.Handles(call.Name) {
@@ -71,12 +71,13 @@ func (adapter TestTurnAdapter) ReconcileEffect(ctx context.Context, call agentru
 }
 
 func TestDefinitions(permissions []string) []agentruntime.ToolDefinition {
+	definitions := make([]agentruntime.ToolDefinition, 0, 2)
 	for _, spec := range Available(permissions) {
-		if spec.Name == "run_go_tests" {
-			return []agentruntime.ToolDefinition{{Name: spec.Name, Description: spec.Description, Parameters: spec.InputSchema}}
+		if isGoTestTool(spec.Name) {
+			definitions = append(definitions, agentruntime.ToolDefinition{Name: spec.Name, Description: spec.Description, Parameters: spec.InputSchema})
 		}
 	}
-	return nil
+	return definitions
 }
 
 func (adapter MutationTurnAdapter) Handles(name string) bool {

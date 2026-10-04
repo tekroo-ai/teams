@@ -31,7 +31,7 @@ func TestAvailableAndAuthorization(t *testing.T) {
 		t.Fatalf("unprivileged tools: %v", got)
 	}
 	read := Available([]string{"repository.read"})
-	if len(read) != 9 || !slices.ContainsFunc(read, func(spec Spec) bool { return spec.Name == "git_status" }) {
+	if len(read) != 10 || !slices.ContainsFunc(read, func(spec Spec) bool { return spec.Name == "git_status" }) {
 		t.Fatalf("read-only surface: %v", read)
 	}
 	for _, spec := range read {
@@ -55,6 +55,35 @@ func TestAvailableAndAuthorization(t *testing.T) {
 	}
 }
 
+func TestCheckGoFormatReportsWithoutWriting(t *testing.T) {
+	root := t.TempDir()
+	formatted := []byte("package greeting\n\nfunc Greeting(name string) string { return \"Hello, \" + name + \"!\" }\n")
+	if err := os.WriteFile(filepath.Join(root, "greeting.go"), formatted, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "rough.go"), []byte("package greeting\nfunc Rough(){println(\"x\")}\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	authority := Authority{WorkspaceRoot: root, Permissions: []string{"repository.read"}}
+	result, err := testHost().execute(context.Background(), authority, call("check_go_format", `{"paths":["greeting.go","rough.go"]}`))
+	if err != nil || result.FormatClean == nil || *result.FormatClean || !slices.Equal(result.Files, []string{"rough.go"}) {
+		t.Fatalf("format check: %+v, %v", result, err)
+	}
+	result, err = testHost().execute(context.Background(), authority, call("check_go_format", `{"paths":["greeting.go"]}`))
+	if err != nil || result.FormatClean == nil || !*result.FormatClean {
+		t.Fatalf("clean format check: %+v, %v", result, err)
+	}
+	content, err := os.ReadFile(filepath.Join(root, "rough.go"))
+	if err != nil || string(content) != "package greeting\nfunc Rough(){println(\"x\")}\n" {
+		t.Fatalf("format checker changed source: %q, %v", content, err)
+	}
+	for _, arguments := range []string{`{"paths":["../outside.go"]}`, `{"paths":["greeting.go","greeting.go"]}`, `{"paths":["greeting.txt"]}`} {
+		if _, err := testHost().execute(context.Background(), authority, call("check_go_format", arguments)); err == nil {
+			t.Fatalf("invalid format check accepted: %s", arguments)
+		}
+	}
+}
+
 func TestReadAndListStayInWorkspace(t *testing.T) {
 	root := t.TempDir()
 	outside := t.TempDir()
@@ -71,8 +100,16 @@ func TestReadAndListStayInWorkspace(t *testing.T) {
 	host := testHost()
 	result, err := host.execute(context.Background(), authority, call("read_file", `{"path":"source.txt","start_line":2,"end_line":3}`))
 	fullFileHash := sha256.Sum256([]byte("one\ntwo\nthree\n"))
-	if err != nil || result.Output != "two\nthree" || result.SHA256 != hex.EncodeToString(fullFileHash[:]) {
+	if err != nil || result.Output != "two\nthree" || result.SHA256 != hex.EncodeToString(fullFileHash[:]) || result.LineCount == nil || *result.LineCount != 3 {
 		t.Fatalf("bounded file read: %+v, %v", result, err)
+	}
+	result, err = host.execute(context.Background(), authority, call("read_file", `{"path":"source.txt","start_line":2,"end_line":4}`))
+	if err != nil || result.Output != "two\nthree" || result.LineCount == nil || *result.LineCount != 3 {
+		t.Fatalf("range past EOF should return available lines: %+v, %v", result, err)
+	}
+	result, err = host.execute(context.Background(), authority, call("read_file", `{"path":"source.txt","start_line":4,"end_line":5}`))
+	if err != nil || result.Output != "" || result.LineCount == nil || *result.LineCount != 3 {
+		t.Fatalf("range after EOF should report file length: %+v, %v", result, err)
 	}
 	result, err = host.execute(context.Background(), authority, call("list_files", `{}`))
 	if err != nil || !slices.Contains(result.Files, "source.txt") {
@@ -170,7 +207,7 @@ func TestGitInspectionUsesAssignedRepository(t *testing.T) {
 	host := testHost()
 	t.Setenv("GIT_DIR", filepath.Join(t.TempDir(), ".git"))
 	status, err := host.execute(context.Background(), authority, call("git_status", `{}`))
-	if err != nil || status.ExitCode != 0 || !strings.Contains(status.Output, "change.txt") || len(status.HEAD) != 40 || status.Branch == "" {
+	if err != nil || status.ExitCode != 0 || !strings.Contains(status.Output, "change.txt") || len(status.HEAD) != 40 || status.Branch == "" || status.Clean == nil || *status.Clean {
 		t.Fatalf("status: %+v, %v", status, err)
 	}
 	diff, err := host.execute(context.Background(), authority, call("git_diff", `{"path":"change.txt"}`))
@@ -249,6 +286,40 @@ func TestGitStatusStillWorksBeforeFirstCommit(t *testing.T) {
 	status, err := testHost().execute(context.Background(), authority, call("git_status", `{}`))
 	if err != nil || status.ExitCode != 0 || status.HEAD != "UNBORN" || status.Branch == "" {
 		t.Fatalf("unborn Git status: %+v, %v", status, err)
+	}
+}
+
+func TestGitStatusExplicitlyReportsCleanWorktree(t *testing.T) {
+	root := t.TempDir()
+	command := exec.Command("git", "init", "-q")
+	command.Dir = root
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v: %s", err, output)
+	}
+	if err := os.WriteFile(filepath.Join(root, "tracked.txt"), []byte("baseline\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	command = exec.Command("git", "add", "tracked.txt")
+	command.Dir = root
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("git add: %v: %s", err, output)
+	}
+	command = exec.Command("git", "-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "baseline")
+	command.Dir = root
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("git commit: %v: %s", err, output)
+	}
+	authority := Authority{WorkspaceRoot: root, Permissions: []string{"repository.read"}}
+	status, err := testHost().execute(context.Background(), authority, call("git_status", `{}`))
+	if err != nil || status.Clean == nil || !*status.Clean {
+		t.Fatalf("clean status: %+v, %v", status, err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "untracked.txt"), []byte("new\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	status, err = testHost().execute(context.Background(), authority, call("git_status", `{}`))
+	if err != nil || status.Clean == nil || *status.Clean {
+		t.Fatalf("untracked file not reported dirty: %+v, %v", status, err)
 	}
 }
 

@@ -80,3 +80,43 @@ func TestTestGatewayStopsOnUnresolvedIntent(t *testing.T) {
 		t.Fatalf("unresolved intent should remain uncertain: found=%t err=%v", found, err)
 	}
 }
+
+func TestWorktreeTestGatewayReplaysCapturedResult(t *testing.T) {
+	root := t.TempDir()
+	writeSnapshotFixture(t, root, "go.mod", "module example.test/effect\n\ngo 1.26.0\n")
+	writeSnapshotFixture(t, root, "baseline.go", "package effect\n")
+	fixtureGit(t, root, "init", "-q")
+	fixtureGit(t, root, "add", "go.mod", "baseline.go")
+	fixtureGit(t, root, "-c", "user.name=Test", "-c", "user.email=test@example.test", "commit", "-qm", "baseline")
+	writeSnapshotFixture(t, root, "value_test.go", "package effect\nimport \"testing\"\nfunc TestValue(t *testing.T) { if Value() != 42 { t.Fatal(\"wrong\") } }\n")
+	digest := kernel.Digest("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+	ledger := &memoryEffectLedger{}
+	authority := Authority{WorkspaceRoot: root, Permissions: []string{"repository.read", "test.execute"}, Purpose: kernel.PurposeImplementation, EffectPolicyDigest: digest}
+	gateway := TestGateway{Bindings: effectBinding{authority: authority}, Host: Host{Timeout: 2 * time.Minute}, Ledger: ledger, Policy: digest}
+	request := Request{InvocationID: kernel.UUIDv7("00000000-0000-7000-8000-000000000997"), RequestDigest: digest,
+		ToolCallID: "worktree-test-1", Call: Call{Name: "run_go_tests_worktree", Arguments: json.RawMessage(`{"package":"./..."}`)}}
+	first, err := gateway.Execute(context.Background(), request)
+	if err != nil || first.Result.ExitCode == 0 || !validExpectedSHA(first.Result.SnapshotSHA256) {
+		t.Fatalf("red worktree receipt: %+v, %v", first, err)
+	}
+	writeSnapshotFixture(t, root, "value.go", "package effect\nfunc Value() int { return 42 }\n")
+	replayed, err := gateway.Execute(context.Background(), request)
+	if err != nil || replayed.ResultHash != first.ResultHash {
+		t.Fatalf("worktree result silently re-executed: %+v, %v", replayed, err)
+	}
+	reconciled, found, err := gateway.Reconcile(context.Background(), request)
+	if err != nil || !found || reconciled.ResultHash != first.ResultHash {
+		t.Fatalf("worktree reconciliation: %+v, %t, %v", reconciled, found, err)
+	}
+	request.ToolCallID = "worktree-test-2"
+	green, err := gateway.Execute(context.Background(), request)
+	if err != nil || green.Result.ExitCode != 0 || green.Result.SnapshotSHA256 == first.Result.SnapshotSHA256 {
+		t.Fatalf("new worktree snapshot did not pass: %+v, %v", green, err)
+	}
+	authority.Purpose = kernel.PurposeValidation
+	validation := TestGateway{Bindings: effectBinding{authority: authority}, Host: gateway.Host, Ledger: ledger, Policy: digest}
+	request.ToolCallID = "validation-forbidden"
+	if _, err := validation.Execute(context.Background(), request); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("validation received worktree test capability: %v", err)
+	}
+}

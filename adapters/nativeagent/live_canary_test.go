@@ -126,9 +126,9 @@ func TestLiveNativeCoderTesterCanary(t *testing.T) {
 		description string
 	}{
 		{name: "coder", invocation: "00000000-0000-7000-8000-000000000a01", purpose: kernel.PurposeImplementation,
-			actor: "teams::coder-1", role: "coder", permissions: []string{"repository.edit"},
-			readTools: []string{"git_status", "list_files", "read_file"}, effects: []string{"git_commit", "git_stage_files", "write_file"},
-			instruction: "Implement the assigned repository task using the available tools. Commit the intended change, then report the result.",
+			actor: "teams::coder-1", role: "coder", permissions: []string{"repository.edit", "test.execute"},
+			readTools: []string{"git_status", "list_files", "read_file"}, effects: []string{"git_commit", "git_stage_files", "run_go_tests_worktree", "write_file"},
+			instruction: "Implement the assigned repository task using the available tools. Use run_go_tests_worktree on uncommitted source before the single candidate commit, then report the result.",
 			description: "Make Greeting return Hello, followed by the supplied name and an exclamation mark. Keep the implementation simple and commit it."},
 		{name: "tester", invocation: "00000000-0000-7000-8000-000000000a02", purpose: kernel.PurposeValidation,
 			actor: "teams::tester-1", role: "tester", permissions: []string{"repository.read", "test.execute"},
@@ -185,7 +185,7 @@ func TestLiveNativeCoderTesterCanary(t *testing.T) {
 				effects[record.Name]++
 			}
 			ledger.mu.Unlock()
-			if stage.name == "coder" && (effects["write_file"] == 0 || effects["git_stage_files"] == 0 || effects["git_commit"] != 1) {
+			if stage.name == "coder" && (effects["write_file"] == 0 || effects["run_go_tests_worktree"] == 0 || effects["git_stage_files"] == 0 || effects["git_commit"] != 1) {
 				t.Fatalf("coder effects = %v", effects)
 			}
 			if stage.name == "tester" && effects["run_go_tests"] == 0 {

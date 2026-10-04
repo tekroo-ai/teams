@@ -290,7 +290,7 @@ func (boundary *Boundary) reconcileBeforeTerminal(brief application.ExecutionBri
 		EffectAuthority *agentruntime.EffectAuthority `json:"effect_authority"`
 	}
 	encoded, err := json.Marshal(brief)
-	if err != nil || json.Unmarshal(entries[0].Payload, &start) != nil || start.RequestDigest != string(digest) || start.Prompt != string(encoded) {
+	if err != nil || json.Unmarshal(entries[0].Payload, &start) != nil || start.RequestDigest != string(digest) || !nativePromptMatchesBrief(brief, digest, encoded, start.Prompt) {
 		return ErrInvalidBinding
 	}
 	if start.EffectAuthority == nil {
@@ -451,7 +451,7 @@ func observeJournalWithPrompt(brief application.ExecutionBrief, digest kernel.Di
 		RequestDigest string `json:"request_digest"`
 		Prompt        string `json:"prompt"`
 	}
-	if entries[0].Kind != agentruntime.Started || json.Unmarshal(entries[0].Payload, &start) != nil || start.RequestDigest != string(digest) || (strictPrompt && start.Prompt != string(encodedBrief)) {
+	if entries[0].Kind != agentruntime.Started || json.Unmarshal(entries[0].Payload, &start) != nil || start.RequestDigest != string(digest) || (strictPrompt && !nativePromptMatchesBrief(brief, digest, encodedBrief, start.Prompt)) {
 		return application.ExternalExecutionObservation{}, false, ErrInvalidBinding
 	}
 	for index, entry := range entries {
