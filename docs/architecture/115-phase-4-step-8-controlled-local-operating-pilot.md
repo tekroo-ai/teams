@@ -65,7 +65,7 @@ Qdrant collections were removed and verified absent. The sandbox repositories
 remain under `OUTPUT/` as retained local evidence.
 
 The machine-readable receipt is
-`OUTPUT/phase-4/step-8-controlled-local-operating-pilot-receipt.json`.
+`docs/evidence/phase-4/step-8-controlled-local-operating-pilot-receipt.json`.
 
 Production deployment, Tekroo v3 migration, and production or historical data
 access remain `NOT_RUN`.

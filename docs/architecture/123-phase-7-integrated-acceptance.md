@@ -79,4 +79,4 @@ billing, wildcard routing, v3 data migration, SMA modification, and historical
 or production data access remain `NOT_RUN`.
 
 The machine-readable receipt is
-`OUTPUT/phase-7/integrated-acceptance.json`.
+`docs/evidence/phase-7/integrated-acceptance.json`.

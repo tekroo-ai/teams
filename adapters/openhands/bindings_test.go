@@ -334,7 +334,7 @@ func TestQualifiedAgentSettingsUseOperationalRequestTimeout(t *testing.T) {
 
 func TestAcceptedSemanticMemoryBindingMatchesRetainedStep15Evidence(t *testing.T) {
 	root := filepath.Join("..", "..")
-	acceptanceRecord := readJSONFixture(t, filepath.Join(root, "OUTPUT", "phase-3", "sma-e1-ddalcu-final-scientific-adjudication-v2", "scientific-adjudication.json"))
+	acceptanceRecord := readJSONFixture(t, filepath.Join("testdata", "sma-e1-acceptance.json"))
 	if sha256Digest(acceptanceRecord) != AcceptedSMAE1AcceptanceRecordSHA {
 		t.Fatalf("acceptance record sha = %s", sha256Digest(acceptanceRecord))
 	}

@@ -44,7 +44,7 @@ the raw journal SHA-256 is
 ## Adjudication
 
 The scientific adjudication is
-`OUTPUT/phase-3/sma-s1-measured-p2final-r1-sealed-v1-attempt-1/scientific-adjudication.json`,
+`docs/evidence/phase-3/sma-s1-measured-p2final-r1-sealed-v1-attempt-1/scientific-adjudication.json`,
 SHA-256
 `d4800482ef8204904c182783abb8800770b46d08f572df5f717e5c1a2ed645b5`.
 

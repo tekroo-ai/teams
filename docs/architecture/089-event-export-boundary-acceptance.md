@@ -21,7 +21,7 @@ Its accepted source is `tekroo.kernel.contracts/0.7.0`, manifest SHA-256
 Neither contract package was modified.
 
 The machine-readable acceptance receipt is
-`OUTPUT/phase-3/event-export-boundary-acceptance.json`, SHA-256
+`docs/evidence/phase-3/event-export-boundary-acceptance.json`, SHA-256
 `48298fee9e784d46b76adff869ef30ca93df092dcb1cc921aeb25b274069d70c`.
 The historical implementation receipt remains unchanged at SHA-256
 `011113ce369eda8001df0b9b1b324a76d5f487f89bc5bd0fa99e07a7eb87d147`.

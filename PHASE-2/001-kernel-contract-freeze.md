@@ -17,13 +17,13 @@ SMA or OpenHands investigations, migrate data, or authorize production use.
 ## Accepted input
 
 - Phase 1B final gate:
-  `OUTPUT/adjudication/step-8-final-gate.json`
+  `docs/evidence/adjudication/step-8-final-gate.json`
   (`6c1859e0580175d58225a60f00a1e7c1d016b1937c6abe14245e4fe89e93bebe`)
 - Architecture handoff:
   `PHASE-1B/008-final-architecture-handoff.md`
   (`ec0aef90ceab404c6288a0279d47f49ee4c5af1c00577d55b8ffd25882b18fef`)
 - Machine-readable handoff:
-  `OUTPUT/adjudication/phase-1b-architecture-handoff.json`
+  `docs/evidence/adjudication/phase-1b-architecture-handoff.json`
   (`137a1399a70cfc96cf36997e8c2154b1847cdde5ee8a50f7a39f7d06e3c83e20`)
 
 These identities are inputs, not editable Phase 2 working files. If one changes,

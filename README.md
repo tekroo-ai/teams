@@ -51,6 +51,19 @@ service from source.
 
 ## Build and verify
 
+`OUTPUT/` is ignored generated evidence, not product source. Compact historical
+decision records are retained under `docs/evidence/`; test inputs belong in
+package-local `testdata/`. Copies of historical records retain their original
+bytes, hashes, and embedded provenance paths; relocation does not create a new
+acceptance or rebind a historical execution.
+
+Bulk output remains available in the existing local `OUTPUT/` directory and
+in Git history. A fresh checkout does not include that evidence. Historical
+report/replay scripts which refer to `OUTPUT/` require the corresponding
+archived evidence; ordinary unit tests must not depend on it. To retrieve an
+original artifact without rewriting history, use
+`git show 67d99fcafad3f82362d154989966a69f2730536d:OUTPUT/<original-path>`.
+
 ```sh
 go test ./... -count=1
 go test -tags=mongo_integration ./... -count=1

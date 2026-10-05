@@ -95,4 +95,4 @@ Configuration examples, the LaunchAgent example, lifecycle scripts, tests, and
 operator documentation use those names. The earlier live receipts remain
 unchanged because they record the command names that existed when those runs
 were performed. The rename acceptance is recorded in
-`OUTPUT/phase-5/phase-5-command-rename-acceptance.json`.
+`docs/evidence/phase-5/phase-5-command-rename-acceptance.json`.

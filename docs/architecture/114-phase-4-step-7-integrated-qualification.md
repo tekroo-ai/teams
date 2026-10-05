@@ -55,7 +55,7 @@ Step 7 first closed the assembly gap identified after Step 6:
 - Preregistration:
   `OUTPUT/phase-4/step-7-integrated-qualification-preregistration.json`
 - Machine receipt:
-  `OUTPUT/phase-4/step-7-integrated-qualification-receipt.json`
+  `docs/evidence/phase-4/step-7-integrated-qualification-receipt.json`
 - Raw command and test receipts:
   `OUTPUT/phase-4/step-7-raw/`
 

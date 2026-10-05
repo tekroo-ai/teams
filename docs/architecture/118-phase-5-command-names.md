@@ -28,4 +28,4 @@ digests remain:
 - recovery/cancellation: `955ea59116e03bac8d239ca46f7357f65890bb9b92a51665dbadf1f49148f349`.
 
 The post-rename acceptance receipt is
-`OUTPUT/phase-5/phase-5-command-rename-acceptance.json`.
+`docs/evidence/phase-5/phase-5-command-rename-acceptance.json`.

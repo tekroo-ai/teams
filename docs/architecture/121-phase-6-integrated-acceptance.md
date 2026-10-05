@@ -127,4 +127,4 @@ not silently claimed as implemented here. Production/historical databases and
 v3 data were not accessed or migrated.
 
 The machine-readable receipt is
-`OUTPUT/phase-6/step-9/integrated-acceptance.json`.
+`docs/evidence/phase-6/step-9/integrated-acceptance.json`.
