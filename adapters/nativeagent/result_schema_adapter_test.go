@@ -10,6 +10,24 @@ import (
 	"github.com/tekroo-ai/teams/kernel"
 )
 
+func TestEnvelopePropertyReplacementPreservesUnrelatedConstraints(t *testing.T) {
+	source := json.RawMessage(`{"type":"object","required":["outcome","work_product"],"properties":{"outcome":{"const":"completed"},"work_product":{"type":"object"}},"if":{"properties":{"outcome":{"const":"completed"}}},"then":{"allOf":[true,{"properties":{"work_product":{"required":["teams_owned"]}}}]},"else":false}`)
+	var schema map[string]json.RawMessage
+	if err := json.Unmarshal(source, &schema); err != nil {
+		t.Fatal(err)
+	}
+	replacement := json.RawMessage(`{"type":"object","additionalProperties":false,"required":["delta"],"properties":{"delta":{"type":"array"}}}`)
+	if err := replaceEnvelopeProperty(schema, "work_product", replacement); err != nil {
+		t.Fatal(err)
+	}
+	adapted, _ := json.Marshal(schema)
+	if !schemaAccepts(t, adapted, []byte(`{"outcome":"completed","work_product":{"delta":[]}}`)) ||
+		schemaAccepts(t, adapted, []byte(`{"outcome":"failed","work_product":{"delta":[]}}`)) ||
+		schemaAccepts(t, adapted, []byte(`{"outcome":"completed","work_product":{"delta":"[]"}}`)) {
+		t.Fatalf("replacement changed unrelated constraints: %s", adapted)
+	}
+}
+
 func TestNoProposalHandlerHasZeroItemModelSchemaAndCanonicalEmptyList(t *testing.T) {
 	handler := application.MessageHandlerGrounding{ResultSchema: json.RawMessage(`{"type":"object","required":["message_proposals"],"properties":{"message_proposals":{"type":"array","items":{"type":"object"}}}}`)}
 	modelSchema, err := modelFacingHandlerSchema(handler, kernel.PurposeHandoff)
@@ -58,6 +76,29 @@ func TestFixedHandlerEnvelopeVersionIsTeamsOwned(t *testing.T) {
 	wrong := json.RawMessage(`{"schema_version":"2.0.0","outcome":"completed"}`)
 	if got := bindHandlerResultVersion(wrong, handler); string(got) != string(wrong) {
 		t.Fatalf("incorrect supplied version silently rewritten: %s", got)
+	}
+}
+
+func TestSignedNestedConstantsAreBoundWithoutChangingModelDecisions(t *testing.T) {
+	schema := json.RawMessage(`{"type":"object","required":["schema_version","outcome","work_product"],"properties":{"schema_version":{"const":"1.0.0"},"outcome":{"enum":["completed","failed"]},"work_product":{"type":"object","required":["schema_version","result_type","tasks"],"properties":{"schema_version":{"const":"1.0.0"},"result_type":{"const":"FEATURE_PLAN"},"tasks":{"type":"array"}}}}}`)
+	input := json.RawMessage(`{"outcome":"completed","work_product":{"tasks":[]}}`)
+	bound := bindHandlerFixedConstants(input, schema)
+	var result struct {
+		SchemaVersion string `json:"schema_version"`
+		Outcome       string `json:"outcome"`
+		WorkProduct   struct {
+			SchemaVersion string `json:"schema_version"`
+			ResultType    string `json:"result_type"`
+			Tasks         []any  `json:"tasks"`
+		} `json:"work_product"`
+	}
+	if err := json.Unmarshal(bound, &result); err != nil || result.SchemaVersion != "1.0.0" || result.Outcome != "completed" || result.WorkProduct.SchemaVersion != "1.0.0" || result.WorkProduct.ResultType != "FEATURE_PLAN" || result.WorkProduct.Tasks == nil {
+		t.Fatalf("signed constants were not bound: %s, err=%v", bound, err)
+	}
+	wrong := json.RawMessage(`{"outcome":"completed","work_product":{"schema_version":"2.0.0","tasks":[]}}`)
+	bound = bindHandlerFixedConstants(wrong, schema)
+	if !strings.Contains(string(bound), `"schema_version":"2.0.0"`) {
+		t.Fatalf("model-supplied conflicting constant was rewritten: %s", bound)
 	}
 }
 

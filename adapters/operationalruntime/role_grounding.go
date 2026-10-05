@@ -22,9 +22,10 @@ type boundRoleDefinition struct {
 // then resolves that FQRN to the authenticated role bundle loaded with the
 // team manifest. Executions fail closed at either missing link.
 type boundRoleGroundingResolver struct {
-	roleByActor map[kernel.ActorFQN]kernel.RoleFQRN
-	byRole      map[kernel.RoleFQRN]boundRoleDefinition
-	handlers    *organization.RoleHandlerResolver
+	roleByActor      map[kernel.ActorFQN]kernel.RoleFQRN
+	byRole           map[kernel.RoleFQRN]boundRoleDefinition
+	handlers         *organization.RoleHandlerResolver
+	teamInstructions string
 }
 
 func newBoundRoleGroundingResolver(team organization.LoadedTeam) (*boundRoleGroundingResolver, error) {
@@ -32,8 +33,9 @@ func newBoundRoleGroundingResolver(team organization.LoadedTeam) (*boundRoleGrou
 		return nil, application.ErrInvalidConfiguration
 	}
 	resolver := &boundRoleGroundingResolver{
-		roleByActor: make(map[kernel.ActorFQN]kernel.RoleFQRN),
-		byRole:      make(map[kernel.RoleFQRN]boundRoleDefinition),
+		roleByActor:      make(map[kernel.ActorFQN]kernel.RoleFQRN),
+		byRole:           make(map[kernel.RoleFQRN]boundRoleDefinition),
+		teamInstructions: team.Manifest.Instructions,
 	}
 	handlers, err := organization.NewRoleHandlerResolver(team)
 	if err != nil {
@@ -80,6 +82,7 @@ func (resolver *boundRoleGroundingResolver) ResolveRoleHandlerGrounding(_ contex
 	grounding := application.RoleExecutionGrounding{
 		ActorFQN: actor, RoleFQRN: dispatch.RoleFQRN, BundleVersion: dispatch.BundleVersion, BundleDigest: dispatch.BundleDigest,
 		Capabilities: slices.Clone(dispatch.Capabilities), Permissions: slices.Clone(dispatch.Permissions), Instructions: dispatch.Charter,
+		TeamInstructions: resolver.teamInstructions,
 	}
 	if !grounding.Valid(actor) {
 		return application.RoleExecutionGrounding{}, application.MessageHandlerGrounding{}, application.ErrInvalidOperationalExecution
@@ -144,7 +147,7 @@ func (resolver *boundRoleGroundingResolver) ResolveRoleGrounding(_ context.Conte
 		ActorFQN: actor, RoleFQRN: fqrn,
 		BundleVersion: definition.version, BundleDigest: definition.digest,
 		Capabilities: slices.Clone(definition.capabilities), Permissions: slices.Clone(definition.permissions),
-		Instructions: definition.instructions,
+		Instructions: definition.instructions, TeamInstructions: resolver.teamInstructions,
 	}
 	if !grounding.Valid(actor) {
 		return application.RoleExecutionGrounding{}, application.ErrInvalidOperationalExecution

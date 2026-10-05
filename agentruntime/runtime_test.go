@@ -92,6 +92,39 @@ func TestRunnerRoundTripAndReplay(t *testing.T) {
 	}
 }
 
+func TestRunnerPinsSystemAndInitialPromptAcrossTurnsAndReplay(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	journal := &memoryJournal{}
+	model := &scriptedModel{responses: []Completion{
+		{ToolCalls: []ToolCall{{ID: "read-1", Name: "read_file", Arguments: json.RawMessage(`{"path":"README.md"}`)}}},
+		{Text: "done"},
+	}}
+	runner := Runner{Journal: journal, Model: model, Tools: &countingTool{}, SystemPrompt: "five exact instruction layers", MaxTurns: 3}
+	if result, err := runner.Run(ctx, "pinned-invocation", testRequestDigest, "original task brief"); err != nil || result != "done" {
+		t.Fatalf("run = %q, %v", result, err)
+	}
+	for turn, messages := range model.seen {
+		if len(messages) < 2 || messages[0].Role != "system" || messages[0].Content != "five exact instruction layers" || messages[1].Role != "user" || messages[1].Content != "original task brief" {
+			t.Fatalf("turn %d lost pinned input: %+v", turn, messages)
+		}
+	}
+	if _, err := runner.Run(ctx, "pinned-invocation", testRequestDigest, "original task brief"); err != nil {
+		t.Fatalf("exact replay rejected: %v", err)
+	}
+	recorded, found, err := RecordedSystemPrompt(ctx, journal, "pinned-invocation", testRequestDigest, "original task brief")
+	if err != nil || !found || recorded != "five exact instruction layers" {
+		t.Fatalf("recorded instructions = %q, found=%v, err=%v", recorded, found, err)
+	}
+	if _, _, err := RecordedSystemPrompt(ctx, journal, "pinned-invocation", testRequestDigest, "changed task brief"); !errors.Is(err, ErrInvalidTurn) {
+		t.Fatalf("changed initial brief admitted: %v", err)
+	}
+	runner.SystemPrompt = "changed instruction layers"
+	if _, err := runner.Run(ctx, "pinned-invocation", testRequestDigest, "original task brief"); !errors.Is(err, ErrInvalidTurn) {
+		t.Fatalf("changed pinned prompt admitted: %v", err)
+	}
+}
+
 func TestRunnerRecordsSemanticContextOnceAndReplaysExactPrompt(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()

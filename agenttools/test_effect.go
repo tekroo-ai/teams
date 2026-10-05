@@ -31,7 +31,7 @@ func (gateway TestGateway) Execute(ctx context.Context, request Request) (Receip
 	var args struct {
 		Package string `json:"package"`
 	}
-	if decode(request.Call.Arguments, &args) != nil || !validGoPackage(args.Package) {
+	if decode(request.Call.Arguments, &args) != nil {
 		return Receipt{}, ErrInvalidCall
 	}
 	operation, cancel := context.WithTimeout(ctx, gateway.Host.Timeout)
@@ -47,6 +47,9 @@ func (gateway TestGateway) Execute(ctx context.Context, request Request) (Receip
 	root, err := canonicalRoot(authority.WorkspaceRoot)
 	if err != nil {
 		return Receipt{}, err
+	}
+	if !validGoPackageInModule(root, args.Package) {
+		return Receipt{}, ErrInvalidCall
 	}
 	argumentsHash := sha256.Sum256(request.Call.Arguments)
 	intent := EffectRecord{InvocationID: request.InvocationID, RequestDigest: request.RequestDigest, ToolCallID: request.ToolCallID,
@@ -84,7 +87,7 @@ func (gateway TestGateway) Reconcile(ctx context.Context, request Request) (Rece
 	var args struct {
 		Package string `json:"package"`
 	}
-	if decode(request.Call.Arguments, &args) != nil || !validGoPackage(args.Package) {
+	if decode(request.Call.Arguments, &args) != nil {
 		return Receipt{}, false, ErrInvalidCall
 	}
 	authority, err := gateway.Bindings.BindToolInvocation(ctx, request.InvocationID, request.RequestDigest)
@@ -98,6 +101,9 @@ func (gateway TestGateway) Reconcile(ctx context.Context, request Request) (Rece
 	root, err := canonicalRoot(authority.WorkspaceRoot)
 	if err != nil {
 		return Receipt{}, false, err
+	}
+	if !validGoPackageInModule(root, args.Package) {
+		return Receipt{}, false, ErrInvalidCall
 	}
 	argumentsHash := sha256.Sum256(request.Call.Arguments)
 	intent := EffectRecord{InvocationID: request.InvocationID, RequestDigest: request.RequestDigest, ToolCallID: request.ToolCallID,

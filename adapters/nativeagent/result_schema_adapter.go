@@ -50,15 +50,18 @@ func modelFacingHandlerSchema(handler application.MessageHandlerGrounding, purpo
 		delete(verdictProperties, "candidate_receipt_sha256")
 		verdict["properties"], _ = json.Marshal(verdictProperties)
 		properties["work_product"], _ = json.Marshal(verdict)
+		if err := replaceEnvelopeProperty(schema, "work_product", properties["work_product"]); err != nil {
+			return nil, err
+		}
 	}
 	if len(handler.AllowedMessageProposals) != 0 {
 		schema["properties"], _ = json.Marshal(properties)
-		return json.Marshal(schema)
+		return encodeModelFacingSchema(schema)
 	}
 	proposalRaw, present := properties["message_proposals"]
 	if !present {
 		schema["properties"], _ = json.Marshal(properties)
-		return json.Marshal(schema)
+		return encodeModelFacingSchema(schema)
 	}
 	var proposal map[string]json.RawMessage
 	if err := json.Unmarshal(proposalRaw, &proposal); err != nil {
@@ -68,7 +71,70 @@ func modelFacingHandlerSchema(handler application.MessageHandlerGrounding, purpo
 	proposal["description"] = json.RawMessage(`"Required array. No message proposals are authorized here; use []."`)
 	properties["message_proposals"], _ = json.Marshal(proposal)
 	schema["properties"], _ = json.Marshal(properties)
-	return json.Marshal(schema)
+	return encodeModelFacingSchema(schema)
+}
+
+// A model-facing field replacement must also replace restrictions at the same
+// envelope level in conditional/composed branches. Otherwise a reduced field
+// can be forbidden from containing the full fields another branch requires.
+// The signed source schema remains unchanged and validates after assembly.
+func replaceEnvelopeProperty(schema map[string]json.RawMessage, name string, replacement json.RawMessage) error {
+	if raw, present := schema["properties"]; present {
+		var properties map[string]json.RawMessage
+		if json.Unmarshal(raw, &properties) != nil || properties == nil {
+			return ErrInvalidBinding
+		}
+		if _, declared := properties[name]; declared {
+			properties[name] = replacement
+			schema["properties"], _ = json.Marshal(properties)
+		}
+	}
+	for _, key := range []string{"then", "else"} {
+		if raw, present := schema[key]; present {
+			if string(raw) == "true" || string(raw) == "false" {
+				continue
+			}
+			var branch map[string]json.RawMessage
+			if json.Unmarshal(raw, &branch) != nil || branch == nil {
+				return ErrInvalidBinding
+			}
+			if err := replaceEnvelopeProperty(branch, name, replacement); err != nil {
+				return err
+			}
+			schema[key], _ = json.Marshal(branch)
+		}
+	}
+	for _, key := range []string{"allOf", "anyOf", "oneOf"} {
+		if raw, present := schema[key]; present {
+			var branches []json.RawMessage
+			if json.Unmarshal(raw, &branches) != nil {
+				return ErrInvalidBinding
+			}
+			for i, rawBranch := range branches {
+				if string(rawBranch) == "true" || string(rawBranch) == "false" {
+					continue
+				}
+				var branch map[string]json.RawMessage
+				if json.Unmarshal(rawBranch, &branch) != nil || branch == nil {
+					return ErrInvalidBinding
+				}
+				if err := replaceEnvelopeProperty(branch, name, replacement); err != nil {
+					return err
+				}
+				branches[i], _ = json.Marshal(branch)
+			}
+			schema[key], _ = json.Marshal(branches)
+		}
+	}
+	return nil
+}
+
+func encodeModelFacingSchema(schema map[string]json.RawMessage) (json.RawMessage, error) {
+	encoded, err := json.Marshal(schema)
+	if err != nil {
+		return nil, err
+	}
+	return simplifyDisjointOneOf(encoded)
 }
 
 func fixedHandlerResultVersion(raw json.RawMessage) bool {
@@ -98,6 +164,50 @@ func bindHandlerResultVersion(arguments json.RawMessage, handler application.Mes
 		}
 	}
 	return arguments
+}
+
+// A required const in the signed handler schema is transport metadata, not a
+// model decision. Supply it when omitted; never rewrite a supplied value.
+// The signed schema still validates the fully assembled result afterward.
+func bindHandlerFixedConstants(arguments, schemaRaw json.RawMessage) json.RawMessage {
+	var schema struct {
+		Required   []string                   `json:"required"`
+		Properties map[string]json.RawMessage `json:"properties"`
+	}
+	var object map[string]json.RawMessage
+	if json.Unmarshal(schemaRaw, &schema) != nil || json.Unmarshal(arguments, &object) != nil || object == nil {
+		return arguments
+	}
+	changed := false
+	for _, name := range schema.Required {
+		property := schema.Properties[name]
+		if property == nil {
+			continue
+		}
+		if value, present := object[name]; present {
+			bound := bindHandlerFixedConstants(value, property)
+			if string(bound) != string(value) {
+				object[name] = bound
+				changed = true
+			}
+			continue
+		}
+		var fixed struct {
+			Const json.RawMessage `json:"const"`
+		}
+		if json.Unmarshal(property, &fixed) == nil && len(fixed.Const) > 0 {
+			object[name] = fixed.Const
+			changed = true
+		}
+	}
+	if !changed {
+		return arguments
+	}
+	encoded, err := json.Marshal(object)
+	if err != nil {
+		return arguments
+	}
+	return encoded
 }
 
 func bindHandlerValidationResult(arguments json.RawMessage, candidate *CandidateBinding) (json.RawMessage, error) {

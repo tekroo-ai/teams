@@ -44,7 +44,7 @@ type Spec struct {
 }
 
 var specs = []Spec{
-	{"read_file", "Read bounded lines from one workspace file; return its total line_count and full-file SHA-256. start_line and end_line select an inclusive range; an end_line beyond EOF stops at EOF.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path"],"properties":{"path":{"type":"string","minLength":1},"start_line":{"type":"integer","minimum":1},"end_line":{"type":"integer","minimum":1}}}`), "repository.read"},
+	{"read_file", "Read bounded lines from one workspace filesystem path, not a Teams evidence ID. Use read_evidence for evidence_id. Returns total line_count and full-file SHA-256; an end_line beyond EOF stops at EOF.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path"],"properties":{"path":{"type":"string","minLength":1,"description":"Relative path to a workspace file; never an evidence_id."},"start_line":{"type":"integer","minimum":1},"end_line":{"type":"integer","minimum":1}}}`), "repository.read"},
 	{"check_go_format", "Check whether named workspace Go files are gofmt-clean without changing them; format_clean is true only when all named files match gofmt output.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["paths"],"properties":{"paths":{"type":"array","minItems":1,"maxItems":32,"uniqueItems":true,"items":{"type":"string","minLength":1}}}}`), "repository.read"},
 	{"list_files", "List one workspace directory without recursing. If truncated, continue with next_after as start_after.", json.RawMessage(`{"type":"object","additionalProperties":false,"properties":{"path":{"type":"string"},"start_after":{"type":"string"},"limit":{"type":"integer","minimum":1,"maximum":200}}}`), "repository.read"},
 	{"find_files", "Find workspace files matching a filename glob; ** matches directories. Results are bounded and sorted.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["filename_glob"],"properties":{"filename_glob":{"type":"string","minLength":1,"maxLength":256},"directory":{"type":"string"},"start_after":{"type":"string"},"limit":{"type":"integer","minimum":1,"maximum":200},"summary":{"type":"string"}}}`), "repository.read"},
@@ -57,8 +57,8 @@ var specs = []Spec{
 	{"write_file", "Create or replace one workspace file only when its expected SHA-256 matches.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path","content","expected_sha256"],"properties":{"path":{"type":"string","minLength":1},"content":{"type":"string"},"expected_sha256":{"type":"string","pattern":"^$|^[0-9a-f]{64}$"}}}`), "repository.edit"},
 	{"git_stage_files", "Stage only the named workspace paths when HEAD still matches the expected commit. Never stages the injected .openhands runtime files.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["paths","expected_head"],"properties":{"paths":{"type":"array","minItems":1,"maxItems":32,"uniqueItems":true,"items":{"type":"string","minLength":1}},"expected_head":{"type":"string","pattern":"^[0-9a-f]{40}$"}}}`), "repository.edit"},
 	{"git_commit", "Commit the exact staged tree against an expected HEAD. A retry after a completed identical commit returns that commit instead of creating another.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["expected_head","expected_index_tree","subject"],"properties":{"expected_head":{"type":"string","pattern":"^[0-9a-f]{40}$"},"expected_index_tree":{"type":"string","pattern":"^[0-9a-f]{40}$"},"subject":{"type":"string","minLength":1,"maxLength":200},"body":{"type":"string","maxLength":5000}}}`), "repository.edit"},
-	{"run_go_tests", "Run Go tests from committed HEAD in a disposable macOS sandbox. Use ./ for the module root or ./... for all packages; no network, host writes, shell expansion, or CGO.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["package"],"properties":{"package":{"type":"string","pattern":"^\\./(?:\\.\\.\\.|[A-Za-z0-9_-][A-Za-z0-9_.-]*(?:/[A-Za-z0-9_-][A-Za-z0-9_.-]*)*)?$"}}}`), "test.execute"},
-	{"run_go_tests_worktree", "Run Go tests against a captured tracked-and-untracked workspace snapshot in a disposable macOS sandbox before committing. Returns snapshot_sha256; the independent validation gate still uses run_go_tests on committed HEAD.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["package"],"properties":{"package":{"type":"string","pattern":"^\\./(?:\\.\\.\\.|[A-Za-z0-9_-][A-Za-z0-9_.-]*(?:/[A-Za-z0-9_-][A-Za-z0-9_.-]*)*)?$"}}}`), "test.execute"},
+	{"run_go_tests", "Run Go tests from committed HEAD in a disposable macOS sandbox. package may be ., ./, ./..., a local relative package, or this workspace's declared Go module/package path; external modules are forbidden. No network, host writes, shell expansion, or CGO.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["package"],"properties":{"package":{"type":"string","pattern":"^(?:\\.|\\./(?:\\.\\.\\.|[A-Za-z0-9_-][A-Za-z0-9_.-]*(?:/[A-Za-z0-9_-][A-Za-z0-9_.-]*)*)?|[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)+)$"}}}`), "test.execute"},
+	{"run_go_tests_worktree", "Run Go tests against a captured tracked-and-untracked workspace snapshot in a disposable macOS sandbox before committing. package may be ., ./, ./..., a local relative package, or this workspace's declared Go module/package path; external modules are forbidden. Returns snapshot_sha256; independent validation still uses run_go_tests on committed HEAD.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["package"],"properties":{"package":{"type":"string","pattern":"^(?:\\.|\\./(?:\\.\\.\\.|[A-Za-z0-9_-][A-Za-z0-9_.-]*(?:/[A-Za-z0-9_-][A-Za-z0-9_.-]*)*)?|[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)+)$"}}}`), "test.execute"},
 }
 
 type Authority struct {
@@ -408,7 +408,7 @@ func (host Host) execute(ctx context.Context, authority Authority, call Call) (R
 		var args struct {
 			Package string `json:"package"`
 		}
-		if decode(call.Arguments, &args) != nil || !validGoPackage(args.Package) {
+		if decode(call.Arguments, &args) != nil || !validGoPackageInModule(root, args.Package) {
 			return Result{}, ErrInvalidCall
 		}
 		result, err = host.runIsolatedGoTests(ctx, root, args.Package)
@@ -416,7 +416,7 @@ func (host Host) execute(ctx context.Context, authority Authority, call Call) (R
 		var args struct {
 			Package string `json:"package"`
 		}
-		if decode(call.Arguments, &args) != nil || !validGoPackage(args.Package) {
+		if decode(call.Arguments, &args) != nil || !validGoPackageInModule(root, args.Package) {
 			return Result{}, ErrInvalidCall
 		}
 		if authority.Purpose != kernel.PurposeImplementation && authority.Purpose != kernel.PurposeRepair {
@@ -710,7 +710,7 @@ func writeFile(root, relative string, content []byte, expectedSHA string) (strin
 }
 
 func validGoPackage(value string) bool {
-	if value == "./..." || value == "./" {
+	if value == "." || value == "./..." || value == "./" {
 		return true
 	}
 	if !strings.HasPrefix(value, "./") {
@@ -727,6 +727,42 @@ func validGoPackage(value string) bool {
 		}
 	}
 	return true
+}
+
+// Go also accepts a package's module import path. Admit only names that map
+// back into this workspace's own module; never resolve an external package.
+func validGoPackageInModule(root, value string) bool {
+	if validGoPackage(value) {
+		return true
+	}
+	content, err := os.ReadFile(filepath.Join(root, "go.mod"))
+	if err != nil || len(content) > 1<<20 {
+		return false
+	}
+	module := ""
+	for _, line := range strings.Split(string(content), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) >= 2 && fields[0] == "module" {
+			module = fields[1]
+			break
+		}
+	}
+	if module == "" || value == module {
+		return value == module && module != ""
+	}
+	if !strings.HasPrefix(value, module+"/") {
+		return false
+	}
+	suffix := strings.TrimPrefix(value, module+"/")
+	if !validGoPackage("./"+suffix) {
+		return false
+	}
+	path, err := existingPath(root, suffix)
+	if err != nil {
+		return false
+	}
+	info, err := os.Stat(path)
+	return err == nil && info.IsDir()
 }
 
 func (host Host) gitBinary() string {

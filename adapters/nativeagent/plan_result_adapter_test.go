@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -14,6 +15,54 @@ import (
 	"github.com/tekroo-ai/teams/application"
 	"github.com/tekroo-ai/teams/kernel"
 )
+
+// The real PM contract requires complete plan fields in a conditional branch.
+// The model owns only the delta; Teams supplies the immutable design fields.
+func TestPlanDeltaAndAssembledResultAgainstSignedConditionalSchema(t *testing.T) {
+	signed, err := os.ReadFile("../../config/starter-team/roles-v4/project-manager-2.2.1/handlers/feature.design-proposed/result.schema.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	originalDigest := sha256.Sum256(signed)
+	source := []byte(application.OrganizationalResultMarker + `
+{"work_product":{"schema_version":"1.0.0","result_type":"FEATURE_PLAN","architecture":"Change greeting behavior without changing its public API.","tasks":[{"story_index":0,"title":"Implement greeting","description":"Update greeting behavior.","acceptance_criteria":["Greeting returns the requested text."],"purpose":"IMPLEMENTATION","complexity":1,"risk":"LOW","attempt_limit":1,"review_round_limit":1,"depends_on":[]}]}}`)
+	digest := sha256.Sum256(source)
+	plan := &PlanFinalizationBinding{SourceOutput: source, SourceDigest: kernel.Digest(fmt.Sprintf("%x", digest[:]))}
+	handler := application.MessageHandlerGrounding{ResultSchema: signed}
+	modelSchema, err := modelFacingHandlerSchema(handler, kernel.PurposeHandoff)
+	if err != nil {
+		t.Fatal(err)
+	}
+	modelSchema, err = modelFacingPlanSchema(modelSchema, plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	delta := json.RawMessage(`{"outcome":"completed","summary":"Ready for implementation.","evidence":["Accepted design reviewed."],"message_proposals":[],"work_product":{"task_dependencies":[],"handoffs":[]}}`)
+	if !schemaAccepts(t, modelSchema, delta) {
+		t.Fatalf("conditional schema rejects admitted model delta: %s", modelSchema)
+	}
+	if schemaAccepts(t, signed, delta) {
+		t.Fatal("signed full-result schema must not accept an unassembled delta")
+	}
+	assembled, err := bindHandlerPlanResult(bindHandlerResultVersion(delta, handler), plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !schemaAccepts(t, signed, assembled) {
+		t.Fatalf("assembled result violates signed schema: %s", assembled)
+	}
+	if sha256.Sum256(signed) != originalDigest {
+		t.Fatal("signed source contract changed")
+	}
+	for _, sample := range []string{
+		`{"outcome":"completed","summary":"Ready","evidence":[],"message_proposals":[],"work_product":{"task_dependencies":"[]","handoffs":[]}}`,
+		`{"outcome":"completed","summary":"Ready","evidence":[],"message_proposals":[],"work_product":{"task_dependencies":[],"handoffs":[],"architecture":"model changed design"}}`,
+	} {
+		if schemaAccepts(t, modelSchema, []byte(sample)) {
+			t.Fatalf("invalid model delta accepted: %s", sample)
+		}
+	}
+}
 
 func TestPlanFinalizationAuthorsOnlyDependenciesAndHandoffs(t *testing.T) {
 	source := []byte(application.OrganizationalResultMarker + `

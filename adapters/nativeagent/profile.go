@@ -8,21 +8,26 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/tekroo-ai/teams/kernel"
 )
 
 const ProfileSettingsVersion = "tekroo.teams.native-profile/1.0.0"
 
+const ResponseModeJSONSchemaActions = "json_schema_actions"
+
 // ProfileSettings is the exact model-serving configuration admitted for a
 // Teams-native session. It is distinct from OpenHands agent_settings so a
 // qualification for one execution surface cannot be reused for the other.
 type ProfileSettings struct {
-	SchemaVersion   string `json:"schema_version"`
-	BaseURL         string `json:"base_url"`
-	Model           string `json:"model"`
-	MaxOutputTokens int    `json:"max_output_tokens"`
-	MaxTurns        int    `json:"max_turns"`
+	SchemaVersion     string `json:"schema_version"`
+	BaseURL           string `json:"base_url"`
+	Model             string `json:"model"`
+	ModelInstructions string `json:"model_instructions,omitempty"`
+	ResponseMode      string `json:"response_mode,omitempty"`
+	MaxOutputTokens   int    `json:"max_output_tokens"`
+	MaxTurns          int    `json:"max_turns"`
 }
 
 func (settings ProfileSettings) Valid() bool {
@@ -34,7 +39,7 @@ func (settings ProfileSettings) Valid() bool {
 	if err != nil || port == 0 || net.ParseIP(endpoint.Hostname()) == nil || !net.ParseIP(endpoint.Hostname()).IsLoopback() {
 		return false
 	}
-	return settings.SchemaVersion == ProfileSettingsVersion && settings.Model != "" && len(settings.Model) <= 1024 && settings.MaxOutputTokens > 0 && settings.MaxOutputTokens <= 262144 && settings.MaxTurns >= 0
+	return settings.SchemaVersion == ProfileSettingsVersion && settings.Model != "" && len(settings.Model) <= 1024 && len(settings.ModelInstructions) <= 1<<16 && utf8.ValidString(settings.ModelInstructions) && (settings.ResponseMode == "" || settings.ResponseMode == ResponseModeJSONSchemaActions) && settings.MaxOutputTokens > 0 && settings.MaxOutputTokens <= 262144 && settings.MaxTurns >= 0
 }
 
 func ModelProfileDigest(role kernel.RoleFQRN, bundle kernel.Digest, settings ProfileSettings) (kernel.Digest, error) {

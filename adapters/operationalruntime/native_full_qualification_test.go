@@ -131,6 +131,16 @@ func TestNativeFullFeatureQualification(t *testing.T) {
 		t.Fatalf("submit feature: created=%t err=%v", created, err)
 	}
 	t.Logf("native feature=%s database=%s baseline=%s", feature.ID, config.Mongo.Database, baseline)
+	defer func() {
+		if output := os.Getenv("TEKROO_NATIVE_QUAL_OUTPUT"); t.Failed() && output != "" {
+			if _, err := os.Stat(filepath.Join(output, "native-evidence.json")); err == nil {
+				return
+			}
+			if current, found, err := service.ReadFeature(featureCtx, feature.ID); err == nil && found {
+				retainNativeQualificationEvidence(t, featureCtx, service, config, current, baseline, output)
+			}
+		}
+	}()
 	deadline := time.Now().Add(90 * time.Minute)
 	lastStatus := feature.Status
 	var admittedAt time.Time
@@ -243,6 +253,7 @@ func TestNativeFullFeatureQualification(t *testing.T) {
 			if output := os.Getenv("TEKROO_NATIVE_QUAL_OUTPUT"); output != "" {
 				retainNativeQualificationEvidence(t, featureCtx, service, config, current, baseline, output)
 			}
+			requireNoNativeToolErrors(t, featureCtx, service, current)
 			t.Logf("native full feature reached acceptance review: %s", current.ID)
 			return
 		}
@@ -252,6 +263,49 @@ func TestNativeFullFeatureQualification(t *testing.T) {
 		time.Sleep(2 * time.Second)
 	}
 	t.Fatalf("native feature did not finish before bounded deadline; last status=%s", lastStatus)
+}
+
+func requireNoNativeToolErrors(t *testing.T, ctx context.Context, service *ProductionService, feature organization.FeatureRequest) {
+	t.Helper()
+	taskIDs := make([]kernel.UUIDv7, 0, 4+len(feature.Plan.Tasks))
+	for _, stage := range []featurePlanningStage{stageRefinement, stageSpecification, stageArchitecture, stagePlanFinalization} {
+		taskIDs = append(taskIDs, featurePlanningTaskID(feature.ID, stage, 0, nil))
+	}
+	for _, task := range feature.Plan.Tasks {
+		taskIDs = append(taskIDs, task.ID)
+	}
+	for _, taskID := range taskIDs {
+		decision, err := service.Store.LoadDecision(ctx, kernel.KernelCommand{Target: kernel.AggregateRef{Kind: kernel.AggregateTask, ID: taskID}})
+		if err != nil {
+			t.Fatalf("load task %s for tool-error audit: %v", taskID, err)
+		}
+		for _, invocation := range decision.WorkInvocations {
+			if invocation.TaskID != taskID {
+				continue
+			}
+			entries, err := service.Store.Load(ctx, string(invocation.ID))
+			if err != nil {
+				t.Fatalf("load invocation %s journal for tool-error audit: %v", invocation.ID, err)
+			}
+			for _, entry := range entries {
+				if entry.Kind == "tool_done" {
+					var result struct {
+						Name  string `json:"name"`
+						Error string `json:"error"`
+					}
+					if err := json.Unmarshal(entry.Payload, &result); err != nil {
+						t.Fatalf("decode invocation %s tool result %d: %v", invocation.ID, entry.Sequence, err)
+					}
+					if result.Error != "" {
+						t.Errorf("native tool error actor=%s invocation=%s sequence=%d tool=%s: %s", invocation.ActorFQN, invocation.ID, entry.Sequence, result.Name, result.Error)
+					}
+				}
+				if strings.Contains(string(entry.Payload), "TEKROO_") && strings.Contains(string(entry.Payload), "CORRECTION") {
+					t.Errorf("native Tekroo correction actor=%s invocation=%s sequence=%d", invocation.ActorFQN, invocation.ID, entry.Sequence)
+				}
+			}
+		}
+	}
 }
 
 // Retain the raw native journal and execution outputs before the disposable
@@ -276,7 +330,11 @@ func retainNativeQualificationEvidence(t *testing.T, ctx context.Context, servic
 		State       kernel.AggregateState `json:"state"`
 		Invocations []invocationEvidence  `json:"invocations"`
 	}
-	tasks := make([]taskEvidence, 0, 4+len(feature.Plan.Tasks))
+	var plannedTasks []organization.PlannedTask
+	if feature.Plan != nil {
+		plannedTasks = feature.Plan.Tasks
+	}
+	tasks := make([]taskEvidence, 0, 4+len(plannedTasks))
 	collect := func(taskID kernel.UUIDv7) {
 		t.Helper()
 		decision, err := service.Store.LoadDecision(ctx, kernel.KernelCommand{Target: kernel.AggregateRef{Kind: kernel.AggregateTask, ID: taskID}})
@@ -314,7 +372,7 @@ func retainNativeQualificationEvidence(t *testing.T, ctx context.Context, servic
 	for _, stage := range []featurePlanningStage{stageRefinement, stageSpecification, stageArchitecture, stagePlanFinalization} {
 		collect(featurePlanningTaskID(feature.ID, stage, 0, nil))
 	}
-	for _, planned := range feature.Plan.Tasks {
+	for _, planned := range plannedTasks {
 		collect(planned.ID)
 	}
 	receipt := struct {
@@ -548,7 +606,7 @@ func nativeQualificationBindNativeProfiles(t *testing.T, config *ProductionConfi
 		if profile.RoleFQRN == "project-manager" && maximumOutput < 32768 {
 			maximumOutput = 32768
 		}
-		settings := nativeagent.ProfileSettings{SchemaVersion: nativeagent.ProfileSettingsVersion, BaseURL: baseURL, Model: model, MaxOutputTokens: maximumOutput}
+		settings := nativeagent.ProfileSettings{SchemaVersion: nativeagent.ProfileSettingsVersion, BaseURL: baseURL, Model: model, ResponseMode: os.Getenv("TEKROO_NATIVE_QUAL_RESPONSE_MODE"), MaxOutputTokens: maximumOutput}
 		modelDigest, err := nativeagent.ModelProfileDigest(profile.RoleFQRN, profile.RoleBundleDigest, settings)
 		if err != nil {
 			t.Fatal(err)

@@ -237,18 +237,19 @@ type ExecutionBrief struct {
 // role bundle indexed by its FQRN. The bundle digest binds the human-readable
 // duties and permissions to the signed bundle loaded at service startup.
 type RoleExecutionGrounding struct {
-	ActorFQN      kernel.ActorFQN `json:"actor_fqn"`
-	RoleFQRN      kernel.RoleFQRN `json:"role_fqrn"`
-	BundleVersion string          `json:"bundle_version"`
-	BundleDigest  kernel.Digest   `json:"bundle_digest"`
-	Capabilities  []string        `json:"capabilities"`
-	Permissions   []string        `json:"permissions"`
-	Instructions  string          `json:"instructions"`
+	ActorFQN         kernel.ActorFQN `json:"actor_fqn"`
+	RoleFQRN         kernel.RoleFQRN `json:"role_fqrn"`
+	BundleVersion    string          `json:"bundle_version"`
+	BundleDigest     kernel.Digest   `json:"bundle_digest"`
+	Capabilities     []string        `json:"capabilities"`
+	Permissions      []string        `json:"permissions"`
+	Instructions     string          `json:"instructions"`
+	TeamInstructions string          `json:"team_instructions,omitempty"`
 }
 
 func (grounding RoleExecutionGrounding) Valid(actor kernel.ActorFQN) bool {
 	fqrn, err := kernel.RoleFQRNFromActor(actor)
-	if err != nil || grounding.ActorFQN != actor || grounding.RoleFQRN != fqrn || grounding.BundleVersion == "" || !grounding.BundleDigest.Valid() || strings.TrimSpace(grounding.Instructions) == "" || len(grounding.Instructions) > 1<<20 || len(grounding.Capabilities) == 0 || len(grounding.Permissions) == 0 || !slices.IsSorted(grounding.Capabilities) || !slices.IsSorted(grounding.Permissions) {
+	if err != nil || grounding.ActorFQN != actor || grounding.RoleFQRN != fqrn || grounding.BundleVersion == "" || !grounding.BundleDigest.Valid() || strings.TrimSpace(grounding.Instructions) == "" || len(grounding.Instructions) > 1<<20 || len(grounding.TeamInstructions) > 1<<16 || len(grounding.Capabilities) == 0 || len(grounding.Permissions) == 0 || !slices.IsSorted(grounding.Capabilities) || !slices.IsSorted(grounding.Permissions) {
 		return false
 	}
 	for _, values := range [][]string{grounding.Capabilities, grounding.Permissions} {

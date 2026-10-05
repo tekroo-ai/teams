@@ -104,7 +104,7 @@ func configuredNativeSession(ctx context.Context, service *ProductionService, pr
 			RoleFQRN: profile.RoleFQRN, RoleBundleDigest: profile.RoleBundleDigest,
 			ModelProfileDigest: profile.ModelProfileDigest, RuntimeIdentityDigest: profile.RuntimeIdentityDigest,
 			ToolPolicyDigest: profile.ToolPolicyDigest, EffectPolicyDigest: profile.EffectPolicyDigest,
-			BaseURL: settings.BaseURL, Model: settings.Model, MaxOutputTokens: settings.MaxOutputTokens, MaxTurns: settings.MaxTurns,
+			BaseURL: settings.BaseURL, Model: settings.Model, ModelInstructions: settings.ModelInstructions, ResponseMode: settings.ResponseMode, MaxOutputTokens: settings.MaxOutputTokens, MaxTurns: settings.MaxTurns,
 			AllowedReadTools: readTools, AllowedEffectTools: effectTools,
 		},
 		ResultContract: resultContract,

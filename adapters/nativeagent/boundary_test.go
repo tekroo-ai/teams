@@ -292,12 +292,16 @@ func TestEffectfulBoundaryCancelReconcilesAppliedWriteWithoutModelCall(t *testin
 		},
 	}
 	arguments := json.RawMessage(`{"path":"note.txt","content":"new content","expected_sha256":""}`)
+	systemPrompt, err := assembleInstructions(brief, profile, root)
+	if err != nil {
+		t.Fatal(err)
+	}
 	start, _ := json.Marshal(struct {
 		RequestDigest   string                        `json:"request_digest"`
 		Prompt          string                        `json:"prompt"`
 		SystemPrompt    string                        `json:"system_prompt"`
 		EffectAuthority *agentruntime.EffectAuthority `json:"effect_authority"`
-	}{string(digest), string(encoded), brief.RoleGrounding.Instructions,
+	}{string(digest), string(encoded), systemPrompt,
 		&agentruntime.EffectAuthority{WorkspaceRoot: root, Permissions: []string{"repository.edit"}, Purpose: string(brief.Purpose), EffectPolicyDigest: string(brief.EffectPolicyDigest)}})
 	turn, _ := json.Marshal(agentruntime.Completion{ToolCalls: []agentruntime.ToolCall{{ID: "write-1", Name: "write_file", Arguments: arguments}}})
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -337,8 +341,20 @@ func TestBoundaryRecoversRecordedModelTurn(t *testing.T) {
 	defer server.Close()
 	boundary, brief, digest, journal := newBoundaryFixture(t, server)
 	encoded, _ := json.Marshal(brief)
+	config, err := boundary.Configure(context.Background(), brief)
+	if err != nil {
+		t.Fatal(err)
+	}
+	authority, err := config.Bindings.BindToolInvocation(context.Background(), brief.InvocationID, digest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	systemPrompt, err := assembleInstructions(brief, config.Profile, authority.WorkspaceRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
 	start, _ := json.Marshal(map[string]string{
-		"request_digest": string(digest), "prompt": string(encoded), "system_prompt": brief.RoleGrounding.Instructions,
+		"request_digest": string(digest), "prompt": string(encoded), "system_prompt": systemPrompt,
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()

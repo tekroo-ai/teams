@@ -31,6 +31,9 @@ type OpenAIModel struct {
 	// JSON response channel, then presented to the runner as a final tool call.
 	FinalTool   string
 	FinalSchema json.RawMessage
+	// TurnContract constrains every choice (ordinary tool or final result) in
+	// the original request. It never asks the model for a readiness turn.
+	TurnContract *StructuredTurnContract
 }
 
 func (model OpenAIModel) Complete(ctx context.Context, transcript []Message) (Completion, error) {
@@ -46,6 +49,14 @@ func (model OpenAIModel) Complete(ctx context.Context, transcript []Message) (Co
 		case "user":
 		case "assistant":
 			if len(item.ToolCalls) > 0 {
+				if model.TurnContract != nil {
+					content, err := structuredAssistantContent(item.ToolCalls, model.TurnContract.final)
+					if err != nil {
+						return Completion{}, err
+					}
+					wire["content"] = content
+					break
+				}
 				calls := make([]map[string]any, 0, len(item.ToolCalls))
 				for _, call := range item.ToolCalls {
 					calls = append(calls, map[string]any{"id": call.ID, "type": "function", "function": map[string]any{"name": call.Name, "arguments": string(call.Arguments)}})
@@ -53,6 +64,14 @@ func (model OpenAIModel) Complete(ctx context.Context, transcript []Message) (Co
 				wire["tool_calls"] = calls
 			}
 		case "tool":
+			if model.TurnContract != nil {
+				content, err := structuredToolContent(item)
+				if err != nil {
+					return Completion{}, err
+				}
+				wire["role"], wire["content"] = "user", content
+				break
+			}
 			if item.CallID == "" {
 				return Completion{}, ErrInvalidTurn
 			}
@@ -64,7 +83,10 @@ func (model OpenAIModel) Complete(ctx context.Context, transcript []Message) (Co
 	}
 	repairFinal := len(transcript) > 0 && model.FinalTool != "" && transcript[len(transcript)-1].Role == "tool" && transcript[len(transcript)-1].Name == model.FinalTool
 	request := map[string]any{"model": model.Model, "messages": messages, "stream": false, "max_tokens": model.MaxTokens}
-	if repairFinal {
+	if model.TurnContract != nil {
+		request["tool_choice"] = "none"
+		request["response_format"] = map[string]any{"type": "json_schema", "json_schema": map[string]any{"name": "tekroo_turn", "strict": true, "schema": model.TurnContract.schema}}
+	} else if repairFinal {
 		if !json.Valid(model.FinalSchema) {
 			return Completion{}, ErrInvalidTurn
 		}
@@ -111,6 +133,7 @@ func (model OpenAIModel) Complete(ctx context.Context, transcript []Message) (Co
 		return Completion{}, fmt.Errorf("model completion HTTP %d (response bytes %d)", response.StatusCode, len(encoded))
 	}
 	var decoded struct {
+		ID      string `json:"id"`
 		Choices []struct {
 			FinishReason string `json:"finish_reason"`
 			Message      struct {
@@ -129,6 +152,12 @@ func (model OpenAIModel) Complete(ctx context.Context, transcript []Message) (Co
 		return Completion{}, fmt.Errorf("%w: malformed model completion", ErrInvalidTurn)
 	}
 	message := decoded.Choices[0].Message
+	if model.TurnContract != nil {
+		if decoded.Choices[0].FinishReason != "stop" || len(message.ToolCalls) != 0 {
+			return Completion{}, fmt.Errorf("%w: incomplete structured turn", ErrInvalidTurn)
+		}
+		return model.TurnContract.decode(json.RawMessage(message.Content), decoded.ID)
+	}
 	if repairFinal {
 		if decoded.Choices[0].FinishReason != "stop" || len(message.ToolCalls) != 0 || !json.Valid([]byte(message.Content)) {
 			return Completion{}, fmt.Errorf("%w: constrained final result was not one JSON object", ErrInvalidTurn)

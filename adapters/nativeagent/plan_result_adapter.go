@@ -51,6 +51,9 @@ func modelFacingPlanSchema(handlerSchema json.RawMessage, plan *PlanFinalization
 	work["properties"], _ = json.Marshal(workProperties)
 	properties["work_product"], _ = json.Marshal(work)
 	schema["properties"], _ = json.Marshal(properties)
+	if err := replaceEnvelopeProperty(schema, "work_product", properties["work_product"]); err != nil {
+		return nil, err
+	}
 	return json.Marshal(schema)
 }
 

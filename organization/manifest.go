@@ -15,6 +15,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/tekroo-ai/teams/kernel"
 )
@@ -180,11 +181,12 @@ type TeamManifest struct {
 	SchemaVersion string        `json:"schema_version"`
 	Team          string        `json:"team"`
 	Version       string        `json:"version"`
+	Instructions  string        `json:"instructions,omitempty"`
 	Roles         []RoleBinding `json:"roles"`
 }
 
 func (manifest TeamManifest) Validate() error {
-	if manifest.SchemaVersion != TeamManifestSchemaVersion || !namePattern.MatchString(manifest.Team) || !versionPattern.MatchString(manifest.Version) || len(manifest.Roles) == 0 || len(manifest.Roles) > 128 {
+	if manifest.SchemaVersion != TeamManifestSchemaVersion || !namePattern.MatchString(manifest.Team) || !versionPattern.MatchString(manifest.Version) || len(manifest.Instructions) > 1<<16 || !utf8.ValidString(manifest.Instructions) || len(manifest.Roles) == 0 || len(manifest.Roles) > 128 {
 		return ErrInvalidTeamManifest
 	}
 	previous := ""

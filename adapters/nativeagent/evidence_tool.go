@@ -61,7 +61,7 @@ func (tool *admittedEvidenceTool) definition() agentruntime.ToolDefinition {
 		},
 		"required": []string{"evidence_id"},
 	})
-	return agentruntime.ToolDefinition{Name: "read_evidence", Description: "Read a page of one admitted immutable Teams evidence artifact by evidence_id. offset and limit are byte counts; defaults are 0 and 32768. The response includes the full SHA-256 and next offset.", Parameters: encoded}
+	return agentruntime.ToolDefinition{Name: "read_evidence", Description: "Read one admitted immutable Teams evidence artifact by evidence_id, not by filesystem path. Use read_file only for workspace files. offset and limit are byte counts; defaults are 0 and 32768. The response includes the full SHA-256 and next offset.", Parameters: encoded}
 }
 
 func (tool *admittedEvidenceTool) read(ctx context.Context, arguments json.RawMessage) (json.RawMessage, error) {

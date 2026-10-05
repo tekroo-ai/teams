@@ -4091,9 +4091,9 @@ func (client *Client) withReadOnlyToolSession(ctx context.Context, agentSettings
 				return nil, ErrProtocol
 			}
 			switch entry["name"] {
-			case "file_read", "list_files":
-				// The Teams MCP surface exposes read_file and list_files with
-				// one path contract; do not advertise native duplicates.
+			case "file_read", "list_files", "find_files", "search_file_contents":
+				// Teams exposes one invocation-bound tool for each of these
+				// operations; do not advertise native duplicates.
 			case "repository_diff_operations":
 				params, ok := entry["params"].(map[string]any)
 				if !ok {
@@ -4328,14 +4328,21 @@ func conversationAgentMatches(info conversationInfo, expectedRaw json.RawMessage
 			return false
 		}
 		// Previously created conversations retain the original qualified list.
-		// New ones omit only the two native readers superseded by Teams tools.
-		unique := slices.DeleteFunc(slices.Clone(expected.Tools), func(tool struct {
+		// Conversations created before this expansion omit only the first two
+		// Teams-owned readers. Preserve both identities for restart recovery.
+		previous := slices.DeleteFunc(slices.Clone(expected.Tools), func(tool struct {
 			Name   string         `json:"name"`
 			Params map[string]any `json:"params"`
 		}) bool {
 			return tool.Name == "file_read" || tool.Name == "list_files"
 		})
-		if !reflect.DeepEqual(info.Agent.Tools, unique) {
+		current := slices.DeleteFunc(slices.Clone(expected.Tools), func(tool struct {
+			Name   string         `json:"name"`
+			Params map[string]any `json:"params"`
+		}) bool {
+			return tool.Name == "file_read" || tool.Name == "list_files" || tool.Name == "find_files" || tool.Name == "search_file_contents"
+		})
+		if !reflect.DeepEqual(info.Agent.Tools, previous) && !reflect.DeepEqual(info.Agent.Tools, current) {
 			return false
 		}
 	}

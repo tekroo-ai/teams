@@ -32,4 +32,18 @@ func TestNativeProfileDigestChangesWithExecutionSettings(t *testing.T) {
 	if err != nil || first == second {
 		t.Fatalf("settings change did not change digest: %s %s %v", first, second, err)
 	}
+	settings.ModelInstructions = "Use native structured tool calls."
+	third, err := ModelProfileDigest("coder", bundle, settings)
+	if err != nil || second == third {
+		t.Fatalf("model instructions did not change digest: %s %s %v", second, third, err)
+	}
+	settings.ResponseMode = ResponseModeJSONSchemaActions
+	fourth, err := ModelProfileDigest("coder", bundle, settings)
+	if err != nil || third == fourth || !settings.Valid() {
+		t.Fatalf("response transport did not rebind profile: %s %s %v", third, fourth, err)
+	}
+	settings.ResponseMode = "unknown"
+	if settings.Valid() {
+		t.Fatal("accepted unknown response mode")
+	}
 }

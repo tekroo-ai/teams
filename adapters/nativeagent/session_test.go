@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -75,6 +76,9 @@ func testBriefAndProfile() (application.ExecutionBrief, kernel.Digest, Profile) 
 
 func TestPreparedSessionBindsModelAndReadToolToInvocation(t *testing.T) {
 	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "AGENTS.md"), []byte("Project instruction: focused tests only.\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(filepath.Join(root, "note.txt"), []byte("hello\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -83,7 +87,8 @@ func TestPreparedSessionBindsModelAndReadToolToInvocation(t *testing.T) {
 		requests++
 		var body struct {
 			Messages []struct {
-				Role string `json:"role"`
+				Role    string `json:"role"`
+				Content string `json:"content"`
 			} `json:"messages"`
 			Tools []struct {
 				Function struct {
@@ -97,6 +102,11 @@ func TestPreparedSessionBindsModelAndReadToolToInvocation(t *testing.T) {
 		if len(body.Messages) < 2 || body.Messages[0].Role != "system" || body.Messages[1].Role != "user" {
 			t.Errorf("missing admitted role and task: %+v", body.Messages)
 		}
+		for _, instruction := range []string{"Project instruction: focused tests only.", "Team instruction: keep work bounded.", "Model instruction: native tool calls.", "Never put JSON-encoded text inside a string"} {
+			if !strings.Contains(body.Messages[0].Content, instruction) {
+				t.Errorf("initial system prompt missing %q", instruction)
+			}
+		}
 		if len(body.Tools) != 1 || body.Tools[0].Function.Name != "read_file" {
 			t.Errorf("profile tool restriction not honored: %+v", body.Tools)
 		}
@@ -109,6 +119,11 @@ func TestPreparedSessionBindsModelAndReadToolToInvocation(t *testing.T) {
 	}))
 	defer server.Close()
 	brief, digest, profile := testBriefAndProfile()
+	brief.RoleGrounding.TeamInstructions = "Team instruction: keep work bounded."
+	encoded, _ := json.Marshal(brief)
+	sum := sha256.Sum256(encoded)
+	digest = kernel.Digest(hex.EncodeToString(sum[:]))
+	profile.ModelInstructions = "Model instruction: native tool calls."
 	profile.BaseURL = server.URL + "/v1"
 	binding := &testBinding{root: root}
 	journal := &testJournal{}
@@ -122,6 +137,17 @@ func TestPreparedSessionBindsModelAndReadToolToInvocation(t *testing.T) {
 	output, err := session.Run(ctx)
 	if err != nil || output != "File says hello." || requests != 2 || binding.calls < 4 || len(journal.entries) != 5 {
 		t.Fatalf("output=%q err=%v requests=%d binding=%d journal=%d", output, err, requests, binding.calls, len(journal.entries))
+	}
+	pinned := session.Runner.SystemPrompt
+	if err := os.WriteFile(filepath.Join(root, "AGENTS.md"), []byte("Changed project instruction.\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	resumed, err := PrepareReadOnly(ctx, brief, digest, config)
+	if err != nil || resumed.Runner.SystemPrompt != pinned {
+		t.Fatalf("restart did not preserve original instructions: %v", err)
+	}
+	if _, err := resumed.Run(ctx); err != nil || requests != 2 {
+		t.Fatalf("restart repeated model execution: %v, requests=%d", err, requests)
 	}
 	output, err = session.Run(ctx)
 	if err != nil || output != "File says hello." || requests != 2 {

@@ -33,6 +33,8 @@ type Profile struct {
 	EffectPolicyDigest    kernel.Digest
 	BaseURL               string
 	Model                 string
+	ModelInstructions     string
+	ResponseMode          string
 	APIKey                string
 	MaxOutputTokens       int
 	MaxTurns              int
@@ -110,7 +112,7 @@ func prepare(ctx context.Context, brief application.ExecutionBrief, requestDiges
 		!profile.RuntimeIdentityDigest.Valid() || !profile.ToolPolicyDigest.Valid() || !profile.EffectPolicyDigest.Valid() ||
 		config.Bindings == nil || config.Gateway.Bindings == nil ||
 		config.Journal == nil || config.HTTP == nil || profile.Model == "" || profile.BaseURL == "" ||
-		profile.MaxOutputTokens <= 0 || profile.MaxTurns < 0 || !slices.IsSorted(profile.AllowedReadTools) || !slices.IsSorted(profile.AllowedEffectTools) {
+		profile.MaxOutputTokens <= 0 || profile.MaxTurns < 0 || (profile.ResponseMode != "" && profile.ResponseMode != ResponseModeJSONSchemaActions) || !slices.IsSorted(profile.AllowedReadTools) || !slices.IsSorted(profile.AllowedEffectTools) {
 		return Session{}, ErrInvalidBinding
 	}
 	if allowEffects {
@@ -281,6 +283,7 @@ func prepare(ctx context.Context, brief application.ExecutionBrief, requestDiges
 					return "", err
 				}
 			}
+			arguments = bindHandlerFixedConstants(arguments, handler.ResultSchema)
 			output := application.OrganizationalResultMarker + "\n" + string(arguments)
 			if _, err := application.ValidateRoleHandlerResult(*handler, []byte(output)); err != nil {
 				return "", err
@@ -326,6 +329,25 @@ func prepare(ctx context.Context, brief application.ExecutionBrief, requestDiges
 		model.FinalTool = finalTool
 		model.FinalSchema = append(json.RawMessage(nil), definitions[len(definitions)-1].Parameters...)
 	}
+	if profile.ResponseMode == ResponseModeJSONSchemaActions {
+		model.TurnContract, err = agentruntime.NewStructuredTurnContract(definitions, finalTool)
+		if err != nil {
+			return Session{}, errors.Join(ErrInvalidBinding, err)
+		}
+	}
+	// A resumed invocation reuses the exact initial instructions recorded with
+	// its admitted brief. A workspace AGENTS.md edit cannot silently replace
+	// the project layer midway through an invocation.
+	systemPrompt, recorded, err := agentruntime.RecordedSystemPrompt(ctx, config.Journal, string(brief.InvocationID), string(requestDigest), prompt)
+	if err != nil {
+		return Session{}, err
+	}
+	if !recorded {
+		systemPrompt, err = assembleInstructions(brief, profile, initial.WorkspaceRoot)
+		if err != nil {
+			return Session{}, err
+		}
+	}
 	return Session{
 		Runner: agentruntime.Runner{
 			Journal:         config.Journal,
@@ -339,7 +361,7 @@ func prepare(ctx context.Context, brief application.ExecutionBrief, requestDiges
 				allowed:  allowed,
 				evidence: evidenceTool,
 			},
-			SystemPrompt:        brief.RoleGrounding.Instructions,
+			SystemPrompt:        systemPrompt,
 			FinalTool:           finalTool,
 			Finalize:            finalize,
 			ValidateFinalResult: config.ValidateFinalResult,

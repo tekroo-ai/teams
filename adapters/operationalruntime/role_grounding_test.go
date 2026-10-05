@@ -41,7 +41,7 @@ func TestBoundRoleGroundingSeparatesFQRNDefinitionFromFQNInstance(t *testing.T) 
 		InitialInstances: 1, MaximumInstances: 2, LaunchMode: organization.LaunchOnDemand,
 		ModelProfileDigest: kernel.Digest(strings.Repeat("b", 64)), WorkspaceIDs: []string{"coder-1", "coder-2"},
 	}
-	manifest := organization.TeamManifest{SchemaVersion: organization.TeamManifestSchemaVersion, Team: "teams", Version: "1.0.0", Roles: []organization.RoleBinding{binding}}
+	manifest := organization.TeamManifest{SchemaVersion: organization.TeamManifestSchemaVersion, Team: "teams", Version: "1.0.0", Instructions: "Team-wide instruction.", Roles: []organization.RoleBinding{binding}}
 	team := organization.LoadedTeam{Manifest: manifest, Roles: []organization.LoadedRole{{Binding: binding, Bundle: bundle}}, Digest: kernel.Digest(strings.Repeat("c", 64))}
 	resolver, err := newBoundRoleGroundingResolver(team)
 	if err != nil {
@@ -52,11 +52,11 @@ func TestBoundRoleGroundingSeparatesFQRNDefinitionFromFQNInstance(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if grounding.ActorFQN != actor || grounding.RoleFQRN != "coder" || grounding.BundleDigest != team.Roles[0].Binding.BundleDigest || grounding.Instructions != team.Roles[0].Bundle.Instructions {
+	if grounding.ActorFQN != actor || grounding.RoleFQRN != "coder" || grounding.BundleDigest != team.Roles[0].Binding.BundleDigest || grounding.Instructions != team.Roles[0].Bundle.Instructions || grounding.TeamInstructions != manifest.Instructions {
 		t.Fatalf("grounding = %#v", grounding)
 	}
 	second, err := resolver.ResolveRoleGrounding(context.Background(), "teams::coder-2")
-	if err != nil || second.ActorFQN != "teams::coder-2" || second.RoleFQRN != grounding.RoleFQRN || second.BundleDigest != grounding.BundleDigest {
+	if err != nil || second.ActorFQN != "teams::coder-2" || second.RoleFQRN != grounding.RoleFQRN || second.BundleDigest != grounding.BundleDigest || second.TeamInstructions != manifest.Instructions {
 		t.Fatalf("second grounding = %#v err=%v", second, err)
 	}
 	grounding.Capabilities[0] = "mutated"

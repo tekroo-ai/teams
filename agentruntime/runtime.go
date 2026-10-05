@@ -108,6 +108,9 @@ type Runner struct {
 	Tools        ReadOnlyTools
 	Effects      Effects
 	SystemPrompt string
+	// Condenser can reduce only post-start conversation history. The system
+	// instructions and original admitted task are always reattached verbatim.
+	Condenser HistoryCondenser
 	// EffectAuthority is a server-generated snapshot used only to reconcile
 	// a committed intent after live task authority has been cancelled.
 	EffectAuthority *EffectAuthority
@@ -251,7 +254,11 @@ func (runner Runner) Run(ctx context.Context, invocationID, requestDigest, promp
 		if runner.MaxTurns > 0 && turns >= runner.MaxTurns {
 			return "", ErrTurnLimit
 		}
-		response, err := runner.Model.Complete(ctx, messages)
+		modelMessages, err := condenseHistory(ctx, messages, runner.Condenser)
+		if err != nil {
+			return "", err
+		}
+		response, err := runner.Model.Complete(ctx, modelMessages)
 		if err != nil {
 			return "", err
 		}
@@ -350,6 +357,27 @@ func (runner Runner) append(ctx context.Context, id string, entries []Entry, kin
 		}
 	}
 	return nil, err
+}
+
+// RecordedSystemPrompt returns an invocation's immutable initial instruction
+// snapshot. A restarted runner must use it rather than reread mutable project
+// files. replay still checks the complete start record before model execution.
+func RecordedSystemPrompt(ctx context.Context, journal Journal, id, requestDigest, prompt string) (string, bool, error) {
+	if journal == nil || id == "" || requestDigest == "" || prompt == "" {
+		return "", false, ErrInvalidTurn
+	}
+	entries, err := journal.Load(ctx, id)
+	if err != nil || len(entries) == 0 {
+		return "", false, err
+	}
+	if entries[0].Kind != Started || entries[0].InvocationID != id || entries[0].Sequence != 1 {
+		return "", false, ErrInvalidTurn
+	}
+	var start startRecord
+	if json.Unmarshal(entries[0].Payload, &start) != nil || start.RequestDigest != requestDigest || start.Prompt != prompt || start.SystemPrompt == "" {
+		return "", false, ErrInvalidTurn
+	}
+	return start.SystemPrompt, true, nil
 }
 
 func replay(id, requestDigest, prompt, systemPrompt, finalTool string, finalize func(json.RawMessage) (string, error), authority *EffectAuthority, entries []Entry) ([]Message, []ToolCall, *string, int, error) {

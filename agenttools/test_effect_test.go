@@ -39,6 +39,22 @@ func TestTestGatewayReturnsDurableReceiptWithoutRerun(t *testing.T) {
 	if err != nil || first.Result.ExitCode != 0 || first.Result.CommitSHA == "" || first.Result.SHA256 == "" {
 		t.Fatalf("first test receipt: %+v, %v", first, err)
 	}
+	moduleRequest := request
+	moduleRequest.ToolCallID = "module-test"
+	moduleRequest.Call.Arguments = json.RawMessage(`{"package":"example.test/effect"}`)
+	moduleResult, err := gateway.Execute(context.Background(), moduleRequest)
+	if err != nil || moduleResult.Result.ExitCode != 0 {
+		t.Fatalf("local module path test receipt: %+v, %v", moduleResult, err)
+	}
+	if _, found, err := gateway.Reconcile(context.Background(), moduleRequest); err != nil || !found {
+		t.Fatalf("local module path test reconciliation: found=%t err=%v", found, err)
+	}
+	externalRequest := request
+	externalRequest.ToolCallID = "external-test"
+	externalRequest.Call.Arguments = json.RawMessage(`{"package":"example.test/other"}`)
+	if _, err := gateway.Execute(context.Background(), externalRequest); !errors.Is(err, ErrInvalidCall) {
+		t.Fatalf("external package was admitted: %v", err)
+	}
 	// Rewriting the source after completion must not trigger a second test for
 	// the same tool-call identity; the prior immutable result is returned.
 	if err := os.WriteFile(filepath.Join(root, "sample_test.go"), []byte("invalid Go"), 0600); err != nil {

@@ -447,6 +447,17 @@ func TestGoTestWorkspaceBudget(t *testing.T) {
 }
 
 func TestGoPackageSchemaMatchesHostValidation(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module example.test/nativequalification\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(root, "subpkg"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	root, err := canonicalRoot(root)
+	if err != nil {
+		t.Fatal(err)
+	}
 	var schema struct {
 		Properties map[string]struct {
 			Pattern string `json:"pattern"`
@@ -464,14 +475,19 @@ func TestGoPackageSchemaMatchesHostValidation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, candidate := range []string{"./", "./...", "./foo", "./foo/bar", "./foo-bar"} {
-		if !pattern.MatchString(candidate) || !validGoPackage(candidate) {
-			t.Fatalf("supported package %q rejected", candidate)
+	for _, candidate := range []string{".", "./", "./...", "./foo", "./foo/bar", "./foo-bar", "example.test/nativequalification", "example.test/nativequalification/subpkg"} {
+		if !pattern.MatchString(candidate) || !validGoPackageInModule(root, candidate) {
+			t.Fatalf("supported package %q rejected by schema=%t or host=%t", candidate, pattern.MatchString(candidate), validGoPackageInModule(root, candidate))
 		}
 	}
-	for _, candidate := range []string{".", "./.", "./..", "./../other", "./foo/", "./.hidden", "./foo;echo"} {
-		if pattern.MatchString(candidate) || validGoPackage(candidate) {
+	for _, candidate := range []string{"./.", "./..", "./../other", "./foo/", "./.hidden", "./foo;echo"} {
+		if pattern.MatchString(candidate) || validGoPackageInModule(root, candidate) {
 			t.Fatalf("unsupported package %q accepted", candidate)
+		}
+	}
+	for _, candidate := range []string{"example.test/other", "example.test/nativequalification/missing", "example.test/nativequalification/../other"} {
+		if validGoPackageInModule(root, candidate) {
+			t.Fatalf("external or nonexistent package %q accepted", candidate)
 		}
 	}
 }

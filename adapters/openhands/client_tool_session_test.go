@@ -49,11 +49,11 @@ func TestReadOnlyToolSessionExposesOneReaderPerOperation(t *testing.T) {
 	for index, tool := range tools {
 		names[index] = tool.(map[string]any)["name"].(string)
 	}
-	want := []string{"find_files", "search_file_contents", "list_changed_files", "read_file_diff"}
+	want := []string{"list_changed_files", "read_file_diff"}
 	if !reflect.DeepEqual(names, want) {
 		t.Fatalf("model-facing native tools = %q, want %q", names, want)
 	}
-	for _, tool := range tools[2:] {
+	for _, tool := range tools {
 		params := tool.(map[string]any)["params"].(map[string]any)
 		if params["baseline_commit"] != baseline {
 			t.Fatalf("baseline binding lost: %#v", tool)
@@ -72,6 +72,19 @@ func TestReadOnlyToolSessionExposesOneReaderPerOperation(t *testing.T) {
 	}
 	if !conversationAgentMatches(legacy, profile, true) {
 		t.Fatal("existing conversation with the qualified native tools was rejected")
+	}
+	// Keep the complete materialized settings from the new conversation and
+	// substitute only the two native tools retained by older MCP sessions.
+	var intermediate conversationInfo
+	if err := json.Unmarshal(mustJSON(map[string]any{"agent": bound}), &intermediate); err != nil {
+		t.Fatal(err)
+	}
+	intermediate.Agent.Tools = append([]struct {
+		Name   string         `json:"name"`
+		Params map[string]any `json:"params"`
+	}{{Name: "find_files", Params: map[string]any{}}, {Name: "search_file_contents", Params: map[string]any{}}}, intermediate.Agent.Tools...)
+	if !conversationAgentMatches(intermediate, profile, true) {
+		t.Fatal("existing two-reader MCP conversation was rejected")
 	}
 	info.Agent.Tools = info.Agent.Tools[1:]
 	if conversationAgentMatches(info, profile, true) {
