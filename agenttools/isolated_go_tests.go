@@ -19,8 +19,10 @@ import (
 )
 
 const (
-	maxTestArchiveFiles   = 20000
-	maxTestArchiveBytes   = 512 << 20
+	maxTestArchiveFiles = 20000
+	// Capture and execution share a source ceiling; fixtures/receipts count too.
+	// Execution still bounds source plus generated files at the sandbox quota.
+	maxTestArchiveBytes   = maxTestWorkspaceBytes
 	maxTestWorkspaceFiles = 100000
 	maxTestWorkspaceBytes = 2 << 30
 )

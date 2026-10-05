@@ -71,8 +71,11 @@ func snapshotWorkingTree(ctx context.Context, root, destination, gitBinary strin
 		if err != nil {
 			return "", err
 		}
-		if !info.Mode().IsRegular() || info.Size() > maxTestArchiveBytes-total {
+		if !info.Mode().IsRegular() {
 			return "", ErrBoundary
+		}
+		if info.Size() > maxTestArchiveBytes-total {
+			return "", fmt.Errorf("test snapshot exceeds %d-byte source limit at %q: %w", maxTestArchiveBytes, relative, ErrTooLarge)
 		}
 		resolved, err := filepath.EvalSymlinks(original)
 		if err != nil || resolved != original {

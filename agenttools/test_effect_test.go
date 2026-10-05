@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -77,7 +79,9 @@ func TestTestGatewayReturnsDurableReceiptWithoutRerun(t *testing.T) {
 func TestTestGatewayStopsOnUnresolvedIntent(t *testing.T) {
 	root := t.TempDir()
 	digest := kernel.Digest("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
-	ledger := &memoryEffectLedger{}
+	// Lost reservation acknowledgement really is uncertain: execution must not
+	// be started by a replay. A known preparation failure is a different case.
+	ledger := &memoryEffectLedger{failReserve: true}
 	gateway := TestGateway{Bindings: effectBinding{authority: Authority{WorkspaceRoot: root,
 		Permissions: []string{"repository.read", "test.execute"}, Purpose: kernel.PurposeValidation, EffectPolicyDigest: digest}},
 		Host: Host{Timeout: time.Second}, Ledger: ledger, Policy: digest}
@@ -85,7 +89,7 @@ func TestTestGatewayStopsOnUnresolvedIntent(t *testing.T) {
 		ToolCallID: "test-unknown", Call: Call{Name: "run_go_tests", Arguments: json.RawMessage(`{"package":"./..."}`)}}
 	_, err := gateway.Execute(context.Background(), request)
 	if !errors.Is(err, ErrEffectUncertain) {
-		t.Fatalf("first attempt without Git candidate: %v", err)
+		t.Fatalf("lost reservation acknowledgement: %v", err)
 	}
 	_, err = gateway.Execute(context.Background(), request)
 	if !errors.Is(err, ErrEffectUncertain) {
@@ -94,6 +98,37 @@ func TestTestGatewayStopsOnUnresolvedIntent(t *testing.T) {
 	_, found, err := gateway.Reconcile(context.Background(), request)
 	if !errors.Is(err, ErrEffectUncertain) || found {
 		t.Fatalf("unresolved intent should remain uncertain: found=%t err=%v", found, err)
+	}
+}
+
+func TestTestGatewayRetainsKnownPreparationFailure(t *testing.T) {
+	root := t.TempDir() // No Git root: preparation fails before starting tests.
+	digest := kernel.Digest("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+	ledger := &memoryEffectLedger{}
+	gateway := TestGateway{Bindings: effectBinding{authority: Authority{WorkspaceRoot: root,
+		Permissions: []string{"repository.read", "test.execute"}, Purpose: kernel.PurposeImplementation, EffectPolicyDigest: digest}},
+		Host: Host{Timeout: time.Second}, Ledger: ledger, Policy: digest}
+	request := Request{InvocationID: kernel.UUIDv7("00000000-0000-7000-8000-000000000996"), RequestDigest: digest,
+		ToolCallID: "known-preparation-error", Call: Call{Name: "run_go_tests_worktree", Arguments: json.RawMessage(`{"package":"./..."}`)}}
+	first, err := gateway.Execute(context.Background(), request)
+	if err != nil || first.Result.ExitCode != -1 {
+		t.Fatalf("known failure became uncertain: %+v, %v", first, err)
+	}
+	encoded, _ := json.Marshal(first.Result)
+	var fields map[string]any
+	_ = json.Unmarshal(encoded, &fields)
+	if fields["execution_error"] != ErrInvalidCall.Error() {
+		t.Fatalf("original failure not retained: %s", encoded)
+	}
+	// Changing the workspace must not replace the completed failure receipt.
+	fixtureGit(t, root, "init", "-q")
+	replayed, err := gateway.Execute(context.Background(), request)
+	if err != nil || replayed.ResultHash != first.ResultHash {
+		t.Fatalf("failure was replayed physically: %+v, %v", replayed, err)
+	}
+	reconciled, found, err := gateway.Reconcile(context.Background(), request)
+	if err != nil || !found || reconciled.ResultHash != first.ResultHash {
+		t.Fatalf("known failure reconciliation: %+v, %t, %v", reconciled, found, err)
 	}
 }
 
@@ -135,4 +170,105 @@ func TestWorktreeTestGatewayReplaysCapturedResult(t *testing.T) {
 	if _, err := validation.Execute(context.Background(), request); !errors.Is(err, ErrForbidden) {
 		t.Fatalf("validation received worktree test capability: %v", err)
 	}
+}
+
+func TestTestGatewayRetainsTimeoutAndCancellation(t *testing.T) {
+	for _, cancelCaller := range []bool{false, true} {
+		name := "timeout"
+		if cancelCaller {
+			name = "cancellation"
+		}
+		t.Run(name, func(t *testing.T) {
+			root := t.TempDir()
+			writeSnapshotFixture(t, root, "go.mod", "module example.test/bounded\n\ngo 1.26.0\n")
+			fixtureGit(t, root, "init", "-q")
+			fixtureGit(t, root, "add", "go.mod")
+			fixtureGit(t, root, "-c", "user.name=Test", "-c", "user.email=test@example.test", "commit", "-qm", "baseline")
+			stub := filepath.Join(t.TempDir(), "go-stub")
+			// A real executable exercises the sandbox/process path without
+			// granting a shell interpreter any extra execution permission.
+			stubSource := stub + ".go"
+			if err := os.WriteFile(stubSource, []byte("package main\nimport (\"fmt\"; \"time\")\nfunc main() { fmt.Println(\"fixture-started\"); time.Sleep(30*time.Second) }\n"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			if output, err := exec.Command("go", "build", "-o", stub, stubSource).CombinedOutput(); err != nil {
+				t.Fatalf("build process fixture: %v: %s", err, output)
+			}
+			digest := kernel.Digest(strings.Repeat("a", 64))
+			gateway := TestGateway{Bindings: effectBinding{authority: Authority{WorkspaceRoot: root,
+				Permissions: []string{"repository.read", "test.execute"}, Purpose: kernel.PurposeImplementation, EffectPolicyDigest: digest}},
+				Host: Host{Timeout: 2 * time.Second, GoBinary: stub}, Ledger: &memoryEffectLedger{}, Policy: digest}
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			if cancelCaller {
+				gateway.Host.Timeout = 10 * time.Second
+				timer := time.AfterFunc(2*time.Second, cancel)
+				defer timer.Stop()
+			}
+			request := Request{InvocationID: "00000000-0000-7000-8000-000000000994", RequestDigest: digest, ToolCallID: name,
+				Call: Call{Name: "run_go_tests_worktree", Arguments: json.RawMessage(`{"package":"./..."}`)}}
+			started := time.Now()
+			first, err := gateway.Execute(ctx, request)
+			want := context.DeadlineExceeded.Error()
+			if cancelCaller {
+				want = context.Canceled.Error()
+			}
+			if err != nil || first.Result.ExitCode != -1 || first.Result.ExecutionError != want || !strings.Contains(first.Result.Output, "fixture-started") || time.Since(started) > 6*time.Second {
+				t.Fatalf("bounded process failure was not retained: %+v, %v", first, err)
+			}
+			// Removing the executable makes any accidental second physical run
+			// produce a different result; reconciliation must reuse the receipt.
+			if err := os.Remove(stub); err != nil {
+				t.Fatal(err)
+			}
+			replayed, err := gateway.Execute(context.Background(), request)
+			if err != nil || replayed.ResultHash != first.ResultHash {
+				t.Fatalf("failure re-executed: %+v, %v", replayed, err)
+			}
+			reconciled, found, err := gateway.Reconcile(context.Background(), request)
+			if err != nil || !found || reconciled.ResultHash != first.ResultHash {
+				t.Fatalf("failure reconciliation: %+v, %t, %v", reconciled, found, err)
+			}
+		})
+	}
+}
+
+func TestTestGatewayLostCompletionNeverReruns(t *testing.T) {
+	for _, storedBeforeError := range []bool{false, true} {
+		t.Run(fmt.Sprint(storedBeforeError), func(t *testing.T) {
+			root := t.TempDir()
+			digest := kernel.Digest(strings.Repeat("a", 64))
+			memory := &memoryEffectLedger{failComplete: !storedBeforeError}
+			var ledger EffectLedger = memory
+			if storedBeforeError {
+				ledger = lostTestCompletionAck{memory}
+			}
+			gateway := TestGateway{Bindings: effectBinding{authority: Authority{WorkspaceRoot: root,
+				Permissions: []string{"repository.read", "test.execute"}, Purpose: kernel.PurposeImplementation, EffectPolicyDigest: digest}},
+				Host: Host{Timeout: time.Second}, Ledger: ledger, Policy: digest}
+			request := Request{InvocationID: "00000000-0000-7000-8000-000000000993", RequestDigest: digest, ToolCallID: "lost-completion",
+				Call: Call{Name: "run_go_tests_worktree", Arguments: json.RawMessage(`{"package":"./..."}`)}}
+			if _, err := gateway.Execute(context.Background(), request); !errors.Is(err, ErrEffectUncertain) {
+				t.Fatalf("lost acknowledgement not uncertain: %v", err)
+			}
+			fixtureGit(t, root, "init", "-q")
+			replayed, err := gateway.Execute(context.Background(), request)
+			if !storedBeforeError {
+				if !errors.Is(err, ErrEffectUncertain) {
+					t.Fatalf("missing receipt executed again: %+v, %v", replayed, err)
+				}
+			} else if err != nil || replayed.Result.ExecutionError != ErrInvalidCall.Error() {
+				t.Fatalf("stored failure was not recovered: %+v, %v", replayed, err)
+			}
+		})
+	}
+}
+
+type lostTestCompletionAck struct{ EffectLedger }
+
+func (ledger lostTestCompletionAck) Complete(ctx context.Context, record EffectRecord, result json.RawMessage) error {
+	if err := ledger.EffectLedger.Complete(ctx, record, result); err != nil {
+		return err
+	}
+	return errors.New("simulated lost completion acknowledgement after storage")
 }

@@ -61,11 +61,11 @@ func (gateway TestGateway) Execute(ctx context.Context, request Request) (Receip
 	if !created {
 		return testEffectReceipt(request, intent.ArgumentsSHA256, stored)
 	}
-	// The physical run may outlive the caller's cancellation only until its
-	// bounded timeout. A lost receipt remains uncertain, never auto-rerun.
+	// Host returns only after preparation or the bounded process has ended.
+	// Known failures must be durable too; only a lost receipt is uncertain.
 	result, err := gateway.Host.execute(operation, authority, request.Call)
 	if err != nil {
-		return Receipt{}, errors.Join(ErrEffectUncertain, err)
+		result = failedTestResult(request.Call.Name, result, err)
 	}
 	encoded, err := json.Marshal(result)
 	if err != nil {
@@ -127,12 +127,33 @@ func testEffectReceipt(request Request, argumentsHash string, stored EffectRecor
 		return Receipt{}, ErrEffectUncertain
 	}
 	var result Result
-	if json.Unmarshal(stored.Result, &result) != nil || result.Name != request.Call.Name || !validFullGitSHA(result.CommitSHA) || !validExpectedSHA(result.SHA256) ||
+	if json.Unmarshal(stored.Result, &result) != nil || result.Name != request.Call.Name || !validExpectedSHA(result.SHA256) {
+		return Receipt{}, ErrEffectUncertain
+	}
+	if result.ExecutionError != "" {
+		if len(result.ExecutionError) > 4096 || result.ExitCode != -1 ||
+			result.CommitSHA != "" && !validFullGitSHA(result.CommitSHA) ||
+			result.SnapshotSHA256 != "" && !validExpectedSHA(result.SnapshotSHA256) {
+			return Receipt{}, ErrEffectUncertain
+		}
+	} else if !validFullGitSHA(result.CommitSHA) ||
 		request.Call.Name == "run_go_tests_worktree" && !validExpectedSHA(result.SnapshotSHA256) ||
 		request.Call.Name == "run_go_tests" && result.SnapshotSHA256 != "" {
 		return Receipt{}, ErrEffectUncertain
 	}
 	return effectReceipt(request, argumentsHash, result)
+}
+
+func failedTestResult(name string, result Result, err error) Result {
+	result.Name = name
+	result.ExitCode = -1
+	result.ExecutionError = err.Error()
+	if len(result.ExecutionError) > 4096 {
+		result.ExecutionError = result.ExecutionError[:4096]
+	}
+	sum := sha256.Sum256([]byte(result.Output))
+	result.SHA256 = hex.EncodeToString(sum[:])
+	return result
 }
 
 func isGoTestTool(name string) bool {

@@ -75,6 +75,29 @@ func TestWorktreeGoTestsRejectValidationAndSymlinkEscape(t *testing.T) {
 	}
 }
 
+func TestTestCaptureBudgetMatchesSandboxAndReportsQuota(t *testing.T) {
+	if maxTestArchiveBytes != maxTestWorkspaceBytes {
+		t.Fatalf("capture rejects a source tree admitted by the sandbox: capture=%d sandbox=%d", maxTestArchiveBytes, maxTestWorkspaceBytes)
+	}
+	root, destination := t.TempDir(), t.TempDir()
+	fixtureGit(t, root, "init", "-q")
+	file, err := os.Create(filepath.Join(root, "oversized"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = file.Truncate(maxTestWorkspaceBytes + 1); err != nil {
+		t.Fatal(err)
+	}
+	if err = file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if _, err := snapshotWorkingTree(ctx, root, destination, "git"); !errors.Is(err, ErrTooLarge) || errors.Is(err, ErrBoundary) {
+		t.Fatalf("source quota mislabeled as path escape: %v", err)
+	}
+}
+
 func writeSnapshotFixture(t *testing.T, root, name, content string) {
 	t.Helper()
 	if err := os.WriteFile(filepath.Join(root, name), []byte(content), 0600); err != nil {

@@ -93,6 +93,9 @@ type Result struct {
 	FormatClean    *bool         `json:"format_clean,omitempty"`
 	Clean          *bool         `json:"clean,omitempty"`
 	ExitCode       int           `json:"exit_code,omitempty"`
+	// A known preparation/process failure is a completed receipt, not an
+	// unknown effect. ExitCode -1 means no completed test-suite result.
+	ExecutionError string `json:"execution_error,omitempty"`
 }
 
 type Host struct {
@@ -754,7 +757,7 @@ func validGoPackageInModule(root, value string) bool {
 		return false
 	}
 	suffix := strings.TrimPrefix(value, module+"/")
-	if !validGoPackage("./"+suffix) {
+	if !validGoPackage("./" + suffix) {
 		return false
 	}
 	path, err := existingPath(root, suffix)
@@ -843,7 +846,10 @@ func toolEnvironment() []string {
 
 func (host Host) requireGitRoot(ctx context.Context, root string) error {
 	result, err := host.command(ctx, root, "git_root", host.gitBinary(), []string{"rev-parse", "--show-toplevel"})
-	if err != nil || result.ExitCode != 0 {
+	if err != nil {
+		return err
+	}
+	if result.ExitCode != 0 {
 		return ErrInvalidCall
 	}
 	resolved, err := filepath.EvalSymlinks(strings.TrimSpace(result.Output))
