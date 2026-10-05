@@ -278,6 +278,15 @@ func TestImplementationWithGoTestGateRequiresSignedTestPermission(t *testing.T) 
 	if !slices.ContainsFunc(model.Tools, func(tool agentruntime.ToolDefinition) bool { return tool.Name == "run_go_tests_worktree" }) {
 		t.Fatal("implementation session did not expose working-tree test schema")
 	}
+	if session.Runner.ValidateFinalResult == nil {
+		t.Fatal("implementation handoff check is not wired into the runner")
+	}
+	if err := session.Runner.ValidateFinalResult(context.Background(), []byte(application.OrganizationalResultMarker+`{"outcome":"blocked"}`)); err != nil {
+		t.Fatalf("blocked result cannot be reported: %v", err)
+	}
+	if err := session.Runner.ValidateFinalResult(context.Background(), []byte(application.OrganizationalResultMarker+`{"outcome":"completed"}`)); err == nil {
+		t.Fatal("completion without an authorized committed candidate was accepted")
+	}
 }
 
 type nativeEffectLedger struct {

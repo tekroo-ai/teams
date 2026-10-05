@@ -160,7 +160,7 @@ func prepare(ctx context.Context, brief application.ExecutionBrief, requestDiges
 	if allowEffects && (initial.Purpose != brief.Purpose || initial.EffectPolicyDigest != brief.EffectPolicyDigest) {
 		return Session{}, ErrInvalidBinding
 	}
-	if brief.Purpose == kernel.PurposeImplementation && slices.Contains(brief.WorkProfile.RequiredDeterministicGateIDs, "go-test") && !slices.Contains(initial.Permissions, "test.execute") {
+	if (brief.Purpose == kernel.PurposeImplementation || brief.Purpose == kernel.PurposeRepair) && slices.Contains(brief.WorkProfile.RequiredDeterministicGateIDs, "go-test") && !slices.Contains(initial.Permissions, "test.execute") {
 		return Session{}, errors.Join(ErrInvalidBinding, ErrRequiredTestToolUnavailable)
 	}
 	stable := stableBinding{source: config.Bindings, initial: initial}
@@ -347,6 +347,9 @@ func prepare(ctx context.Context, brief application.ExecutionBrief, requestDiges
 		if err != nil {
 			return Session{}, err
 		}
+	}
+	if allowEffects && (brief.Purpose == kernel.PurposeImplementation || brief.Purpose == kernel.PurposeRepair) {
+		config.ValidateFinalResult = implementationCompletionCheck(brief, requestDigest, config.Gateway, config.Effects, config.ValidateFinalResult)
 	}
 	return Session{
 		Runner: agentruntime.Runner{

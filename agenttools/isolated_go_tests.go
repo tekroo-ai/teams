@@ -32,18 +32,21 @@ const (
 // deliberately not a Git worktree: test code cannot modify the candidate or
 // gain a writable .git directory.
 func (host Host) runIsolatedGoTests(ctx context.Context, root, pattern string) (Result, error) {
-	return host.runIsolatedGoTestsFrom(ctx, root, pattern, false)
+	return host.runIsolatedGoTestsFrom(ctx, root, pattern, false, false)
 }
 
 // runIsolatedGoTestsWorktree copies admitted workspace files into the same
 // sandbox, so implementation can observe red/green tests before one commit.
 // The committed-HEAD validation tool remains a separate operation.
 func (host Host) runIsolatedGoTestsWorktree(ctx context.Context, root, pattern string) (Result, error) {
-	return host.runIsolatedGoTestsFrom(ctx, root, pattern, true)
+	return host.runIsolatedGoTestsFrom(ctx, root, pattern, true, false)
 }
 
-func (host Host) runIsolatedGoTestsFrom(ctx context.Context, root, pattern string, worktree bool) (Result, error) {
+func (host Host) runIsolatedGoTestsFrom(ctx context.Context, root, pattern string, worktree, compileOnly bool) (Result, error) {
 	result := Result{Name: "run_go_tests"}
+	if compileOnly {
+		result.Name = "verify_go_build"
+	}
 	if worktree {
 		result.Name = "run_go_tests_worktree"
 	}
@@ -107,7 +110,13 @@ func (host Host) runIsolatedGoTestsFrom(ctx context.Context, root, pattern strin
 	if err != nil {
 		return result, err
 	}
-	command := exec.CommandContext(operation, "/usr/bin/sandbox-exec", "-p", profile, goBinary, "test", "-count=1", pattern)
+	arguments := []string{"-p", profile, goBinary, "test", "-count=1"}
+	if compileOnly {
+		// Compile production and test packages without repeating their test suites.
+		arguments = append(arguments, "-run", "^$")
+	}
+	arguments = append(arguments, pattern)
+	command := exec.CommandContext(operation, "/usr/bin/sandbox-exec", arguments...)
 	command.Dir = source
 	command.Env = append(toolEnvironment(),
 		"HOME="+filepath.Join(workspace, "home"),
