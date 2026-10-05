@@ -112,7 +112,7 @@ func (gateway MutationGateway) Execute(ctx context.Context, request Request) (Re
 			return Receipt{}, err
 		}
 		if exists && before != args.ExpectedSHA256 || !exists && args.ExpectedSHA256 != "" {
-			return Receipt{}, ErrConflict
+			return Receipt{}, filePreconditionError(args.Path, args.ExpectedSHA256, before, exists)
 		}
 	}
 	stored, created, err := gateway.Ledger.Reserve(operation, intent)
@@ -145,7 +145,7 @@ func (gateway MutationGateway) Execute(ctx context.Context, request Request) (Re
 	}
 	if created {
 		if exists && actualHash != args.ExpectedSHA256 || !exists && args.ExpectedSHA256 != "" {
-			return completeEffect(gateway.Ledger, request, intent, failedEffectResult(request.Call.Name, Result{}, ErrConflict))
+			return completeEffect(gateway.Ledger, request, intent, failedEffectResult(request.Call.Name, Result{}, filePreconditionError(args.Path, args.ExpectedSHA256, actualHash, exists)))
 		}
 	} else if exists && actualHash == desiredHash {
 		return gateway.completeWrite(committed, request, intent, desiredHash)

@@ -74,25 +74,30 @@ type Call struct {
 }
 
 type Result struct {
-	Name           string        `json:"name"`
-	Output         string        `json:"output,omitempty"`
-	Files          []string      `json:"files,omitempty"`
-	Matches        []SearchMatch `json:"matches,omitempty"`
-	MatchCount     *int          `json:"match_count,omitempty"`
-	Ignored        *bool         `json:"ignored,omitempty"`
-	IndexTree      string        `json:"index_tree,omitempty"`
-	CommitSHA      string        `json:"commit_sha,omitempty"`
-	Truncated      bool          `json:"truncated,omitempty"`
-	SkippedFiles   int           `json:"skipped_files,omitempty"`
-	NextAfter      string        `json:"next_after,omitempty"`
-	HEAD           string        `json:"head,omitempty"`
-	Branch         string        `json:"branch,omitempty"`
-	SHA256         string        `json:"sha256,omitempty"`
-	SnapshotSHA256 string        `json:"snapshot_sha256,omitempty"`
-	LineCount      *int          `json:"line_count,omitempty"`
-	FormatClean    *bool         `json:"format_clean,omitempty"`
-	Clean          *bool         `json:"clean,omitempty"`
-	ExitCode       int           `json:"exit_code,omitempty"`
+	Name            string        `json:"name"`
+	Path            string        `json:"path,omitempty"`
+	Output          string        `json:"output,omitempty"`
+	Files           []string      `json:"files,omitempty"`
+	Matches         []SearchMatch `json:"matches,omitempty"`
+	MatchCount      *int          `json:"match_count,omitempty"`
+	Ignored         *bool         `json:"ignored,omitempty"`
+	IndexTree       string        `json:"index_tree,omitempty"`
+	CommitSHA       string        `json:"commit_sha,omitempty"`
+	Truncated       bool          `json:"truncated,omitempty"`
+	SkippedFiles    int           `json:"skipped_files,omitempty"`
+	NextAfter       string        `json:"next_after,omitempty"`
+	HEAD            string        `json:"head,omitempty"`
+	Branch          string        `json:"branch,omitempty"`
+	SHA256          string        `json:"sha256,omitempty"`
+	SnapshotSHA256  string        `json:"snapshot_sha256,omitempty"`
+	LineCount       *int          `json:"line_count,omitempty"`
+	StartLine       *int          `json:"start_line,omitempty"`
+	EndLine         *int          `json:"end_line,omitempty"`
+	ContentComplete *bool         `json:"content_complete,omitempty"`
+	MaxReadLines    int           `json:"max_read_lines,omitempty"`
+	FormatClean     *bool         `json:"format_clean,omitempty"`
+	Clean           *bool         `json:"clean,omitempty"`
+	ExitCode        int           `json:"exit_code,omitempty"`
 	// A known preparation/process failure is a completed receipt, not an
 	// unknown effect. ExitCode -1 means no completed test-suite result.
 	ExecutionError string `json:"execution_error,omitempty"`
@@ -170,6 +175,22 @@ func (host Host) execute(ctx context.Context, authority Authority, call Call) (R
 		result.Output, result.SHA256, lineCount, err = readFile(root, args.Path, start, end)
 		if err == nil {
 			result.LineCount = &lineCount
+			result.Path = args.Path
+			actualStart, actualEnd := start, end
+			if actualStart == 0 {
+				actualStart = 1
+			}
+			if actualEnd == 0 {
+				actualEnd = actualStart + maxReadFileLines - 1
+			}
+			actualEnd = min(actualEnd, lineCount)
+			if lineCount == 0 || actualStart > lineCount {
+				actualStart, actualEnd = 0, 0
+			}
+			complete := lineCount == 0 || actualStart == 1 && actualEnd == lineCount
+			result.StartLine, result.EndLine = &actualStart, &actualEnd
+			result.ContentComplete, result.Truncated = &complete, !complete
+			result.MaxReadLines = maxReadFileLines
 		}
 	case "check_go_format":
 		var args struct {
@@ -502,6 +523,8 @@ func existingPath(root, relative string) (string, error) {
 	return resolved, nil
 }
 
+const maxReadFileLines = 400
+
 func readFile(root, relative string, start, end int) (string, string, int, error) {
 	path, err := existingPath(root, relative)
 	if err != nil {
@@ -534,10 +557,10 @@ func readFile(root, relative string, start, end int) (string, string, int, error
 		start = 1
 	}
 	if end == 0 {
-		end = min(len(lines), start+399)
+		end = min(len(lines), start+maxReadFileLines-1)
 	}
-	if start < 1 || end < start || end-start >= 400 {
-		return "", "", 0, ErrInvalidCall
+	if start < 1 || end < start || end-start >= maxReadFileLines {
+		return "", "", 0, fmt.Errorf("%w: read_file path=%q requires end_line >= start_line and at most %d lines per call", ErrInvalidCall, relative, maxReadFileLines)
 	}
 	if start > lineCount {
 		return "", hex.EncodeToString(fullHash[:]), lineCount, nil
@@ -675,11 +698,11 @@ func writeFile(root, relative string, content []byte, expectedSHA string) (strin
 		}
 		actual := sha256.Sum256(old)
 		if expectedSHA != hex.EncodeToString(actual[:]) {
-			return "", ErrConflict
+			return "", filePreconditionError(relative, expectedSHA, hex.EncodeToString(actual[:]), true)
 		}
 	} else if errors.Is(statErr, os.ErrNotExist) {
 		if expectedSHA != "" {
-			return "", ErrConflict
+			return "", filePreconditionError(relative, expectedSHA, "", false)
 		}
 	} else {
 		return "", statErr
@@ -710,6 +733,10 @@ func writeFile(root, relative string, content []byte, expectedSHA string) (strin
 	}
 	digest := sha256.Sum256(content)
 	return hex.EncodeToString(digest[:]), nil
+}
+
+func filePreconditionError(path, expected, current string, exists bool) error {
+	return fmt.Errorf("%w: path=%q expected_sha256=%q current_sha256=%q exists=%t", ErrConflict, path, expected, current, exists)
 }
 
 func validGoPackage(value string) bool {

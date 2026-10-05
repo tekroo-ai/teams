@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"syscall"
@@ -287,8 +288,26 @@ func goTestSandboxProfile(workspace, goBinary, modCache string) (string, error) 
 	// preexisting module cache, and reads/writes only in this disposable root.
 	// No network or process-signal permission is granted.
 	goRoot := filepath.Dir(filepath.Dir(goBinary))
+	// EvalSymlinks lstat's each ancestor even when the target is inside the
+	// admitted snapshot. Permit metadata on these exact directories, not their
+	// contents or descendants; outside-file reads/writes remain denied.
+	ancestors := make(map[string]bool)
+	for _, target := range []string{workspace, goRoot, modCache} {
+		for parent := filepath.Dir(target); ; parent = filepath.Dir(parent) {
+			ancestors[parent] = true
+			if parent == string(filepath.Separator) {
+				break
+			}
+		}
+	}
+	metadata := make([]string, 0, len(ancestors))
+	for parent := range ancestors {
+		metadata = append(metadata, "(literal "+strconv.Quote(parent)+")")
+	}
+	sort.Strings(metadata)
 	profile := `(version 1)
 (deny default)
+(allow file-read-metadata ` + strings.Join(metadata, " ") + `)
 (allow process-exec (subpath ` + strconv.Quote(goRoot) + `) (subpath ` + strconv.Quote(workspace) + `))
 (allow process-fork)
 (allow process-info*)
