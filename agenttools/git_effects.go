@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"slices"
 	"strings"
 
 	"github.com/tekroo-ai/teams/kernel"
@@ -71,6 +70,9 @@ func validGitEffectResult(name string, args gitEffectArguments, result Result) b
 	if result.Name != name {
 		return false
 	}
+	if result.ExecutionError != "" {
+		return validFailedEffectResult(name, result) && result.CommitSHA == "" && result.IndexTree == ""
+	}
 	if name == "git_stage_files" {
 		return validFullGitSHA(result.IndexTree) && result.CommitSHA == ""
 	}
@@ -78,11 +80,7 @@ func validGitEffectResult(name string, args gitEffectArguments, result Result) b
 }
 
 func (gateway MutationGateway) completeGitEffect(ctx context.Context, request Request, intent EffectRecord, result Result) (Receipt, error) {
-	encoded, _ := json.Marshal(result)
-	if err := gateway.Ledger.Complete(ctx, intent, encoded); err != nil {
-		return Receipt{}, errors.Join(ErrEffectUncertain, err)
-	}
-	return effectReceipt(request, intent.ArgumentsSHA256, result)
+	return completeEffect(gateway.Ledger, request, intent, result)
 }
 
 func (gateway MutationGateway) executeGitEffect(ctx context.Context, request Request) (Receipt, error) {
@@ -97,7 +95,7 @@ func (gateway MutationGateway) executeGitEffect(ctx context.Context, request Req
 		return Receipt{}, err
 	}
 	defer unlock()
-	stored, _, err := gateway.Ledger.Reserve(operation, intent)
+	stored, created, err := gateway.Ledger.Reserve(operation, intent)
 	if err != nil {
 		return Receipt{}, errors.Join(ErrEffectUncertain, err)
 	}
@@ -110,9 +108,42 @@ func (gateway MutationGateway) executeGitEffect(ctx context.Context, request Req
 	}
 	committed, stopCommitted := context.WithTimeout(context.Background(), gateway.Host.Timeout)
 	defer stopCommitted()
+	if !created {
+		// A recorded call is not permission to perform it again against today's
+		// files. Inspect its outcome; never restage/recommit on uncertain replay.
+		result, applied, err := gateway.inspectGitEffect(committed, root, request.Call.Name, args)
+		if err != nil || !applied {
+			return Receipt{}, errors.Join(ErrEffectUncertain, err)
+		}
+		return gateway.completeGitEffect(committed, request, intent, result)
+	}
+	beforeIndex, err := gateway.Host.gitValue(committed, root, "write-tree")
+	if err != nil {
+		return gateway.completeGitEffect(committed, request, intent, failedEffectResult(request.Call.Name, Result{}, err))
+	}
 	result, err := gateway.Host.execute(committed, authority, request.Call)
-	if err != nil || !validGitEffectResult(request.Call.Name, args, result) {
-		return Receipt{}, errors.Join(ErrEffectUncertain, err)
+	if err != nil {
+		var rejected effectNotAppliedError
+		if errors.As(err, &rejected) {
+			return gateway.completeGitEffect(committed, request, intent, failedEffectResult(request.Call.Name, Result{}, err))
+		}
+		// The subprocess has returned, including on timeout. Inspect under the
+		// workspace lock with a fresh bound, not the expired execution context.
+		inspection, stopInspection := context.WithTimeout(context.Background(), gateway.Host.Timeout)
+		defer stopInspection()
+		observed, applied, inspectErr := gateway.inspectGitEffect(inspection, root, request.Call.Name, args)
+		if inspectErr == nil && applied {
+			return gateway.completeGitEffect(inspection, request, intent, observed)
+		}
+		head, headErr := gateway.Host.gitValue(inspection, root, "rev-parse", "HEAD")
+		index, indexErr := gateway.Host.gitValue(inspection, root, "write-tree")
+		if headErr == nil && indexErr == nil && head == args.ExpectedHead && index == beforeIndex {
+			return gateway.completeGitEffect(inspection, request, intent, failedEffectResult(request.Call.Name, Result{}, err))
+		}
+		return Receipt{}, errors.Join(ErrEffectUncertain, err, inspectErr, headErr, indexErr)
+	}
+	if !validGitEffectResult(request.Call.Name, args, result) {
+		return Receipt{}, ErrEffectUncertain
 	}
 	return gateway.completeGitEffect(committed, request, intent, result)
 }
@@ -178,15 +209,6 @@ func (gateway MutationGateway) inspectGitEffect(ctx context.Context, root, name 
 	if head != args.ExpectedHead {
 		return Result{}, false, ErrEffectUncertain
 	}
-	staged, err := gateway.gitNameSet(ctx, root, []string{"diff", "--cached", "--name-only", "-z", "--"})
-	if err != nil {
-		return Result{}, false, err
-	}
-	for path := range staged {
-		if !matchesSelectedPath(path, args.Paths) {
-			return Result{}, false, ErrEffectUncertain
-		}
-	}
 	pathspecs := make([]string, 0, len(args.Paths))
 	for _, path := range args.Paths {
 		pathspecs = append(pathspecs, ":(literal)"+path)
@@ -200,9 +222,6 @@ func (gateway MutationGateway) inspectGitEffect(ctx context.Context, root, name 
 		return Result{}, false, err
 	}
 	if len(unstaged) != 0 || len(untracked) != 0 {
-		if len(staged) != 0 {
-			return Result{}, false, ErrEffectUncertain
-		}
 		return Result{}, false, nil
 	}
 	tree, err := gateway.Host.gitValue(ctx, root, "write-tree")
@@ -224,8 +243,4 @@ func (gateway MutationGateway) gitNameSet(ctx context.Context, root string, args
 		}
 	}
 	return paths, nil
-}
-
-func matchesSelectedPath(path string, selected []string) bool {
-	return slices.Contains(selected, path) || slices.ContainsFunc(selected, func(prefix string) bool { return strings.HasPrefix(path, prefix+"/") })
 }

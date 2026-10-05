@@ -40,8 +40,8 @@ type EffectLedger interface {
 	Complete(context.Context, EffectRecord, json.RawMessage) error
 }
 
-// MutationGateway is deliberately separate from the read-only gateway. Only
-// the idempotently reconcilable write_file operation is enabled at this stage.
+// MutationGateway is separate from the read-only gateway. Writes, staging and
+// commits reserve their identities before acting and retain their outcomes.
 type MutationGateway struct {
 	Bindings BindingSource
 	Host     Host
@@ -131,7 +131,7 @@ func (gateway MutationGateway) Execute(ctx context.Context, request Request) (Re
 	desiredHash := hex.EncodeToString(desired[:])
 	if len(stored.Result) > 0 {
 		var result Result
-		if json.Unmarshal(stored.Result, &result) != nil || result.Name != request.Call.Name || result.SHA256 != desiredHash {
+		if json.Unmarshal(stored.Result, &result) != nil || !validWriteEffectResult(request.Call.Name, desiredHash, result) {
 			return Receipt{}, ErrEffectUncertain
 		}
 		return effectReceipt(request, intent.ArgumentsSHA256, result)
@@ -139,17 +139,19 @@ func (gateway MutationGateway) Execute(ctx context.Context, request Request) (Re
 	actualHash, exists, err := fileHash(root, args.Path)
 	if err != nil {
 		if created {
-			return Receipt{}, err
+			return completeEffect(gateway.Ledger, request, intent, failedEffectResult(request.Call.Name, Result{}, err))
 		}
 		return Receipt{}, errors.Join(ErrEffectUncertain, err)
 	}
 	if created {
 		if exists && actualHash != args.ExpectedSHA256 || !exists && args.ExpectedSHA256 != "" {
-			return Receipt{}, ErrConflict
+			return completeEffect(gateway.Ledger, request, intent, failedEffectResult(request.Call.Name, Result{}, ErrConflict))
 		}
 	} else if exists && actualHash == desiredHash {
 		return gateway.completeWrite(committed, request, intent, desiredHash)
-	} else if exists && actualHash != args.ExpectedSHA256 || !exists && args.ExpectedSHA256 != "" {
+	} else {
+		// Even an unchanged preimage does not prove an unrecorded action never
+		// ran. Recovery may inspect it, but must not initiate another write.
 		return Receipt{}, ErrEffectUncertain
 	}
 	result, writeErr := gateway.Host.execute(committed, authority, request.Call)
@@ -157,10 +159,16 @@ func (gateway MutationGateway) Execute(ctx context.Context, request Request) (Re
 		// The host can lose an acknowledgment after rename. Inspect before
 		// deciding whether the effect is safe to report as failed.
 		actualHash, exists, inspectErr := fileHash(root, args.Path)
-		if inspectErr != nil || exists && actualHash == desiredHash {
+		if inspectErr != nil {
 			return Receipt{}, errors.Join(ErrEffectUncertain, writeErr, inspectErr)
 		}
-		return Receipt{}, writeErr
+		if exists && actualHash == desiredHash {
+			return gateway.completeWrite(committed, request, intent, desiredHash)
+		}
+		if exists && actualHash == args.ExpectedSHA256 || !exists && args.ExpectedSHA256 == "" {
+			return completeEffect(gateway.Ledger, request, intent, failedEffectResult(request.Call.Name, Result{}, writeErr))
+		}
+		return Receipt{}, errors.Join(ErrEffectUncertain, writeErr)
 	}
 	if result.SHA256 != desiredHash {
 		return Receipt{}, ErrEffectUncertain
@@ -233,7 +241,7 @@ func (gateway MutationGateway) ReconcileWrite(ctx context.Context, request Reque
 	desiredHash := hex.EncodeToString(desired[:])
 	if len(stored.Result) > 0 {
 		var result Result
-		if json.Unmarshal(stored.Result, &result) != nil || result.Name != request.Call.Name || result.SHA256 != desiredHash {
+		if json.Unmarshal(stored.Result, &result) != nil || !validWriteEffectResult(request.Call.Name, desiredHash, result) {
 			return Receipt{}, false, ErrEffectUncertain
 		}
 		receipt, err := effectReceipt(request, intent.ArgumentsSHA256, result)
@@ -255,11 +263,14 @@ func (gateway MutationGateway) ReconcileWrite(ctx context.Context, request Reque
 
 func (gateway MutationGateway) completeWrite(ctx context.Context, request Request, intent EffectRecord, desiredHash string) (Receipt, error) {
 	result := Result{Name: "write_file", SHA256: desiredHash}
-	encoded, _ := json.Marshal(result)
-	if err := gateway.Ledger.Complete(ctx, intent, encoded); err != nil {
-		return Receipt{}, errors.Join(ErrEffectUncertain, err)
+	return completeEffect(gateway.Ledger, request, intent, result)
+}
+
+func validWriteEffectResult(name, desiredHash string, result Result) bool {
+	if result.ExecutionError != "" {
+		return validFailedEffectResult(name, result) && result.CommitSHA == "" && result.IndexTree == ""
 	}
-	return effectReceipt(request, intent.ArgumentsSHA256, result)
+	return result.Name == name && result.SHA256 == desiredHash
 }
 
 func effectReceipt(request Request, argumentsHash string, result Result) (Receipt, error) {

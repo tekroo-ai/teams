@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
-	"time"
 
 	"github.com/tekroo-ai/teams/kernel"
 )
@@ -67,16 +66,7 @@ func (gateway TestGateway) Execute(ctx context.Context, request Request) (Receip
 	if err != nil {
 		result = failedTestResult(request.Call.Name, result, err)
 	}
-	encoded, err := json.Marshal(result)
-	if err != nil {
-		return Receipt{}, errors.Join(ErrEffectUncertain, err)
-	}
-	completion, stopCompletion := context.WithTimeout(context.Background(), 5*time.Second)
-	defer stopCompletion()
-	if err := gateway.Ledger.Complete(completion, intent, encoded); err != nil {
-		return Receipt{}, errors.Join(ErrEffectUncertain, err)
-	}
-	return effectReceipt(request, intent.ArgumentsSHA256, result)
+	return completeEffect(gateway.Ledger, request, intent, result)
 }
 
 func (gateway TestGateway) Reconcile(ctx context.Context, request Request) (Receipt, bool, error) {
@@ -131,7 +121,7 @@ func testEffectReceipt(request Request, argumentsHash string, stored EffectRecor
 		return Receipt{}, ErrEffectUncertain
 	}
 	if result.ExecutionError != "" {
-		if len(result.ExecutionError) > 4096 || result.ExitCode != -1 ||
+		if !validFailedEffectResult(request.Call.Name, result) ||
 			result.CommitSHA != "" && !validFullGitSHA(result.CommitSHA) ||
 			result.SnapshotSHA256 != "" && !validExpectedSHA(result.SnapshotSHA256) {
 			return Receipt{}, ErrEffectUncertain
@@ -145,15 +135,7 @@ func testEffectReceipt(request Request, argumentsHash string, stored EffectRecor
 }
 
 func failedTestResult(name string, result Result, err error) Result {
-	result.Name = name
-	result.ExitCode = -1
-	result.ExecutionError = err.Error()
-	if len(result.ExecutionError) > 4096 {
-		result.ExecutionError = result.ExecutionError[:4096]
-	}
-	sum := sha256.Sum256([]byte(result.Output))
-	result.SHA256 = hex.EncodeToString(sum[:])
-	return result
+	return failedEffectResult(name, result, err)
 }
 
 func isGoTestTool(name string) bool {
