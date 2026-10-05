@@ -64,6 +64,10 @@ archived evidence; ordinary unit tests must not depend on it. To retrieve an
 original artifact without rewriting history, use
 `git show 67d99fcafad3f82362d154989966a69f2730536d:OUTPUT/<original-path>`.
 
+For Teams-native execution with Go test tools, set `native.go_binary` to an
+absolute Go executable path. Startup verifies and resolves that executable;
+agent turns do not depend on a login shell or Homebrew being in launchd's PATH.
+
 ```sh
 go test ./... -count=1
 go test -tags=mongo_integration ./... -count=1

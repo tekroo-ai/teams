@@ -30,6 +30,7 @@ type Config struct {
 	OpenHandsSessionAPIKey string
 	AgentToolBaseURL       string
 	AgentToolSigningKey    []byte
+	AgentGoBinary          string
 	HTTPClient             *http.Client
 	WorkspaceBindings      []openhands.WorkspaceBinding
 	WorkspaceResolver      openhands.WorkspaceResolver
@@ -92,7 +93,7 @@ func New(ctx context.Context, config Config) (*Runtime, error) {
 		Reader: executionReader, Roles: config.RoleGrounding,
 		Workspaces:   toolWorkspaceAdapter{resolver: workspaces},
 		MaximumBytes: config.ExecutionPolicy.MaximumBriefBytes, Now: config.Clock.Now,
-	}, Host: agenttools.Host{Timeout: config.ExecutionPolicy.OperationTimeout}}
+	}, Host: agenttools.Host{Timeout: config.ExecutionPolicy.OperationTimeout, GoBinary: config.AgentGoBinary}}
 	var toolService *agenttools.HTTPService
 	if config.AgentToolBaseURL != "" || len(config.AgentToolSigningKey) != 0 {
 		toolService, err = agenttools.NewHTTPService(toolGateway, config.AgentToolBaseURL, config.AgentToolSigningKey)

@@ -115,6 +115,9 @@ type ProductionOpenHandsConfig struct {
 // ProductionNativeConfig is an explicit file-backed opt-in. Omitting
 // execution_backend retains the established OpenHands path.
 type ProductionNativeConfig struct {
+	// Pin the executable independently of launchd/login-shell PATH. If omitted,
+	// Go-capable teams resolve it once at startup, not during an agent turn.
+	GoBinary         string                         `json:"go_binary,omitempty"`
 	Owner            string                         `json:"owner"`
 	LeaseDuration    string                         `json:"lease_duration"`
 	Heartbeat        string                         `json:"heartbeat"`
@@ -386,6 +389,7 @@ type resolvedProductionConfig struct {
 	pollInterval          time.Duration
 	nativeLease           time.Duration
 	nativeHeartbeat       time.Duration
+	nativeGoBinary        string
 	nativeResultSchemas   map[string]NativeResultSchema
 	nativeWorkflows       []kernel.WorkflowDefinition
 	messageWaitTimeout    time.Duration
@@ -786,6 +790,23 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 			}
 		}
 	}
+	var nativeGoBinary string
+	if nativeSelected {
+		needsGo := config.Native.GoBinary != ""
+		for _, loaded := range team.Roles {
+			for _, permission := range loaded.Bundle.Permissions {
+				if permission == "test.execute" {
+					needsGo = true
+				}
+			}
+		}
+		if needsGo {
+			nativeGoBinary, err = resolveNativeGoBinary(config.Native.GoBinary)
+			if err != nil {
+				return resolvedProductionConfig{}, err
+			}
+		}
+	}
 	if config.Federation != nil {
 		for _, route := range config.Federation.Routes {
 			if route.SourceDeployment == config.DeploymentIdentity && !loadedTeamHasActor(team, route.SourceActor) || route.DestinationDeployment == config.DeploymentIdentity && !loadedTeamHasActor(team, route.DestinationActor) {
@@ -851,7 +872,7 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 	if err := readStrictJSONFile(config.ProvenanceFile, &provenance); err != nil || !provenance.Valid() || provenance.PolicyDigest != policy.PolicyDigest || provenance.PolicyRevision != policy.Revision {
 		return resolvedProductionConfig{}, invalidConfig("provenance file is invalid or does not bind the authorization policy")
 	}
-	return resolvedProductionConfig{ProductionConfig: config, mongoURI: mongoURI, sessionAPIKey: sessionKey, operatorBearerToken: operatorToken, humanCredentials: humanCredentials, authorizationPolicy: policy, provenance: provenance, requestTimeout: requestTimeout, pollInterval: pollInterval, nativeLease: nativeLease, nativeHeartbeat: nativeHeartbeat, nativeResultSchemas: nativeResultSchemas, nativeWorkflows: nativeWorkflows, messageWaitTimeout: messageWaitTimeout, operationTimeout: operationTimeout, leaseDuration: leaseDuration, reconciliation: reconciliation, leaseOperationTimeout: leaseOperationTimeout, projectionInterval: projectionInterval, projectionTimeout: projectionTimeout, continuityHeartbeat: continuityHeartbeat, continuityThreshold: continuityThreshold, operatorTimeout: operatorTimeout, team: team, libraryTeams: libraryTeams, trustedRolePublishers: trustedKeys, workflowLibrary: workflowLibrary, roleReconciliation: roleReconciliation, planningDeadline: planningDeadline, gitOperationTimeout: gitOperationTimeout, federationRegistry: federationRegistry, federationPrivateKey: federationPrivateKey, federationTimeout: federationTimeout, federationFutureSkew: federationFutureSkew, federationTTL: federationTTL}, nil
+	return resolvedProductionConfig{ProductionConfig: config, mongoURI: mongoURI, sessionAPIKey: sessionKey, operatorBearerToken: operatorToken, humanCredentials: humanCredentials, authorizationPolicy: policy, provenance: provenance, requestTimeout: requestTimeout, pollInterval: pollInterval, nativeLease: nativeLease, nativeHeartbeat: nativeHeartbeat, nativeGoBinary: nativeGoBinary, nativeResultSchemas: nativeResultSchemas, nativeWorkflows: nativeWorkflows, messageWaitTimeout: messageWaitTimeout, operationTimeout: operationTimeout, leaseDuration: leaseDuration, reconciliation: reconciliation, leaseOperationTimeout: leaseOperationTimeout, projectionInterval: projectionInterval, projectionTimeout: projectionTimeout, continuityHeartbeat: continuityHeartbeat, continuityThreshold: continuityThreshold, operatorTimeout: operatorTimeout, team: team, libraryTeams: libraryTeams, trustedRolePublishers: trustedKeys, workflowLibrary: workflowLibrary, roleReconciliation: roleReconciliation, planningDeadline: planningDeadline, gitOperationTimeout: gitOperationTimeout, federationRegistry: federationRegistry, federationPrivateKey: federationPrivateKey, federationTimeout: federationTimeout, federationFutureSkew: federationFutureSkew, federationTTL: federationTTL}, nil
 }
 
 func loadedTeamHasActor(team organization.LoadedTeam, actor kernel.ActorFQN) bool {
@@ -1035,6 +1056,7 @@ func NewProductionService(ctx context.Context, config ProductionConfig) (*Produc
 	}
 	runtime, err := New(ctx, Config{
 		Store: store, Catalogue: catalogue, Clock: clock, IDs: ids,
+		AgentGoBinary:    resolved.nativeGoBinary,
 		OpenHandsBaseURL: config.OpenHands.BaseURL, OpenHandsSessionAPIKey: resolved.sessionAPIKey,
 		AgentToolBaseURL: agentToolBaseURL, AgentToolSigningKey: agentToolSigningKey,
 		HTTPClient: &http.Client{Timeout: resolved.requestTimeout}, WorkspaceBindings: workspaces, WorkspaceResolver: workspaceResolver, ExecutionProfiles: profiles, ExecutionBoundary: boundary, RoleGrounding: roleGrounding, DeadlineExtensionReader: store,

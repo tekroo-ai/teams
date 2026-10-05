@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
@@ -28,6 +29,49 @@ func TestFileBackedNativeSelectionBindsProfileAndTools(t *testing.T) {
 	writeJSON(t, path, config, 0o600)
 	if _, err := LoadProductionConfig(path); err == nil {
 		t.Fatal("OpenHands tool surface was accepted for native execution")
+	}
+}
+
+func TestNativeGoExecutableBindingSurvivesMinimalPATH(t *testing.T) {
+	goPath, err := exec.LookPath("go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	goPath, err = filepath.EvalSymlinks(goPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path, config := writeNativeProductionFixture(t)
+	config.Native.GoBinary = goPath
+	writeJSON(t, path, config, 0o600)
+	// Model the launchd environment: no login-shell/Homebrew PATH entry.
+	t.Setenv("PATH", t.TempDir())
+	loaded, err := LoadProductionConfig(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resolved, err := resolveProductionConfig(loaded)
+	if err != nil || resolved.nativeGoBinary != goPath {
+		t.Fatalf("explicit toolchain was lost: %q, %v", resolved.nativeGoBinary, err)
+	}
+	if _, err := resolveNativeGoBinary(""); err == nil {
+		t.Fatal("missing toolchain was not rejected before agent work")
+	}
+	if _, err := resolveNativeGoBinary("go"); err == nil {
+		t.Fatal("relative configured executable accepted")
+	}
+	if _, err := resolveNativeGoBinary(t.TempDir()); err == nil {
+		t.Fatal("directory accepted as an executable")
+	}
+	missing := filepath.Join(t.TempDir(), "go")
+	if _, err := resolveNativeGoBinary(missing); err == nil {
+		t.Fatal("missing configured toolchain accepted")
+	}
+	if err := os.WriteFile(missing, []byte("not executable"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := resolveNativeGoBinary(missing); err == nil {
+		t.Fatal("non-executable file accepted")
 	}
 }
 
