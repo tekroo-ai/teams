@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -156,5 +157,112 @@ func TestStructuredTurnRejectsIncompleteOrNativeToolResponses(t *testing.T) {
 				t.Fatalf("accepted unsupported response: %v", err)
 			}
 		})
+	}
+}
+
+func TestStructuredTurnRejectionReturnsEvidenceWithoutDispatch(t *testing.T) {
+	contract := structuredTestContract(t)
+	requests := 0
+	invalid := `{"calls":[{"read_file":{"file_path":"README.md"}}]}`
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		var request struct {
+			Messages []Message `json:"messages"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			t.Error(err)
+		}
+		content := invalid
+		if requests == 2 {
+			foundRaw, foundError := false, false
+			for _, m := range request.Messages {
+				foundRaw = foundRaw || m.Role == "assistant" && m.Content == invalid
+				foundError = foundError || m.Role == "user" && strings.Contains(m.Content, "structured turn schema")
+			}
+			if !foundRaw || !foundError {
+				t.Errorf("rejection evidence missing from continuation: %+v", request.Messages)
+			}
+			content = `{"submit_result":{"work_product":{"ok":true},"evidence":[]}}`
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"id": fmt.Sprintf("rejected-%d", requests), "choices": []any{map[string]any{"finish_reason": "stop", "message": map[string]any{"content": content}}}})
+	}))
+	defer server.Close()
+	journal, tools := &memoryJournal{}, &countingTool{}
+	runner := Runner{Journal: journal, Tools: tools, FinalTool: "submit_result", MaxFinalSubmissions: 3,
+		Model:    OpenAIModel{Client: server.Client(), BaseURL: server.URL + "/v1", Model: "local", MaxTokens: 512, TurnContract: contract},
+		Finalize: func(raw json.RawMessage) (string, error) { return string(raw), nil }}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if _, err := runner.Run(ctx, "rejected-invocation", testRequestDigest, "Finish this task"); err != nil {
+		t.Fatal(err)
+	}
+	if requests != 2 || tools.calls != 0 {
+		t.Fatalf("requests=%d dispatched=%d", requests, tools.calls)
+	}
+	if len(journal.entries) != 4 || journal.entries[1].Kind != "model_rejected" || !strings.Contains(string(journal.entries[1].Payload), "file_path") {
+		t.Fatalf("raw rejection not retained: %+v", journal.entries)
+	}
+	if _, err := runner.Run(ctx, "rejected-invocation", testRequestDigest, "Finish this task"); err != nil || requests != 2 {
+		t.Fatalf("replay requested generation again: %v", err)
+	}
+}
+
+func TestStructuredTurnRejectionBoundSurvivesReplay(t *testing.T) {
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		_ = json.NewEncoder(w).Encode(map[string]any{"id": fmt.Sprintf("bad-%d", requests), "choices": []any{map[string]any{"finish_reason": "stop", "message": map[string]any{"content": `{"calls":[{"read_file":{"file_path":"README.md"}}]}`}}}})
+	}))
+	defer server.Close()
+	journal, tools := &memoryJournal{}, &countingTool{}
+	runner := Runner{Journal: journal, Tools: tools, FinalTool: "submit_result", MaxFinalSubmissions: 3,
+		Model:    OpenAIModel{Client: server.Client(), BaseURL: server.URL + "/v1", Model: "local", MaxTokens: 512, TurnContract: structuredTestContract(t)},
+		Finalize: func(raw json.RawMessage) (string, error) { return string(raw), nil }}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	for i := 0; i < 2; i++ {
+		_, err := runner.Run(ctx, "bounded-rejection", testRequestDigest, "Finish this task")
+		if !errors.Is(err, ErrInvalidTurn) || requests != 3 || tools.calls != 0 {
+			t.Fatalf("replay %d: err=%v requests=%d dispatched=%d", i, err, requests, tools.calls)
+		}
+	}
+	if len(journal.entries) != 4 {
+		t.Fatalf("rejections lost: %+v", journal.entries)
+	}
+}
+
+func TestStructuredTurnRejectionResumesAfterTransportFailure(t *testing.T) {
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		if requests == 2 {
+			http.Error(w, "temporary transport failure", http.StatusServiceUnavailable)
+			return
+		}
+		var request struct {
+			Messages []Message `json:"messages"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&request)
+		content := `{"calls":[{"read_file":{"file_path":"README.md"}}]}`
+		if requests == 3 {
+			if len(request.Messages) < 3 || !strings.Contains(request.Messages[len(request.Messages)-1].Content, "model_turn_rejected") {
+				t.Error("replayed rejection feedback missing")
+			}
+			content = `{"submit_result":{"work_product":{"ok":true},"evidence":[]}}`
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"id": fmt.Sprintf("resume-%d", requests), "choices": []any{map[string]any{"finish_reason": "stop", "message": map[string]any{"content": content}}}})
+	}))
+	defer server.Close()
+	journal, tools := &memoryJournal{}, &countingTool{}
+	runner := Runner{Journal: journal, Tools: tools, FinalTool: "submit_result", MaxFinalSubmissions: 3,
+		Model:    OpenAIModel{Client: server.Client(), BaseURL: server.URL + "/v1", Model: "local", MaxTokens: 512, TurnContract: structuredTestContract(t)},
+		Finalize: func(raw json.RawMessage) (string, error) { return string(raw), nil }}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if _, err := runner.Run(ctx, "resume-rejection", testRequestDigest, "Finish this task"); err == nil || len(journal.entries) != 2 {
+		t.Fatalf("expected retained rejection then transport failure: %v", err)
+	}
+	if _, err := runner.Run(ctx, "resume-rejection", testRequestDigest, "Finish this task"); err != nil || requests != 3 || tools.calls != 0 {
+		t.Fatalf("continuation: err=%v requests=%d dispatched=%d", err, requests, tools.calls)
 	}
 }

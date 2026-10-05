@@ -22,6 +22,21 @@ type StructuredTurnContract struct {
 	final    string
 }
 
+// A complete JSON response rejected before dispatch is recoverable in the same
+// invocation. Keep its exact structured value; never execute its proposed calls.
+type RejectedTurnError struct {
+	ResponseID string          `json:"response_id"`
+	Response   json.RawMessage `json:"response"`
+	Problem    string          `json:"problem"`
+}
+
+func (err *RejectedTurnError) Error() string { return err.Problem }
+func (err *RejectedTurnError) Unwrap() error { return ErrInvalidTurn }
+
+func (err *RejectedTurnError) valid() bool {
+	return err != nil && err.ResponseID != "" && len(err.Response) <= 2<<20 && json.Valid(err.Response) && err.Problem != ""
+}
+
 type turnSchemaLoader struct{}
 
 func (turnSchemaLoader) Load(url string) (any, error) {
@@ -101,7 +116,7 @@ func (contract *StructuredTurnContract) decode(raw json.RawMessage, responseID s
 		return Completion{}, fmt.Errorf("%w: decode structured turn: %v", ErrInvalidTurn, err)
 	}
 	if err := contract.compiled.Validate(instance); err != nil {
-		return Completion{}, fmt.Errorf("%w: structured turn schema: %v", ErrInvalidTurn, err)
+		return Completion{}, &RejectedTurnError{ResponseID: responseID, Response: append(json.RawMessage(nil), raw...), Problem: fmt.Sprintf("%s: structured turn schema: %v", ErrInvalidTurn, err)}
 	}
 	var turn map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &turn); err != nil {

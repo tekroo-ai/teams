@@ -24,13 +24,14 @@ var (
 type Kind string
 
 const (
-	Started   Kind = "started"
-	ModelTurn Kind = "model_turn"
-	ToolDone  Kind = "tool_done"
-	Finished  Kind = "finished"
-	Failed    Kind = "failed"
-	Cancelled Kind = "cancelled"
-	TimedOut  Kind = "timed_out"
+	Started       Kind = "started"
+	ModelTurn     Kind = "model_turn"
+	ModelRejected Kind = "model_rejected"
+	ToolDone      Kind = "tool_done"
+	Finished      Kind = "finished"
+	Failed        Kind = "failed"
+	Cancelled     Kind = "cancelled"
+	TimedOut      Kind = "timed_out"
 )
 
 // Entry is an append-only execution observation, not an organizational event.
@@ -240,6 +241,9 @@ func (runner Runner) Run(ctx context.Context, invocationID, requestDigest, promp
 		if count, last := finalSubmissionErrors(entries, runner.FinalTool); runner.FinalTool != "" && runner.MaxFinalSubmissions > 1 && count >= runner.MaxFinalSubmissions {
 			return "", fmt.Errorf("final result contract failed after %d submissions: %s", count, last)
 		}
+		if count := consecutiveRejectedTurns(entries); runner.MaxFinalSubmissions > 1 && count >= runner.MaxFinalSubmissions {
+			return "", fmt.Errorf("%w: response schema rejected %d consecutive turns", ErrInvalidTurn, count)
+		}
 		if turns > 0 && runner.FinalTool == "" {
 			var last Completion
 			if err := json.Unmarshal(entries[len(entries)-1].Payload, &last); err == nil && entries[len(entries)-1].Kind == ModelTurn && len(last.ToolCalls) == 0 {
@@ -260,6 +264,18 @@ func (runner Runner) Run(ctx context.Context, invocationID, requestDigest, promp
 		}
 		response, err := runner.Model.Complete(ctx, modelMessages)
 		if err != nil {
+			var rejected *RejectedTurnError
+			if runner.MaxFinalSubmissions > 1 && errors.As(err, &rejected) && rejected.valid() {
+				payload, encodeErr := json.Marshal(rejected)
+				if encodeErr != nil {
+					return "", encodeErr
+				}
+				entries, err = runner.append(ctx, invocationID, entries, ModelRejected, payload)
+				if err != nil {
+					return "", err
+				}
+				continue
+			}
 			return "", err
 		}
 		if err := validateCompletion(response, runner.FinalTool); err != nil {
@@ -271,6 +287,19 @@ func (runner Runner) Run(ctx context.Context, invocationID, requestDigest, promp
 			return "", err
 		}
 	}
+}
+
+func consecutiveRejectedTurns(entries []Entry) int {
+	count := 0
+	for i := len(entries) - 1; i >= 0; i-- {
+		if entries[i].Kind == ModelTurn {
+			break
+		}
+		if entries[i].Kind == ModelRejected {
+			count++
+		}
+	}
+	return count
 }
 
 func finalSubmissionErrors(entries []Entry, finalTool string) (int, string) {
@@ -408,6 +437,17 @@ func replay(id, requestDigest, prompt, systemPrompt, finalTool string, finalize 
 			continue
 		}
 		switch entry.Kind {
+		case ModelRejected:
+			var rejected RejectedTurnError
+			if len(outstanding) != 0 || finalText != nil || json.Unmarshal(entry.Payload, &rejected) != nil || !rejected.valid() {
+				return nil, nil, nil, 0, ErrInvalidTurn
+			}
+			feedback, _ := json.Marshal(map[string]any{"model_turn_rejected": map[string]any{
+				"validation_error": rejected.Problem, "tools_dispatched": false,
+				"instruction": "Correct the response to match the declared schema. No proposed tool was executed. Preserve completed work; do not repeat discovery to correct serialization.",
+			}})
+			messages = append(messages, Message{Role: "assistant", Content: string(rejected.Response)}, Message{Role: "user", Content: string(feedback)})
+			turns++
 		case ModelTurn:
 			if len(outstanding) > 0 || finalText != nil {
 				return nil, nil, nil, 0, ErrInvalidTurn
