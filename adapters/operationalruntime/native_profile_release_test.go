@@ -29,6 +29,26 @@ type measuredNativeInvocation struct {
 	Output     []byte                `json:"output"`
 }
 
+// Validate generated deployment files before stopping the active service.
+// Loading checks the strict Go configuration contract without starting a model
+// invocation or connecting to the operational database.
+func TestValidatePreparedNativeFeatureConfig(t *testing.T) {
+	path := os.Getenv("TEKROO_NATIVE_PREPARED_CONFIG")
+	if path == "" {
+		t.Skip("explicit prepared deployment config required")
+	}
+	config, err := LoadProductionConfig(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if config.ExecutionBackend != "native" {
+		t.Fatal("not a native deployment")
+	}
+	if err := ValidateOperationalProfileQualifications(config.Profiles, time.Now().UTC()); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // This release preparation consumes retained real executions, not the fixture's
 // synthetic admission records. Missing roles run directly against authenticated
 // role packages in a disposable repository, without a kernel admission bypass.

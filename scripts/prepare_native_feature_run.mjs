@@ -32,7 +32,7 @@ fs.mkdirSync(evidenceRoot, { mode: 0o700 });
 config.mongo.database = `tekroo_teams_v4_phase10_prod_${run}`;
 config.teams_database_identity = config.mongo.database;
 config.evidence_root = evidenceRoot;
-config.deployment_identity = crypto.createHash('sha256').update(`native:${run}:${baseline}`).digest('hex');
+config.deployment_identity_digest = crypto.createHash('sha256').update(`native:${run}:${baseline}`).digest('hex');
 config.native.owner = `tekrood-production-native-${run}`;
 config.worker.start_paused = true;
 const bytes = JSON.stringify(config, null, 2) + '\n';
