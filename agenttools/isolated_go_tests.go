@@ -106,7 +106,30 @@ func (host Host) runIsolatedGoTestsFrom(ctx context.Context, root, pattern strin
 	if resolved, resolveErr := filepath.EvalSymlinks(modCache); resolveErr == nil {
 		modCache = resolved
 	}
-	profile, err := goTestSandboxProfile(workspace, goBinary, modCache)
+	gitBinary, err := exec.LookPath(host.gitBinary())
+	if err != nil {
+		return result, err
+	}
+	gitBinary, err = filepath.EvalSymlinks(gitBinary)
+	if err != nil {
+		return result, err
+	}
+	// /usr/bin/git is an SDK launcher and tries to create a host xcrun cache.
+	// Resolve that configured launcher outside the sandbox, then use the real
+	// executable inside it. Neither fixture execution nor caching escapes.
+	if gitBinary == "/usr/bin/git" {
+		lookup := exec.CommandContext(operation, "/usr/bin/xcrun", "--find", "git")
+		lookup.Env = toolEnvironment()
+		located, lookupErr := lookup.Output()
+		if lookupErr != nil {
+			return result, fmt.Errorf("resolve isolated Git toolchain: %w", lookupErr)
+		}
+		gitBinary, err = filepath.EvalSymlinks(strings.TrimSpace(string(located)))
+		if err != nil || gitBinary == "/usr/bin/git" || !filepath.IsAbs(gitBinary) {
+			return result, ErrBoundary
+		}
+	}
+	profile, err := goTestSandboxProfileWithGit(workspace, goBinary, modCache, gitBinary)
 	if err != nil {
 		return result, err
 	}
@@ -119,6 +142,9 @@ func (host Host) runIsolatedGoTestsFrom(ctx context.Context, root, pattern strin
 	command := exec.CommandContext(operation, "/usr/bin/sandbox-exec", arguments...)
 	command.Dir = source
 	command.Env = append(toolEnvironment(),
+		// Fixture subprocesses must select the same concrete Git admitted by
+		// policy, not a different launcher inherited from the daemon's PATH.
+		"PATH="+filepath.Dir(gitBinary)+string(os.PathListSeparator)+os.Getenv("PATH"),
 		"HOME="+filepath.Join(workspace, "home"),
 		"TMPDIR="+filepath.Join(workspace, "tmp"),
 		"GOCACHE="+filepath.Join(workspace, "cache"),
@@ -126,6 +152,7 @@ func (host Host) runIsolatedGoTestsFrom(ctx context.Context, root, pattern strin
 		"GOMODCACHE="+modCache,
 		"XDG_CACHE_HOME="+filepath.Join(workspace, "cache"),
 		"CGO_ENABLED=0",
+		"GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null", "GIT_TERMINAL_PROMPT=0", "GIT_ATTR_NOSYSTEM=1",
 	)
 	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	command.Cancel = func() error {
@@ -163,6 +190,8 @@ func (host Host) runIsolatedGoTestsFrom(ctx context.Context, root, pattern strin
 	}
 finished:
 	result.Output = string(output.data)
+	foldedOutput := strings.ToLower(result.Output)
+	result.PermissionDenial = strings.Contains(foldedOutput, "operation not permitted") || strings.Contains(foldedOutput, "permission denied")
 	digest := sha256.Sum256(output.data)
 	result.SHA256 = hex.EncodeToString(digest[:])
 	if workspaceErr != nil {
@@ -288,20 +317,33 @@ func archiveCommittedTree(ctx context.Context, root, commit, destination, gitBin
 }
 
 func goTestSandboxProfile(workspace, goBinary, modCache string) (string, error) {
+	return goTestSandboxProfileWithGit(workspace, goBinary, modCache, "")
+}
+
+func goTestSandboxProfileWithGit(workspace, goBinary, modCache, gitBinary string) (string, error) {
 	for _, path := range []string{workspace, goBinary, modCache} {
 		if !filepath.IsAbs(path) || strings.ContainsAny(path, "\x00\r\n") {
 			return "", ErrBoundary
 		}
 	}
+	if gitBinary != "" && (!filepath.IsAbs(gitBinary) || strings.ContainsAny(gitBinary, "\x00\r\n")) {
+		return "", ErrBoundary
+	}
 	// The default-deny profile permits read-only OS/toolchain files, the
 	// preexisting module cache, and reads/writes only in this disposable root.
-	// No network or process-signal permission is granted.
+	// Native development tests may bind/connect on loopback for HTTP fixtures.
+	// This intentionally permits existing localhost services too; filesystem,
+	// non-loopback network and process-signal restrictions remain unchanged.
 	goRoot := filepath.Dir(filepath.Dir(goBinary))
 	// EvalSymlinks lstat's each ancestor even when the target is inside the
 	// admitted snapshot. Permit metadata on these exact directories, not their
 	// contents or descendants; outside-file reads/writes remain denied.
 	ancestors := make(map[string]bool)
-	for _, target := range []string{workspace, goRoot, modCache} {
+	metadataTargets := []string{workspace, goRoot, modCache}
+	if gitBinary != "" {
+		metadataTargets = append(metadataTargets, gitBinary)
+	}
+	for _, target := range metadataTargets {
 		for parent := filepath.Dir(target); ; parent = filepath.Dir(parent) {
 			ancestors[parent] = true
 			if parent == string(filepath.Separator) {
@@ -316,6 +358,9 @@ func goTestSandboxProfile(workspace, goBinary, modCache string) (string, error) 
 	sort.Strings(metadata)
 	profile := `(version 1)
 (deny default)
+(allow network-bind (local ip "localhost:*"))
+(allow network-inbound (local ip "localhost:*"))
+(allow network-outbound (remote ip "localhost:*"))
 (allow file-read-metadata ` + strings.Join(metadata, " ") + `)
 (allow process-exec (subpath ` + strconv.Quote(goRoot) + `) (subpath ` + strconv.Quote(workspace) + `))
 (allow process-fork)
@@ -331,5 +376,17 @@ func goTestSandboxProfile(workspace, goBinary, modCache string) (string, error) 
   (subpath ` + strconv.Quote(modCache) + `)
   (subpath ` + strconv.Quote(workspace) + `))
 (allow file-write* (subpath ` + strconv.Quote(workspace) + `) (literal "/dev/null"))`
+	if gitBinary != "" {
+		profile += "\n(allow process-exec (literal " + strconv.Quote(gitBinary) + "))"
+		gitRoot := filepath.Dir(filepath.Dir(gitBinary))
+		profile += "\n(allow file-read* (literal " + strconv.Quote(gitBinary) + ") (subpath " + strconv.Quote(filepath.Join(gitRoot, "lib")) + ") (subpath " + strconv.Quote(filepath.Join(gitRoot, "libexec", "git-core")) + ") (subpath " + strconv.Quote(filepath.Join(gitRoot, "share", "git-core")) + "))"
+		// Local clone/worktree fixtures need Git's own helper executables;
+		// Git launches upload-pack through sh. Both remain in this sandbox:
+		// no external network, host writes, or agent-facing shell tool is added.
+		profile += "\n(allow process-exec (subpath " + strconv.Quote(filepath.Join(gitRoot, "libexec", "git-core")) + "))"
+		// On current macOS sh is a launcher for bash; its selection file is
+		// system metadata, not a fixture-controlled or user configuration path.
+		profile += "\n(allow process-exec (literal \"/bin/sh\") (literal \"/bin/bash\"))\n(allow file-read* (literal \"/bin/sh\") (literal \"/bin/bash\") (literal \"/private/var/select/sh\"))\n(allow file-read-metadata (literal \"/bin\") (literal \"/private/var/select\"))"
+	}
 	return profile, nil
 }

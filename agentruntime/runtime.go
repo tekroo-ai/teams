@@ -287,6 +287,7 @@ func (runner Runner) Run(ctx context.Context, invocationID, requestDigest, promp
 			if err != nil {
 				return "", err
 			}
+			modelMessages = referenceRepeatedReads(modelMessages)
 			response, err = runner.Model.Complete(ctx, modelMessages)
 		}
 		if err != nil {

@@ -24,6 +24,30 @@ func structuredTestContract(t *testing.T) *StructuredTurnContract {
 	return contract
 }
 
+func TestStructuredTurnSameFileMutationsAreRejectedBeforeDispatch(t *testing.T) {
+	contract, err := NewStructuredTurnContract([]ToolDefinition{
+		{Name: "edit_file", Parameters: json.RawMessage(`{"type":"object","required":["path"],"properties":{"path":{"type":"string"}}}`)},
+		{Name: "write_file", Parameters: json.RawMessage(`{"type":"object","required":["path"],"properties":{"path":{"type":"string"}}}`)},
+		{Name: "submit_result", Parameters: json.RawMessage(`{"type":"object"}`)},
+	}, "submit_result")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, raw := range []string{
+		`{"calls":[{"edit_file":{"path":"a.go"}},{"edit_file":{"path":"a.go"}}]}`,
+		`{"calls":[{"write_file":{"path":"a.go"}},{"edit_file":{"path":"./a.go"}}]}`,
+	} {
+		completion, err := contract.decode(json.RawMessage(raw), "batch")
+		var rejection *RejectedTurnError
+		if !errors.As(err, &rejection) || len(completion.ToolCalls) != 0 || !strings.Contains(rejection.Problem, "no tools dispatched") {
+			t.Fatalf("partial dispatch available: %+v error=%v", completion, err)
+		}
+	}
+	if completion, err := contract.decode(json.RawMessage(`{"calls":[{"edit_file":{"path":"a.go"}},{"edit_file":{"path":"b.go"}}]}`), "different"); err != nil || len(completion.ToolCalls) != 2 {
+		t.Fatalf("independent batch blocked: %+v %v", completion, err)
+	}
+}
+
 func TestStructuredTurnRejectsMalformedCallsBeforeDispatch(t *testing.T) {
 	contract := structuredTestContract(t)
 	for _, raw := range []string{

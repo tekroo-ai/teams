@@ -25,10 +25,10 @@ func TestReadFileIdentifiesCompleteContentAndExcerpts(t *testing.T) {
 		complete          bool
 	}{
 		{`{"path":"large.txt"}`, "large.txt", 1, 400, 500, false},
-		{`{"path":"large.txt","start_line":401,"end_line":500}`, "large.txt", 401, 500, 500, false},
+		{`{"path":"large.txt","start_line":401,"line_count":100}`, "large.txt", 401, 500, 500, false},
 		{`{"path":"small.txt"}`, "small.txt", 1, 3, 3, true},
-		{`{"path":"small.txt","start_line":2,"end_line":10}`, "small.txt", 2, 3, 3, false},
-		{`{"path":"small.txt","start_line":4,"end_line":10}`, "small.txt", 0, 0, 3, false},
+		{`{"path":"small.txt","start_line":2,"line_count":9}`, "small.txt", 2, 3, 3, false},
+		{`{"path":"small.txt","start_line":4,"line_count":7}`, "small.txt", 0, 0, 3, false},
 		{`{"path":"empty.txt"}`, "empty.txt", 0, 0, 0, true},
 	} {
 		result, err := testHost().execute(t.Context(), authority, call("read_file", test.args))
@@ -44,7 +44,7 @@ func TestReadFileIdentifiesCompleteContentAndExcerpts(t *testing.T) {
 			t.Fatal("excerpt hash no longer identifies the full file")
 		}
 	}
-	_, err := testHost().execute(t.Context(), authority, call("read_file", `{"path":"large.txt","start_line":120,"end_line":2001}`))
+	_, err := testHost().execute(t.Context(), authority, call("read_file", `{"path":"large.txt","start_line":120,"line_count":401}`))
 	if !errors.Is(err, ErrInvalidCall) || !strings.Contains(err.Error(), "400 lines") || !strings.Contains(err.Error(), `path="large.txt"`) {
 		t.Fatalf("wide read did not explain its bound: %v", err)
 	}

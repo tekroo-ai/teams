@@ -44,22 +44,23 @@ type Spec struct {
 }
 
 var specs = []Spec{
-	{"read_file", "Read bounded lines from one workspace filesystem path, not a Teams evidence ID. Use read_evidence for evidence_id. Returns total line_count and full-file SHA-256; an end_line beyond EOF stops at EOF.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path"],"properties":{"path":{"type":"string","minLength":1,"description":"Relative path to a workspace file; never an evidence_id."},"start_line":{"type":"integer","minimum":1},"end_line":{"type":"integer","minimum":1}}}`), "repository.read"},
+	{"read_file", "Read one workspace file starting at start_line (default 1), for line_count lines (default 400, maximum 400). Returns total file line_count, full-file SHA-256, actual start/end lines, and next_start_line when more lines remain. Stops at EOF. A missing file returns status NOT_FOUND without reading any alternative; use find_files to discover its actual path. Use read_evidence for evidence IDs.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path"],"properties":{"path":{"type":"string","minLength":1,"description":"Relative path to a workspace file; never an evidence_id."},"start_line":{"type":"integer","minimum":1,"default":1},"line_count":{"type":"integer","minimum":1,"maximum":400,"default":400,"description":"Number of lines requested, not an ending line number."}}}`), "repository.read"},
 	{"check_go_format", "Check whether named workspace Go files are gofmt-clean without changing them; format_clean is true only when all named files match gofmt output.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["paths"],"properties":{"paths":{"type":"array","minItems":1,"maxItems":32,"uniqueItems":true,"items":{"type":"string","minLength":1}}}}`), "repository.read"},
 	{"list_files", "List one workspace directory without recursing. If truncated, continue with next_after as start_after.", json.RawMessage(`{"type":"object","additionalProperties":false,"properties":{"path":{"type":"string"},"start_after":{"type":"string"},"limit":{"type":"integer","minimum":1,"maximum":200}}}`), "repository.read"},
 	{"find_files", "Find workspace files matching a filename glob; ** matches directories. Results are bounded and sorted.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["filename_glob"],"properties":{"filename_glob":{"type":"string","minLength":1,"maxLength":256},"directory":{"type":"string"},"start_after":{"type":"string"},"limit":{"type":"integer","minimum":1,"maximum":200},"summary":{"type":"string"}}}`), "repository.read"},
-	{"search_file_contents", "Search workspace text files with a RE2 regular expression (use | for alternatives). Select matching lines, filenames, or a total count; optionally include following lines. Results are bounded and skipped files reported.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["regex"],"properties":{"regex":{"type":"string","minLength":1,"maxLength":4096},"path":{"type":"string"},"filename_glob":{"type":"string","maxLength":256},"exclude_glob":{"type":"string","maxLength":256},"ignore_case":{"type":"boolean"},"result_mode":{"type":"string","enum":["lines","filenames","count"]},"after_lines":{"type":"integer","minimum":0,"maximum":40},"max_results":{"type":"integer","minimum":1,"maximum":100},"summary":{"type":"string"}}}`), "repository.read"},
+	{"search_text", "Find literal text in workspace files. Punctuation such as parentheses, brackets and | is literal; no escaping or regex syntax is needed. Select matching lines, filenames, or a total count. Results are bounded and skipped files reported.", searchInputSchema("text"), "repository.read"},
+	{"search_regex", "Search workspace text files with a deliberate RE2 regular expression (use | for alternatives and escape literal punctuation). For ordinary literal text, use search_text. Select matching lines, filenames, or a total count. Invalid regex syntax is reported precisely, never reinterpreted as literal text.", searchInputSchema("regex"), "repository.read"},
 	{"git_status", "Read the worktree's branch, HEAD, and Git status without changing it; clean reports whether porcelain status has no tracked or untracked file entries.", json.RawMessage(`{"type":"object","additionalProperties":false}`), "repository.read"},
 	{"git_diff", "Read a bounded Git diff for the worktree, index, or specified commits; optionally narrow it to one path.", json.RawMessage(`{"type":"object","additionalProperties":false,"properties":{"path":{"type":"string","minLength":1},"from_commit":{"type":"string","pattern":"^(HEAD|[0-9a-f]{7,40})$"},"to_commit":{"type":"string","pattern":"^(HEAD|[0-9a-f]{7,40})$"},"staged":{"type":"boolean"},"format":{"type":"string","enum":["patch","stat","name_status","numstat","name_only"]}}}`), "repository.read"},
 	{"git_log", "Read up to 20 recent commits without changing the repository.", json.RawMessage(`{"type":"object","additionalProperties":false,"properties":{"limit":{"type":"integer","minimum":1,"maximum":20},"format":{"type":"string","enum":["oneline","message"]}}}`), "repository.read"},
 	{"git_show", "Read a bounded commit patch or summary, optionally for one path.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["commit"],"properties":{"commit":{"type":"string","pattern":"^(HEAD|[0-9a-f]{7,40})$"},"path":{"type":"string","minLength":1},"format":{"type":"string","enum":["patch","stat"]}}}`), "repository.read"},
 	{"git_check_ignore", "Check whether one workspace path is ignored by Git.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path"],"properties":{"path":{"type":"string","minLength":1}}}`), "repository.read"},
 	{"write_file", "Create a file or replace its ENTIRE contents when its expected SHA-256 matches. content must contain the complete file, never a fragment or patch. For a small change to an existing file, use edit_file instead. expected_sha256 is empty only for a new file.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path","content","expected_sha256"],"properties":{"path":{"type":"string","minLength":1},"content":{"type":"string"},"expected_sha256":{"type":"string","pattern":"^$|^[0-9a-f]{64}$"}}}`), "repository.edit"},
-	{"edit_file", "Replace exactly one occurrence of old_text in an existing file with new_text, preserving every other byte. Pass the full-file SHA-256 from read_file as expected_sha256. old_text must match exactly once; missing or ambiguous matches and stale hashes leave the file unchanged. new_text may be empty for deletion.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path","old_text","new_text","expected_sha256"],"properties":{"path":{"type":"string","minLength":1},"old_text":{"type":"string","minLength":1,"maxLength":1048576},"new_text":{"type":"string","maxLength":1048576},"expected_sha256":{"type":"string","pattern":"^[0-9a-f]{64}$","minLength":64,"maxLength":64}}}`), "repository.edit"},
+	{"edit_file", "Atomically apply an ordered edits array to ONE existing file against ONE full-file SHA-256 from read_file. Each edit replaces exactly one occurrence of old_text with new_text in the preceding edit's result; new_text may be empty for deletion. Put all replacements for this file in this one call, not separate same-file calls with the same hash. Every edit must match before anything is written; missing or ambiguous text and stale hashes leave the entire file unchanged.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path","edits","expected_sha256"],"properties":{"path":{"type":"string","minLength":1},"edits":{"type":"array","minItems":1,"maxItems":32,"items":{"type":"object","additionalProperties":false,"required":["old_text","new_text"],"properties":{"old_text":{"type":"string","minLength":1,"maxLength":1048576},"new_text":{"type":"string","maxLength":1048576}}}},"expected_sha256":{"type":"string","pattern":"^[0-9a-f]{64}$","minLength":64,"maxLength":64}}}`), "repository.edit"},
 	{"git_stage_files", "Stage only the named workspace paths when HEAD still matches the expected commit. Never stages the injected .openhands runtime files.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["paths","expected_head"],"properties":{"paths":{"type":"array","minItems":1,"maxItems":32,"uniqueItems":true,"items":{"type":"string","minLength":1}},"expected_head":{"type":"string","pattern":"^[0-9a-f]{40}$"}}}`), "repository.edit"},
 	{"git_commit", "Commit the exact staged tree against an expected HEAD. A retry after a completed identical commit returns that commit instead of creating another.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["expected_head","expected_index_tree","subject"],"properties":{"expected_head":{"type":"string","pattern":"^[0-9a-f]{40}$"},"expected_index_tree":{"type":"string","pattern":"^[0-9a-f]{40}$"},"subject":{"type":"string","minLength":1,"maxLength":200},"body":{"type":"string","maxLength":5000}}}`), "repository.edit"},
-	{"run_go_tests", "Run Go tests from committed HEAD in a disposable macOS sandbox. package may be ., ./, ./..., a local package such as ./adapters/mongo, or a subtree such as ./adapters/mongo/...; this workspace's declared module paths also work. External modules, traversal, shell expansion, network, host writes and CGO are forbidden.", goTestInputSchema, "test.execute"},
-	{"run_go_tests_worktree", "Run Go tests against a tracked-and-untracked workspace snapshot in a disposable macOS sandbox before committing. package may be ., ./, ./..., a local package such as ./adapters/mongo, or a subtree such as ./adapters/mongo/...; this workspace's declared module paths also work. External modules and traversal are forbidden. Returns snapshot_sha256; independent validation uses run_go_tests on committed HEAD.", goTestInputSchema, "test.execute"},
+	{"run_go_tests", "Run Go tests from committed HEAD in a disposable macOS filesystem sandbox. package may be ., ./, ./..., a local package such as ./adapters/mongo, or a subtree such as ./adapters/mongo/...; this workspace's declared module paths also work. Local Git subprocesses and localhost networking are supported for fixtures; use temporary test data, not live databases. Non-loopback networking, external modules, traversal, shell expansion, host writes and CGO are forbidden. permission_denial reports observed OS permission-denial output; it does not prove a candidate defect.", goTestInputSchema, "test.execute"},
+	{"run_go_tests_worktree", "Run Go tests against a tracked-and-untracked workspace snapshot in a disposable macOS filesystem sandbox before committing. package may be ., ./, ./..., a local package such as ./adapters/mongo, or a subtree such as ./adapters/mongo/...; this workspace's declared module paths also work. Local Git subprocesses and localhost networking are supported for fixtures; use temporary test data, not live databases. Non-loopback networking, external modules and traversal are forbidden. Returns snapshot_sha256; independent validation uses run_go_tests on committed HEAD. permission_denial reports observed OS permission-denial output, not proof of a candidate defect.", goTestInputSchema, "test.execute"},
 }
 
 // Both test tools expose the same syntax. Module ownership and recursive
@@ -96,8 +97,10 @@ type Result struct {
 	SHA256          string        `json:"sha256,omitempty"`
 	SnapshotSHA256  string        `json:"snapshot_sha256,omitempty"`
 	LineCount       *int          `json:"line_count,omitempty"`
+	Status          string        `json:"status,omitempty"`
 	StartLine       *int          `json:"start_line,omitempty"`
 	EndLine         *int          `json:"end_line,omitempty"`
+	NextStartLine   *int          `json:"next_start_line,omitempty"`
 	ContentComplete *bool         `json:"content_complete,omitempty"`
 	MaxReadLines    int           `json:"max_read_lines,omitempty"`
 	FormatClean     *bool         `json:"format_clean,omitempty"`
@@ -105,7 +108,8 @@ type Result struct {
 	ExitCode        int           `json:"exit_code,omitempty"`
 	// A known preparation/process failure is a completed receipt, not an
 	// unknown effect. ExitCode -1 means no completed test-suite result.
-	ExecutionError string `json:"execution_error,omitempty"`
+	ExecutionError   string `json:"execution_error,omitempty"`
+	PermissionDenial bool   `json:"permission_denial,omitempty"`
 }
 
 type Host struct {
@@ -158,39 +162,54 @@ func (host Host) execute(ctx context.Context, authority Authority, call Call) (R
 		var args struct {
 			Path      string `json:"path"`
 			StartLine *int   `json:"start_line"`
-			EndLine   *int   `json:"end_line"`
+			LineCount *int   `json:"line_count"`
 		}
 		if decode(call.Arguments, &args) != nil || args.Path == "" {
 			return Result{}, ErrInvalidCall
 		}
-		start, end := 0, 0
+		var supplied map[string]json.RawMessage
+		_ = json.Unmarshal(call.Arguments, &supplied)
+		for _, field := range []string{"start_line", "line_count"} {
+			if bytes.Equal(bytes.TrimSpace(supplied[field]), []byte("null")) {
+				return Result{}, ErrInvalidCall
+			}
+		}
+		start, count := 1, maxReadFileLines
 		if args.StartLine != nil {
 			start = *args.StartLine
 			if start < 1 {
 				return Result{}, ErrInvalidCall
 			}
 		}
-		if args.EndLine != nil {
-			end = *args.EndLine
-			if end < 1 {
-				return Result{}, ErrInvalidCall
+		if args.LineCount != nil {
+			count = *args.LineCount
+			if count < 1 || count > maxReadFileLines {
+				return Result{}, fmt.Errorf("%w: read_file path=%q supports 1 through %d lines per call", ErrInvalidCall, args.Path, maxReadFileLines)
 			}
 		}
 		var lineCount int
-		result.Output, result.SHA256, lineCount, err = readFile(root, args.Path, start, end)
+		result.Output, result.SHA256, lineCount, err = readFile(root, args.Path, start, count)
+		if errors.Is(err, os.ErrNotExist) {
+			// Only an absent, confined path is a discovery miss. Permission,
+			// symlink and traversal failures remain explicit errors.
+			if boundaryErr := checkMissingFilePath(root, args.Path); boundaryErr != nil {
+				return Result{}, boundaryErr
+			}
+			return Result{Name: call.Name, Path: args.Path, Status: "NOT_FOUND"}, nil
+		}
 		if err == nil {
+			result.Status = "FOUND"
 			result.LineCount = &lineCount
 			result.Path = args.Path
-			actualStart, actualEnd := start, end
-			if actualStart == 0 {
-				actualStart = 1
-			}
-			if actualEnd == 0 {
-				actualEnd = actualStart + maxReadFileLines - 1
-			}
-			actualEnd = min(actualEnd, lineCount)
+			actualStart, actualEnd := start, 0
 			if lineCount == 0 || actualStart > lineCount {
 				actualStart, actualEnd = 0, 0
+			} else {
+				actualEnd = actualStart + min(count, lineCount-actualStart+1) - 1
+				if actualEnd < lineCount {
+					next := actualEnd + 1
+					result.NextStartLine = &next
+				}
 			}
 			complete := lineCount == 0 || actualStart == 1 && actualEnd == lineCount
 			result.StartLine, result.EndLine = &actualStart, &actualEnd
@@ -239,9 +258,10 @@ func (host Host) execute(ctx context.Context, authority Authority, call Call) (R
 			limit = *args.Limit
 		}
 		result.Files, result.Truncated, result.NextAfter, err = findFiles(ctx, root, args.Directory, args.FilenameGlob, args.StartAfter, limit)
-	case "search_file_contents":
+	case "search_text", "search_regex":
 		var args struct {
 			Regex        string `json:"regex"`
+			Text         string `json:"text"`
 			Path         string `json:"path"`
 			FilenameGlob string `json:"filename_glob"`
 			ExcludeGlob  string `json:"exclude_glob"`
@@ -254,6 +274,14 @@ func (host Host) execute(ctx context.Context, authority Authority, call Call) (R
 		if decode(call.Arguments, &args) != nil || args.MaxResults != nil && (*args.MaxResults < 1 || *args.MaxResults > 100) || args.AfterLines != nil && (*args.AfterLines < 0 || *args.AfterLines > 40) {
 			return Result{}, ErrInvalidCall
 		}
+		// Match the two discrete schemas even for direct host callers.
+		var fields map[string]json.RawMessage
+		if json.Unmarshal(call.Arguments, &fields) != nil {
+			return Result{}, ErrInvalidCall
+		}
+		if call.Name == "search_text" && (args.Text == "" || fields["regex"] != nil) || call.Name == "search_regex" && (args.Regex == "" || fields["text"] != nil) {
+			return Result{}, ErrInvalidCall
+		}
 		limit := 100
 		if args.MaxResults != nil {
 			limit = *args.MaxResults
@@ -263,7 +291,7 @@ func (host Host) execute(ctx context.Context, authority Authority, call Call) (R
 			after = *args.AfterLines
 		}
 		var searchResult contentSearchResult
-		searchResult, err = searchFileContents(ctx, root, contentSearchQuery{Path: args.Path, FilenameGlob: args.FilenameGlob, ExcludeGlob: args.ExcludeGlob, Regex: args.Regex, IgnoreCase: args.IgnoreCase, ResultMode: args.ResultMode, AfterLines: after, MaxResults: limit})
+		searchResult, err = searchFileContents(ctx, root, contentSearchQuery{Path: args.Path, FilenameGlob: args.FilenameGlob, ExcludeGlob: args.ExcludeGlob, Regex: args.Regex, Literal: args.Text, IgnoreCase: args.IgnoreCase, ResultMode: args.ResultMode, AfterLines: after, MaxResults: limit})
 		result.Matches, result.Files, result.MatchCount, result.Truncated, result.SkippedFiles = searchResult.Matches, searchResult.Files, searchResult.MatchCount, searchResult.Truncated, searchResult.SkippedFiles
 	case "git_status":
 		var args struct{}
@@ -540,7 +568,10 @@ func existingPath(root, relative string) (string, error) {
 
 const maxReadFileLines = 400
 
-func readFile(root, relative string, start, end int) (string, string, int, error) {
+func readFile(root, relative string, start, count int) (string, string, int, error) {
+	if start < 1 || count < 1 || count > maxReadFileLines {
+		return "", "", 0, ErrInvalidCall
+	}
 	path, err := existingPath(root, relative)
 	if err != nil {
 		return "", "", 0, err
@@ -561,26 +592,15 @@ func readFile(root, relative string, start, end int) (string, string, int, error
 	}
 	fullHash := sha256.Sum256(content)
 	if len(content) == 0 {
-		if end != 0 && end < start {
-			return "", "", 0, ErrInvalidCall
-		}
 		return "", hex.EncodeToString(fullHash[:]), 0, nil
 	}
 	lines := strings.Split(strings.TrimSuffix(string(content), "\n"), "\n")
 	lineCount := len(lines)
-	if start == 0 {
-		start = 1
-	}
-	if end == 0 {
-		end = min(len(lines), start+maxReadFileLines-1)
-	}
-	if start < 1 || end < start || end-start >= maxReadFileLines {
-		return "", "", 0, fmt.Errorf("%w: read_file path=%q requires end_line >= start_line and at most %d lines per call", ErrInvalidCall, relative, maxReadFileLines)
-	}
 	if start > lineCount {
 		return "", hex.EncodeToString(fullHash[:]), lineCount, nil
 	}
-	end = min(end, lineCount)
+	// Subtract before adding: an arbitrarily large start must not overflow.
+	end := start + min(count, lineCount-start+1) - 1
 	selected := strings.Join(lines[start-1:end], "\n")
 	if len(selected) > 64<<10 {
 		return "", "", 0, ErrTooLarge

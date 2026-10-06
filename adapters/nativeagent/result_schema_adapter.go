@@ -53,6 +53,22 @@ func modelFacingHandlerSchema(handler application.MessageHandlerGrounding, purpo
 		if err := replaceEnvelopeProperty(schema, "work_product", properties["work_product"]); err != nil {
 			return nil, err
 		}
+		// This cross-field rule belongs in generation as well as finalization.
+		// Otherwise individually valid enum values can produce a hidden rejection.
+		var constraints []json.RawMessage
+		if raw := schema["allOf"]; raw != nil && json.Unmarshal(raw, &constraints) != nil {
+			return nil, ErrInvalidBinding
+		}
+		branches := make([]any, 0, len(validationOutcomePairs))
+		for _, pair := range validationOutcomePairs {
+			branches = append(branches, map[string]any{"required": []string{"outcome", "work_product"}, "properties": map[string]any{
+				"outcome":      map[string]any{"const": pair.envelope},
+				"work_product": map[string]any{"required": []string{"outcome"}, "properties": map[string]any{"outcome": map[string]any{"const": pair.verdict}}},
+			}})
+		}
+		paired, _ := json.Marshal(map[string]any{"anyOf": branches})
+		constraints = append(constraints, paired)
+		schema["allOf"], _ = json.Marshal(constraints)
 	}
 	if len(handler.AllowedMessageProposals) != 0 {
 		schema["properties"], _ = json.Marshal(properties)
@@ -72,6 +88,10 @@ func modelFacingHandlerSchema(handler application.MessageHandlerGrounding, purpo
 	properties["message_proposals"], _ = json.Marshal(proposal)
 	schema["properties"], _ = json.Marshal(properties)
 	return encodeModelFacingSchema(schema)
+}
+
+var validationOutcomePairs = [...]struct{ envelope, verdict string }{
+	{"completed", "PASS"}, {"failed", "FAIL"}, {"blocked", "BLOCKED"}, {"needs_decision", "INCONCLUSIVE"},
 }
 
 // A model-facing field replacement must also replace restrictions at the same
@@ -258,10 +278,17 @@ func bindHandlerValidationResult(arguments json.RawMessage, candidate *Candidate
 	var verdict struct {
 		Outcome string `json:"outcome"`
 	}
-	if json.Unmarshal(encoded, &verdict) != nil || map[string]string{
-		"completed": "PASS", "failed": "FAIL", "blocked": "BLOCKED", "needs_decision": "INCONCLUSIVE",
-	}[outerOutcome] != verdict.Outcome {
+	if json.Unmarshal(encoded, &verdict) != nil {
 		return nil, ErrInvalidBinding
+	}
+	matched := false
+	for _, pair := range validationOutcomePairs {
+		if outerOutcome == pair.envelope && verdict.Outcome == pair.verdict {
+			matched = true
+		}
+	}
+	if !matched {
+		return nil, fmt.Errorf("submit_result verdict mismatch: outcome=%q work_product.outcome=%q; required pairs: completed/PASS, failed/FAIL, blocked/BLOCKED, needs_decision/INCONCLUSIVE", outerOutcome, verdict.Outcome)
 	}
 	envelope["work_product"] = encoded
 	return json.Marshal(envelope)

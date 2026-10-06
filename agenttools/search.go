@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path"
 	"path/filepath"
@@ -27,6 +28,7 @@ type contentSearchQuery struct {
 	FilenameGlob string
 	ExcludeGlob  string
 	Regex        string
+	Literal      string
 	IgnoreCase   bool
 	ResultMode   string
 	AfterLines   int
@@ -162,7 +164,7 @@ func findFiles(ctx context.Context, root, relativeDirectory, pattern, startAfter
 }
 
 func searchFileContents(ctx context.Context, root string, query contentSearchQuery) (contentSearchResult, error) {
-	if query.Regex == "" || len(query.Regex) > 4096 || query.MaxResults < 1 || query.MaxResults > 100 || query.AfterLines < 0 || query.AfterLines > 40 {
+	if (query.Regex == "") == (query.Literal == "") || len(query.Regex) > 4096 || len(query.Literal) > 4096 || query.MaxResults < 1 || query.MaxResults > 100 || query.AfterLines < 0 || query.AfterLines > 40 {
 		return contentSearchResult{}, ErrInvalidCall
 	}
 	if query.ResultMode == "" {
@@ -179,12 +181,15 @@ func searchFileContents(ctx context.Context, root string, query contentSearchQue
 		}
 	}
 	expression := query.Regex
+	if query.Literal != "" {
+		expression = regexp.QuoteMeta(query.Literal)
+	}
 	if query.IgnoreCase {
 		expression = "(?i:" + expression + ")"
 	}
 	re, err := regexp.Compile(expression)
 	if err != nil {
-		return contentSearchResult{}, ErrInvalidCall
+		return contentSearchResult{}, fmt.Errorf("%w: search_regex regex=%q: %v", ErrInvalidCall, query.Regex, err)
 	}
 	target, err := existingPath(root, query.Path)
 	if err != nil {

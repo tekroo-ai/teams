@@ -383,7 +383,10 @@ func (boundary *Boundary) reconcileBeforeTerminal(brief application.ExecutionBri
 		return nil
 	}
 	snapshot := *start.EffectAuthority
-	if snapshot.WorkspaceRoot == "" || snapshot.Purpose != string(brief.Purpose) || snapshot.EffectPolicyDigest != string(brief.EffectPolicyDigest) || !slices.Equal(snapshot.Permissions, brief.RoleGrounding.Permissions) || !slices.Contains(snapshot.Permissions, "repository.edit") {
+	// Test execution also reserves effects. Its read-only validator must be
+	// able to drain those receipts and publish failure/cancellation/timeout.
+	admittedEffects := slices.Contains(snapshot.Permissions, "repository.edit") || slices.Contains(snapshot.Permissions, "test.execute")
+	if snapshot.WorkspaceRoot == "" || snapshot.Purpose != string(brief.Purpose) || snapshot.EffectPolicyDigest != string(brief.EffectPolicyDigest) || !slices.Equal(snapshot.Permissions, brief.RoleGrounding.Permissions) || !admittedEffects {
 		return ErrInvalidBinding
 	}
 	config, err := boundary.Configure(ctx, brief)

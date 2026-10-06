@@ -366,6 +366,7 @@ var repositoryExecutionGuidance = []string{
 	"If repository inspection is needed for this assignment, read AGENTS.md before source files. Use only the repository tools exposed for this invocation; do not inspect the repository merely because tools are available.",
 	"Every inspection must resolve a concrete open question in the assigned task. When a search identifies the relevant implementation and tests, inspect those files and stop discovery; do not enumerate unrelated directories to prove absence.",
 	"Read accepted CONTRACTS packages only when they directly resolve an open question in the assigned task. Never modify accepted CONTRACTS packages.",
+	"A bounded or truncated search is incomplete evidence, not proof of repository-wide absence. Inspect the relevant source or narrow the query before making a broader claim. Literal search treats punctuation literally; alternatives require the exposed regular-expression search tool.",
 }
 
 var editableExecutionGuidance = []string{
@@ -397,11 +398,15 @@ var readOnlyExecutionGuidance = []string{
 	"Inspect current interfaces and relevant tests only when needed to perform the assigned role, then return the required result through result_protocol.",
 	"When you write a command, CLI, or API example in planning text, use a placeholder operand (for example <actor-fqn> or <alias>) rather than a concrete agent instance FQN such as teams::coder-2; naming a specific running instance is a routing decision Teams owns, and an invented instance FQN in a plan or refinement is rejected.",
 	"When the task requires a structured result, validate it against result_protocol and every required field in the task's result schema before submitting it.",
+	"When producing or approving an executable plan, trace each accepted outcome through the real application entry point, concrete implementation, configuration or activation, and verification. Assign necessary integration to a task with the required write scope; interfaces and test doubles alone do not complete a runtime path. If an immutable design omits required integration, report that precise gap rather than silently accepting it or expanding product scope.",
 }
 
 var validationExecutionGuidance = []string{
 	"Act as an independent engineering validator, not only as a test runner. Candidate-authored tests, builds, vet, and race checks are necessary evidence but do not by themselves prove that the implementation matches an acceptance criterion.",
 	"For every acceptance criterion, trace the relevant production control or data path and test a concrete plausible near-miss against that path. A cited test supports a criterion only when its assertions distinguish the required behavior from that near-miss.",
+	"Trace any new capability from the actual application entry point through its configured concrete implementation. An optional interface or test double is not evidence of production wiring. Distinguish a task-local dependency left to an identified later task from a feature-level integration gap with no owner.",
+	"A truncated search, skipped file, scoped lookup, or literal query containing regex alternatives cannot establish repository-wide absence. Keep claims within the inspected evidence. A skipped integration test does not establish executed behavior.",
+	"When test execution is denied by the sandbox or unavailable environment, distinguish that infrastructure limitation from an observed candidate defect and report the affected criteria as unverified rather than repeatedly running the unchanged failing command.",
 	"Return PASS only when every criterion is supported by the inspected production behavior and distinguishing verification. Return FAIL for an observed contradiction and INCONCLUSIVE when the available evidence cannot distinguish compliance from a plausible near-miss; never convert missing evidence into PASS.",
 }
 

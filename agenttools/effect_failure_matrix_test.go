@@ -63,7 +63,7 @@ func failureMatrixFixture(t *testing.T, name string) (MutationGateway, TestGatew
 			if err := os.Chmod(filepath.Join(root, "readonly"), 0500); err != nil {
 				t.Fatal(err)
 			}
-			args = fileEdit{"readonly/existing.txt", "before", "after", textSHA("before")}
+			args = fileEdit{Path: "readonly/existing.txt", Edits: []textEdit{{"before", "after"}}, ExpectedSHA256: textSHA("before")}
 		}
 	case "git_stage_files":
 		args = map[string]any{"paths": []string{"a.go"}, "expected_head": strings.Repeat("b", 40)}

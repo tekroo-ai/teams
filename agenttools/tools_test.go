@@ -31,7 +31,7 @@ func TestAvailableAndAuthorization(t *testing.T) {
 		t.Fatalf("unprivileged tools: %v", got)
 	}
 	read := Available([]string{"repository.read"})
-	if len(read) != 10 || !slices.ContainsFunc(read, func(spec Spec) bool { return spec.Name == "git_status" }) {
+	if len(read) != 11 || !slices.ContainsFunc(read, func(spec Spec) bool { return spec.Name == "git_status" }) {
 		t.Fatalf("read-only surface: %v", read)
 	}
 	for _, spec := range read {
@@ -98,16 +98,16 @@ func TestReadAndListStayInWorkspace(t *testing.T) {
 	}
 	authority := Authority{WorkspaceRoot: root, Permissions: []string{"repository.read"}}
 	host := testHost()
-	result, err := host.execute(context.Background(), authority, call("read_file", `{"path":"source.txt","start_line":2,"end_line":3}`))
+	result, err := host.execute(context.Background(), authority, call("read_file", `{"path":"source.txt","start_line":2,"line_count":2}`))
 	fullFileHash := sha256.Sum256([]byte("one\ntwo\nthree\n"))
 	if err != nil || result.Output != "two\nthree" || result.SHA256 != hex.EncodeToString(fullFileHash[:]) || result.LineCount == nil || *result.LineCount != 3 {
 		t.Fatalf("bounded file read: %+v, %v", result, err)
 	}
-	result, err = host.execute(context.Background(), authority, call("read_file", `{"path":"source.txt","start_line":2,"end_line":4}`))
+	result, err = host.execute(context.Background(), authority, call("read_file", `{"path":"source.txt","start_line":2,"line_count":3}`))
 	if err != nil || result.Output != "two\nthree" || result.LineCount == nil || *result.LineCount != 3 {
 		t.Fatalf("range past EOF should return available lines: %+v, %v", result, err)
 	}
-	result, err = host.execute(context.Background(), authority, call("read_file", `{"path":"source.txt","start_line":4,"end_line":5}`))
+	result, err = host.execute(context.Background(), authority, call("read_file", `{"path":"source.txt","start_line":4,"line_count":2}`))
 	if err != nil || result.Output != "" || result.LineCount == nil || *result.LineCount != 3 {
 		t.Fatalf("range after EOF should report file length: %+v, %v", result, err)
 	}
@@ -131,7 +131,7 @@ func TestReadAndListStayInWorkspace(t *testing.T) {
 	}
 	_, err = host.execute(context.Background(), authority, call("read_file", `{"path":"source.txt","start_line":3,"end_line":2}`))
 	if !errors.Is(err, ErrInvalidCall) {
-		t.Fatalf("inverted range was accepted: %v", err)
+		t.Fatalf("obsolete end_line argument was accepted: %v", err)
 	}
 	_, err = host.execute(context.Background(), authority, call("read_file", `{"path":"source.txt","start_line":0}`))
 	if !errors.Is(err, ErrInvalidCall) {
@@ -362,7 +362,7 @@ func TestGoTestsAreTypedAndBounded(t *testing.T) {
 	}
 }
 
-func TestGoTestsCannotReadWriteOutsideSnapshotOrConnect(t *testing.T) {
+func TestGoTestsKeepFilesystemBoundaryAndAllowLoopback(t *testing.T) {
 	root := t.TempDir()
 	outside := t.TempDir()
 	secret := filepath.Join(outside, "secret")
@@ -374,12 +374,15 @@ func TestGoTestsCannotReadWriteOutsideSnapshotOrConnect(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer listener.Close()
-	source := "package sample\nimport (\"net\"; \"os\"; \"os/exec\"; \"testing\"; \"time\")\n" +
+	source := "package sample\nimport (\"errors\"; \"io\"; \"net\"; \"net/http\"; \"net/http/httptest\"; \"os\"; \"os/exec\"; \"syscall\"; \"testing\"; \"time\")\n" +
 		"func TestBoundary(t *testing.T) {\n" +
 		" if _, err := os.ReadFile(" + strconv.Quote(secret) + "); err == nil { t.Error(\"outside read succeeded\") }\n" +
 		" if err := os.Symlink(" + strconv.Quote(secret) + ", \"escaped-link\"); err == nil { if _, readErr := os.ReadFile(\"escaped-link\"); readErr == nil { t.Error(\"symlink escaped\") } }\n" +
 		" if err := os.WriteFile(" + strconv.Quote(filepath.Join(outside, "write")) + ", []byte(\"bad\"), 0600); err == nil { t.Error(\"outside write succeeded\") }\n" +
-		" if conn, err := net.DialTimeout(\"tcp\", " + strconv.Quote(listener.Addr().String()) + ", time.Second); err == nil { conn.Close(); t.Error(\"network succeeded\") }\n" +
+		" if conn, err := net.DialTimeout(\"tcp\", " + strconv.Quote(listener.Addr().String()) + ", time.Second); err != nil { t.Errorf(\"host loopback unavailable: %v\", err) } else { conn.Close() }\n" +
+		" if conn, err := net.DialTimeout(\"tcp\", \"192.0.2.1:80\", time.Second); err == nil { conn.Close(); t.Error(\"non-loopback network succeeded\") } else if !errors.Is(err, syscall.EPERM) && !errors.Is(err, syscall.EACCES) { t.Errorf(\"non-loopback was not denied by policy: %v\", err) }\n" +
+		" server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, \"fixture\") })); defer server.Close()\n" +
+		" client := &http.Client{Timeout: time.Second}; response, err := client.Get(server.URL); if err != nil { t.Fatal(err) }; body, err := io.ReadAll(response.Body); response.Body.Close(); if err != nil || string(body) != \"fixture\" { t.Fatalf(\"HTTP fixture: %q %v\", body, err) }\n" +
 		" if err := exec.Command(\"/usr/bin/true\").Run(); err == nil { t.Error(\"system executable succeeded\") }\n" +
 		" if sink, err := os.OpenFile(\"/dev/null\", os.O_WRONLY, 0); err != nil { t.Errorf(\"/dev/null unavailable: %v\", err) } else { sink.Close() }\n" +
 		"}\n"

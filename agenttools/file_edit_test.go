@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,8 +20,53 @@ func textSHA(text string) string {
 	return hex.EncodeToString(digest[:])
 }
 
+func TestEditFileAtomicOrderedReplacements(t *testing.T) {
+	for _, badSecond := range []bool{false, true} {
+		t.Run(fmt.Sprint(badSecond), func(t *testing.T) {
+			root := t.TempDir()
+			before := "first\nsecond\nkeep\n"
+			file := filepath.Join(root, "note.txt")
+			if err := os.WriteFile(file, []byte(before), 0600); err != nil {
+				t.Fatal(err)
+			}
+			edits := []textEdit{{"first", "updated"}, {"second\n", ""}}
+			if badSecond {
+				edits[1].OldText = "absent"
+			}
+			args, _ := json.Marshal(fileEdit{Path: "note.txt", ExpectedSHA256: textSHA(before), Edits: edits})
+			result, err := testHost().execute(t.Context(), Authority{WorkspaceRoot: root, Permissions: []string{"repository.edit"}}, Call{Name: "edit_file", Arguments: args})
+			got, readErr := os.ReadFile(file)
+			if readErr != nil {
+				t.Fatal(readErr)
+			}
+			if badSecond {
+				if err == nil || string(got) != before {
+					t.Fatalf("partial edit: %q error=%v", got, err)
+				}
+			} else if err != nil || string(got) != "updated\nkeep\n" || result.SHA256 != textSHA(string(got)) {
+				t.Fatalf("atomic edit: %q result=%+v error=%v", got, result, err)
+			}
+		})
+	}
+}
+
+func TestAtomicEditEffectLostReceiptReconcilesWholePostimage(t *testing.T) {
+	gateway, ledger, root, request := editEffectFixture(t)
+	args, _ := json.Marshal(fileEdit{Path: "note.txt", ExpectedSHA256: textSHA("before\nkeep\n"), Edits: []textEdit{{"before", "after"}, {"keep", "preserved"}}})
+	request.Call.Arguments = args
+	ledger.failComplete = true
+	if _, err := gateway.Execute(t.Context(), request); !errors.Is(err, ErrEffectUncertain) {
+		t.Fatalf("lost receipt: %v", err)
+	}
+	result, complete, err := gateway.Reconcile(t.Context(), request)
+	got, _ := os.ReadFile(filepath.Join(root, "note.txt"))
+	if err != nil || !complete || string(got) != "after\npreserved\n" || result.Result.SHA256 != textSHA(string(got)) {
+		t.Fatalf("atomic replay: result=%+v complete=%t content=%q error=%v", result, complete, got, err)
+	}
+}
+
 func editArguments(path, before, oldText, newText string) json.RawMessage {
-	encoded, _ := json.Marshal(fileEdit{Path: path, OldText: oldText, NewText: newText, ExpectedSHA256: textSHA(before)})
+	encoded, _ := json.Marshal(fileEdit{Path: path, Edits: []textEdit{{OldText: oldText, NewText: newText}}, ExpectedSHA256: textSHA(before)})
 	return encoded
 }
 
@@ -58,7 +104,7 @@ func TestEditFileRejectsBadPreconditionsWithoutChangingFile(t *testing.T) {
 			}
 			args := editArguments("note.txt", tc.before, tc.oldText, tc.newText)
 			if tc.expected != "" {
-				args, _ = json.Marshal(fileEdit{"note.txt", tc.oldText, tc.newText, tc.expected})
+				args, _ = json.Marshal(fileEdit{Path: "note.txt", Edits: []textEdit{{tc.oldText, tc.newText}}, ExpectedSHA256: tc.expected})
 			}
 			_, err := testHost().execute(t.Context(), Authority{WorkspaceRoot: root, Permissions: []string{"repository.edit"}}, Call{Name: "edit_file", Arguments: args})
 			got, readErr := os.ReadFile(path)
@@ -134,6 +180,11 @@ func TestEditFileKeepsWorkspaceAndPermissionBoundaries(t *testing.T) {
 
 func TestEditFileRequiresExplicitReplacementIncludingDeletion(t *testing.T) {
 	for _, raw := range []string{
+		`{"path":"a","edits":[],"expected_sha256":"` + strings.Repeat("a", 64) + `"}`,
+		`{"path":"a","edits":[{"old_text":"x"}],"expected_sha256":"` + strings.Repeat("a", 64) + `"}`,
+		`{"path":"a","edits":[{"old_text":"x","new_text":null}],"expected_sha256":"` + strings.Repeat("a", 64) + `"}`,
+		`{"path":"a","edits":[{"old_text":"x","new_text":"y","extra":1}],"expected_sha256":"` + strings.Repeat("a", 64) + `"}`,
+		`{"path":"a","edits":[{"old_text":"x","new_text":"y"}],"old_text":"x","expected_sha256":"` + strings.Repeat("a", 64) + `"}`,
 		`{"path":"a","old_text":"x","expected_sha256":"` + strings.Repeat("a", 64) + `"}`,
 		`{"path":"a","old_text":"x","new_text":null,"expected_sha256":"` + strings.Repeat("a", 64) + `"}`,
 		`{"path":"a","old_text":"x","new_text":"y","expected_sha256":"` + strings.Repeat("a", 64) + `","extra":true}`,

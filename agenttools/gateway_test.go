@@ -40,7 +40,7 @@ func TestGatewayBindsReadToInvocationAndReceipts(t *testing.T) {
 	digest := kernel.Digest(hex.EncodeToString(make([]byte, 32)))
 	binding := &staticBinding{authority: Authority{WorkspaceRoot: root, Permissions: []string{"repository.read"}}, id: id, digest: digest}
 	gateway := Gateway{Bindings: binding, Host: Host{Timeout: time.Second}}
-	request := Request{InvocationID: id, RequestDigest: digest, ToolCallID: "call-1", Call: Call{Name: "read_file", Arguments: json.RawMessage(`{"path":"note.txt","start_line":2,"end_line":2}`)}}
+	request := Request{InvocationID: id, RequestDigest: digest, ToolCallID: "call-1", Call: Call{Name: "read_file", Arguments: json.RawMessage(`{"path":"note.txt","start_line":2,"line_count":1}`)}}
 	receipt, err := gateway.ExecuteReadOnly(context.Background(), request)
 	if err != nil {
 		t.Fatal(err)
@@ -53,7 +53,7 @@ func TestGatewayBindsReadToInvocationAndReceipts(t *testing.T) {
 		t.Fatalf("unbound receipt hashes: %+v", receipt)
 	}
 	request.ToolCallID = "call-2"
-	request.Call = Call{Name: "search_file_contents", Arguments: json.RawMessage(`{"regex":"second","filename_glob":"*.txt"}`)}
+	request.Call = Call{Name: "search_regex", Arguments: json.RawMessage(`{"regex":"second","filename_glob":"*.txt"}`)}
 	searched, err := gateway.ExecuteReadOnly(context.Background(), request)
 	if err != nil || len(searched.Result.Matches) != 1 || searched.Result.Matches[0].Line != 2 || binding.called != 2 {
 		t.Fatalf("invocation-bound search: %+v, %v", searched, err)

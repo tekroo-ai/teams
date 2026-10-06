@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"path"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
 )
@@ -104,7 +105,11 @@ func NewStructuredTurnContract(tools []ToolDefinition, final string) (*Structure
 	if err != nil {
 		return nil, fmt.Errorf("%w: compile turn schema: %v", ErrInvalidTurn, err)
 	}
-	return &StructuredTurnContract{schema: raw, compiled: compiled, final: final}, nil
+	generation, err := generationSchema(raw)
+	if err != nil {
+		return nil, fmt.Errorf("%w: generation schema: %v", ErrInvalidTurn, err)
+	}
+	return &StructuredTurnContract{schema: generation, compiled: compiled, final: final}, nil
 }
 
 func (contract *StructuredTurnContract) decode(raw json.RawMessage, responseID string) (Completion, error) {
@@ -139,6 +144,25 @@ func (contract *StructuredTurnContract) decode(raw json.RawMessage, responseID s
 	}
 	if err := validateCompletion(result, contract.final); err != nil {
 		return Completion{}, err
+	}
+	// Multiple mutations of one preimage cannot be independently hash-bound.
+	// Reject the entire proposal before its first effect; edit_file accepts an
+	// atomic ordered list for this case. Different files may still be batched.
+	paths := make(map[string]bool)
+	for _, call := range result.ToolCalls {
+		if call.Name != "write_file" && call.Name != "edit_file" {
+			continue
+		}
+		var mutation struct {
+			Path string `json:"path"`
+		}
+		if json.Unmarshal(call.Arguments, &mutation) == nil && mutation.Path != "" {
+			mutation.Path = path.Clean(mutation.Path)
+			if paths[mutation.Path] {
+				return Completion{}, &RejectedTurnError{ResponseID: responseID, Response: append(json.RawMessage(nil), raw...), Problem: fmt.Sprintf("same-file mutation batch for %q: no tools dispatched; combine replacements in one edit_file.edits array against one hash", mutation.Path)}
+			}
+			paths[mutation.Path] = true
+		}
 	}
 	return result, nil
 }

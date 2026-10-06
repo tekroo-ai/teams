@@ -83,39 +83,39 @@ func TestSearchFileContentsReportsMatchesAndIncompleteSearch(t *testing.T) {
 		t.Fatal(err)
 	}
 	authority := Authority{WorkspaceRoot: root, Permissions: []string{"repository.read"}}
-	result, err := testHost().execute(context.Background(), authority, call("search_file_contents", `{"regex":"Alias","path":"src","filename_glob":"*.go","max_results":1}`))
+	result, err := testHost().execute(context.Background(), authority, call("search_regex", `{"regex":"Alias","path":"src","filename_glob":"*.go","max_results":1}`))
 	if err != nil || len(result.Matches) != 1 || result.Matches[0].Path != "src/alias.go" || result.Matches[0].Line != 1 || !result.Truncated {
 		t.Fatalf("bounded search: %+v, %v", result, err)
 	}
-	result, err = testHost().execute(context.Background(), authority, call("search_file_contents", `{"regex":"ResolveAlias","path":"src/alias.go"}`))
+	result, err = testHost().execute(context.Background(), authority, call("search_regex", `{"regex":"ResolveAlias","path":"src/alias.go"}`))
 	if err != nil || len(result.Matches) != 1 || result.Matches[0].Line != 2 || result.Truncated {
 		t.Fatalf("single-file search: %+v, %v", result, err)
 	}
-	contextResult, err := testHost().execute(context.Background(), authority, call("search_file_contents", `{"regex":"BindAlias","path":"src/alias.go","after_lines":1}`))
+	contextResult, err := testHost().execute(context.Background(), authority, call("search_regex", `{"regex":"BindAlias","path":"src/alias.go","after_lines":1}`))
 	if err != nil || len(contextResult.Matches) != 1 || !reflect.DeepEqual(contextResult.Matches[0].After, []string{"func ResolveAlias() {}"}) {
 		t.Fatalf("following lines: %+v, %v", contextResult, err)
 	}
-	filenames, err := testHost().execute(context.Background(), authority, call("search_file_contents", `{"regex":"alias","path":"src","filename_glob":"alias*.go","exclude_glob":"*_test.go","ignore_case":true,"result_mode":"filenames"}`))
+	filenames, err := testHost().execute(context.Background(), authority, call("search_regex", `{"regex":"alias","path":"src","filename_glob":"alias*.go","exclude_glob":"*_test.go","ignore_case":true,"result_mode":"filenames"}`))
 	if err != nil || !reflect.DeepEqual(filenames.Files, []string{"src/alias.go"}) || filenames.Truncated {
 		t.Fatalf("case-insensitive filename search: %+v, %v", filenames, err)
 	}
-	count, err := testHost().execute(context.Background(), authority, call("search_file_contents", `{"regex":"Alias","path":"src/alias.go","result_mode":"count"}`))
+	count, err := testHost().execute(context.Background(), authority, call("search_regex", `{"regex":"Alias","path":"src/alias.go","result_mode":"count"}`))
 	if err != nil || count.MatchCount == nil || *count.MatchCount != 2 || count.Truncated {
 		t.Fatalf("count search: %+v, %v", count, err)
 	}
-	result, err = testHost().execute(context.Background(), authority, call("search_file_contents", `{"regex":"not-present","path":"src"}`))
+	result, err = testHost().execute(context.Background(), authority, call("search_regex", `{"regex":"not-present","path":"src"}`))
 	if err != nil || len(result.Matches) != 0 || result.SkippedFiles != 1 || !result.Truncated {
 		t.Fatalf("binary skip was hidden: %+v, %v", result, err)
 	}
 	for _, args := range []string{`{"regex":"["}`, `{"regex":"Alias","path":"../"}`, `{"regex":"Alias","filename_glob":"["}`, `{"regex":"Alias","exclude_glob":"../x"}`, `{"regex":"Alias","max_results":0}`, `{"regex":"Alias","result_mode":"count","after_lines":1}`, `{"regex":"Alias","result_mode":"unknown"}`} {
-		_, err := testHost().execute(context.Background(), authority, call("search_file_contents", args))
+		_, err := testHost().execute(context.Background(), authority, call("search_regex", args))
 		if err == nil {
 			t.Fatalf("invalid search accepted: %s", args)
 		}
 	}
 	cancelled, cancel := context.WithCancel(context.Background())
 	cancel()
-	_, err = testHost().execute(cancelled, authority, call("search_file_contents", `{"regex":"Alias"}`))
+	_, err = testHost().execute(cancelled, authority, call("search_regex", `{"regex":"Alias"}`))
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("cancelled search continued: %v", err)
 	}

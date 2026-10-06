@@ -1,14 +1,72 @@
 package nativeagent
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"slices"
 	"strings"
 	"testing"
 
+	"github.com/tekroo-ai/teams/agentruntime"
 	"github.com/tekroo-ai/teams/application"
 	"github.com/tekroo-ai/teams/kernel"
 )
+
+func TestValidationVerdictPairContractMatchesFinalizer(t *testing.T) {
+	handler := application.MessageHandlerGrounding{ResultSchema: json.RawMessage(`{"type":"object","required":["outcome","work_product"],"properties":{"outcome":{"enum":["completed","failed","blocked","needs_decision"]},"work_product":{"type":"object"}}}`)}
+	schema, err := modelFacingHandlerSchema(handler, kernel.PurposeValidation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	contract, err := agentruntime.NewStructuredTurnContract([]agentruntime.ToolDefinition{{Name: "submit_result", Parameters: schema}}, "submit_result")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var wireSchema json.RawMessage
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var request struct {
+			Format struct {
+				Schema struct {
+					Schema json.RawMessage `json:"schema"`
+				} `json:"json_schema"`
+			} `json:"response_format"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			t.Error(err)
+		}
+		wireSchema = request.Format.Schema.Schema
+		_ = json.NewEncoder(w).Encode(map[string]any{"id": "paired", "choices": []any{map[string]any{"finish_reason": "stop", "message": map[string]any{"content": `{"submit_result":{"outcome":"completed","work_product":{"schema_version":"1.0.0","outcome":"PASS","reasons":["retained test evidence"]}}}`}}}})
+	}))
+	defer server.Close()
+	model := agentruntime.OpenAIModel{Client: server.Client(), BaseURL: server.URL + "/v1", Model: "fixture", MaxTokens: 512, TurnContract: contract}
+	if _, err := model.Complete(context.Background(), []agentruntime.Message{{Role: "user", Content: "finish"}}); err != nil {
+		t.Fatal(err)
+	}
+	candidate := &CandidateBinding{ID: kernel.UUIDv7("00000000-0000-7000-8000-000000000965"), ReceiptSHA256: kernel.Digest(strings.Repeat("a", 64))}
+	for _, outer := range validationOutcomePairs {
+		for _, inner := range validationOutcomePairs {
+			raw := json.RawMessage(fmt.Sprintf(`{"outcome":%q,"work_product":{"schema_version":"1.0.0","outcome":%q,"reasons":["retained test evidence"]}}`, outer.envelope, inner.verdict))
+			want := outer == inner
+			if accepted := schemaAccepts(t, schema, raw); accepted != want {
+				t.Fatalf("model schema %s accepted=%t want=%t", raw, accepted, want)
+			}
+			wrapped, _ := json.Marshal(map[string]json.RawMessage{"submit_result": raw})
+			if accepted := schemaAccepts(t, wireSchema, wrapped); accepted != want {
+				t.Fatalf("wire grammar %s accepted=%t want=%t", wrapped, accepted, want)
+			}
+			_, err := bindHandlerValidationResult(raw, candidate)
+			if (err == nil) != want {
+				t.Fatalf("finalizer %s error=%v want accepted=%t", raw, err, want)
+			}
+			if !want && !strings.Contains(err.Error(), "required pairs:") {
+				t.Fatalf("imprecise conflict: %v", err)
+			}
+		}
+	}
+}
 
 func TestEnvelopePropertyReplacementPreservesUnrelatedConstraints(t *testing.T) {
 	source := json.RawMessage(`{"type":"object","required":["outcome","work_product"],"properties":{"outcome":{"const":"completed"},"work_product":{"type":"object"}},"if":{"properties":{"outcome":{"const":"completed"}}},"then":{"allOf":[true,{"properties":{"work_product":{"required":["teams_owned"]}}}]},"else":false}`)

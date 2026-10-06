@@ -12,24 +12,54 @@ import (
 )
 
 type fileEdit struct {
-	Path           string `json:"path"`
-	OldText        string `json:"old_text"`
-	NewText        string `json:"new_text"`
-	ExpectedSHA256 string `json:"expected_sha256"`
+	Path string `json:"path"`
+	// Single-replacement fields are decoded only for retained historical calls.
+	// The model-facing contract exposes one ordered edits list instead.
+	OldText        string     `json:"old_text,omitempty"`
+	NewText        string     `json:"new_text,omitempty"`
+	ExpectedSHA256 string     `json:"expected_sha256"`
+	Edits          []textEdit `json:"edits,omitempty"`
+}
+
+type textEdit struct {
+	OldText string `json:"old_text"`
+	NewText string `json:"new_text"`
 }
 
 func decodeFileEdit(raw json.RawMessage) (fileEdit, error) {
 	var args fileEdit
 	var fields map[string]json.RawMessage
-	if json.Unmarshal(raw, &fields) != nil || fields["new_text"] == nil || string(fields["new_text"]) == "null" {
+	if json.Unmarshal(raw, &fields) != nil || decode(raw, &args) != nil {
 		return fileEdit{}, ErrInvalidCall
 	}
+	if edits, present := fields["edits"]; present {
+		if fields["old_text"] != nil || fields["new_text"] != nil || string(edits) == "null" || len(args.Edits) == 0 || len(args.Edits) > 32 {
+			return fileEdit{}, ErrInvalidCall
+		}
+		var objects []map[string]json.RawMessage
+		if json.Unmarshal(edits, &objects) != nil {
+			return fileEdit{}, ErrInvalidCall
+		}
+		for _, object := range objects {
+			if object["new_text"] == nil || string(object["new_text"]) == "null" {
+				return fileEdit{}, ErrInvalidCall
+			}
+		}
+	} else {
+		if fields["new_text"] == nil || string(fields["new_text"]) == "null" {
+			return fileEdit{}, ErrInvalidCall
+		}
+		args.Edits = []textEdit{{OldText: args.OldText, NewText: args.NewText}}
+	}
 	// Unlike creation, an edit always targets an existing, hash-bound file.
-	if decode(raw, &args) != nil || args.Path == "" || args.OldText == "" ||
-		len(args.OldText) > 1<<20 || len(args.NewText) > 1<<20 ||
-		!utf8.ValidString(args.OldText) || !utf8.ValidString(args.NewText) ||
+	if args.Path == "" ||
 		len(args.ExpectedSHA256) != 64 || !validExpectedSHA(args.ExpectedSHA256) {
 		return fileEdit{}, ErrInvalidCall
+	}
+	for _, edit := range args.Edits {
+		if edit.OldText == "" || len(edit.OldText) > 1<<20 || len(edit.NewText) > 1<<20 || !utf8.ValidString(edit.OldText) || !utf8.ValidString(edit.NewText) {
+			return fileEdit{}, ErrInvalidCall
+		}
 	}
 	if _, err := relativePath(args.Path); err != nil {
 		return fileEdit{}, err
@@ -75,13 +105,18 @@ func prepareFileEdit(root string, args fileEdit) ([]byte, error) {
 		return nil, ErrInvalidCall
 	}
 	text := string(content)
-	// Count overlapping occurrences too: replacing "aa" in "aaa" is ambiguous.
-	index := strings.Index(text, args.OldText)
-	if index < 0 || strings.Contains(text[index+1:], args.OldText) {
-		return nil, fmt.Errorf("%w: edit_file path=%q old_text must match exactly once", ErrConflict, args.Path)
+	// Prepare every replacement before the single hash-conditional write.
+	// A later mismatch discards the whole postimage, never a partially edited file.
+	for i, edit := range args.Edits {
+		// Count overlapping occurrences too: "aa" in "aaa" is ambiguous.
+		index := strings.Index(text, edit.OldText)
+		if index < 0 || strings.Contains(text[index+1:], edit.OldText) {
+			return nil, fmt.Errorf("%w: edit_file path=%q edits[%d].old_text must match exactly once", ErrConflict, args.Path, i)
+		}
+		if len(text)-len(edit.OldText)+len(edit.NewText) > 1<<20 {
+			return nil, ErrTooLarge
+		}
+		text = text[:index] + edit.NewText + text[index+len(edit.OldText):]
 	}
-	if len(content)-len(args.OldText)+len(args.NewText) > 1<<20 {
-		return nil, ErrTooLarge
-	}
-	return []byte(text[:index] + args.NewText + text[index+len(args.OldText):]), nil
+	return []byte(text), nil
 }
