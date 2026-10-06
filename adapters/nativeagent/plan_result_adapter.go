@@ -3,13 +3,17 @@ package nativeagent
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"slices"
 
 	"github.com/tekroo-ai/teams/application"
 )
 
-var planDeltaToolSchema = json.RawMessage(`{"type":"object","description":"Native plan result: supply only new dependency edges and handoffs. Teams carries the accepted architecture, decisions, assumptions, tasks, and source digest into the stored result.","additionalProperties":false,"required":["task_dependencies","handoffs"],"properties":{"task_dependencies":{"type":"array","description":"Additional task dependencies only; use [] when none are needed. Do not repeat existing dependencies.","maxItems":64,"items":{"type":"object","additionalProperties":false,"required":["task_index","depends_on"],"properties":{"task_index":{"type":"integer","minimum":0},"depends_on":{"type":"array","uniqueItems":true,"items":{"type":"integer","minimum":0}}}}},"handoffs":{"type":"array","description":"Cross-task capability handoffs; use [] when none are needed.","maxItems":4096,"items":{"type":"object","additionalProperties":false,"required":["provider_task_index","consumer_task_index","capability","contract"],"properties":{"provider_task_index":{"type":"integer","minimum":0},"consumer_task_index":{"type":"integer","minimum":0},"capability":{"type":"string","minLength":1},"contract":{"type":"string","minLength":1,"maxLength":4096}}}}}}`)
+var ErrInvalidPlanDelta = errors.New("invalid plan-finalization result")
+
+var planDeltaToolSchema = json.RawMessage(`{"type":"object","description":"Native plan result: supply dependency edges and handoffs. Teams carries the accepted architecture, decisions, assumptions, tasks, and source digest into the stored result.","additionalProperties":false,"required":["task_dependencies","handoffs"],"properties":{"task_dependencies":{"type":"array","description":"Additional task dependencies; use [] when none are needed. Repeating an accepted prerequisite has no effect.","maxItems":64,"items":{"type":"object","additionalProperties":false,"required":["task_index","depends_on"],"properties":{"task_index":{"type":"integer","minimum":0},"depends_on":{"type":"array","uniqueItems":true,"items":{"type":"integer","minimum":0}}}}},"handoffs":{"type":"array","description":"Cross-task capability handoffs; use [] when none are needed.","maxItems":4096,"items":{"type":"object","additionalProperties":false,"required":["provider_task_index","consumer_task_index","capability","contract"],"properties":{"provider_task_index":{"type":"integer","minimum":0},"consumer_task_index":{"type":"integer","minimum":0},"capability":{"type":"string","minLength":1},"contract":{"type":"string","minLength":1,"maxLength":4096}}}}}}`)
 
 func modelFacingPlanSchema(handlerSchema json.RawMessage, plan *PlanFinalizationBinding) (json.RawMessage, error) {
 	_, tasks, err := acceptedPlanWorkProduct(plan)
@@ -87,11 +91,11 @@ func acceptedPlanWorkProduct(plan *PlanFinalizationBinding) (map[string]json.Raw
 func bindHandlerPlanResult(arguments json.RawMessage, plan *PlanFinalizationBinding) (json.RawMessage, error) {
 	var envelope map[string]json.RawMessage
 	if json.Unmarshal(arguments, &envelope) != nil || envelope == nil {
-		return nil, ErrInvalidBinding
+		return nil, fmt.Errorf("%w: result must be an object", ErrInvalidPlanDelta)
 	}
 	var outerOutcome string
 	if json.Unmarshal(envelope["outcome"], &outerOutcome) != nil {
-		return nil, ErrInvalidBinding
+		return nil, fmt.Errorf("%w: outcome must be a string", ErrInvalidPlanDelta)
 	}
 	if outerOutcome != "completed" {
 		return arguments, nil
@@ -110,30 +114,32 @@ func bindHandlerPlanResult(arguments json.RawMessage, plan *PlanFinalizationBind
 	decoder := json.NewDecoder(bytes.NewReader(envelope["work_product"]))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&delta); err != nil {
-		return nil, fmt.Errorf("%w: submit_result.work_product: %v", ErrInvalidBinding, err)
+		return nil, fmt.Errorf("%w: submit_result.work_product: %v", ErrInvalidPlanDelta, err)
 	}
 	if decoder.Decode(&struct{}{}) != io.EOF || delta.TaskDependencies == nil || delta.Handoffs == nil {
-		return nil, ErrInvalidBinding
+		return nil, fmt.Errorf("%w: task_dependencies and handoffs must be arrays in one object", ErrInvalidPlanDelta)
 	}
 	seen := make(map[uint32]bool, len(delta.TaskDependencies))
 	for _, change := range delta.TaskDependencies {
 		if int(change.TaskIndex) >= len(tasks) || seen[change.TaskIndex] || change.DependsOn == nil {
-			return nil, ErrInvalidBinding
+			return nil, fmt.Errorf("%w: task_dependencies task_index %d must be unique, in range, and have a depends_on array", ErrInvalidPlanDelta, change.TaskIndex)
 		}
 		seen[change.TaskIndex] = true
 		task := tasks[change.TaskIndex]
 		var existing []uint32
 		if json.Unmarshal(task["depends_on"], &existing) != nil {
-			return nil, ErrInvalidBinding
+			return nil, fmt.Errorf("%w: accepted task %d depends_on cannot be decoded", ErrInvalidBinding, change.TaskIndex)
 		}
+		seenDependencies := make(map[uint32]bool, len(change.DependsOn))
 		for _, dependency := range change.DependsOn {
-			if int(dependency) >= len(tasks) || dependency == change.TaskIndex {
-				return nil, ErrInvalidBinding
+			if int(dependency) >= len(tasks) || dependency == change.TaskIndex || seenDependencies[dependency] {
+				return nil, fmt.Errorf("%w: task %d dependency %d must be unique, in range, and not self-referencing", ErrInvalidPlanDelta, change.TaskIndex, dependency)
 			}
-			for _, prior := range existing {
-				if prior == dependency {
-					return nil, ErrInvalidBinding
-				}
+			seenDependencies[dependency] = true
+			// Edges are prerequisites, not actions. Confirming an accepted edge
+			// is an idempotent no-op; it must not invalidate execution authority.
+			if slices.Contains(existing, dependency) {
+				continue
 			}
 			existing = append(existing, dependency)
 		}
@@ -141,7 +147,7 @@ func bindHandlerPlanResult(arguments json.RawMessage, plan *PlanFinalizationBind
 	}
 	var handoffs []json.RawMessage
 	if json.Unmarshal(delta.Handoffs, &handoffs) != nil || handoffs == nil {
-		return nil, ErrInvalidBinding
+		return nil, fmt.Errorf("%w: handoffs must be an array", ErrInvalidPlanDelta)
 	}
 	source["schema_version"] = json.RawMessage(`"1.0.0"`)
 	source["result_type"] = json.RawMessage(`"FEATURE_EXECUTION_PLAN"`)

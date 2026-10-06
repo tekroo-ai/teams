@@ -4,9 +4,12 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
+	"os/exec"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -116,6 +119,104 @@ func TestPlanFinalizationAuthorsOnlyDependenciesAndHandoffs(t *testing.T) {
 	if _, err := bindHandlerPlanResult(json.RawMessage(`{"outcome":"completed","work_product":{"task_dependencies":[],"handoffs":[],"architecture":"changed"}}`), plan); err == nil || !strings.Contains(err.Error(), `unknown field "architecture"`) {
 		t.Fatalf("invalid plan field was not identified: %v", err)
 	}
+}
+
+// r45: the PM repeated an edge already present in the accepted architecture.
+// Reasserting the same prerequisite must not change the graph or the binding.
+func TestPlanFinalizationRepeatedDependenciesAreIdempotent(t *testing.T) {
+	source := []byte(application.OrganizationalResultMarker + `
+{"work_product":{"result_type":"FEATURE_PLAN","architecture":"unchanged","tasks":[{"depends_on":[]},{"depends_on":[0]},{"depends_on":[0,1]}]}}`)
+	plan := &PlanFinalizationBinding{SourceOutput: source}
+	for _, dependencies := range []string{
+		`[{"task_index":2,"depends_on":[0]}]`,
+		`[{"task_index":2,"depends_on":[0,1]}]`,
+	} {
+		raw := json.RawMessage(`{"outcome":"completed","work_product":{"task_dependencies":` + dependencies + `,"handoffs":[]}}`)
+		bound, err := bindHandlerPlanResult(raw, plan)
+		if err != nil {
+			t.Fatalf("repeated dependency rejected: %v", err)
+		}
+		var result struct {
+			WorkProduct struct {
+				Architecture string `json:"architecture"`
+				Tasks        []struct {
+					DependsOn []uint32 `json:"depends_on"`
+				} `json:"tasks"`
+			} `json:"work_product"`
+		}
+		if json.Unmarshal(bound, &result) != nil || result.WorkProduct.Architecture != "unchanged" || fmt.Sprint(result.WorkProduct.Tasks[2].DependsOn) != "[0 1]" {
+			t.Fatalf("repeated edge changed accepted graph: %s", bound)
+		}
+		if string(plan.SourceOutput) != string(source) {
+			t.Fatal("accepted architecture mutated")
+		}
+	}
+	for _, dependencies := range []string{
+		`[{"task_index":2,"depends_on":[2]}]`,
+		`[{"task_index":2,"depends_on":[3]}]`,
+		`[{"task_index":2,"depends_on":[0,0]}]`,
+		`[{"task_index":2,"depends_on":null}]`,
+		`[{"task_index":2,"depends_on":[0]},{"task_index":2,"depends_on":[1]}]`,
+	} {
+		_, err := bindHandlerPlanResult(json.RawMessage(`{"outcome":"completed","work_product":{"task_dependencies":`+dependencies+`,"handoffs":[]}}`), plan)
+		if !errors.Is(err, ErrInvalidPlanDelta) || errors.Is(err, ErrInvalidBinding) {
+			t.Fatalf("invalid delta misclassified: %s: %v", dependencies, err)
+		}
+	}
+}
+
+// Opt-in, read-only replay of retained model submissions. No model calls,
+// journal writes, or invocation state changes are made by this test.
+func TestPlanFinalizationRetainedSubmissionReplay(t *testing.T) {
+	if os.Getenv("TEKROO_PLAN_REPLAY_CONFIG") == "" {
+		t.Skip("requires an explicit config and architecture/PM invocation IDs")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	script := `const fs=require("fs");const c=JSON.parse(fs.readFileSync(process.env.TEKROO_PLAN_REPLAY_CONFIG));const d=new Mongo(fs.readFileSync(c.mongo.uri_file,"utf8").trim()).getDB(c.mongo.database);const source=d.agent_turn_entries.findOne({invocation_id:process.env.TEKROO_PLAN_REPLAY_ARCHITECT,kind:"finished"});if(!source)throw new Error("architecture result absent");const submissions=[];for(const r of d.agent_turn_entries.find({invocation_id:process.env.TEKROO_PLAN_REPLAY_PM,kind:"model_turn"}).sort({sequence:1}).toArray()){const p=JSON.parse(r.payload.toString("utf8"));for(const t of p.tool_calls||[]){if(t.name==="submit_result")submissions.push(t.arguments);}}print(JSON.stringify({source:JSON.parse(source.payload.toString("utf8")),submissions}));`
+	output, err := exec.CommandContext(ctx, "mongosh", "--nodb", "--quiet", "--eval", script).Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var retained struct {
+		Source      string            `json:"source"`
+		Submissions []json.RawMessage `json:"submissions"`
+	}
+	if err := json.Unmarshal(output, &retained); err != nil || len(retained.Submissions) == 0 {
+		t.Fatalf("read retained submissions: %v", err)
+	}
+	signed, err := os.ReadFile("../../config/starter-team/roles-v4/project-manager-2.2.1/handlers/feature.design-proposed/result.schema.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sourceHash := sha256.Sum256([]byte(retained.Source))
+	plan := &PlanFinalizationBinding{SourceOutput: []byte(retained.Source), SourceDigest: kernel.Digest(fmt.Sprintf("%x", sourceHash[:]))}
+	handler := application.MessageHandlerGrounding{ResultSchema: signed}
+	for index, raw := range retained.Submissions {
+		bound, err := bindHandlerPlanResult(bindHandlerResultVersion(raw, handler), plan)
+		if err != nil {
+			t.Fatalf("retained submission %d: %v", index+1, err)
+		}
+		if !schemaAccepts(t, signed, bound) {
+			t.Fatalf("retained submission %d violates signed schema", index+1)
+		}
+		_, sourceTasks, err := acceptedPlanWorkProduct(plan)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var result struct {
+			WorkProduct struct {
+				Tasks []map[string]json.RawMessage `json:"tasks"`
+			} `json:"work_product"`
+		}
+		if err := json.Unmarshal(bound, &result); err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(sourceTasks, result.WorkProduct.Tasks) {
+			t.Fatal("retained submission changed accepted tasks")
+		}
+	}
+	t.Logf("%d retained PM submissions accepted; signed schema and accepted tasks preserved", len(retained.Submissions))
 }
 
 func TestPlanFinalizationSchemaForbidsHandoffsWithOneImplementationTask(t *testing.T) {
