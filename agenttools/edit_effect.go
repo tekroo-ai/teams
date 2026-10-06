@@ -71,6 +71,9 @@ func (gateway MutationGateway) executeEdit(ctx context.Context, request Request)
 	}
 	digest := sha256.Sum256(content)
 	intent.PreparedSHA256 = hex.EncodeToString(digest[:])
+	if err := captureFilePreimage(root, args.Path, &intent); err != nil {
+		return Receipt{}, err
+	}
 	stored, created, err := gateway.Ledger.Reserve(operation, intent)
 	if err != nil {
 		return Receipt{}, errors.Join(ErrEffectUncertain, err)
@@ -84,14 +87,14 @@ func (gateway MutationGateway) executeEdit(ctx context.Context, request Request)
 	}
 	actual, writeErr := writeFile(root, args.Path, content, args.ExpectedSHA256)
 	if writeErr == nil && actual == intent.PreparedSHA256 {
-		return completeEffect(gateway.Ledger, request, intent, Result{Name: request.Call.Name, SHA256: actual})
+		return completeEffect(gateway.Ledger, request, intent, Result{Name: request.Call.Name, SHA256: actual, ChangeID: fileChangeID(intent)})
 	}
 	current, exists, inspectErr := fileHash(root, args.Path)
 	if inspectErr != nil {
 		return Receipt{}, errors.Join(ErrEffectUncertain, writeErr, inspectErr)
 	}
 	if exists && current == intent.PreparedSHA256 {
-		return completeEffect(gateway.Ledger, request, intent, Result{Name: request.Call.Name, SHA256: current})
+		return completeEffect(gateway.Ledger, request, intent, Result{Name: request.Call.Name, SHA256: current, ChangeID: fileChangeID(intent)})
 	}
 	if writeErr != nil && exists && current == args.ExpectedSHA256 {
 		return completeEffect(gateway.Ledger, request, intent, failedEffectResult(request.Call.Name, Result{}, writeErr))
@@ -138,7 +141,11 @@ func (gateway MutationGateway) reconcileEditRecord(ctx context.Context, request 
 		return Receipt{}, false, errors.Join(ErrEffectUncertain, err)
 	}
 	if exists && actual == stored.PreparedSHA256 {
-		receipt, err := completeEffect(gateway.Ledger, request, stored, Result{Name: request.Call.Name, SHA256: actual})
+		result := Result{Name: request.Call.Name, SHA256: actual}
+		if stored.HasPreimage {
+			result.ChangeID = fileChangeID(stored)
+		}
+		receipt, err := completeEffect(gateway.Ledger, request, stored, result)
 		return receipt, err == nil, err
 	}
 	if exists && actual == args.ExpectedSHA256 {

@@ -325,7 +325,7 @@ func TestImplementationWithGoTestGateRequiresSignedTestPermission(t *testing.T) 
 	brief.WorkProfile.RequiredDeterministicGateIDs = []string{"go-test"}
 	brief.RoleGrounding.Permissions = []string{"repository.edit"}
 	profile.BaseURL = "http://127.0.0.1:1/v1"
-	profile.AllowedEffectTools = []string{"write_file"}
+	profile.AllowedEffectTools = []string{"create_file"}
 	encoded, _ := json.Marshal(brief)
 	sum := sha256.Sum256(encoded)
 	digest := kernel.Digest(hex.EncodeToString(sum[:]))
@@ -339,7 +339,7 @@ func TestImplementationWithGoTestGateRequiresSignedTestPermission(t *testing.T) 
 	encoded, _ = json.Marshal(brief)
 	sum = sha256.Sum256(encoded)
 	digest = kernel.Digest(hex.EncodeToString(sum[:]))
-	profile.AllowedEffectTools = []string{"edit_file", "run_go_tests", "run_go_tests_worktree", "write_file"}
+	profile.AllowedEffectTools = []string{"create_file", "edit_file", "run_go_tests", "run_go_tests_worktree"}
 	binding.tests = true
 	config.Bindings, config.Gateway.Bindings, config.Profile = binding, binding, profile
 	session, err := PrepareWithEffects(context.Background(), brief, digest, config)
@@ -410,7 +410,7 @@ func TestPreparedEffectSessionReconcilesPendingWriteWithoutRepeatingModel(t *tes
 		modelCalls++
 		writer.Header().Set("Content-Type", "application/json")
 		if modelCalls == 1 {
-			_, _ = writer.Write([]byte(`{"choices":[{"finish_reason":"tool_calls","message":{"tool_calls":[{"id":"write-1","function":{"name":"write_file","arguments":"{\"path\":\"result.txt\",\"content\":\"written\",\"expected_sha256\":\"\"}"}}]}}]}`))
+			_, _ = writer.Write([]byte(`{"choices":[{"finish_reason":"tool_calls","message":{"tool_calls":[{"id":"write-1","function":{"name":"create_file","arguments":"{\"path\":\"result.txt\",\"content\":\"written\"}"}}]}}]}`))
 		} else {
 			_, _ = writer.Write([]byte(`{"choices":[{"finish_reason":"stop","message":{"content":"done"}}]}`))
 		}
@@ -423,7 +423,7 @@ func TestPreparedEffectSessionReconcilesPendingWriteWithoutRepeatingModel(t *tes
 	sum := sha256.Sum256(encoded)
 	digest := kernel.Digest(hex.EncodeToString(sum[:]))
 	profile.BaseURL = server.URL + "/v1"
-	profile.AllowedEffectTools = []string{"write_file"}
+	profile.AllowedEffectTools = []string{"create_file"}
 	binding := nativeEffectBinding{root: root, policy: brief.EffectPolicyDigest}
 	ledger := &nativeEffectLedger{failComplete: true}
 	journal := &testJournal{}
@@ -469,7 +469,7 @@ func TestEffectfulSessionExposesOnlyExplicitMutationAllowlist(t *testing.T) {
 	sum := sha256.Sum256(encoded)
 	digest := kernel.Digest(hex.EncodeToString(sum[:]))
 	profile.BaseURL = server.URL + "/v1"
-	profile.AllowedEffectTools = []string{"git_commit", "git_stage_files", "write_file"}
+	profile.AllowedEffectTools = []string{"create_file", "git_commit", "git_stage_files"}
 	binding := nativeEffectBinding{root: t.TempDir(), policy: brief.EffectPolicyDigest}
 	config := Config{Bindings: binding, Gateway: agenttools.Gateway{Bindings: binding, Host: agenttools.Host{Timeout: time.Second}},
 		Journal: &testJournal{}, Effects: &nativeEffectLedger{}, HTTP: server.Client(), Profile: profile}
@@ -521,7 +521,7 @@ func TestValidationSessionBindsOnlyExplicitTestTool(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !session.Runner.Effects.Handles("run_go_tests") || session.Runner.Effects.Handles("run_go_tests_worktree") || session.Runner.Effects.Handles("write_file") {
+	if !session.Runner.Effects.Handles("run_go_tests") || session.Runner.Effects.Handles("run_go_tests_worktree") || session.Runner.Effects.Handles("create_file") {
 		t.Fatal("validation session effect boundary is wrong")
 	}
 	model := session.Runner.Model.(boundModel).model.(agentruntime.OpenAIModel)
@@ -536,7 +536,7 @@ func TestValidationSessionBindsOnlyExplicitTestTool(t *testing.T) {
 	if _, err := PrepareWithEffects(context.Background(), brief, digest, config); !errors.Is(err, ErrInvalidBinding) {
 		t.Fatalf("validation role acquired working-tree test effect: %v", err)
 	}
-	profile.AllowedEffectTools = []string{"write_file"}
+	profile.AllowedEffectTools = []string{"create_file"}
 	config.Profile = profile
 	if _, err := PrepareWithEffects(context.Background(), brief, digest, config); !errors.Is(err, ErrInvalidBinding) {
 		t.Fatalf("validation role acquired write effect: %v", err)

@@ -150,7 +150,7 @@ func (contract *StructuredTurnContract) decode(raw json.RawMessage, responseID s
 	// atomic ordered list for this case. Different files may still be batched.
 	paths := make(map[string]bool)
 	for _, call := range result.ToolCalls {
-		if call.Name != "write_file" && call.Name != "edit_file" {
+		if call.Name != "write_file" && call.Name != "create_file" && call.Name != "restore_file_from_commit" && call.Name != "edit_file" {
 			continue
 		}
 		var mutation struct {

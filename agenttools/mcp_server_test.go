@@ -43,8 +43,8 @@ func TestReadOnlyMCPRoundTripThroughTeamsGateway(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(listed.Tools) != 11 {
-		t.Fatalf("read-only MCP tool count = %d, want 10", len(listed.Tools))
+	if len(listed.Tools) != 12 {
+		t.Fatalf("read-only MCP tool count = %d, want 12", len(listed.Tools))
 	}
 	for _, tool := range listed.Tools {
 		if !isReadOnlyTool(tool.Name) {

@@ -30,6 +30,12 @@ type EffectRecord struct {
 	// Computed by the host before edit_file; retained through restart, not
 	// supplied by the model. Empty on older and other operation records.
 	PreparedSHA256 string
+	FilePath       string
+	HasPreimage    bool
+	BeforeExists   bool
+	BeforeContent  []byte
+	BeforeSHA256   string
+	DesiredAbsent  bool
 	Result         json.RawMessage
 }
 
@@ -53,6 +59,9 @@ type MutationGateway struct {
 }
 
 func (gateway MutationGateway) Execute(ctx context.Context, request Request) (Receipt, error) {
+	if request.Call.Name == "undo_file_change" || request.Call.Name == "restore_file_from_commit" {
+		return gateway.executeFileRecovery(ctx, request)
+	}
 	if request.Call.Name == "edit_file" {
 		return gateway.executeEdit(ctx, request)
 	}
@@ -62,7 +71,7 @@ func (gateway MutationGateway) Execute(ctx context.Context, request Request) (Re
 	if gateway.Bindings == nil || gateway.Ledger == nil || gateway.Host.Timeout <= 0 || !gateway.Policy.Valid() || !request.InvocationID.Valid() || !request.RequestDigest.Valid() || strings.TrimSpace(request.ToolCallID) == "" || len(request.ToolCallID) > 256 {
 		return Receipt{}, ErrInvalidCall
 	}
-	if request.Call.Name != "write_file" {
+	if request.Call.Name != "write_file" && request.Call.Name != "create_file" {
 		return Receipt{}, ErrForbidden
 	}
 	operation, cancel := context.WithTimeout(ctx, gateway.Host.Timeout)
@@ -86,6 +95,12 @@ func (gateway MutationGateway) Execute(ctx context.Context, request Request) (Re
 	if decode(request.Call.Arguments, &args) != nil || args.Path == "" || len(args.Content) > 1<<20 || !utf8.ValidString(args.Content) || !validExpectedSHA(args.ExpectedSHA256) {
 		return Receipt{}, ErrInvalidCall
 	}
+	if request.Call.Name == "create_file" {
+		var create createFileArgs
+		if decode(request.Call.Arguments, &create) != nil {
+			return Receipt{}, ErrInvalidCall
+		}
+	}
 	if _, err := relativePath(args.Path); err != nil {
 		return Receipt{}, err
 	}
@@ -106,11 +121,14 @@ func (gateway MutationGateway) Execute(ctx context.Context, request Request) (Re
 		Name: request.Call.Name, ArgumentsSHA256: hex.EncodeToString(argumentsHash[:]), WorkspaceRoot: root,
 		EffectPolicyHash: gateway.Policy,
 	}
-	_, found, err := gateway.Ledger.Lookup(operation, intent)
+	previous, found, err := gateway.Ledger.Lookup(operation, intent)
 	if err != nil {
 		return Receipt{}, errors.Join(ErrEffectUncertain, err)
 	}
 	if !found {
+		if request.Call.Name == "write_file" { // retained journals only; never admit a new overwrite
+			return Receipt{}, ErrForbidden
+		}
 		// A newly rejected precondition has no physical effect; do not leave
 		// a reserved intent that would make later cancellation uncertain.
 		before, exists, err := fileHash(root, args.Path)
@@ -120,6 +138,13 @@ func (gateway MutationGateway) Execute(ctx context.Context, request Request) (Re
 		if exists && before != args.ExpectedSHA256 || !exists && args.ExpectedSHA256 != "" {
 			return Receipt{}, filePreconditionError(args.Path, args.ExpectedSHA256, before, exists)
 		}
+		if exists {
+			return Receipt{}, filePreconditionError(args.Path, "", before, true)
+		}
+		intent.FilePath, intent.HasPreimage = args.Path, true
+		intent.PreparedSHA256 = contentSHA([]byte(args.Content))
+	} else {
+		intent = previous
 	}
 	stored, created, err := gateway.Ledger.Reserve(operation, intent)
 	if err != nil {
@@ -188,6 +213,10 @@ func (gateway MutationGateway) Reconcile(ctx context.Context, request Request) (
 		return gateway.reconcileEdit(ctx, request)
 	case "write_file":
 		return gateway.ReconcileWrite(ctx, request)
+	case "create_file":
+		return gateway.ReconcileWrite(ctx, request)
+	case "undo_file_change", "restore_file_from_commit":
+		return gateway.reconcileFileRecovery(ctx, request)
 	case "git_stage_files", "git_commit":
 		return gateway.reconcileGitEffect(ctx, request)
 	default:
@@ -200,7 +229,7 @@ func (gateway MutationGateway) Reconcile(ctx context.Context, request Request) (
 // lock also waits for any prior process still finishing this effect.
 // applied=false means no write from this call is known to have occurred.
 func (gateway MutationGateway) ReconcileWrite(ctx context.Context, request Request) (Receipt, bool, error) {
-	if gateway.Bindings == nil || gateway.Ledger == nil || gateway.Host.Timeout <= 0 || !gateway.Policy.Valid() || !request.InvocationID.Valid() || !request.RequestDigest.Valid() || request.Call.Name != "write_file" || strings.TrimSpace(request.ToolCallID) == "" {
+	if gateway.Bindings == nil || gateway.Ledger == nil || gateway.Host.Timeout <= 0 || !gateway.Policy.Valid() || !request.InvocationID.Valid() || !request.RequestDigest.Valid() || (request.Call.Name != "write_file" && request.Call.Name != "create_file") || strings.TrimSpace(request.ToolCallID) == "" {
 		return Receipt{}, false, ErrInvalidCall
 	}
 	operation, cancel := context.WithTimeout(ctx, gateway.Host.Timeout)
@@ -260,7 +289,7 @@ func (gateway MutationGateway) ReconcileWrite(ctx context.Context, request Reque
 		return Receipt{}, false, errors.Join(ErrEffectUncertain, err)
 	}
 	if exists && actualHash == desiredHash {
-		receipt, err := gateway.completeWrite(operation, request, intent, desiredHash)
+		receipt, err := gateway.completeWrite(operation, request, stored, desiredHash)
 		return receipt, true, err
 	}
 	if exists && actualHash == args.ExpectedSHA256 || !exists && args.ExpectedSHA256 == "" {
@@ -270,7 +299,11 @@ func (gateway MutationGateway) ReconcileWrite(ctx context.Context, request Reque
 }
 
 func (gateway MutationGateway) completeWrite(ctx context.Context, request Request, intent EffectRecord, desiredHash string) (Receipt, error) {
-	result := Result{Name: "write_file", SHA256: desiredHash}
+	result := Result{Name: request.Call.Name, SHA256: desiredHash}
+	if request.Call.Name == "create_file" {
+		result.ChangeID = fileChangeID(intent)
+		result.Path = intent.FilePath
+	}
 	return completeEffect(gateway.Ledger, request, intent, result)
 }
 

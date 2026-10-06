@@ -29,7 +29,7 @@ func (effects *sleepEffects) ReconcileEffect(context.Context, ToolCall) (json.Ra
 }
 
 func TestSleepRecoveryDoesNotRepeatRecordedModelOrAppliedEffect(t *testing.T) {
-	for _, name := range []string{"write_file", "edit_file", "git_stage_files", "git_commit"} {
+	for _, name := range []string{"create_file", "edit_file", "git_stage_files", "git_commit"} {
 		t.Run(name, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()

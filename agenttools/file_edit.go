@@ -105,6 +105,10 @@ func prepareFileEdit(root string, args fileEdit) ([]byte, error) {
 		return nil, ErrInvalidCall
 	}
 	text := string(content)
+	untouched := make([]bool, len(text))
+	for i := range untouched {
+		untouched[i] = true
+	}
 	// Prepare every replacement before the single hash-conditional write.
 	// A later mismatch discards the whole postimage, never a partially edited file.
 	for i, edit := range args.Edits {
@@ -113,10 +117,25 @@ func prepareFileEdit(root string, args fileEdit) ([]byte, error) {
 		if index < 0 || strings.Contains(text[index+1:], edit.OldText) {
 			return nil, fmt.Errorf("%w: edit_file path=%q edits[%d].old_text must match exactly once", ErrConflict, args.Path, i)
 		}
+		next := make([]bool, 0, len(text)-len(edit.OldText)+len(edit.NewText))
+		next = append(next, untouched[:index]...)
+		next = append(next, make([]bool, len(edit.NewText))...)
+		next = append(next, untouched[index+len(edit.OldText):]...)
+		untouched = next
 		if len(text)-len(edit.OldText)+len(edit.NewText) > 1<<20 {
 			return nil, ErrTooLarge
 		}
 		text = text[:index] + edit.NewText + text[index+len(edit.OldText):]
+	}
+	preserved := false
+	for i, original := range untouched {
+		if original && text[i] != ' ' && text[i] != '\t' && text[i] != '\r' && text[i] != '\n' {
+			preserved = true
+			break
+		}
+	}
+	if !preserved {
+		return nil, fmt.Errorf("%w: edit_file cannot replace or delete the entire file; restore recorded content instead", ErrForbidden)
 	}
 	return []byte(text), nil
 }

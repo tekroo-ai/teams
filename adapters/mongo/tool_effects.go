@@ -11,6 +11,7 @@ import (
 
 	"github.com/tekroo-ai/teams/agentruntime"
 	"github.com/tekroo-ai/teams/agenttools"
+	"github.com/tekroo-ai/teams/kernel"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	driver "go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
@@ -29,10 +30,17 @@ type toolEffectDocument struct {
 	WorkspaceRoot    string `bson:"workspace_root"`
 	EffectPolicyHash string `bson:"effect_policy_digest"`
 	PreparedSHA256   string `bson:"prepared_sha256,omitempty"`
+	FilePath         string `bson:"file_path,omitempty"`
+	HasPreimage      bool   `bson:"has_preimage,omitempty"`
+	BeforeExists     bool   `bson:"before_exists,omitempty"`
+	BeforeContent    []byte `bson:"before_content,omitempty"`
+	BeforeSHA256     string `bson:"before_sha256,omitempty"`
+	DesiredAbsent    bool   `bson:"desired_absent,omitempty"`
 	Result           []byte `bson:"result,omitempty"`
 }
 
 var _ agenttools.EffectLedger = (*Store)(nil)
+var _ agenttools.FileChangeLookup = (*Store)(nil)
 
 func toolEffectID(invocationID, callID string) string {
 	sum := sha256.Sum256([]byte(invocationID + "\x00" + callID))
@@ -51,12 +59,54 @@ func toolEffectCandidate(record agenttools.EffectRecord) (toolEffectDocument, er
 			return toolEffectDocument{}, agenttools.ErrInvalidCall
 		}
 	}
+	if record.HasPreimage {
+		if record.FilePath == "" || len(record.BeforeContent) > 1<<20 || record.PreparedSHA256 == "" {
+			return toolEffectDocument{}, agenttools.ErrInvalidCall
+		}
+		sum := sha256.Sum256(record.BeforeContent)
+		if record.BeforeExists && record.BeforeSHA256 != hex.EncodeToString(sum[:]) || !record.BeforeExists && (len(record.BeforeContent) != 0 || record.BeforeSHA256 != "") {
+			return toolEffectDocument{}, agenttools.ErrInvalidCall
+		}
+	}
 	return toolEffectDocument{
 		ID: toolEffectID(string(record.InvocationID), record.ToolCallID), InvocationID: string(record.InvocationID),
 		RequestDigest: string(record.RequestDigest), ToolCallID: record.ToolCallID, Name: record.Name,
 		ArgumentsSHA256: record.ArgumentsSHA256, WorkspaceRoot: record.WorkspaceRoot,
 		EffectPolicyHash: string(record.EffectPolicyHash), PreparedSHA256: record.PreparedSHA256,
+		FilePath: record.FilePath, HasPreimage: record.HasPreimage, BeforeExists: record.BeforeExists,
+		BeforeContent: append([]byte(nil), record.BeforeContent...), BeforeSHA256: record.BeforeSHA256, DesiredAbsent: record.DesiredAbsent,
 	}, nil
+}
+
+func sameEffectSnapshot(left, right toolEffectDocument) bool {
+	return left.PreparedSHA256 == right.PreparedSHA256 && left.FilePath == right.FilePath && left.HasPreimage == right.HasPreimage && left.BeforeExists == right.BeforeExists && bytes.Equal(left.BeforeContent, right.BeforeContent) && left.BeforeSHA256 == right.BeforeSHA256 && left.DesiredAbsent == right.DesiredAbsent
+}
+
+func retainedEffect(document toolEffectDocument) (agenttools.EffectRecord, error) {
+	record := agenttools.EffectRecord{InvocationID: kernel.UUIDv7(document.InvocationID), RequestDigest: kernel.Digest(document.RequestDigest), ToolCallID: document.ToolCallID, Name: document.Name, ArgumentsSHA256: document.ArgumentsSHA256, WorkspaceRoot: document.WorkspaceRoot, EffectPolicyHash: kernel.Digest(document.EffectPolicyHash), PreparedSHA256: document.PreparedSHA256, FilePath: document.FilePath, HasPreimage: document.HasPreimage, BeforeExists: document.BeforeExists, BeforeContent: append([]byte(nil), document.BeforeContent...), BeforeSHA256: document.BeforeSHA256, DesiredAbsent: document.DesiredAbsent, Result: append(json.RawMessage(nil), document.Result...)}
+	if _, err := toolEffectCandidate(record); err != nil || len(record.Result) > 0 && !json.Valid(record.Result) {
+		return agenttools.EffectRecord{}, agenttools.ErrEffectUncertain
+	}
+	return record, nil
+}
+
+func (s *Store) LoadFileChange(ctx context.Context, id string) (agenttools.EffectRecord, bool, error) {
+	if err := requireDeadline(ctx); err != nil {
+		return agenttools.EffectRecord{}, false, err
+	}
+	if decoded, err := hex.DecodeString(id); err != nil || len(decoded) != 32 || strings.ToLower(id) != id {
+		return agenttools.EffectRecord{}, false, agenttools.ErrInvalidCall
+	}
+	var document toolEffectDocument
+	err := s.db.Collection("agent_tool_effects").FindOne(ctx, bson.D{{Key: "_id", Value: id}}).Decode(&document)
+	if errors.Is(err, driver.ErrNoDocuments) {
+		return agenttools.EffectRecord{}, false, nil
+	}
+	if err != nil {
+		return agenttools.EffectRecord{}, false, err
+	}
+	record, err := retainedEffect(document)
+	return record, err == nil, err
 }
 
 func sameEffectIdentity(left, right toolEffectDocument) bool {
@@ -71,7 +121,7 @@ func (s *Store) Reserve(ctx context.Context, record agenttools.EffectRecord) (ag
 	if err != nil {
 		return agenttools.EffectRecord{}, false, err
 	}
-	if record.Name == "edit_file" && record.PreparedSHA256 == "" {
+	if record.Name == "edit_file" && record.PreparedSHA256 == "" || (record.Name == "create_file" || record.Name == "undo_file_change" || record.Name == "restore_file_from_commit") && !record.HasPreimage {
 		return agenttools.EffectRecord{}, false, agenttools.ErrInvalidCall
 	}
 	if _, fenced := agentruntime.RunOwnershipFromContext(ctx); fenced {
@@ -87,15 +137,11 @@ func (s *Store) Reserve(ctx context.Context, record agenttools.EffectRecord) (ag
 	if err := collection.FindOne(ctx, bson.D{{Key: "_id", Value: candidate.ID}}).Decode(&existing); err != nil {
 		return agenttools.EffectRecord{}, false, err
 	}
-	if !sameEffectIdentity(existing, candidate) || existing.PreparedSHA256 != candidate.PreparedSHA256 {
+	if !sameEffectIdentity(existing, candidate) || !sameEffectSnapshot(existing, candidate) {
 		return agenttools.EffectRecord{}, false, agenttools.ErrConflict
 	}
-	record.PreparedSHA256 = existing.PreparedSHA256
-	record.Result = append(json.RawMessage(nil), existing.Result...)
-	if len(record.Result) > 0 && !json.Valid(record.Result) {
-		return agenttools.EffectRecord{}, false, agenttools.ErrEffectUncertain
-	}
-	return record, false, nil
+	record, err = retainedEffect(existing)
+	return record, false, err
 }
 
 func (s *Store) reserveOwnedEffect(ctx context.Context, record agenttools.EffectRecord, candidate toolEffectDocument) (agenttools.EffectRecord, bool, error) {
@@ -122,7 +168,7 @@ func (s *Store) reserveOwnedEffect(ctx context.Context, record agenttools.Effect
 		if err != nil {
 			return nil, err
 		}
-		if !sameEffectIdentity(stored, candidate) || stored.PreparedSHA256 != candidate.PreparedSHA256 {
+		if !sameEffectIdentity(stored, candidate) || !sameEffectSnapshot(stored, candidate) {
 			return nil, agenttools.ErrConflict
 		}
 		return nil, nil
@@ -130,12 +176,8 @@ func (s *Store) reserveOwnedEffect(ctx context.Context, record agenttools.Effect
 	if err != nil {
 		return agenttools.EffectRecord{}, false, err
 	}
-	record.PreparedSHA256 = stored.PreparedSHA256
-	record.Result = append(json.RawMessage(nil), stored.Result...)
-	if len(record.Result) > 0 && !json.Valid(record.Result) {
-		return agenttools.EffectRecord{}, false, agenttools.ErrEffectUncertain
-	}
-	return record, created, nil
+	record, err = retainedEffect(stored)
+	return record, created, err
 }
 
 func (s *Store) Lookup(ctx context.Context, record agenttools.EffectRecord) (agenttools.EffectRecord, bool, error) {
@@ -157,12 +199,8 @@ func (s *Store) Lookup(ctx context.Context, record agenttools.EffectRecord) (age
 	if !sameEffectIdentity(existing, candidate) {
 		return agenttools.EffectRecord{}, false, agenttools.ErrConflict
 	}
-	record.PreparedSHA256 = existing.PreparedSHA256
-	record.Result = append(json.RawMessage(nil), existing.Result...)
-	if len(record.Result) > 0 && !json.Valid(record.Result) {
-		return agenttools.EffectRecord{}, false, agenttools.ErrEffectUncertain
-	}
-	return record, true, nil
+	record, err = retainedEffect(existing)
+	return record, err == nil, err
 }
 
 func (s *Store) Complete(ctx context.Context, record agenttools.EffectRecord, result json.RawMessage) error {
@@ -173,13 +211,29 @@ func (s *Store) Complete(ctx context.Context, record agenttools.EffectRecord, re
 	if err != nil || !json.Valid(result) || len(result) > 1<<20 {
 		return agenttools.ErrInvalidCall
 	}
-	if record.Name == "edit_file" && record.PreparedSHA256 == "" {
+	if record.Name == "edit_file" && record.PreparedSHA256 == "" || (record.Name == "create_file" || record.Name == "undo_file_change" || record.Name == "restore_file_from_commit") && !record.HasPreimage {
 		return agenttools.ErrInvalidCall
 	}
 	collection := s.db.Collection("agent_tool_effects")
 	filter := bson.D{{Key: "_id", Value: candidate.ID}, {Key: "request_digest", Value: candidate.RequestDigest}, {Key: "tool_call_id", Value: candidate.ToolCallID}, {Key: "name", Value: candidate.Name}, {Key: "arguments_sha256", Value: candidate.ArgumentsSHA256}, {Key: "workspace_root", Value: candidate.WorkspaceRoot}, {Key: "effect_policy_digest", Value: candidate.EffectPolicyHash}, {Key: "result", Value: bson.D{{Key: "$exists", Value: false}}}}
 	if candidate.PreparedSHA256 != "" {
 		filter = append(filter, bson.E{Key: "prepared_sha256", Value: candidate.PreparedSHA256})
+	}
+	if candidate.HasPreimage {
+		filter = append(filter, bson.E{Key: "has_preimage", Value: true}, bson.E{Key: "file_path", Value: candidate.FilePath})
+		for key, value := range map[string]bool{"before_exists": candidate.BeforeExists, "desired_absent": candidate.DesiredAbsent} {
+			if value {
+				filter = append(filter, bson.E{Key: key, Value: true})
+			} else {
+				filter = append(filter, bson.E{Key: key, Value: bson.D{{Key: "$ne", Value: true}}})
+			}
+		}
+		if candidate.BeforeExists {
+			filter = append(filter, bson.E{Key: "before_sha256", Value: candidate.BeforeSHA256})
+			if len(candidate.BeforeContent) > 0 {
+				filter = append(filter, bson.E{Key: "before_content", Value: candidate.BeforeContent})
+			}
+		}
 	}
 	updated, err := collection.UpdateOne(ctx, filter, bson.D{{Key: "$set", Value: bson.D{{Key: "result", Value: []byte(result)}}}})
 	if err != nil {
@@ -195,7 +249,7 @@ func (s *Store) Complete(ctx context.Context, record agenttools.EffectRecord, re
 		}
 		return err
 	}
-	if !sameEffectIdentity(existing, candidate) || existing.PreparedSHA256 != candidate.PreparedSHA256 || !bytes.Equal(existing.Result, result) {
+	if !sameEffectIdentity(existing, candidate) || !sameEffectSnapshot(existing, candidate) || !bytes.Equal(existing.Result, result) {
 		return agenttools.ErrConflict
 	}
 	return nil

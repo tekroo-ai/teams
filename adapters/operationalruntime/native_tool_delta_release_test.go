@@ -105,11 +105,7 @@ func TestPrepareNativeToolDeltaRelease(t *testing.T) {
 			t.Fatal(err)
 		}
 		editable := slices.Contains(bundle.Permissions, "repository.edit")
-		value := "2"
-		if editable {
-			value = "1"
-		}
-		before := "package mongo\n\nconst Value = " + value + "\n" + strings.Repeat("// retained unrelated content\n", 600)
+		before := "package mongo\n\nconst Value = 2\n" + strings.Repeat("// retained unrelated content\n", 600)
 		for name, data := range map[string]string{"AGENTS.md": "Use only the supplied Teams tools; keep unrelated bytes unchanged.\n", "go.mod": "module example.test/tooldelta\n\ngo 1.26.0\n", "adapters/mongo/value.go": before, "adapters/mongo/value_test.go": "package mongo\nimport \"testing\"\nfunc TestValue(t *testing.T) { if Value != 2 { t.Fatal(Value) } }\n"} {
 			if err := os.WriteFile(filepath.Join(root, name), []byte(data), 0600); err != nil {
 				t.Fatal(err)
@@ -117,6 +113,12 @@ func TestPrepareNativeToolDeltaRelease(t *testing.T) {
 		}
 		for _, args := range [][]string{{"init", "-q"}, {"add", "."}, {"-c", "user.name=Tool Delta", "-c", "user.email=delta@example.test", "commit", "-qm", "baseline"}} {
 			nativeQualificationGit(t, root, args...)
+		}
+		head := strings.TrimSpace(nativeQualificationGit(t, root, "rev-parse", "HEAD"))
+		if editable {
+			if err := os.WriteFile(filepath.Join(root, "adapters/mongo/value.go"), []byte(strings.Replace(before, "const Value = 2", "const Value = 1", 1)), 0600); err != nil {
+				t.Fatal(err)
+			}
 		}
 		id, err := ids.Next()
 		if err != nil {
@@ -135,13 +137,13 @@ func TestPrepareNativeToolDeltaRelease(t *testing.T) {
 		// qualification; the capability check cannot drift into unrelated work.
 		definitions := []agentruntime.ToolDefinition{}
 		for _, definition := range agenttools.ReadOnlyDefinitions(bundle.Permissions) {
-			if definition.Name == "read_file" {
+			if definition.Name == "read_file" || definition.Name == "read_file_from_commit" {
 				definitions = append(definitions, definition)
 			}
 		}
 		if editable {
 			for _, definition := range agenttools.MutationDefinitions(bundle.Permissions) {
-				if definition.Name == "edit_file" {
+				if definition.Name == "edit_file" || definition.Name == "create_file" || definition.Name == "undo_file_change" || definition.Name == "restore_file_from_commit" {
 					definitions = append(definitions, definition)
 				}
 			}
@@ -159,8 +161,9 @@ func TestPrepareNativeToolDeltaRelease(t *testing.T) {
 		journal := &nativeReleaseJournal{path: filepath.Join(output, string(p.RoleFQRN)+"-journal.json")}
 		runner := agentruntime.Runner{Journal: journal, Tools: agenttools.ReadOnlyTurnAdapter{Gateway: agenttools.Gateway{Bindings: binding, Host: host}, InvocationID: id, RequestDigest: requestDigest}, Effects: toolDeltaEffects{mutation: mutation, tests: tests}, Model: agentruntime.OpenAIModel{Client: &http.Client{Timeout: 10 * time.Minute}, BaseURL: p.NativeSettings.BaseURL, Model: p.NativeSettings.Model, MaxTokens: p.NativeSettings.MaxOutputTokens, Tools: definitions, FinalTool: "submit_result", FinalSchema: definitions[len(definitions)-1].Parameters, TurnContract: contract}, FinalTool: "submit_result", Finalize: func(raw json.RawMessage) (string, error) { return string(raw), nil }, SystemPrompt: agentruntime.StructuredTurnInstruction, MaxTurns: 20}
 		prompt := "Read AGENTS.md. This is a bounded tool capability check in a disposable repository, not feature work. "
+		prompt += "Use read_file_from_commit to read the first 20 lines of adapters/mongo/value.go at exact commit " + head + ". "
 		if editable {
-			prompt += "Read adapters/mongo/value.go, then use edit_file to replace exactly const Value = 1 with const Value = 2 using the full-file SHA-256; preserve everything else. "
+			prompt += "Read the current adapters/mongo/value.go. Use edit_file to change exactly const Value = 1 to const Value = 3, preserving other bytes. Undo that edit with undo_file_change and its returned change_id and SHA-256, restoring the uncommitted Value = 1. Then use restore_file_from_commit with exact commit " + head + " and the current SHA-256 to restore the committed Value = 2. Create scratch.txt with content disposable using create_file, then undo that creation with undo_file_change so scratch.txt is absent. Do these operations in order; hashes and change IDs come from tool results. "
 		}
 		if slices.Contains(bundle.Permissions, "test.execute") {
 			if editable {
@@ -198,9 +201,15 @@ func TestPrepareNativeToolDeltaRelease(t *testing.T) {
 		}
 		if editable {
 			got, err := os.ReadFile(filepath.Join(root, "adapters/mongo/value.go"))
-			if err != nil || string(got) != strings.Replace(before, "const Value = 1", "const Value = 2", 1) || seen["edit_file"] != 1 {
-				t.Fatal("precise edit was not executed byte-exactly once")
+			if err != nil || string(got) != before || seen["edit_file"] != 1 || seen["undo_file_change"] != 2 || seen["restore_file_from_commit"] != 1 || seen["create_file"] != 1 {
+				t.Fatal("edit, uncommitted undo, committed restore and create/undo did not execute exactly")
 			}
+			if _, err := os.Stat(filepath.Join(root, "scratch.txt")); !os.IsNotExist(err) {
+				t.Fatal("creation undo did not remove scratch.txt")
+			}
+		}
+		if seen["read_file_from_commit"] != 1 {
+			t.Fatal("historical file contents were not read exactly once")
 		}
 		if slices.Contains(bundle.Permissions, "test.execute") {
 			name := "run_go_tests"
@@ -219,8 +228,8 @@ func TestPrepareNativeToolDeltaRelease(t *testing.T) {
 		corpus.ScenarioIDs = slices.Clone(corpus.ScenarioIDs)
 		// Requalifying the same capability on a new catalog retains its
 		// scenario identity; duplicate IDs make the corpus invalid.
-		if !slices.Contains(corpus.ScenarioIDs, "native-tool-delta-edit-subtree") {
-			corpus.ScenarioIDs = append(corpus.ScenarioIDs, "native-tool-delta-edit-subtree")
+		if !slices.Contains(corpus.ScenarioIDs, "native-tool-delta-file-recovery") {
+			corpus.ScenarioIDs = append(corpus.ScenarioIDs, "native-tool-delta-file-recovery")
 		}
 		corpusDigest, err := corpus.Digest()
 		if err != nil {

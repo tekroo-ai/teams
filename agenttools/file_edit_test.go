@@ -52,7 +52,7 @@ func TestEditFileAtomicOrderedReplacements(t *testing.T) {
 
 func TestAtomicEditEffectLostReceiptReconcilesWholePostimage(t *testing.T) {
 	gateway, ledger, root, request := editEffectFixture(t)
-	args, _ := json.Marshal(fileEdit{Path: "note.txt", ExpectedSHA256: textSHA("before\nkeep\n"), Edits: []textEdit{{"before", "after"}, {"keep", "preserved"}}})
+	args, _ := json.Marshal(fileEdit{Path: "note.txt", ExpectedSHA256: textSHA("before\nkeep\n"), Edits: []textEdit{{"before", "after"}, {"k", "K"}}})
 	request.Call.Arguments = args
 	ledger.failComplete = true
 	if _, err := gateway.Execute(t.Context(), request); !errors.Is(err, ErrEffectUncertain) {
@@ -60,7 +60,7 @@ func TestAtomicEditEffectLostReceiptReconcilesWholePostimage(t *testing.T) {
 	}
 	result, complete, err := gateway.Reconcile(t.Context(), request)
 	got, _ := os.ReadFile(filepath.Join(root, "note.txt"))
-	if err != nil || !complete || string(got) != "after\npreserved\n" || result.Result.SHA256 != textSHA(string(got)) {
+	if err != nil || !complete || string(got) != "after\nKeep\n" || result.Result.SHA256 != textSHA(string(got)) {
 		t.Fatalf("atomic replay: result=%+v complete=%t content=%q error=%v", result, complete, got, err)
 	}
 }

@@ -290,6 +290,14 @@ func TestTestGatewayLostCompletionNeverReruns(t *testing.T) {
 
 type lostTestCompletionAck struct{ EffectLedger }
 
+func (ledger lostTestCompletionAck) LoadFileChange(ctx context.Context, id string) (EffectRecord, bool, error) {
+	lookup, ok := ledger.EffectLedger.(FileChangeLookup)
+	if !ok {
+		return EffectRecord{}, false, ErrForbidden
+	}
+	return lookup.LoadFileChange(ctx, id)
+}
+
 func (ledger lostTestCompletionAck) Complete(ctx context.Context, record EffectRecord, result json.RawMessage) error {
 	if err := ledger.EffectLedger.Complete(ctx, record, result); err != nil {
 		return err

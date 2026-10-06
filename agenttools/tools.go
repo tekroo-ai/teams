@@ -55,8 +55,11 @@ var specs = []Spec{
 	{"git_log", "Read up to 20 recent commits without changing the repository.", json.RawMessage(`{"type":"object","additionalProperties":false,"properties":{"limit":{"type":"integer","minimum":1,"maximum":20},"format":{"type":"string","enum":["oneline","message"]}}}`), "repository.read"},
 	{"git_show", "Read a bounded commit patch or summary, optionally for one path.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["commit"],"properties":{"commit":{"type":"string","pattern":"^(HEAD|[0-9a-f]{7,40})$"},"path":{"type":"string","minLength":1},"format":{"type":"string","enum":["patch","stat"]}}}`), "repository.read"},
 	{"git_check_ignore", "Check whether one workspace path is ignored by Git.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path"],"properties":{"path":{"type":"string","minLength":1}}}`), "repository.read"},
-	{"write_file", "Create a file or replace its ENTIRE contents when its expected SHA-256 matches. content must contain the complete file, never a fragment or patch. For a small change to an existing file, use edit_file instead. expected_sha256 is empty only for a new file.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path","content","expected_sha256"],"properties":{"path":{"type":"string","minLength":1},"content":{"type":"string"},"expected_sha256":{"type":"string","pattern":"^$|^[0-9a-f]{64}$"}}}`), "repository.edit"},
-	{"edit_file", "Atomically apply an ordered edits array to ONE existing file against ONE full-file SHA-256 from read_file. Each edit replaces exactly one occurrence of old_text with new_text in the preceding edit's result; new_text may be empty for deletion. Put all replacements for this file in this one call, not separate same-file calls with the same hash. Every edit must match before anything is written; missing or ambiguous text and stale hashes leave the entire file unchanged.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path","edits","expected_sha256"],"properties":{"path":{"type":"string","minLength":1},"edits":{"type":"array","minItems":1,"maxItems":32,"items":{"type":"object","additionalProperties":false,"required":["old_text","new_text"],"properties":{"old_text":{"type":"string","minLength":1,"maxLength":1048576},"new_text":{"type":"string","maxLength":1048576}}}},"expected_sha256":{"type":"string","pattern":"^[0-9a-f]{64}$","minLength":64,"maxLength":64}}}`), "repository.edit"},
+	{"create_file", "Create ONE new file. Refuses any existing file; it cannot overwrite. Use edit_file for existing files. Returns change_id for exact undo.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path","content"],"properties":{"path":{"type":"string","minLength":1},"content":{"type":"string","maxLength":1048576}}}`), "repository.edit"},
+	{"undo_file_change", "Undo one successful file change using its returned change_id. Restores the exact recorded bytes (or removes a newly created file); never reconstruct content. Refuses if the file has changed since that operation. Does not change the Git index or commits.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["change_id","expected_sha256"],"properties":{"change_id":{"type":"string","pattern":"^[0-9a-f]{64}$"},"expected_sha256":{"type":"string","pattern":"^[0-9a-f]{64}$"}}}`), "repository.edit"},
+	{"restore_file_from_commit", "Restore ONE existing file from an exact commit SHA in this workspace's HEAD ancestry. Copies recorded Git bytes, not model-generated content. Requires the current file SHA-256 and preserves Git index/commits. Returns change_id for undo.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path","commit","expected_sha256"],"properties":{"path":{"type":"string","minLength":1},"commit":{"type":"string","pattern":"^[0-9a-f]{40}$"},"expected_sha256":{"type":"string","pattern":"^[0-9a-f]{64}$"}}}`), "repository.edit"},
+	{"read_file_from_commit", "Read the actual file contents at an exact commit SHA in HEAD ancestry, even when that commit did not change the file. This is not a patch. Returns SHA-256 and bounded lines like read_file.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path","commit"],"properties":{"path":{"type":"string","minLength":1},"commit":{"type":"string","pattern":"^[0-9a-f]{40}$"},"start_line":{"type":"integer","minimum":1},"line_count":{"type":"integer","minimum":1,"maximum":400}}}`), "repository.read"},
+	{"edit_file", "Atomically apply an ordered edits array to ONE existing file against ONE full-file SHA-256 from read_file. Each edit replaces exactly one occurrence of old_text with new_text in the preceding edit's result; new_text may be empty for deletion. Put all replacements for this file in this one call, not separate same-file calls with the same hash. Whole-file replacement/deletion is forbidden. Successful mutations return change_id; undo_file_change restores their exact pre-edit bytes without reconstruction. Every edit must match before anything is written; missing or ambiguous text and stale hashes leave the entire file unchanged.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path","edits","expected_sha256"],"properties":{"path":{"type":"string","minLength":1},"edits":{"type":"array","minItems":1,"maxItems":32,"items":{"type":"object","additionalProperties":false,"required":["old_text","new_text"],"properties":{"old_text":{"type":"string","minLength":1,"maxLength":1048576},"new_text":{"type":"string","maxLength":1048576}}}},"expected_sha256":{"type":"string","pattern":"^[0-9a-f]{64}$","minLength":64,"maxLength":64}}}`), "repository.edit"},
 	{"git_stage_files", "Stage only the named workspace paths when HEAD still matches the expected commit. Never stages the injected .openhands runtime files.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["paths","expected_head"],"properties":{"paths":{"type":"array","minItems":1,"maxItems":32,"uniqueItems":true,"items":{"type":"string","minLength":1}},"expected_head":{"type":"string","pattern":"^[0-9a-f]{40}$"}}}`), "repository.edit"},
 	{"git_commit", "Commit the exact staged tree against an expected HEAD. A retry after a completed identical commit returns that commit instead of creating another.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["expected_head","expected_index_tree","subject"],"properties":{"expected_head":{"type":"string","pattern":"^[0-9a-f]{40}$"},"expected_index_tree":{"type":"string","pattern":"^[0-9a-f]{40}$"},"subject":{"type":"string","minLength":1,"maxLength":200},"body":{"type":"string","maxLength":5000}}}`), "repository.edit"},
 	{"run_go_tests", "Run Go tests from committed HEAD in a disposable macOS filesystem sandbox. package may be ., ./, ./..., a local package such as ./adapters/mongo, or a subtree such as ./adapters/mongo/...; this workspace's declared module paths also work. Local Git subprocesses and localhost networking are supported for fixtures; use temporary test data, not live databases. Non-loopback networking, external modules, traversal, shell expansion, host writes and CGO are forbidden. permission_denial reports observed OS permission-denial output; it does not prove a candidate defect.", goTestInputSchema, "test.execute"},
@@ -80,6 +83,8 @@ type Call struct {
 }
 
 type Result struct {
+	ChangeID        string        `json:"change_id,omitempty"`
+	Removed         bool          `json:"removed,omitempty"`
 	Name            string        `json:"name"`
 	Path            string        `json:"path,omitempty"`
 	Output          string        `json:"output,omitempty"`
@@ -139,6 +144,9 @@ func permitted(permissions []string, required string) bool {
 }
 
 func (host Host) execute(ctx context.Context, authority Authority, call Call) (Result, error) {
+	if call.Name == "write_file" {
+		return Result{}, ErrForbidden
+	}
 	var spec *Spec
 	for i := range specs {
 		if specs[i].Name == call.Name {
@@ -480,16 +488,14 @@ func (host Host) execute(ctx context.Context, authority Authority, call Call) (R
 			return Result{}, ErrForbidden
 		}
 		result, err = host.runIsolatedGoTestsWorktree(ctx, root, args.Package)
-	case "write_file":
-		var args struct {
-			Path           string `json:"path"`
-			Content        string `json:"content"`
-			ExpectedSHA256 string `json:"expected_sha256"`
-		}
-		if decode(call.Arguments, &args) != nil || args.Path == "" || len(args.Content) > 1<<20 || !utf8.ValidString(args.Content) || !validExpectedSHA(args.ExpectedSHA256) {
+	case "create_file":
+		var args createFileArgs
+		if decode(call.Arguments, &args) != nil || args.Path == "" || len(args.Content) > 1<<20 || !utf8.ValidString(args.Content) {
 			return Result{}, ErrInvalidCall
 		}
-		result.SHA256, err = writeFile(root, args.Path, []byte(args.Content), args.ExpectedSHA256)
+		result.SHA256, err = createFile(root, args.Path, []byte(args.Content))
+	case "read_file_from_commit":
+		return host.readFileFromCommit(ctx, root, call)
 	case "edit_file":
 		args, decodeErr := decodeFileEdit(call.Arguments)
 		if decodeErr != nil {
@@ -763,7 +769,14 @@ func writeFile(root, relative string, content []byte, expectedSHA string) (strin
 	if err = file.Close(); err != nil {
 		return "", err
 	}
-	if err = os.Rename(temporary, path); err != nil {
+	// An exclusive link publishes a newly created file atomically without
+	// overwriting a file that appeared after the precondition check.
+	if expectedSHA == "" {
+		err = os.Link(temporary, path)
+	} else {
+		err = os.Rename(temporary, path)
+	}
+	if err != nil {
 		return "", err
 	}
 	digest := sha256.Sum256(content)

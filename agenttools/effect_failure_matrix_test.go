@@ -14,7 +14,7 @@ import (
 	"github.com/tekroo-ai/teams/kernel"
 )
 
-var effectToolNames = []string{"write_file", "edit_file", "git_stage_files", "git_commit", "run_go_tests", "run_go_tests_worktree"}
+var effectToolNames = []string{"create_file", "edit_file", "undo_file_change", "restore_file_from_commit", "git_stage_files", "git_commit", "run_go_tests", "run_go_tests_worktree"}
 
 func TestFailureMatrixCoversEveryEffectfulTool(t *testing.T) {
 	var actual []string
@@ -49,21 +49,42 @@ func failureMatrixFixture(t *testing.T, name string) (MutationGateway, TestGatew
 	tests := TestGateway{Bindings: authority, Host: host, Ledger: l, Policy: policy}
 	var args any
 	switch name {
-	case "write_file", "edit_file":
+	case "create_file", "edit_file", "undo_file_change", "restore_file_from_commit":
 		if err := os.Mkdir(filepath.Join(root, "readonly"), 0500); err != nil {
 			t.Fatal(err)
 		}
 		t.Cleanup(func() { _ = os.Chmod(filepath.Join(root, "readonly"), 0700) })
-		args = map[string]any{"path": "readonly/new.txt", "content": "new", "expected_sha256": ""}
+		args = map[string]any{"path": "readonly/new.txt", "content": "new"}
 		if name == "edit_file" {
 			if err := os.Chmod(filepath.Join(root, "readonly"), 0700); err != nil {
 				t.Fatal(err)
 			}
-			writeSnapshotFixture(t, root, "readonly/existing.txt", "before")
+			writeSnapshotFixture(t, root, "readonly/existing.txt", "before\nretained\n")
 			if err := os.Chmod(filepath.Join(root, "readonly"), 0500); err != nil {
 				t.Fatal(err)
 			}
-			args = fileEdit{Path: "readonly/existing.txt", Edits: []textEdit{{"before", "after"}}, ExpectedSHA256: textSHA("before")}
+			args = fileEdit{Path: "readonly/existing.txt", Edits: []textEdit{{"before", "after"}}, ExpectedSHA256: textSHA("before\nretained\n")}
+		}
+		if name == "undo_file_change" || name == "restore_file_from_commit" {
+			if err := os.Chmod(filepath.Join(root, "readonly"), 0700); err != nil {
+				t.Fatal(err)
+			}
+			writeSnapshotFixture(t, root, "readonly/existing.txt", "before\nretained\n")
+			fixtureGit(t, root, "add", "--", "readonly/existing.txt")
+			fixtureGit(t, root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "recovery baseline")
+			head = strings.TrimSpace(fixtureGit(t, root, "rev-parse", "HEAD"))
+			edit := Request{InvocationID: kernel.UUIDv7("00000000-0000-7000-8000-000000000986"), RequestDigest: policy, ToolCallID: "prior-edit", Call: Call{Name: "edit_file", Arguments: editArguments("readonly/existing.txt", "before\nretained\n", "before", "after")}}
+			prior, err := mutation.Execute(t.Context(), edit)
+			if err != nil {
+				t.Fatal(err)
+			}
+			args = map[string]any{"expected_sha256": prior.Result.SHA256, "change_id": prior.Result.ChangeID}
+			if name == "restore_file_from_commit" {
+				args = map[string]any{"path": "readonly/existing.txt", "commit": head, "expected_sha256": prior.Result.SHA256}
+			}
+			if err := os.Chmod(filepath.Join(root, "readonly"), 0500); err != nil {
+				t.Fatal(err)
+			}
 		}
 	case "git_stage_files":
 		args = map[string]any{"paths": []string{"a.go"}, "expected_head": strings.Repeat("b", 40)}
@@ -100,7 +121,7 @@ func TestEveryEffectToolRetainsKnownFailureAndReplaysIt(t *testing.T) {
 			}
 			// Remove the write failure condition: the same identity must still
 			// return the recorded failure, never create the file now.
-			if name == "write_file" || name == "edit_file" {
+			if name == "create_file" || name == "edit_file" {
 				if err := os.Chmod(filepath.Join(root, "readonly"), 0700); err != nil {
 					t.Fatal(err)
 				}
@@ -113,7 +134,7 @@ func TestEveryEffectToolRetainsKnownFailureAndReplaysIt(t *testing.T) {
 			if err != nil || !completed || receipt.ResultHash != first.ResultHash {
 				t.Fatalf("completed failure reconciliation: %+v %t %v", receipt, completed, err)
 			}
-			if name == "write_file" || name == "edit_file" {
+			if name == "create_file" || name == "edit_file" {
 				if _, err := os.Stat(filepath.Join(root, "readonly", "new.txt")); !errors.Is(err, os.ErrNotExist) {
 					t.Fatalf("failure replay wrote a file: %v", err)
 				}
@@ -136,7 +157,7 @@ func TestEveryEffectToolStopsAfterLostFailureReceipt(t *testing.T) {
 			if _, err := execute(ctx, request); !errors.Is(err, ErrEffectUncertain) {
 				t.Fatalf("lost failure receipt = %v", err)
 			}
-			if name == "write_file" {
+			if name == "create_file" {
 				if err := os.Chmod(filepath.Join(root, "readonly"), 0700); err != nil {
 					t.Fatal(err)
 				}
@@ -144,7 +165,7 @@ func TestEveryEffectToolStopsAfterLostFailureReceipt(t *testing.T) {
 			if _, err := execute(ctx, request); !errors.Is(err, ErrEffectUncertain) {
 				t.Fatalf("unresolved call was run again: %v", err)
 			}
-			if name == "write_file" {
+			if name == "create_file" {
 				if _, err := os.Stat(filepath.Join(root, "readonly", "new.txt")); !errors.Is(err, os.ErrNotExist) {
 					t.Fatalf("lost-receipt replay wrote a file: %v", err)
 				}

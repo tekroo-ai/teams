@@ -31,7 +31,7 @@ func TestAvailableAndAuthorization(t *testing.T) {
 		t.Fatalf("unprivileged tools: %v", got)
 	}
 	read := Available([]string{"repository.read"})
-	if len(read) != 11 || !slices.ContainsFunc(read, func(spec Spec) bool { return spec.Name == "git_status" }) {
+	if len(read) != 12 || !slices.ContainsFunc(read, func(spec Spec) bool { return spec.Name == "git_status" }) {
 		t.Fatalf("read-only surface: %v", read)
 	}
 	for _, spec := range read {
@@ -508,11 +508,11 @@ func TestGoPackageSchemaMatchesHostValidation(t *testing.T) {
 	}
 }
 
-func TestWriteFileRequiresEditPermissionAndExactPrecondition(t *testing.T) {
+func TestCreateFileRequiresEditPermissionAndNeverOverwrites(t *testing.T) {
 	root := t.TempDir()
 	host := testHost()
 	readOnly := Authority{WorkspaceRoot: root, Permissions: []string{"repository.read"}}
-	create := call("write_file", `{"path":"note.txt","content":"first\n","expected_sha256":""}`)
+	create := call("create_file", `{"path":"note.txt","content":"first\n"}`)
 	if _, err := host.execute(context.Background(), readOnly, create); !errors.Is(err, ErrForbidden) {
 		t.Fatalf("read-only actor wrote a file: %v", err)
 	}
@@ -526,11 +526,11 @@ func TestWriteFileRequiresEditPermissionAndExactPrecondition(t *testing.T) {
 		t.Fatalf("stale create was accepted: %v", err)
 	}
 	replace := call("write_file", `{"path":"note.txt","content":"second\n","expected_sha256":"`+result.SHA256+`"}`)
-	if _, err := host.execute(context.Background(), writer, replace); err != nil {
-		t.Fatalf("replace: %v", err)
+	if _, err := host.execute(context.Background(), writer, replace); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("legacy replacement admitted: %v", err)
 	}
 	content, err := os.ReadFile(filepath.Join(root, "note.txt"))
-	if err != nil || string(content) != "second\n" {
+	if err != nil || string(content) != "first\n" {
 		t.Fatalf("written content: %q, %v", content, err)
 	}
 	outside := t.TempDir()
@@ -538,10 +538,10 @@ func TestWriteFileRequiresEditPermissionAndExactPrecondition(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, arguments := range []string{
-		`{"path":"linked/escape.txt","content":"bad","expected_sha256":""}`,
-		`{"path":"../escape.txt","content":"bad","expected_sha256":""}`,
+		`{"path":"linked/escape.txt","content":"bad"}`,
+		`{"path":"../escape.txt","content":"bad"}`,
 	} {
-		if _, err := host.execute(context.Background(), writer, call("write_file", arguments)); !errors.Is(err, ErrBoundary) {
+		if _, err := host.execute(context.Background(), writer, call("create_file", arguments)); !errors.Is(err, ErrBoundary) {
 			t.Fatalf("out-of-workspace write %s: %v", arguments, err)
 		}
 	}

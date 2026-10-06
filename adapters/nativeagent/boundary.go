@@ -375,7 +375,7 @@ func (boundary *Boundary) reconcileBeforeTerminal(brief application.ExecutionBri
 				return ErrInvalidBinding
 			}
 			for _, call := range turn.ToolCalls {
-				if call.Name == "write_file" || call.Name == "git_stage_files" || call.Name == "git_commit" {
+				if (agenttools.MutationTurnAdapter{}).Handles(call.Name) {
 					return ErrInvalidBinding
 				}
 			}

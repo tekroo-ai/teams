@@ -62,3 +62,38 @@ func TestToolEffectLedgerPersistsAndRejectsIdentityDrift(t *testing.T) {
 		t.Fatalf("completion drift = %v", err)
 	}
 }
+
+func TestFileChangeLookupRetainsExactPreimage(t *testing.T) {
+	store := openTestStore(t)
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	record := retainedFileFixture()
+	if _, _, err := store.Reserve(ctx, record); err != nil {
+		t.Fatal(err)
+	}
+	document, err := toolEffectCandidate(record)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, found, err := store.LoadFileChange(ctx, document.ID)
+	if err != nil || !found || string(got.BeforeContent) != string(record.BeforeContent) || got.FilePath != record.FilePath {
+		t.Fatalf("lookup: %+v %t %v", got, found, err)
+	}
+	// Lookup's request contains identity only; snapshots come from storage.
+	identity := record
+	identity.HasPreimage = false
+	identity.FilePath = ""
+	identity.BeforeExists = false
+	identity.BeforeContent = nil
+	identity.BeforeSHA256 = ""
+	identity.PreparedSHA256 = ""
+	got, found, err = store.Lookup(ctx, identity)
+	if err != nil || !found || string(got.BeforeContent) != string(record.BeforeContent) {
+		t.Fatalf("identity lookup lost preimage: %+v %t %v", got, found, err)
+	}
+	drift := record
+	drift.FilePath = "other.go"
+	if _, _, err := store.Reserve(ctx, drift); !errors.Is(err, agenttools.ErrConflict) {
+		t.Fatalf("snapshot path drift: %v", err)
+	}
+}

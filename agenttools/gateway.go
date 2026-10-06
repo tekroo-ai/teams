@@ -171,7 +171,7 @@ func (gateway Gateway) ExecuteReadOnly(ctx context.Context, request Request) (Re
 	operation, cancel := context.WithTimeout(ctx, gateway.Host.Timeout)
 	defer cancel()
 	switch request.Call.Name {
-	case "read_file", "check_go_format", "list_files", "find_files", "search_text", "search_regex", "git_status", "git_diff", "git_log", "git_show", "git_check_ignore":
+	case "read_file", "read_file_from_commit", "check_go_format", "list_files", "find_files", "search_text", "search_regex", "git_status", "git_diff", "git_log", "git_show", "git_check_ignore":
 	default:
 		return Receipt{}, ErrForbidden
 	}

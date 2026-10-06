@@ -2,8 +2,6 @@ package agenttools
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"os"
@@ -26,6 +24,17 @@ type memoryEffectLedger struct {
 	records      map[string]EffectRecord
 	failComplete bool
 	failReserve  bool
+}
+
+func (ledger *memoryEffectLedger) LoadFileChange(_ context.Context, id string) (EffectRecord, bool, error) {
+	ledger.mu.Lock()
+	defer ledger.mu.Unlock()
+	for _, record := range ledger.records {
+		if fileChangeID(record) == id {
+			return record, true, nil
+		}
+	}
+	return EffectRecord{}, false, nil
 }
 
 func (ledger *memoryEffectLedger) Reserve(_ context.Context, intent EffectRecord) (EffectRecord, bool, error) {
@@ -95,7 +104,7 @@ func effectFixture(t *testing.T) (MutationGateway, *memoryEffectLedger, string, 
 		Host:     Host{Timeout: time.Second}, Ledger: ledger, Policy: digest,
 	}
 	request := Request{InvocationID: kernel.UUIDv7("00000000-0000-7000-8000-000000000981"), RequestDigest: digest, ToolCallID: "write-1", Call: Call{
-		Name: "write_file", Arguments: json.RawMessage(`{"path":"note.txt","content":"new content","expected_sha256":""}`),
+		Name: "create_file", Arguments: json.RawMessage(`{"path":"note.txt","content":"new content"}`),
 	}}
 	return gateway, ledger, root, request
 }
@@ -113,14 +122,14 @@ func TestMutationGatewayReconcilesWriteAfterLostReceipt(t *testing.T) {
 		t.Fatalf("physical effect = %q, %v", content, err)
 	}
 	receipt, err := gateway.Execute(ctx, request)
-	if err != nil || receipt.Result.Name != "write_file" || receipt.Result.SHA256 == "" {
+	if err != nil || receipt.Result.Name != "create_file" || receipt.Result.SHA256 == "" {
 		t.Fatalf("reconciled receipt = %+v, %v", receipt, err)
 	}
 	again, err := gateway.Execute(ctx, request)
 	if err != nil || again.ResultHash != receipt.ResultHash {
 		t.Fatalf("duplicate receipt = %+v, %v", again, err)
 	}
-	request.Call.Arguments = json.RawMessage(`{"path":"other.txt","content":"new content","expected_sha256":""}`)
+	request.Call.Arguments = json.RawMessage(`{"path":"other.txt","content":"new content"}`)
 	if _, err := gateway.Execute(ctx, request); !errors.Is(err, ErrConflict) {
 		t.Fatalf("same call id with different arguments = %v", err)
 	}
@@ -144,11 +153,11 @@ func TestMutationGatewayRejectsDriftAndForbiddenPaths(t *testing.T) {
 		t.Fatalf("read-only role mutation = %v", err)
 	}
 	gateway.Bindings = effectBinding{authority: Authority{WorkspaceRoot: root, Permissions: []string{"repository.edit"}, Purpose: kernel.PurposeImplementation, EffectPolicyDigest: gateway.Policy}}
-	request.Call.Arguments = json.RawMessage(`{"path":".openhands/agent.yaml","content":"malicious","expected_sha256":""}`)
+	request.Call.Arguments = json.RawMessage(`{"path":".openhands/agent.yaml","content":"malicious"}`)
 	if _, err := gateway.Execute(ctx, request); !errors.Is(err, ErrForbidden) {
 		t.Fatalf("runtime hook write = %v", err)
 	}
-	request.Call.Arguments = json.RawMessage(`{"path":"note.txt","content":"new content","expected_sha256":""}`)
+	request.Call.Arguments = json.RawMessage(`{"path":"note.txt","content":"new content"}`)
 	if err := os.WriteFile(filepath.Join(root, "note.txt"), []byte("prior"), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -158,11 +167,10 @@ func TestMutationGatewayRejectsDriftAndForbiddenPaths(t *testing.T) {
 	if len(ledger.records) != 0 {
 		t.Fatalf("precondition conflict left an effect intent: %+v", ledger.records)
 	}
-	prior := sha256.Sum256([]byte("prior"))
 	request.ToolCallID = "write-2"
-	request.Call.Arguments, _ = json.Marshal(map[string]string{"path": "note.txt", "content": "new content", "expected_sha256": hex.EncodeToString(prior[:])})
-	if _, err := gateway.Execute(ctx, request); err != nil {
-		t.Fatalf("matching preimage = %v", err)
+	request.Call.Arguments, _ = json.Marshal(map[string]string{"path": "note.txt", "content": "new content"})
+	if _, err := gateway.Execute(ctx, request); !errors.Is(err, ErrConflict) {
+		t.Fatalf("creation overwrote existing file = %v", err)
 	}
 }
 
@@ -205,9 +213,8 @@ func TestReconcileWriteRecognizesReservedButUnapplied(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	argumentsHash := sha256.Sum256(request.Call.Arguments)
 	intent := EffectRecord{InvocationID: request.InvocationID, RequestDigest: request.RequestDigest, ToolCallID: request.ToolCallID,
-		Name: request.Call.Name, ArgumentsSHA256: hex.EncodeToString(argumentsHash[:]), WorkspaceRoot: canonical, EffectPolicyHash: gateway.Policy}
+		Name: request.Call.Name, ArgumentsSHA256: contentSHA(request.Call.Arguments), WorkspaceRoot: canonical, EffectPolicyHash: gateway.Policy, FilePath: "note.txt", HasPreimage: true, PreparedSHA256: textSHA("new content")}
 	if _, _, err := ledger.Reserve(context.Background(), intent); err != nil {
 		t.Fatal(err)
 	}

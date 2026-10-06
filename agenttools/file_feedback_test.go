@@ -56,7 +56,8 @@ func TestWriteConflictReportsCorrectPathWithoutWritingOrReserving(t *testing.T) 
 	writeSnapshotFixture(t, root, "b.txt", "second file")
 	wrong := sha256.Sum256([]byte("second file"))
 	actual := sha256.Sum256([]byte("first file"))
-	request.Call.Arguments, _ = json.Marshal(map[string]string{"path": "a.txt", "content": "replacement", "expected_sha256": hex.EncodeToString(wrong[:])})
+	request.Call.Name = "edit_file"
+	request.Call.Arguments, _ = json.Marshal(fileEdit{Path: "a.txt", ExpectedSHA256: hex.EncodeToString(wrong[:]), Edits: []textEdit{{"first", "replacement"}}})
 	_, err := gateway.Execute(t.Context(), request)
 	if !errors.Is(err, ErrConflict) || !strings.Contains(err.Error(), `path="a.txt"`) || !strings.Contains(err.Error(), hex.EncodeToString(actual[:])) || !strings.Contains(err.Error(), hex.EncodeToString(wrong[:])) {
 		t.Fatalf("wrong-file hash conflict lacks target evidence: %v", err)

@@ -279,7 +279,7 @@ func TestEffectfulBoundaryCancelReconcilesAppliedWriteWithoutModelCall(t *testin
 	digest := kernel.Digest(hex.EncodeToString(sum[:]))
 	profile.BaseURL = server.URL + "/v1"
 	profile.AllowedReadTools = nil
-	profile.AllowedEffectTools = []string{"write_file"}
+	profile.AllowedEffectTools = []string{"create_file"}
 	root := t.TempDir()
 	liveCancelled := &atomic.Bool{}
 	binding := cancelRejectingEffectBinding{inner: nativeEffectBinding{root: root, policy: brief.EffectPolicyDigest}, cancelled: liveCancelled}
@@ -291,7 +291,7 @@ func TestEffectfulBoundaryCancelReconcilesAppliedWriteWithoutModelCall(t *testin
 			return Config{Bindings: binding, Gateway: agenttools.Gateway{Bindings: binding, Host: agenttools.Host{Timeout: time.Second}}, Effects: ledger, HTTP: server.Client(), Profile: profile}, nil
 		},
 	}
-	arguments := json.RawMessage(`{"path":"note.txt","content":"new content","expected_sha256":""}`)
+	arguments := json.RawMessage(`{"path":"note.txt","content":"new content"}`)
 	systemPrompt, err := assembleInstructions(brief, profile, root)
 	if err != nil {
 		t.Fatal(err)
@@ -303,7 +303,7 @@ func TestEffectfulBoundaryCancelReconcilesAppliedWriteWithoutModelCall(t *testin
 		EffectAuthority *agentruntime.EffectAuthority `json:"effect_authority"`
 	}{string(digest), string(encoded), systemPrompt,
 		&agentruntime.EffectAuthority{WorkspaceRoot: root, Permissions: []string{"repository.edit"}, Purpose: string(brief.Purpose), EffectPolicyDigest: string(brief.EffectPolicyDigest)}})
-	turn, _ := json.Marshal(agentruntime.Completion{ToolCalls: []agentruntime.ToolCall{{ID: "write-1", Name: "write_file", Arguments: arguments}}})
+	turn, _ := json.Marshal(agentruntime.Completion{ToolCalls: []agentruntime.ToolCall{{ID: "write-1", Name: "create_file", Arguments: arguments}}})
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	if _, err := journal.Append(ctx, string(brief.InvocationID), 0, agentruntime.Started, start); err != nil {
@@ -313,7 +313,7 @@ func TestEffectfulBoundaryCancelReconcilesAppliedWriteWithoutModelCall(t *testin
 		t.Fatal(err)
 	}
 	gateway := agenttools.MutationGateway{Bindings: binding, Host: agenttools.Host{Timeout: time.Second}, Ledger: ledger, Policy: brief.EffectPolicyDigest}
-	request := agenttools.Request{InvocationID: brief.InvocationID, RequestDigest: digest, ToolCallID: "write-1", Call: agenttools.Call{Name: "write_file", Arguments: arguments}}
+	request := agenttools.Request{InvocationID: brief.InvocationID, RequestDigest: digest, ToolCallID: "write-1", Call: agenttools.Call{Name: "create_file", Arguments: arguments}}
 	if _, err := gateway.Execute(ctx, request); !errors.Is(err, agenttools.ErrEffectUncertain) {
 		t.Fatalf("lost receipt = %v", err)
 	}
