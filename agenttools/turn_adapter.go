@@ -81,7 +81,7 @@ func TestDefinitions(permissions []string) []agentruntime.ToolDefinition {
 }
 
 func (adapter MutationTurnAdapter) Handles(name string) bool {
-	return name == "write_file" || name == "git_stage_files" || name == "git_commit"
+	return name == "write_file" || name == "edit_file" || name == "git_stage_files" || name == "git_commit"
 }
 
 func (adapter MutationTurnAdapter) ExecuteEffect(ctx context.Context, call agentruntime.ToolCall) (json.RawMessage, error) {
@@ -119,9 +119,9 @@ func (adapter MutationTurnAdapter) ReconcileEffect(ctx context.Context, call age
 
 func MutationDefinitions(permissions []string) []agentruntime.ToolDefinition {
 	available := Available(permissions)
-	definitions := make([]agentruntime.ToolDefinition, 0, 3)
+	definitions := make([]agentruntime.ToolDefinition, 0, 4)
 	for _, spec := range available {
-		if spec.Name == "write_file" || spec.Name == "git_stage_files" || spec.Name == "git_commit" {
+		if spec.Name == "write_file" || spec.Name == "edit_file" || spec.Name == "git_stage_files" || spec.Name == "git_commit" {
 			definitions = append(definitions, agentruntime.ToolDefinition{Name: spec.Name, Description: spec.Description, Parameters: spec.InputSchema})
 		}
 	}

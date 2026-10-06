@@ -339,11 +339,11 @@ func TestImplementationWithGoTestGateRequiresSignedTestPermission(t *testing.T) 
 	encoded, _ = json.Marshal(brief)
 	sum = sha256.Sum256(encoded)
 	digest = kernel.Digest(hex.EncodeToString(sum[:]))
-	profile.AllowedEffectTools = []string{"run_go_tests", "run_go_tests_worktree", "write_file"}
+	profile.AllowedEffectTools = []string{"edit_file", "run_go_tests", "run_go_tests_worktree", "write_file"}
 	binding.tests = true
 	config.Bindings, config.Gateway.Bindings, config.Profile = binding, binding, profile
 	session, err := PrepareWithEffects(context.Background(), brief, digest, config)
-	if err != nil || !session.Runner.Effects.Handles("run_go_tests") || !session.Runner.Effects.Handles("run_go_tests_worktree") {
+	if err != nil || !session.Runner.Effects.Handles("edit_file") || !session.Runner.Effects.Handles("run_go_tests") || !session.Runner.Effects.Handles("run_go_tests_worktree") {
 		t.Fatalf("signed test permission did not enable required tool: %v", err)
 	}
 	model := session.Runner.Model.(boundModel).model.(agentruntime.OpenAIModel)

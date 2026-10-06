@@ -14,7 +14,7 @@ import (
 	"github.com/tekroo-ai/teams/kernel"
 )
 
-var effectToolNames = []string{"write_file", "git_stage_files", "git_commit", "run_go_tests", "run_go_tests_worktree"}
+var effectToolNames = []string{"write_file", "edit_file", "git_stage_files", "git_commit", "run_go_tests", "run_go_tests_worktree"}
 
 func TestFailureMatrixCoversEveryEffectfulTool(t *testing.T) {
 	var actual []string
@@ -49,12 +49,22 @@ func failureMatrixFixture(t *testing.T, name string) (MutationGateway, TestGatew
 	tests := TestGateway{Bindings: authority, Host: host, Ledger: l, Policy: policy}
 	var args any
 	switch name {
-	case "write_file":
+	case "write_file", "edit_file":
 		if err := os.Mkdir(filepath.Join(root, "readonly"), 0500); err != nil {
 			t.Fatal(err)
 		}
 		t.Cleanup(func() { _ = os.Chmod(filepath.Join(root, "readonly"), 0700) })
 		args = map[string]any{"path": "readonly/new.txt", "content": "new", "expected_sha256": ""}
+		if name == "edit_file" {
+			if err := os.Chmod(filepath.Join(root, "readonly"), 0700); err != nil {
+				t.Fatal(err)
+			}
+			writeSnapshotFixture(t, root, "readonly/existing.txt", "before")
+			if err := os.Chmod(filepath.Join(root, "readonly"), 0500); err != nil {
+				t.Fatal(err)
+			}
+			args = fileEdit{"readonly/existing.txt", "before", "after", textSHA("before")}
+		}
 	case "git_stage_files":
 		args = map[string]any{"paths": []string{"a.go"}, "expected_head": strings.Repeat("b", 40)}
 	case "git_commit":
@@ -90,7 +100,7 @@ func TestEveryEffectToolRetainsKnownFailureAndReplaysIt(t *testing.T) {
 			}
 			// Remove the write failure condition: the same identity must still
 			// return the recorded failure, never create the file now.
-			if name == "write_file" {
+			if name == "write_file" || name == "edit_file" {
 				if err := os.Chmod(filepath.Join(root, "readonly"), 0700); err != nil {
 					t.Fatal(err)
 				}
@@ -103,7 +113,7 @@ func TestEveryEffectToolRetainsKnownFailureAndReplaysIt(t *testing.T) {
 			if err != nil || !completed || receipt.ResultHash != first.ResultHash {
 				t.Fatalf("completed failure reconciliation: %+v %t %v", receipt, completed, err)
 			}
-			if name == "write_file" {
+			if name == "write_file" || name == "edit_file" {
 				if _, err := os.Stat(filepath.Join(root, "readonly", "new.txt")); !errors.Is(err, os.ErrNotExist) {
 					t.Fatalf("failure replay wrote a file: %v", err)
 				}

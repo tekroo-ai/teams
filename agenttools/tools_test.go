@@ -475,19 +475,32 @@ func TestGoPackageSchemaMatchesHostValidation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, candidate := range []string{".", "./", "./...", "./foo", "./foo/bar", "./foo-bar", "example.test/nativequalification", "example.test/nativequalification/subpkg"} {
+	for _, candidate := range []string{".", "./", "./...", "./foo", "./foo/bar", "./foo-bar", "./subpkg/...", "example.test/nativequalification", "example.test/nativequalification/...", "example.test/nativequalification/subpkg", "example.test/nativequalification/subpkg/..."} {
 		if !pattern.MatchString(candidate) || !validGoPackageInModule(root, candidate) {
 			t.Fatalf("supported package %q rejected by schema=%t or host=%t", candidate, pattern.MatchString(candidate), validGoPackageInModule(root, candidate))
 		}
 	}
-	for _, candidate := range []string{"./.", "./..", "./../other", "./foo/", "./.hidden", "./foo;echo"} {
+	for _, candidate := range []string{"./.", "./..", "./../other", "./foo/", "./.hidden", "./foo;echo", "./.../foo", "./subpkg/.../foo", "./subpkg/../../...", "./subpkg/...."} {
 		if pattern.MatchString(candidate) || validGoPackageInModule(root, candidate) {
 			t.Fatalf("unsupported package %q accepted", candidate)
 		}
 	}
-	for _, candidate := range []string{"example.test/other", "example.test/nativequalification/missing", "example.test/nativequalification/../other"} {
+	for _, candidate := range []string{"example.test/other", "example.test/other/...", "example.test/nativequalification/missing", "example.test/nativequalification/missing/...", "example.test/nativequalification/../other", "./missing/..."} {
 		if validGoPackageInModule(root, candidate) {
 			t.Fatalf("external or nonexistent package %q accepted", candidate)
+		}
+	}
+	if err := os.Symlink(t.TempDir(), filepath.Join(root, "escape")); err != nil {
+		t.Fatal(err)
+	}
+	for _, candidate := range []string{"./escape/...", "example.test/nativequalification/escape/..."} {
+		if validGoPackageInModule(root, candidate) {
+			t.Fatalf("external subtree accepted: %s", candidate)
+		}
+	}
+	for _, spec := range Available([]string{"test.execute"}) {
+		if spec.Name == "run_go_tests_worktree" && string(spec.InputSchema) != string(goTestInputSchema) {
+			t.Fatal("test tool schemas diverged")
 		}
 	}
 }

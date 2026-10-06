@@ -27,7 +27,10 @@ type EffectRecord struct {
 	ArgumentsSHA256  string
 	WorkspaceRoot    string
 	EffectPolicyHash kernel.Digest
-	Result           json.RawMessage
+	// Computed by the host before edit_file; retained through restart, not
+	// supplied by the model. Empty on older and other operation records.
+	PreparedSHA256 string
+	Result         json.RawMessage
 }
 
 type EffectLedger interface {
@@ -50,6 +53,9 @@ type MutationGateway struct {
 }
 
 func (gateway MutationGateway) Execute(ctx context.Context, request Request) (Receipt, error) {
+	if request.Call.Name == "edit_file" {
+		return gateway.executeEdit(ctx, request)
+	}
 	if request.Call.Name == "git_stage_files" || request.Call.Name == "git_commit" {
 		return gateway.executeGitEffect(ctx, request)
 	}
@@ -178,6 +184,8 @@ func (gateway MutationGateway) Execute(ctx context.Context, request Request) (Re
 
 func (gateway MutationGateway) Reconcile(ctx context.Context, request Request) (Receipt, bool, error) {
 	switch request.Call.Name {
+	case "edit_file":
+		return gateway.reconcileEdit(ctx, request)
 	case "write_file":
 		return gateway.ReconcileWrite(ctx, request)
 	case "git_stage_files", "git_commit":

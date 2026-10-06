@@ -23,6 +23,7 @@ type toolEffectDocument struct {
 	ArgumentsSHA256  string `bson:"arguments_sha256"`
 	WorkspaceRoot    string `bson:"workspace_root"`
 	EffectPolicyHash string `bson:"effect_policy_digest"`
+	PreparedSHA256   string `bson:"prepared_sha256,omitempty"`
 	Result           []byte `bson:"result,omitempty"`
 }
 
@@ -40,11 +41,16 @@ func toolEffectCandidate(record agenttools.EffectRecord) (toolEffectDocument, er
 	if _, err := hex.DecodeString(record.ArgumentsSHA256); err != nil || strings.ToLower(record.ArgumentsSHA256) != record.ArgumentsSHA256 {
 		return toolEffectDocument{}, agenttools.ErrInvalidCall
 	}
+	if record.PreparedSHA256 != "" {
+		if _, err := hex.DecodeString(record.PreparedSHA256); err != nil || len(record.PreparedSHA256) != 64 || strings.ToLower(record.PreparedSHA256) != record.PreparedSHA256 {
+			return toolEffectDocument{}, agenttools.ErrInvalidCall
+		}
+	}
 	return toolEffectDocument{
 		ID: toolEffectID(string(record.InvocationID), record.ToolCallID), InvocationID: string(record.InvocationID),
 		RequestDigest: string(record.RequestDigest), ToolCallID: record.ToolCallID, Name: record.Name,
 		ArgumentsSHA256: record.ArgumentsSHA256, WorkspaceRoot: record.WorkspaceRoot,
-		EffectPolicyHash: string(record.EffectPolicyHash),
+		EffectPolicyHash: string(record.EffectPolicyHash), PreparedSHA256: record.PreparedSHA256,
 	}, nil
 }
 
@@ -60,6 +66,9 @@ func (s *Store) Reserve(ctx context.Context, record agenttools.EffectRecord) (ag
 	if err != nil {
 		return agenttools.EffectRecord{}, false, err
 	}
+	if record.Name == "edit_file" && record.PreparedSHA256 == "" {
+		return agenttools.EffectRecord{}, false, agenttools.ErrInvalidCall
+	}
 	collection := s.db.Collection("agent_tool_effects")
 	if _, err := collection.InsertOne(ctx, candidate); err == nil {
 		return record, true, nil
@@ -70,9 +79,10 @@ func (s *Store) Reserve(ctx context.Context, record agenttools.EffectRecord) (ag
 	if err := collection.FindOne(ctx, bson.D{{Key: "_id", Value: candidate.ID}}).Decode(&existing); err != nil {
 		return agenttools.EffectRecord{}, false, err
 	}
-	if !sameEffectIdentity(existing, candidate) {
+	if !sameEffectIdentity(existing, candidate) || existing.PreparedSHA256 != candidate.PreparedSHA256 {
 		return agenttools.EffectRecord{}, false, agenttools.ErrConflict
 	}
+	record.PreparedSHA256 = existing.PreparedSHA256
 	record.Result = append(json.RawMessage(nil), existing.Result...)
 	if len(record.Result) > 0 && !json.Valid(record.Result) {
 		return agenttools.EffectRecord{}, false, agenttools.ErrEffectUncertain
@@ -99,6 +109,7 @@ func (s *Store) Lookup(ctx context.Context, record agenttools.EffectRecord) (age
 	if !sameEffectIdentity(existing, candidate) {
 		return agenttools.EffectRecord{}, false, agenttools.ErrConflict
 	}
+	record.PreparedSHA256 = existing.PreparedSHA256
 	record.Result = append(json.RawMessage(nil), existing.Result...)
 	if len(record.Result) > 0 && !json.Valid(record.Result) {
 		return agenttools.EffectRecord{}, false, agenttools.ErrEffectUncertain
@@ -114,8 +125,14 @@ func (s *Store) Complete(ctx context.Context, record agenttools.EffectRecord, re
 	if err != nil || !json.Valid(result) || len(result) > 1<<20 {
 		return agenttools.ErrInvalidCall
 	}
+	if record.Name == "edit_file" && record.PreparedSHA256 == "" {
+		return agenttools.ErrInvalidCall
+	}
 	collection := s.db.Collection("agent_tool_effects")
 	filter := bson.D{{Key: "_id", Value: candidate.ID}, {Key: "request_digest", Value: candidate.RequestDigest}, {Key: "tool_call_id", Value: candidate.ToolCallID}, {Key: "name", Value: candidate.Name}, {Key: "arguments_sha256", Value: candidate.ArgumentsSHA256}, {Key: "workspace_root", Value: candidate.WorkspaceRoot}, {Key: "effect_policy_digest", Value: candidate.EffectPolicyHash}, {Key: "result", Value: bson.D{{Key: "$exists", Value: false}}}}
+	if candidate.PreparedSHA256 != "" {
+		filter = append(filter, bson.E{Key: "prepared_sha256", Value: candidate.PreparedSHA256})
+	}
 	updated, err := collection.UpdateOne(ctx, filter, bson.D{{Key: "$set", Value: bson.D{{Key: "result", Value: []byte(result)}}}})
 	if err != nil {
 		return err
@@ -130,7 +147,7 @@ func (s *Store) Complete(ctx context.Context, record agenttools.EffectRecord, re
 		}
 		return err
 	}
-	if !sameEffectIdentity(existing, candidate) || !bytes.Equal(existing.Result, result) {
+	if !sameEffectIdentity(existing, candidate) || existing.PreparedSHA256 != candidate.PreparedSHA256 || !bytes.Equal(existing.Result, result) {
 		return agenttools.ErrConflict
 	}
 	return nil

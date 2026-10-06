@@ -39,6 +39,9 @@ func (ledger *memoryEffectLedger) Reserve(_ context.Context, intent EffectRecord
 		if old.RequestDigest != intent.RequestDigest || old.Name != intent.Name || old.ArgumentsSHA256 != intent.ArgumentsSHA256 || old.WorkspaceRoot != intent.WorkspaceRoot || old.EffectPolicyHash != intent.EffectPolicyHash {
 			return EffectRecord{}, false, ErrConflict
 		}
+		if old.PreparedSHA256 != intent.PreparedSHA256 {
+			return EffectRecord{}, false, ErrConflict
+		}
 		return old, false, nil
 	}
 	ledger.records[key] = intent
@@ -71,7 +74,7 @@ func (ledger *memoryEffectLedger) Complete(_ context.Context, intent EffectRecor
 	}
 	key := string(intent.InvocationID) + ":" + intent.ToolCallID
 	old, found := ledger.records[key]
-	if !found || old.ArgumentsSHA256 != intent.ArgumentsSHA256 {
+	if !found || old.ArgumentsSHA256 != intent.ArgumentsSHA256 || old.PreparedSHA256 != intent.PreparedSHA256 {
 		return ErrConflict
 	}
 	if len(old.Result) > 0 && string(old.Result) != string(result) {
