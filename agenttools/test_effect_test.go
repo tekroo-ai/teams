@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -185,10 +186,16 @@ func TestTestGatewayRetainsTimeoutAndCancellation(t *testing.T) {
 			fixtureGit(t, root, "add", "go.mod")
 			fixtureGit(t, root, "-c", "user.name=Test", "-c", "user.email=test@example.test", "commit", "-qm", "baseline")
 			stub := filepath.Join(t.TempDir(), "go-stub")
+			listener, err := net.ListenTCP("tcp", &net.TCPAddr{IP: net.ParseIP("127.0.0.1")})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer listener.Close()
 			// A real executable exercises the sandbox/process path without
 			// granting a shell interpreter any extra execution permission.
 			stubSource := stub + ".go"
-			if err := os.WriteFile(stubSource, []byte("package main\nimport (\"fmt\"; \"time\")\nfunc main() { fmt.Println(\"fixture-started\"); time.Sleep(30*time.Second) }\n"), 0600); err != nil {
+			stubCode := fmt.Sprintf("package main\nimport (\"fmt\"; \"net\"; \"time\")\nfunc main() { fmt.Println(\"fixture-started\"); c, err := net.Dial(\"tcp\", %q); if err != nil { panic(err) }; c.Close(); time.Sleep(30*time.Second) }\n", listener.Addr().String())
+			if err := os.WriteFile(stubSource, []byte(stubCode), 0600); err != nil {
 				t.Fatal(err)
 			}
 			if output, err := exec.Command("go", "build", "-o", stub, stubSource).CombinedOutput(); err != nil {
@@ -197,14 +204,28 @@ func TestTestGatewayRetainsTimeoutAndCancellation(t *testing.T) {
 			digest := kernel.Digest(strings.Repeat("a", 64))
 			gateway := TestGateway{Bindings: effectBinding{authority: Authority{WorkspaceRoot: root,
 				Permissions: []string{"repository.read", "test.execute"}, Purpose: kernel.PurposeImplementation, EffectPolicyDigest: digest}},
-				Host: Host{Timeout: 2 * time.Second, GoBinary: stub}, Ledger: &memoryEffectLedger{}, Policy: digest}
+				Host: Host{Timeout: 5 * time.Second, GoBinary: stub}, Ledger: &memoryEffectLedger{}, Policy: digest}
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			if cancelCaller {
 				gateway.Host.Timeout = 10 * time.Second
-				timer := time.AfterFunc(2*time.Second, cancel)
-				defer timer.Stop()
 			}
+			// Cancel only after the actual subprocess has reached its marker,
+			// not after an assumed preparation/startup duration on a loaded host.
+			if err := listener.SetDeadline(time.Now().Add(10 * time.Second)); err != nil {
+				t.Fatal(err)
+			}
+			ready := make(chan error, 1)
+			go func() {
+				connection, err := listener.Accept()
+				if err == nil {
+					connection.Close()
+					if cancelCaller {
+						cancel()
+					}
+				}
+				ready <- err
+			}()
 			request := Request{InvocationID: "00000000-0000-7000-8000-000000000994", RequestDigest: digest, ToolCallID: name,
 				Call: Call{Name: "run_go_tests_worktree", Arguments: json.RawMessage(`{"package":"./..."}`)}}
 			started := time.Now()
@@ -213,7 +234,10 @@ func TestTestGatewayRetainsTimeoutAndCancellation(t *testing.T) {
 			if cancelCaller {
 				want = context.Canceled.Error()
 			}
-			if err != nil || first.Result.ExitCode != -1 || first.Result.ExecutionError != want || !strings.Contains(first.Result.Output, "fixture-started") || time.Since(started) > 6*time.Second {
+			if startupErr := <-ready; startupErr != nil {
+				t.Fatalf("fixture never started: %v", startupErr)
+			}
+			if err != nil || first.Result.ExitCode != -1 || first.Result.ExecutionError != want || !strings.Contains(first.Result.Output, "fixture-started") || time.Since(started) > gateway.Host.Timeout+4*time.Second {
 				t.Fatalf("bounded process failure was not retained: %+v, %v", first, err)
 			}
 			// Removing the executable makes any accidental second physical run
