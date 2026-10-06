@@ -74,6 +74,9 @@ func (s *Store) Append(ctx context.Context, invocationID string, expected uint64
 	}
 	defer session.EndSession(ctx)
 	_, err = session.WithTransaction(ctx, func(tx context.Context) (any, error) {
+		if err := s.fenceRunWrite(tx, invocationID, "", true); err != nil {
+			return nil, err
+		}
 		heads := s.db.Collection("agent_turn_heads")
 		if expected == 0 {
 			if _, err := heads.InsertOne(tx, turnHeadDocument{ID: invocationID, Sequence: 1}); err != nil {

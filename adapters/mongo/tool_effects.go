@@ -9,9 +9,14 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/tekroo-ai/teams/agentruntime"
 	"github.com/tekroo-ai/teams/agenttools"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	driver "go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
+	"go.mongodb.org/mongo-driver/v2/mongo/readconcern"
+	"go.mongodb.org/mongo-driver/v2/mongo/readpref"
+	"go.mongodb.org/mongo-driver/v2/mongo/writeconcern"
 )
 
 type toolEffectDocument struct {
@@ -69,6 +74,9 @@ func (s *Store) Reserve(ctx context.Context, record agenttools.EffectRecord) (ag
 	if record.Name == "edit_file" && record.PreparedSHA256 == "" {
 		return agenttools.EffectRecord{}, false, agenttools.ErrInvalidCall
 	}
+	if _, fenced := agentruntime.RunOwnershipFromContext(ctx); fenced {
+		return s.reserveOwnedEffect(ctx, record, candidate)
+	}
 	collection := s.db.Collection("agent_tool_effects")
 	if _, err := collection.InsertOne(ctx, candidate); err == nil {
 		return record, true, nil
@@ -88,6 +96,46 @@ func (s *Store) Reserve(ctx context.Context, record agenttools.EffectRecord) (ag
 		return agenttools.EffectRecord{}, false, agenttools.ErrEffectUncertain
 	}
 	return record, false, nil
+}
+
+func (s *Store) reserveOwnedEffect(ctx context.Context, record agenttools.EffectRecord, candidate toolEffectDocument) (agenttools.EffectRecord, bool, error) {
+	session, err := s.client.StartSession()
+	if err != nil {
+		return agenttools.EffectRecord{}, false, err
+	}
+	defer session.EndSession(ctx)
+	var created bool
+	var stored toolEffectDocument
+	_, err = session.WithTransaction(ctx, func(tx context.Context) (any, error) {
+		created = false
+		if err := s.fenceRunWrite(tx, candidate.InvocationID, candidate.RequestDigest, false); err != nil {
+			return nil, err
+		}
+		collection := s.db.Collection("agent_tool_effects")
+		err := collection.FindOne(tx, bson.D{{Key: "_id", Value: candidate.ID}}).Decode(&stored)
+		if errors.Is(err, driver.ErrNoDocuments) {
+			stored = candidate
+			_, err = collection.InsertOne(tx, candidate)
+			created = err == nil
+			return nil, err
+		}
+		if err != nil {
+			return nil, err
+		}
+		if !sameEffectIdentity(stored, candidate) || stored.PreparedSHA256 != candidate.PreparedSHA256 {
+			return nil, agenttools.ErrConflict
+		}
+		return nil, nil
+	}, options.Transaction().SetReadConcern(readconcern.Snapshot()).SetWriteConcern(writeconcern.Majority()).SetReadPreference(readpref.Primary()))
+	if err != nil {
+		return agenttools.EffectRecord{}, false, err
+	}
+	record.PreparedSHA256 = stored.PreparedSHA256
+	record.Result = append(json.RawMessage(nil), stored.Result...)
+	if len(record.Result) > 0 && !json.Valid(record.Result) {
+		return agenttools.EffectRecord{}, false, agenttools.ErrEffectUncertain
+	}
+	return record, created, nil
 }
 
 func (s *Store) Lookup(ctx context.Context, record agenttools.EffectRecord) (agenttools.EffectRecord, bool, error) {

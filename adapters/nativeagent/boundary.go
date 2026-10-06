@@ -20,7 +20,7 @@ type SessionConfigurator func(context.Context, application.ExecutionBrief) (Conf
 
 // Boundary is an opt-in AgentExecutionBoundary. It uses a MongoDB lease and
 // journal to recover after daemon restart, and reconciles admitted filesystem
-// effects before terminal cancellation. No production wiring selects it.
+// effects before terminal cancellation.
 type Boundary struct {
 	Control   agentruntime.RunControl
 	Journal   agentruntime.Journal
@@ -30,13 +30,18 @@ type Boundary struct {
 	Heartbeat time.Duration
 
 	mu      sync.Mutex
-	workers map[string]context.CancelCauseFunc
+	workers map[string]*nativeWorker
+}
+
+type nativeWorker struct {
+	cancel context.CancelCauseFunc
+	epoch  uint64
 }
 
 var _ application.AgentExecutionBoundary = (*Boundary)(nil)
 
 var (
-	errLeaseLost       = errors.New("native agent run lease lost")
+	errLeaseLost       = agentruntime.ErrLeaseLost
 	errCancelRequested = errors.New("native agent cancellation requested")
 )
 
@@ -65,10 +70,17 @@ func (boundary *Boundary) ReconcileSuperseded(ctx context.Context, brief applica
 		return application.ExternalExecutionObservation{}, err
 	}
 	boundary.mu.Lock()
-	cancel := boundary.workers[conversationID]
+	worker := boundary.workers[conversationID]
+	var cancel context.CancelCauseFunc
+	if worker != nil {
+		cancel = worker.cancel
+	}
 	boundary.mu.Unlock()
 	if cancel != nil {
 		cancel(errCancelRequested)
+	}
+	if worker != nil {
+		return application.ExternalExecutionObservation{}, errLeaseLost
 	}
 	entries, err := boundary.Journal.Load(ctx, conversationID)
 	if err != nil {
@@ -86,10 +98,10 @@ func (boundary *Boundary) ReconcileSuperseded(ctx context.Context, brief applica
 		// here would let the coordinator close the old attempt prematurely.
 		return application.ExternalExecutionObservation{}, errLeaseLost
 	}
-	if err := boundary.reconcileBeforeTerminal(brief, oldDigest); err != nil {
+	if err := boundary.reconcileBeforeTerminal(brief, oldDigest, lease.Epoch); err != nil {
 		return application.ExternalExecutionObservation{}, err
 	}
-	if err := boundary.recordTerminalWithPrompt(brief, oldDigest, agentruntime.Cancelled, "execution brief superseded", false); err != nil {
+	if err := boundary.recordTerminalWithPrompt(brief, oldDigest, lease.Epoch, agentruntime.Cancelled, "execution brief superseded", false); err != nil {
 		return application.ExternalExecutionObservation{}, err
 	}
 	boundary.release(brief, oldDigest, lease.Epoch)
@@ -109,7 +121,11 @@ func (boundary *Boundary) Cancel(ctx context.Context, brief application.Executio
 		return application.ExternalExecutionObservation{}, err
 	}
 	boundary.mu.Lock()
-	cancel := boundary.workers[string(brief.InvocationID)]
+	worker := boundary.workers[string(brief.InvocationID)]
+	var cancel context.CancelCauseFunc
+	if worker != nil {
+		cancel = worker.cancel
+	}
 	boundary.mu.Unlock()
 	if cancel != nil {
 		cancel(errCancelRequested)
@@ -128,6 +144,38 @@ func (boundary *Boundary) ensure(ctx context.Context, brief application.Executio
 	if observed, terminal, err := observeJournal(brief, digest, entries); err != nil || terminal {
 		return observed, err
 	}
+	// Reserve the local slot BEFORE Claim/Configure. In particular, waking
+	// after lease expiry must drain the previous goroutine before re-claiming;
+	// replacing its cancel function would lose the ability to stop it.
+	id := string(brief.InvocationID)
+	boundary.mu.Lock()
+	if previous := boundary.workers[id]; previous != nil {
+		cancel, epoch := previous.cancel, previous.epoch
+		boundary.mu.Unlock()
+		if cancel != nil {
+			renewCtx, stop := context.WithTimeout(ctx, boundary.Heartbeat)
+			renewal, err := boundary.Control.Renew(renewCtx, id, string(digest), boundary.Owner, epoch, time.Now().UTC(), boundary.LeaseTTL)
+			stop()
+			if err != nil || !renewal.Held {
+				cancel(errLeaseLost)
+			} else if renewal.CancelRequested {
+				cancel(errCancelRequested)
+			}
+		}
+		return nativeObservation(brief, digest, application.ExternalRunning, nil, false), nil
+	}
+	if boundary.workers == nil {
+		boundary.workers = make(map[string]*nativeWorker)
+	}
+	worker := &nativeWorker{}
+	boundary.workers[id] = worker
+	boundary.mu.Unlock()
+	started := false
+	defer func() {
+		if !started {
+			boundary.removeWorker(id, worker)
+		}
+	}()
 	lease, err := boundary.Control.Claim(ctx, string(brief.InvocationID), string(digest), boundary.Owner, time.Now().UTC(), boundary.LeaseTTL)
 	if err != nil {
 		return application.ExternalExecutionObservation{}, err
@@ -136,10 +184,10 @@ func (boundary *Boundary) ensure(ctx context.Context, brief application.Executio
 		return nativeObservation(brief, digest, application.ExternalRunning, nil, false), nil
 	}
 	if lease.CancelRequested {
-		if err := boundary.reconcileBeforeTerminal(brief, digest); err != nil {
+		if err := boundary.reconcileBeforeTerminal(brief, digest, lease.Epoch); err != nil {
 			return application.ExternalExecutionObservation{}, err
 		}
-		if err := boundary.recordTerminal(brief, digest, agentruntime.Cancelled, "cancelled before resume"); err != nil {
+		if err := boundary.recordTerminal(brief, digest, lease.Epoch, agentruntime.Cancelled, "cancelled before resume"); err != nil {
 			return application.ExternalExecutionObservation{}, err
 		}
 		boundary.release(brief, digest, lease.Epoch)
@@ -166,10 +214,10 @@ func (boundary *Boundary) ensure(ctx context.Context, brief application.Executio
 		return application.ExternalExecutionObservation{}, errors.Join(errLeaseLost, err)
 	}
 	if renewal.CancelRequested {
-		if err := boundary.reconcileBeforeTerminal(brief, digest); err != nil {
+		if err := boundary.reconcileBeforeTerminal(brief, digest, lease.Epoch); err != nil {
 			return application.ExternalExecutionObservation{}, err
 		}
-		if err := boundary.recordTerminal(brief, digest, agentruntime.Cancelled, "cancelled before model use"); err != nil {
+		if err := boundary.recordTerminal(brief, digest, lease.Epoch, agentruntime.Cancelled, "cancelled before model use"); err != nil {
 			return application.ExternalExecutionObservation{}, err
 		}
 		boundary.release(brief, digest, lease.Epoch)
@@ -184,24 +232,20 @@ func (boundary *Boundary) ensure(ctx context.Context, brief application.Executio
 	// model use, not only during the short coordinator boundary call.
 	deadlineCtx, stopDeadline := context.WithDeadline(context.Background(), brief.DeadlineAt)
 	workerCtx, cancel := context.WithCancelCause(deadlineCtx)
+	workerCtx = agentruntime.WithRunOwnership(workerCtx, boundary.ownership(brief, digest, lease.Epoch))
 	boundary.mu.Lock()
-	if boundary.workers == nil {
-		boundary.workers = make(map[string]context.CancelCauseFunc)
-	}
-	boundary.workers[string(brief.InvocationID)] = cancel
+	worker.cancel, worker.epoch = cancel, lease.Epoch
 	boundary.mu.Unlock()
-	go boundary.runWorker(workerCtx, cancel, stopDeadline, brief, digest, lease.Epoch)
+	started = true
+	go boundary.runWorker(workerCtx, cancel, stopDeadline, brief, digest, worker)
 	return nativeObservation(brief, digest, application.ExternalRunning, nil, false), nil
 }
 
-func (boundary *Boundary) runWorker(ctx context.Context, cancel context.CancelCauseFunc, stopDeadline context.CancelFunc, brief application.ExecutionBrief, digest kernel.Digest, epoch uint64) {
+func (boundary *Boundary) runWorker(ctx context.Context, cancel context.CancelCauseFunc, stopDeadline context.CancelFunc, brief application.ExecutionBrief, digest kernel.Digest, worker *nativeWorker) {
+	epoch := worker.epoch
 	defer cancel(nil)
 	defer stopDeadline()
-	defer func() {
-		boundary.mu.Lock()
-		delete(boundary.workers, string(brief.InvocationID))
-		boundary.mu.Unlock()
-	}()
+	defer boundary.removeWorker(string(brief.InvocationID), worker)
 	stopRenewal := make(chan struct{})
 	renewalDone := make(chan struct{})
 	go boundary.renewWhileRunning(ctx, cancel, brief, digest, epoch, stopRenewal, renewalDone)
@@ -230,6 +274,20 @@ func (boundary *Boundary) runWorker(ctx context.Context, cancel context.CancelCa
 		boundary.finishWorker(ctx, brief, digest, epoch, err)
 		return
 	}
+	session.Runner.CheckOwnership = func(operation context.Context) error {
+		checkCtx, stop := context.WithTimeout(operation, boundary.Heartbeat)
+		defer stop()
+		renewal, err := boundary.Control.Renew(checkCtx, string(brief.InvocationID), string(digest), boundary.Owner, epoch, time.Now().UTC(), boundary.LeaseTTL)
+		if err != nil || !renewal.Held {
+			cancel(errLeaseLost)
+			return errors.Join(errLeaseLost, err)
+		}
+		if renewal.CancelRequested {
+			cancel(errCancelRequested)
+			return errCancelRequested
+		}
+		return nil
+	}
 	_, err = session.Run(ctx)
 	stopHeartbeat()
 	boundary.finishWorker(ctx, brief, digest, epoch, err)
@@ -237,11 +295,24 @@ func (boundary *Boundary) runWorker(ctx context.Context, cancel context.CancelCa
 
 func (boundary *Boundary) finishWorker(ctx context.Context, brief application.ExecutionBrief, digest kernel.Digest, epoch uint64, runErr error) {
 	cause := context.Cause(ctx)
-	if errors.Is(cause, errLeaseLost) {
+	if errors.Is(cause, errLeaseLost) || errors.Is(runErr, errLeaseLost) {
+		// Release is itself epoch-conditional. It cannot release a replacement
+		// owner's lease, and avoids waiting a full TTL after a local drain.
+		boundary.release(brief, digest, epoch)
 		return
 	}
 	if runErr != nil || cause != nil {
-		if err := boundary.reconcileBeforeTerminal(brief, digest); err != nil {
+		// A deadline/error can arrive before the renewal goroutine runs on
+		// wake. Do not publish it for an expired or superseded owner. The
+		// journal adapter also checks this atomically at the actual append.
+		checkCtx, stop := context.WithTimeout(context.Background(), boundary.Heartbeat)
+		renewal, err := boundary.Control.Renew(checkCtx, string(brief.InvocationID), string(digest), boundary.Owner, epoch, time.Now().UTC(), boundary.LeaseTTL)
+		stop()
+		if err != nil || !renewal.Held {
+			boundary.release(brief, digest, epoch)
+			return
+		}
+		if err := boundary.reconcileBeforeTerminal(brief, digest, epoch); err != nil {
 			// Do not report cancellation/failure while a physical effect is
 			// uncertain. A later inspector may reclaim and reconcile it.
 			return
@@ -259,7 +330,7 @@ func (boundary *Boundary) finishWorker(ctx context.Context, brief application.Ex
 		case errors.Is(cause, errCancelRequested):
 			kind = agentruntime.Cancelled
 		}
-		if err := boundary.recordTerminal(brief, digest, kind, runErr.Error()); err != nil {
+		if err := boundary.recordTerminal(brief, digest, epoch, kind, runErr.Error()); err != nil {
 			// Keep the lease: a later inspector can reconcile the uncertain write
 			// after expiry instead of claiming that a terminal result exists.
 			return
@@ -277,9 +348,10 @@ func prepareSession(ctx context.Context, brief application.ExecutionBrief, diges
 
 // Called only while this boundary owns the invocation lease or after its
 // worker has returned. It cannot start a new effect or a model turn.
-func (boundary *Boundary) reconcileBeforeTerminal(brief application.ExecutionBrief, digest kernel.Digest) error {
+func (boundary *Boundary) reconcileBeforeTerminal(brief application.ExecutionBrief, digest kernel.Digest, epoch uint64) error {
 	ctx, cancel := context.WithTimeout(context.Background(), boundary.LeaseTTL)
 	defer cancel()
+	ctx = agentruntime.WithRunOwnership(ctx, boundary.ownership(brief, digest, epoch))
 	entries, err := boundary.Journal.Load(ctx, string(brief.InvocationID))
 	if err != nil || len(entries) == 0 || entries[len(entries)-1].Kind == agentruntime.Started {
 		return err
@@ -365,13 +437,14 @@ func (boundary *Boundary) renewWhileRunning(ctx context.Context, cancel context.
 	}
 }
 
-func (boundary *Boundary) recordTerminal(brief application.ExecutionBrief, digest kernel.Digest, kind agentruntime.Kind, reason string) error {
-	return boundary.recordTerminalWithPrompt(brief, digest, kind, reason, true)
+func (boundary *Boundary) recordTerminal(brief application.ExecutionBrief, digest kernel.Digest, epoch uint64, kind agentruntime.Kind, reason string) error {
+	return boundary.recordTerminalWithPrompt(brief, digest, epoch, kind, reason, true)
 }
 
-func (boundary *Boundary) recordTerminalWithPrompt(brief application.ExecutionBrief, digest kernel.Digest, kind agentruntime.Kind, reason string, strictPrompt bool) error {
+func (boundary *Boundary) recordTerminalWithPrompt(brief application.ExecutionBrief, digest kernel.Digest, epoch uint64, kind agentruntime.Kind, reason string, strictPrompt bool) error {
 	ctx, cancel := context.WithTimeout(context.Background(), boundary.Heartbeat)
 	defer cancel()
+	ctx = agentruntime.WithRunOwnership(ctx, boundary.ownership(brief, digest, epoch))
 	entries, err := boundary.Journal.Load(ctx, string(brief.InvocationID))
 	if err != nil {
 		return err
@@ -415,6 +488,18 @@ func (boundary *Boundary) recordTerminalWithPrompt(brief application.ExecutionBr
 		return err
 	}
 	return nil
+}
+
+func (boundary *Boundary) ownership(brief application.ExecutionBrief, digest kernel.Digest, epoch uint64) agentruntime.RunOwnership {
+	return agentruntime.RunOwnership{InvocationID: string(brief.InvocationID), RequestDigest: string(digest), Owner: boundary.Owner, Epoch: epoch}
+}
+
+func (boundary *Boundary) removeWorker(id string, worker *nativeWorker) {
+	boundary.mu.Lock()
+	defer boundary.mu.Unlock()
+	if boundary.workers[id] == worker {
+		delete(boundary.workers, id)
+	}
 }
 
 func (boundary *Boundary) release(brief application.ExecutionBrief, digest kernel.Digest, epoch uint64) {

@@ -130,6 +130,10 @@ type Runner struct {
 	MaxFinalSubmissions int
 	// Zero leaves turn count unbounded; the caller's deadline still bounds work.
 	MaxTurns int
+	// CheckOwnership runs before starting external work and before accepting
+	// its response. A suspended worker must not rely on heartbeat scheduling
+	// order to discover that its lease expired while the host was asleep.
+	CheckOwnership func(context.Context) error
 }
 
 type startRecord struct {
@@ -164,6 +168,9 @@ func (runner Runner) Run(ctx context.Context, invocationID, requestDigest, promp
 		return "", err
 	}
 	if len(entries) == 0 {
+		if err := runner.checkOwnership(ctx); err != nil {
+			return "", err
+		}
 		memory := SemanticContext{Status: "NOT_CONFIGURED"}
 		if runner.ContextProvider != nil {
 			memory, err = runner.ContextProvider.Retrieve(ctx, invocationID, runner.WorkspaceRoot, prompt)
@@ -190,6 +197,9 @@ func (runner Runner) Run(ctx context.Context, invocationID, requestDigest, promp
 		}
 		if complete != nil {
 			return *complete, nil
+		}
+		if err := runner.checkOwnership(ctx); err != nil {
+			return "", err
 		}
 		if len(pending) > 0 {
 			call := pending[0]
@@ -280,6 +290,11 @@ func (runner Runner) Run(ctx context.Context, invocationID, requestDigest, promp
 			response, err = runner.Model.Complete(ctx, modelMessages)
 		}
 		if err != nil {
+			// A request timeout delivered on wake is not a task failure if the
+			// worker lost its lease during sleep. Preserve the checkpoint.
+			if ownershipErr := runner.checkOwnership(ctx); ownershipErr != nil {
+				return "", ownershipErr
+			}
 			var partial *PartialTurnError
 			if errors.As(err, &partial) && partial.valid() && reflect.DeepEqual(partial.Messages, modelMessages) {
 				if entries[len(entries)-1].Kind == ModelPartial {
@@ -399,6 +414,9 @@ func (runner Runner) ReconcilePendingEffects(ctx context.Context, invocationID, 
 }
 
 func (runner Runner) append(ctx context.Context, id string, entries []Entry, kind Kind, payload json.RawMessage) ([]Entry, error) {
+	if err := runner.checkOwnership(ctx); err != nil {
+		return nil, err
+	}
 	if len(payload) > MaxJournalPayloadBytes {
 		return nil, fmt.Errorf("%w: journal payload exceeds %d bytes", ErrInvalidTurn, MaxJournalPayloadBytes)
 	}
@@ -423,6 +441,16 @@ func (runner Runner) append(ctx context.Context, id string, entries []Entry, kin
 		}
 	}
 	return nil, err
+}
+
+func (runner Runner) checkOwnership(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if runner.CheckOwnership != nil {
+		return runner.CheckOwnership(ctx)
+	}
+	return nil
 }
 
 // RecordedSystemPrompt returns an invocation's immutable initial instruction

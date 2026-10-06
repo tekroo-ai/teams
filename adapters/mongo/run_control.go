@@ -29,6 +29,34 @@ func validRunControl(id, digest string) bool {
 	return err == nil && len(decoded) == 32
 }
 
+// Called inside the SAME transaction as the journal append or new effect
+// reservation. Updating the control document conflicts with a concurrent
+// claim: a read-only ownership check would leave a handover race.
+func (s *Store) fenceRunWrite(ctx context.Context, id, digest string, allowCancelled bool) error {
+	ownership, fenced := agentruntime.RunOwnershipFromContext(ctx)
+	if !fenced {
+		return nil
+	} // Non-worker journal/ledger callers retain their API.
+	if ownership.InvocationID != id || digest != "" && ownership.RequestDigest != digest || !validRunControl(id, ownership.RequestDigest) || ownership.Owner == "" || ownership.Epoch == 0 {
+		return agentruntime.ErrLeaseLost
+	}
+	filter := bson.D{{Key: "_id", Value: id}, {Key: "request_digest", Value: ownership.RequestDigest}, {Key: "owner", Value: ownership.Owner}, {Key: "epoch", Value: ownership.Epoch}, {Key: "lease_until", Value: bson.D{{Key: "$gt", Value: time.Now().UTC()}}}}
+	if !allowCancelled {
+		filter = append(filter, bson.E{Key: "cancel_requested", Value: false})
+	}
+	result, err := s.db.Collection("agent_run_control").UpdateOne(ctx,
+		filter,
+		bson.D{{Key: "$inc", Value: bson.D{{Key: "write_fence", Value: 1}}}},
+	)
+	if err != nil {
+		return err
+	}
+	if result.MatchedCount != 1 {
+		return agentruntime.ErrLeaseLost
+	}
+	return nil
+}
+
 func (s *Store) Claim(ctx context.Context, id, digest, owner string, now time.Time, ttl time.Duration) (agentruntime.RunLease, error) {
 	if err := requireDeadline(ctx); err != nil {
 		return agentruntime.RunLease{}, err
