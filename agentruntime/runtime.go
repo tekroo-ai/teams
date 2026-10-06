@@ -27,6 +27,7 @@ const (
 	Started       Kind = "started"
 	ModelTurn     Kind = "model_turn"
 	ModelRejected Kind = "model_rejected"
+	ModelPartial  Kind = "model_partial"
 	ToolDone      Kind = "tool_done"
 	Finished      Kind = "finished"
 	Failed        Kind = "failed"
@@ -258,12 +259,45 @@ func (runner Runner) Run(ctx context.Context, invocationID, requestDigest, promp
 		if runner.MaxTurns > 0 && turns >= runner.MaxTurns {
 			return "", ErrTurnLimit
 		}
-		modelMessages, err := condenseHistory(ctx, messages, runner.Condenser)
-		if err != nil {
-			return "", err
+		var response Completion
+		var modelMessages []Message
+		if entries[len(entries)-1].Kind == ModelPartial {
+			var partial PartialTurnError
+			if json.Unmarshal(entries[len(entries)-1].Payload, &partial) != nil || !partial.valid() {
+				return "", ErrInvalidTurn
+			}
+			continuing, ok := runner.Model.(ContinuingModel)
+			if !ok {
+				return "", fmt.Errorf("%w: model does not support retained continuation", ErrInvalidTurn)
+			}
+			modelMessages = partial.Messages
+			response, err = continuing.Continue(ctx, partial)
+		} else {
+			modelMessages, err = condenseHistory(ctx, messages, runner.Condenser)
+			if err != nil {
+				return "", err
+			}
+			response, err = runner.Model.Complete(ctx, modelMessages)
 		}
-		response, err := runner.Model.Complete(ctx, modelMessages)
 		if err != nil {
+			var partial *PartialTurnError
+			if errors.As(err, &partial) && partial.valid() && reflect.DeepEqual(partial.Messages, modelMessages) {
+				if entries[len(entries)-1].Kind == ModelPartial {
+					var prior PartialTurnError
+					if json.Unmarshal(entries[len(entries)-1].Payload, &prior) != nil || partial.Binding != prior.Binding || len(partial.Prefix) <= len(prior.Prefix) || !strings.HasPrefix(partial.Prefix, prior.Prefix) {
+						return "", fmt.Errorf("%w: continuation rewrote or repeated its retained prefix", ErrInvalidTurn)
+					}
+				}
+				payload, encodeErr := json.Marshal(partial)
+				if encodeErr != nil {
+					return "", encodeErr
+				}
+				entries, err = runner.append(ctx, invocationID, entries, ModelPartial, payload)
+				if err != nil {
+					return "", err
+				}
+				continue
+			}
 			var rejected *RejectedTurnError
 			if runner.MaxFinalSubmissions > 1 && errors.As(err, &rejected) && rejected.valid() {
 				payload, encodeErr := json.Marshal(rejected)
@@ -365,6 +399,9 @@ func (runner Runner) ReconcilePendingEffects(ctx context.Context, invocationID, 
 }
 
 func (runner Runner) append(ctx context.Context, id string, entries []Entry, kind Kind, payload json.RawMessage) ([]Entry, error) {
+	if len(payload) > MaxJournalPayloadBytes {
+		return nil, fmt.Errorf("%w: journal payload exceeds %d bytes", ErrInvalidTurn, MaxJournalPayloadBytes)
+	}
 	var sequence uint64
 	if len(entries) > 0 {
 		sequence = entries[len(entries)-1].Sequence
@@ -429,6 +466,7 @@ func replay(id, requestDigest, prompt, systemPrompt, finalTool string, finalize 
 	seenCalls := make(map[string]bool)
 	var turns int
 	var finalText *string
+	var partial *PartialTurnError
 	for i, entry := range entries {
 		if entry.InvocationID != id || entry.Sequence != uint64(i+1) || !json.Valid(entry.Payload) {
 			return nil, nil, nil, 0, ErrInvalidTurn
@@ -437,6 +475,22 @@ func replay(id, requestDigest, prompt, systemPrompt, finalTool string, finalize 
 			continue
 		}
 		switch entry.Kind {
+		case ModelPartial:
+			var next PartialTurnError
+			if len(outstanding) != 0 || finalText != nil || json.Unmarshal(entry.Payload, &next) != nil || !next.valid() {
+				return nil, nil, nil, 0, ErrInvalidTurn
+			}
+			pinned := 1
+			if systemPrompt != "" {
+				pinned = 2
+			}
+			if len(next.Messages) < pinned || !reflect.DeepEqual(next.Messages[:pinned], messages[:pinned]) {
+				return nil, nil, nil, 0, ErrInvalidTurn
+			}
+			if partial != nil && (next.Binding != partial.Binding || !reflect.DeepEqual(next.Messages, partial.Messages) || len(next.Prefix) <= len(partial.Prefix) || !strings.HasPrefix(next.Prefix, partial.Prefix)) {
+				return nil, nil, nil, 0, ErrInvalidTurn
+			}
+			partial = &next
 		case ModelRejected:
 			var rejected RejectedTurnError
 			if len(outstanding) != 0 || finalText != nil || json.Unmarshal(entry.Payload, &rejected) != nil || !rejected.valid() {
@@ -448,6 +502,7 @@ func replay(id, requestDigest, prompt, systemPrompt, finalTool string, finalize 
 			}})
 			messages = append(messages, Message{Role: "assistant", Content: string(rejected.Response)}, Message{Role: "user", Content: string(feedback)})
 			turns++
+			partial = nil
 		case ModelTurn:
 			if len(outstanding) > 0 || finalText != nil {
 				return nil, nil, nil, 0, ErrInvalidTurn
@@ -466,12 +521,16 @@ func replay(id, requestDigest, prompt, systemPrompt, finalTool string, finalize 
 				seenCalls[call.ID] = true
 			}
 			turns++
+			partial = nil
 			messages = append(messages, Message{Role: "assistant", Content: response.Text, ToolCalls: response.ToolCalls})
 			outstanding = append([]ToolCall(nil), response.ToolCalls...)
 			if len(response.ToolCalls) == 0 && finalTool == "" {
 				finalText = &response.Text
 			}
 		case ToolDone:
+			if partial != nil {
+				return nil, nil, nil, 0, ErrInvalidTurn
+			}
 			var result ToolResult
 			if json.Unmarshal(entry.Payload, &result) != nil || len(outstanding) == 0 || result.CallID != outstanding[0].ID || result.Name != outstanding[0].Name || !json.Valid(result.Output) {
 				return nil, nil, nil, 0, ErrInvalidTurn
@@ -483,6 +542,9 @@ func replay(id, requestDigest, prompt, systemPrompt, finalTool string, finalize 
 			messages = append(messages, Message{Role: "tool", Content: content, CallID: result.CallID, Name: result.Name})
 			outstanding = outstanding[1:]
 		case Finished:
+			if partial != nil {
+				return nil, nil, nil, 0, ErrInvalidTurn
+			}
 			if i != len(entries)-1 {
 				return nil, nil, nil, 0, ErrInvalidTurn
 			}

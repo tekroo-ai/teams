@@ -450,3 +450,14 @@ func (bound boundModel) Complete(ctx context.Context, messages []agentruntime.Me
 	}
 	return bound.model.Complete(ctx, messages)
 }
+
+func (bound boundModel) Continue(ctx context.Context, partial agentruntime.PartialTurnError) (agentruntime.Completion, error) {
+	if _, err := bound.bindings.BindToolInvocation(ctx, bound.id, bound.digest); err != nil {
+		return agentruntime.Completion{}, err
+	}
+	continuing, ok := bound.model.(agentruntime.ContinuingModel)
+	if !ok {
+		return agentruntime.Completion{}, agentruntime.ErrInvalidTurn
+	}
+	return continuing.Continue(ctx, partial)
+}

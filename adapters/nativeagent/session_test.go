@@ -223,6 +223,78 @@ func TestPreparedHandlerSessionAcceptsOnlyValidatedStructuredResult(t *testing.T
 	}
 }
 
+func TestPreparedHandlerSessionContinuesCappedStructuredResult(t *testing.T) {
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		var request struct {
+			Continue bool                   `json:"continue_final_message"`
+			Messages []agentruntime.Message `json:"messages"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			t.Error(err)
+		}
+		content, reason := `{"submit_result":{"outcome":`, "length"
+		if requests == 2 {
+			last := request.Messages[len(request.Messages)-1]
+			if !request.Continue || last.Role != "assistant" || last.Content != content {
+				t.Errorf("not continuing exact partial: %+v", request)
+			}
+			content, reason = `"completed"}}`, "stop"
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"id": "part", "choices": []any{map[string]any{"finish_reason": reason, "message": map[string]any{"content": content}}}})
+	}))
+	defer server.Close()
+	brief, _, profile := testBriefAndProfile()
+	brief.MessageHandler = &application.MessageHandlerGrounding{ResultSchema: json.RawMessage(`{"type":"object","additionalProperties":false,"required":["schema_version","outcome"],"properties":{"schema_version":{"const":"1.0.0"},"outcome":{"const":"completed"}}}`), AllowedResults: []string{"completed"}}
+	brief.ResultProtocol = &application.ExecutionResultProtocol{Marker: application.OrganizationalResultMarker}
+	encoded, _ := json.Marshal(brief)
+	sum := sha256.Sum256(encoded)
+	digest := kernel.Digest(hex.EncodeToString(sum[:]))
+	profile.BaseURL = server.URL + "/v1"
+	profile.ResponseMode = ResponseModeJSONSchemaActions
+	binding := &testBinding{root: t.TempDir()}
+	journal := &testJournal{}
+	config := Config{Bindings: binding, Gateway: agenttools.Gateway{Bindings: binding, Host: agenttools.Host{Timeout: time.Second}}, Journal: journal, HTTP: server.Client(), Profile: profile}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	session, err := PrepareReadOnly(ctx, brief, digest, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	output, err := session.Run(ctx)
+	if err != nil || requests != 2 || !strings.Contains(output, `"outcome":"completed"`) || len(journal.entries) != 4 || journal.entries[1].Kind != agentruntime.ModelPartial {
+		t.Fatalf("output=%s err=%v requests=%d journal_entries=%d", output, err, requests, len(journal.entries))
+	}
+	if _, err := session.Run(ctx); err != nil || requests != 2 {
+		t.Fatalf("completed stage repeated: %v", err)
+	}
+}
+
+func TestBoundModelContinuationRechecksAuthority(t *testing.T) {
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		_, _ = w.Write([]byte(`{"id":"r","choices":[{"finish_reason":"length","message":{"content":"{\"submit_result\":"}}]}`))
+	}))
+	defer server.Close()
+	contract, err := agentruntime.NewStructuredTurnContract([]agentruntime.ToolDefinition{{Name: "submit_result", Parameters: json.RawMessage(`{"type":"object"}`)}}, "submit_result")
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := t.TempDir()
+	binding := &testBinding{root: root, drift: true}
+	bound := boundModel{bindings: stableBinding{source: binding, initial: agenttools.Authority{WorkspaceRoot: root, Permissions: []string{"repository.read"}}}, model: agentruntime.OpenAIModel{Client: server.Client(), BaseURL: server.URL + "/v1", Model: "local", MaxTokens: 8, TurnContract: contract}}
+	_, err = bound.Complete(context.Background(), []agentruntime.Message{{Role: "user", Content: "finish"}})
+	var partial *agentruntime.PartialTurnError
+	if !errors.As(err, &partial) {
+		t.Fatal(err)
+	}
+	if _, err = bound.Continue(context.Background(), *partial); !errors.Is(err, ErrInvalidBinding) || requests != 1 {
+		t.Fatalf("authority drift reached model: err=%v requests=%d", err, requests)
+	}
+}
+
 type nativeEffectBinding struct {
 	root   string
 	policy kernel.Digest

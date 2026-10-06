@@ -3,6 +3,7 @@ package agentruntime
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -37,6 +38,17 @@ type OpenAIModel struct {
 }
 
 func (model OpenAIModel) Complete(ctx context.Context, transcript []Message) (Completion, error) {
+	return model.complete(ctx, transcript, nil)
+}
+
+func (model OpenAIModel) Continue(ctx context.Context, partial PartialTurnError) (Completion, error) {
+	if !partial.valid() {
+		return Completion{}, ErrInvalidTurn
+	}
+	return model.complete(ctx, partial.Messages, &partial)
+}
+
+func (model OpenAIModel) complete(ctx context.Context, transcript []Message, partial *PartialTurnError) (Completion, error) {
 	base, err := url.Parse(model.BaseURL)
 	if err != nil || (base.Scheme != "http" && base.Scheme != "https") || base.Host == "" || model.Client == nil || model.Model == "" || model.MaxTokens <= 0 || len(transcript) == 0 {
 		return Completion{}, ErrInvalidTurn
@@ -107,6 +119,33 @@ func (model OpenAIModel) Complete(ctx context.Context, transcript []Message) (Co
 		}
 		request["tools"] = tools
 	}
+	constrained := model.TurnContract != nil || repairFinal
+	var binding string
+	if constrained {
+		// Continuation begins inside JSON, not the model's reasoning protocol.
+		request["enable_thinking"] = false
+		request["chat_template_kwargs"] = map[string]any{"enable_thinking": false}
+		bound := make(map[string]any, len(request))
+		for key, value := range request {
+			if key != "messages" {
+				bound[key] = value
+			}
+		}
+		bound["endpoint"] = strings.TrimRight(model.BaseURL, "/")
+		encoded, err := json.Marshal(bound)
+		if err != nil {
+			return Completion{}, err
+		}
+		binding = fmt.Sprintf("%x", sha256.Sum256(encoded))
+	}
+	if partial != nil {
+		if !constrained || binding != partial.Binding {
+			return Completion{}, fmt.Errorf("%w: continuation model/schema binding changed", ErrInvalidTurn)
+		}
+		messages = append(messages, map[string]any{"role": "assistant", "content": partial.Prefix})
+		request["messages"] = messages
+		request["continue_final_message"] = true
+	}
 	body, err := json.Marshal(request)
 	if err != nil {
 		return Completion{}, err
@@ -152,6 +191,29 @@ func (model OpenAIModel) Complete(ctx context.Context, transcript []Message) (Co
 		return Completion{}, fmt.Errorf("%w: malformed model completion", ErrInvalidTurn)
 	}
 	message := decoded.Choices[0].Message
+	if constrained {
+		if len(message.ToolCalls) != 0 || decoded.ID == "" && (model.TurnContract != nil || decoded.Choices[0].FinishReason == "length") {
+			return Completion{}, fmt.Errorf("%w: native tools or missing response identity on structured channel", ErrInvalidTurn)
+		}
+		prefix := ""
+		if partial != nil {
+			prefix = partial.Prefix
+		}
+		if len(prefix)+len(message.Content) > MaxStructuredResponseBytes {
+			return Completion{}, fmt.Errorf("%w: structured response exceeds %d bytes", ErrInvalidTurn, MaxStructuredResponseBytes)
+		}
+		if decoded.Choices[0].FinishReason == "length" {
+			if message.Content == "" {
+				return Completion{}, fmt.Errorf("%w: structured continuation made no progress", ErrInvalidTurn)
+			}
+			checkpoint := &PartialTurnError{Prefix: prefix + message.Content, Binding: binding, ResponseID: decoded.ID, Messages: transcript}
+			if !checkpoint.valid() {
+				return Completion{}, ErrInvalidTurn
+			}
+			return Completion{}, checkpoint
+		}
+		message.Content = prefix + message.Content
+	}
 	if model.TurnContract != nil {
 		if decoded.Choices[0].FinishReason != "stop" || len(message.ToolCalls) != 0 {
 			return Completion{}, fmt.Errorf("%w: incomplete structured turn", ErrInvalidTurn)

@@ -64,7 +64,7 @@ func (s *Store) Append(ctx context.Context, invocationID string, expected uint64
 	if err := requireDeadline(ctx); err != nil {
 		return agentruntime.Entry{}, err
 	}
-	if strings.TrimSpace(invocationID) == "" || kind == "" || !json.Valid(payload) || len(payload) > 1<<20 {
+	if strings.TrimSpace(invocationID) == "" || kind == "" || !json.Valid(payload) || len(payload) > agentruntime.MaxJournalPayloadBytes {
 		return agentruntime.Entry{}, agentruntime.ErrInvalidTurn
 	}
 	entry := agentruntime.Entry{InvocationID: invocationID, Sequence: expected + 1, Kind: kind, Payload: append(json.RawMessage(nil), payload...)}
