@@ -216,7 +216,12 @@ func TestPrepareNativeToolDeltaRelease(t *testing.T) {
 		corpus := *p.QualificationCorpus
 		corpus.Revision++
 		corpus.ToolSurfaceDigest = surface
-		corpus.ScenarioIDs = append(slices.Clone(corpus.ScenarioIDs), "native-tool-delta-edit-subtree")
+		corpus.ScenarioIDs = slices.Clone(corpus.ScenarioIDs)
+		// Requalifying the same capability on a new catalog retains its
+		// scenario identity; duplicate IDs make the corpus invalid.
+		if !slices.Contains(corpus.ScenarioIDs, "native-tool-delta-edit-subtree") {
+			corpus.ScenarioIDs = append(corpus.ScenarioIDs, "native-tool-delta-edit-subtree")
+		}
 		corpusDigest, err := corpus.Digest()
 		if err != nil {
 			t.Fatal(err)
