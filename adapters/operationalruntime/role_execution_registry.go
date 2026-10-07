@@ -45,7 +45,7 @@ func (service *ProductionService) registerRoleState(ctx context.Context, state o
 // the role host before a prior daemon stopped. It runs before eager roles are
 // relaunched so fencing epochs remain contiguous.
 func (service *ProductionService) reconcileDurableRoleExecutions(ctx context.Context) error {
-	if service == nil || service.RoleHost == nil {
+	if service == nil || service.RoleHost == nil || service.Store == nil {
 		return organization.ErrRoleRuntime
 	}
 	roster, err := service.RoleHost.Roster(ctx)
@@ -56,9 +56,23 @@ func (service *ProductionService) reconcileDurableRoleExecutions(ctx context.Con
 		if !state.Execution.Valid() {
 			return errors.New("durable role state has no valid execution")
 		}
-		if err := service.registerRoleState(ctx, state); err != nil {
+		if err := service.reconcileRoleExecution(ctx, state); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func (service *ProductionService) reconcileRoleExecution(ctx context.Context, state organization.RoleInstanceState) error {
+	registration, found, err := service.Store.ReadExecutionRegistration(ctx, state.ActorFQN)
+	if err != nil {
+		return err
+	}
+	// An exact durable registry head needs no reconstruction from a profile
+	// that may have been replaced. New or unfinished transitions still require
+	// the configured profile and normal contiguous fencing checks.
+	if found && registration.Execution == state.Execution {
+		return nil
+	}
+	return service.registerRoleState(ctx, state)
 }
