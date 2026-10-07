@@ -11,7 +11,7 @@ func (service *ProductionService) newInvocationAdmissionBlocked() bool {
 }
 
 func (service *ProductionService) newInvocationAdmissionBlockedLocked() bool {
-	return service.suspendNewInvocations || service.admissionLimitEnabled && service.admissionRemaining == 0
+	return service.suspendNewInvocations || service.admissionLimitEnabled && service.admissionRemaining == 0 || service.featureExecutionPaused()
 }
 
 // beginNewInvocationAdmission serializes the check and authorization of a new

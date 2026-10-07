@@ -151,6 +151,12 @@ func (controller *Controller) Inspect() ControlStatus {
 	}
 }
 
+func (controller *Controller) isRunning() bool {
+	controller.mu.Lock()
+	defer controller.mu.Unlock()
+	return controller.state == ControlRunning
+}
+
 func (controller *Controller) Stop(ctx context.Context) error {
 	controller.mu.Lock()
 	if controller.state != ControlRunning && controller.state != ControlPaused && controller.state != ControlFailed {

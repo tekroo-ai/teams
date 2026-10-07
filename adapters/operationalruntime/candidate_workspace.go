@@ -27,10 +27,11 @@ import (
 )
 
 const (
-	candidateReceiptSchema        = "tekroo.teams.candidate-receipt/1.1.0"
-	nativeCandidateReceiptSchema  = "tekroo.teams.candidate-receipt/1.2.0"
-	legacyCandidateReceiptSchema  = "tekroo.teams.candidate-receipt/1.0.0"
-	candidateRehydrateParallelism = 4
+	candidateReceiptSchema               = "tekroo.teams.candidate-receipt/1.1.0"
+	nativeCandidateReceiptSchema         = "tekroo.teams.candidate-receipt/1.3.0"
+	previousNativeCandidateReceiptSchema = "tekroo.teams.candidate-receipt/1.2.0"
+	legacyCandidateReceiptSchema         = "tekroo.teams.candidate-receipt/1.0.0"
+	candidateRehydrateParallelism        = 4
 )
 
 var errInvalidCandidateWorkspace = errors.New("invalid immutable candidate workspace")
@@ -61,6 +62,7 @@ type candidateGateReceipt struct {
 	FullStdoutSHA256 kernel.Digest `json:"full_stdout_sha256,omitempty"`
 	FullStderrSHA256 kernel.Digest `json:"full_stderr_sha256,omitempty"`
 	ReusedFrom       string        `json:"-"`
+	PackageTargets   []string      `json:"package_targets,omitempty"`
 }
 
 type candidateReceipt struct {
@@ -126,7 +128,7 @@ func newCandidateWorkspaceManagerWithMode(ctx context.Context, evidenceRoot, git
 		for _, argument := range gate.Command {
 			invalidArgument = invalidArgument || strings.TrimSpace(argument) == ""
 		}
-		if gate.GateID == "" || len(gate.Command) == 0 || invalidArgument {
+		if gate.GateID == "" || len(gate.Command) == 0 || invalidArgument || !validGateScope(gate) {
 			return nil, errInvalidCandidateWorkspace
 		}
 		gateTimeout, err := time.ParseDuration(gate.Timeout)
@@ -151,7 +153,7 @@ func newCandidateWorkspaceManagerWithMode(ctx context.Context, evidenceRoot, git
 	return manager, nil
 }
 
-func (manager *candidateWorkspaceManager) Prepare(ctx context.Context, feature organization.FeatureRequest, consumer organization.PlannedTask, consumerWorkspaceID string, source ProductionWorkspace, targets []candidateTargetReceipt, requiredGateIDs []string) (ProductionWorkspace, candidateReceipt, kernel.Digest, error) {
+func (manager *candidateWorkspaceManager) Prepare(ctx context.Context, feature organization.FeatureRequest, consumer organization.PlannedTask, consumerWorkspaceID string, source ProductionWorkspace, targets []candidateTargetReceipt, requiredGateIDs []string, componentScope ...[]string) (ProductionWorkspace, candidateReceipt, kernel.Digest, error) {
 	started := time.Now()
 	defer func() { log.Printf("candidate_prepare consumer=%s elapsed=%s", consumer.ID, time.Since(started)) }()
 	if manager == nil || !feature.ID.Valid() || !consumer.ID.Valid() || consumerWorkspaceID == "" || source.WorkspaceID == "" || !filepath.IsAbs(source.WorkingDirectory) || len(source.BaselineSHA) != 40 || len(targets) == 0 || len(requiredGateIDs) == 0 {
@@ -177,6 +179,10 @@ func (manager *candidateWorkspaceManager) Prepare(ctx context.Context, feature o
 	if err != nil {
 		return ProductionWorkspace{}, candidateReceipt{}, "", err
 	}
+	manager, policyDigest, err := manager.withGateScope(source.WorkingDirectory, requiredGateIDs, componentScope)
+	if err != nil {
+		return ProductionWorkspace{}, candidateReceipt{}, "", err
+	}
 	seed := struct {
 		FeatureID          kernel.UUIDv7            `json:"feature_id"`
 		RepositoryDigest   kernel.Digest            `json:"repository_digest"`
@@ -187,7 +193,8 @@ func (manager *candidateWorkspaceManager) Prepare(ctx context.Context, feature o
 		DiffSHA256         kernel.Digest            `json:"diff_sha256"`
 		RuntimeHookSHA256  kernel.Digest            `json:"runtime_hook_sha256"`
 		Targets            []candidateTargetReceipt `json:"targets"`
-	}{feature.ID, state.repositoryDigest, source.BaselineSHA, state.commit, state.tree, state.changedFilesDigest, state.diffDigest, state.runtimeHookDigest, targets}
+		GatePolicySHA256   kernel.Digest            `json:"gate_policy_sha256,omitempty"`
+	}{feature.ID, state.repositoryDigest, source.BaselineSHA, state.commit, state.tree, state.changedFilesDigest, state.diffDigest, state.runtimeHookDigest, targets, policyDigest}
 	seedBytes, err := json.Marshal(seed)
 	if err != nil {
 		return ProductionWorkspace{}, candidateReceipt{}, "", err
@@ -559,6 +566,19 @@ func (manager *candidateWorkspaceManager) runGates(ctx context.Context, director
 		command := exec.CommandContext(gateCtx, gate.Command[0], gate.Command[1:]...)
 		command.Dir = directory
 		command.Env = append(os.Environ(), "CI=1", "GIT_PAGER=cat", "PAGER=cat", "GIT_TERMINAL_PROMPT=0")
+		inputKey, err := candidateGateInputKey(ctx, gate, command.Env, directory, strings.TrimSpace(string(identity)), strings.TrimSpace(string(tree)))
+		if err != nil {
+			cancel()
+			return receipts, err
+		}
+		failure, err := manager.readGateFailure(inputKey, gate, directory, strings.TrimSpace(string(identity)))
+		if err != nil || failure != nil {
+			cancel()
+			if err != nil {
+				return receipts, err
+			}
+			return append(receipts, failure.Receipt), failure
+		}
 		cacheKey, err := candidateGateCacheKey(ctx, gate, command.Env, directory, strings.TrimSpace(string(identity)), strings.TrimSpace(string(tree)))
 		if err != nil {
 			cancel()
@@ -589,6 +609,7 @@ func (manager *candidateWorkspaceManager) runGates(ctx context.Context, director
 		started := time.Now()
 		runErr := command.Run()
 		finished := time.Now()
+		gateContextErr := gateCtx.Err()
 		log.Printf("candidate_gate gate=%s elapsed=%s error=%t", gateID, time.Since(started), runErr != nil)
 		cancel()
 		exitCode := 0
@@ -606,6 +627,7 @@ func (manager *candidateWorkspaceManager) runGates(ctx context.Context, director
 			StdoutBase64: base64.StdEncoding.EncodeToString(stdout.Bytes()), StderrBase64: base64.StdEncoding.EncodeToString(stderr.Bytes()),
 			StdoutSHA256: stdoutDigest, StderrSHA256: stderrDigest,
 			StartedAt: started.UTC(), FinishedAt: finished.UTC(),
+			PackageTargets: append([]string(nil), gate.packageTargets...),
 		}
 		if runErr != nil {
 			receipt.ExecutionError = runErr.Error()
@@ -623,6 +645,15 @@ func (manager *candidateWorkspaceManager) runGates(ctx context.Context, director
 		}
 		receipts = append(receipts, receipt)
 		if runErr != nil {
+			// Cancellation and timeout are infrastructure outcomes, not a negative
+			// verdict about the candidate. Never persist them as compiler findings.
+			if exitCode > 0 && gateContextErr == nil {
+				failure := &candidateGateFailure{InputSHA256: kernel.Digest(inputKey), Directory: directory, Commit: strings.TrimSpace(string(identity)), Receipt: receipt}
+				if err := manager.retainGateFailure(failure); err != nil {
+					return receipts, err
+				}
+				return receipts, failure
+			}
 			return receipts, fmt.Errorf("%w: deterministic gate %q failed with exit code %d: %v", errInvalidCandidateWorkspace, gateID, exitCode, runErr)
 		}
 		if err := manager.writeGateCache(cacheKey, receipt); err != nil {
@@ -941,7 +972,7 @@ func (manager *candidateWorkspaceManager) rehydrate(ctx context.Context) error {
 func (manager *candidateWorkspaceManager) validReceipt(receipt candidateReceipt) bool {
 	legacy := receipt.SchemaVersion == legacyCandidateReceiptSchema && receipt.RuntimeHookSHA256 == ""
 	current := receipt.SchemaVersion == candidateReceiptSchema && receipt.RuntimeHookSHA256.Valid()
-	native := receipt.SchemaVersion == nativeCandidateReceiptSchema && receipt.RuntimeHookSHA256 == ""
+	native := (receipt.SchemaVersion == nativeCandidateReceiptSchema || receipt.SchemaVersion == previousNativeCandidateReceiptSchema) && receipt.RuntimeHookSHA256 == ""
 	if manager.requireRuntimeHook && !legacy && !current || !manager.requireRuntimeHook && !native || !receipt.CandidateID.Valid() || !receipt.FeatureID.Valid() || !receipt.ConsumerTaskID.Valid() || receipt.ConsumerWorkspaceID == "" || receipt.SourceWorkspaceID == "" || receipt.SourceWorktreeID == "" || !filepath.IsAbs(receipt.SourceWorkingDirectory) || receipt.SourceBranch == "" || !receipt.RepositoryDigest.Valid() || !validGitCommit(receipt.BaselineCommit) || !validGitCommit(receipt.CandidateCommit) || !validGitCommit(receipt.CandidateTree) || !receipt.ChangedFileInventoryDigest.Valid() || !receipt.DiffSHA256.Valid() || len(receipt.ChangedFileInventory) == 0 || len(receipt.Targets) == 0 || len(receipt.GateReceipts) == 0 {
 		return false
 	}
@@ -972,7 +1003,7 @@ func (manager *candidateWorkspaceManager) validReceipt(receipt candidateReceipt)
 		stdout, stdoutErr := base64.StdEncoding.DecodeString(gate.StdoutBase64)
 		stderr, stderrErr := base64.StdEncoding.DecodeString(gate.StderrBase64)
 		configured, found := manager.gates[gate.GateID]
-		if !gate.ReceiptID.Valid() || !found || !slices.Equal(gate.Command, configured.Command) || gate.ExitCode != 0 || stdoutErr != nil || stderrErr != nil || digestBytes(stdout) != gate.StdoutSHA256 || digestBytes(stderr) != gate.StderrSHA256 {
+		if !gate.ReceiptID.Valid() || !found || !gateReceiptMatchesScope(gate, configured) || gate.ExitCode != 0 || gate.ExecutionError != "" || stdoutErr != nil || stderrErr != nil || digestBytes(stdout) != gate.StdoutSHA256 || digestBytes(stderr) != gate.StderrSHA256 {
 			return false
 		}
 	}
@@ -1074,7 +1105,16 @@ func (service *ProductionService) prepareCandidateConsumerWorkspace(ctx context.
 		source = assembled
 		baseEvidence = append(append([]kernel.EvidenceRef(nil), baseEvidence...), assemblyEvidence)
 	}
-	workspace, receipt, receiptDigest, err := service.candidates.Prepare(ctx, feature, consumer, owner.WorkspaceID, source, targets, service.planning.gateIDs(&plan, consumer))
+	var componentScope [][]string
+	if whole, found := wholeFeatureValidationTaskID(plan); found && consumer.Purpose != kernel.PurposePromotion && whole != consumer.ID {
+		var paths []string
+		for _, id := range targetIDs {
+			task, _ := plannedTaskByID(plan, id)
+			paths = append(paths, task.WriteScope...)
+		}
+		componentScope = [][]string{paths}
+	}
+	workspace, receipt, receiptDigest, err := service.candidates.Prepare(ctx, feature, consumer, owner.WorkspaceID, source, targets, service.planning.gateIDs(&plan, consumer), componentScope...)
 	if err != nil {
 		return ProductionWorkspace{}, nil, err
 	}

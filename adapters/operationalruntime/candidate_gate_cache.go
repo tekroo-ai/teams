@@ -20,7 +20,13 @@ func candidateGateCacheKey(ctx context.Context, gate ProductionCandidateGate, en
 	if gate.ReuseInputsSHA256 == "" {
 		return "", nil
 	}
-	if !gate.ReuseInputsSHA256.Valid() || !validGitCommit(commit) || !validGitCommit(tree) || !filepath.IsAbs(directory) {
+	return candidateGateInputKey(ctx, gate, environment, directory, commit, tree)
+}
+
+// Failure identity is mandatory even when successful-result reuse is disabled.
+// A failure is a durable finding, not permission to execute unchanged work again.
+func candidateGateInputKey(ctx context.Context, gate ProductionCandidateGate, environment []string, directory, commit, tree string) (string, error) {
+	if gate.ReuseInputsSHA256 != "" && !gate.ReuseInputsSHA256.Valid() || gate.VerificationInputsSHA256 != "" && !gate.VerificationInputsSHA256.Valid() || !validGitCommit(commit) || !validGitCommit(tree) || !filepath.IsAbs(directory) {
 		return "", errInvalidCandidateWorkspace
 	}
 	if err := ctx.Err(); err != nil {

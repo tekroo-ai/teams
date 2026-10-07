@@ -29,6 +29,12 @@ func (service *ProductionService) reconcilePlannedFeatureWork(ctx context.Contex
 }
 
 func (service *ProductionService) reconcileFeaturePlan(ctx context.Context, feature organization.FeatureRequest, plan organization.FeaturePlan) error {
+	if service.featureExecutionPaused() {
+		return nil
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	planBytes, err := json.Marshal(plan)
 	if err != nil {
 		return err
@@ -66,6 +72,11 @@ func (service *ProductionService) reconcileFeaturePlan(ctx context.Context, feat
 	}
 	if changed, err := service.reconcileCandidateLineage(ctx, feature, plan, states, invocations, snapshot); err != nil || changed {
 		return err
+	}
+	if changed, err := service.reconcileCandidateGateBlocks(ctx, feature, plan, states, heads, invocations, snapshot); err != nil {
+		return err
+	} else if changed {
+		return service.reconcileFeaturePlan(ctx, feature, plan)
 	}
 	deadlinesExtended, err := service.reconcileFeatureProfileDeadlines(ctx, feature, plan, states, heads, invocations, snapshot, budget)
 	if err != nil {
@@ -239,6 +250,15 @@ func (service *ProductionService) reconcileFeaturePlan(ctx context.Context, feat
 		} else if len(item.Validates) > 0 || item.Purpose == kernel.PurposePromotion {
 			workspace, taskEvidence, err = service.prepareCandidateConsumerWorkspace(ctx, feature, item, owner, plan, invocations, evidence)
 			if err != nil {
+				var failure *candidateGateFailure
+				if errors.As(err, &failure) {
+					if err := service.blockCandidateGate(ctx, feature, plan, tracked, failure, invocations); err != nil {
+						return err
+					}
+					// A blocked verification node must not starve the rest of the
+					// ready frontier. Reload after the durable lifecycle mutation.
+					return service.reconcileFeaturePlan(ctx, feature, plan)
+				}
 				return err
 			}
 		}
@@ -520,6 +540,15 @@ func (service *ProductionService) reconcileValidationRounds(ctx context.Context,
 		if len(validator.Validates) == 0 || !changedCandidateValidatorPhase(state.Phase) {
 			continue
 		}
+		if state.Condition == kernel.ConditionBlocked {
+			_, _, gateBlocked, err := service.readCandidateGateBlock(ctx, validator, heads[validator.ID])
+			if err != nil {
+				return false, err
+			}
+			if gateBlocked {
+				continue
+			}
+		}
 		latest, found := invocations[validator.ID]
 		if !found || latest.State != kernel.InvocationSucceeded {
 			continue
@@ -580,6 +609,24 @@ func (service *ProductionService) reconcileValidationRounds(ctx context.Context,
 		tracked := &trackedTask{plan: validator, revision: states[validator.ID].Revision, last: heads[validator.ID], profile: profileSnapshot.Profile, owner: owner}
 		workspace, candidateEvidence, workspaceErr := service.prepareCandidateConsumerWorkspace(ctx, feature, validator, owner, plan, invocations, evidence)
 		if workspaceErr != nil {
+			var failure *candidateGateFailure
+			if errors.As(workspaceErr, &failure) {
+				if state.Phase == kernel.PhaseCompleted {
+					finding, err := service.registerGateFinding(ctx, feature, plan, validator, failure, invocations)
+					if err != nil {
+						return false, err
+					}
+					updated, head, successor, err := service.reopenCompletedValidatorForChangedCandidate(ctx, feature, validator, state, tracked.last, tracked.profile, expectedCondition, []kernel.EvidenceRef{finding})
+					if err != nil {
+						return false, err
+					}
+					tracked.revision, tracked.last, tracked.profile = updated.Revision, head, successor
+				}
+				if err := service.blockCandidateGate(ctx, feature, plan, tracked, failure, invocations); err != nil {
+					return false, err
+				}
+				return true, nil
+			}
 			return false, workspaceErr
 		}
 		if state.Phase == kernel.PhaseCompleted {

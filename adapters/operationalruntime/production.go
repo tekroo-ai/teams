@@ -315,8 +315,16 @@ type ProductionCandidateGate struct {
 	GateID  string   `json:"gate_id"`
 	Command []string `json:"command"`
 	Timeout string   `json:"timeout"`
+	// task-packages limits component checks to the accepted targets' Go
+	// packages. Whole-feature validation and promotion always use Command.
+	Scope          string `json:"scope,omitempty"`
+	packageTargets []string
+	// Explicit identity for external verification inputs or evidence-backed
+	// remediation. Changing it permits a new check without enabling PASS reuse.
+	VerificationInputsSHA256 kernel.Digest `json:"verification_inputs_sha256,omitempty"`
 	// Opt-in attestation of all non-repository inputs to a hermetic gate.
-	// Empty means always execute; failures are never cached.
+	// Empty disables successful-result reuse. Negative findings are retained
+	// separately and require changed inputs or an explicit recovery decision.
 	ReuseInputsSHA256 kernel.Digest `json:"reuse_inputs_sha256,omitempty"`
 }
 
@@ -630,7 +638,7 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 		for _, argument := range gate.Command {
 			invalidArgument = invalidArgument || strings.TrimSpace(argument) == ""
 		}
-		if timeoutErr != nil || gate.GateID == "" || len(gate.Command) == 0 || invalidArgument || gateTimeout > planningDeadline || gate.ReuseInputsSHA256 != "" && !gate.ReuseInputsSHA256.Valid() {
+		if timeoutErr != nil || gate.GateID == "" || len(gate.Command) == 0 || invalidArgument || !validGateScope(gate) || gateTimeout > planningDeadline || gate.ReuseInputsSHA256 != "" && !gate.ReuseInputsSHA256.Valid() || gate.VerificationInputsSHA256 != "" && !gate.VerificationInputsSHA256.Valid() {
 			return resolvedProductionConfig{}, invalidConfig("candidate gate configuration is invalid")
 		}
 		if _, duplicate := configuredGates[gate.GateID]; duplicate {
@@ -929,6 +937,8 @@ type ProductionService struct {
 	recoveryDone           chan error
 	roleRecoveryDone       chan error
 	featureRecoveryDone    chan error
+	featureRecoveryMu      sync.Mutex
+	featureRecoveryCancel  context.CancelFunc
 	featureWake            chan struct{}
 	continuityDone         chan error
 	failures               chan error
@@ -1188,7 +1198,11 @@ func (service *ProductionService) Pause(ctx context.Context) error {
 	if service == nil || service.Controller == nil {
 		return application.ErrInvalidConfiguration
 	}
-	return service.Controller.Pause(ctx)
+	if err := service.Controller.Pause(ctx); err != nil {
+		return err
+	}
+	service.cancelFeatureRecovery()
+	return nil
 }
 
 func (service *ProductionService) Resume(ctx context.Context) error {
@@ -1819,18 +1833,12 @@ func (service *ProductionService) runFeatureRecovery(ctx context.Context) error 
 		} else {
 			service.clearRecoveryFault("runtime-continuity")
 		}
-		operationContext, cancel := service.featureRecoveryOperationContext(ctx)
-		if planningErr := service.reconcileFeaturePlanning(operationContext); planningErr != nil {
-			service.recordRecoveryFault("feature-planning", planningErr)
-		} else {
-			service.clearRecoveryFault("feature-planning")
+		if !service.featureExecutionPaused() {
+			operationContext, cancel := service.featureRecoveryOperationContext(ctx)
+			service.recordFeatureRecoveryOutcome("feature-planning", service.reconcileFeaturePlanning(operationContext))
+			service.recordFeatureRecoveryOutcome("feature-work", service.reconcilePlannedFeatureWork(operationContext))
+			cancel()
 		}
-		if workErr := service.reconcilePlannedFeatureWork(operationContext); workErr != nil {
-			service.recordRecoveryFault("feature-work", workErr)
-		} else {
-			service.clearRecoveryFault("feature-work")
-		}
-		cancel()
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
@@ -1846,8 +1854,38 @@ func (service *ProductionService) runFeatureRecovery(ctx context.Context) error 
 	}
 }
 
+func (service *ProductionService) recordFeatureRecoveryOutcome(kind string, err error) {
+	if errors.Is(err, context.Canceled) && service.featureExecutionPaused() {
+		return // An operator pause is not an infrastructure fault.
+	}
+	if err != nil {
+		service.recordRecoveryFault(kind, err)
+	} else {
+		service.clearRecoveryFault(kind)
+	}
+}
+
 func (service *ProductionService) featureRecoveryOperationContext(parent context.Context) (context.Context, context.CancelFunc) {
-	return context.WithTimeout(parent, service.planningDeadline)
+	service.featureRecoveryMu.Lock()
+	defer service.featureRecoveryMu.Unlock()
+	ctx, cancel := context.WithTimeout(parent, service.planningDeadline)
+	service.featureRecoveryCancel = cancel
+	if service.featureExecutionPaused() {
+		cancel()
+	}
+	return ctx, cancel
+}
+
+func (service *ProductionService) featureExecutionPaused() bool {
+	return service.Controller != nil && !service.Controller.isRunning()
+}
+
+func (service *ProductionService) cancelFeatureRecovery() {
+	service.featureRecoveryMu.Lock()
+	defer service.featureRecoveryMu.Unlock()
+	if service.featureRecoveryCancel != nil {
+		service.featureRecoveryCancel()
+	}
 }
 
 type expiredIntentSweeper interface {
