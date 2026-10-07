@@ -601,7 +601,18 @@ func (service *ProductionService) ensureFeaturePlanningTaskForRound(ctx context.
 	if err != nil {
 		return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, err
 	}
-	owner, err := service.ensureExactPlanningRoleExcept(ctx, role, excludedActor)
+	var owner organization.RoleInstanceState
+	if stage == stageArchitecture && architectureRound == 1 && feature.DesignRevision != nil {
+		source, _, sourceErr := service.featureArchitectureCandidateForRound(ctx, feature, 0)
+		if sourceErr != nil {
+			return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, sourceErr
+		}
+		// A consultation belongs to the original decision owner, including
+		// after its process restarts. Do not substitute another role instance.
+		owner, err = service.ensurePlanningActorExcept(ctx, []kernel.ActorFQN{source.ActorFQN}, "")
+	} else {
+		owner, err = service.ensureExactPlanningRoleExcept(ctx, role, excludedActor)
+	}
 	if err != nil {
 		return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, err
 	}
@@ -617,6 +628,33 @@ func (service *ProductionService) ensureFeaturePlanningTaskForRound(ctx context.
 	evidenceID, evidence, err := service.ensureFeaturePlanningEvidence(ctx, feature)
 	if err != nil {
 		return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, err
+	}
+	if stage == stageArchitecture && architectureRound == 1 && feature.DesignRevision != nil {
+		source, _, sourceErr := service.featureArchitectureCandidateForRound(ctx, feature, 0)
+		if sourceErr != nil || source.OutputDigest == nil || *source.OutputDigest != feature.DesignRevision.PriorDesignDigest || source.ActorFQN != owner.ActorFQN {
+			return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, errors.Join(organization.ErrInvalidFeature, sourceErr)
+		}
+		priorSnapshot, loadErr := service.Store.LoadDecision(ctx, kernel.KernelCommand{Target: source.Ref()})
+		if loadErr != nil {
+			return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, loadErr
+		}
+		refs, refsErr := evidenceForInvocations(priorSnapshot, source)
+		if refsErr != nil {
+			return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, refsErr
+		}
+		// Admit the exact source output before the successor starts. History
+		// access is not granted by an actor name or a model-provided ID alone.
+		found := false
+		for _, ref := range refs {
+			if ref.SHA256 == *source.OutputDigest {
+				evidence = append(evidence, ref)
+				found = true
+				break
+			}
+		}
+		if !found {
+			return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, organization.ErrInvalidFeature
+		}
 	}
 	deadline := feature.CreatedAt.Add(service.planningDeadline)
 	budget, err := service.ensureFeatureWorkBudget(ctx, feature, evidenceID, evidence, deadline)
@@ -1209,7 +1247,7 @@ func (service *ProductionService) featureArchitectureSuccessorDescription(ctx co
 		if baseErr != nil {
 			return "", baseErr
 		}
-		feedback, marshalErr := json.Marshal(map[string]any{"prior_design_sha256": revision.PriorDesignDigest, "prior_design_output": string(predecessorOutput), "pm_decision_sha256": revision.DecisionDigest, "pm_decision_reason": revision.Reason})
+		feedback, marshalErr := designRevisionFeedback(*revision, predecessorOutput)
 		if marshalErr != nil || len(base)+len(feedback) > 768<<10 {
 			return "", organization.ErrInvalidFeature
 		}
@@ -1277,6 +1315,20 @@ func (service *ProductionService) featureArchitectureSuccessorDescription(ctx co
 		return "", organization.ErrInvalidFeature
 	}
 	return description, nil
+}
+
+// Preserve the prior proposal as an object, not JSON hidden inside a string.
+// The digest still binds the complete original output retained as evidence.
+func designRevisionFeedback(revision organization.FeatureDesignRevision, output []byte) (json.RawMessage, error) {
+	if digestBytes(output) != revision.PriorDesignDigest {
+		return nil, organization.ErrInvalidFeature
+	}
+	product, found := roleHandlerWorkProduct(output)
+	var object map[string]json.RawMessage
+	if !found || json.Unmarshal(product, &object) != nil || object == nil {
+		return nil, organization.ErrInvalidFeature
+	}
+	return json.Marshal(map[string]any{"prior_design_sha256": revision.PriorDesignDigest, "prior_design_work_product": product, "pm_decision_sha256": revision.DecisionDigest, "pm_decision_reason": revision.Reason})
 }
 
 func featureArchitectureReviewDescription(feature organization.FeatureRequest, invocation kernel.WorkInvocation, output []byte, instruction string) (string, error) {

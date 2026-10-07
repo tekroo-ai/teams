@@ -8,7 +8,7 @@ This changes transport behavior, not the assigned work or its acceptance criteri
   It does not decode or execute any tool from the incomplete document.
 - The next request keeps the schema and original messages, appends the exact
   prefix as the final assistant message, and sets `continue_final_message: true`.
-  Thinking and API-native tools are disabled on this constrained response path.
+  Thinking and API-native tools are disabled for that suffix request only.
   mlx-serve primes its grammar from the prefix and returns only newly generated
   suffix bytes. Teams concatenates those bytes without trimming or reformatting.
 - Further caps produce further checkpoints. A process restart resumes the
@@ -26,6 +26,37 @@ capped response. An already-complete prefix returns an empty suffix and zero
 completion tokens. Completion-token usage counts new tokens only; prefix tokens
 are input. Streaming deltas also contain only new suffix bytes.
 
+## Ordinary-turn reasoning
+
+JSON Schema does not disable ordinary-turn reasoning. Each native profile can
+explicitly configure `native_settings.reasoning`:
+
+```json
+{
+  "enable_thinking": true,
+  "reasoning_effort": "medium",
+  "reasoning_budget_tokens": -1
+}
+```
+
+Use that configuration for all current team roles. Effort remains configurable
+per profile; this is not a role-name-specific framework rule. On the current
+mlx-serve schema channel, `-1` is required to avoid its finite-reasoning-budget
+fallback to thinking disabled. The existing `max_output_tokens` still bounds
+the complete response, including reasoning. This does not select xhigh.
+
+The suffix request disables thinking and omits effort/budget controls, while
+its checkpoint remains bound to the *original* reasoning configuration. A new
+ordinary turn restores the profile settings. A cap exhausted entirely in
+reasoning, before any JSON exists, remains an explicit failure, not a fabricated
+JSON checkpoint.
+
+Omitted reasoning settings preserve legacy behavior and profile digests. To
+enable reasoning, explicitly update every profile, recompute its model-profile
+digest, rebind the team manifest and admission records, and qualify the changed
+profiles before activation. Do not relabel old thinking-disabled measurements
+as qualification for the new settings or change an active invocation in place.
+
 Qualification:
 
 ```
@@ -37,6 +68,14 @@ The opt-in `TestLiveStructuredContinuation` requires
 caps against a schema-fixed disposable receipt without running organizational work.
 Server streaming/non-streaming qualification lives in mlx-serve's
 `tests/test_json_continuation.py`.
+
+`TestLiveThinkingStructuredContinuation` separately checks real low/medium
+thinking with schema-constrained output, then caps a fixed integer array and
+verifies exact assembly through thinking-disabled suffix requests. It requires
+explicit `TEKROO_REASONING_PROBE_BASE_URL`, `TEKROO_REASONING_PROBE_MODEL`, and a
+fresh absolute `TEKROO_REASONING_PROBE_OUTPUT` path. It retains raw HTTP evidence
+without executing tools or altering organizational state. This functional probe
+does not qualify role behavior or compare task-completion performance.
 
 Deployment must pair this Teams client with mlx-serve's grammar-priming support.
 Old failures that discarded their partial text cannot recover that lost text;

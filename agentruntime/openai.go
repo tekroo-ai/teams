@@ -28,6 +28,9 @@ type OpenAIModel struct {
 	APIKey    string
 	Tools     []ToolDefinition
 	MaxTokens int
+	// Reasoning controls ordinary turns. A resumed JSON suffix never opens a
+	// new reasoning section, but remains bound to this original configuration.
+	Reasoning *ReasoningConfig
 	// A rejected final tool call is retried through the server's constrained
 	// JSON response channel, then presented to the runner as a final tool call.
 	FinalTool   string
@@ -35,6 +38,8 @@ type OpenAIModel struct {
 	// TurnContract constrains every choice (ordinary tool or final result) in
 	// the original request. It never asks the model for a readiness turn.
 	TurnContract *StructuredTurnContract
+	// ResponseSchema is a tool-free structured completion (e.g. compaction).
+	ResponseSchema json.RawMessage
 }
 
 func (model OpenAIModel) Complete(ctx context.Context, transcript []Message) (Completion, error) {
@@ -49,6 +54,9 @@ func (model OpenAIModel) Continue(ctx context.Context, partial PartialTurnError)
 }
 
 func (model OpenAIModel) complete(ctx context.Context, transcript []Message, partial *PartialTurnError) (Completion, error) {
+	if model.Reasoning != nil && !model.Reasoning.Valid() {
+		return Completion{}, fmt.Errorf("%w: invalid reasoning configuration", ErrInvalidTurn)
+	}
 	base, err := url.Parse(model.BaseURL)
 	if err != nil || (base.Scheme != "http" && base.Scheme != "https") || base.Host == "" || model.Client == nil || model.Model == "" || model.MaxTokens <= 0 || len(transcript) == 0 {
 		return Completion{}, ErrInvalidTurn
@@ -98,6 +106,12 @@ func (model OpenAIModel) complete(ctx context.Context, transcript []Message, par
 	if model.TurnContract != nil {
 		request["tool_choice"] = "none"
 		request["response_format"] = map[string]any{"type": "json_schema", "json_schema": map[string]any{"name": "tekroo_turn", "strict": true, "schema": model.TurnContract.schema}}
+	} else if len(model.ResponseSchema) != 0 {
+		if !json.Valid(model.ResponseSchema) || len(model.Tools) != 0 || model.FinalTool != "" {
+			return Completion{}, ErrInvalidTurn
+		}
+		request["tool_choice"] = "none"
+		request["response_format"] = map[string]any{"type": "json_schema", "json_schema": map[string]any{"name": "tekroo_context_checkpoint", "strict": true, "schema": model.ResponseSchema}}
 	} else if repairFinal {
 		if !json.Valid(model.FinalSchema) {
 			return Completion{}, ErrInvalidTurn
@@ -119,12 +133,18 @@ func (model OpenAIModel) complete(ctx context.Context, transcript []Message, par
 		}
 		request["tools"] = tools
 	}
-	constrained := model.TurnContract != nil || repairFinal
+	constrained := model.TurnContract != nil || repairFinal || len(model.ResponseSchema) != 0
+	if model.Reasoning != nil {
+		model.Reasoning.apply(request)
+	} else if constrained {
+		// Preserve legacy profiles/checkpoints; enabling reasoning is an explicit,
+		// digest-bound profile change, not an unrecorded deployment side effect.
+		(ReasoningConfig{}).apply(request)
+	}
 	var binding string
 	if constrained {
-		// Continuation begins inside JSON, not the model's reasoning protocol.
-		request["enable_thinking"] = false
-		request["chat_template_kwargs"] = map[string]any{"enable_thinking": false}
+		// Bind the ordinary-turn configuration before applying the suffix-only
+		// transport override. Changed profile/schema/model cannot resume it.
 		bound := make(map[string]any, len(request))
 		for key, value := range request {
 			if key != "messages" {
@@ -145,6 +165,11 @@ func (model OpenAIModel) complete(ctx context.Context, transcript []Message, par
 		messages = append(messages, map[string]any{"role": "assistant", "content": partial.Prefix})
 		request["messages"] = messages
 		request["continue_final_message"] = true
+		// This request starts inside an existing JSON document. Do not reopen
+		// reasoning, and do not send contradictory effort/budget controls.
+		delete(request, "reasoning_effort")
+		delete(request, "reasoning_budget_tokens")
+		(ReasoningConfig{}).apply(request)
 	}
 	body, err := json.Marshal(request)
 	if err != nil {
@@ -219,6 +244,12 @@ func (model OpenAIModel) complete(ctx context.Context, transcript []Message, par
 			return Completion{}, fmt.Errorf("%w: incomplete structured turn", ErrInvalidTurn)
 		}
 		return model.TurnContract.decode(json.RawMessage(message.Content), decoded.ID)
+	}
+	if len(model.ResponseSchema) != 0 {
+		if decoded.Choices[0].FinishReason != "stop" || !json.Valid([]byte(message.Content)) {
+			return Completion{}, ErrInvalidTurn
+		}
+		return Completion{Text: message.Content}, nil
 	}
 	if repairFinal {
 		if decoded.Choices[0].FinishReason != "stop" || len(message.ToolCalls) != 0 || !json.Valid([]byte(message.Content)) {

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/tekroo-ai/teams/agentruntime"
 	"github.com/tekroo-ai/teams/kernel"
 )
 
@@ -21,16 +22,20 @@ const ResponseModeJSONSchemaActions = "json_schema_actions"
 // Teams-native session. It is distinct from OpenHands agent_settings so a
 // qualification for one execution surface cannot be reused for the other.
 type ProfileSettings struct {
-	SchemaVersion     string `json:"schema_version"`
-	BaseURL           string `json:"base_url"`
-	Model             string `json:"model"`
-	ModelInstructions string `json:"model_instructions,omitempty"`
-	ResponseMode      string `json:"response_mode,omitempty"`
-	MaxOutputTokens   int    `json:"max_output_tokens"`
-	MaxTurns          int    `json:"max_turns"`
+	SchemaVersion     string                        `json:"schema_version"`
+	BaseURL           string                        `json:"base_url"`
+	Model             string                        `json:"model"`
+	ModelInstructions string                        `json:"model_instructions,omitempty"`
+	ResponseMode      string                        `json:"response_mode,omitempty"`
+	MaxOutputTokens   int                           `json:"max_output_tokens"`
+	MaxTurns          int                           `json:"max_turns"`
+	Reasoning         *agentruntime.ReasoningConfig `json:"reasoning,omitempty"`
 }
 
 func (settings ProfileSettings) Valid() bool {
+	if !validProfileReasoning(settings.Reasoning, settings.ResponseMode) {
+		return false
+	}
 	endpoint, err := url.Parse(settings.BaseURL)
 	if err != nil || endpoint.Scheme != "http" || endpoint.User != nil || endpoint.RawQuery != "" || endpoint.Fragment != "" || endpoint.Path != "/v1" || strings.HasSuffix(settings.BaseURL, "/") {
 		return false
@@ -40,6 +45,18 @@ func (settings ProfileSettings) Valid() bool {
 		return false
 	}
 	return settings.SchemaVersion == ProfileSettingsVersion && settings.Model != "" && len(settings.Model) <= 1024 && len(settings.ModelInstructions) <= 1<<16 && utf8.ValidString(settings.ModelInstructions) && (settings.ResponseMode == "" || settings.ResponseMode == ResponseModeJSONSchemaActions) && settings.MaxOutputTokens > 0 && settings.MaxOutputTokens <= 262144 && settings.MaxTurns >= 0
+}
+
+func validProfileReasoning(reasoning *agentruntime.ReasoningConfig, responseMode string) bool {
+	if reasoning == nil {
+		return true // legacy profile; no change to its admitted execution settings
+	}
+	if !reasoning.Valid() {
+		return false
+	}
+	// The supported local schema transport otherwise silently turns thinking
+	// off for finite/default reasoning caps. MaxOutputTokens still bounds output.
+	return responseMode != ResponseModeJSONSchemaActions || !reasoning.EnableThinking || reasoning.BudgetTokens != nil && *reasoning.BudgetTokens == -1
 }
 
 func ModelProfileDigest(role kernel.RoleFQRN, bundle kernel.Digest, settings ProfileSettings) (kernel.Digest, error) {

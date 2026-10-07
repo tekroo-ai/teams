@@ -211,6 +211,7 @@ func TestPrepareMeasuredNativeProfileRelease(t *testing.T) {
 		slices.Sort(readTools)
 		settings := p.NativeSettings
 		cfg := nativeagent.Config{Bindings: binding, Gateway: agenttools.Gateway{Bindings: binding, Host: agenttools.Host{Timeout: 2 * time.Minute}}, Journal: journal, HTTP: &http.Client{Timeout: 20 * time.Minute}, Profile: nativeagent.Profile{RoleFQRN: p.RoleFQRN, RoleBundleDigest: p.RoleBundleDigest, ModelProfileDigest: p.ModelProfileDigest, RuntimeIdentityDigest: p.RuntimeIdentityDigest, ToolPolicyDigest: p.ToolPolicyDigest, EffectPolicyDigest: p.EffectPolicyDigest, BaseURL: settings.BaseURL, Model: settings.Model, ResponseMode: settings.ResponseMode, MaxOutputTokens: settings.MaxOutputTokens, AllowedReadTools: readTools}}
+		cfg.Profile.Reasoning = settings.Reasoning
 		encoded, _ := json.Marshal(brief)
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
 		session, err := nativeagent.PrepareReadOnly(ctx, brief, digestBytes(encoded), cfg)

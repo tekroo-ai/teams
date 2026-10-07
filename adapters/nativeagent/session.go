@@ -38,18 +38,22 @@ type Profile struct {
 	APIKey                string
 	MaxOutputTokens       int
 	MaxTurns              int
+	Reasoning             *agentruntime.ReasoningConfig
 	AllowedReadTools      []string
 	AllowedEffectTools    []string
 }
 
 type Config struct {
-	Bindings        agenttools.BindingSource
-	Gateway         agenttools.Gateway
-	Journal         agentruntime.Journal
-	Effects         agenttools.EffectLedger
-	SemanticContext agentruntime.SemanticContextProvider
-	EvidenceReader  EvidenceReader
-	ResultContract  *ResultContract
+	// ContextSource is supplied by the coordinator through BindContextFork.
+	ContextSource     *agentruntime.ForkSource
+	ContextInvocation *kernel.WorkInvocation
+	Bindings          agenttools.BindingSource
+	Gateway           agenttools.Gateway
+	Journal           agentruntime.Journal
+	Effects           agenttools.EffectLedger
+	SemanticContext   agentruntime.SemanticContextProvider
+	EvidenceReader    EvidenceReader
+	ResultContract    *ResultContract
 	// Candidate is resolved by Teams from the immutable workspace binding, not
 	// supplied by the model. It binds a validation result to the exact receipt.
 	Candidate *CandidateBinding
@@ -104,6 +108,9 @@ func prepare(ctx context.Context, brief application.ExecutionBrief, requestDiges
 	}
 	digest := sha256.Sum256(encoded)
 	profile := config.Profile
+	if !validProfileReasoning(profile.Reasoning, profile.ResponseMode) {
+		return Session{}, ErrInvalidBinding
+	}
 	if brief.ContractManifest != kernel.ContractIdentity || !brief.InvocationID.Valid() || !requestDigest.Valid() || requestDigest != kernel.Digest(hex.EncodeToString(digest[:])) ||
 		!brief.RoleGrounding.Valid(brief.ActorFQN) || profile.RoleFQRN != brief.RoleGrounding.RoleFQRN ||
 		profile.RoleBundleDigest != brief.RoleGrounding.BundleDigest || profile.ModelProfileDigest != brief.ModelProfileDigest ||
@@ -192,6 +199,27 @@ func prepare(ctx context.Context, brief application.ExecutionBrief, requestDiges
 			return Session{}, err
 		}
 		definitions = append(definitions, evidenceTool.definition())
+	}
+	var inherited *agentruntime.ContextFork
+	var priorTool *priorTurnsTool
+	if (config.ContextSource == nil) != (config.ContextInvocation == nil) {
+		return Session{}, ErrInvalidBinding
+	}
+	if config.ContextSource != nil {
+		authorized, err := BindContextFork(ctx, config.Journal, brief, *config.ContextInvocation)
+		if err != nil || *authorized != *config.ContextSource {
+			return Session{}, errors.Join(ErrInvalidBinding, err)
+		}
+		var forkErr error
+		inherited, forkErr = agentruntime.PrepareContextFork(ctx, config.Journal, string(brief.InvocationID), *config.ContextSource)
+		if forkErr != nil {
+			return Session{}, errors.Join(ErrInvalidBinding, forkErr)
+		}
+		priorTool = &priorTurnsTool{journal: config.Journal, source: *config.ContextSource, checkAuthority: func(operation context.Context) error {
+			_, err := stable.BindToolInvocation(operation, brief.InvocationID, requestDigest)
+			return err
+		}}
+		definitions = append(definitions, priorTool.definition())
 	}
 	readDefinitionCount := len(definitions)
 	var effects agentruntime.Effects
@@ -323,7 +351,8 @@ func prepare(ctx context.Context, brief application.ExecutionBrief, requestDiges
 	model := agentruntime.OpenAIModel{
 		Client: config.HTTP, BaseURL: profile.BaseURL, Model: profile.Model,
 		APIKey: profile.APIKey, MaxTokens: profile.MaxOutputTokens,
-		Tools: definitions,
+		Tools:     definitions,
+		Reasoning: profile.Reasoning,
 	}
 	if finalTool != "" {
 		model.FinalTool = finalTool
@@ -354,6 +383,7 @@ func prepare(ctx context.Context, brief application.ExecutionBrief, requestDiges
 	return Session{
 		Runner: agentruntime.Runner{
 			Journal:         config.Journal,
+			ContextFork:     inherited,
 			Model:           boundModel{bindings: stable, id: brief.InvocationID, digest: requestDigest, model: model},
 			Effects:         effects,
 			EffectAuthority: effectAuthority,
@@ -363,6 +393,7 @@ func prepare(ctx context.Context, brief application.ExecutionBrief, requestDiges
 				inner:    agenttools.ReadOnlyTurnAdapter{Gateway: config.Gateway, InvocationID: brief.InvocationID, RequestDigest: requestDigest},
 				allowed:  allowed,
 				evidence: evidenceTool,
+				prior:    priorTool,
 			},
 			SystemPrompt:        systemPrompt,
 			FinalTool:           finalTool,
@@ -376,6 +407,7 @@ func prepare(ctx context.Context, brief application.ExecutionBrief, requestDiges
 }
 
 type allowedReadTools struct {
+	prior    *priorTurnsTool
 	inner    agentruntime.ReadOnlyTools
 	allowed  map[string]struct{}
 	evidence *admittedEvidenceTool
@@ -412,6 +444,9 @@ func (effects allowedEffects) ReconcileEffect(ctx context.Context, call agentrun
 }
 
 func (tools allowedReadTools) ExecuteReadOnly(ctx context.Context, call agentruntime.ToolCall) (json.RawMessage, error) {
+	if call.Name == "read_prior_turns" && tools.prior != nil {
+		return tools.prior.read(ctx, call.Arguments)
+	}
 	if call.Name == "read_evidence" && tools.evidence != nil {
 		return tools.evidence.read(ctx, call.Arguments)
 	}

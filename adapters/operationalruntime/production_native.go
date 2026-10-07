@@ -105,6 +105,7 @@ func configuredNativeSession(ctx context.Context, service *ProductionService, pr
 			ModelProfileDigest: profile.ModelProfileDigest, RuntimeIdentityDigest: profile.RuntimeIdentityDigest,
 			ToolPolicyDigest: profile.ToolPolicyDigest, EffectPolicyDigest: profile.EffectPolicyDigest,
 			BaseURL: settings.BaseURL, Model: settings.Model, ModelInstructions: settings.ModelInstructions, ResponseMode: settings.ResponseMode, MaxOutputTokens: settings.MaxOutputTokens, MaxTurns: settings.MaxTurns,
+			Reasoning:        settings.Reasoning,
 			AllowedReadTools: readTools, AllowedEffectTools: effectTools,
 		},
 		ResultContract: resultContract,
@@ -119,9 +120,22 @@ func configuredNativeSession(ctx context.Context, service *ProductionService, pr
 		}
 		result.Candidate = &nativeagent.CandidateBinding{ID: kernel.UUIDv7(workspace.Candidate.CandidateID), ReceiptSHA256: workspace.Candidate.ReceiptSHA256}
 	}
-	feature, stage, _, _, planning, err := service.planningFeatureForTask(ctx, brief.Task.TaskID)
+	feature, stage, _, round, planning, err := service.planningFeatureForTask(ctx, brief.Task.TaskID)
 	if err != nil {
 		return nativeagent.Config{}, err
+	}
+	if planning && stage == stageArchitecture && round == 1 && feature.DesignRevision != nil {
+		// This is a new forward node, not a restart of the completed design.
+		// Resolve the original invocation from Teams state, never a model ID.
+		source, _, sourceErr := service.featureArchitectureCandidateForRound(ctx, feature, 0)
+		if sourceErr != nil || source.OutputDigest == nil || *source.OutputDigest != feature.DesignRevision.PriorDesignDigest {
+			return nativeagent.Config{}, errors.Join(nativeagent.ErrInvalidBinding, sourceErr)
+		}
+		ref, bindErr := nativeagent.BindContextFork(ctx, service.Store, brief, source)
+		if bindErr != nil {
+			return nativeagent.Config{}, bindErr
+		}
+		result.ContextSource, result.ContextInvocation = ref, &source
 	}
 	if planning && stage == stagePlanFinalization {
 		_, architectureOutput, sourceErr := service.featureArchitectureCandidate(ctx, feature)

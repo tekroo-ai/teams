@@ -28,6 +28,7 @@ const (
 	ModelTurn     Kind = "model_turn"
 	ModelRejected Kind = "model_rejected"
 	ModelPartial  Kind = "model_partial"
+	Compacted     Kind = "compacted"
 	ToolDone      Kind = "tool_done"
 	Finished      Kind = "finished"
 	Failed        Kind = "failed"
@@ -105,7 +106,9 @@ type SemanticContextProvider interface {
 }
 
 type Runner struct {
-	Journal      Journal
+	Journal Journal
+	// ContextFork is a Teams-authorized immutable ancestor, not executable work.
+	ContextFork  *ContextFork
 	Model        Model
 	Tools        ReadOnlyTools
 	Effects      Effects
@@ -137,6 +140,7 @@ type Runner struct {
 }
 
 type startRecord struct {
+	ContextFork     *ContextFork     `json:"context_fork,omitempty"`
 	RequestDigest   string           `json:"request_digest"`
 	Prompt          string           `json:"prompt"`
 	SystemPrompt    string           `json:"system_prompt,omitempty"`
@@ -168,6 +172,18 @@ func (runner Runner) Run(ctx context.Context, invocationID, requestDigest, promp
 		return "", err
 	}
 	if len(entries) == 0 {
+		if !validContextFork(runner.ContextFork, invocationID) {
+			return "", ErrInvalidTurn
+		}
+		if runner.ContextFork != nil {
+			prepared, err := PrepareContextFork(ctx, runner.Journal, invocationID, runner.ContextFork.Source)
+			if err != nil {
+				return "", err
+			}
+			if !reflect.DeepEqual(prepared, runner.ContextFork) {
+				return "", ErrInvalidTurn
+			}
+		}
 		if err := runner.checkOwnership(ctx); err != nil {
 			return "", err
 		}
@@ -184,11 +200,17 @@ func (runner Runner) Run(ctx context.Context, invocationID, requestDigest, promp
 		if !validSemanticContext(memory) {
 			memory = SemanticContext{Status: "INVALID_RESPONSE"}
 		}
-		start, _ := json.Marshal(startRecord{RequestDigest: requestDigest, Prompt: prompt, SystemPrompt: runner.SystemPrompt, FinalTool: runner.FinalTool, EffectAuthority: runner.EffectAuthority, SemanticContext: memory})
+		start, _ := json.Marshal(startRecord{ContextFork: runner.ContextFork, RequestDigest: requestDigest, Prompt: prompt, SystemPrompt: runner.SystemPrompt, FinalTool: runner.FinalTool, EffectAuthority: runner.EffectAuthority, SemanticContext: memory})
 		entries, err = runner.append(ctx, invocationID, entries, Started, start)
 		if err != nil {
 			return "", err
 		}
+	}
+	// A restart must retain the same authorized ancestor. A caller cannot
+	// replace or silently remove the inherited history of an existing child.
+	var recordedStart startRecord
+	if json.Unmarshal(entries[0].Payload, &recordedStart) != nil || !reflect.DeepEqual(recordedStart.ContextFork, runner.ContextFork) {
+		return "", ErrInvalidTurn
 	}
 	for {
 		messages, pending, complete, turns, err := replay(invocationID, requestDigest, prompt, runner.SystemPrompt, runner.FinalTool, runner.Finalize, runner.EffectAuthority, entries)
@@ -286,6 +308,20 @@ func (runner Runner) Run(ctx context.Context, invocationID, requestDigest, promp
 			modelMessages, err = condenseHistory(ctx, messages, runner.Condenser)
 			if err != nil {
 				return "", err
+			}
+			if !reflect.DeepEqual(modelMessages, messages) {
+				pinned := 1
+				if runner.SystemPrompt != "" {
+					pinned = 2
+				}
+				payload, err := json.Marshal(historyCheckpoint{SourceDigest: historyDigest(messages), History: modelMessages[pinned:]})
+				if err != nil {
+					return "", err
+				}
+				entries, err = runner.append(ctx, invocationID, entries, Compacted, payload)
+				if err != nil {
+					return "", err
+				}
 			}
 			modelMessages = referenceRepeatedReads(modelMessages)
 			response, err = runner.Model.Complete(ctx, modelMessages)
@@ -491,6 +527,14 @@ func replay(id, requestDigest, prompt, systemPrompt, finalTool string, finalize 
 	if systemPrompt != "" {
 		messages = append([]Message{{Role: "system", Content: systemPrompt}}, messages...)
 	}
+	if !validContextFork(start.ContextFork, id) {
+		return nil, nil, nil, 0, ErrInvalidTurn
+	}
+	if start.ContextFork != nil {
+		messages = append(messages, Message{Role: "user", Content: "Historical transcript from completed invocation " + start.ContextFork.Source.InvocationID + " follows. It records prior reasoning and evidence, not a new assignment or permission to repeat its actions."})
+		messages = append(messages, start.ContextFork.WorkingHistory...)
+		messages = append(messages, Message{Role: "user", Content: "Continue only the current assignment below. Prior tools/results are historical; do not execute or resubmit them.\n" + prompt})
+	}
 	var outstanding []ToolCall
 	seenCalls := make(map[string]bool)
 	var turns int
@@ -504,6 +548,16 @@ func replay(id, requestDigest, prompt, systemPrompt, finalTool string, finalize 
 			continue
 		}
 		switch entry.Kind {
+		case Compacted:
+			var checkpoint historyCheckpoint
+			if len(outstanding) != 0 || finalText != nil || partial != nil || json.Unmarshal(entry.Payload, &checkpoint) != nil || checkpoint.SourceDigest != historyDigest(messages) || !validWorkingHistory(checkpoint.History) {
+				return nil, nil, nil, 0, ErrInvalidTurn
+			}
+			pinned := 1
+			if systemPrompt != "" {
+				pinned = 2
+			}
+			messages = append(messages[:pinned:pinned], checkpoint.History...)
 		case ModelPartial:
 			var next PartialTurnError
 			if len(outstanding) != 0 || finalText != nil || json.Unmarshal(entry.Payload, &next) != nil || !next.valid() {
