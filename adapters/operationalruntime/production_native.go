@@ -79,8 +79,19 @@ func configuredNativeSession(ctx context.Context, service *ProductionService, pr
 	}
 	slices.Sort(effectTools)
 	var resultContract *nativeagent.ResultContract
+	var consultationSource *kernel.WorkInvocation
+	if brief.MessageHandler == nil && brief.Purpose == kernel.PurposeHandoff {
+		var err error
+		resultContract, consultationSource, err = service.nativeTaskConsultation(ctx, brief)
+		if err != nil {
+			return nativeagent.Config{}, err
+		}
+	}
 	if brief.MessageHandler == nil && brief.ResultProtocol != nil && (brief.Purpose == kernel.PurposeHandoff || brief.Purpose == kernel.PurposeReplan) {
 		for _, definition := range workflows {
+			if consultationSource != nil {
+				break
+			}
 			candidate, err := ResolveNativeWorkflowResultContract(brief, definition, schemas)
 			if err != nil {
 				continue
@@ -112,6 +123,17 @@ func configuredNativeSession(ctx context.Context, service *ProductionService, pr
 	}
 	if len(effectTools) > 0 {
 		result.Effects = service.Store
+	}
+	if consultationSource != nil {
+		ref, err := nativeagent.BindContextFork(ctx, service.Store, brief, *consultationSource)
+		if err != nil {
+			return nativeagent.Config{}, err
+		}
+		result.ContextSource, result.ContextInvocation = ref, consultationSource
+		result.ValidateFinalResult = func(_ context.Context, output []byte) error {
+			_, _, err := consultationAnswer(output)
+			return err
+		}
 	}
 	if strings.HasPrefix(brief.Scope.WorktreeID, "candidate-") {
 		workspace, err := service.workspaceResolver.ResolveWorkspace(ctx, brief.Scope)

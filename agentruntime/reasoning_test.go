@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
 )
@@ -172,7 +171,7 @@ func TestReasoningOnlyTokenCapIsNotAJSONCheckpoint(t *testing.T) {
 	model := OpenAIModel{Client: server.Client(), BaseURL: server.URL + "/v1", Model: "fixture", MaxTokens: 64, TurnContract: structuredTestContract(t), Reasoning: &ReasoningConfig{EnableThinking: true, Effort: "medium", BudgetTokens: reasoningBudget(-1)}}
 	_, err := model.Complete(context.Background(), []Message{{Role: "user", Content: "Finish."}})
 	var partial *PartialTurnError
-	if !errors.Is(err, ErrInvalidTurn) || errors.As(err, &partial) || !strings.Contains(err.Error(), "no progress") {
+	if !errors.Is(err, ErrReasoningBudgetExhausted) || errors.As(err, &partial) {
 		t.Fatalf("fabricated resumable JSON prefix: %v", err)
 	}
 }

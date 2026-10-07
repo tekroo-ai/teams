@@ -1947,6 +1947,10 @@ func (service *ProductionService) buildExecutableFeaturePlan(ctx context.Context
 		}
 		handoffs = append(handoffs, organization.PlannedHandoff{ProviderTaskID: taskIDs[handoff.ProviderTaskIndex], ConsumerTaskID: taskIDs[handoff.ConsumerTaskIndex], Capability: handoff.Capability, Contract: handoff.Contract})
 	}
+	tasks, err = bindPlanHandoffObligations(tasks, handoffs)
+	if err != nil {
+		return organization.FeaturePlan{}, err
+	}
 	plan := organization.FeaturePlan{Version: planVersion, PreparedBy: invocation.ActorFQN, PreparedExecution: invocation.Execution, Architecture: string(result.Architecture), DesignDecisions: result.DesignDecisions, Assumptions: result.Assumptions, SourceDesignDigest: result.SourceDesignDigest, Stories: planStories, Tasks: tasks, Handoffs: handoffs, CreatedAt: createdAt}
 	if plan.Validate(feature) != nil {
 		return organization.FeaturePlan{}, fmt.Errorf("build plan: assembled plan validation failed: %w", plan.Validate(feature))

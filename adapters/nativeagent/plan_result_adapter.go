@@ -36,6 +36,16 @@ func modelFacingPlanSchema(handlerSchema json.RawMessage, plan *PlanFinalization
 	if json.Unmarshal(work["properties"], &workProperties) != nil {
 		return nil, ErrInvalidBinding
 	}
+	var handoffArray map[string]json.RawMessage
+	_ = json.Unmarshal(workProperties["handoffs"], &handoffArray)
+	var handoffItem map[string]json.RawMessage
+	_ = json.Unmarshal(handoffArray["items"], &handoffItem)
+	var handoffProperties map[string]json.RawMessage
+	_ = json.Unmarshal(handoffItem["properties"], &handoffProperties)
+	handoffProperties["contract"] = constructionContractSchema
+	handoffItem["properties"], _ = json.Marshal(handoffProperties)
+	handoffArray["items"], _ = json.Marshal(handoffItem)
+	workProperties["handoffs"], _ = json.Marshal(handoffArray)
 	implementationTasks := 0
 	for _, task := range tasks {
 		var purpose string
@@ -149,10 +159,22 @@ func bindHandlerPlanResult(arguments json.RawMessage, plan *PlanFinalizationBind
 	if json.Unmarshal(delta.Handoffs, &handoffs) != nil || handoffs == nil {
 		return nil, fmt.Errorf("%w: handoffs must be an array", ErrInvalidPlanDelta)
 	}
+	for index, raw := range handoffs {
+		var handoff map[string]json.RawMessage
+		if json.Unmarshal(raw, &handoff) != nil {
+			return nil, ErrInvalidPlanDelta
+		}
+		contract, err := decodeConstructionContract(handoff["contract"])
+		if err != nil {
+			return nil, err
+		}
+		handoff["contract"], _ = json.Marshal(contract)
+		handoffs[index], _ = json.Marshal(handoff)
+	}
 	source["schema_version"] = json.RawMessage(`"1.0.0"`)
 	source["result_type"] = json.RawMessage(`"FEATURE_EXECUTION_PLAN"`)
 	source["source_design_digest"], _ = json.Marshal(plan.SourceDigest)
-	source["handoffs"] = delta.Handoffs
+	source["handoffs"], _ = json.Marshal(handoffs)
 	source["tasks"], _ = json.Marshal(tasks)
 	envelope["work_product"], _ = json.Marshal(source)
 	return json.Marshal(envelope)

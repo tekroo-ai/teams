@@ -86,7 +86,7 @@ func TestPlanFinalizationAuthorsOnlyDependenciesAndHandoffs(t *testing.T) {
 		work.Properties["architecture"] != nil || work.Properties["tasks"] != nil || work.Properties["task_dependencies"] == nil {
 		t.Fatalf("model still authors immutable design: %s", modelSchema)
 	}
-	input := json.RawMessage(`{"outcome":"completed","work_product":{"task_dependencies":[{"task_index":1,"depends_on":[0]}],"handoffs":[{"provider_task_index":0,"consumer_task_index":1,"capability":"api","contract":"function exists"}]}}`)
+	input := json.RawMessage(`{"outcome":"completed","work_product":{"task_dependencies":[{"task_index":1,"depends_on":[0]}],"handoffs":[{"provider_task_index":0,"consumer_task_index":1,"capability":"api","contract":{"provided_interface":"Public function","required_inputs":[],"consumer_usage":"Call the public function","verification":"Invoke the actual public function"}}]}}`)
 	bound, err := bindHandlerPlanResult(input, plan)
 	if err != nil {
 		t.Fatal(err)

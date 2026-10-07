@@ -95,6 +95,12 @@ func (service *ProductionService) reconcileFeaturePlan(ctx context.Context, feat
 	if glitchRetried {
 		return nil
 	}
+	// Resume a partially applied clarification recovery before processing its
+	// original needs_decision output again. The consultation is identity-bound
+	// and cannot be reused by a later invocation of the same task.
+	if changed, err := service.reconcileTaskConsultations(ctx, feature, plan, states, invocations); err != nil || changed {
+		return err
+	}
 	completed, err := service.reconcileTaskCompletions(ctx, feature, plan, states, heads, invocations, snapshot)
 	if err != nil {
 		return fmt.Errorf("reconcile task completions: %w", err)

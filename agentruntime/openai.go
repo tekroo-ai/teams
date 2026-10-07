@@ -5,11 +5,14 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
+	"syscall"
 )
 
 type ToolDefinition struct {
@@ -17,6 +20,14 @@ type ToolDefinition struct {
 	Description string          `json:"description"`
 	Parameters  json.RawMessage `json:"parameters"`
 	Strict      bool            `json:"strict,omitempty"`
+}
+
+func classifyModelTransportError(err error) error {
+	var network net.Error
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, syscall.ECONNRESET) || errors.Is(err, syscall.ECONNREFUSED) || errors.Is(err, syscall.ETIMEDOUT) || errors.As(err, &network) && network.Timeout() {
+		return errors.Join(ErrTransientModel, err)
+	}
+	return err // e.g. a malformed endpoint or invalid certificate is not transient
 }
 
 // OpenAIModel talks directly to an OpenAI-compatible /v1/chat/completions
@@ -186,14 +197,22 @@ func (model OpenAIModel) complete(ctx context.Context, transcript []Message, par
 	}
 	response, err := model.Client.Do(httpRequest)
 	if err != nil {
-		return Completion{}, err
+		if ctx.Err() != nil {
+			return Completion{}, ctx.Err()
+		}
+		return Completion{}, classifyModelTransportError(err)
 	}
 	defer response.Body.Close()
 	encoded, err := io.ReadAll(io.LimitReader(response.Body, 2<<20+1))
 	if err != nil {
-		return Completion{}, err
+		return Completion{}, classifyModelTransportError(err)
 	}
 	if len(encoded) > 2<<20 || response.StatusCode < 200 || response.StatusCode >= 300 {
+		// A generic 500 may be a deterministic generation/grammar failure.
+		// HTTP status alone does not justify replaying that request unchanged.
+		if len(encoded) <= 2<<20 && (response.StatusCode == http.StatusTooManyRequests || response.StatusCode == http.StatusBadGateway || response.StatusCode == http.StatusServiceUnavailable || response.StatusCode == http.StatusGatewayTimeout) {
+			return Completion{}, fmt.Errorf("%w: HTTP %d", ErrTransientModel, response.StatusCode)
+		}
 		return Completion{}, fmt.Errorf("model completion HTTP %d (response bytes %d)", response.StatusCode, len(encoded))
 	}
 	var decoded struct {
@@ -240,6 +259,15 @@ func (model OpenAIModel) complete(ctx context.Context, transcript []Message, par
 		}
 		if decoded.Choices[0].FinishReason == "length" {
 			if message.Content == "" {
+				var usage struct {
+					Completion struct {
+						Reasoning int `json:"reasoning_tokens"`
+					} `json:"completion_tokens_details"`
+				}
+				_ = json.Unmarshal(decoded.Usage, &usage)
+				if len(message.ReasoningContent) > 0 || usage.Completion.Reasoning > 0 {
+					return Completion{}, errors.Join(ErrInvalidTurn, ErrReasoningBudgetExhausted)
+				}
 				return Completion{}, fmt.Errorf("%w: structured continuation made no progress", ErrInvalidTurn)
 			}
 			checkpoint := &PartialTurnError{Prefix: prefix + message.Content, Binding: binding, ResponseID: decoded.ID, Messages: transcript}

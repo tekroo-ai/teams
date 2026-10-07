@@ -374,6 +374,7 @@ var editableExecutionGuidance = []string{
 	"Ground code decisions in the relevant source and tests. A search result locates evidence but does not replace reading the source before relying on a name, signature, or field.",
 	"Run each focused test once per repository change. Do not re-run an equivalent passing build or test more than twice without an intervening code change, and do not re-run a failing test unchanged: read its output, repair the root cause, then run it again once.",
 	"Map and extend existing interfaces before adding a parallel abstraction.",
+	"For a capability delivered to another task, verify that its consumer can construct and invoke the real public implementation using inputs accessible within the consumer's scope. A type assertion or nil/test-double constructor is not that verification. If the handoff cannot be honored within scope, report needs_decision with the exact interface/input conflict and inspected evidence; do not keep searching for hypothetical accessors or silently expand scope.",
 	"When the task requires a new artifact of a kind the repository already contains (a test, fixture, handler, or wiring), locate the closest existing example and adapt it rather than reconstructing it from the internals it depends on.",
 	"Implement in cohesive increments and run focused tests after each increment.",
 	"Before reporting success, commit the intended changes and tests on the assigned branch and leave Git status clean. Validators receive only the committed candidate.",
@@ -399,6 +400,7 @@ var readOnlyExecutionGuidance = []string{
 	"When you write a command, CLI, or API example in planning text, use a placeholder operand (for example <actor-fqn> or <alias>) rather than a concrete agent instance FQN such as teams::coder-2; naming a specific running instance is a routing decision Teams owns, and an invented instance FQN in a plan or refinement is rejected.",
 	"When the task requires a structured result, validate it against result_protocol and every required field in the task's result schema before submitting it.",
 	"When producing or approving an executable plan, trace each accepted outcome through the real application entry point, concrete implementation, configuration or activation, and verification. Assign necessary integration to a task with the required write scope; interfaces and test doubles alone do not complete a runtime path. If an immutable design omits required integration, report that precise gap rather than silently accepting it or expanding product scope.",
+	"For every capability handoff, establish the callable/data interface, all required inputs and their accessible sources, consumer usage within its write scope, and provider-side verification. Do not accept a constructor requiring an inaccessible resource or a scope change that has no assigned owner. Report needs_decision for a material unresolved conflict rather than certifying it as executable.",
 }
 
 var validationExecutionGuidance = []string{
@@ -418,7 +420,7 @@ var reviewExecutionGuidance = []string{
 
 var sharedRetainedRetryExecutionGuidance = []string{
 	"This is a bounded retry. Reuse the current workspace and retained task evidence; do not restart repository discovery from the beginning.",
-	"The prior OpenHands conversation is retained in this retry. Do not reread AGENTS.md or repeat inspections already present in that history.",
+	"The prior execution history is retained in this retry. Do not reread AGENTS.md or repeat inspections already present in that history.",
 	"Continue from the retained checkpoint. Distinct, relevant inspections are allowed; exact repeated actions without an intervening state change are rejected.",
 }
 
@@ -431,12 +433,13 @@ var readOnlyRetainedRetryExecutionGuidance = []string{
 }
 
 var sharedExplicitRecoveryExecutionGuidance = []string{
-	"This explicit recovery starts a clean OpenHands conversation. Prior conversational history is not available; use the current workspace and task evidence as the durable recovery state.",
+	"This explicit recovery starts a new invocation. Use any admitted prior history, the current workspace, and task evidence as the durable recovery state; do not assume history that is not provided.",
 	"The recovery_directive records the exact condition that made the preceding result unacceptable. Address it before re-evaluating the original acceptance criteria; satisfying the original task without resolving the directive is not a successful recovery.",
 }
 
 var editableExplicitRecoveryExecutionGuidance = []string{
-	"Use the workspace-bound repository_status and read_file_diff tools to inspect the current candidate before reading source broadly. The workspace may already contain a completed implementation from the failed invocation.",
+	"Use the exposed Git status, log, and diff tools to inspect the current candidate before reading source broadly. Do not assume that the failed invocation produced implementation changes.",
+	"If retained evidence establishes an interface or scope conflict, report needs_decision with the exact conflict and evidence instead of repeating discovery or searching for hypothetical accessors.",
 	"Do not restart implementation or force a new edit when the current committed work already satisfies the task. Verify the existing result against the acceptance criteria and submit promptly.",
 	"If the existing workspace does not satisfy the task, make the smallest justified code or test correction, then run focused verification. If it already satisfies the task, run focused verification and submit without changing it.",
 	"Map and extend existing interfaces before adding a parallel abstraction.",

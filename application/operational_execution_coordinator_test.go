@@ -115,7 +115,7 @@ func TestRetryExecutionBriefDirectsAgentToContinueFromRetainedState(t *testing.T
 		t.Fatal(err)
 	}
 	guidance := strings.Join(brief.ExecutionGuidance, "\n")
-	for _, required := range []string{"bounded retry", "do not restart repository discovery", "prior OpenHands conversation", "retained checkpoint", "Distinct, relevant inspections", "exact repeated actions"} {
+	for _, required := range []string{"bounded retry", "do not restart repository discovery", "prior execution history", "retained checkpoint", "Distinct, relevant inspections", "exact repeated actions"} {
 		if !strings.Contains(guidance, required) {
 			t.Fatalf("retry guidance omitted %q: %v", required, brief.ExecutionGuidance)
 		}
@@ -145,12 +145,12 @@ func TestExplicitRecoveryExecutionBriefUsesCleanConversationAndExistingWorkspace
 		t.Fatal(err)
 	}
 	guidance := strings.Join(brief.ExecutionGuidance, "\n")
-	for _, required := range []string{"clean OpenHands conversation", "Prior conversational history is not available", "current workspace", "recovery_directive records the exact condition", "repository_status", "may already contain a completed implementation", "without changing it"} {
+	for _, required := range []string{"new invocation", "do not assume history that is not provided", "current workspace", "recovery_directive records the exact condition", "exposed Git status, log, and diff tools", "Do not assume that the failed invocation produced implementation", "without changing it"} {
 		if !strings.Contains(guidance, required) {
 			t.Fatalf("explicit recovery guidance omitted %q: %v", required, brief.ExecutionGuidance)
 		}
 	}
-	for _, forbidden := range []string{"prior OpenHands conversation is retained", "additional read-only repository actions are allowed", "Make a concrete code or test edit"} {
+	for _, forbidden := range []string{"OpenHands", "repository_status", "additional read-only repository actions are allowed", "Make a concrete code or test edit"} {
 		if strings.Contains(guidance, forbidden) {
 			t.Fatalf("explicit recovery guidance contains stale instruction %q: %v", forbidden, brief.ExecutionGuidance)
 		}
@@ -235,7 +235,7 @@ func TestChangedCandidateValidationRetryDoesNotRequireOperatorRecoveryDirective(
 		t.Fatal(err)
 	}
 	guidance := strings.Join(brief.ExecutionGuidance, "\n")
-	if brief.RecoveryDirective != nil || !strings.Contains(guidance, "bounded retry") || !strings.Contains(guidance, "prior OpenHands conversation") {
+	if brief.RecoveryDirective != nil || !strings.Contains(guidance, "bounded retry") || !strings.Contains(guidance, "prior execution history") {
 		t.Fatalf("changed-candidate retry brief=%#v guidance=%v", brief.RecoveryDirective, brief.ExecutionGuidance)
 	}
 }
@@ -329,7 +329,7 @@ func TestReadOnlyRoleGuidanceNeverOrdersEditsAndAppliesToHandoffRetry(t *testing
 		t.Fatal(err)
 	}
 	guidance := strings.Join(brief.ExecutionGuidance, "\n")
-	for _, required := range []string{"does not authorize repository edits", "Do not edit repository files", "Use only the repository evidence needed", "structured result", "every required field", "bounded retry", "prior OpenHands conversation", "retained checkpoint", "Produce the assigned plan"} {
+	for _, required := range []string{"does not authorize repository edits", "Do not edit repository files", "Use only the repository evidence needed", "structured result", "every required field", "bounded retry", "prior execution history", "retained checkpoint", "Produce the assigned plan"} {
 		if !strings.Contains(guidance, required) {
 			t.Fatalf("read-only guidance omitted %q: %v", required, brief.ExecutionGuidance)
 		}

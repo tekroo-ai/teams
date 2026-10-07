@@ -330,7 +330,11 @@ func (boundary *Boundary) finishWorker(ctx context.Context, brief application.Ex
 		case errors.Is(cause, errCancelRequested):
 			kind = agentruntime.Cancelled
 		}
-		if err := boundary.recordTerminal(brief, digest, epoch, kind, runErr.Error()); err != nil {
+		payload, _ := json.Marshal(runErr.Error())
+		if kind == agentruntime.Failed {
+			payload, _ = json.Marshal(agentruntime.ClassifyFailure(runErr))
+		}
+		if err := boundary.recordTerminalPayload(brief, digest, epoch, kind, payload, true); err != nil {
 			// Keep the lease: a later inspector can reconcile the uncertain write
 			// after expiry instead of claiming that a terminal result exists.
 			return
@@ -445,6 +449,14 @@ func (boundary *Boundary) recordTerminal(brief application.ExecutionBrief, diges
 }
 
 func (boundary *Boundary) recordTerminalWithPrompt(brief application.ExecutionBrief, digest kernel.Digest, epoch uint64, kind agentruntime.Kind, reason string, strictPrompt bool) error {
+	if len(reason) > 4096 {
+		reason = reason[:4096]
+	}
+	payload, _ := json.Marshal(reason)
+	return boundary.recordTerminalPayload(brief, digest, epoch, kind, payload, strictPrompt)
+}
+
+func (boundary *Boundary) recordTerminalPayload(brief application.ExecutionBrief, digest kernel.Digest, epoch uint64, kind agentruntime.Kind, payload json.RawMessage, strictPrompt bool) error {
 	ctx, cancel := context.WithTimeout(context.Background(), boundary.Heartbeat)
 	defer cancel()
 	ctx = agentruntime.WithRunOwnership(ctx, boundary.ownership(brief, digest, epoch))
@@ -476,10 +488,6 @@ func (boundary *Boundary) recordTerminalWithPrompt(brief application.ExecutionBr
 	if _, terminal, err := observeJournalWithPrompt(brief, digest, entries, strictPrompt); err != nil || terminal {
 		return err
 	}
-	if len(reason) > 4096 {
-		reason = reason[:4096]
-	}
-	payload, _ := json.Marshal(reason)
 	if _, err := boundary.Journal.Append(ctx, string(brief.InvocationID), entries[len(entries)-1].Sequence, kind, payload); err != nil {
 		current, loadErr := boundary.Journal.Load(ctx, string(brief.InvocationID))
 		if loadErr != nil {
@@ -555,7 +563,15 @@ func observeJournalWithPrompt(brief application.ExecutionBrief, digest kernel.Di
 	case agentruntime.Finished:
 		state = application.ExternalSucceeded
 	case agentruntime.Failed:
-		state, retryable = application.ExternalFailed, true
+		failure, err := agentruntime.DecodeFailure(last.Payload)
+		if err != nil {
+			return application.ExternalExecutionObservation{}, false, ErrInvalidBinding
+		}
+		output, err = json.Marshal(failure)
+		if err != nil {
+			return application.ExternalExecutionObservation{}, false, err
+		}
+		return nativeObservation(brief, digest, application.ExternalFailed, output, failure.Retryable), true, nil
 	case agentruntime.Cancelled:
 		state = application.ExternalCancelled
 	case agentruntime.TimedOut:

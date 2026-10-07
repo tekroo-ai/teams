@@ -609,6 +609,15 @@ func (service *ProductionService) handlerDispatchForCurrentMessage(ctx context.C
 	if service == nil || task == nil || service.roleGrounding == nil || !service.roleGrounding.requiresMessageHandler(task.owner.ActorFQN) {
 		return nil, nil
 	}
+	// A retained-context advisory node is not a redelivery of a completed
+	// organizational message. Its authority is its task and causal evidence.
+	if service.qualificationNative && feature.Plan != nil && task.plan.Purpose == kernel.PurposeHandoff {
+		for _, original := range feature.Plan.Tasks {
+			if task.plan.ID == taskConsultationID(feature, original.ID) {
+				return nil, nil
+			}
+		}
+	}
 	messageID := feature.LastMessageID
 	if featurePlanContainsTask(feature.Plan, task.plan.ID) {
 		messageID = plannedTaskMessageID(feature.ID, task.plan.ID)

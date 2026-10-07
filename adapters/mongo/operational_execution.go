@@ -173,8 +173,32 @@ func (s *Store) loadExecutionRecoveryDirective(ctx context.Context, invocation k
 		if err != nil || found {
 			return directive, err
 		}
+	} else if invocation.Purpose == kernel.PurposeRepair {
+		// The first repair can follow a succeeded needs_decision report without
+		// a same-purpose predecessor. Still carry its evidence-bound changed
+		// condition, rather than silently dropping the clarification answer.
+		if prior, found := repairDirectivePredecessor(invocation, snapshot.WorkInvocations); found {
+			directive, found, err := s.recoveryDirectiveFromBudgetEvents(ctx, budgetRef, prior.AdmissionPolicyRevision, invocation.AdmissionPolicyRevision, profileEvidenceSet(snapshot.WorkProfiles[taskRef].Profile.ClassificationEvidenceIDs), snapshot)
+			if err != nil || found {
+				return directive, err
+			}
+		}
 	}
 	return s.recoveryDirectiveFromTaskReopen(ctx, taskRef, invocation, snapshot)
+}
+
+func repairDirectivePredecessor(next kernel.WorkInvocation, invocations map[kernel.AggregateRef]kernel.WorkInvocation) (kernel.WorkInvocation, bool) {
+	var selected kernel.WorkInvocation
+	found := false
+	for _, prior := range invocations {
+		if prior.TaskID != next.TaskID || prior.Purpose != kernel.PurposeImplementation || prior.State != kernel.InvocationSucceeded || prior.AdmissionPolicyRevision >= next.AdmissionPolicyRevision {
+			continue
+		}
+		if !found || prior.AdmissionPolicyRevision > selected.AdmissionPolicyRevision || prior.AdmissionPolicyRevision == selected.AdmissionPolicyRevision && prior.AttemptOrdinal > selected.AttemptOrdinal {
+			selected, found = prior, true
+		}
+	}
+	return selected, found
 }
 
 func (s *Store) recoveryDirectiveFromBudgetEvents(ctx context.Context, budgetRef kernel.AggregateRef, afterPolicyRevision, throughPolicyRevision uint64, profileEvidence map[kernel.UUIDv7]struct{}, snapshot kernel.Snapshot) (*application.ExecutionRecoveryDirective, bool, error) {

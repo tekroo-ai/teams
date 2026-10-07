@@ -153,7 +153,7 @@ func (service *ProductionService) RetryFailedTask(ctx context.Context, principal
 	if err != nil {
 		return InvocationStatus{}, fmt.Errorf("resolve recovery workspace: %w", err)
 	}
-	if (recoveryKind == taskRecoveryInvalidStructuredOutput || recoveryKind == taskRecoveryFailedEscalation) && state.Condition == kernel.ConditionBlocked {
+	if (recoveryKind == taskRecoveryInvalidStructuredOutput || recoveryKind == taskRecoveryFailedEscalation || recoveryKind == taskRecoveryReportedDecision) && state.Condition == kernel.ConditionBlocked {
 		if err := service.unblockInvalidStructuredTask(ctx, feature, planned, state, head, terminal, registered, request.IdempotencyKey); err != nil {
 			return InvocationStatus{}, fmt.Errorf("unblock invalid validator output: %w", err)
 		}
@@ -191,7 +191,7 @@ func (service *ProductionService) RetryFailedTask(ctx context.Context, principal
 	nextAttempt := terminal.AttemptOrdinal + 1
 	predecessor := &terminal
 	conditionDigests := []kernel.Digest{recoveryCondition}
-	if recoveryKind == taskRecoveryOperatorRepair {
+	if recoveryKind == taskRecoveryOperatorRepair || recoveryKind == taskRecoveryReportedDecision {
 		nextPurpose = kernel.PurposeRepair
 		nextAttempt = nextTaskPurposeAttempt(snapshot.WorkInvocations, planned.ID, nextPurpose)
 		// The first repair changes purpose from IMPLEMENTATION to REPAIR and has
@@ -300,6 +300,10 @@ const (
 	// the task unretryable: the operator's corrected-condition retry-task is
 	// the designed response to "operator escalation is required".
 	taskRecoveryFailedEscalation
+	// A syntactically successful invocation can report that work needs a
+	// decision. Changed-condition evidence may continue this exact task without
+	// treating a missing candidate as completed implementation.
+	taskRecoveryReportedDecision
 )
 
 // findPromotionRecoveryUnblock walks the causal chain from the task head back
@@ -334,6 +338,29 @@ func findPromotionRecoveryUnblock(ctx context.Context, store *mongo.Store, head 
 }
 
 func (service *ProductionService) classifyTaskRecovery(ctx context.Context, task organization.PlannedTask, state kernel.AggregateState, head kernel.UUIDv7, invocation kernel.WorkInvocation) (taskRecoveryKind, error) {
+	if head.Valid() && task.Purpose == kernel.PurposeImplementation && state.Phase == kernel.PhaseActive && invocation.State == kernel.InvocationSucceeded && invocation.OutputDigest != nil {
+		blockHead := head
+		if state.Condition == kernel.ConditionRunnable {
+			unblock, found, err := findPromotionRecoveryUnblock(ctx, service.Store, head, task.ID, invocation.ID)
+			if err != nil {
+				return 0, err
+			}
+			if found {
+				blockHead = unblock.Parents[0].ParentEventID
+			} else {
+				blockHead = ""
+			}
+		}
+		if blockHead != "" {
+			blocked, found, err := service.Store.ReadEvent(ctx, blockHead)
+			if err != nil {
+				return 0, err
+			}
+			if found && isExactReportedDecisionBlock(blocked, task, invocation, service.policyAuthority) {
+				return taskRecoveryReportedDecision, nil
+			}
+		}
+	}
 	recoverablePurpose := task.Purpose == kernel.PurposeImplementation || task.Purpose == kernel.PurposeRepair ||
 		(task.Purpose == kernel.PurposeValidation || task.Purpose == kernel.PurposeReview) && len(task.Validates) > 0
 	if recoverablePurpose && state.Condition == kernel.ConditionRunnable && (recoverableTaskTerminal(invocation) || operatorRevalidatableTaskTerminal(task, invocation)) {

@@ -516,6 +516,19 @@ func isExactRecoverableStructuredDecisionBlock(event kernel.DomainEvent, task or
 	return len(payload.BlockerRefs) == 1 && payload.BlockerRefs[0] == "teams://work-invocation/"+string(invocation.ID) && recoverableReason && payload.ReviewPolicy == invalidStructuredReviewPolicy
 }
 
+func isExactReportedDecisionBlock(event kernel.DomainEvent, task organization.PlannedTask, invocation kernel.WorkInvocation, authority kernel.PrincipalRef) bool {
+	if task.Purpose != kernel.PurposeImplementation || invocation.State != kernel.InvocationSucceeded || invocation.OutputDigest == nil ||
+		event.EventID == "" || event.EventType != "tekroo.event.work.blocked" || event.Aggregate != (kernel.AggregateRef{Kind: kernel.AggregateTask, ID: task.ID}) || event.Authority != authority ||
+		event.ActorFQN == nil || *event.ActorFQN != invocation.ActorFQN || event.Execution == nil || *event.Execution != invocation.Execution ||
+		len(event.Parents) != 1 || event.Parents[0] != (kernel.DagParent{ParentEventID: invocation.LastEventID, EdgeKind: kernel.EdgeResponse}) {
+		return false
+	}
+	var payload planningOutputBlockPayload
+	return json.Unmarshal(event.Payload, &payload) == nil && len(payload.BlockerRefs) == 1 &&
+		payload.BlockerRefs[0] == "teams://work-invocation/"+string(invocation.ID) &&
+		strings.HasPrefix(payload.Reason, "task reported needs_decision: ") && payload.ReviewPolicy == invalidStructuredReviewPolicy
+}
+
 // isExactFailedTaskEscalationBlock reports whether event is the glitch-retry
 // escalation block for exactly this failed invocation. The escalation command
 // is attributed to the actor's currently registered execution rather than the
