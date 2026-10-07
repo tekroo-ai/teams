@@ -53,7 +53,7 @@ func (model OpenAIModel) Continue(ctx context.Context, partial PartialTurnError)
 	return model.complete(ctx, partial.Messages, &partial)
 }
 
-func (model OpenAIModel) complete(ctx context.Context, transcript []Message, partial *PartialTurnError) (Completion, error) {
+func (model OpenAIModel) complete(ctx context.Context, transcript []Message, partial *PartialTurnError) (completion Completion, completionErr error) {
 	if model.Reasoning != nil && !model.Reasoning.Valid() {
 		return Completion{}, fmt.Errorf("%w: invalid reasoning configuration", ErrInvalidTurn)
 	}
@@ -197,12 +197,14 @@ func (model OpenAIModel) complete(ctx context.Context, transcript []Message, par
 		return Completion{}, fmt.Errorf("model completion HTTP %d (response bytes %d)", response.StatusCode, len(encoded))
 	}
 	var decoded struct {
-		ID      string `json:"id"`
+		ID      string          `json:"id"`
+		Usage   json.RawMessage `json:"usage"`
 		Choices []struct {
 			FinishReason string `json:"finish_reason"`
 			Message      struct {
-				Content   string `json:"content"`
-				ToolCalls []struct {
+				Content          string `json:"content"`
+				ReasoningContent string `json:"reasoning_content"`
+				ToolCalls        []struct {
 					ID       string `json:"id"`
 					Function struct {
 						Name      string `json:"name"`
@@ -216,6 +218,15 @@ func (model OpenAIModel) complete(ctx context.Context, transcript []Message, par
 		return Completion{}, fmt.Errorf("%w: malformed model completion", ErrInvalidTurn)
 	}
 	message := decoded.Choices[0].Message
+	diagnostics := ModelDiagnostics{ResponseID: decoded.ID, ResponseSHA256: fmt.Sprintf("%x", sha256.Sum256(encoded)), FinishReason: decoded.Choices[0].FinishReason,
+		ContentBytes: len(message.Content), ReasoningBytes: len(message.ReasoningContent), Usage: decoded.Usage, Continuation: partial != nil, MaxOutputTokens: model.MaxTokens}
+	defer func() {
+		if completionErr != nil {
+			completionErr = &ModelCompletionError{Diagnostics: diagnostics, Cause: completionErr}
+		} else {
+			completion.Diagnostics = &diagnostics
+		}
+	}()
 	if constrained {
 		if len(message.ToolCalls) != 0 || decoded.ID == "" && (model.TurnContract != nil || decoded.Choices[0].FinishReason == "length") {
 			return Completion{}, fmt.Errorf("%w: native tools or missing response identity on structured channel", ErrInvalidTurn)

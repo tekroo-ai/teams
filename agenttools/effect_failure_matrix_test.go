@@ -14,7 +14,9 @@ import (
 	"github.com/tekroo-ai/teams/kernel"
 )
 
-var effectToolNames = []string{"create_file", "edit_file", "undo_file_change", "restore_file_from_commit", "git_stage_files", "git_commit", "run_go_tests", "run_go_tests_worktree"}
+var effectToolNames = []string{"create_file", "edit_file", "undo_file_change", "restore_file_from_commit", "git_stage_files", "git_commit", "run_go_tests", "run_go_tests_worktree", "check_go_build_worktree"}
+
+var filesystemToolNames = []string{"make_directory", "format_go_files", "move_file", "remove_file"}
 
 func TestFailureMatrixCoversEveryEffectfulTool(t *testing.T) {
 	var actual []string
@@ -24,6 +26,7 @@ func TestFailureMatrixCoversEveryEffectfulTool(t *testing.T) {
 		}
 	}
 	expected := slices.Clone(effectToolNames)
+	expected = append(expected, filesystemToolNames...)
 	slices.Sort(actual)
 	slices.Sort(expected)
 	if !slices.Equal(actual, expected) {
@@ -90,6 +93,8 @@ func failureMatrixFixture(t *testing.T, name string) (MutationGateway, TestGatew
 		args = map[string]any{"paths": []string{"a.go"}, "expected_head": strings.Repeat("b", 40)}
 	case "git_commit":
 		args = map[string]any{"expected_head": head, "expected_index_tree": strings.Repeat("b", 40), "subject": "candidate"}
+	case "check_go_build_worktree":
+		args = struct{}{}
 	default:
 		args = map[string]any{"package": "./..."}
 	}

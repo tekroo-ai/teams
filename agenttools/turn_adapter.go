@@ -81,7 +81,7 @@ func TestDefinitions(permissions []string) []agentruntime.ToolDefinition {
 }
 
 func (adapter MutationTurnAdapter) Handles(name string) bool {
-	return name == "create_file" || name == "undo_file_change" || name == "restore_file_from_commit" || name == "write_file" || name == "edit_file" || name == "git_stage_files" || name == "git_commit"
+	return isFilesystemTool(name) || name == "create_file" || name == "undo_file_change" || name == "restore_file_from_commit" || name == "write_file" || name == "edit_file" || name == "git_stage_files" || name == "git_commit"
 }
 
 func (adapter MutationTurnAdapter) ExecuteEffect(ctx context.Context, call agentruntime.ToolCall) (json.RawMessage, error) {

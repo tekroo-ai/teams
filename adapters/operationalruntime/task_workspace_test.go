@@ -2,6 +2,7 @@ package operationalruntime
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -13,6 +14,54 @@ import (
 	"github.com/tekroo-ai/teams/kernel"
 	"github.com/tekroo-ai/teams/organization"
 )
+
+func TestCandidateInputReceiptPinsExportsAndSurvivesRestart(t *testing.T) {
+	directory, baseline, _ := candidateRepository(t)
+	root := ProductionWorkspace{WorkspaceID: "repository", WorktreeID: "main", WorkingDirectory: directory, Branch: "source", BaselineSHA: baseline, WritablePaths: []string{"."}}
+	resolver, err := openhands.NewBoundWorkspaceResolver([]openhands.WorkspaceBinding{{WorkspaceID: root.WorkspaceID, WorktreeID: root.WorktreeID, WorkingDirectory: directory}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	evidenceRoot := t.TempDir()
+	manager, err := newTaskWorkspaceManagerWithContext(t.Context(), evidenceRoot, "git", time.Minute, resolver)
+	if err != nil {
+		t.Fatal(err)
+	}
+	feature := organization.FeatureRequest{ID: candidateTestUUID(1801)}
+	producer := organization.PlannedTask{ID: candidateTestUUID(1802), Purpose: kernel.PurposeImplementation}
+	consumer := organization.PlannedTask{ID: candidateTestUUID(1803), Purpose: kernel.PurposeImplementation, DependsOn: []kernel.UUIDv7{producer.ID}}
+	workspace, _, err := manager.PrepareTask(t.Context(), feature, producer, "coder-1", root, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	commitTaskFile(t, workspace.WorkingDirectory, "exports.go", "package fixture\nfunc Ready(value string) error { return nil }\n", "producer export")
+	component := taskWorkspaceComponent{TaskID: producer.ID, WorkspaceID: workspace.WorkspaceID, WorktreeID: workspace.WorktreeID, WorkingDirectory: workspace.WorkingDirectory, InvocationID: candidateTestUUID(1804), OutputSHA256: repeatedDigest('b'), Readiness: "CANDIDATE_READY", ReadinessPolicy: repeatedDigest('a')}
+	_, receipt, err := manager.PrepareTask(t.Context(), feature, consumer, "coder-2", root, []taskWorkspaceComponent{component})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(receipt.Components) != 1 {
+		t.Fatal("producer missing")
+	}
+	pinned := receipt.Components[0]
+	if pinned.InvocationID != component.InvocationID || pinned.OutputSHA256 != component.OutputSHA256 || pinned.Commit == "" || pinned.Tree == "" || len(pinned.Exports) != 1 || pinned.Exports[0].Symbol != "Ready" || pinned.Exports[0].Signature != "func Ready(value string) error" {
+		t.Fatalf("incomplete handoff: %+v", pinned)
+	}
+	restarted, err := newTaskWorkspaceManagerWithContext(t.Context(), evidenceRoot, "git", time.Minute, resolver)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, replayed, err := restarted.PrepareTask(t.Context(), feature, consumer, "coder-2", root, []taskWorkspaceComponent{component})
+	first, _ := json.Marshal(receipt)
+	second, _ := json.Marshal(replayed)
+	if err != nil || string(first) != string(second) {
+		t.Fatalf("restart changed handoff: %v", err)
+	}
+	component.InvocationID = candidateTestUUID(1805)
+	if _, _, err := restarted.PrepareTask(t.Context(), feature, consumer, "coder-2", root, []taskWorkspaceComponent{component}); err == nil {
+		t.Fatal("superseded input silently reused editable branch")
+	}
+}
 
 func TestTaskWorkspacesIsolateBranchesAndAssembleTheDAGDeterministically(t *testing.T) {
 	rootDirectory, _, baseline := candidateRepository(t)

@@ -17,10 +17,11 @@ const MaxJournalPayloadBytes = 8 << 20
 // Messages retain the exact pre-generation context, including any condensation.
 // Prefix is raw assistant content; it must not be parsed and reserialized.
 type PartialTurnError struct {
-	Prefix     string    `json:"prefix"`
-	Binding    string    `json:"binding"`
-	ResponseID string    `json:"response_id"`
-	Messages   []Message `json:"messages"`
+	Prefix      string            `json:"prefix"`
+	Binding     string            `json:"binding"`
+	ResponseID  string            `json:"response_id"`
+	Messages    []Message         `json:"messages"`
+	Diagnostics *ModelDiagnostics `json:"diagnostics,omitempty"`
 }
 
 func (partial *PartialTurnError) Error() string {

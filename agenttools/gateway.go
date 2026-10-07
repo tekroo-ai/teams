@@ -162,6 +162,7 @@ type Receipt struct {
 type Gateway struct {
 	Bindings BindingSource
 	Host     Host
+	History  FileChangeHistory
 }
 
 func (gateway Gateway) ExecuteReadOnly(ctx context.Context, request Request) (Receipt, error) {
@@ -171,7 +172,7 @@ func (gateway Gateway) ExecuteReadOnly(ctx context.Context, request Request) (Re
 	operation, cancel := context.WithTimeout(ctx, gateway.Host.Timeout)
 	defer cancel()
 	switch request.Call.Name {
-	case "read_file", "read_file_from_commit", "check_go_format", "list_files", "find_files", "search_text", "search_regex", "git_status", "git_diff", "git_log", "git_show", "git_check_ignore":
+	case "file_change_history", "find_definitions", "find_references", "read_file", "read_file_from_commit", "check_go_format", "list_files", "find_files", "search_text", "search_regex", "git_status", "git_diff", "git_log", "git_show", "git_check_ignore":
 	default:
 		return Receipt{}, ErrForbidden
 	}
@@ -179,7 +180,12 @@ func (gateway Gateway) ExecuteReadOnly(ctx context.Context, request Request) (Re
 	if err != nil {
 		return Receipt{}, err
 	}
-	result, err := gateway.Host.execute(operation, authority, request.Call)
+	var result Result
+	if request.Call.Name == "file_change_history" {
+		result, err = gateway.fileHistory(operation, authority, request.Call)
+	} else {
+		result, err = gateway.Host.execute(operation, authority, request.Call)
+	}
 	if err != nil {
 		return Receipt{}, err
 	}

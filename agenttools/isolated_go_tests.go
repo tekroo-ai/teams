@@ -135,8 +135,13 @@ func (host Host) runIsolatedGoTestsFrom(ctx context.Context, root, pattern strin
 	}
 	arguments := []string{"-p", profile, goBinary, "test", "-count=1"}
 	if compileOnly {
-		// Compile production and test packages without repeating their test suites.
-		arguments = append(arguments, "-run", "^$")
+		// -run '^$' still executes init/TestMain. Compile-only means -c: no
+		// candidate executable or test initializer is run, even with side effects.
+		compiled := filepath.Join(workspace, "compiled-tests")
+		if err := os.Mkdir(compiled, 0700); err != nil {
+			return result, err
+		}
+		arguments = append(arguments, "-c", "-o", compiled+string(filepath.Separator))
 	}
 	arguments = append(arguments, pattern)
 	command := exec.CommandContext(operation, "/usr/bin/sandbox-exec", arguments...)
@@ -154,6 +159,9 @@ func (host Host) runIsolatedGoTestsFrom(ctx context.Context, root, pattern strin
 		"CGO_ENABLED=0",
 		"GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null", "GIT_TERMINAL_PROMPT=0", "GIT_ATTR_NOSYSTEM=1",
 	)
+	if err := host.seedCompilationCache(operation, workspace, source, goBinary, profile, command.Env, pattern); err != nil {
+		return result, err
+	}
 	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	command.Cancel = func() error {
 		if command.Process == nil {

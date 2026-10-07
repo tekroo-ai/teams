@@ -32,7 +32,7 @@ func TestBothGoToolsExecuteRecursiveSubtreeInSandbox(t *testing.T) {
 	permissions := []string{"repository.read", "test.execute"}
 	authority := Authority{WorkspaceRoot: root, Permissions: permissions, Purpose: kernel.PurposeImplementation}
 	for _, spec := range Available(permissions) {
-		if !isGoTestTool(spec.Name) {
+		if spec.Name != "run_go_tests" && spec.Name != "run_go_tests_worktree" {
 			continue
 		}
 		compiler := jsonschema.NewCompiler()

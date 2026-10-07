@@ -64,6 +64,9 @@ func (service *ProductionService) reconcileFeaturePlan(ctx context.Context, feat
 	if !found || !budget.Valid() {
 		return errors.New("feature work budget is missing")
 	}
+	if changed, err := service.reconcileCandidateLineage(ctx, feature, plan, states, invocations, snapshot); err != nil || changed {
+		return err
+	}
 	deadlinesExtended, err := service.reconcileFeatureProfileDeadlines(ctx, feature, plan, states, heads, invocations, snapshot, budget)
 	if err != nil {
 		return fmt.Errorf("reconcile profile deadlines: %w", err)
@@ -104,7 +107,7 @@ func (service *ProductionService) reconcileFeaturePlan(ctx context.Context, feat
 	}
 	allCompleted := true
 	for _, item := range plan.Tasks {
-		if states[item.ID].Phase != kernel.PhaseCompleted {
+		if states[item.ID].Phase != kernel.PhaseCompleted || states[item.ID].Condition != kernel.ConditionRunnable {
 			allCompleted = false
 			break
 		}
@@ -152,11 +155,22 @@ func (service *ProductionService) reconcileFeaturePlan(ctx context.Context, feat
 				continue
 			}
 			dependency := states[dependencyID]
-			if !plannedDependencyReady(false, dependency, kernel.WorkInvocation{}, false) {
+			producer, exists := plannedTaskByID(plan, dependencyID)
+			invocation, invocationFound := invocations[dependencyID]
+			if !exists || !candidateDependencyReady(service.planning, item, producer, dependency, invocation, invocationFound) {
 				ready = false
 				break
 			}
-			dependencyEvents = append(dependencyEvents, heads[dependencyID])
+			if service.planning.candidateOverlapEnabled() && item.Purpose == kernel.PurposeImplementation && producer.Purpose == kernel.PurposeImplementation {
+				if !invocationFound || invocation.State != kernel.InvocationSucceeded || invocation.OutputDigest == nil {
+					ready = false
+					break
+				}
+				dependencyEvents = append(dependencyEvents, invocation.LastEventID)
+				conditionDigests = append(conditionDigests, *invocation.OutputDigest)
+			} else {
+				dependencyEvents = append(dependencyEvents, heads[dependencyID])
+			}
 			if bindDependencyOutputs {
 				invocation, succeeded := invocations[dependencyID]
 				if !succeeded || invocation.State != kernel.InvocationSucceeded || invocation.OutputDigest == nil {
@@ -405,6 +419,9 @@ func (service *ProductionService) resumeInvocationlessActiveTask(ctx context.Con
 // waits for the dependency to complete, which means its required independent
 // validation has passed. This rule is independent of role and work domain.
 func plannedDependencyReady(validationTarget bool, dependency kernel.AggregateState, invocation kernel.WorkInvocation, found bool) bool {
+	if dependency.Condition != kernel.ConditionRunnable {
+		return false
+	}
 	if validationTarget {
 		return found && invocation.State == kernel.InvocationSucceeded && invocation.OutputDigest != nil
 	}

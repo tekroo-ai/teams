@@ -91,6 +91,12 @@ func TestStructuredContinuationPreservesExactPrefixAndCheckpoints(t *testing.T) 
 			if len(journal.entries) != 5 || journal.entries[1].Kind != "model_partial" || journal.entries[2].Kind != "model_partial" {
 				t.Fatalf("missing partial checkpoints: %+v", journal.entries)
 			}
+			for _, entry := range journal.entries[1:3] {
+				var checkpoint PartialTurnError
+				if json.Unmarshal(entry.Payload, &checkpoint) != nil || checkpoint.Diagnostics == nil || checkpoint.Diagnostics.FinishReason != "length" || checkpoint.Diagnostics.ResponseSHA256 == "" {
+					t.Fatal("partial response metadata was not retained")
+				}
+			}
 			if condenser.calls != 1 {
 				t.Fatalf("continuation re-condensed original context %d times", condenser.calls)
 			}

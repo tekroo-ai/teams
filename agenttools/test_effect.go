@@ -30,7 +30,7 @@ func (gateway TestGateway) Execute(ctx context.Context, request Request) (Receip
 	var args struct {
 		Package string `json:"package"`
 	}
-	if decode(request.Call.Arguments, &args) != nil {
+	if !decodeGoTestArguments(request.Call, &args.Package) {
 		return Receipt{}, ErrInvalidCall
 	}
 	operation, cancel := context.WithTimeout(ctx, gateway.Host.Timeout)
@@ -46,6 +46,9 @@ func (gateway TestGateway) Execute(ctx context.Context, request Request) (Receip
 	root, err := canonicalRoot(authority.WorkspaceRoot)
 	if err != nil {
 		return Receipt{}, err
+	}
+	if request.Call.Name == "check_go_build_worktree" {
+		args.Package = "./..."
 	}
 	if !validGoPackageInModule(root, args.Package) {
 		return Receipt{}, ErrInvalidCall
@@ -77,7 +80,7 @@ func (gateway TestGateway) Reconcile(ctx context.Context, request Request) (Rece
 	var args struct {
 		Package string `json:"package"`
 	}
-	if decode(request.Call.Arguments, &args) != nil {
+	if !decodeGoTestArguments(request.Call, &args.Package) {
 		return Receipt{}, false, ErrInvalidCall
 	}
 	authority, err := gateway.Bindings.BindToolInvocation(ctx, request.InvocationID, request.RequestDigest)
@@ -91,6 +94,9 @@ func (gateway TestGateway) Reconcile(ctx context.Context, request Request) (Rece
 	root, err := canonicalRoot(authority.WorkspaceRoot)
 	if err != nil {
 		return Receipt{}, false, err
+	}
+	if request.Call.Name == "check_go_build_worktree" {
+		args.Package = "./..."
 	}
 	if !validGoPackageInModule(root, args.Package) {
 		return Receipt{}, false, ErrInvalidCall
@@ -127,7 +133,7 @@ func testEffectReceipt(request Request, argumentsHash string, stored EffectRecor
 			return Receipt{}, ErrEffectUncertain
 		}
 	} else if !validFullGitSHA(result.CommitSHA) ||
-		request.Call.Name == "run_go_tests_worktree" && !validExpectedSHA(result.SnapshotSHA256) ||
+		(request.Call.Name == "run_go_tests_worktree" || request.Call.Name == "check_go_build_worktree") && !validExpectedSHA(result.SnapshotSHA256) ||
 		request.Call.Name == "run_go_tests" && result.SnapshotSHA256 != "" {
 		return Receipt{}, ErrEffectUncertain
 	}
@@ -139,11 +145,27 @@ func failedTestResult(name string, result Result, err error) Result {
 }
 
 func isGoTestTool(name string) bool {
-	return name == "run_go_tests" || name == "run_go_tests_worktree"
+	return name == "run_go_tests" || name == "run_go_tests_worktree" || name == "check_go_build_worktree"
+}
+
+func decodeGoTestArguments(call Call, pattern *string) bool {
+	if call.Name == "check_go_build_worktree" {
+		var empty struct{}
+		*pattern = "./..."
+		return decode(call.Arguments, &empty) == nil
+	}
+	var args struct {
+		Package string `json:"package"`
+	}
+	if decode(call.Arguments, &args) != nil {
+		return false
+	}
+	*pattern = args.Package
+	return true
 }
 
 func goTestPurposeAllowed(name string, purpose kernel.WorkPurpose) bool {
-	if name == "run_go_tests_worktree" {
+	if name == "run_go_tests_worktree" || name == "check_go_build_worktree" {
 		return purpose == kernel.PurposeImplementation || purpose == kernel.PurposeRepair
 	}
 	return name == "run_go_tests" && (purpose == kernel.PurposeValidation || purpose == kernel.PurposeImplementation || purpose == kernel.PurposeRepair)

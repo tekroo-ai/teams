@@ -852,7 +852,7 @@ func legacyPlanningStageDefinition(stage featurePlanningStage) (string, kernel.W
 	case stageSpecification:
 		return "project-manager", kernel.PurposeHandoff, kernel.RouteBoundedExecution, "Specify feature stories", "Turn the authoritative request into the smallest complete product specification. Default to one story. Split only when each proposed story would remain independently usable, testable, and releasable from the current baseline if every other proposed story were omitted. Apply that omission test before finish and merge dependent outcomes. A shared capability and its organization, persistence, operator surfaces, tests, documentation, and review are one story, not layer stories. Preserve every submitted acceptance criterion verbatim in a story; add none. Produce one result JSON object with schema_version=1.0.0, result_type=FEATURE_SPECIFICATION, stories [{title, description, acceptance_criteria, priority}]. Teams carries operator constraints; omit design_constraints. Priority is LOW, NORMAL, HIGH, or CRITICAL. Do not add operational identities or delegate. Produce only the specified result once through the configured result channel.", []string{"stories are finite, testable, and within the accepted feature scope"}, nil
 	case stageArchitecture:
-		return "architect", kernel.PurposeReplan, kernel.RouteComplexReasoning, "Design executable feature DAG", "Read AGENTS.md and inspect relevant source, interfaces, and tests with read-only repository tools. Cite only repository-relative files actually inspected. Name an external package or API only when inspected repository evidence supports it; a dependency-manifest entry alone is insufficient. Otherwise describe the capability and make API verification an implementation responsibility. Produce the smallest complete acyclic plan. Every task is implementation work, fits one run, and has complexity at most authored_task_policy.maximum_task_complexity. Do not author test, validation, security-review, or product-acceptance tasks; Teams appends those and whole-feature validation independently. Describe the work, dependencies, complexity, and risk; do not select an operational role. Teams applies execution_routing_policy after validating the plan. Give each task measurable, task-specific acceptance criteria. The feature specification remains authoritative, and Teams carries its complete story-level acceptance criteria into independent whole-feature validation and final product acceptance; do not duplicate them across tasks merely for bookkeeping. For stateful or concurrent work identify invariants, ownership boundaries, state transitions, linearization points, and failure or compensation semantics. A read-then-act sequence is not proof of atomicity. Explain partial-failure safety without prescribing a particular implementation unless requirements or inspected architecture demand it. Assign each invariant to exactly one owning component or layer; other tasks consume that owner's abstraction. Lower-level storage and transport must not depend on higher-level workflow, deployment, or team configuration. Compare every task with the architecture and decisions; remove duplicate, conflicting, or inverted ownership. Self-check for one consistent state model and remove unresolved mutually exclusive alternatives. Treat changes that affect identity, authority, credentials, external control surfaces, or routing as HIGH risk. Compute materialized_total=2*len(tasks)+count(HIGH-or-CRITICAL tasks)+2 and keep it within task_budget.maximum_total_tasks. Combine cohesive work and obey maximum_moderate_or_lower_implementation_tasks. Obey authored_task_policy: purpose=IMPLEMENTATION, validates=[], and backward depends_on indexes. story_index is one zero-based integer naming the task's primary story; it is never an array. depends_on and validates contain zero-based task indexes, so a second task depending on the first emits depends_on=[0]. Risk is LOW, MODERATE, HIGH, or CRITICAL. Do not add contract verification unless a normative contract change is requested. Produce one result JSON object with schema_version=1.0.0, result_type=FEATURE_PLAN, architecture, design_decisions, assumptions, and tasks. Each task has story_index, title, description, acceptance_criteria, depends_on, validates, purpose, complexity, risk, critical_path, attempt_limit, and review_round_limit. Do not edit, invent paths, assign operational identities, or delegate. Produce only the specified result once through the configured result channel.", []string{"the result is a repository-grounded finite acyclic task plan with explicit validation"}, nil
+		return "architect", kernel.PurposeReplan, kernel.RouteComplexReasoning, "Design executable feature DAG", "Read AGENTS.md and inspect relevant source, interfaces, and tests with read-only repository tools. Cite only repository-relative files actually inspected. Name an external package or API only when inspected repository evidence supports it; a dependency-manifest entry alone is insufficient. Otherwise describe the capability and make API verification an implementation responsibility. Produce the smallest complete acyclic plan. Each task fits one run; obey authored_task_policy.maximum_task_complexity. Do not author test, validation, security-review, or product-acceptance tasks; Teams appends those and whole-feature validation independently. Describe the work, dependencies, complexity, and risk; do not select an operational role. Teams applies execution_routing_policy after validating the plan. Give each task measurable, task-specific acceptance criteria. The feature specification remains authoritative, and Teams carries its complete story-level acceptance criteria into independent whole-feature validation and final product acceptance; do not duplicate them across tasks merely for bookkeeping. For stateful or concurrent work identify invariants, ownership boundaries, state transitions, linearization points, and failure or compensation semantics. A read-then-act sequence is not proof of atomicity. Explain partial-failure safety without prescribing a particular implementation unless requirements or inspected architecture demand it. Assign each invariant to exactly one owning component or layer; other tasks consume that owner's abstraction. Lower-level storage and transport must not depend on higher-level workflow, deployment, or team configuration. Compare every task with the architecture and decisions; remove duplicate, conflicting, or inverted ownership. Self-check for one consistent state model and remove unresolved mutually exclusive alternatives. Treat changes that affect identity, authority, credentials, external control surfaces, or routing as HIGH risk. Compute materialized_total=len(tasks)+count(tasks that supply an implementation handoff or are HIGH-or-CRITICAL)+count(HIGH-or-CRITICAL tasks)+2 and keep it within task_budget.maximum_total_tasks. A handoff/high-risk task gets one validator, not two for satisfying both conditions. Keep coherent task boundaries; do not merge unrelated work simply to fit the budget. If coherent work exceeds the authorized total, report a budget decision. maximum_moderate_or_lower_implementation_tasks is a best-case upper bound; actual dependencies add validator costs. Obey authored_task_policy: purpose=IMPLEMENTATION, validates=[], and backward depends_on indexes. story_index is one zero-based integer naming the task's primary story; it is never an array. depends_on and validates contain zero-based task indexes, so a second task depending on the first emits depends_on=[0]. Risk is LOW, MODERATE, HIGH, or CRITICAL. Do not add contract verification unless a normative contract change is requested. Return FEATURE_PLAN through its declared schema (schema_version=1.0.0). Do not edit, invent paths, assign operational identities, or delegate. Submit once through the configured result channel.", []string{"the result is a repository-grounded finite acyclic task plan with explicit validation"}, nil
 	case stagePlanFinalization:
 		return "project-manager", kernel.PurposeHandoff, kernel.RouteBoundedExecution, "Finalize executable feature DAG", "Inspect the architect's immutable design proposal. Preserve its technical task descriptions and acceptance criteria. Assemble the final DAG by adding only justified dependencies, identify each cross-task capability handoff with its provider, consumer, capability, and precise contract, and check that every required capability is supplied upstream. Return FEATURE_EXECUTION_PLAN with source_design_digest, architecture, design_decisions, assumptions, tasks, and handoffs. If technical design must change, return needs_decision with the exact deficiency instead of silently rewriting it. Do not edit code or expand product scope.", []string{"the project manager owns a complete executable DAG whose cross-task handoffs close"}, nil
 	case stageArchitectureTaskReview:
@@ -930,6 +930,8 @@ func featurePlanningDescription(feature organization.FeatureRequest, stage featu
 		type taskBudget struct {
 			MaximumTotalTasks                                 uint32 `json:"maximum_total_tasks"`
 			ValidationTasksPerImplementation                  uint32 `json:"validation_tasks_per_implementation"`
+			ValidationTasksPerHandoffImplementation           uint32 `json:"validation_tasks_per_handoff_implementation"`
+			ValidationTasksPerHighRiskImplementation          uint32 `json:"validation_tasks_per_high_risk_implementation"`
 			AdditionalSecurityReviewPerHighRiskImplementation uint32 `json:"additional_security_review_per_high_risk_implementation"`
 			ReservedFeatureValidationTasks                    uint32 `json:"reserved_feature_validation_tasks"`
 			ReservedProductAcceptanceTasks                    uint32 `json:"reserved_product_acceptance_tasks"`
@@ -942,10 +944,7 @@ func featurePlanningDescription(feature organization.FeatureRequest, stage featu
 			RoleSelectionOwner    string               `json:"role_selection_owner"`
 			TasksAreSerialized    bool                 `json:"tasks_are_serialized"`
 		}
-		maximumImplementationTasks := uint32(0)
-		if feature.Input.MaximumTasks > 2 {
-			maximumImplementationTasks = (feature.Input.MaximumTasks - 2) / 2
-		}
+		maximumImplementationTasks := maximumBudgetedImplementationTasks(feature.Input.MaximumTasks)
 		state = struct {
 			FeatureID          kernel.UUIDv7                     `json:"feature_id"`
 			Sources            sourceDigests                     `json:"source_sha256"`
@@ -966,7 +965,8 @@ func featurePlanningDescription(feature organization.FeatureRequest, stage featu
 			Repository: feature.Input.Repository, RequestConstraints: append([]string(nil), feature.Input.Constraints...),
 			MaximumTasks: feature.Input.MaximumTasks, MaximumHops: feature.Input.MaximumHops,
 			TaskBudget: taskBudget{
-				MaximumTotalTasks: feature.Input.MaximumTasks, ValidationTasksPerImplementation: 1,
+				MaximumTotalTasks: feature.Input.MaximumTasks, ValidationTasksPerImplementation: 0,
+				ValidationTasksPerHandoffImplementation: 1, ValidationTasksPerHighRiskImplementation: 1,
 				AdditionalSecurityReviewPerHighRiskImplementation: 1, ReservedFeatureValidationTasks: 1, ReservedProductAcceptanceTasks: 1,
 				MaximumModerateOrLowerImplementationTasks: maximumImplementationTasks,
 			},
@@ -1959,7 +1959,7 @@ func normalizeArchitecturePlanTasks(feature organization.FeatureRequest, tasks [
 		return nil, organization.ErrInvalidFeature
 	}
 	if materialized := requiredMaterializedTaskCount(tasks); materialized > int(feature.Input.MaximumTasks) {
-		return nil, fmt.Errorf("%w: authored task plan materializes %d tasks, maximum %d; Teams adds required validation and acceptance, so reduce authored implementation tasks", organization.ErrInvalidFeature, materialized, feature.Input.MaximumTasks)
+		return nil, fmt.Errorf("%w: authored plan requires %d total tasks, authorized maximum is %d; retain coherent task boundaries and request a budget decision rather than merging unrelated work merely to fit", organization.ErrInvalidFeature, materialized, feature.Input.MaximumTasks)
 	}
 	normalizedTasks, err := normalizeArchitectureTaskCriteria(*feature.Specification, tasks)
 	if err != nil {
@@ -1982,6 +1982,15 @@ func requiredMaterializedTaskCount(tasks []architectureTaskResult) int {
 		}
 	}
 	return count
+}
+
+// This is an upper bound, not a false promise of a validator for every task.
+// Actual graph-specific validation/security costs remain checked at admission.
+func maximumBudgetedImplementationTasks(maximumTotal uint32) uint32 {
+	if maximumTotal <= 2 {
+		return 0
+	}
+	return maximumTotal - 2
 }
 
 func authoredImplementationHandoffs(tasks []architectureTaskResult) []bool {

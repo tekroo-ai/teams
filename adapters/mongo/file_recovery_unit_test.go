@@ -54,3 +54,39 @@ func TestFilePreimageSurvivesBSONAndRejectsCorruption(t *testing.T) {
 		t.Fatal("removal drift accepted")
 	}
 }
+
+func TestFilesystemSnapshotSurvivesBSONAndBindsHistoryPaths(t *testing.T) {
+	record := retainedFileFixture()
+	record.Name = "remove_file"
+	record.HasPreimage = false
+	record.FilePath = ""
+	record.Filesystem = []byte(`{"files":[{"path":"source.go","before":{"exists":true,"content":"eAo=","sha256":"73cb3858a687a8494ca3323053016282f3dad39d42cf62ca4e79dda2aac7d9ac","mode":420},"after":{"exists":false}}]}`)
+	record.PreparedSHA256 = digestEffectBytes(record.Filesystem)
+	document, err := toolEffectCandidate(record)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := bson.Marshal(document)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded toolEffectDocument
+	if err := bson.Unmarshal(raw, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := retainedEffect(decoded); err != nil {
+		t.Fatal(err)
+	}
+	decoded.FilesystemPaths = []string{"different.go"}
+	if _, err := retainedEffect(decoded); err == nil {
+		t.Fatal("unbound history index accepted")
+	}
+	document.Filesystem[0] = '['
+	if _, err := retainedEffect(document); err == nil {
+		t.Fatal("corrupted snapshot accepted")
+	}
+	record.Name = "run_command"
+	if _, err := toolEffectCandidate(record); err == nil {
+		t.Fatal("snapshot attached to unrelated effect")
+	}
+}

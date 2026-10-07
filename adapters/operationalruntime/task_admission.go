@@ -123,6 +123,9 @@ func featureBudgetPolicyAccepted(account kernel.WorkBudgetAccount, planning Prod
 }
 
 func (service *ProductionService) preparePlannedTasks(ctx context.Context, feature organization.FeatureRequest, plan organization.FeaturePlan, storyEvents map[kernel.UUIDv7]kernel.UUIDv7, taskEvents map[kernel.UUIDv7]kernel.UUIDv7) error {
+	// Classification and candidate preparation must select gates from the same
+	// materialized plan, even when the caller has not attached it to feature.
+	feature.Plan = &plan
 	planBytes, err := json.Marshal(plan)
 	if err != nil {
 		return err
@@ -254,7 +257,7 @@ func (service *ProductionService) workProfile(feature organization.FeatureReques
 	return kernel.WorkRiskProfile{
 		TaskID: task.ID, ProfileID: profileID, ProfileRevision: 1, ProfileDigest: profileDigest, LifecycleEpoch: lifecycleEpoch, ScopeRevision: scopeRevision,
 		WorkKind: workKindForPurpose(task.Purpose, task.Risk), Ambiguity: ambiguity, Novelty: novelty, BlastRadius: blast, SecuritySensitivity: security,
-		MinimumDecisionRoute: task.DecisionRoute, AcceptanceCriteriaDigest: digestBytes(criteria), RequiredDeterministicGateIDs: append([]string(nil), service.planning.RequiredGateIDs...),
+		MinimumDecisionRoute: task.DecisionRoute, AcceptanceCriteriaDigest: digestBytes(criteria), RequiredDeterministicGateIDs: service.planning.gateIDs(feature.Plan, task),
 		RequiredValidationBranches: 1, RequiredIndependenceDimensions: independence,
 		ImplementationVariantCount: 1, ValidCandidateQuorum: 1, VerificationTopologyDigest: service.planning.VerificationTopologyDigest,
 		ClassificationPolicyRevision: service.planning.PolicyRevision, ClassificationPolicyDigest: service.planning.ClassificationPolicyDigest,

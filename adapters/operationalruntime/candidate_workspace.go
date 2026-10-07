@@ -3,10 +3,13 @@ package operationalruntime
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash"
 	"log"
 	"os"
 	"os/exec"
@@ -15,6 +18,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/tekroo-ai/teams/adapters/openhands"
@@ -47,6 +51,16 @@ type candidateGateReceipt struct {
 	StderrBase64 string        `json:"stderr_base64"`
 	StdoutSHA256 kernel.Digest `json:"stdout_sha256"`
 	StderrSHA256 kernel.Digest `json:"stderr_sha256"`
+	// Wall-clock observations live in the attempt log, never in the canonical
+	// deterministic candidate receipt (which must reconstruct after a crash).
+	StartedAt        time.Time     `json:"-"`
+	FinishedAt       time.Time     `json:"-"`
+	ExecutionError   string        `json:"execution_error,omitempty"`
+	StdoutTruncated  bool          `json:"stdout_truncated,omitempty"`
+	StderrTruncated  bool          `json:"stderr_truncated,omitempty"`
+	FullStdoutSHA256 kernel.Digest `json:"full_stdout_sha256,omitempty"`
+	FullStderrSHA256 kernel.Digest `json:"full_stderr_sha256,omitempty"`
+	ReusedFrom       string        `json:"-"`
 }
 
 type candidateReceipt struct {
@@ -532,15 +546,49 @@ func (manager *candidateWorkspaceManager) runGates(ctx context.Context, director
 			return nil, errInvalidCandidateWorkspace
 		}
 		seen[gateID] = struct{}{}
+		identity, err := manager.git(ctx, directory, "rev-parse", "HEAD")
+		if err != nil {
+			return receipts, err
+		}
+		tree, err := manager.git(ctx, directory, "rev-parse", "HEAD^{tree}")
+		if err != nil {
+			return receipts, err
+		}
 		timeout, _ := time.ParseDuration(gate.Timeout)
 		gateCtx, cancel := context.WithTimeout(ctx, timeout)
 		command := exec.CommandContext(gateCtx, gate.Command[0], gate.Command[1:]...)
 		command.Dir = directory
 		command.Env = append(os.Environ(), "CI=1", "GIT_PAGER=cat", "PAGER=cat", "GIT_TERMINAL_PROMPT=0")
-		var stdout, stderr bytes.Buffer
-		command.Stdout, command.Stderr = &stdout, &stderr
+		cacheKey, err := candidateGateCacheKey(ctx, gate, command.Env, directory, strings.TrimSpace(string(identity)), strings.TrimSpace(string(tree)))
+		if err != nil {
+			cancel()
+			return receipts, err
+		}
+		if cached, found, err := manager.readGateCache(cacheKey, gate); err != nil {
+			cancel()
+			return receipts, err
+		} else if found {
+			cancel()
+			cached.StartedAt, cached.FinishedAt, cached.ReusedFrom = time.Now().UTC(), time.Now().UTC(), cacheKey
+			if err := manager.retainGateAttempt(directory, strings.TrimSpace(string(identity)), strings.TrimSpace(string(tree)), cached); err != nil {
+				return receipts, err
+			}
+			receipts = append(receipts, cached)
+			continue
+		}
+		stdout, stderr := newGateOutput(), newGateOutput()
+		command.Stdout, command.Stderr = stdout, stderr
+		command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+		command.Cancel = func() error {
+			if command.Process == nil {
+				return os.ErrProcessDone
+			}
+			return syscall.Kill(-command.Process.Pid, syscall.SIGKILL)
+		}
+		command.WaitDelay = 2 * time.Second
 		started := time.Now()
 		runErr := command.Run()
+		finished := time.Now()
 		log.Printf("candidate_gate gate=%s elapsed=%s error=%t", gateID, time.Since(started), runErr != nil)
 		cancel()
 		exitCode := 0
@@ -557,13 +605,78 @@ func (manager *candidateWorkspaceManager) runGates(ctx context.Context, director
 			GateID:    gateID, Command: append([]string(nil), gate.Command...), ExitCode: exitCode,
 			StdoutBase64: base64.StdEncoding.EncodeToString(stdout.Bytes()), StderrBase64: base64.StdEncoding.EncodeToString(stderr.Bytes()),
 			StdoutSHA256: stdoutDigest, StderrSHA256: stderrDigest,
+			StartedAt: started.UTC(), FinishedAt: finished.UTC(),
+		}
+		if runErr != nil {
+			receipt.ExecutionError = runErr.Error()
+		}
+		receipt.StdoutTruncated, receipt.StderrTruncated = stdout.truncated, stderr.truncated
+		if stdout.truncated {
+			receipt.FullStdoutSHA256 = stdout.digest()
+		}
+		if stderr.truncated {
+			receipt.FullStderrSHA256 = stderr.digest()
+		}
+		// Keep failures too. A later successful retry must not erase its cause.
+		if err := manager.retainGateAttempt(directory, strings.TrimSpace(string(identity)), strings.TrimSpace(string(tree)), receipt); err != nil {
+			return receipts, err
 		}
 		receipts = append(receipts, receipt)
 		if runErr != nil {
-			return nil, fmt.Errorf("%w: deterministic gate %q failed with exit code %d: %v", errInvalidCandidateWorkspace, gateID, exitCode, runErr)
+			return receipts, fmt.Errorf("%w: deterministic gate %q failed with exit code %d: %v", errInvalidCandidateWorkspace, gateID, exitCode, runErr)
+		}
+		if err := manager.writeGateCache(cacheKey, receipt); err != nil {
+			return receipts, err
 		}
 	}
 	return receipts, nil
+}
+
+func (manager *candidateWorkspaceManager) retainGateAttempt(directory, commit, tree string, receipt candidateGateReceipt) error {
+	if manager.root == "" || !filepath.IsAbs(manager.root) || !validGitCommit(commit) || !validGitCommit(tree) {
+		return errInvalidCandidateWorkspace
+	}
+	root := filepath.Join(manager.root, "gate-attempts")
+	if err := os.MkdirAll(root, 0700); err != nil {
+		return err
+	}
+	encoded, err := json.Marshal(struct {
+		Workspace       string               `json:"workspace"`
+		CandidateCommit string               `json:"candidate_commit"`
+		CandidateTree   string               `json:"candidate_tree"`
+		StartedAt       time.Time            `json:"started_at"`
+		FinishedAt      time.Time            `json:"finished_at"`
+		Receipt         candidateGateReceipt `json:"receipt"`
+		ReusedFrom      string               `json:"reused_from,omitempty"`
+	}{directory, commit, tree, receipt.StartedAt, receipt.FinishedAt, receipt, receipt.ReusedFrom})
+	if err != nil {
+		return err
+	}
+	return writeExclusiveSynced(filepath.Join(root, string(digestBytes(encoded))+".json"), encoded)
+}
+
+// Bound retained output while hashing the complete stream. Child output must
+// never exhaust the supervisor's memory or block draining a failed process.
+type gateOutput struct {
+	bytes.Buffer
+	hash      hash.Hash
+	truncated bool
+}
+
+func newGateOutput() *gateOutput { return &gateOutput{hash: sha256.New()} }
+func (output *gateOutput) Write(data []byte) (int, error) {
+	_, _ = output.hash.Write(data)
+	remaining := (256 << 10) - output.Len()
+	if remaining < len(data) {
+		output.truncated = true
+	}
+	if remaining > 0 {
+		_, _ = output.Buffer.Write(data[:min(remaining, len(data))])
+	}
+	return len(data), nil
+}
+func (output *gateOutput) digest() kernel.Digest {
+	return kernel.Digest(hex.EncodeToString(output.hash.Sum(nil)))
 }
 
 func (manager *candidateWorkspaceManager) materialize(ctx context.Context, source string, receipt candidateReceipt, receiptBytes []byte) error {
@@ -961,7 +1074,7 @@ func (service *ProductionService) prepareCandidateConsumerWorkspace(ctx context.
 		source = assembled
 		baseEvidence = append(append([]kernel.EvidenceRef(nil), baseEvidence...), assemblyEvidence)
 	}
-	workspace, receipt, receiptDigest, err := service.candidates.Prepare(ctx, feature, consumer, owner.WorkspaceID, source, targets, service.planning.RequiredGateIDs)
+	workspace, receipt, receiptDigest, err := service.candidates.Prepare(ctx, feature, consumer, owner.WorkspaceID, source, targets, service.planning.gateIDs(&plan, consumer))
 	if err != nil {
 		return ProductionWorkspace{}, nil, err
 	}
@@ -1183,7 +1296,7 @@ func (service *ProductionService) registerCandidateReceipt(ctx context.Context, 
 	evidenceID := deterministicOperationalUUID("candidate-receipt-evidence", string(receipt.CandidateID), string(digest))
 	payload, err := json.Marshal(map[string]any{
 		"access_partition": feature.Input.WorkspaceID, "availability": "AVAILABLE", "byte_length": len(content), "canonical_digest": digest,
-		"computation":        map[string]any{"method": "tekrood-immutable-git-candidate-v1", "build_digest": digestBytes([]byte(candidateReceiptSchema)), "configuration_digest": digestBytes([]byte(strings.Join(service.planning.RequiredGateIDs, "\x00"))), "deterministic": true},
+		"computation":        map[string]any{"method": "tekrood-immutable-git-candidate-v1", "build_digest": digestBytes([]byte(candidateReceiptSchema)), "configuration_digest": digestBytes([]byte(strings.Join(candidateReceiptGateIDs(receipt), "\x00"))), "deterministic": true},
 		"deletion_tombstone": nil, "evidence_kind": "ARTIFACT", "integrity_state": "DIGEST_VERIFIED",
 		"locator": service.candidates.receiptPath(receipt), "locator_immutable": true, "media_type": "application/json",
 		"producing_component": "tekrood-candidate-materializer", "producing_version": candidateReceiptSchema, "redacts": nil,

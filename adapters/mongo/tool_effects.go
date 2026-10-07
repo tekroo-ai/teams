@@ -7,7 +7,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"slices"
 	"strings"
+	"time"
 
 	"github.com/tekroo-ai/teams/agentruntime"
 	"github.com/tekroo-ai/teams/agenttools"
@@ -21,26 +23,30 @@ import (
 )
 
 type toolEffectDocument struct {
-	ID               string `bson:"_id"`
-	InvocationID     string `bson:"invocation_id"`
-	RequestDigest    string `bson:"request_digest"`
-	ToolCallID       string `bson:"tool_call_id"`
-	Name             string `bson:"name"`
-	ArgumentsSHA256  string `bson:"arguments_sha256"`
-	WorkspaceRoot    string `bson:"workspace_root"`
-	EffectPolicyHash string `bson:"effect_policy_digest"`
-	PreparedSHA256   string `bson:"prepared_sha256,omitempty"`
-	FilePath         string `bson:"file_path,omitempty"`
-	HasPreimage      bool   `bson:"has_preimage,omitempty"`
-	BeforeExists     bool   `bson:"before_exists,omitempty"`
-	BeforeContent    []byte `bson:"before_content,omitempty"`
-	BeforeSHA256     string `bson:"before_sha256,omitempty"`
-	DesiredAbsent    bool   `bson:"desired_absent,omitempty"`
-	Result           []byte `bson:"result,omitempty"`
+	ID               string    `bson:"_id"`
+	InvocationID     string    `bson:"invocation_id"`
+	RequestDigest    string    `bson:"request_digest"`
+	ToolCallID       string    `bson:"tool_call_id"`
+	Name             string    `bson:"name"`
+	ArgumentsSHA256  string    `bson:"arguments_sha256"`
+	WorkspaceRoot    string    `bson:"workspace_root"`
+	EffectPolicyHash string    `bson:"effect_policy_digest"`
+	PreparedSHA256   string    `bson:"prepared_sha256,omitempty"`
+	FilePath         string    `bson:"file_path,omitempty"`
+	HasPreimage      bool      `bson:"has_preimage,omitempty"`
+	BeforeExists     bool      `bson:"before_exists,omitempty"`
+	BeforeContent    []byte    `bson:"before_content,omitempty"`
+	BeforeSHA256     string    `bson:"before_sha256,omitempty"`
+	DesiredAbsent    bool      `bson:"desired_absent,omitempty"`
+	Result           []byte    `bson:"result,omitempty"`
+	Filesystem       []byte    `bson:"filesystem,omitempty"`
+	FilesystemPaths  []string  `bson:"filesystem_paths,omitempty"`
+	RecordedAt       time.Time `bson:"recorded_at,omitempty"`
 }
 
 var _ agenttools.EffectLedger = (*Store)(nil)
 var _ agenttools.FileChangeLookup = (*Store)(nil)
+var _ agenttools.FileChangeHistory = (*Store)(nil)
 
 func toolEffectID(invocationID, callID string) string {
 	sum := sha256.Sum256([]byte(invocationID + "\x00" + callID))
@@ -48,6 +54,12 @@ func toolEffectID(invocationID, callID string) string {
 }
 
 func toolEffectCandidate(record agenttools.EffectRecord) (toolEffectDocument, error) {
+	if len(record.Filesystem) > 0 && record.Name != "make_directory" && record.Name != "format_go_files" && record.Name != "move_file" && record.Name != "remove_file" && record.Name != "undo_file_change" {
+		return toolEffectDocument{}, agenttools.ErrInvalidCall
+	}
+	if len(record.Filesystem) > 0 && (agenttools.ValidateFilesystemSnapshot(record.Filesystem) != nil || record.PreparedSHA256 != digestEffectBytes(record.Filesystem)) {
+		return toolEffectDocument{}, agenttools.ErrInvalidCall
+	}
 	if !record.InvocationID.Valid() || !record.RequestDigest.Valid() || strings.TrimSpace(record.ToolCallID) == "" || len(record.ToolCallID) > 256 || record.Name == "" || len(record.ArgumentsSHA256) != 64 || record.WorkspaceRoot == "" || !record.EffectPolicyHash.Valid() {
 		return toolEffectDocument{}, agenttools.ErrInvalidCall
 	}
@@ -75,19 +87,68 @@ func toolEffectCandidate(record agenttools.EffectRecord) (toolEffectDocument, er
 		EffectPolicyHash: string(record.EffectPolicyHash), PreparedSHA256: record.PreparedSHA256,
 		FilePath: record.FilePath, HasPreimage: record.HasPreimage, BeforeExists: record.BeforeExists,
 		BeforeContent: append([]byte(nil), record.BeforeContent...), BeforeSHA256: record.BeforeSHA256, DesiredAbsent: record.DesiredAbsent,
+		Filesystem: append([]byte(nil), record.Filesystem...), FilesystemPaths: filesystemEffectPaths(record.Filesystem),
 	}, nil
 }
 
 func sameEffectSnapshot(left, right toolEffectDocument) bool {
-	return left.PreparedSHA256 == right.PreparedSHA256 && left.FilePath == right.FilePath && left.HasPreimage == right.HasPreimage && left.BeforeExists == right.BeforeExists && bytes.Equal(left.BeforeContent, right.BeforeContent) && left.BeforeSHA256 == right.BeforeSHA256 && left.DesiredAbsent == right.DesiredAbsent
+	return bytes.Equal(left.Filesystem, right.Filesystem) && left.PreparedSHA256 == right.PreparedSHA256 && left.FilePath == right.FilePath && left.HasPreimage == right.HasPreimage && left.BeforeExists == right.BeforeExists && bytes.Equal(left.BeforeContent, right.BeforeContent) && left.BeforeSHA256 == right.BeforeSHA256 && left.DesiredAbsent == right.DesiredAbsent
 }
 
 func retainedEffect(document toolEffectDocument) (agenttools.EffectRecord, error) {
 	record := agenttools.EffectRecord{InvocationID: kernel.UUIDv7(document.InvocationID), RequestDigest: kernel.Digest(document.RequestDigest), ToolCallID: document.ToolCallID, Name: document.Name, ArgumentsSHA256: document.ArgumentsSHA256, WorkspaceRoot: document.WorkspaceRoot, EffectPolicyHash: kernel.Digest(document.EffectPolicyHash), PreparedSHA256: document.PreparedSHA256, FilePath: document.FilePath, HasPreimage: document.HasPreimage, BeforeExists: document.BeforeExists, BeforeContent: append([]byte(nil), document.BeforeContent...), BeforeSHA256: document.BeforeSHA256, DesiredAbsent: document.DesiredAbsent, Result: append(json.RawMessage(nil), document.Result...)}
-	if _, err := toolEffectCandidate(record); err != nil || len(record.Result) > 0 && !json.Valid(record.Result) {
+	record.Filesystem = append(json.RawMessage(nil), document.Filesystem...)
+	if _, err := toolEffectCandidate(record); err != nil || len(record.Result) > 0 && !json.Valid(record.Result) || !slices.Equal(document.FilesystemPaths, filesystemEffectPaths(document.Filesystem)) {
 		return agenttools.EffectRecord{}, agenttools.ErrEffectUncertain
 	}
 	return record, nil
+}
+
+func digestEffectBytes(content []byte) string {
+	sum := sha256.Sum256(content)
+	return hex.EncodeToString(sum[:])
+}
+
+func filesystemEffectPaths(encoded []byte) []string {
+	var snapshot struct {
+		Files []struct {
+			Path string `json:"path"`
+		} `json:"files"`
+	}
+	_ = json.Unmarshal(encoded, &snapshot)
+	paths := make([]string, 0, len(snapshot.Files))
+	for _, file := range snapshot.Files {
+		paths = append(paths, file.Path)
+	}
+	return paths
+}
+
+func (s *Store) ListFileChanges(ctx context.Context, root string, policy kernel.Digest, path string) ([]agenttools.EffectRecord, error) {
+	if err := requireDeadline(ctx); err != nil {
+		return nil, err
+	}
+	if root == "" || path == "" || !policy.Valid() {
+		return nil, agenttools.ErrInvalidCall
+	}
+	filter := bson.D{{Key: "workspace_root", Value: root}, {Key: "effect_policy_digest", Value: string(policy)}, {Key: "result", Value: bson.D{{Key: "$exists", Value: true}}}, {Key: "$or", Value: bson.A{bson.D{{Key: "file_path", Value: path}}, bson.D{{Key: "filesystem_paths", Value: path}}}}}
+	cursor, err := s.db.Collection("agent_tool_effects").Find(ctx, filter, options.Find().SetLimit(20).SetSort(bson.D{{Key: "recorded_at", Value: -1}, {Key: "_id", Value: 1}}))
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+	var result []agenttools.EffectRecord
+	for cursor.Next(ctx) {
+		var document toolEffectDocument
+		if err := cursor.Decode(&document); err != nil {
+			return nil, err
+		}
+		record, err := retainedEffect(document)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, record)
+	}
+	return result, cursor.Err()
 }
 
 func (s *Store) LoadFileChange(ctx context.Context, id string) (agenttools.EffectRecord, bool, error) {
@@ -122,8 +183,11 @@ func (s *Store) Reserve(ctx context.Context, record agenttools.EffectRecord) (ag
 		return agenttools.EffectRecord{}, false, err
 	}
 	if record.Name == "edit_file" && record.PreparedSHA256 == "" || (record.Name == "create_file" || record.Name == "undo_file_change" || record.Name == "restore_file_from_commit") && !record.HasPreimage {
-		return agenttools.EffectRecord{}, false, agenttools.ErrInvalidCall
+		if len(record.Filesystem) == 0 {
+			return agenttools.EffectRecord{}, false, agenttools.ErrInvalidCall
+		}
 	}
+	candidate.RecordedAt = time.Now().UTC()
 	if _, fenced := agentruntime.RunOwnershipFromContext(ctx); fenced {
 		return s.reserveOwnedEffect(ctx, record, candidate)
 	}
@@ -212,12 +276,17 @@ func (s *Store) Complete(ctx context.Context, record agenttools.EffectRecord, re
 		return agenttools.ErrInvalidCall
 	}
 	if record.Name == "edit_file" && record.PreparedSHA256 == "" || (record.Name == "create_file" || record.Name == "undo_file_change" || record.Name == "restore_file_from_commit") && !record.HasPreimage {
-		return agenttools.ErrInvalidCall
+		if len(record.Filesystem) == 0 {
+			return agenttools.ErrInvalidCall
+		}
 	}
 	collection := s.db.Collection("agent_tool_effects")
 	filter := bson.D{{Key: "_id", Value: candidate.ID}, {Key: "request_digest", Value: candidate.RequestDigest}, {Key: "tool_call_id", Value: candidate.ToolCallID}, {Key: "name", Value: candidate.Name}, {Key: "arguments_sha256", Value: candidate.ArgumentsSHA256}, {Key: "workspace_root", Value: candidate.WorkspaceRoot}, {Key: "effect_policy_digest", Value: candidate.EffectPolicyHash}, {Key: "result", Value: bson.D{{Key: "$exists", Value: false}}}}
 	if candidate.PreparedSHA256 != "" {
 		filter = append(filter, bson.E{Key: "prepared_sha256", Value: candidate.PreparedSHA256})
+	}
+	if len(candidate.Filesystem) > 0 {
+		filter = append(filter, bson.E{Key: "filesystem", Value: candidate.Filesystem})
 	}
 	if candidate.HasPreimage {
 		filter = append(filter, bson.E{Key: "has_preimage", Value: true}, bson.E{Key: "file_path", Value: candidate.FilePath})

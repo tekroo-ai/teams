@@ -60,6 +60,9 @@ type Config struct {
 	// PlanFinalization carries the accepted architect output so the model only
 	// authors dependencies and handoffs, not copies of immutable design fields.
 	PlanFinalization *PlanFinalizationBinding
+	// ResultArrayLimits narrow the generation schema to coordinator-owned
+	// admission limits. They do not change the signed role result contract.
+	ResultArrayLimits []ResultArrayLimit
 	// ValidateFinalResult applies workflow-level semantics before the native
 	// runner commits a final result, while the same model turn can still repair it.
 	ValidateFinalResult func(context.Context, []byte) error
@@ -174,6 +177,9 @@ func prepare(ctx context.Context, brief application.ExecutionBrief, requestDiges
 	// Both model turns and tool calls pass through the same stability check.
 	// The gateway still reconstructs actual authority at the moment of a call.
 	config.Gateway.Bindings = stable
+	if history, ok := config.Effects.(agenttools.FileChangeHistory); ok {
+		config.Gateway.History = history
+	}
 	canonical := agenttools.ReadOnlyDefinitions(initial.Permissions)
 	allowed := make(map[string]struct{}, len(profile.AllowedReadTools))
 	for _, name := range profile.AllowedReadTools {
@@ -243,7 +249,7 @@ func prepare(ctx context.Context, brief application.ExecutionBrief, requestDiges
 				if brief.Purpose != kernel.PurposeValidation && brief.Purpose != kernel.PurposeImplementation && brief.Purpose != kernel.PurposeRepair {
 					return Session{}, ErrInvalidBinding
 				}
-				if definition.Name == "run_go_tests_worktree" && brief.Purpose == kernel.PurposeValidation {
+				if (definition.Name == "run_go_tests_worktree" || definition.Name == "check_go_build_worktree") && brief.Purpose == kernel.PurposeValidation {
 					return Session{}, ErrInvalidBinding
 				}
 				definitions = append(definitions, definition)
@@ -281,6 +287,10 @@ func prepare(ctx context.Context, brief application.ExecutionBrief, requestDiges
 			if err != nil {
 				return Session{}, errors.Join(ErrInvalidBinding, err)
 			}
+		}
+		modelSchema, err = narrowResultArrays(modelSchema, config.ResultArrayLimits)
+		if err != nil {
+			return Session{}, err
 		}
 		// Preserve exact source-brief binding while distinguishing the fields
 		// authored by the model from Teams' assembled signed result.

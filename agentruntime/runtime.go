@@ -28,6 +28,7 @@ const (
 	ModelTurn     Kind = "model_turn"
 	ModelRejected Kind = "model_rejected"
 	ModelPartial  Kind = "model_partial"
+	ModelResponse Kind = "model_response"
 	Compacted     Kind = "compacted"
 	ToolDone      Kind = "tool_done"
 	Finished      Kind = "finished"
@@ -57,8 +58,9 @@ type ToolCall struct {
 }
 
 type Completion struct {
-	Text      string     `json:"text,omitempty"`
-	ToolCalls []ToolCall `json:"tool_calls,omitempty"`
+	Text        string            `json:"text,omitempty"`
+	ToolCalls   []ToolCall        `json:"tool_calls,omitempty"`
+	Diagnostics *ModelDiagnostics `json:"diagnostics,omitempty"`
 }
 
 type ToolResult struct {
@@ -332,7 +334,24 @@ func (runner Runner) Run(ctx context.Context, invocationID, requestDigest, promp
 			if ownershipErr := runner.checkOwnership(ctx); ownershipErr != nil {
 				return "", ownershipErr
 			}
+			var observed *ModelCompletionError
 			var partial *PartialTurnError
+			var rejected *RejectedTurnError
+			isPartial, isRejected := errors.As(err, &partial), errors.As(err, &rejected)
+			if errors.As(err, &observed) && isPartial {
+				partial.Diagnostics = &observed.Diagnostics
+			} else if observed != nil && isRejected {
+				rejected.Diagnostics = &observed.Diagnostics
+			} else if observed != nil {
+				payload, marshalErr := json.Marshal(observed.Diagnostics)
+				if marshalErr != nil {
+					return "", marshalErr
+				}
+				entries, marshalErr = runner.append(ctx, invocationID, entries, ModelResponse, payload)
+				if marshalErr != nil {
+					return "", marshalErr
+				}
+			}
 			if errors.As(err, &partial) && partial.valid() && reflect.DeepEqual(partial.Messages, modelMessages) {
 				if entries[len(entries)-1].Kind == ModelPartial {
 					var prior PartialTurnError
@@ -350,7 +369,6 @@ func (runner Runner) Run(ctx context.Context, invocationID, requestDigest, promp
 				}
 				continue
 			}
-			var rejected *RejectedTurnError
 			if runner.MaxFinalSubmissions > 1 && errors.As(err, &rejected) && rejected.valid() {
 				payload, encodeErr := json.Marshal(rejected)
 				if encodeErr != nil {
@@ -548,6 +566,12 @@ func replay(id, requestDigest, prompt, systemPrompt, finalTool string, finalize 
 			continue
 		}
 		switch entry.Kind {
+		case ModelResponse:
+			// Transport observations never become model instructions or a new turn.
+			var observation ModelDiagnostics
+			if json.Unmarshal(entry.Payload, &observation) != nil || observation.ResponseSHA256 == "" {
+				return nil, nil, nil, 0, ErrInvalidTurn
+			}
 		case Compacted:
 			var checkpoint historyCheckpoint
 			if len(outstanding) != 0 || finalText != nil || partial != nil || json.Unmarshal(entry.Payload, &checkpoint) != nil || checkpoint.SourceDigest != historyDigest(messages) || !validWorkingHistory(checkpoint.History) {

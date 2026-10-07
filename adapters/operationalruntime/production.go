@@ -118,6 +118,7 @@ type ProductionNativeConfig struct {
 	// Pin the executable independently of launchd/login-shell PATH. If omitted,
 	// Go-capable teams resolve it once at startup, not during an agent turn.
 	GoBinary         string                         `json:"go_binary,omitempty"`
+	CompilationCache bool                           `json:"compilation_cache,omitempty"`
 	Owner            string                         `json:"owner"`
 	LeaseDuration    string                         `json:"lease_duration"`
 	Heartbeat        string                         `json:"heartbeat"`
@@ -295,6 +296,8 @@ type ProductionPlanning struct {
 	SelectionPolicyDigest      kernel.Digest                                     `json:"selection_policy_digest"`
 	BudgetPolicyDigest         kernel.Digest                                     `json:"budget_policy_digest"`
 	RequiredGateIDs            []string                                          `json:"required_gate_ids"`
+	TaskGateIDs                []string                                          `json:"task_gate_ids,omitempty"`
+	CandidateReadiness         *CandidateReadinessPolicy                         `json:"candidate_readiness,omitempty"`
 	CandidateGates             []ProductionCandidateGate                         `json:"candidate_gates,omitempty"`
 	TaskMessageRoutes          map[kernel.WorkPurpose]ProductionTaskMessageRoute `json:"task_message_routes,omitempty"`
 	Deadline                   string                                            `json:"deadline"`
@@ -312,6 +315,9 @@ type ProductionCandidateGate struct {
 	GateID  string   `json:"gate_id"`
 	Command []string `json:"command"`
 	Timeout string   `json:"timeout"`
+	// Opt-in attestation of all non-repository inputs to a hermetic gate.
+	// Empty means always execute; failures are never cached.
+	ReuseInputsSHA256 kernel.Digest `json:"reuse_inputs_sha256,omitempty"`
 }
 
 type ProductionExecution struct {
@@ -624,7 +630,7 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 		for _, argument := range gate.Command {
 			invalidArgument = invalidArgument || strings.TrimSpace(argument) == ""
 		}
-		if timeoutErr != nil || gate.GateID == "" || len(gate.Command) == 0 || invalidArgument || gateTimeout > planningDeadline {
+		if timeoutErr != nil || gate.GateID == "" || len(gate.Command) == 0 || invalidArgument || gateTimeout > planningDeadline || gate.ReuseInputsSHA256 != "" && !gate.ReuseInputsSHA256.Valid() {
 			return resolvedProductionConfig{}, invalidConfig("candidate gate configuration is invalid")
 		}
 		if _, duplicate := configuredGates[gate.GateID]; duplicate {
@@ -649,6 +655,9 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 		if !purpose.Valid() || !organization.ValidMessageType(route.MessageType) || !route.MessagePurpose.Valid() {
 			return resolvedProductionConfig{}, invalidConfig("task message route is invalid")
 		}
+	}
+	if err := config.Planning.validateEfficiencyPolicy(configuredGates); err != nil {
+		return resolvedProductionConfig{}, invalidConfig(err.Error())
 	}
 	gitOperationTimeout := time.Duration(0)
 	if config.Git != nil {
@@ -868,6 +877,9 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 	if err := readStrictJSONFile(config.AuthorizationPolicyFile, &policy); err != nil || !productionPolicyValid(policy, config.ServiceAuthority, config.ExpiryAuthority) || config.Execution.PolicyRevision != policy.Revision || config.Evidence.PolicyRevision != policy.Revision {
 		return resolvedProductionConfig{}, invalidConfig("authorization policy file is invalid")
 	}
+	if config.Planning.candidateOverlapEnabled() && !directGrantCovers(policy.Grants, config.ExpiryAuthority, "tekroo.command.work-invocation.request-cancellation") {
+		return resolvedProductionConfig{}, invalidConfig("candidate overlap requires authority to cancel superseded consumers")
+	}
 	var provenance kernel.ProvenanceBasis
 	if err := readStrictJSONFile(config.ProvenanceFile, &provenance); err != nil || !provenance.Valid() || provenance.PolicyDigest != policy.PolicyDigest || provenance.PolicyRevision != policy.Revision {
 		return resolvedProductionConfig{}, invalidConfig("provenance file is invalid or does not bind the authorization policy")
@@ -1056,8 +1068,9 @@ func NewProductionService(ctx context.Context, config ProductionConfig) (*Produc
 	}
 	runtime, err := New(ctx, Config{
 		Store: store, Catalogue: catalogue, Clock: clock, IDs: ids,
-		AgentGoBinary:    resolved.nativeGoBinary,
-		OpenHandsBaseURL: config.OpenHands.BaseURL, OpenHandsSessionAPIKey: resolved.sessionAPIKey,
+		AgentGoBinary:         resolved.nativeGoBinary,
+		AgentCompilationCache: nativeSelected && config.Native != nil && config.Native.CompilationCache,
+		OpenHandsBaseURL:      config.OpenHands.BaseURL, OpenHandsSessionAPIKey: resolved.sessionAPIKey,
 		AgentToolBaseURL: agentToolBaseURL, AgentToolSigningKey: agentToolSigningKey,
 		HTTPClient: &http.Client{Timeout: resolved.requestTimeout}, WorkspaceBindings: workspaces, WorkspaceResolver: workspaceResolver, ExecutionProfiles: profiles, ExecutionBoundary: boundary, RoleGrounding: roleGrounding, DeadlineExtensionReader: store,
 		OpenHandsPollInterval: resolved.pollInterval, OpenHandsMaximumPages: config.OpenHands.MaximumPages,

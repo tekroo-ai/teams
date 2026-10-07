@@ -97,6 +97,9 @@ func (service *ProductionService) reconcileTaskCompletions(ctx context.Context, 
 		if task.Purpose != kernel.PurposeImplementation {
 			continue
 		}
+		if !acceptedImplementationDependencies(plan, task, states) {
+			continue
+		}
 		if _, covered := independentlyValidated[task.ID]; covered {
 			continue
 		}
@@ -170,6 +173,9 @@ func (service *ProductionService) reconcileTaskCompletions(ctx context.Context, 
 
 	changed := false
 	for _, target := range plan.Tasks {
+		if target.Purpose == kernel.PurposeImplementation && !acceptedImplementationDependencies(plan, target, states) {
+			continue
+		}
 		validators := validatorsByTarget[target.ID]
 		if len(validators) == 0 {
 			continue

@@ -44,7 +44,7 @@ func TestReadOnlyTurnAdapterUsesBoundGatewayAndCanonicalSchema(t *testing.T) {
 
 func TestTestDefinitionsExposeBothIsolatedPaths(t *testing.T) {
 	definitions := TestDefinitions([]string{"repository.read", "test.execute"})
-	if len(definitions) != 2 || definitions[0].Name != "run_go_tests" || definitions[1].Name != "run_go_tests_worktree" {
+	if len(definitions) != 3 || definitions[0].Name != "check_go_build_worktree" || definitions[1].Name != "run_go_tests" || definitions[2].Name != "run_go_tests_worktree" {
 		t.Fatalf("test tool definitions: %+v", definitions)
 	}
 	for _, definition := range definitions {

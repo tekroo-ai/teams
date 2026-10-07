@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/tekroo-ai/teams/adapters/openhands"
+	"github.com/tekroo-ai/teams/agenttools"
 	"github.com/tekroo-ai/teams/kernel"
 	"github.com/tekroo-ai/teams/organization"
 )
@@ -34,12 +35,17 @@ const (
 )
 
 type taskWorkspaceComponent struct {
-	TaskID           kernel.UUIDv7 `json:"task_id"`
-	WorkspaceID      string        `json:"workspace_id"`
-	WorktreeID       string        `json:"worktree_id"`
-	WorkingDirectory string        `json:"working_directory"`
-	Commit           string        `json:"commit"`
-	Tree             string        `json:"tree"`
+	TaskID           kernel.UUIDv7               `json:"task_id"`
+	WorkspaceID      string                      `json:"workspace_id"`
+	WorktreeID       string                      `json:"worktree_id"`
+	WorkingDirectory string                      `json:"working_directory"`
+	Commit           string                      `json:"commit"`
+	Tree             string                      `json:"tree"`
+	Exports          []agenttools.SymbolLocation `json:"exports,omitempty"`
+	InvocationID     kernel.UUIDv7               `json:"invocation_id,omitempty"`
+	OutputSHA256     kernel.Digest               `json:"output_sha256,omitempty"`
+	Readiness        string                      `json:"readiness,omitempty"`
+	ReadinessPolicy  kernel.Digest               `json:"readiness_policy_sha256,omitempty"`
 }
 
 type taskWorkspaceReceipt struct {
@@ -291,7 +297,40 @@ func (manager *taskWorkspaceManager) observeComponents(ctx context.Context, root
 			return nil, errors.Join(errInvalidTaskWorkspace, err)
 		}
 		component.Commit, component.Tree = commit, tree
+		if component.InvocationID != "" && (!component.InvocationID.Valid() || !component.OutputSHA256.Valid() || component.Readiness != "CANDIDATE_READY" || !component.ReadinessPolicy.Valid()) {
+			return nil, errInvalidTaskWorkspace
+		}
+		component.Exports, err = manager.componentExports(ctx, component, rootBaseline)
+		if err != nil {
+			return nil, err
+		}
 		result[index] = component
+	}
+	return result, nil
+}
+
+func (manager *taskWorkspaceManager) componentExports(ctx context.Context, component taskWorkspaceComponent, baseline string) ([]agenttools.SymbolLocation, error) {
+	changed, err := manager.git(ctx, component.WorkingDirectory, "diff", "--name-only", "--diff-filter=AM", "-z", baseline, component.Commit, "--", "*.go")
+	if err != nil {
+		return nil, err
+	}
+	var result []agenttools.SymbolLocation
+	for _, path := range strings.Split(strings.TrimSuffix(string(changed), "\x00"), "\x00") {
+		if path == "" {
+			continue
+		}
+		content, err := manager.git(ctx, component.WorkingDirectory, "show", component.Commit+":"+path)
+		if err != nil {
+			return nil, err
+		}
+		exports, err := agenttools.ExportedGoDeclarations(path, content)
+		if err != nil {
+			return nil, fmt.Errorf("candidate interface inventory %s: %w", path, err)
+		}
+		result = append(result, exports...)
+		if len(result) > 512 {
+			return nil, agenttools.ErrTooLarge
+		}
 	}
 	return result, nil
 }
@@ -386,7 +425,16 @@ func (receipt taskWorkspaceReceipt) productionWorkspace() ProductionWorkspace {
 }
 
 func (manager *taskWorkspaceManager) receiptMatches(receipt taskWorkspaceReceipt, kind taskWorkspaceKind, featureID, workID kernel.UUIDv7, workspaceID string, root ProductionWorkspace, components []taskWorkspaceComponent, branch, path string) bool {
-	return manager.validRuntimeHookReceipt(receipt) && receipt.Kind == kind && receipt.FeatureID == featureID && receipt.WorkID == workID && receipt.WorkspaceID == workspaceID && receipt.WorktreeID == filepath.Base(path) && receipt.WorkingDirectory == path && receipt.Branch == branch && receipt.RootSource == filepath.Clean(root.WorkingDirectory) && receipt.RootBaselineCommit == root.BaselineSHA && receipt.PreparedCommit != "" && receipt.PreparedTree != "" && slices.Equal(receipt.Components, components)
+	return manager.validRuntimeHookReceipt(receipt) && receipt.Kind == kind && receipt.FeatureID == featureID && receipt.WorkID == workID && receipt.WorkspaceID == workspaceID && receipt.WorktreeID == filepath.Base(path) && receipt.WorkingDirectory == path && receipt.Branch == branch && receipt.RootSource == filepath.Clean(root.WorkingDirectory) && receipt.RootBaselineCommit == root.BaselineSHA && receipt.PreparedCommit != "" && receipt.PreparedTree != "" && taskWorkspaceComponentsMatch(receipt.Components, components)
+}
+
+func taskWorkspaceComponentsMatch(retained, observed []taskWorkspaceComponent) bool {
+	return slices.EqualFunc(retained, observed, func(a, b taskWorkspaceComponent) bool {
+		// Old receipts lack the optional declaration inventory. Their exact
+		// commit/tree binding remains authoritative during restart/replay.
+		exportsMatch := a.Exports == nil || slices.Equal(a.Exports, b.Exports)
+		return a.TaskID == b.TaskID && a.WorkspaceID == b.WorkspaceID && a.WorktreeID == b.WorktreeID && a.WorkingDirectory == b.WorkingDirectory && a.Commit == b.Commit && a.Tree == b.Tree && exportsMatch && a.InvocationID == b.InvocationID && a.OutputSHA256 == b.OutputSHA256 && a.Readiness == b.Readiness && a.ReadinessPolicy == b.ReadinessPolicy
+	})
 }
 
 func (manager *taskWorkspaceManager) validRuntimeHookReceipt(receipt taskWorkspaceReceipt) bool {
@@ -501,7 +549,20 @@ func (service *ProductionService) prepareImplementationWorkspace(ctx context.Con
 		if err != nil {
 			return ProductionWorkspace{}, kernel.EvidenceRef{}, err
 		}
-		components = append(components, taskWorkspaceComponent{TaskID: dependency.ID, WorkspaceID: workspace.WorkspaceID, WorktreeID: workspace.WorktreeID, WorkingDirectory: workspace.WorkingDirectory})
+		component := taskWorkspaceComponent{TaskID: dependency.ID, WorkspaceID: workspace.WorkspaceID, WorktreeID: workspace.WorktreeID, WorkingDirectory: workspace.WorkingDirectory}
+		if service.planning.candidateOverlapEnabled() {
+			decision, err := service.Store.LoadDecision(ctx, kernel.KernelCommand{Target: kernel.AggregateRef{Kind: kernel.AggregateTask, ID: dependency.ID}})
+			if err != nil {
+				return ProductionWorkspace{}, kernel.EvidenceRef{}, err
+			}
+			invocation, found := latestTaskInvocation(decision.WorkInvocations, dependency.ID)
+			if !found || invocation.State != kernel.InvocationSucceeded || invocation.OutputDigest == nil {
+				return ProductionWorkspace{}, kernel.EvidenceRef{}, errInvalidTaskWorkspace
+			}
+			component.InvocationID, component.OutputSHA256 = invocation.ID, *invocation.OutputDigest
+			component.Readiness, component.ReadinessPolicy = "CANDIDATE_READY", service.planning.CandidateReadiness.PolicyDigest
+		}
+		components = append(components, component)
 	}
 	workspace, receipt, err := service.taskWorkspaces.PrepareTask(ctx, feature, task, owner.WorkspaceID, root, components)
 	if err != nil {

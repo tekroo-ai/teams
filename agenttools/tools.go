@@ -44,6 +44,14 @@ type Spec struct {
 }
 
 var specs = []Spec{
+	{"make_directory", "Create a workspace directory and missing parents. Existing directories succeed; files, symlinks and reserved paths are rejected. Never deletes or overwrites. Returns a durable effect receipt.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path"],"properties":{"path":{"type":"string","minLength":1,"maxLength":1024}}}`), "repository.edit"},
+	{"file_change_history", "Read up to 20 retained successful file changes in this authorized workspace. Returns change IDs, recorded postcondition hashes and whether exact undo is currently applicable. Never returns preimage contents.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path"],"properties":{"path":{"type":"string","minLength":1}}}`), "repository.read"},
+	{"format_go_files", "Apply gofmt to named Go files against their exact current SHA-256 hashes. All inputs must validate before mutation. Returns one change_id and aggregate SHA-256 for exact undo_file_change; syntax failures leave files unchanged.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["files"],"properties":{"files":{"type":"array","minItems":1,"maxItems":16,"items":{"type":"object","additionalProperties":false,"required":["path","expected_sha256"],"properties":{"path":{"type":"string","minLength":1},"expected_sha256":{"type":"string","pattern":"^[0-9a-f]{64}$"}}}}}}`), "repository.edit"},
+	{"move_file", "Move one regular workspace file to a new path without overwriting. Requires current source SHA-256; destination parent must exist. Returns change_id and aggregate postcondition SHA-256 for exact undo.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["source","destination","expected_sha256"],"properties":{"source":{"type":"string","minLength":1},"destination":{"type":"string","minLength":1},"expected_sha256":{"type":"string","pattern":"^[0-9a-f]{64}$"}}}`), "repository.edit"},
+	{"remove_file", "Remove one regular workspace file against its current SHA-256, retaining exact bytes for undo. Never removes directories or recursively deletes. Returns change_id and aggregate postcondition SHA-256 for exact undo.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path","expected_sha256"],"properties":{"path":{"type":"string","minLength":1},"expected_sha256":{"type":"string","pattern":"^[0-9a-f]{64}$"}}}`), "repository.edit"},
+	{"find_definitions", "Find Go declarations for one exact symbol in a workspace directory. Returns signatures and file/line locations from parsed source, not text matches. Reports skipped/unparseable files; bounded to 100 declarations.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["symbol"],"properties":{"symbol":{"type":"string","pattern":"^[A-Za-z_][A-Za-z0-9_]*$"},"directory":{"type":"string"}}}`), "repository.read"},
+	{"find_references", "Find semantically resolved Go references to the declaration at path and line. Returns bounded file/line locations and explicitly reports unresolved packages. Never labels plain text matches as symbol references.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path","line"],"properties":{"path":{"type":"string","minLength":1},"line":{"type":"integer","minimum":1}}}`), "repository.read"},
+	{"check_go_build_worktree", "Compile production and test packages across the module from a disposable working-tree snapshot without executing candidate binaries, initializers or TestMain. Returns snapshot identity and compiler diagnostics. This is a compile check, not a test-suite or acceptance verdict.", json.RawMessage(`{"type":"object","additionalProperties":false}`), "test.execute"},
 	{"read_file", "Read one workspace file starting at start_line (default 1), for line_count lines (default 400, maximum 400). Returns total file line_count, full-file SHA-256, actual start/end lines, and next_start_line when more lines remain. Stops at EOF. A missing file returns status NOT_FOUND without reading any alternative; use find_files to discover its actual path. Use read_evidence for evidence IDs.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path"],"properties":{"path":{"type":"string","minLength":1,"description":"Relative path to a workspace file; never an evidence_id."},"start_line":{"type":"integer","minimum":1,"default":1},"line_count":{"type":"integer","minimum":1,"maximum":400,"default":400,"description":"Number of lines requested, not an ending line number."}}}`), "repository.read"},
 	{"check_go_format", "Check whether named workspace Go files are gofmt-clean without changing them; format_clean is true only when all named files match gofmt output.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["paths"],"properties":{"paths":{"type":"array","minItems":1,"maxItems":32,"uniqueItems":true,"items":{"type":"string","minLength":1}}}}`), "repository.read"},
 	{"list_files", "List one workspace directory without recursing. If truncated, continue with next_after as start_after.", json.RawMessage(`{"type":"object","additionalProperties":false,"properties":{"path":{"type":"string"},"start_after":{"type":"string"},"limit":{"type":"integer","minimum":1,"maximum":200}}}`), "repository.read"},
@@ -83,34 +91,38 @@ type Call struct {
 }
 
 type Result struct {
-	ChangeID        string        `json:"change_id,omitempty"`
-	Removed         bool          `json:"removed,omitempty"`
-	Name            string        `json:"name"`
-	Path            string        `json:"path,omitempty"`
-	Output          string        `json:"output,omitempty"`
-	Files           []string      `json:"files,omitempty"`
-	Matches         []SearchMatch `json:"matches,omitempty"`
-	MatchCount      *int          `json:"match_count,omitempty"`
-	Ignored         *bool         `json:"ignored,omitempty"`
-	IndexTree       string        `json:"index_tree,omitempty"`
-	CommitSHA       string        `json:"commit_sha,omitempty"`
-	Truncated       bool          `json:"truncated,omitempty"`
-	SkippedFiles    int           `json:"skipped_files,omitempty"`
-	NextAfter       string        `json:"next_after,omitempty"`
-	HEAD            string        `json:"head,omitempty"`
-	Branch          string        `json:"branch,omitempty"`
-	SHA256          string        `json:"sha256,omitempty"`
-	SnapshotSHA256  string        `json:"snapshot_sha256,omitempty"`
-	LineCount       *int          `json:"line_count,omitempty"`
-	Status          string        `json:"status,omitempty"`
-	StartLine       *int          `json:"start_line,omitempty"`
-	EndLine         *int          `json:"end_line,omitempty"`
-	NextStartLine   *int          `json:"next_start_line,omitempty"`
-	ContentComplete *bool         `json:"content_complete,omitempty"`
-	MaxReadLines    int           `json:"max_read_lines,omitempty"`
-	FormatClean     *bool         `json:"format_clean,omitempty"`
-	Clean           *bool         `json:"clean,omitempty"`
-	ExitCode        int           `json:"exit_code,omitempty"`
+	Changes         []FileChangeSummary `json:"changes,omitempty"`
+	Definitions     []SymbolLocation    `json:"definitions,omitempty"`
+	References      []SymbolLocation    `json:"references,omitempty"`
+	Unresolved      []string            `json:"unresolved,omitempty"`
+	ChangeID        string              `json:"change_id,omitempty"`
+	Removed         bool                `json:"removed,omitempty"`
+	Name            string              `json:"name"`
+	Path            string              `json:"path,omitempty"`
+	Output          string              `json:"output,omitempty"`
+	Files           []string            `json:"files,omitempty"`
+	Matches         []SearchMatch       `json:"matches,omitempty"`
+	MatchCount      *int                `json:"match_count,omitempty"`
+	Ignored         *bool               `json:"ignored,omitempty"`
+	IndexTree       string              `json:"index_tree,omitempty"`
+	CommitSHA       string              `json:"commit_sha,omitempty"`
+	Truncated       bool                `json:"truncated,omitempty"`
+	SkippedFiles    int                 `json:"skipped_files,omitempty"`
+	NextAfter       string              `json:"next_after,omitempty"`
+	HEAD            string              `json:"head,omitempty"`
+	Branch          string              `json:"branch,omitempty"`
+	SHA256          string              `json:"sha256,omitempty"`
+	SnapshotSHA256  string              `json:"snapshot_sha256,omitempty"`
+	LineCount       *int                `json:"line_count,omitempty"`
+	Status          string              `json:"status,omitempty"`
+	StartLine       *int                `json:"start_line,omitempty"`
+	EndLine         *int                `json:"end_line,omitempty"`
+	NextStartLine   *int                `json:"next_start_line,omitempty"`
+	ContentComplete *bool               `json:"content_complete,omitempty"`
+	MaxReadLines    int                 `json:"max_read_lines,omitempty"`
+	FormatClean     *bool               `json:"format_clean,omitempty"`
+	Clean           *bool               `json:"clean,omitempty"`
+	ExitCode        int                 `json:"exit_code,omitempty"`
 	// A known preparation/process failure is a completed receipt, not an
 	// unknown effect. ExitCode -1 means no completed test-suite result.
 	ExecutionError   string `json:"execution_error,omitempty"`
@@ -118,9 +130,10 @@ type Result struct {
 }
 
 type Host struct {
-	GitBinary string
-	GoBinary  string
-	Timeout   time.Duration
+	GitBinary        string
+	GoBinary         string
+	Timeout          time.Duration
+	CompilationCache string
 }
 
 // Available exposes only tools permitted by the admitted role. repository.edit
@@ -166,6 +179,14 @@ func (host Host) execute(ctx context.Context, authority Authority, call Call) (R
 	}
 	result := Result{Name: call.Name}
 	switch call.Name {
+	case "find_definitions", "find_references":
+		return host.findSymbols(ctx, root, call)
+	case "check_go_build_worktree":
+		if decode(call.Arguments, &struct{}{}) != nil {
+			return Result{}, ErrInvalidCall
+		}
+		result, err = host.runIsolatedGoTestsFrom(ctx, root, "./...", true, true)
+		result.Name = call.Name
 	case "read_file":
 		var args struct {
 			Path      string `json:"path"`

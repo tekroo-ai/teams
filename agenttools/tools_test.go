@@ -31,7 +31,7 @@ func TestAvailableAndAuthorization(t *testing.T) {
 		t.Fatalf("unprivileged tools: %v", got)
 	}
 	read := Available([]string{"repository.read"})
-	if len(read) != 12 || !slices.ContainsFunc(read, func(spec Spec) bool { return spec.Name == "git_status" }) {
+	if len(read) != 15 || !slices.ContainsFunc(read, func(spec Spec) bool { return spec.Name == "git_status" }) {
 		t.Fatalf("read-only surface: %v", read)
 	}
 	for _, spec := range read {

@@ -26,9 +26,10 @@ type StructuredTurnContract struct {
 // A complete JSON response rejected before dispatch is recoverable in the same
 // invocation. Keep its exact structured value; never execute its proposed calls.
 type RejectedTurnError struct {
-	ResponseID string          `json:"response_id"`
-	Response   json.RawMessage `json:"response"`
-	Problem    string          `json:"problem"`
+	ResponseID  string            `json:"response_id"`
+	Response    json.RawMessage   `json:"response"`
+	Problem     string            `json:"problem"`
+	Diagnostics *ModelDiagnostics `json:"diagnostics,omitempty"`
 }
 
 func (err *RejectedTurnError) Error() string { return err.Problem }

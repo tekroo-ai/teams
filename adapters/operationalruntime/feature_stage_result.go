@@ -465,6 +465,11 @@ func validateArchitectureStageResult(result architectureStageResult, allowedMark
 	}
 	for index := range result.Tasks {
 		task := &result.Tasks[index]
+		writeScope, scopeErr := normalizeArchitectureWriteScope(task.WriteScope)
+		if scopeErr != nil {
+			return architectureStageResult{}, fmt.Errorf("%w: task %d has invalid write_scope: %v", organization.ErrInvalidFeature, index, scopeErr)
+		}
+		task.WriteScope = writeScope
 		// Risk is model-authored JSON, so normalize the spelling at this adapter
 		// boundary before validating the canonical domain value. MEDIUM remains
 		// the sole semantic synonym for MODERATE; unknown values still fail.
@@ -482,8 +487,6 @@ func validateArchitectureStageResult(result architectureStageResult, allowedMark
 			invalid = "description"
 		case !validStageStrings(task.AcceptanceCriteria, true):
 			invalid = "acceptance_criteria"
-		case !validArchitectureWriteScope(task.WriteScope):
-			invalid = "write_scope"
 		case containsPreAssignmentOperationalIdentityExcept(allowedActorFQNs, allowedMarkers, append([]string{task.Title, task.Description}, task.AcceptanceCriteria...)...):
 			invalid = "pre-assignment operational identity in task text"
 		case !task.Purpose.Valid():
@@ -509,21 +512,32 @@ func validateArchitectureStageResult(result architectureStageResult, allowedMark
 	return result, nil
 }
 
-func validArchitectureWriteScope(scope []string) bool {
+func normalizeArchitectureWriteScope(scope []string) ([]string, error) {
 	if len(scope) > 32 {
-		return false
+		return nil, fmt.Errorf("at most 32 paths are allowed")
 	}
+	if scope == nil {
+		return nil, nil
+	}
+	normalized := make([]string, len(scope))
 	seen := make(map[string]struct{}, len(scope))
-	for _, item := range scope {
-		if item == "" || len(item) > 1024 || strings.TrimSpace(item) != item || path.IsAbs(item) || path.Clean(item) != item || item == "." || strings.HasPrefix(item, "../") {
-			return false
+	for index, raw := range scope {
+		if raw == "" || len(raw) > 1024 || strings.TrimSpace(raw) != raw || path.IsAbs(raw) {
+			return nil, fmt.Errorf("path %d %q must be a nonempty repository-relative path without surrounding whitespace (maximum 1024 bytes)", index, raw)
+		}
+		// A directory's trailing slash does not change its authorization scope.
+		// Do not clean internal components: that would silently accept traversal.
+		item := strings.TrimRight(raw, "/")
+		if item == "" || item == "." || item == ".." || strings.HasPrefix(item, "../") || path.Clean(item) != item {
+			return nil, fmt.Errorf("path %d %q must not name the repository root or contain traversal/noncanonical internal components", index, raw)
 		}
 		if _, duplicate := seen[item]; duplicate {
-			return false
+			return nil, fmt.Errorf("path %d %q duplicates normalized path %q", index, raw, item)
 		}
 		seen[item] = struct{}{}
+		normalized[index] = item
 	}
-	return true
+	return normalized, nil
 }
 
 func parseArchitectureReviewStageResult(output []byte) (architectureReviewStageResult, error) {

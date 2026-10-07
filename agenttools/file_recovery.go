@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -143,6 +144,9 @@ func (gateway MutationGateway) executeFileRecovery(ctx context.Context, request 
 		return Receipt{}, errors.Join(ErrEffectUncertain, err)
 	}
 	if found {
+		if len(stored.Filesystem) > 0 {
+			return gateway.reconcileFilesystem(operation, request, stored)
+		}
 		receipt, known, err := gateway.reconcileFileRecord(operation, request, stored)
 		if err != nil || known {
 			return receipt, err
@@ -160,12 +164,18 @@ func (gateway MutationGateway) executeFileRecovery(ctx context.Context, request 
 		if err != nil {
 			return Receipt{}, err
 		}
-		if !exists || !prior.HasPreimage || prior.WorkspaceRoot != root || prior.EffectPolicyHash != gateway.Policy || fileChangeID(prior) != args.ChangeID || len(prior.Result) == 0 {
+		if !exists || prior.WorkspaceRoot != root || prior.EffectPolicyHash != gateway.Policy || fileChangeID(prior) != args.ChangeID || len(prior.Result) == 0 {
+			return Receipt{}, ErrForbidden
+		}
+		if len(prior.Filesystem) > 0 {
+			return gateway.undoFilesystem(operation, request, intent, prior, args.ExpectedSHA256)
+		}
+		if !prior.HasPreimage {
 			return Receipt{}, ErrForbidden
 		}
 		var result Result
 		if json.Unmarshal(prior.Result, &result) != nil || result.Name != prior.Name || result.ExecutionError != "" || result.SHA256 != args.ExpectedSHA256 || result.SHA256 != prior.PreparedSHA256 || prior.DesiredAbsent {
-			return Receipt{}, ErrConflict
+			return Receipt{}, fmt.Errorf("%w: change_id=%s path=%q recorded_postcondition_sha256=%s supplied_sha256=%s; use file_change_history to select an applicable change", ErrConflict, args.ChangeID, prior.FilePath, prior.PreparedSHA256, args.ExpectedSHA256)
 		}
 		if prior.BeforeExists && contentSHA(prior.BeforeContent) != prior.BeforeSHA256 {
 			return Receipt{}, ErrEffectUncertain
@@ -243,6 +253,10 @@ func (gateway MutationGateway) reconcileFileRecovery(ctx context.Context, reques
 	}
 	if !found {
 		return Receipt{}, false, nil
+	}
+	if len(stored.Filesystem) > 0 {
+		receipt, err := gateway.reconcileFilesystem(operation, request, stored)
+		return receipt, err == nil, err
 	}
 	return gateway.reconcileFileRecord(operation, request, stored)
 }

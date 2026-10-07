@@ -37,6 +37,7 @@ type EffectRecord struct {
 	BeforeSHA256   string
 	DesiredAbsent  bool
 	Result         json.RawMessage
+	Filesystem     json.RawMessage
 }
 
 type EffectLedger interface {
@@ -59,6 +60,9 @@ type MutationGateway struct {
 }
 
 func (gateway MutationGateway) Execute(ctx context.Context, request Request) (Receipt, error) {
+	if isFilesystemTool(request.Call.Name) {
+		return gateway.executeFilesystem(ctx, request, false)
+	}
 	if request.Call.Name == "undo_file_change" || request.Call.Name == "restore_file_from_commit" {
 		return gateway.executeFileRecovery(ctx, request)
 	}
@@ -209,6 +213,9 @@ func (gateway MutationGateway) Execute(ctx context.Context, request Request) (Re
 
 func (gateway MutationGateway) Reconcile(ctx context.Context, request Request) (Receipt, bool, error) {
 	switch request.Call.Name {
+	case "make_directory", "format_go_files", "move_file", "remove_file":
+		r, err := gateway.executeFilesystem(ctx, request, true)
+		return r, r.Result.Name != "", err
 	case "edit_file":
 		return gateway.reconcileEdit(ctx, request)
 	case "write_file":

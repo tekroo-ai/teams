@@ -11,8 +11,8 @@ import (
 func TestPlannedDependencyReadinessExposesUnacceptedCandidateOnlyToValidator(t *testing.T) {
 	digest := kernel.Digest("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 	invocation := kernel.WorkInvocation{State: kernel.InvocationSucceeded, OutputDigest: &digest}
-	active := kernel.AggregateState{Phase: kernel.PhaseActive}
-	completed := kernel.AggregateState{Phase: kernel.PhaseCompleted}
+	active := kernel.AggregateState{Phase: kernel.PhaseActive, Condition: kernel.ConditionRunnable}
+	completed := kernel.AggregateState{Phase: kernel.PhaseCompleted, Condition: kernel.ConditionRunnable}
 
 	if !plannedDependencyReady(true, active, invocation, true) {
 		t.Fatal("explicit validator could not inspect a successful candidate")
@@ -22,6 +22,10 @@ func TestPlannedDependencyReadinessExposesUnacceptedCandidateOnlyToValidator(t *
 	}
 	if !plannedDependencyReady(false, completed, kernel.WorkInvocation{}, false) {
 		t.Fatal("completed dependency did not release ordinary downstream work")
+	}
+	active.Condition = kernel.ConditionBlocked
+	if plannedDependencyReady(true, active, invocation, true) {
+		t.Fatal("blocked producer released its validator")
 	}
 }
 

@@ -284,6 +284,10 @@ func (s *Store) ensureIndexes(ctx context.Context) error {
 		"agent_turn_entries": {
 			{Keys: bson.D{{Key: "invocation_id", Value: 1}, {Key: "sequence", Value: 1}}, Options: options.Index().SetName("agent_turn_sequence_unique").SetUnique(true)},
 		},
+		"agent_tool_effects": {
+			{Keys: bson.D{{Key: "workspace_root", Value: 1}, {Key: "effect_policy_digest", Value: 1}, {Key: "file_path", Value: 1}, {Key: "recorded_at", Value: -1}}, Options: options.Index().SetName("file_change_history")},
+			{Keys: bson.D{{Key: "workspace_root", Value: 1}, {Key: "effect_policy_digest", Value: 1}, {Key: "filesystem_paths", Value: 1}, {Key: "recorded_at", Value: -1}}, Options: options.Index().SetName("filesystem_change_history")},
+		},
 		"receipts": {
 			{Keys: bson.D{{Key: "scope", Value: 1}}, Options: options.Index().SetName("idempotency_scope_unique").SetUnique(true)},
 		},

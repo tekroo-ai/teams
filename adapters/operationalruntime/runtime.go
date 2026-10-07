@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -31,6 +32,7 @@ type Config struct {
 	AgentToolBaseURL       string
 	AgentToolSigningKey    []byte
 	AgentGoBinary          string
+	AgentCompilationCache  bool
 	HTTPClient             *http.Client
 	WorkspaceBindings      []openhands.WorkspaceBinding
 	WorkspaceResolver      openhands.WorkspaceResolver
@@ -94,6 +96,14 @@ func New(ctx context.Context, config Config) (*Runtime, error) {
 		Workspaces:   toolWorkspaceAdapter{resolver: workspaces},
 		MaximumBytes: config.ExecutionPolicy.MaximumBriefBytes, Now: config.Clock.Now,
 	}, Host: agenttools.Host{Timeout: config.ExecutionPolicy.OperationTimeout, GoBinary: config.AgentGoBinary}}
+	if config.AgentCompilationCache {
+		root, err := filepath.EvalSymlinks(config.EvidenceRoot)
+		if err != nil {
+			return nil, err
+		}
+		toolGateway.Host.CompilationCache = filepath.Join(root, "go-compilation-cache")
+	}
+	toolGateway.History = config.Store
 	var toolService *agenttools.HTTPService
 	if config.AgentToolBaseURL != "" || len(config.AgentToolSigningKey) != 0 {
 		toolService, err = agenttools.NewHTTPService(toolGateway, config.AgentToolBaseURL, config.AgentToolSigningKey)

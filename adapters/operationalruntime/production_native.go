@@ -71,7 +71,7 @@ func configuredNativeSession(ctx context.Context, service *ProductionService, pr
 	}
 	if brief.Purpose == kernel.PurposeValidation || brief.Purpose == kernel.PurposeImplementation || brief.Purpose == kernel.PurposeRepair {
 		for _, definition := range agenttools.TestDefinitions(permissions) {
-			if brief.Purpose == kernel.PurposeValidation && definition.Name == "run_go_tests_worktree" {
+			if brief.Purpose == kernel.PurposeValidation && (definition.Name == "run_go_tests_worktree" || definition.Name == "check_go_build_worktree") {
 				continue
 			}
 			effectTools = append(effectTools, definition.Name)
@@ -124,6 +124,9 @@ func configuredNativeSession(ctx context.Context, service *ProductionService, pr
 	if err != nil {
 		return nativeagent.Config{}, err
 	}
+	if planning {
+		result.ResultArrayLimits = featureStageResultArrayLimits(stage, feature.Input.MaximumTasks)
+	}
 	if planning && stage == stageArchitecture && round == 1 && feature.DesignRevision != nil {
 		// This is a new forward node, not a restart of the completed design.
 		// Resolve the original invocation from Teams state, never a model ID.
@@ -150,4 +153,14 @@ func configuredNativeSession(ctx context.Context, service *ProductionService, pr
 		}
 	}
 	return result, nil
+}
+
+func featureStageResultArrayLimits(stage featurePlanningStage, maximumTasks uint32) []nativeagent.ResultArrayLimit {
+	if stage != stageArchitecture {
+		return nil
+	}
+	return []nativeagent.ResultArrayLimit{{
+		PropertyPath: []string{"work_product", "tasks"},
+		MaxItems:     int(maximumBudgetedImplementationTasks(maximumTasks)),
+	}}
 }
