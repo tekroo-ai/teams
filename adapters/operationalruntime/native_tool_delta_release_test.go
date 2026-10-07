@@ -7,6 +7,7 @@ import (
 	"crypto/ed25519"
 	"encoding/base64"
 	"encoding/json"
+	"go/format"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -32,6 +33,7 @@ func TestPrepareNativeToolDeltaRelease(t *testing.T) {
 	if source == "" || output == "" {
 		t.Skip("explicit source and new output directory required")
 	}
+	efficiency := os.Getenv("TEKROO_NATIVE_DELTA_KIND") == "workspace-efficiency"
 	var config ProductionConfig
 	if err := readStrictJSONFile(source, &config); err != nil {
 		t.Fatal(err)
@@ -58,7 +60,8 @@ func TestPrepareNativeToolDeltaRelease(t *testing.T) {
 	if err := ValidateOperationalProfileQualifications(config.Profiles, time.Now().UTC()); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Mkdir(output, 0700); err != nil {
+	resume := os.Getenv("TEKROO_NATIVE_DELTA_RESUME") == "1"
+	if err := os.Mkdir(output, 0700); err != nil && !(resume && os.IsExist(err)) {
 		t.Fatal(err)
 	}
 	write := func(name string, value any) {
@@ -97,8 +100,63 @@ func TestPrepareNativeToolDeltaRelease(t *testing.T) {
 		if surface == p.ToolPolicyDigest {
 			continue
 		}
+		if p.Qualification == nil && p.QualificationCorpus == nil {
+			// Updating a manual/unqualified catalog never grants automatic work.
+			p.ToolPolicyDigest = surface
+			continue
+		}
 		if p.Qualification == nil || p.QualificationCorpus == nil || p.NativeSettings == nil {
 			t.Fatal("changed role lacks prior qualification")
+		}
+		if resume {
+			raw, readErr := os.ReadFile(filepath.Join(output, string(p.RoleFQRN)+"-measurement.json"))
+			if readErr == nil {
+				var retained struct {
+					ID      kernel.UUIDv7   `json:"invocation_id"`
+					Profile kernel.Digest   `json:"model_profile_digest"`
+					Surface kernel.Digest   `json:"tool_surface_digest"`
+					Result  json.RawMessage `json:"result"`
+					Counts  map[string]int  `json:"tool_counts"`
+				}
+				if json.Unmarshal(raw, &retained) != nil || !retained.ID.Valid() || retained.Profile != p.ModelProfileDigest || retained.Surface != surface {
+					t.Fatal("invalid completed catalog measurement")
+				}
+				var completion map[string]string
+				if json.Unmarshal(retained.Result, &completion) != nil || len(completion) != 1 || completion["outcome"] != "completed" {
+					t.Fatal("retained result is not completed")
+				}
+				journalRaw, err := os.ReadFile(filepath.Join(output, string(p.RoleFQRN)+"-journal.json"))
+				var entries []agentruntime.Entry
+				if err != nil || json.Unmarshal(journalRaw, &entries) != nil || len(entries) == 0 || entries[len(entries)-1].Kind != agentruntime.Finished {
+					t.Fatal("invalid retained catalog journal")
+				}
+				counts := map[string]int{}
+				for _, entry := range entries {
+					if entry.InvocationID != string(retained.ID) || entry.Kind == agentruntime.ModelRejected {
+						t.Fatal("retained journal identity/rejection")
+					}
+					if entry.Kind == agentruntime.ToolDone {
+						var done agentruntime.ToolResult
+						if json.Unmarshal(entry.Payload, &done) != nil || done.Error != "" {
+							t.Fatal("retained tool failure")
+						}
+						counts[done.Name]++
+					}
+				}
+				if len(counts) != len(retained.Counts) {
+					t.Fatal("retained tool counts differ")
+				}
+				for name, count := range retained.Counts {
+					if counts[name] != count {
+						t.Fatal("retained tool count mismatch")
+					}
+				}
+				bindToolDeltaQualification(t, p, surface, retained.ID, efficiency, ids)
+				t.Logf("retained completed role=%s invocation=%s", p.RoleFQRN, retained.ID)
+				continue
+			} else if !os.IsNotExist(readErr) {
+				t.Fatal(readErr)
+			}
 		}
 		root := t.TempDir()
 		if err := os.MkdirAll(filepath.Join(root, "adapters/mongo"), 0700); err != nil {
@@ -106,6 +164,14 @@ func TestPrepareNativeToolDeltaRelease(t *testing.T) {
 		}
 		editable := slices.Contains(bundle.Permissions, "repository.edit")
 		before := "package mongo\n\nconst Value = 2\n" + strings.Repeat("// retained unrelated content\n", 600)
+		if efficiency {
+			before = "package mongo\n\nconst Value = 2\n" + strings.Repeat("// retained unrelated content\n", 16)
+			formatted, err := format.Source([]byte(before))
+			if err != nil {
+				t.Fatal(err)
+			}
+			before = string(formatted)
+		}
 		for name, data := range map[string]string{"AGENTS.md": "Use only the supplied Teams tools; keep unrelated bytes unchanged.\n", "go.mod": "module example.test/tooldelta\n\ngo 1.26.0\n", "adapters/mongo/value.go": before, "adapters/mongo/value_test.go": "package mongo\nimport \"testing\"\nfunc TestValue(t *testing.T) { if Value != 2 { t.Fatal(Value) } }\n"} {
 			if err := os.WriteFile(filepath.Join(root, name), []byte(data), 0600); err != nil {
 				t.Fatal(err)
@@ -115,7 +181,7 @@ func TestPrepareNativeToolDeltaRelease(t *testing.T) {
 			nativeQualificationGit(t, root, args...)
 		}
 		head := strings.TrimSpace(nativeQualificationGit(t, root, "rev-parse", "HEAD"))
-		if editable {
+		if editable && !efficiency {
 			if err := os.WriteFile(filepath.Join(root, "adapters/mongo/value.go"), []byte(strings.Replace(before, "const Value = 2", "const Value = 1", 1)), 0600); err != nil {
 				t.Fatal(err)
 			}
@@ -137,19 +203,19 @@ func TestPrepareNativeToolDeltaRelease(t *testing.T) {
 		// qualification; the capability check cannot drift into unrelated work.
 		definitions := []agentruntime.ToolDefinition{}
 		for _, definition := range agenttools.ReadOnlyDefinitions(bundle.Permissions) {
-			if definition.Name == "read_file" || definition.Name == "read_file_from_commit" {
+			if definition.Name == "read_file" || !efficiency && definition.Name == "read_file_from_commit" || efficiency && slices.Contains([]string{"find_definitions", "find_references", "file_change_history"}, definition.Name) {
 				definitions = append(definitions, definition)
 			}
 		}
 		if editable {
 			for _, definition := range agenttools.MutationDefinitions(bundle.Permissions) {
-				if definition.Name == "edit_file" || definition.Name == "create_file" || definition.Name == "undo_file_change" || definition.Name == "restore_file_from_commit" {
+				if !efficiency && slices.Contains([]string{"edit_file", "create_file", "undo_file_change", "restore_file_from_commit"}, definition.Name) || efficiency && slices.Contains([]string{"make_directory", "format_go_files", "move_file", "remove_file", "create_file", "undo_file_change"}, definition.Name) {
 					definitions = append(definitions, definition)
 				}
 			}
 		}
 		for _, definition := range agenttools.TestDefinitions(bundle.Permissions) {
-			if editable && definition.Name == "run_go_tests_worktree" || !editable && definition.Name == "run_go_tests" {
+			if editable && (definition.Name == "run_go_tests_worktree" && !efficiency || definition.Name == "check_go_build_worktree" && efficiency) || !editable && definition.Name == "run_go_tests" {
 				definitions = append(definitions, definition)
 			}
 		}
@@ -159,7 +225,12 @@ func TestPrepareNativeToolDeltaRelease(t *testing.T) {
 			t.Fatal(err)
 		}
 		journal := &nativeReleaseJournal{path: filepath.Join(output, string(p.RoleFQRN)+"-journal.json")}
-		runner := agentruntime.Runner{Journal: journal, Tools: agenttools.ReadOnlyTurnAdapter{Gateway: agenttools.Gateway{Bindings: binding, Host: host}, InvocationID: id, RequestDigest: requestDigest}, Effects: toolDeltaEffects{mutation: mutation, tests: tests}, Model: agentruntime.OpenAIModel{Client: &http.Client{Timeout: 10 * time.Minute}, BaseURL: p.NativeSettings.BaseURL, Model: p.NativeSettings.Model, MaxTokens: p.NativeSettings.MaxOutputTokens, Reasoning: p.NativeSettings.Reasoning, Tools: definitions, FinalTool: "submit_result", FinalSchema: definitions[len(definitions)-1].Parameters, TurnContract: contract}, FinalTool: "submit_result", Finalize: func(raw json.RawMessage) (string, error) { return string(raw), nil }, SystemPrompt: agentruntime.StructuredTurnInstruction, MaxTurns: 20}
+		if _, err := os.Stat(journal.path); err == nil {
+			if err := os.Rename(journal.path, filepath.Join(output, string(p.RoleFQRN)+"-prior-journal-"+string(id)+".json")); err != nil {
+				t.Fatal(err)
+			}
+		}
+		runner := agentruntime.Runner{Journal: journal, Tools: agenttools.ReadOnlyTurnAdapter{Gateway: agenttools.Gateway{Bindings: binding, Host: host, History: store}, InvocationID: id, RequestDigest: requestDigest}, Effects: toolDeltaEffects{mutation: mutation, tests: tests}, Model: agentruntime.OpenAIModel{Client: &http.Client{Timeout: 10 * time.Minute}, BaseURL: p.NativeSettings.BaseURL, Model: p.NativeSettings.Model, MaxTokens: p.NativeSettings.MaxOutputTokens, Reasoning: p.NativeSettings.Reasoning, Tools: definitions, FinalTool: "submit_result", FinalSchema: definitions[len(definitions)-1].Parameters, TurnContract: contract}, FinalTool: "submit_result", Finalize: func(raw json.RawMessage) (string, error) { return string(raw), nil }, SystemPrompt: agentruntime.StructuredTurnInstruction, MaxTurns: 20}
 		prompt := "Read AGENTS.md. This is a bounded tool capability check in a disposable repository, not feature work. "
 		prompt += "Use read_file_from_commit to read the first 20 lines of adapters/mongo/value.go at exact commit " + head + ". "
 		if editable {
@@ -173,6 +244,22 @@ func TestPrepareNativeToolDeltaRelease(t *testing.T) {
 			}
 		}
 		prompt += "Then submit_result with outcome completed. No Git commit is needed for this isolated capability check."
+		if efficiency {
+			prompt = "Read AGENTS.md. This is a bounded tool-catalog compatibility check in a disposable repository, not feature work. Use find_definitions for Value in adapters/mongo; use find_references for its declaration in adapters/mongo/value.go at line 3. Read adapters/mongo/value.go for its current full-file SHA-256. "
+			if editable {
+				prompt += "Use format_go_files on that file with its SHA-256, then file_change_history for that file. Create directory scratch with make_directory. Create scratch/probe.txt containing disposable. Move it to scratch/moved.txt using move_file; remove scratch/moved.txt with remove_file. Undo the remove, then undo the move, then undo the creation, using each original operation's returned change_id and aggregate SHA-256. Directory scratch may remain. Perform in order and take hashes only from actual tool results. "
+			} else {
+				prompt += "Use file_change_history for adapters/mongo/value.go; an empty history is expected. "
+			}
+			if slices.Contains(bundle.Permissions, "test.execute") {
+				if editable {
+					prompt += "Use check_go_build_worktree to compile without executing tests. "
+				} else {
+					prompt += "Run the committed tests with run_go_tests, package ./adapters/mongo/.... "
+				}
+			}
+			prompt += "Finish with submit_result outcome completed. Do not commit or do unrelated work."
+		}
 		ctx, cancel := context.WithTimeout(t.Context(), 10*time.Minute)
 		t.Logf("checking role=%s invocation=%s", p.RoleFQRN, id)
 		result, err := runner.Run(ctx, string(id), string(requestDigest), prompt)
@@ -196,10 +283,16 @@ func TestPrepareNativeToolDeltaRelease(t *testing.T) {
 						t.Fatal("recursive test did not pass")
 					}
 				}
+				if done.Name == "check_go_build_worktree" {
+					var receipt agenttools.Result
+					if json.Unmarshal(done.Output, &receipt) != nil || receipt.ExecutionError != "" || receipt.ExitCode != 0 || receipt.SnapshotSHA256 == "" {
+						t.Fatal("compile check did not succeed against an identified snapshot")
+					}
+				}
 				seen[done.Name]++
 			}
 		}
-		if editable {
+		if editable && !efficiency {
 			got, err := os.ReadFile(filepath.Join(root, "adapters/mongo/value.go"))
 			if err != nil || string(got) != before || seen["edit_file"] != 1 || seen["undo_file_change"] != 2 || seen["restore_file_from_commit"] != 1 || seen["create_file"] != 1 {
 				t.Fatal("edit, uncommitted undo, committed restore and create/undo did not execute exactly")
@@ -208,52 +301,86 @@ func TestPrepareNativeToolDeltaRelease(t *testing.T) {
 				t.Fatal("creation undo did not remove scratch.txt")
 			}
 		}
-		if seen["read_file_from_commit"] != 1 {
+		if efficiency {
+			for _, name := range []string{"find_definitions", "find_references", "file_change_history"} {
+				if seen[name] < 1 {
+					t.Fatalf("%s did not exercise %s", p.RoleFQRN, name)
+				}
+			}
+			if editable {
+				for _, name := range []string{"make_directory", "format_go_files", "move_file", "remove_file", "create_file"} {
+					if seen[name] != 1 {
+						t.Fatalf("%s did not exercise %s exactly once", p.RoleFQRN, name)
+					}
+				}
+				got, err := os.ReadFile(filepath.Join(root, "adapters/mongo/value.go"))
+				if err != nil || string(got) != before || seen["undo_file_change"] != 3 {
+					t.Fatal("filesystem round trip did not preserve original bytes")
+				}
+				for _, name := range []string{"scratch/probe.txt", "scratch/moved.txt"} {
+					if _, err := os.Stat(filepath.Join(root, name)); !os.IsNotExist(err) {
+						t.Fatal("temporary file survived undo")
+					}
+				}
+			}
+		} else if seen["read_file_from_commit"] != 1 {
 			t.Fatal("historical file contents were not read exactly once")
 		}
 		if slices.Contains(bundle.Permissions, "test.execute") {
 			name := "run_go_tests"
 			if editable {
 				name = "run_go_tests_worktree"
+				if efficiency {
+					name = "check_go_build_worktree"
+				}
 			}
 			if seen[name] != 1 {
 				t.Fatal("recursive test tool was not executed exactly once")
 			}
 		}
 		write(string(p.RoleFQRN)+"-measurement.json", map[string]any{"invocation_id": id, "model_profile_digest": p.ModelProfileDigest, "tool_surface_digest": surface, "result": json.RawMessage(result), "tool_counts": seen})
-		p.ToolPolicyDigest = surface
-		corpus := *p.QualificationCorpus
-		corpus.Revision++
-		corpus.ToolSurfaceDigest = surface
-		corpus.ScenarioIDs = slices.Clone(corpus.ScenarioIDs)
-		// Requalifying the same capability on a new catalog retains its
-		// scenario identity; duplicate IDs make the corpus invalid.
-		if !slices.Contains(corpus.ScenarioIDs, "native-tool-delta-file-recovery") {
-			corpus.ScenarioIDs = append(corpus.ScenarioIDs, "native-tool-delta-file-recovery")
-		}
-		corpusDigest, err := corpus.Digest()
-		if err != nil {
-			t.Fatal(err)
-		}
-		qual := p.Qualification.Clone()
-		qual.QualificationID, err = ids.Next()
-		if err != nil {
-			t.Fatal(err)
-		}
-		qual.QualificationCorpusDigest = corpusDigest
-		qual.ObservedAt = time.Now().UTC()
-		qual.EvidenceIDs = append(qual.EvidenceIDs, id)
-		qual.QualificationDigest, err = application.QualificationDigest(qual)
-		if err != nil {
-			t.Fatal(err)
-		}
-		p.QualificationCorpus = &corpus
-		p.Qualification = &qual
+		bindToolDeltaQualification(t, p, surface, id, efficiency, ids)
 	}
 	write("tekrood.native-candidate.json", config)
 	if _, err := LoadProductionConfig(filepath.Join(output, "tekrood.native-candidate.json")); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func bindToolDeltaQualification(t *testing.T, p *ProductionProfile, surface kernel.Digest, id kernel.UUIDv7, efficiency bool, ids *UUIDv7Source) {
+	t.Helper()
+	p.ToolPolicyDigest = surface
+	corpus := *p.QualificationCorpus
+	corpus.Revision++
+	corpus.ToolSurfaceDigest = surface
+	corpus.ScenarioIDs = slices.Clone(corpus.ScenarioIDs)
+	// Requalifying the same capability on a new catalog retains its
+	// scenario identity; duplicate IDs make the corpus invalid.
+	scenario := "native-tool-delta-file-recovery"
+	if efficiency {
+		scenario = "native-tool-delta-workspace-efficiency"
+	}
+	if !slices.Contains(corpus.ScenarioIDs, scenario) {
+		corpus.ScenarioIDs = append(corpus.ScenarioIDs, scenario)
+	}
+	corpusDigest, err := corpus.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	qual := p.Qualification.Clone()
+	qual.QualificationID, err = ids.Next()
+	if err != nil {
+		t.Fatal(err)
+	}
+	qual.QualificationCorpusDigest = corpusDigest
+	qual.ObservedAt = time.Now().UTC()
+	qual.EvidenceIDs = append(qual.EvidenceIDs, id)
+	qual.QualificationDigest, err = application.QualificationDigest(qual)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.QualificationCorpus = &corpus
+	p.Qualification = &qual
 }
 
 type toolDeltaEffects struct {
