@@ -81,17 +81,16 @@ func TestPreparedSessionPassesReasoningToWire(t *testing.T) {
 	}
 }
 
-func TestNativeStructuredReasoningRejectsServerFallbackSettings(t *testing.T) {
+func TestNativeStructuredReasoningRequiresExplicitBudget(t *testing.T) {
 	settings := ProfileSettings{SchemaVersion: ProfileSettingsVersion, BaseURL: "http://127.0.0.1:8800/v1", Model: "fixture", ResponseMode: ResponseModeJSONSchemaActions, MaxOutputTokens: 16384}
-	for _, budget := range []*int{nil, func() *int { v := 1024; return &v }()} {
-		settings.Reasoning = &agentruntime.ReasoningConfig{EnableThinking: true, Effort: "medium", BudgetTokens: budget}
-		if settings.Valid() {
-			t.Fatal("accepted structured reasoning that mlx-serve silently disables")
-		}
+	settings.Reasoning = &agentruntime.ReasoningConfig{EnableThinking: true, Effort: "medium"}
+	if settings.Valid() {
+		t.Fatal("accepted implicit structured reasoning budget")
 	}
-	budget := -1
-	settings.Reasoning.BudgetTokens = &budget
-	if !settings.Valid() {
-		t.Fatal("rejected supported structured reasoning configuration")
+	for _, budget := range []int{-1, 1024, 8192} {
+		settings.Reasoning.BudgetTokens = &budget
+		if !settings.Valid() {
+			t.Fatalf("rejected supported structured reasoning budget %d", budget)
+		}
 	}
 }

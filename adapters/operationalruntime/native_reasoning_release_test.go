@@ -84,7 +84,10 @@ func TestPrepareNativeReasoningRelease(t *testing.T) {
 		p := &config.Profiles[i]
 		old := *p
 		settings := *p.NativeSettings
-		budget := -1
+		budget := 8192
+		if settings.MaxOutputTokens < 16384 {
+			settings.MaxOutputTokens = 16384
+		}
 		settings.Reasoning = &agentruntime.ReasoningConfig{EnableThinking: true, Effort: "medium", BudgetTokens: &budget}
 		digest, err := nativeagent.ModelProfileDigest(p.RoleFQRN, p.RoleBundleDigest, settings)
 		if err != nil {
@@ -113,7 +116,7 @@ func TestPrepareNativeReasoningRelease(t *testing.T) {
 		}
 		binding := nativeReleaseBinding{authority: agenttools.Authority{WorkspaceRoot: root, Permissions: bundle.Permissions, Purpose: kernel.PurposeValidation, EffectPolicyDigest: p.EffectPolicyDigest}}
 		journal := &nativeReleaseJournal{path: filepath.Join(output, string(p.RoleFQRN)+"-journal.json")}
-		transport := &reasoningReleaseTransport{path: filepath.Join(output, string(p.RoleFQRN)+"-http.jsonl")}
+		transport := &reasoningReleaseTransport{path: filepath.Join(output, string(p.RoleFQRN)+"-http.jsonl"), budget: budget}
 		runner := agentruntime.Runner{Journal: journal, Tools: agenttools.ReadOnlyTurnAdapter{Gateway: agenttools.Gateway{Bindings: binding, Host: agenttools.Host{Timeout: time.Minute}}, InvocationID: id, RequestDigest: digest}, Model: agentruntime.OpenAIModel{Client: &http.Client{Timeout: 5 * time.Minute, Transport: transport}, BaseURL: settings.BaseURL, Model: settings.Model, MaxTokens: settings.MaxOutputTokens, Reasoning: settings.Reasoning, Tools: definitions, FinalTool: final.Name, FinalSchema: final.Parameters, TurnContract: contract}, FinalTool: final.Name, Finalize: func(raw json.RawMessage) (string, error) { return string(raw), nil }, SystemPrompt: agentruntime.StructuredTurnInstruction, MaxTurns: 8}
 		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Minute)
 		t.Logf("checking ordinary reasoning role=%s invocation=%s", p.RoleFQRN, id)
@@ -178,7 +181,7 @@ func TestPrepareNativeReasoningRelease(t *testing.T) {
 				t.Fatal(err)
 			}
 			corpus.Revision = 1
-			corpus.ScenarioIDs = []string{"accepted-role-baseline-plus-medium-reasoning-transport-delta"}
+			corpus.ScenarioIDs = []string{"accepted-role-baseline-plus-bounded-medium-reasoning-transport-delta"}
 			corpus.ThresholdDigest = digestBytes([]byte(string(old.Qualification.QualificationDigest) + ":unchanged role/tool policy; ordinary thinking verified; successful authorized read where available; structured final; no tool/schema errors"))
 			corpusDigest, err := corpus.Digest()
 			if err != nil {
@@ -223,6 +226,7 @@ func TestPrepareNativeReasoningRelease(t *testing.T) {
 type reasoningReleaseTransport struct {
 	path                      string
 	requests, reasoningTokens int
+	budget                    int
 }
 
 func (transport *reasoningReleaseTransport) RoundTrip(request *http.Request) (*http.Response, error) {
@@ -239,7 +243,7 @@ func (transport *reasoningReleaseTransport) RoundTrip(request *http.Request) (*h
 	if err := json.Unmarshal(raw, &payload); err != nil {
 		return nil, err
 	}
-	if !payload.Thinking || payload.Effort != "medium" || payload.Budget != -1 {
+	if !payload.Thinking || payload.Effort != "medium" || payload.Budget != transport.budget {
 		return nil, agentruntime.ErrInvalidTurn
 	}
 	response, err := http.DefaultTransport.RoundTrip(request)

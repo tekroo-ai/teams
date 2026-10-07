@@ -111,7 +111,7 @@ func prepare(ctx context.Context, brief application.ExecutionBrief, requestDiges
 	}
 	digest := sha256.Sum256(encoded)
 	profile := config.Profile
-	if !validProfileReasoning(profile.Reasoning, profile.ResponseMode) {
+	if !validProfileReasoning(profile.Reasoning, profile.ResponseMode, profile.MaxOutputTokens) {
 		return Session{}, ErrInvalidBinding
 	}
 	if brief.ContractManifest != kernel.ContractIdentity || !brief.InvocationID.Valid() || !requestDigest.Valid() || requestDigest != kernel.Digest(hex.EncodeToString(digest[:])) ||

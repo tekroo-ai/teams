@@ -3,8 +3,23 @@ package nativeagent
 import (
 	"testing"
 
+	"github.com/tekroo-ai/teams/agentruntime"
 	"github.com/tekroo-ai/teams/kernel"
 )
+
+func TestNativeSchemaThinkingBudgetLeavesOutputAllowance(t *testing.T) {
+	budget := 8192
+	settings := ProfileSettings{SchemaVersion: ProfileSettingsVersion, BaseURL: "http://127.0.0.1:8800/v1", Model: "local-model", ResponseMode: ResponseModeJSONSchemaActions, MaxOutputTokens: 16384, Reasoning: &agentruntime.ReasoningConfig{EnableThinking: true, Effort: "medium", BudgetTokens: &budget}}
+	if !settings.Valid() {
+		t.Fatal("bounded schema thinking rejected")
+	}
+	for _, cap := range []int{8192, 4096} {
+		settings.MaxOutputTokens = cap
+		if settings.Valid() {
+			t.Fatal("reasoning budget consumes output allowance")
+		}
+	}
+}
 
 func TestNativeProfileSettingsRequireExactLoopbackEndpoint(t *testing.T) {
 	valid := ProfileSettings{SchemaVersion: ProfileSettingsVersion, BaseURL: "http://127.0.0.1:8800/v1", Model: "local-model", MaxOutputTokens: 8192}
