@@ -152,7 +152,7 @@ func (service *ProductionService) reconcileTaskConsultations(ctx context.Context
 					return true, nil // recover on the next pass from durable completion
 				}
 				if !resolved {
-					continue
+					return service.reservePlanAmendment(ctx, feature, inv, latest)
 				}
 				// Recovery uses registered, immutable answer evidence and the same
 				// existing workspace. It cannot grant a different write scope.
@@ -200,7 +200,7 @@ func (service *ProductionService) reconcileTaskConsultations(ctx context.Context
 		tracked := &trackedTask{plan: consult, owner: owner, profile: wp, revision: state.Revision, last: head}
 		if existing, found := cs.WorkProfiles[ref]; found {
 			tracked.profile = existing.Profile
-		} else if err := service.applyTaskCommand(ctx, feature, tracked, "tekroo.command.task.bind-work-profile", kernel.SchemaVersion, service.policyAuthority, wp, evidence, nil, "profile"); err != nil {
+		} else if err := service.bindConsultationWorkProfile(ctx, feature, tracked, evidence); err != nil {
 			return false, err
 		}
 		if err := service.activateTask(ctx, feature, tracked, profile, workspace, budget.Revision, []kernel.UUIDv7{source.LastEventID}, evidence, evidence[0].EvidenceID, []kernel.Digest{*inv.OutputDigest, *source.OutputDigest}); err != nil {
@@ -211,10 +211,22 @@ func (service *ProductionService) reconcileTaskConsultations(ctx context.Context
 	return false, nil
 }
 
+func (service *ProductionService) bindConsultationWorkProfile(ctx context.Context, feature organization.FeatureRequest, task *trackedTask, evidence []kernel.EvidenceRef) error {
+	// Both the reported question and accepted design classify this advisory
+	// work. The kernel requires the declared IDs to equal command evidence;
+	// declaring only evidence[0] prevents admission with UNAUTHORIZED.
+	task.profile.ClassificationEvidenceIDs = evidenceIDs(evidence)
+	// Rejected commands retain idempotent receipts. Do not reuse the old
+	// single-evidence "profile" identity with a corrected payload, or the
+	// durable rejection will be replayed (or conflict) after deployment.
+	key := "consultation-profile-evidence-" + string(digestBytes(mustJSON(evidence)))
+	return service.applyTaskCommand(ctx, feature, task, "tekroo.command.task.bind-work-profile", kernel.SchemaVersion, service.policyAuthority, task.profile, evidence, nil, key)
+}
+
 // Resolve by deterministic task identity and authoritative Teams state. No
 // model-supplied actor, conversation ID, or result schema is trusted.
 func (service *ProductionService) nativeTaskConsultation(ctx context.Context, brief application.ExecutionBrief) (*nativeagent.ResultContract, *kernel.WorkInvocation, error) {
-	features, err := service.Store.ListFeatures(ctx, []organization.FeatureStatus{organization.FeaturePlanned, organization.FeatureApproved}, 1000)
+	features, err := service.Store.ListFeatures(ctx, nativePlanningInspectionStatuses(), 1000)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -222,19 +234,30 @@ func (service *ProductionService) nativeTaskConsultation(ctx context.Context, br
 		if feature.Plan == nil {
 			continue
 		}
-		for _, task := range feature.Plan.Tasks {
-			if taskConsultationID(feature, task.ID) != brief.Task.TaskID {
-				continue
+		plans := []*organization.FeaturePlan{feature.Plan}
+		if feature.PlanAmendment != nil {
+			plans = append(plans, &feature.PlanAmendment.PriorPlan)
+		}
+		for _, plan := range plans {
+			prior := feature
+			prior.Plan = plan
+			for _, task := range plan.Tasks {
+				if taskConsultationID(prior, task.ID) != brief.Task.TaskID {
+					continue
+				}
+				if a := feature.PlanAmendment; a != nil && a.ConsultationID == brief.Task.TaskID && a.ConsultationInvocationID != brief.InvocationID {
+					return nil, nil, nativeagent.ErrInvalidBinding
+				}
+				source, _, err := service.featureArchitectureCandidate(ctx, feature)
+				if err != nil {
+					return nil, nil, err
+				}
+				if !consultationSourceBound(feature, source) || source.ActorFQN != brief.ActorFQN || brief.Purpose != kernel.PurposeHandoff {
+					return nil, nil, nativeagent.ErrInvalidBinding
+				}
+				contract := &nativeagent.ResultContract{TaskID: brief.Task.TaskID, TaskSourceDigest: brief.Task.SourceDigest, SchemaRef: "tekroo.task.consultation", SchemaSHA256: digestBytes(consultationSchema), Schema: consultationSchema}
+				return contract, &source, nil
 			}
-			source, _, err := service.featureArchitectureCandidate(ctx, feature)
-			if err != nil {
-				return nil, nil, err
-			}
-			if !consultationSourceBound(feature, source) || source.ActorFQN != brief.ActorFQN || brief.Purpose != kernel.PurposeHandoff {
-				return nil, nil, nativeagent.ErrInvalidBinding
-			}
-			contract := &nativeagent.ResultContract{TaskID: brief.Task.TaskID, TaskSourceDigest: brief.Task.SourceDigest, SchemaRef: "tekroo.task.consultation", SchemaSHA256: digestBytes(consultationSchema), Schema: consultationSchema}
-			return contract, &source, nil
 		}
 	}
 	return nil, nil, nil

@@ -57,7 +57,7 @@ func snapshotWorkingTree(ctx context.Context, root, destination, gitBinary strin
 	var total int64
 	for index, relative := range paths {
 		if index > 0 && paths[index-1] == relative {
-			return "", ErrBoundary
+			return "", fmt.Errorf("duplicate snapshot path %q: %w", relative, ErrBoundary)
 		}
 		if err := ctx.Err(); err != nil {
 			return "", err
@@ -72,14 +72,14 @@ func snapshotWorkingTree(ctx context.Context, root, destination, gitBinary strin
 			return "", err
 		}
 		if !info.Mode().IsRegular() {
-			return "", ErrBoundary
+			return "", fmt.Errorf("snapshot path %q is not a regular file: %w", relative, ErrBoundary)
 		}
 		if info.Size() > maxTestArchiveBytes-total {
 			return "", fmt.Errorf("test snapshot exceeds %d-byte source limit at %q: %w", maxTestArchiveBytes, relative, ErrTooLarge)
 		}
 		resolved, err := filepath.EvalSymlinks(original)
 		if err != nil || resolved != original {
-			return "", ErrBoundary
+			return "", fmt.Errorf("snapshot path %q traverses a link: %w", relative, ErrBoundary)
 		}
 		target := filepath.Join(destination, relative)
 		if err := os.MkdirAll(filepath.Dir(target), 0700); err != nil {
@@ -93,6 +93,19 @@ func snapshotWorkingTree(ctx context.Context, root, destination, gitBinary strin
 	return hex.EncodeToString(digest.Sum(nil)), nil
 }
 
+// CaptureRepositoryFiles shares the bounded, symlink-rejecting source capture
+// used by isolated tests. Coordinator-only API, not an exposed agent tool.
+// The caller owns an empty destination and must fence source writers itself.
+func CaptureRepositoryFiles(ctx context.Context, root, destination, gitBinary string) (string, error) {
+	// macOS may spell an authorized temporary root through /var rather than
+	// /private/var. Resolve that root once; links below it remain forbidden.
+	resolved, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return "", err
+	}
+	return snapshotWorkingTree(ctx, resolved, destination, gitBinary)
+}
+
 func copySnapshotFile(original, target, relative string, originalInfo os.FileInfo, digest hash.Hash) error {
 	source, err := os.Open(original)
 	if err != nil {
@@ -103,7 +116,7 @@ func copySnapshotFile(original, target, relative string, originalInfo os.FileInf
 	if err != nil || !openedInfo.Mode().IsRegular() || !os.SameFile(originalInfo, openedInfo) || openedInfo.Size() != originalInfo.Size() {
 		return ErrBoundary
 	}
-	copy, err := os.OpenFile(target, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	copy, err := os.OpenFile(target, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600|originalInfo.Mode().Perm()&0111)
 	if err != nil {
 		return err
 	}

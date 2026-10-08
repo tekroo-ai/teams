@@ -289,6 +289,7 @@ func sameWorkKinds(left, right []kernel.WorkKind) bool {
 }
 
 type ProductionPlanning struct {
+	PlanAmendment              *ProductionPlanAmendment                          `json:"plan_amendment,omitempty"`
 	PolicyRevision             uint64                                            `json:"policy_revision"`
 	ClassificationPolicyDigest kernel.Digest                                     `json:"classification_policy_digest"`
 	PromotionPolicyDigest      kernel.Digest                                     `json:"promotion_policy_digest"`
@@ -630,6 +631,9 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 	planningDeadline, err := positiveDuration("planning.deadline", config.Planning.Deadline)
 	if err != nil || config.Planning.PolicyRevision == 0 || !config.Planning.ClassificationPolicyDigest.Valid() || !config.Planning.PromotionPolicyDigest.Valid() || !config.Planning.VerificationTopologyDigest.Valid() || !config.Planning.SelectionPolicyDigest.Valid() || !config.Planning.BudgetPolicyDigest.Valid() || len(config.Planning.RequiredGateIDs) == 0 || len(config.Planning.RequiredGateIDs) > 32 {
 		return resolvedProductionConfig{}, invalidConfig("planning policy is invalid")
+	}
+	if err := config.Planning.PlanAmendment.validate(); err != nil {
+		return resolvedProductionConfig{}, err
 	}
 	configuredGates := make(map[string]struct{}, len(config.Planning.CandidateGates))
 	for _, gate := range config.Planning.CandidateGates {

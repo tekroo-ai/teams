@@ -123,6 +123,10 @@ func featureBudgetPolicyAccepted(account kernel.WorkBudgetAccount, planning Prod
 }
 
 func (service *ProductionService) preparePlannedTasks(ctx context.Context, feature organization.FeatureRequest, plan organization.FeaturePlan, storyEvents map[kernel.UUIDv7]kernel.UUIDv7, taskEvents map[kernel.UUIDv7]kernel.UUIDv7) error {
+	return service.preparePlannedTaskSubset(ctx, feature, plan, storyEvents, taskEvents, nil)
+}
+
+func (service *ProductionService) preparePlannedTaskSubset(ctx context.Context, feature organization.FeatureRequest, plan organization.FeaturePlan, storyEvents map[kernel.UUIDv7]kernel.UUIDv7, taskEvents map[kernel.UUIDv7]kernel.UUIDv7, selected map[kernel.UUIDv7]bool) error {
 	// Classification and candidate preparation must select gates from the same
 	// materialized plan, even when the caller has not attached it to feature.
 	feature.Plan = &plan
@@ -158,16 +162,31 @@ func (service *ProductionService) preparePlannedTasks(ctx context.Context, featu
 	// account begins at the intake deadline and may move only through an
 	// authorized work-budget amendment; a plan timestamp never rebases it.
 	deadline := feature.CreatedAt.Add(service.planningDeadline)
-	budget, err := service.ensureFeatureWorkBudget(ctx, feature, evidenceID, evidenceRefs, deadline)
+	var budget kernel.WorkBudgetAccount
+	if selected == nil {
+		budget, err = service.ensureFeatureWorkBudget(ctx, feature, evidenceID, evidenceRefs, deadline)
+	} else {
+		var snapshot kernel.Snapshot
+		snapshot, err = service.Store.LoadDecision(ctx, kernel.KernelCommand{Target: kernel.AggregateRef{Kind: kernel.AggregateWorkBudget, ID: feature.BudgetAccountID}})
+		budget = snapshot.WorkBudgetAccounts[kernel.AggregateRef{Kind: kernel.AggregateWorkBudget, ID: feature.BudgetAccountID}]
+		if err == nil && !budget.Valid() {
+			err = organization.ErrPlanAmendment
+		}
+	}
 	if err != nil {
 		return err
 	}
 	deadline = budget.DeadlineAt
-	if err := service.ensurePlannedTaskMessages(ctx, feature, plan, taskEvents, planDigest, deadline); err != nil {
-		return err
+	if selected == nil || feature.PlanAmendment != nil && feature.PlanAmendment.State == organization.AmendmentApplied {
+		if err := service.ensurePlannedTaskMessageSubset(ctx, feature, plan, taskEvents, planDigest, deadline, selected); err != nil {
+			return err
+		}
 	}
 
 	for _, item := range plan.Tasks {
+		if selected != nil && !selected[item.ID] {
+			continue
+		}
 		taskRef := kernel.AggregateRef{Kind: kernel.AggregateTask, ID: item.ID}
 		taskState, taskHead, taskFound, err := service.Store.ReadAggregateHead(ctx, taskRef)
 		if err != nil || !taskFound || taskState.LifecycleEpoch == 0 || taskState.ScopeRevision == 0 || taskState.Phase == kernel.PhaseClosed || taskState.Condition == kernel.ConditionBlocked {
@@ -612,6 +631,9 @@ func (service *ProductionService) handlerDispatchForCurrentMessage(ctx context.C
 	// A retained-context advisory node is not a redelivery of a completed
 	// organizational message. Its authority is its task and causal evidence.
 	if service.qualificationNative && feature.Plan != nil && task.plan.Purpose == kernel.PurposeHandoff {
+		if feature.PlanAmendment != nil && task.plan.ID == feature.PlanAmendment.AssessmentID {
+			return nil, nil
+		}
 		for _, original := range feature.Plan.Tasks {
 			if task.plan.ID == taskConsultationID(feature, original.ID) {
 				return nil, nil
@@ -640,6 +662,10 @@ func (service *ProductionService) handlerDispatchForCurrentMessage(ctx context.C
 }
 
 func (service *ProductionService) ensurePlannedTaskMessages(ctx context.Context, feature organization.FeatureRequest, plan organization.FeaturePlan, taskEvents map[kernel.UUIDv7]kernel.UUIDv7, planDigest kernel.Digest, deadline time.Time) error {
+	return service.ensurePlannedTaskMessageSubset(ctx, feature, plan, taskEvents, planDigest, deadline, nil)
+}
+
+func (service *ProductionService) ensurePlannedTaskMessageSubset(ctx context.Context, feature organization.FeatureRequest, plan organization.FeaturePlan, taskEvents map[kernel.UUIDv7]kernel.UUIDv7, planDigest kernel.Digest, deadline time.Time, selected map[kernel.UUIDv7]bool) error {
 	if service == nil || service.MessageBus == nil || service.roleGrounding == nil {
 		return application.ErrInvalidConfiguration
 	}
@@ -648,6 +674,9 @@ func (service *ProductionService) ensurePlannedTaskMessages(ctx context.Context,
 		return err
 	}
 	for _, task := range plan.Tasks {
+		if selected != nil && !selected[task.ID] {
+			continue
+		}
 		if !service.roleGrounding.requiresMessageHandler(task.Owner) {
 			continue
 		}
@@ -1021,6 +1050,17 @@ func (service *ProductionService) submitDeterministicCommand(ctx context.Context
 	return service.submitDeterministicCommandAtLifecycle(ctx, feature, commandType, version, kind, id, authority, revision, feature.LifecycleEpoch, payload, parents, evidence, key, preconditions...)
 }
 
+// A durable kernel rejection is distinct from a failed transport/store call,
+// whose outcome may be unknown. Only the former permits fault-local recovery.
+type deterministicCommandRejection struct {
+	Receipt     kernel.CommandReceipt
+	CommandType string
+}
+
+func (err *deterministicCommandRejection) Error() string {
+	return fmt.Sprintf("%s rejected: %s", err.CommandType, err.Receipt.ReasonCode)
+}
+
 func (service *ProductionService) submitDeterministicCommandAtLifecycle(ctx context.Context, feature organization.FeatureRequest, commandType, version string, kind kernel.AggregateKind, id kernel.UUIDv7, authority kernel.PrincipalRef, revision, lifecycleEpoch uint64, payload []byte, parents []kernel.DagParent, evidence []kernel.EvidenceRef, key string, preconditions ...kernel.AggregatePrecondition) (kernel.CommandReceipt, error) {
 	idempotencyKey := featureCommandIdempotencyKey(feature, key)
 	command := kernel.KernelCommand{ContractManifest: kernel.ContractIdentity, CommandID: deterministicFeatureCommandID(feature, commandType, id, key), CommandType: commandType, CommandVersion: version, Target: kernel.AggregateRef{Kind: kind, ID: id}, Authority: authority, ExpectedRevision: expectedRevision(revision), ExpectedLifecycleEpoch: expectedLifecycleEpoch(kind, revision, lifecycleEpoch), Preconditions: append([]kernel.AggregatePrecondition(nil), preconditions...), ExpectedPolicyRevision: service.provenance.PolicyRevision, ExpectedCatalogueRevision: kernel.CatalogueRevision, IdempotencyKey: idempotencyKey, CorrelationID: feature.ID, Causation: append([]kernel.DagParent(nil), parents...), Payload: append([]byte(nil), payload...), EvidenceRefs: append([]kernel.EvidenceRef(nil), evidence...)}
@@ -1035,7 +1075,7 @@ func (service *ProductionService) submitDeterministicCommandAtLifecycle(ctx cont
 		return receipt, fmt.Errorf("%s: %w", commandType, err)
 	}
 	if receipt.OutcomeCode != kernel.OutcomeApplied && receipt.OutcomeCode != kernel.OutcomeNoChange {
-		return receipt, fmt.Errorf("%s rejected: %s", commandType, receipt.ReasonCode)
+		return receipt, &deterministicCommandRejection{Receipt: receipt, CommandType: commandType}
 	}
 	return receipt, nil
 }

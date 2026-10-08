@@ -1,0 +1,117 @@
+{
+  "boundary": "Component and isolated automatic coordinator/frontier verification with a canned HTTP model, accepted-context inputs and minimal signed role fixtures. No current production-role or live-model qualification is claimed.",
+  "cases": [
+    {
+      "id": "P15-DOMAIN",
+      "requirement": "One independent-policy-approved amendment preserves product/design and retained work; no unplanned/wrong-purpose source or task, attempt, purpose, hop or deadline capacity reset",
+      "testNames": [
+        "TestPlanAmendmentReservationRejectsUnplannedAndWrongPurposeSources",
+        "TestPlanAmendmentSourceRepairUsesExistingFiniteAllowance",
+        "TestPlanAmendmentPreservesCompletedWorkAndRequiresIndependentPolicy",
+        "TestPlanAmendmentRejectsUnsafePlans"
+      ],
+      "testSource": "organization/plan_amendment_test.go"
+    },
+    {
+      "id": "P15-SCHEMA",
+      "requirement": "Runtime and packaged closed Draft 2020-12 object schema agree; encoded objects and ambiguous fields rejected",
+      "testNames": [
+        "TestPlanAmendmentGeneratedSchemaMatchesRuntime",
+        "TestPlanAmendmentSchemaRejectsEncodedObjectsAndAmbiguousFields"
+      ],
+      "testSource": "organization/plan_amendment_test.go"
+    },
+    {
+      "id": "P15-TRANSACTION",
+      "requirement": "Full graph, invocation, available evidence and complete budget value fenced; no generic-CAS bypass; failed assessment rejection retained",
+      "testNames": [
+        "TestPlanAmendmentTransactionFencesBudgetDebitsAndPreservesRejection",
+        "TestPlanAmendmentTransactionPublishesOnlyPinnedAssessmentAndFreshSuccessors",
+        "TestPlanAmendmentFailedAssessmentWithoutOutputIsDurablyRejected"
+      ],
+      "testSource": "adapters/mongo/plan_amendment_store_integration_test.go"
+    },
+    {
+      "id": "P15-PREPARATION",
+      "requirement": "Kernel/Mongo native service preparation and restart create no prepublication invocation/message and do not rewrite retained state or budget",
+      "testNames": [
+        "TestAmendmentPrepublicationCreatesOnlyFreshUnassignedNodesAcrossRestart"
+      ],
+      "testSource": "adapters/operationalruntime/plan_amendment_integration_test.go"
+    },
+    {
+      "id": "P15-NATIVE",
+      "requirement": "Retained reasoning, admitted raw nested input and formal schema reach native wire; journal replay repeats no model call",
+      "testNames": [
+        "TestPreparedAmendmentRetainsHistoryAndUsesRawInputAndFormalGrammar"
+      ],
+      "testSource": "adapters/nativeagent/plan_amendment_test.go"
+    },
+    {
+      "id": "P15-CHECKPOINT",
+      "requirement": "Private checkpoint preserves dirty bytes/deletions/executable mode without editing original Git; isolated successor lineage, immutable replay and tamper/path rejection",
+      "testNames": [
+        "TestAmendmentCheckpointPreservesDirtyWorkWithoutChangingSourceGit",
+        "TestAmendmentCheckpointPreservesDeletionAndRejectsSymlinks"
+      ],
+      "testSource": "adapters/operationalruntime/plan_amendment_checkpoint_test.go"
+    },
+    {
+      "id": "P15-ACTIVATION",
+      "requirement": "No activation without exact frozen schema/manifest, independent HUMAN acceptance and pinned policy",
+      "testNames": [
+        "TestAmendmentActivationRequiresFrozenContractAndBoundHumanAcceptance"
+      ],
+      "testSource": "adapters/operationalruntime/plan_amendment_config_test.go"
+    },
+    {
+      "id": "P15-EVIDENCE",
+      "requirement": "Successor consumes source/consultation/assessment/input evidence with output bindings; retained evidence unchanged",
+      "testNames": [
+        "TestAmendmentSuccessorEvidencePreservesAndBindsDecisionTrail"
+      ],
+      "testSource": "adapters/operationalruntime/plan_amendment_evidence_test.go"
+    },
+    {
+      "id": "P15-REJECTION",
+      "requirement": "Real coordinator persists malformed/failed/expired assessment as an operator-readable decision; restart freezes dispatch without a repeated assessment or ledger rewrite",
+      "testNames": [
+        "TestAmendmentCoordinatorRetainsOperatorDecisionWithoutAnotherAssessment"
+      ],
+      "testSource": "adapters/operationalruntime/plan_amendment_rejection_integration_test.go"
+    },
+    {
+      "id": "P15-FAULT-ISOLATION",
+      "requirement": "Receipt-backed consultation failure preserves unrelated terminal ingestion without repair/retry admission; four-reference exact binding and restart preserve original rejection",
+      "testNames": [
+        "TestConsultationProfileRecoversRejectedEvidenceBindingAcrossRestart"
+      ],
+      "testSource": "adapters/operationalruntime/task_consultation_integration_test.go"
+    },
+    {
+      "id": "P15-FORWARD",
+      "requirement": "Real kernel/native-worker blocked output through architect consultation, one retained-context PM assessment, independent policy, checkpoint, publication and normal successor frontier; restart, immutable completed/source Git and budget preservation without seeded terminal/APPROVED/APPLIED projections; exact completed journal inspection after publication, changed invocation rejection and used-allowance no-op",
+      "testNames": [
+        "TestAmendmentForwardCoordinatorNativeAssessmentAndPublicationAcrossRestart",
+        "TestAmendmentInScopeConsultationContinuesWithoutPMAssessment"
+      ],
+      "testSource": "adapters/operationalruntime/plan_amendment_forward_integration_test.go"
+    },
+    {
+      "id": "P15-PROTOCOL-INSPECTION",
+      "requirement": "Protocol wrapper construction and inspection share exact server-resolved binding; changed prompt, schema contract, input, invocation and sequence rejected",
+      "testNames": [
+        "TestBoundaryRecognizesOnlyExactServerResolvedProtocolPrompt"
+      ],
+      "testSource": "adapters/nativeagent/protocol_prompt_binding_test.go"
+    }
+  ],
+  "contractIdentity": "tekroo.kernel.contracts/0.15.0",
+  "implementationStatus": "COMPLETE",
+  "pending": [
+    "exact independent principal policy acceptance and activation",
+    "current production-role live-model qualification"
+  ],
+  "productionAuthority": "NONE",
+  "schemaVersion": "1.0.0"
+}

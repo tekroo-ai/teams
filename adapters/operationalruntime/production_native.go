@@ -18,6 +18,7 @@ import (
 	"github.com/tekroo-ai/teams/agenttools"
 	"github.com/tekroo-ai/teams/application"
 	"github.com/tekroo-ai/teams/kernel"
+	"github.com/tekroo-ai/teams/organization"
 )
 
 func loadProductionNativeResultSchemas(sources []ProductionNativeResultSchema) (map[string]NativeResultSchema, error) {
@@ -80,11 +81,19 @@ func configuredNativeSession(ctx context.Context, service *ProductionService, pr
 	slices.Sort(effectTools)
 	var resultContract *nativeagent.ResultContract
 	var consultationSource *kernel.WorkInvocation
+	amendmentAssessment := false
 	if brief.MessageHandler == nil && brief.Purpose == kernel.PurposeHandoff {
 		var err error
 		resultContract, consultationSource, err = service.nativeTaskConsultation(ctx, brief)
 		if err != nil {
 			return nativeagent.Config{}, err
+		}
+		if resultContract == nil {
+			resultContract, consultationSource, err = service.nativePlanAmendment(ctx, brief)
+			if err != nil {
+				return nativeagent.Config{}, err
+			}
+			amendmentAssessment = resultContract != nil
 		}
 	}
 	if brief.MessageHandler == nil && brief.ResultProtocol != nil && (brief.Purpose == kernel.PurposeHandoff || brief.Purpose == kernel.PurposeReplan) {
@@ -124,6 +133,29 @@ func configuredNativeSession(ctx context.Context, service *ProductionService, pr
 	if len(effectTools) > 0 {
 		result.Effects = service.Store
 	}
+	if amendmentAssessment {
+		features, err := service.Store.ListFeatures(ctx, nativePlanningInspectionStatuses(), 1000)
+		if err != nil {
+			return nativeagent.Config{}, err
+		}
+		for _, feature := range features {
+			if feature.PlanAmendment == nil || feature.PlanAmendment.AssessmentID != brief.Task.TaskID {
+				continue
+			}
+			input := feature.PlanAmendment.AssessmentInput
+			if input == nil || !slices.Contains(brief.Evidence, *input) {
+				return nativeagent.Config{}, nativeagent.ErrInvalidBinding
+			}
+			raw, err := service.Runtime.ReadExecutionOutput(ctx, input.SHA256)
+			if err != nil || digestBytes(raw) != input.SHA256 {
+				return nativeagent.Config{}, errors.Join(nativeagent.ErrInvalidBinding, err)
+			}
+			result.ResultInput = &nativeagent.ResultInput{Evidence: *input, Value: append(json.RawMessage(nil), raw...)}
+		}
+		if result.ResultInput == nil {
+			return nativeagent.Config{}, nativeagent.ErrInvalidBinding
+		}
+	}
 	if consultationSource != nil {
 		ref, err := nativeagent.BindContextFork(ctx, service.Store, brief, *consultationSource)
 		if err != nil {
@@ -131,6 +163,10 @@ func configuredNativeSession(ctx context.Context, service *ProductionService, pr
 		}
 		result.ContextSource, result.ContextInvocation = ref, consultationSource
 		result.ValidateFinalResult = func(_ context.Context, output []byte) error {
+			if amendmentAssessment {
+				raw := bytes.TrimSpace(bytes.TrimPrefix(output, []byte(application.OrganizationalResultMarker)))
+				return organization.ValidatePlanAmendmentProposalJSON(raw)
+			}
 			_, _, err := consultationAnswer(output)
 			return err
 		}

@@ -68,3 +68,26 @@ func (s *Store) ReadAggregateRevisionHead(ctx context.Context, aggregate kernel.
 	}
 	return document.Revision, domain.EventID, true, nil
 }
+
+// ReadAggregateEventAtRevision retrieves an immutable causal parent rather
+// than substituting a moving head when replaying materialization commands.
+func (s *Store) ReadAggregateEventAtRevision(ctx context.Context, aggregate kernel.AggregateRef, revision uint64) (kernel.DomainEvent, bool, error) {
+	if err := requireDeadline(ctx); err != nil {
+		return kernel.DomainEvent{}, false, err
+	}
+	if s == nil || !aggregate.Valid() || revision == 0 {
+		return kernel.DomainEvent{}, false, ErrInvalidDecision
+	}
+	var document eventDocument
+	if err := s.db.Collection("events").FindOne(ctx, bson.D{{Key: "aggregate_key", Value: aggregateKey(aggregate)}, {Key: "revision", Value: revision}}).Decode(&document); err != nil {
+		if errors.Is(err, driver.ErrNoDocuments) {
+			return kernel.DomainEvent{}, false, nil
+		}
+		return kernel.DomainEvent{}, false, err
+	}
+	var event kernel.DomainEvent
+	if decode(document.Data, &event) != nil || event.EventID != kernel.UUIDv7(document.ID) || event.Aggregate != aggregate || event.AggregateRevision != revision {
+		return kernel.DomainEvent{}, false, ErrCorruptAggregate
+	}
+	return event, true, nil
+}

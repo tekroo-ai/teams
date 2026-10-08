@@ -77,7 +77,26 @@ func (service *ProductionService) reconcileCandidateLineage(ctx context.Context,
 		if !taskWorkspaceEvidenceBinds(snapshot, scope, encoded) {
 			return false, errInvalidTaskWorkspace
 		}
-		producer, stale := candidateLineageChanged(receipt, states, invocations)
+		// A published amendment preserves an explicitly blocked terminal output;
+		// it is not an accepted candidate in the successor DAG. Revalidate its
+		// exact amendment/checkpoint binding before excluding it from live
+		// producer-readiness checks. Git identity is still checked below.
+		liveReceipt := receipt
+		liveReceipt.Components = make([]taskWorkspaceComponent, 0, len(receipt.Components))
+		for _, component := range receipt.Components {
+			if component.Readiness == "BLOCKED_CHECKPOINT" {
+				expected, err := service.amendmentCheckpointComponent(ctx, feature, task)
+				if err != nil {
+					return false, err
+				}
+				if expected == nil || !taskWorkspaceComponentsMatch([]taskWorkspaceComponent{component}, []taskWorkspaceComponent{*expected}) {
+					return false, fmt.Errorf("task %s checkpoint binding: %w", task.ID, errInvalidTaskWorkspace)
+				}
+				continue
+			}
+			liveReceipt.Components = append(liveReceipt.Components, component)
+		}
+		producer, stale := candidateLineageChanged(liveReceipt, states, invocations)
 		if !stale {
 			for _, component := range receipt.Components {
 				if component.InvocationID == "" {

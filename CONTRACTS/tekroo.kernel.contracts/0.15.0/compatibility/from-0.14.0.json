@@ -1,0 +1,28 @@
+{
+  "additions": [
+    "closed raw-object PM amendment proposal",
+    "single-use reservation and independent policy decision ledger",
+    "transaction fences on tasks, invocations, evidence availability and complete budget snapshot"
+  ],
+  "compatibility": "ADDITIVE_OPT_IN",
+  "contractName": "tekroo.kernel.contracts",
+  "contractVersion": "0.15.0",
+  "directions": {
+    "adapter": "UNRESOLVED_ADVISORY_REMAINS_BLOCKED_WITHOUT_ACTIVATION",
+    "reader": "COMPATIBLE",
+    "writer": "EXPLICIT_AMENDMENT_POLICY_REQUIRED"
+  },
+  "predecessor": {
+    "contractName": "tekroo.kernel.contracts",
+    "contractVersion": "0.14.0",
+    "manifestSha256": "a8076ab90e7aa711176d13d531ed8d2ef855525dc2769a90b171370bc1abcb96"
+  },
+  "preserved": [
+    "accepted product specification and completed work",
+    "all immutable predecessor events, outputs and task definitions",
+    "existing finite invocation/purpose budgets and deadlines",
+    "kernel command identities and SMA boundary"
+  ],
+  "qualification": "Reviewed frozen candidate. Isolated component and automatic coordinator/frontier tests with a canned model pass. Current production-role/live-model behavior remains unqualified. Disabled until exact independent principal policy acceptance and separate deployment authority.",
+  "schemaVersion": "1.0.0"
+}

@@ -1,0 +1,475 @@
+{
+  "$id": "https://tekroo.ai/contracts/plan-amendment/0.15.0/proposal",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "answer_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "blocked_invocation_id": {
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "type": "string"
+    },
+    "blocked_task_id": {
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "type": "string"
+    },
+    "blocked_task_revision": {
+      "maximum": 1000000,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "consultation_id": {
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "type": "string"
+    },
+    "feature_id": {
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "type": "string"
+    },
+    "feature_revision": {
+      "maximum": 1000000,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "impacts": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "enum": [
+              "PRODUCTION_IMPLEMENTER",
+              "WIRING",
+              "CALLER",
+              "TEST_DOUBLE"
+            ]
+          },
+          "owner_task_id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "path": {
+            "maxLength": 1024,
+            "minLength": 1,
+            "type": "string"
+          },
+          "verification": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "path",
+          "owner_task_id",
+          "verification"
+        ],
+        "type": "object"
+      },
+      "maxItems": 256,
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "plan_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "plan_version": {
+      "maximum": 1000000,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "reason": {
+      "maxLength": 4096,
+      "minLength": 1,
+      "type": "string"
+    },
+    "replacements": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "prior_task_id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
+          "successor_task_id": {
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "prior_task_id",
+          "successor_task_id"
+        ],
+        "type": "object"
+      },
+      "maxItems": 128,
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "schema_version": {
+      "const": "0.15.0"
+    },
+    "specification_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "successor_plan": {
+      "additionalProperties": false,
+      "properties": {
+        "architecture": {
+          "maxLength": 65536,
+          "minLength": 1,
+          "type": "string"
+        },
+        "assumptions": {
+          "items": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 0,
+          "type": [
+            "array",
+            "null"
+          ],
+          "uniqueItems": true
+        },
+        "created_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "design_decisions": {
+          "items": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 64,
+          "minItems": 0,
+          "type": [
+            "array",
+            "null"
+          ],
+          "uniqueItems": true
+        },
+        "handoffs": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "capability": {
+                "pattern": "^[a-z0-9](?:[a-z0-9.-]{0,126}[a-z0-9])?$",
+                "type": "string"
+              },
+              "consumer_task_id": {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              "contract": {
+                "maxLength": 4096,
+                "minLength": 1,
+                "type": "string"
+              },
+              "provider_task_id": {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "provider_task_id",
+              "consumer_task_id",
+              "capability",
+              "contract"
+            ],
+            "type": "object"
+          },
+          "maxItems": 16384,
+          "minItems": 0,
+          "type": [
+            "array",
+            "null"
+          ],
+          "uniqueItems": true
+        },
+        "prepared_by": {
+          "maxLength": 256,
+          "pattern": "^(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])::(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])-[1-9][0-9]{0,19}$",
+          "type": "string"
+        },
+        "prepared_execution": {
+          "additionalProperties": false,
+          "properties": {
+            "execution_id": {
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+              "type": "string"
+            },
+            "fencing_epoch": {
+              "maximum": 1000000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "execution_id",
+            "fencing_epoch"
+          ],
+          "type": "object"
+        },
+        "source_design_digest": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "stories": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "acceptance_criteria": {
+                "items": {
+                  "maxLength": 4096,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maxItems": 32,
+                "minItems": 1,
+                "type": "array",
+                "uniqueItems": true
+              },
+              "description": {
+                "maxLength": 65536,
+                "minLength": 1,
+                "type": "string"
+              },
+              "id": {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              "priority": {
+                "enum": [
+                  "LOW",
+                  "NORMAL",
+                  "HIGH",
+                  "CRITICAL"
+                ]
+              },
+              "supersedes_story_id": {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              "title": {
+                "maxLength": 256,
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "description",
+              "acceptance_criteria",
+              "priority"
+            ],
+            "type": "object"
+          },
+          "maxItems": 32,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "tasks": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "acceptance_criteria": {
+                "items": {
+                  "maxLength": 4096,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maxItems": 64,
+                "minItems": 1,
+                "type": "array",
+                "uniqueItems": true
+              },
+              "attempt_limit": {
+                "maximum": 16,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "complexity": {
+                "maximum": 10,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "critical_path": {
+                "type": "boolean"
+              },
+              "decision_route": {
+                "enum": [
+                  "BOUNDED_EXECUTION",
+                  "COMPLEX_REASONING"
+                ]
+              },
+              "depends_on": {
+                "items": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                "maxItems": 128,
+                "minItems": 0,
+                "type": [
+                  "array",
+                  "null"
+                ],
+                "uniqueItems": true
+              },
+              "description": {
+                "maxLength": 65536,
+                "minLength": 1,
+                "type": "string"
+              },
+              "id": {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              "model_profile_digest": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "owner": {
+                "maxLength": 256,
+                "pattern": "^(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])::(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])-[1-9][0-9]{0,19}$",
+                "type": "string"
+              },
+              "purpose": {
+                "enum": [
+                  "INVESTIGATION",
+                  "IMPLEMENTATION",
+                  "VALIDATION",
+                  "REVIEW",
+                  "REPAIR",
+                  "HANDOFF",
+                  "REPLAN",
+                  "PROMOTION",
+                  "ESCALATION"
+                ]
+              },
+              "review_round_limit": {
+                "maximum": 8,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "risk": {
+                "enum": [
+                  "LOW",
+                  "MODERATE",
+                  "HIGH",
+                  "CRITICAL"
+                ]
+              },
+              "story_id": {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              "title": {
+                "maxLength": 256,
+                "minLength": 1,
+                "type": "string"
+              },
+              "validates": {
+                "items": {
+                  "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                  "type": "string"
+                },
+                "maxItems": 128,
+                "minItems": 0,
+                "type": [
+                  "array",
+                  "null"
+                ],
+                "uniqueItems": true
+              },
+              "write_scope": {
+                "items": {
+                  "maxLength": 1024,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maxItems": 32,
+                "minItems": 0,
+                "type": [
+                  "array",
+                  "null"
+                ],
+                "uniqueItems": true
+              }
+            },
+            "required": [
+              "id",
+              "story_id",
+              "title",
+              "description",
+              "acceptance_criteria",
+              "depends_on",
+              "owner",
+              "model_profile_digest",
+              "decision_route",
+              "purpose",
+              "complexity",
+              "risk",
+              "critical_path",
+              "attempt_limit",
+              "review_round_limit"
+            ],
+            "type": "object"
+          },
+          "maxItems": 128,
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "version": {
+          "maximum": 1000000,
+          "minimum": 2,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "version",
+        "prepared_by",
+        "prepared_execution",
+        "architecture",
+        "design_decisions",
+        "assumptions",
+        "source_design_digest",
+        "stories",
+        "tasks",
+        "created_at"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "schema_version",
+    "feature_id",
+    "feature_revision",
+    "plan_version",
+    "plan_digest",
+    "specification_digest",
+    "blocked_task_id",
+    "blocked_task_revision",
+    "blocked_invocation_id",
+    "consultation_id",
+    "answer_digest",
+    "reason",
+    "successor_plan",
+    "replacements",
+    "impacts"
+  ],
+  "title": "Single-use PM execution-plan amendment proposal",
+  "type": "object"
+}

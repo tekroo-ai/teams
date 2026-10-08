@@ -87,6 +87,13 @@ func TestPreparedHandoffSessionUsesBoundSchema(t *testing.T) {
 	sum := sha256.Sum256(encoded)
 	digest := kernel.Digest(hex.EncodeToString(sum[:]))
 	contract := testResultContract(brief)
+	inputValue := json.RawMessage(`{"accepted_plan":{"version":1},"remaining_budget":3}`)
+	inputSHA := sha256.Sum256(inputValue)
+	input := ResultInput{Evidence: kernel.EvidenceRef{EvidenceID: kernel.UUIDv7("00000000-0000-7000-8000-000000000955"), SHA256: kernel.Digest(hex.EncodeToString(inputSHA[:]))}, Value: inputValue}
+	brief.Evidence = append(brief.Evidence, input.Evidence)
+	encoded, _ = json.Marshal(brief)
+	sum = sha256.Sum256(encoded)
+	digest = kernel.Digest(hex.EncodeToString(sum[:]))
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		var body struct {
 			Messages []struct {
@@ -104,6 +111,14 @@ func TestPreparedHandoffSessionUsesBoundSchema(t *testing.T) {
 		if len(body.Messages) < 2 || !strings.Contains(body.Messages[1].Content, contract.SchemaRef) || strings.Contains(body.Messages[1].Content, "The OpenHands finish tool message") || !strings.Contains(body.Messages[1].Content, string(digest)) {
 			t.Error("native result contract was not exposed with source identity")
 		}
+		var initial struct {
+			Input struct {
+				Value map[string]any `json:"value"`
+			} `json:"result_input"`
+		}
+		if json.Unmarshal([]byte(body.Messages[1].Content), &initial) != nil || initial.Input.Value["remaining_budget"] != float64(3) {
+			t.Error("coordinator input was not a raw JSON object")
+		}
 		found := false
 		for _, tool := range body.Tools {
 			found = found || tool.Function.Name == "submit_result"
@@ -117,13 +132,29 @@ func TestPreparedHandoffSessionUsesBoundSchema(t *testing.T) {
 	defer server.Close()
 	profile.BaseURL = server.URL + "/v1"
 	binding := &testBinding{root: t.TempDir()}
-	config := Config{Bindings: binding, Gateway: agenttools.Gateway{Bindings: binding, Host: agenttools.Host{Timeout: time.Second}}, Journal: &testJournal{}, HTTP: server.Client(), Profile: profile, ResultContract: &contract}
+	config := Config{Bindings: binding, Gateway: agenttools.Gateway{Bindings: binding, Host: agenttools.Host{Timeout: time.Second}}, Journal: &testJournal{}, HTTP: server.Client(), Profile: profile, ResultContract: &contract, ResultInput: &input}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	withoutContract := config
 	withoutContract.ResultContract = nil
 	if _, err := PrepareReadOnly(ctx, brief, digest, withoutContract); !errors.Is(err, ErrInvalidBinding) {
 		t.Fatalf("accepted handoff without resolved schema: %v", err)
+	}
+	for _, value := range []json.RawMessage{json.RawMessage(`"{\"remaining_budget\":3}"`), json.RawMessage(`{"remaining_budget":4}`)} {
+		changed := input
+		changed.Value = value
+		bad := config
+		bad.ResultInput = &changed
+		if _, err := PrepareReadOnly(ctx, brief, digest, bad); !errors.Is(err, ErrInvalidBinding) {
+			t.Fatalf("accepted encoded or tampered input: %v", err)
+		}
+	}
+	changed := input
+	changed.Evidence.EvidenceID = kernel.UUIDv7("00000000-0000-7000-8000-000000000956")
+	bad := config
+	bad.ResultInput = &changed
+	if _, err := PrepareReadOnly(ctx, brief, digest, bad); !errors.Is(err, ErrInvalidBinding) {
+		t.Fatalf("accepted unadmitted input: %v", err)
 	}
 	session, err := PrepareReadOnly(ctx, brief, digest, config)
 	if err != nil {

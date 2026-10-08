@@ -222,6 +222,22 @@ func (s *Store) AdvanceFeature(ctx context.Context, next organization.FeatureReq
 	}
 	defer session.EndSession(ctx)
 	_, err = session.WithTransaction(ctx, func(transactionContext context.Context) (any, error) {
+		// Amendment transitions require graph/invocation/budget fences. The
+		// generic feature CAS must not bypass that dedicated transaction port.
+		var priorDocument featureDocument
+		if loadErr := s.db.Collection("feature_requests").FindOne(transactionContext, bson.D{{Key: "_id", Value: string(next.ID)}, {Key: "revision", Value: expectedRevision}}).Decode(&priorDocument); loadErr != nil {
+			if errors.Is(loadErr, driver.ErrNoDocuments) {
+				return nil, organization.ErrFeatureRevisionConflict
+			}
+			return nil, loadErr
+		}
+		prior, loadErr := decodeFeature(priorDocument)
+		if loadErr != nil {
+			return nil, loadErr
+		}
+		if !reflect.DeepEqual(prior.PlanAmendment, next.PlanAmendment) || prior.PlanAmendment != nil && !reflect.DeepEqual(prior.Plan, next.Plan) {
+			return nil, organization.ErrPlanAmendment
+		}
 		result, updateErr := s.db.Collection("feature_requests").UpdateOne(transactionContext, bson.D{{Key: "_id", Value: string(next.ID)}, {Key: "revision", Value: expectedRevision}}, bson.D{{Key: "$set", Value: bson.D{{Key: "revision", Value: next.Revision}, {Key: "status", Value: next.Status}, {Key: "updated_at", Value: next.UpdatedAt}, {Key: "data", Value: raw}}}})
 		if updateErr != nil {
 			return nil, updateErr

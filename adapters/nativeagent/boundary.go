@@ -141,7 +141,7 @@ func (boundary *Boundary) ensure(ctx context.Context, brief application.Executio
 	if err != nil {
 		return application.ExternalExecutionObservation{}, err
 	}
-	if observed, terminal, err := observeJournal(brief, digest, entries); err != nil || terminal {
+	if observed, terminal, err := boundary.observeJournal(ctx, brief, digest, entries); err != nil || terminal {
 		return observed, err
 	}
 	// Reserve the local slot BEFORE Claim/Configure. In particular, waking
@@ -195,7 +195,7 @@ func (boundary *Boundary) ensure(ctx context.Context, brief application.Executio
 		if err != nil {
 			return application.ExternalExecutionObservation{}, err
 		}
-		observed, _, err := observeJournal(brief, digest, entries)
+		observed, _, err := boundary.observeJournal(ctx, brief, digest, entries)
 		return observed, err
 	}
 	config, err := boundary.Configure(ctx, brief)
@@ -225,7 +225,7 @@ func (boundary *Boundary) ensure(ctx context.Context, brief application.Executio
 		if err != nil {
 			return application.ExternalExecutionObservation{}, err
 		}
-		observed, _, err := observeJournal(brief, digest, entries)
+		observed, _, err := boundary.observeJournal(ctx, brief, digest, entries)
 		return observed, err
 	}
 	// Prepare again in the worker so its binding is checked at the moment of
@@ -485,7 +485,13 @@ func (boundary *Boundary) recordTerminalPayload(brief application.ExecutionBrief
 			}
 		}
 	}
-	if _, terminal, err := observeJournalWithPrompt(brief, digest, entries, strictPrompt); err != nil || terminal {
+	var terminal bool
+	if strictPrompt {
+		_, terminal, err = boundary.observeJournal(ctx, brief, digest, entries)
+	} else {
+		_, terminal, err = observeJournalWithPrompt(brief, digest, entries, false)
+	}
+	if err != nil || terminal {
 		return err
 	}
 	if _, err := boundary.Journal.Append(ctx, string(brief.InvocationID), entries[len(entries)-1].Sequence, kind, payload); err != nil {
@@ -533,6 +539,37 @@ func validBoundaryRequest(brief application.ExecutionBrief, digest kernel.Digest
 
 func observeJournal(brief application.ExecutionBrief, digest kernel.Digest, entries []agentruntime.Entry) (application.ExternalExecutionObservation, bool, error) {
 	return observeJournalWithPrompt(brief, digest, entries, true)
+}
+
+func (boundary *Boundary) observeJournal(ctx context.Context, brief application.ExecutionBrief, digest kernel.Digest, entries []agentruntime.Entry) (application.ExternalExecutionObservation, bool, error) {
+	if len(entries) == 0 || brief.MessageHandler != nil || brief.ResultProtocol == nil {
+		return observeJournal(brief, digest, entries)
+	}
+	var start struct {
+		RequestDigest string `json:"request_digest"`
+		Prompt        string `json:"prompt"`
+	}
+	encoded, err := json.Marshal(brief)
+	if err != nil || entries[0].Kind != agentruntime.Started || json.Unmarshal(entries[0].Payload, &start) != nil || start.RequestDigest != string(digest) {
+		return application.ExternalExecutionObservation{}, false, ErrInvalidBinding
+	}
+	if nativePromptMatchesBrief(brief, digest, encoded, start.Prompt) {
+		return observeJournal(brief, digest, entries)
+	}
+	if boundary.Configure == nil {
+		return application.ExternalExecutionObservation{}, false, ErrInvalidBinding
+	}
+	config, err := boundary.Configure(ctx, brief)
+	if err != nil {
+		return application.ExternalExecutionObservation{}, false, err
+	}
+	expected, err := nativeProtocolPrompt(brief, digest, config.ResultContract, config.ResultInput)
+	if err != nil || expected != start.Prompt {
+		return application.ExternalExecutionObservation{}, false, errors.Join(ErrInvalidBinding, err)
+	}
+	// Only prompt comparison has been satisfied by the exact server-resolved
+	// constructor above. Sequence, invocation and terminal validation stay on.
+	return observeJournalWithPrompt(brief, digest, entries, false)
 }
 
 func observeJournalWithPrompt(brief application.ExecutionBrief, digest kernel.Digest, entries []agentruntime.Entry, strictPrompt bool) (application.ExternalExecutionObservation, bool, error) {

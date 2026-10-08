@@ -1,13 +1,50 @@
 package nativeagent
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"slices"
 
 	"github.com/tekroo-ai/teams/application"
 	"github.com/tekroo-ai/teams/kernel"
 )
 
 const nativeResultGuidance = "Use the submit_result tool's parameter schema for the fields you author. Teams supplies the fixed outer schema_version in the stored signed envelope; omit that outer field from the tool call. The handler result_schema describes the assembled result and may include Teams-supplied fields."
+
+// The same constructor is used at session creation and boundary inspection.
+// Contract metadata is supplied by the server resolver, never reconstructed
+// from an untrusted prompt. Nested input remains raw JSON bound to evidence.
+func nativeProtocolPrompt(brief application.ExecutionBrief, digest kernel.Digest, contract *ResultContract, input *ResultInput) (string, error) {
+	if brief.MessageHandler != nil || brief.ResultProtocol == nil {
+		return "", ErrInvalidBinding
+	}
+	if contract != nil {
+		if !contract.validFor(brief) {
+			return "", ErrInvalidBinding
+		}
+	} else if _, _, valid := nativeValidationResult(brief); !valid {
+		return "", ErrInvalidBinding
+	}
+	if input != nil {
+		sum := sha256.Sum256(input.Value)
+		if contract == nil || len(input.Value) > 1<<20 || !json.Valid(input.Value) || !bytes.HasPrefix(bytes.TrimSpace(input.Value), []byte("{")) || kernel.Digest(hex.EncodeToString(sum[:])) != input.Evidence.SHA256 || !slices.Contains(brief.Evidence, input.Evidence) {
+			return "", ErrInvalidBinding
+		}
+	}
+	nativeBrief := brief
+	protocol := *brief.ResultProtocol
+	protocol.Instruction = "Call submit_result once with a JSON object matching its tool schema. Do not JSON-encode the object in a string or call OpenHands finish. Teams validates the structured result before advancing."
+	nativeBrief.ResultProtocol = &protocol
+	adapted, err := json.Marshal(struct {
+		SourceRequestDigest kernel.Digest              `json:"source_request_digest"`
+		ExecutionBrief      application.ExecutionBrief `json:"execution_brief"`
+		ResultContract      *ResultContract            `json:"result_contract,omitempty"`
+		ResultInput         *ResultInput               `json:"result_input,omitempty"`
+	}{digest, nativeBrief, contract, input})
+	return string(adapted), err
+}
 
 func nativeHandlerPrompt(brief application.ExecutionBrief, digest kernel.Digest, encoded []byte, planFinalization bool) (string, error) {
 	guidance := nativeResultGuidance

@@ -1,0 +1,25 @@
+{
+  "additions": [
+    "content-addressed role charters",
+    "per-role message handler bindings",
+    "handler result authority",
+    "idle timeout without organizational work"
+  ],
+  "compatibility": "ADDITIVE",
+  "contractName": "tekroo.kernel.contracts",
+  "contractVersion": "0.12.0",
+  "directions": {
+    "adapter": "ROLE_BUNDLE_V1_COMPATIBILITY_ADAPTER_REQUIRED",
+    "reader": "COMPATIBLE",
+    "writer": "SUCCESSOR_IDENTITY_REQUIRED"
+  },
+  "predecessor": {
+    "contractName": "tekroo.kernel.contracts",
+    "contractVersion": "0.11.0",
+    "manifestSha256": "85306c8edc703e85df502280642ef30161e16b8e82ff48f568c5a5c6d421f12d"
+  },
+  "preserved": [
+    "all 0.11.0 workflow, kernel, organization, federation, task, story, budget, execution, OpenHands, and SMA boundaries"
+  ],
+  "schemaVersion": "1.0.0"
+}

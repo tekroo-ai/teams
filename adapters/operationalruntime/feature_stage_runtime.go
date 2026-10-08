@@ -996,11 +996,25 @@ func featurePlanningDescription(feature organization.FeatureRequest, stage featu
 	if err != nil {
 		return "", err
 	}
-	description := instruction + "\n\nAUTHORITATIVE_FEATURE_STATE_JSON:\n" + string(encoded)
+	// Add harness-owned planning checks after the selected workflow instruction,
+	// including successor architecture rounds. Do not modify signed workflows or
+	// mistake model review guidance for a proof of semantic coverage.
+	description := instruction + planningImpactCoverageGuidance(stage) + "\n\nAUTHORITATIVE_FEATURE_STATE_JSON:\n" + string(encoded)
 	if len(description) > 65536 {
 		return "", organization.ErrInvalidFeature
 	}
 	return description, nil
+}
+
+func planningImpactCoverageGuidance(stage featurePlanningStage) string {
+	switch stage {
+	case stageArchitecture:
+		return "\n\nINTERFACE_IMPACT_REVIEW: When changing an existing interface, inspect its concrete production implementers, construction/wiring sites, callers, and existing test doubles. Assign every required compatibility edit to an implementation task whose write_scope includes it, with task-specific verification. Keep each committed handoff usable by its assigned consumer; do not leave a broken interface implementation for an unassigned later task. Prefer one coherent owning task over extra coordination. A scoped component test does not prove that existing callers still compile. State evidence-backed coverage in the existing task descriptions and design decisions; do not add undeclared result fields. This review does not authorize new product behavior."
+	case stagePlanFinalization:
+		return "\n\nINTERFACE_IMPACT_REVIEW: Check the proposal's ownership and write_scope for concrete production implementers, construction/wiring sites, callers, and existing test doubles affected by interface changes. Each required compatibility edit needs an owner and distinguishing verification; each consumer must have its usable dependency upstream. Passing component tests alone do not close this review. If an owner, scope, or usable dependency is missing, report needs_decision with the inspected gap through the bounded design-revision path. Do not silently rewrite technical tasks or widen scope."
+	default:
+		return ""
+	}
 }
 
 func featurePlanningTaskKey(stage featurePlanningStage, architectureRound uint32, reviewedTaskIndex *uint32) string {

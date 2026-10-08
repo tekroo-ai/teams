@@ -297,10 +297,12 @@ func (manager *taskWorkspaceManager) observeComponents(ctx context.Context, root
 			return nil, errors.Join(errInvalidTaskWorkspace, err)
 		}
 		component.Commit, component.Tree = commit, tree
-		if component.InvocationID != "" && (!component.InvocationID.Valid() || !component.OutputSHA256.Valid() || component.Readiness != "CANDIDATE_READY" || !component.ReadinessPolicy.Valid()) {
+		if component.InvocationID != "" && (!component.InvocationID.Valid() || !component.OutputSHA256.Valid() || component.Readiness != "CANDIDATE_READY" && component.Readiness != "BLOCKED_CHECKPOINT" || !component.ReadinessPolicy.Valid()) {
 			return nil, errInvalidTaskWorkspace
 		}
-		component.Exports, err = manager.componentExports(ctx, component, rootBaseline)
+		if component.Readiness != "BLOCKED_CHECKPOINT" {
+			component.Exports, err = manager.componentExports(ctx, component, rootBaseline)
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -541,6 +543,13 @@ func (service *ProductionService) prepareImplementationWorkspace(ctx context.Con
 		wanted[dependencyID] = struct{}{}
 	}
 	components := make([]taskWorkspaceComponent, 0, len(wanted))
+	checkpoint, err := service.amendmentCheckpointComponent(ctx, feature, task)
+	if err != nil {
+		return ProductionWorkspace{}, kernel.EvidenceRef{}, err
+	}
+	if checkpoint != nil {
+		components = append(components, *checkpoint)
+	}
 	for _, dependency := range plan.Tasks {
 		if _, required := wanted[dependency.ID]; !required || dependency.Purpose != kernel.PurposeImplementation && dependency.Purpose != kernel.PurposeRepair {
 			continue
@@ -571,6 +580,11 @@ func (service *ProductionService) prepareImplementationWorkspace(ctx context.Con
 	evidence, err := service.registerTaskWorkspaceReceipt(ctx, feature, receipt)
 	if err != nil {
 		return ProductionWorkspace{}, kernel.EvidenceRef{}, err
+	}
+	if feature.PlanAmendment != nil && feature.PlanAmendment.State == organization.AmendmentApplied {
+		if _, retained := plannedTaskByID(feature.PlanAmendment.PriorPlan, task.ID); !retained {
+			workspace.WritablePaths = append([]string(nil), task.WriteScope...)
+		}
 	}
 	return workspace, evidence, nil
 }

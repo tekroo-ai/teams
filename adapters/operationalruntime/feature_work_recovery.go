@@ -8,6 +8,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/tekroo-ai/teams/application"
 	"github.com/tekroo-ai/teams/kernel"
 	"github.com/tekroo-ai/teams/organization"
 )
@@ -17,15 +18,70 @@ func (service *ProductionService) reconcilePlannedFeatureWork(ctx context.Contex
 	if err != nil {
 		return err
 	}
+	return reconcileFeatureBatch(ctx, features, service.reconcileFeaturePlan)
+}
+
+func reconcileFeatureBatch(ctx context.Context, features []organization.FeatureRequest, reconcile func(context.Context, organization.FeatureRequest, organization.FeaturePlan) error) error {
+	var faults []error
 	for _, feature := range features {
-		if feature.Plan == nil {
-			return organization.ErrInvalidFeature
+		if err := ctx.Err(); err != nil {
+			return errors.Join(append(faults, err)...)
 		}
-		if err := service.reconcileFeaturePlan(ctx, feature, *feature.Plan); err != nil {
-			return fmt.Errorf("feature %s: %w", feature.ID, err)
+		if feature.Plan == nil {
+			faults = append(faults, fmt.Errorf("feature %s: %w", feature.ID, organization.ErrInvalidFeature))
+			continue
+		}
+		if err := reconcile(ctx, feature, *feature.Plan); err != nil {
+			faults = append(faults, fmt.Errorf("feature %s: %w", feature.ID, err))
 		}
 	}
-	return nil
+	return errors.Join(faults...)
+}
+
+func (service *ProductionService) reconcileCompletionsAfterConsultationRejection(ctx context.Context, feature organization.FeatureRequest, plan organization.FeaturePlan, states map[kernel.UUIDv7]kernel.AggregateState, heads map[kernel.UUIDv7]kernel.UUIDv7, invocations map[kernel.UUIDv7]kernel.WorkInvocation, snapshot kernel.Snapshot) (bool, error) {
+	eligible, err := completionInvocationsWithoutOpenQuestions(ctx, plan, invocations, service.Runtime.ReadExecutionOutput)
+	if err != nil {
+		return false, err
+	}
+	return service.reconcileTaskCompletionsWithAdmission(ctx, feature, plan, states, heads, eligible, snapshot, false)
+}
+
+func preserveTerminalResultsOnConsultationFault(fault error, reconcile func() (bool, error)) error {
+	var rejected *deterministicCommandRejection
+	if !errors.As(fault, &rejected) || rejected.CommandType != "tekroo.command.task.bind-work-profile" || !rejected.Receipt.CommandID.Valid() || rejected.Receipt.StateChanged {
+		return fault
+	}
+	_, completionErr := reconcile()
+	return errors.Join(fault, completionErr)
+}
+
+func completionInvocationsWithoutOpenQuestions(ctx context.Context, plan organization.FeaturePlan, invocations map[kernel.UUIDv7]kernel.WorkInvocation, readOutput func(context.Context, kernel.Digest) ([]byte, error)) (map[kernel.UUIDv7]kernel.WorkInvocation, error) {
+	eligible := make(map[kernel.UUIDv7]kernel.WorkInvocation, len(invocations))
+	for id, inv := range invocations {
+		eligible[id] = inv
+	}
+	for _, task := range plan.Tasks {
+		inv, found := invocations[task.ID]
+		if !found || task.Purpose != kernel.PurposeImplementation || inv.State != kernel.InvocationSucceeded || inv.OutputDigest == nil {
+			continue
+		}
+		output, err := readOutput(ctx, *inv.OutputDigest)
+		if err != nil {
+			return nil, fmt.Errorf("read task %s pending question: %w", task.ID, err)
+		}
+		if digestBytes(output) != *inv.OutputDigest {
+			return nil, fmt.Errorf("task %s pending-question output digest: %w", task.ID, application.ErrInvalidOperationalExecution)
+		}
+		_, outcome, reported := reportedTaskNonCompletion(output)
+		if reported && outcome == "needs_decision" {
+			// A partially applied continuation may already have unblocked this
+			// task. Reprocessing its old question would re-block it or complete it
+			// before advisory recovery finishes. Leave both it and its consumers
+			// to the normal consultation/recovery path; never mutate the source map.
+			delete(eligible, task.ID)
+		}
+	}
+	return eligible, nil
 }
 
 func (service *ProductionService) reconcileFeaturePlan(ctx context.Context, feature organization.FeatureRequest, plan organization.FeaturePlan) error {
@@ -33,6 +89,9 @@ func (service *ProductionService) reconcileFeaturePlan(ctx context.Context, feat
 		return nil
 	}
 	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if handled, err := service.reconcilePlanAmendment(ctx, feature); handled || err != nil {
 		return err
 	}
 	planBytes, err := json.Marshal(plan)
@@ -109,8 +168,14 @@ func (service *ProductionService) reconcileFeaturePlan(ctx context.Context, feat
 	// Resume a partially applied clarification recovery before processing its
 	// original needs_decision output again. The consultation is identity-bound
 	// and cannot be reused by a later invocation of the same task.
-	if changed, err := service.reconcileTaskConsultations(ctx, feature, plan, states, invocations); err != nil || changed {
-		return err
+	if changed, err := service.reconcileTaskConsultations(ctx, feature, plan, states, invocations); err != nil {
+		// Preserve the original receipt-backed fault. Unknown store/transport
+		// outcomes never permit this terminal-only fallback.
+		return preserveTerminalResultsOnConsultationFault(err, func() (bool, error) {
+			return service.reconcileCompletionsAfterConsultationRejection(ctx, feature, plan, states, heads, invocations, snapshot)
+		})
+	} else if changed {
+		return nil
 	}
 	completed, err := service.reconcileTaskCompletions(ctx, feature, plan, states, heads, invocations, snapshot)
 	if err != nil {
@@ -261,6 +326,10 @@ func (service *ProductionService) reconcileFeaturePlan(ctx context.Context, feat
 				}
 				return err
 			}
+		}
+		taskEvidence, err = amendmentSuccessorEvidence(feature, item, snapshot, taskEvidence)
+		if err != nil {
+			return err
 		}
 		sort.Slice(taskEvidence, func(left, right int) bool { return taskEvidence[left].EvidenceID < taskEvidence[right].EvidenceID })
 		if err := service.activateTask(ctx, feature, tracked, profileConfig, workspace, budget.Revision, dependencyEvents, taskEvidence, evidenceID, conditionDigests); err != nil {

@@ -55,6 +55,12 @@ const (
 )
 
 func (service *ProductionService) reconcileTaskCompletions(ctx context.Context, feature organization.FeatureRequest, plan organization.FeaturePlan, states map[kernel.UUIDv7]kernel.AggregateState, heads map[kernel.UUIDv7]kernel.UUIDv7, invocations map[kernel.UUIDv7]kernel.WorkInvocation, snapshot kernel.Snapshot) (bool, error) {
+	return service.reconcileTaskCompletionsWithAdmission(ctx, feature, plan, states, heads, invocations, snapshot, true)
+}
+
+// Terminal-only reconciliation preserves findings and completion receipts while
+// a known admission fault is unresolved. It must not create repair/glitch work.
+func (service *ProductionService) reconcileTaskCompletionsWithAdmission(ctx context.Context, feature organization.FeatureRequest, plan organization.FeaturePlan, states map[kernel.UUIDv7]kernel.AggregateState, heads map[kernel.UUIDv7]kernel.UUIDv7, invocations map[kernel.UUIDv7]kernel.WorkInvocation, snapshot kernel.Snapshot, admitNewWork bool) (bool, error) {
 	for _, task := range plan.Tasks {
 		state := states[task.ID]
 		invocation, found := invocations[task.ID]
@@ -75,7 +81,7 @@ func (service *ProductionService) reconcileTaskCompletions(ctx context.Context, 
 		}
 		return blocked, nil
 	}
-	promotionChanged, err := service.reconcilePromotionCompletion(ctx, feature, plan, states, heads, invocations, snapshot)
+	promotionChanged, err := service.reconcilePromotionCompletion(ctx, feature, plan, states, heads, invocations, snapshot, admitNewWork)
 	if err != nil || promotionChanged {
 		return promotionChanged, err
 	}
@@ -160,7 +166,7 @@ func (service *ProductionService) reconcileTaskCompletions(ctx context.Context, 
 			err = service.validateCandidateResult(ctx, task, snapshot, result)
 		}
 		if err != nil {
-			authorized, retryErr := service.handleInvalidStructuredTaskOutput(ctx, feature, task, states[task.ID], heads[task.ID], invocation, snapshot, conditionDigests)
+			authorized, retryErr := service.handleInvalidStructuredTaskOutput(ctx, feature, task, states[task.ID], heads[task.ID], invocation, snapshot, conditionDigests, admitNewWork)
 			if retryErr != nil {
 				return false, fmt.Errorf("validator %s invalid-output handling: %w", task.ID, retryErr)
 			}
@@ -236,6 +242,11 @@ func (service *ProductionService) reconcileTaskCompletions(ctx context.Context, 
 			return false, fmt.Errorf("finalize task %s review: %w", target.ID, err)
 		}
 		if status != "PASS" {
+			if !admitNewWork {
+				// The negative review is durable. Its ordinary recovery path can
+				// authorize repair only after the admission fault is resolved.
+				continue
+			}
 			authorized, repairErr := service.authorizeRepairAfterFailedReview(ctx, feature, target, states[target.ID], heads[target.ID], implementer, validators, snapshot)
 			if repairErr != nil {
 				return false, repairErr
@@ -260,7 +271,7 @@ func (service *ProductionService) reconcileTaskCompletions(ctx context.Context, 
 			changed = true
 		}
 	}
-	featureValidationChanged, err := service.reconcileFeatureValidationCompletion(ctx, feature, plan, states, heads, invocations, snapshot)
+	featureValidationChanged, err := service.reconcileFeatureValidationCompletion(ctx, feature, plan, states, heads, invocations, snapshot, admitNewWork)
 	if err != nil {
 		return changed, err
 	}
@@ -275,7 +286,7 @@ func reportedTaskNonCompletion(output []byte) (reason, outcome string, reported 
 	return "task reported " + outcome + ": " + summary, outcome, true
 }
 
-func (service *ProductionService) reconcileFeatureValidationCompletion(ctx context.Context, feature organization.FeatureRequest, plan organization.FeaturePlan, states map[kernel.UUIDv7]kernel.AggregateState, heads map[kernel.UUIDv7]kernel.UUIDv7, invocations map[kernel.UUIDv7]kernel.WorkInvocation, snapshot kernel.Snapshot) (bool, error) {
+func (service *ProductionService) reconcileFeatureValidationCompletion(ctx context.Context, feature organization.FeatureRequest, plan organization.FeaturePlan, states map[kernel.UUIDv7]kernel.AggregateState, heads map[kernel.UUIDv7]kernel.UUIDv7, invocations map[kernel.UUIDv7]kernel.WorkInvocation, snapshot kernel.Snapshot, admitNewWork bool) (bool, error) {
 	featureValidatorID, found := wholeFeatureValidationTaskID(plan)
 	if !found {
 		return false, nil
@@ -328,7 +339,7 @@ func (service *ProductionService) reconcileFeatureValidationCompletion(ctx conte
 		err = service.validateCandidateResult(ctx, *task, snapshot, result)
 	}
 	if err != nil {
-		return service.handleInvalidStructuredTaskOutput(ctx, feature, *task, state, heads[task.ID], invocation, snapshot, conditionDigests)
+		return service.handleInvalidStructuredTaskOutput(ctx, feature, *task, state, heads[task.ID], invocation, snapshot, conditionDigests, admitNewWork)
 	}
 	if result.Outcome != "PASS" {
 		return service.blockStructuredDecisionTask(ctx, feature, *task, state, invocation, snapshot, "whole-feature validation did not pass: "+strings.Join(result.Reasons, "; "), "whole-feature-validation-not-pass")
@@ -341,7 +352,7 @@ func (service *ProductionService) reconcileFeatureValidationCompletion(ctx conte
 	return true, nil
 }
 
-func (service *ProductionService) reconcilePromotionCompletion(ctx context.Context, feature organization.FeatureRequest, plan organization.FeaturePlan, states map[kernel.UUIDv7]kernel.AggregateState, heads map[kernel.UUIDv7]kernel.UUIDv7, invocations map[kernel.UUIDv7]kernel.WorkInvocation, snapshot kernel.Snapshot) (bool, error) {
+func (service *ProductionService) reconcilePromotionCompletion(ctx context.Context, feature organization.FeatureRequest, plan organization.FeaturePlan, states map[kernel.UUIDv7]kernel.AggregateState, heads map[kernel.UUIDv7]kernel.UUIDv7, invocations map[kernel.UUIDv7]kernel.WorkInvocation, snapshot kernel.Snapshot, admitNewWork bool) (bool, error) {
 	for _, task := range plan.Tasks {
 		if task.Purpose != kernel.PurposePromotion || len(task.Validates) != 0 || states[task.ID].Phase != kernel.PhaseActive || states[task.ID].Condition != kernel.ConditionRunnable {
 			continue
@@ -359,7 +370,7 @@ func (service *ProductionService) reconcilePromotionCompletion(ctx context.Conte
 			err = service.validateCandidateResult(ctx, task, snapshot, result)
 		}
 		if err != nil {
-			return service.handleInvalidStructuredTaskOutput(ctx, feature, task, states[task.ID], heads[task.ID], invocation, snapshot, nil)
+			return service.handleInvalidStructuredTaskOutput(ctx, feature, task, states[task.ID], heads[task.ID], invocation, snapshot, nil, admitNewWork)
 		}
 		if result.Outcome != "PASS" {
 			return service.blockStructuredDecisionTask(ctx, feature, task, states[task.ID], invocation, snapshot, "product acceptance did not pass: "+strings.Join(result.Reasons, "; "), "promotion-not-pass")
@@ -375,13 +386,16 @@ func (service *ProductionService) reconcilePromotionCompletion(ctx context.Conte
 	return false, nil
 }
 
-func (service *ProductionService) handleInvalidStructuredTaskOutput(ctx context.Context, feature organization.FeatureRequest, task organization.PlannedTask, state kernel.AggregateState, head kernel.UUIDv7, invocation kernel.WorkInvocation, snapshot kernel.Snapshot, conditionDigests []kernel.Digest) (bool, error) {
+func (service *ProductionService) handleInvalidStructuredTaskOutput(ctx context.Context, feature organization.FeatureRequest, task organization.PlannedTask, state kernel.AggregateState, head kernel.UUIDv7, invocation kernel.WorkInvocation, snapshot kernel.Snapshot, conditionDigests []kernel.Digest, admitNewWork bool) (bool, error) {
 	if state.Phase != kernel.PhaseActive || invocation.State != kernel.InvocationSucceeded || invocation.OutputDigest == nil {
 		return false, organization.ErrInvalidFeature
 	}
 	_ = conditionDigests
 	if featureValidationAtCeiling(feature, snapshot, service.clock.Now().UTC()) {
 		return service.blockStructuredDecisionTask(ctx, feature, task, state, invocation, snapshot, validationTimeCeilingReason, "validation-time-ceiling")
+	}
+	if !admitNewWork {
+		return service.blockStructuredDecisionTask(ctx, feature, task, state, invocation, snapshot, invalidStructuredOutputReason, "invalid-structured-output")
 	}
 	retried, err := service.authorizeStructuredOutputGlitchRetry(ctx, feature, task, state, head, invocation, snapshot)
 	if err != nil {

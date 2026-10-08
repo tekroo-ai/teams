@@ -1,0 +1,27 @@
+{
+  "additions": [
+    "immutable architect design candidate",
+    "PM-owned executable plan",
+    "explicit cross-task capability handoffs",
+    "explicit PM decision-request block"
+  ],
+  "compatibility": "ADDITIVE_OPT_IN",
+  "contractName": "tekroo.kernel.contracts",
+  "contractVersion": "0.13.0",
+  "directions": {
+    "adapter": "LEGACY_ARCHITECT_PLAN_PATH_PRESERVED",
+    "reader": "COMPATIBLE",
+    "writer": "WORKFLOW_2_0_0_REQUIRED"
+  },
+  "predecessor": {
+    "contractName": "tekroo.kernel.contracts",
+    "contractVersion": "0.12.0",
+    "manifestSha256": "7622432bd06e6ba93174efa1a92d31cd56522654248a126c91023f42519ce5f3"
+  },
+  "preserved": [
+    "0.12.0 workflow and role-handler semantics for already-admitted instances",
+    "kernel event and command identities",
+    "SMA boundary"
+  ],
+  "schemaVersion": "1.0.0"
+}

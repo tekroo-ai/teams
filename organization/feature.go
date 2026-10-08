@@ -123,6 +123,7 @@ type FeatureRequest struct {
 	DesignRevision          *FeatureDesignRevision          `json:"design_revision,omitempty"`
 	Plan                    *FeaturePlan                    `json:"plan,omitempty"`
 	PlanSupersession        *FeaturePlanSupersession        `json:"plan_supersession,omitempty"`
+	PlanAmendment           *FeaturePlanAmendment           `json:"plan_amendment,omitempty"`
 	Acceptance              *FeatureAcceptance              `json:"acceptance,omitempty"`
 }
 
@@ -134,6 +135,9 @@ func (feature FeatureRequest) Validate() error {
 		return ErrInvalidFeature
 	}
 	if feature.PlanSupersession != nil && feature.PlanSupersession.Validate(feature) != nil {
+		return ErrInvalidFeature
+	}
+	if feature.PlanAmendment != nil && feature.PlanAmendment.Validate(feature) != nil {
 		return ErrInvalidFeature
 	}
 	if (feature.Status == FeatureSpecified || feature.Status == FeatureDesigned) && feature.Plan != nil && feature.PlanSupersession == nil {

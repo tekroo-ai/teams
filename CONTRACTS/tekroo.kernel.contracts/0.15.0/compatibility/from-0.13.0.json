@@ -1,0 +1,26 @@
+{
+  "additions": [
+    "optional workflow nodes and durable SKIP transition",
+    "one PM-requested architect revision with immutable decision receipt",
+    "terminal block on a second PM decision"
+  ],
+  "compatibility": "ADDITIVE_OPT_IN",
+  "contractName": "tekroo.kernel.contracts",
+  "contractVersion": "0.14.0",
+  "directions": {
+    "adapter": "WORKFLOW_2_0_0_DECISION_BLOCK_PRESERVED",
+    "reader": "COMPATIBLE",
+    "writer": "WORKFLOW_2_1_0_REQUIRED"
+  },
+  "predecessor": {
+    "contractName": "tekroo.kernel.contracts",
+    "contractVersion": "0.13.0",
+    "manifestSha256": "4f29f9bbf8f855e5309c6202526432cd0f483af6a094785ef8f90ba2265139de"
+  },
+  "preserved": [
+    "0.13.0 workflow and role-handler semantics for already-admitted instances",
+    "kernel event and command identities",
+    "SMA boundary"
+  ],
+  "schemaVersion": "1.0.0"
+}

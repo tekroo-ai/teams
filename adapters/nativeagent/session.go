@@ -3,6 +3,7 @@
 package nativeagent
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -54,6 +55,9 @@ type Config struct {
 	SemanticContext   agentruntime.SemanticContextProvider
 	EvidenceReader    EvidenceReader
 	ResultContract    *ResultContract
+	// ResultInput is a coordinator-resolved raw object, admitted by evidence
+	// identity. Never embed a structured handoff as a JSON-valued string.
+	ResultInput *ResultInput
 	// Candidate is resolved by Teams from the immutable workspace binding, not
 	// supplied by the model. It binds a validation result to the exact receipt.
 	Candidate *CandidateBinding
@@ -68,6 +72,11 @@ type Config struct {
 	ValidateFinalResult func(context.Context, []byte) error
 	HTTP                *http.Client
 	Profile             Profile
+}
+
+type ResultInput struct {
+	Evidence kernel.EvidenceRef `json:"evidence"`
+	Value    json.RawMessage    `json:"value"`
 }
 
 type CandidateBinding struct {
@@ -134,6 +143,12 @@ func prepare(ctx context.Context, brief application.ExecutionBrief, requestDiges
 	}
 	if config.ResultContract != nil && (brief.MessageHandler != nil || brief.ResultProtocol == nil || brief.ResultProtocol.Marker != application.OrganizationalResultMarker) {
 		return Session{}, ErrInvalidBinding
+	}
+	if input := config.ResultInput; input != nil {
+		sum := sha256.Sum256(input.Value)
+		if config.ResultContract == nil || len(input.Value) > 1<<20 || !json.Valid(input.Value) || !bytes.HasPrefix(bytes.TrimSpace(input.Value), []byte("{")) || kernel.Digest(hex.EncodeToString(sum[:])) != input.Evidence.SHA256 || !slices.Contains(brief.Evidence, input.Evidence) {
+			return Session{}, ErrInvalidBinding
+		}
 	}
 	if candidate := config.Candidate; candidate != nil {
 		if !candidate.ID.Valid() || !candidate.ReceiptSHA256.Valid() ||
@@ -344,19 +359,11 @@ func prepare(ctx context.Context, brief application.ExecutionBrief, requestDiges
 		definitions = append(definitions, definition)
 		// Only the transport instruction changes. Preserve the authenticated
 		// source brief digest alongside the exact model-visible adaptation.
-		nativeBrief := brief
-		protocol := *brief.ResultProtocol
-		protocol.Instruction = "Call submit_result once with a JSON object matching its tool schema. Do not JSON-encode the object in a string or call OpenHands finish. Teams validates the structured result before advancing."
-		nativeBrief.ResultProtocol = &protocol
-		adapted, err := json.Marshal(struct {
-			SourceRequestDigest kernel.Digest              `json:"source_request_digest"`
-			ExecutionBrief      application.ExecutionBrief `json:"execution_brief"`
-			ResultContract      *ResultContract            `json:"result_contract,omitempty"`
-		}{SourceRequestDigest: requestDigest, ExecutionBrief: nativeBrief, ResultContract: config.ResultContract})
+		adapted, err := nativeProtocolPrompt(brief, requestDigest, config.ResultContract, config.ResultInput)
 		if err != nil {
 			return Session{}, err
 		}
-		prompt = string(adapted)
+		prompt = adapted
 	}
 	model := agentruntime.OpenAIModel{
 		Client: config.HTTP, BaseURL: profile.BaseURL, Model: profile.Model,

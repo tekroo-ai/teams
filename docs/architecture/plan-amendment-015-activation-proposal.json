@@ -1,0 +1,40 @@
+{
+  "status": "PROPOSED_NOT_ACCEPTED",
+  "manifest_file": "CONTRACTS/tekroo.kernel.contracts/0.15.0/manifest.json",
+  "policy": {
+    "contract_version": "0.15.0",
+    "manifest_digest": "d32a5c9953c74f798859bbb821fa57b360bfc123f066ec10a9504fc4538a9012",
+    "authority": {
+      "kind": "POLICY",
+      "id": "teams-admission-policy"
+    },
+    "allowed_roots": [
+      "adapters",
+      "agentruntime",
+      "agenttools",
+      "application",
+      "benchmarks",
+      "cmd",
+      "config",
+      "contract",
+      "docs",
+      "eventexport",
+      "examples",
+      "internal",
+      "kernel",
+      "organization",
+      "promptpolicy",
+      "scripts",
+      "testdata"
+    ]
+  },
+  "limits": {
+    "assessments_per_feature": 1,
+    "approval": "Independent deterministic policy validation, never PM self-approval",
+    "scope": "Only exact inspected paths declared in successor task scopes and impact records, within the listed repository roots",
+    "preserve": "Accepted specification and technical design, completed and active work, immutable history, remaining finite task attempts and feature budgets/deadline",
+    "failure": "Rejected, expired, failed or second amendment requires the operator; no repeated PM assessment"
+  },
+  "activation": "Separate exact principal acceptance required; this file is not an acceptance receipt",
+  "qualification": "Fresh isolated live-model run; preserve r54"
+}
