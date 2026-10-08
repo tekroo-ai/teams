@@ -89,6 +89,11 @@ func (coordinator *OperationalExecutionCoordinator) Process(ctx context.Context,
 	if current.Invocation.AuthorizationEventID != intent.EventID {
 		return OperationalExecutionResult{}, ErrInvalidOperationalExecution
 	}
+	return coordinator.processCurrent(ctx, current, intent)
+}
+
+func (coordinator *OperationalExecutionCoordinator) processCurrent(ctx context.Context, current OperationalExecutionContext, intent kernel.OutboxIntent) (OperationalExecutionResult, error) {
+	var err error
 	claimedThisCall := false
 	for transitions := 0; transitions < 5; transitions++ {
 		invocation := current.Invocation
@@ -227,6 +232,26 @@ func (coordinator *OperationalExecutionCoordinator) Process(ctx context.Context,
 		}
 	}
 	return OperationalExecutionResult{InvocationID: current.Invocation.ID, State: current.Invocation.State}, ErrInvalidOperationalExecution
+}
+
+// ReconcileRequestedCancellation drains only a durably cancelled STARTED
+// invocation. It never admits, claims, starts or retries an invocation. This
+// path remains available while normal outbox admission is paused.
+func (coordinator *OperationalExecutionCoordinator) ReconcileRequestedCancellation(ctx context.Context, id kernel.UUIDv7) (OperationalExecutionResult, error) {
+	if err := ctx.Err(); err != nil {
+		return OperationalExecutionResult{}, err
+	}
+	current, err := coordinator.reader.LoadOperationalExecution(ctx, id)
+	if err != nil {
+		return OperationalExecutionResult{}, err
+	}
+	inv := current.Invocation
+	if inv.CancellationRequestedAt == nil || (!inv.State.Terminal() && inv.State != kernel.InvocationStarted) {
+		return OperationalExecutionResult{}, ErrInvalidOperationalExecution
+	}
+	// STARTED returns directly after an observation; no authorization intent is
+	// needed. Terminal replay also returns without any provider call.
+	return coordinator.processCurrent(ctx, current, kernel.OutboxIntent{})
 }
 
 func validateHandlerObservation(brief ExecutionBrief, observation ExternalExecutionObservation) ExternalExecutionObservation {

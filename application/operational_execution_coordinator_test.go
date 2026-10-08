@@ -643,6 +643,67 @@ func TestOperationalCoordinatorHonorsDurableCancellationAndRecordsTerminalEviden
 	}
 }
 
+func TestOperationalCoordinatorReconcilesRequestedCancellationWithoutAdmission(t *testing.T) {
+	runtime := newOperationalRuntime(t)
+	runtime.applyClaim(t)
+	runtime.applyStarted(t)
+	requestedAt := runtime.clock.Now()
+	runtime.context.Invocation.CancellationRequestedAt = &requestedAt
+	runtime.context.Invocation.Revision++
+	runtime.context.Invocation.LastEventID = testUUID(905)
+	runtime.cancelState = ExternalCancelled
+	coordinator := newTestOperationalCoordinator(t, runtime)
+	result, err := coordinator.ReconcileRequestedCancellation(t.Context(), runtime.context.Invocation.ID)
+	if err != nil || result.State != kernel.InvocationCancelled || runtime.context.Invocation.FinishedAt == nil {
+		t.Fatalf("result=%+v invocation=%+v err=%v", result, runtime.context.Invocation, err)
+	}
+	if runtime.startCalls != 0 || runtime.inspectCalls != 0 || runtime.cancelCalls != 1 {
+		t.Fatalf("start=%d inspect=%d cancel=%d", runtime.startCalls, runtime.inspectCalls, runtime.cancelCalls)
+	}
+	if _, err := coordinator.ReconcileRequestedCancellation(t.Context(), runtime.context.Invocation.ID); err != nil {
+		t.Fatal(err)
+	}
+	if runtime.cancelCalls != 1 {
+		t.Fatalf("terminal replay repeated cancellation: %d", runtime.cancelCalls)
+	}
+}
+
+func TestOperationalCoordinatorCancellationDrainRejectsUnrequestedOrUnstartedWork(t *testing.T) {
+	for _, started := range []bool{false, true} {
+		runtime := newOperationalRuntime(t)
+		if started {
+			runtime.applyClaim(t)
+			runtime.applyStarted(t)
+		} else {
+			at := runtime.clock.Now()
+			runtime.context.Invocation.CancellationRequestedAt = &at
+		}
+		coordinator := newTestOperationalCoordinator(t, runtime)
+		if _, err := coordinator.ReconcileRequestedCancellation(t.Context(), runtime.context.Invocation.ID); !errors.Is(err, ErrInvalidOperationalExecution) {
+			t.Fatalf("started=%v err=%v", started, err)
+		}
+		if runtime.startCalls != 0 || runtime.inspectCalls != 0 || runtime.cancelCalls != 0 {
+			t.Fatal("drain crossed admission boundary")
+		}
+	}
+}
+
+func TestOperationalCoordinatorCancellationDrainPreservesFinishedSuccess(t *testing.T) {
+	runtime := newOperationalRuntime(t)
+	runtime.applyClaim(t)
+	runtime.applyStarted(t)
+	at := runtime.clock.Now()
+	runtime.context.Invocation.CancellationRequestedAt = &at
+	runtime.context.Invocation.Revision++
+	runtime.context.Invocation.LastEventID = testUUID(905)
+	runtime.cancelState = ExternalSucceeded
+	coordinator := newTestOperationalCoordinator(t, runtime)
+	result, err := coordinator.ReconcileRequestedCancellation(t.Context(), runtime.context.Invocation.ID)
+	if err != nil || result.State != kernel.InvocationSucceeded || runtime.startCalls != 0 {
+		t.Fatalf("finished work overwritten: %+v %v", result, err)
+	}
+}
+
 func TestOperationalCoordinatorRecordsDeadlineCancellationAsRetryableTimeout(t *testing.T) {
 	runtime := newOperationalRuntime(t)
 	runtime.applyClaim(t)

@@ -133,7 +133,7 @@ func (host Host) runIsolatedGoTestsFrom(ctx context.Context, root, pattern strin
 	if err != nil {
 		return result, err
 	}
-	arguments := []string{"-p", profile, goBinary, "test", "-count=1"}
+	arguments := []string{"-p", profile, goBinary, "test", "-trimpath", "-count=1"}
 	if compileOnly {
 		// -run '^$' still executes init/TestMain. Compile-only means -c: no
 		// candidate executable or test initializer is run, even with side effects.
@@ -233,7 +233,7 @@ func boundedWorkspace(root string) error {
 		}
 		count++
 		if count > maxTestWorkspaceFiles {
-			return ErrTooLarge
+			return fmt.Errorf("workspace entry quota: %d exceeds %d: %w", count, maxTestWorkspaceFiles, ErrTooLarge)
 		}
 		if entry.IsDir() {
 			return nil
@@ -246,7 +246,7 @@ func boundedWorkspace(root string) error {
 			return err
 		}
 		if info.Size() > maxTestWorkspaceBytes-bytes {
-			return ErrTooLarge
+			return fmt.Errorf("workspace byte quota: %d exceeds %d: %w", bytes+info.Size(), int64(maxTestWorkspaceBytes), ErrTooLarge)
 		}
 		bytes += info.Size()
 		return nil

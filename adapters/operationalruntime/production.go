@@ -1837,6 +1837,12 @@ func (service *ProductionService) runFeatureRecovery(ctx context.Context) error 
 		} else {
 			service.clearRecoveryFault("runtime-continuity")
 		}
+		// Cancellation settles existing work without opening the admission gate.
+		// It must survive a pause or daemon replacement and must not run feature
+		// retries, candidate gates or successor dispatch.
+		operationContext, stopCancellation := context.WithTimeout(ctx, service.recoveryTimeout)
+		service.recordFeatureRecoveryOutcome("invocation-cancellation", service.reconcileRequestedCancellations(operationContext))
+		stopCancellation()
 		if !service.featureExecutionPaused() {
 			operationContext, cancel := service.featureRecoveryOperationContext(ctx)
 			service.recordFeatureRecoveryOutcome("feature-planning", service.reconcileFeaturePlanning(operationContext))

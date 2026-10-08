@@ -74,3 +74,23 @@ func (service *ProductionService) RequestInvocationCancellation(ctx context.Cont
 	}
 	return updated, nil
 }
+
+func (service *ProductionService) reconcileRequestedCancellations(ctx context.Context) error {
+	if service == nil || service.Store == nil || service.Runtime == nil || service.Runtime.coordinator == nil {
+		return application.ErrInvalidConfiguration
+	}
+	ids, err := service.Store.ListRequestedInvocationCancellations(ctx)
+	if err != nil {
+		return err
+	}
+	var faults error
+	for _, id := range ids {
+		if err := ctx.Err(); err != nil {
+			return errors.Join(faults, err)
+		}
+		if _, err := service.Runtime.coordinator.ReconcileRequestedCancellation(ctx, id); err != nil {
+			faults = errors.Join(faults, err)
+		}
+	}
+	return faults
+}

@@ -9,6 +9,38 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
+// ListRequestedInvocationCancellations is independent of dispatch. Invocation
+// bodies are stored as canonical JSON bytes, so bound the scan and fail visibly
+// rather than silently missing a cancellation beyond a truncated result set.
+func (s *Store) ListRequestedInvocationCancellations(ctx context.Context) ([]kernel.UUIDv7, error) {
+	if err := requireDeadline(ctx); err != nil {
+		return nil, err
+	}
+	const maximum = 10000
+	cursor, err := s.db.Collection("work_invocations").Find(ctx, bson.D{}, options.Find().SetSort(bson.D{{Key: "_id", Value: 1}}).SetLimit(maximum+1))
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+	var ids []kernel.UUIDv7
+	count := 0
+	for cursor.Next(ctx) {
+		count++
+		if count > maximum {
+			return nil, ErrBacklogLimit
+		}
+		var document valueDocument
+		var value invocationValue
+		if cursor.Decode(&document) != nil || decode(document.Data, &value) != nil || !value.Invocation.Valid() || value.Reference != value.Invocation.Ref() || document.ID != aggregateKey(value.Reference) {
+			return nil, ErrCorruptAggregate
+		}
+		if value.Invocation.State == kernel.InvocationStarted && value.Invocation.CancellationRequestedAt != nil {
+			ids = append(ids, value.Invocation.ID)
+		}
+	}
+	return ids, cursor.Err()
+}
+
 func (s *Store) ListActiveTaskProjections(ctx context.Context, limit int64) ([]TaskProjection, error) {
 	if err := requireDeadline(ctx); err != nil {
 		return nil, err
