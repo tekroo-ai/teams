@@ -482,11 +482,12 @@ func (service *ProductionService) authorizeStructuredOutputGlitchRetry(ctx conte
 	return true, nil
 }
 
-func (service *ProductionService) blockStructuredDecisionTask(ctx context.Context, feature organization.FeatureRequest, task organization.PlannedTask, state kernel.AggregateState, invocation kernel.WorkInvocation, snapshot kernel.Snapshot, reason, key string) (bool, error) {
+func (service *ProductionService) blockStructuredDecisionTask(ctx context.Context, feature organization.FeatureRequest, task organization.PlannedTask, state kernel.AggregateState, invocation kernel.WorkInvocation, snapshot kernel.Snapshot, reason, key string, findings ...kernel.EvidenceRef) (bool, error) {
 	evidence, err := evidenceForInvocations(snapshot, invocation)
 	if err != nil {
 		return false, err
 	}
+	evidence = append(evidence, findings...)
 	reason = boundedWorkBlockReason(reason, invocation.ID)
 	payload, err := json.Marshal(map[string]any{"blocker_refs": []string{"teams://work-invocation/" + string(invocation.ID)}, "reason": reason, "review_policy": invalidStructuredReviewPolicy})
 	if err != nil {

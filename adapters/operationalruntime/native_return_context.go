@@ -67,12 +67,8 @@ func (service *ProductionService) recordedReturnContext(ctx context.Context, bri
 // conversation or the actor's unrelated recent work.
 func (service *ProductionService) nativeReturnedInvocation(ctx context.Context, brief application.ExecutionBrief) (*kernel.WorkInvocation, error) {
 	if brief.RetryOfInvocationID != nil {
-		prior, err := service.Store.LoadOperationalExecution(ctx, *brief.RetryOfInvocationID)
-		if err != nil {
-			return nil, errors.Join(nativeagent.ErrInvalidBinding, err)
-		}
-		source := prior.Invocation
-		return &source, nil
+		source, _, err := service.nativeRetryContext(ctx, brief)
+		return source, err
 	}
 	if brief.Purpose != kernel.PurposeRepair || brief.RecoveryDirective == nil {
 		return nil, nil
@@ -102,6 +98,59 @@ func (service *ProductionService) nativeReturnedInvocation(ctx context.Context, 
 	return source, nil
 }
 
+func (service *ProductionService) nativeRetryContext(ctx context.Context, brief application.ExecutionBrief) (*kernel.WorkInvocation, *nativeagent.ContextReturnBinding, error) {
+	return nativeRetryContext(ctx, service.Store, brief)
+}
+
+type nativeRetryContextReader interface {
+	LoadOperationalExecution(context.Context, kernel.UUIDv7) (application.OperationalExecutionContext, error)
+	Load(context.Context, string) ([]agentruntime.Entry, error)
+}
+
+// The first advisory attempt returns to the original decision owner. A
+// started retry instead continues that advisory attempt's own history, which
+// already contains the original fork. nativeRetryContext and BindContextFork
+// separately verify the exact retry chain, actor, workspace and journal.
+func decisionOwnerReturnCompatible(brief application.ExecutionBrief, original, selected *kernel.WorkInvocation) bool {
+	return original == nil || selected != nil && (original.ID == selected.ID || brief.RetryOfInvocationID != nil && selected.TaskID == brief.Task.TaskID)
+}
+
+func nativeRetryContext(ctx context.Context, reader nativeRetryContextReader, brief application.ExecutionBrief) (*kernel.WorkInvocation, *nativeagent.ContextReturnBinding, error) {
+	id, attempt, retry, condition := brief.RetryOfInvocationID, brief.AttemptOrdinal, brief.RetryOrdinal, brief.ConditionDigest
+	var skipped []kernel.WorkInvocation
+	for id != nil && len(skipped) < 1000 {
+		prior, err := reader.LoadOperationalExecution(ctx, *id)
+		if err != nil {
+			return nil, nil, errors.Join(nativeagent.ErrInvalidBinding, err)
+		}
+		source := prior.Invocation
+		if !source.Valid() || source.ID != *id || source.TaskID != brief.Task.TaskID || source.ActorFQN != brief.ActorFQN || source.WorkspaceID != brief.Scope.WorkspaceID || source.Purpose != brief.Purpose || attempt != source.AttemptOrdinal+1 || retry != source.RetryOrdinal+1 || condition == source.ConditionDigest {
+			return nil, nil, nativeagent.ErrInvalidBinding
+		}
+		if source.State != kernel.InvocationStartFailed {
+			if len(skipped) == 0 {
+				return &source, nil, nil
+			}
+			return &source, &nativeagent.ContextReturnBinding{SourceInvocationID: source.ID, SourceTaskID: source.TaskID, ChildInvocationID: brief.InvocationID, ChildTaskID: brief.Task.TaskID, PreStartRetries: skipped}, nil
+		}
+		entries, err := reader.Load(ctx, string(source.ID))
+		if err != nil || !nativeagent.NeverStarted(source) || len(entries) != 0 {
+			return nil, nil, errors.Join(nativeagent.ErrInvalidBinding, err)
+		}
+		for _, evidenceID := range source.TerminalEvidenceIDs {
+			if !slices.ContainsFunc(brief.Evidence, func(ref kernel.EvidenceRef) bool { return ref.EvidenceID == evidenceID && ref.SHA256.Valid() }) {
+				return nil, nil, nativeagent.ErrInvalidBinding
+			}
+		}
+		skipped = append(skipped, source)
+		id, attempt, retry, condition = source.RetryOfInvocationID, source.AttemptOrdinal, source.RetryOrdinal, source.ConditionDigest
+	}
+	if id != nil {
+		return nil, nil, nativeagent.ErrInvalidBinding
+	}
+	return nil, &nativeagent.ContextReturnBinding{ChildInvocationID: brief.InvocationID, ChildTaskID: brief.Task.TaskID, PreStartRetries: skipped}, nil // no new history; preserve any original decision-owner dependency
+}
+
 // A subsequent design/finalization round returns to its original decision
 // owner. A first finalization after earlier design-only review has no PM parent.
 func (service *ProductionService) planningReturnSource(ctx context.Context, feature organization.FeatureRequest, stage featurePlanningStage, round uint32) (*kernel.WorkInvocation, error) {
@@ -128,8 +177,11 @@ func (service *ProductionService) planningReturnSource(ctx context.Context, feat
 		if !found || source.State != kernel.InvocationSucceeded || source.OutputDigest == nil || source.RequestDigest == nil {
 			return nil, nativeagent.ErrInvalidBinding
 		}
-		if stage == stageArchitecture && round == 1 && feature.DesignRevision != nil && *source.OutputDigest != feature.DesignRevision.PriorDesignDigest {
-			return nil, nativeagent.ErrInvalidBinding
+		if stage == stageArchitecture && feature.DesignRevision != nil {
+			sourceRound, revisionErr := service.designRevisionSourceRound(ctx, feature)
+			if revisionErr != nil || round == sourceRound+1 && *source.OutputDigest != feature.DesignRevision.PriorDesignDigest {
+				return nil, errors.Join(nativeagent.ErrInvalidBinding, revisionErr)
+			}
 		}
 		return &source, nil
 	}

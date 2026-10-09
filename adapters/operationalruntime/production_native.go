@@ -134,7 +134,7 @@ func configuredNativeSession(ctx context.Context, service *ProductionService, pr
 		result.Effects = service.Store
 	}
 	if amendmentAssessment {
-		features, err := service.Store.ListFeatures(ctx, nativePlanningInspectionStatuses(), 1000)
+		features, err := service.nativeBriefFeatures(ctx, brief)
 		if err != nil {
 			return nativeagent.Config{}, err
 		}
@@ -157,11 +157,6 @@ func configuredNativeSession(ctx context.Context, service *ProductionService, pr
 		}
 	}
 	if consultationSource != nil {
-		ref, err := nativeagent.BindContextFork(ctx, service.Store, brief, *consultationSource)
-		if err != nil {
-			return nativeagent.Config{}, err
-		}
-		result.ContextSource, result.ContextInvocation = ref, consultationSource
 		result.ValidateFinalResult = func(_ context.Context, output []byte) error {
 			if amendmentAssessment {
 				raw := bytes.TrimSpace(bytes.TrimPrefix(output, []byte(application.OrganizationalResultMarker)))
@@ -178,9 +173,19 @@ func configuredNativeSession(ctx context.Context, service *ProductionService, pr
 		}
 		result.Candidate = &nativeagent.CandidateBinding{ID: kernel.UUIDv7(workspace.Candidate.CandidateID), ReceiptSHA256: workspace.Candidate.ReceiptSHA256}
 	}
-	feature, stage, _, round, planning, err := service.planningFeatureForTask(ctx, brief.Task.TaskID)
-	if err != nil {
-		return nativeagent.Config{}, err
+	var feature organization.FeatureRequest
+	var stage featurePlanningStage
+	var round uint32
+	var planning bool
+	if consultationSource == nil {
+		var err error
+		feature, stage, _, round, planning, err = service.planningFeatureForTask(ctx, brief.Task.TaskID)
+		if err != nil {
+			return nativeagent.Config{}, err
+		}
+	}
+	if planning && brief.Task.StoryID != deterministicOperationalUUID("feature-planning-story", string(feature.ID)) || !planning && brief.Task.StoryID == deterministicOperationalUUID("feature-planning-story", string(feature.ID)) {
+		return nativeagent.Config{}, nativeagent.ErrInvalidBinding
 	}
 	if planning {
 		result.ResultArrayLimits = featureStageResultArrayLimits(stage, feature.Input.MaximumTasks)
@@ -200,7 +205,17 @@ func configuredNativeSession(ctx context.Context, service *ProductionService, pr
 	if sourceErr != nil {
 		return nativeagent.Config{}, sourceErr
 	}
-	if !recordedContext {
+	var returnBinding *nativeagent.ContextReturnBinding
+	if brief.RetryOfInvocationID != nil && (!recordedContext || returnSource != nil) {
+		resolved, binding, retryErr := service.nativeRetryContext(ctx, brief)
+		if retryErr != nil || recordedContext && resolved != nil && resolved.ID != returnSource.ID {
+			return nativeagent.Config{}, errors.Join(nativeagent.ErrInvalidBinding, retryErr)
+		}
+		returnBinding = binding
+		if !recordedContext {
+			returnSource = resolved
+		}
+	} else if !recordedContext {
 		returnSource, sourceErr = service.nativeReturnedInvocation(ctx, brief)
 		if sourceErr != nil {
 			return nativeagent.Config{}, sourceErr
@@ -212,15 +227,26 @@ func configuredNativeSession(ctx context.Context, service *ProductionService, pr
 			return nativeagent.Config{}, sourceErr
 		}
 	}
+	if returnSource == nil && consultationSource != nil {
+		returnSource = consultationSource
+	}
 	if returnSource != nil {
-		if result.ContextInvocation != nil && result.ContextInvocation.ID != returnSource.ID {
+		if !decisionOwnerReturnCompatible(brief, consultationSource, returnSource) {
 			return nativeagent.Config{}, nativeagent.ErrInvalidBinding
 		}
-		var returnBinding *nativeagent.ContextReturnBinding
-		if !slices.Contains(brief.Task.DependsOn, returnSource.TaskID) && brief.RetryOfInvocationID == nil && brief.Purpose != kernel.PurposeRepair {
-			returnBinding, sourceErr = service.correctedPlanningReturn(ctx, feature, stage, round, planning, brief, *returnSource)
+		if returnBinding != nil {
+			returnBinding.SourceInvocationID, returnBinding.SourceTaskID = returnSource.ID, returnSource.TaskID
+		}
+		if !slices.Contains(brief.Task.DependsOn, returnSource.TaskID) && returnSource.TaskID != brief.Task.TaskID && brief.Purpose != kernel.PurposeRepair {
+			correction, err := service.correctedPlanningReturn(ctx, feature, stage, round, planning, brief, *returnSource)
+			sourceErr = err
 			if sourceErr != nil {
 				return nativeagent.Config{}, sourceErr
+			}
+			if returnBinding == nil {
+				returnBinding = correction
+			} else {
+				returnBinding.CorrectionEvidence = correction.CorrectionEvidence
 			}
 		}
 		ref, bindErr := nativeagent.BindContextFork(ctx, service.Store, brief, *returnSource, returnBinding)

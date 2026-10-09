@@ -226,7 +226,7 @@ func (service *ProductionService) bindConsultationWorkProfile(ctx context.Contex
 // Resolve by deterministic task identity and authoritative Teams state. No
 // model-supplied actor, conversation ID, or result schema is trusted.
 func (service *ProductionService) nativeTaskConsultation(ctx context.Context, brief application.ExecutionBrief) (*nativeagent.ResultContract, *kernel.WorkInvocation, error) {
-	features, err := service.Store.ListFeatures(ctx, nativePlanningInspectionStatuses(), 1000)
+	features, err := service.nativeBriefFeatures(ctx, brief)
 	if err != nil {
 		return nil, nil, err
 	}

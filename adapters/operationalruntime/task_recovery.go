@@ -656,7 +656,16 @@ func planRecoveryRoleTransition(owner organization.RoleInstanceState, found bool
 }
 
 func (service *ProductionService) plannedFeatureTask(ctx context.Context, taskID kernel.UUIDv7) (organization.FeatureRequest, organization.PlannedTask, bool, error) {
-	features, err := service.Store.ListFeatures(ctx, []organization.FeatureStatus{organization.FeaturePlanned, organization.FeatureApproved}, 1000)
+	feature, dispatched, err := service.dispatchedTaskFeature(ctx, taskID)
+	if err != nil {
+		return organization.FeatureRequest{}, organization.PlannedTask{}, false, err
+	}
+	var features []organization.FeatureRequest
+	if dispatched {
+		features = []organization.FeatureRequest{feature}
+	} else {
+		features, err = service.Store.ListFeatures(ctx, []organization.FeatureStatus{organization.FeaturePlanned, organization.FeatureApproved}, 1000)
+	}
 	if err != nil {
 		return organization.FeatureRequest{}, organization.PlannedTask{}, false, err
 	}

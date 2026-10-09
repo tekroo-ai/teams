@@ -25,10 +25,51 @@ type ContextReturnBinding struct {
 	ChildInvocationID  kernel.UUIDv7
 	ChildTaskID        kernel.UUIDv7
 	CorrectionEvidence []kernel.EvidenceRef
+	// Closest predecessor first. These durable attempts never started, so they
+	// cannot replace the last started conversation with an empty one.
+	PreStartRetries []kernel.WorkInvocation
 }
 
 func (binding *ContextReturnBinding) valid(child application.ExecutionBrief, source kernel.WorkInvocation) bool {
-	if binding == nil || binding.SourceInvocationID != source.ID || binding.SourceTaskID != source.TaskID || binding.ChildInvocationID != child.InvocationID || binding.ChildTaskID != child.Task.TaskID || binding.ChildTaskID == binding.SourceTaskID || len(binding.CorrectionEvidence) == 0 || len(binding.CorrectionEvidence) > 64 {
+	if binding == nil || binding.SourceInvocationID != source.ID || binding.SourceTaskID != source.TaskID || binding.ChildInvocationID != child.InvocationID || binding.ChildTaskID != child.Task.TaskID {
+		return false
+	}
+	if len(binding.PreStartRetries) > 0 {
+		if len(binding.PreStartRetries) > 1000 {
+			return false
+		}
+		id, attempt, retry, condition := child.RetryOfInvocationID, child.AttemptOrdinal, child.RetryOrdinal, child.ConditionDigest
+		for _, prior := range binding.PreStartRetries {
+			if id == nil || *id != prior.ID || !NeverStarted(prior) || prior.TaskID != child.Task.TaskID || prior.ActorFQN != child.ActorFQN || prior.WorkspaceID != child.Scope.WorkspaceID || prior.Purpose != child.Purpose || attempt != prior.AttemptOrdinal+1 || retry != prior.RetryOrdinal+1 || condition == prior.ConditionDigest {
+				return false
+			}
+			for _, evidenceID := range prior.TerminalEvidenceIDs {
+				if !slices.ContainsFunc(child.Evidence, func(ref kernel.EvidenceRef) bool { return ref.EvidenceID == evidenceID && ref.SHA256.Valid() }) {
+					return false
+				}
+			}
+			id, attempt, retry, condition = prior.RetryOfInvocationID, prior.AttemptOrdinal, prior.RetryOrdinal, prior.ConditionDigest
+		}
+		if id != nil {
+			return len(binding.CorrectionEvidence) == 0 && child.Task.TaskID == source.TaskID && *id == source.ID && attempt == source.AttemptOrdinal+1 && retry == source.RetryOrdinal+1 && condition != source.ConditionDigest
+		}
+		if source.State != kernel.InvocationSucceeded || child.Task.TaskID == source.TaskID {
+			return false
+		}
+		if slices.Contains(child.Task.DependsOn, source.TaskID) {
+			return len(binding.CorrectionEvidence) == 0
+		}
+		if len(binding.CorrectionEvidence) == 0 || len(binding.CorrectionEvidence) > 64 {
+			return false
+		}
+		for _, ref := range binding.CorrectionEvidence {
+			if !ref.EvidenceID.Valid() || !ref.SHA256.Valid() || !slices.Contains(child.Evidence, ref) {
+				return false
+			}
+		}
+		return true
+	}
+	if binding.ChildTaskID == binding.SourceTaskID || len(binding.CorrectionEvidence) == 0 || len(binding.CorrectionEvidence) > 64 {
 		return false
 	}
 	for _, ref := range binding.CorrectionEvidence {
@@ -37,6 +78,12 @@ func (binding *ContextReturnBinding) valid(child application.ExecutionBrief, sou
 		}
 	}
 	return true
+}
+
+// A terminal pre-start failure is fresh-start authority only if there is no
+// start receipt, conversation, request, output, or recorded journal to lose.
+func NeverStarted(source kernel.WorkInvocation) bool {
+	return source.Valid() && source.State == kernel.InvocationStartFailed && source.StartedAt == nil && source.RequestDigest == nil && source.ConversationID == nil && source.OutputDigest == nil && source.FinishedAt != nil && len(source.TerminalEvidenceIDs) > 0
 }
 
 func BindContextFork(ctx context.Context, journal agentruntime.Journal, child application.ExecutionBrief, source kernel.WorkInvocation, returns ...*ContextReturnBinding) (*agentruntime.ForkSource, error) {
@@ -50,16 +97,25 @@ func BindContextFork(ctx context.Context, journal agentruntime.Journal, child ap
 	if returned != nil && !returned.valid(child, source) {
 		return nil, ErrInvalidBinding
 	}
+	bridgedRetry := returned != nil && len(returned.PreStartRetries) > 0
+	if bridgedRetry {
+		for _, prior := range returned.PreStartRetries {
+			entries, err := journal.Load(ctx, string(prior.ID))
+			if err != nil || len(entries) != 0 {
+				return nil, errors.Join(ErrInvalidBinding, err)
+			}
+		}
+	}
 	if !child.InvocationID.Valid() || child.InvocationID == source.ID || child.ActorFQN != source.ActorFQN || !source.Valid() || source.RequestDigest == nil || !source.RequestDigest.Valid() || source.FinishedAt == nil || !child.DeadlineAt.After(source.FinishedAt.UTC()) || child.Scope.WorkspaceID != source.WorkspaceID {
 		return nil, ErrInvalidBinding
 	}
-	retry := child.RetryOfInvocationID != nil && *child.RetryOfInvocationID == source.ID
+	retry := child.RetryOfInvocationID != nil && *child.RetryOfInvocationID == source.ID || bridgedRetry
 	repair := child.RetryOfInvocationID == nil && child.Purpose == kernel.PurposeRepair && child.RecoveryDirective != nil && child.RecoveryDirective.Valid() && child.Task.TaskID == source.TaskID && child.ConditionDigest != source.ConditionDigest
 	if retry || repair {
-		if returned != nil {
+		if returned != nil && !bridgedRetry {
 			return nil, ErrInvalidBinding
 		}
-		if len(source.TerminalEvidenceIDs) == 0 || retry && (child.Task.TaskID != source.TaskID || child.AttemptOrdinal != source.AttemptOrdinal+1 || child.RetryOrdinal != source.RetryOrdinal+1 || child.ConditionDigest == source.ConditionDigest) {
+		if len(source.TerminalEvidenceIDs) == 0 || retry && !bridgedRetry && (child.Task.TaskID != source.TaskID || child.AttemptOrdinal != source.AttemptOrdinal+1 || child.RetryOrdinal != source.RetryOrdinal+1 || child.ConditionDigest == source.ConditionDigest) {
 			return nil, ErrInvalidBinding
 		}
 		for _, id := range source.TerminalEvidenceIDs {

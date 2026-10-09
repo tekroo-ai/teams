@@ -159,7 +159,11 @@ func (service *ProductionService) reconcileFeaturePlanning(ctx context.Context) 
 			}
 			if !revisionRequested {
 				if err := service.validateFeatureStageOutputWithEvidence(ctx, feature, stage, output); err != nil {
-					if _, blockErr := service.blockStructuredDecisionTask(ctx, feature, task, state, invocation, snapshot, invalidPlanningOutputReason, "invalid-planning-output"); blockErr != nil {
+					finding, findingErr := service.registerPlanningOutputFinding(ctx, feature, stage, invocation, err)
+					if findingErr != nil {
+						return fmt.Errorf("feature %s %s invalid-output finding: %w", feature.ID, stage, findingErr)
+					}
+					if _, blockErr := service.blockStructuredDecisionTask(ctx, feature, task, state, invocation, snapshot, invalidPlanningOutputReason, "invalid-planning-output", finding); blockErr != nil {
 						return fmt.Errorf("feature %s %s invalid-output block: %w", feature.ID, stage, blockErr)
 					}
 					continue
@@ -703,7 +707,14 @@ func (service *ProductionService) ensureFeaturePlanningTaskForRound(ctx context.
 		rejections, rejected, rejectionErr := service.architecturePlanRejections(ctx, feature, architectureRound-1)
 		operatorCorrection := feature.PlanSupersession != nil && feature.PlanSupersession.ArchitectureRound == architectureRound
 		specificationCorrection := feature.SpecificationCorrection != nil && feature.SpecificationCorrection.ArchitectureRound == architectureRound
-		pmRevision := feature.DesignRevision != nil && architectureRound == 1
+		pmRevision := false
+		if feature.DesignRevision != nil {
+			sourceRound, revisionErr := service.designRevisionSourceRound(ctx, feature)
+			if revisionErr != nil {
+				return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, revisionErr
+			}
+			pmRevision = architectureRound == sourceRound+1
+		}
 		predecessorReady := predecessorState.Phase == kernel.PhaseCompleted || specificationCorrection && predecessorState.Condition == kernel.ConditionBlocked
 		if predecessorErr != nil || rejectionErr != nil || !predecessorFound || !predecessorReady || !rejected && !operatorCorrection && !specificationCorrection && !pmRevision {
 			return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, errors.Join(organization.ErrFeatureConflict, predecessorErr, rejectionErr)
@@ -712,7 +723,7 @@ func (service *ProductionService) ensureFeaturePlanningTaskForRound(ctx context.
 			dependsOn = append(dependsOn, predecessorID)
 		}
 		if pmRevision {
-			pmTaskID := featurePlanningTaskID(feature.ID, stagePlanFinalization, 0, nil)
+			pmTaskID := featurePlanningTaskID(feature.ID, stagePlanFinalization, architectureRound-1, nil)
 			pmState, pmHead, pmFound, pmErr := service.Store.ReadAggregateHead(ctx, kernel.AggregateRef{Kind: kernel.AggregateTask, ID: pmTaskID})
 			if pmErr != nil || !pmFound || pmState.Phase != kernel.PhaseCompleted {
 				return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, errors.Join(organization.ErrFeatureConflict, pmErr)
@@ -1111,8 +1122,14 @@ func (service *ProductionService) desiredArchitecturePlanRound(ctx context.Conte
 	if err != nil {
 		return round, err
 	}
-	if feature.DesignRevision != nil && round == 0 {
-		return 1, nil
+	if feature.DesignRevision != nil {
+		sourceRound, err := service.designRevisionSourceRound(ctx, feature)
+		if err != nil {
+			return 0, err
+		}
+		if round < sourceRound+1 {
+			return sourceRound + 1, nil
+		}
 	}
 	maximumAutomaticRound := architectureAutomaticSuccessorLimit
 	if feature.PlanSupersession != nil {
@@ -1296,9 +1313,10 @@ func (service *ProductionService) featureArchitectureSuccessorDescription(ctx co
 	if err != nil || predecessorInvocation.OutputDigest == nil {
 		return "", errors.Join(organization.ErrInvalidFeature, err)
 	}
-	if revision := feature.DesignRevision; revision != nil && round == 1 {
-		if revision.PriorDesignDigest != *predecessorInvocation.OutputDigest {
-			return "", organization.ErrInvalidFeature
+	if revision := feature.DesignRevision; revision != nil && revision.PriorDesignDigest == *predecessorInvocation.OutputDigest {
+		sourceRound, revisionErr := service.designRevisionSourceRound(ctx, feature)
+		if revisionErr != nil || round != sourceRound+1 {
+			return "", errors.Join(organization.ErrInvalidFeature, revisionErr)
 		}
 		routing, routingErr := service.workflowTaskRoutingPolicy(service.clock.Now().UTC())
 		if routingErr != nil {

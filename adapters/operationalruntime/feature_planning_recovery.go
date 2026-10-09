@@ -113,6 +113,13 @@ func (service *ProductionService) RetryCancelledFeaturePlanning(ctx context.Cont
 		}
 		return InvocationStatus{}, fmt.Errorf("planning recovery successor conflict terminal=%s latest=%s latest_attempt=%d terminal_attempt=%d: %w", terminal.ID, latest.ID, latest.AttemptOrdinal, terminal.AttemptOrdinal, application.ErrInvalidOperationalExecution)
 	}
+	owner, roleFound, err := service.RoleHost.Status(ctx, task.Owner)
+	if err != nil {
+		return InvocationStatus{}, fmt.Errorf("read planning recovery role: %w", err)
+	}
+	if _, err := planRecoveryRoleTransition(owner, roleFound, terminal.Execution); err != nil {
+		return InvocationStatus{}, fmt.Errorf("preflight planning recovery role: %w", err)
+	}
 	budget, err = service.amendPlanningRecoveryBudget(ctx, principal, feature, terminal, budget, request, recoveryCondition, registered)
 	if err != nil {
 		return InvocationStatus{}, fmt.Errorf("amend planning recovery budget: %w", err)
@@ -129,22 +136,24 @@ func (service *ProductionService) RetryCancelledFeaturePlanning(ctx context.Cont
 		}
 	}
 
-	owner, active, err := service.RoleHost.Status(ctx, task.Owner)
+	// Recheck after durable preparation; a concurrent role transition must not
+	// be authorized from the preflight snapshot.
+	owner, roleFound, err = service.RoleHost.Status(ctx, task.Owner)
 	if err != nil {
 		return InvocationStatus{}, fmt.Errorf("read planning recovery role: %w", err)
 	}
-	if active {
-		if owner.Status != organization.RoleIdle {
-			return InvocationStatus{}, organization.ErrRoleNotRunning
-		}
-		if owner.Execution == terminal.Execution {
-			owner, err = service.RestartRole(ctx, task.Owner)
-		}
-	} else {
+	transition, err := planRecoveryRoleTransition(owner, roleFound, terminal.Execution)
+	if err != nil {
+		return InvocationStatus{}, fmt.Errorf("plan planning recovery role transition: %w", err)
+	}
+	switch transition {
+	case recoveryRoleStart:
 		owner, err = service.StartRole(ctx, task.Owner)
+	case recoveryRoleRestart:
+		owner, err = service.RestartRole(ctx, task.Owner)
 	}
 	if err != nil || owner.Status != organization.RoleIdle || owner.Execution == terminal.Execution {
-		return InvocationStatus{}, fmt.Errorf("restart planning recovery role active=%t status=%s execution_changed=%t: %w", active, owner.Status, owner.Execution != terminal.Execution, errors.Join(organization.ErrRoleNotRunning, err))
+		return InvocationStatus{}, fmt.Errorf("restart planning recovery role found=%t status=%s execution_changed=%t: %w", roleFound, owner.Status, owner.Execution != terminal.Execution, errors.Join(organization.ErrRoleNotRunning, err))
 	}
 	profileConfig, configured := service.profilesByModel[owner.ModelProfile]
 	workspace, workspaceFound := service.workspacesByID[owner.WorkspaceID]
@@ -595,39 +604,24 @@ func containsEveryUUID(values, required []kernel.UUIDv7) bool {
 }
 
 func (service *ProductionService) planningFeatureForTask(ctx context.Context, taskID kernel.UUIDv7) (organization.FeatureRequest, featurePlanningStage, *uint32, uint32, bool, error) {
-	statuses := []organization.FeatureStatus{organization.FeatureSubmitted, organization.FeatureReadyForPlanning, organization.FeatureSpecified, organization.FeatureDesigned}
+	feature, dispatched, err := service.dispatchedTaskFeature(ctx, taskID)
+	if err != nil {
+		return organization.FeatureRequest{}, "", nil, 0, false, err
+	}
+	if dispatched {
+		stage, index, round, planning := planningTaskIdentity(feature, taskID)
+		return feature, stage, index, round, planning, nil
+	}
+	// Pre-handler tasks have no admitted message link. Keep their existing
+	// bounded compatibility path; current dispatch never falls through here.
+	statuses := append(nativePlanningInspectionStatuses(), organization.FeatureSubmitted, organization.FeatureReadyForPlanning, organization.FeatureSpecified, organization.FeatureDesigned)
 	features, err := service.Store.ListFeatures(ctx, statuses, 1000)
 	if err != nil {
 		return organization.FeatureRequest{}, "", nil, 0, false, err
 	}
 	for _, feature := range features {
-		stage, planning := planningStage(feature.Status)
-		if planning && stage != stageArchitecture && featurePlanningTaskID(feature.ID, stage, 0, nil) == taskID {
-			return feature, stage, nil, 0, true, nil
-		}
-		if feature.Status == organization.FeatureSpecified {
-			for round := uint32(0); round <= architecturePlanRecordedRoundLimit; round++ {
-				if featurePlanningTaskID(feature.ID, stageArchitecture, round, nil) == taskID {
-					return feature, stageArchitecture, nil, round, true, nil
-				}
-				if featurePlanningTaskID(feature.ID, stageArchitectureReview, round, nil) == taskID {
-					return feature, stageArchitectureReview, nil, round, true, nil
-				}
-				_, architectureOutput, candidateErr := service.featureArchitectureCandidateForRound(ctx, feature, round)
-				if candidateErr != nil {
-					continue
-				}
-				candidate, candidateErr := parseArchitectureStageResult(architectureOutput, featureInputOperationalMarkers(feature), featureAuthorizedActorFQNs(feature)...)
-				if candidateErr != nil {
-					return organization.FeatureRequest{}, "", nil, 0, false, candidateErr
-				}
-				for index := range candidate.Tasks {
-					reviewedTaskIndex := uint32(index)
-					if featurePlanningTaskID(feature.ID, stageArchitectureTaskReview, round, &reviewedTaskIndex) == taskID {
-						return feature, stageArchitectureTaskReview, &reviewedTaskIndex, round, true, nil
-					}
-				}
-			}
+		if stage, index, round, planning := planningTaskIdentity(feature, taskID); planning {
+			return feature, stage, index, round, true, nil
 		}
 	}
 	return organization.FeatureRequest{}, "", nil, 0, false, nil
