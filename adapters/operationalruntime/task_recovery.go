@@ -153,7 +153,7 @@ func (service *ProductionService) RetryFailedTask(ctx context.Context, principal
 	if err != nil {
 		return InvocationStatus{}, fmt.Errorf("resolve recovery workspace: %w", err)
 	}
-	if (recoveryKind == taskRecoveryInvalidStructuredOutput || recoveryKind == taskRecoveryFailedEscalation || recoveryKind == taskRecoveryReportedDecision) && state.Condition == kernel.ConditionBlocked {
+	if (recoveryKind == taskRecoveryInvalidStructuredOutput || recoveryKind == taskRecoveryFailedEscalation || recoveryKind == taskRecoveryReportedDecision || recoveryKind == taskRecoveryReportedValidatorBlock) && state.Condition == kernel.ConditionBlocked {
 		if err := service.unblockInvalidStructuredTask(ctx, feature, planned, state, head, terminal, registered, request.IdempotencyKey); err != nil {
 			return InvocationStatus{}, fmt.Errorf("unblock invalid validator output: %w", err)
 		}
@@ -304,6 +304,9 @@ const (
 	// decision. Changed-condition evidence may continue this exact task without
 	// treating a missing candidate as completed implementation.
 	taskRecoveryReportedDecision
+	// A validator can truthfully report an unavailable gate through its outer
+	// result envelope. Only evidence-bound operator recovery may rerun it.
+	taskRecoveryReportedValidatorBlock
 )
 
 // findPromotionRecoveryUnblock walks the causal chain from the task head back
@@ -418,10 +421,16 @@ func (service *ProductionService) classifyTaskRecovery(ctx context.Context, task
 		return 0, application.ErrInvalidOperationalExecution
 	}
 	blocked, found, err := service.Store.ReadEvent(ctx, head)
-	if err != nil || !found || !isExactRecoverableStructuredDecisionBlock(blocked, task, invocation, service.policyAuthority) {
+	if err != nil || !found {
 		return 0, errors.Join(application.ErrInvalidOperationalExecution, err)
 	}
-	return taskRecoveryInvalidStructuredOutput, nil
+	if isExactRecoverableStructuredDecisionBlock(blocked, task, invocation, service.policyAuthority) {
+		return taskRecoveryInvalidStructuredOutput, nil
+	}
+	if state.Phase == kernel.PhaseActive && isExactReportedValidatorBlock(blocked, task, invocation, service.policyAuthority) {
+		return taskRecoveryReportedValidatorBlock, nil
+	}
+	return 0, application.ErrInvalidOperationalExecution
 }
 
 // A later validator or operator inspection can find a material defect after an

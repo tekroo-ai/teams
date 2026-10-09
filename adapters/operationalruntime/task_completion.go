@@ -519,15 +519,34 @@ func isExactInvalidStructuredOutputBlock(event kernel.DomainEvent, task organiza
 }
 
 func isExactRecoverableStructuredDecisionBlock(event kernel.DomainEvent, task organization.PlannedTask, invocation kernel.WorkInvocation, authority kernel.PrincipalRef) bool {
-	if event.EventID == "" || event.EventType != "tekroo.event.work.blocked" || event.Aggregate != (kernel.AggregateRef{Kind: kernel.AggregateTask, ID: task.ID}) || event.Authority != authority || event.ActorFQN == nil || *event.ActorFQN != invocation.ActorFQN || event.Execution == nil || *event.Execution != invocation.Execution || len(event.Parents) != 1 || event.Parents[0] != (kernel.DagParent{ParentEventID: invocation.LastEventID, EdgeKind: kernel.EdgeResponse}) {
+	payload, exact := exactStructuredDecisionBlockPayload(event, task, invocation, authority)
+	if !exact {
 		return false
+	}
+	return payload.Reason == invalidStructuredOutputReason || strings.HasPrefix(payload.Reason, "whole-feature validation did not pass:") || strings.HasPrefix(payload.Reason, "product acceptance did not pass:")
+}
+
+// This is an operator recovery classification, not an automatic retry or a
+// passing validation. RetryFailedTask still requires registered remediation
+// evidence, the latest invocation, and a bounded successor deadline/budget.
+func isExactReportedValidatorBlock(event kernel.DomainEvent, task organization.PlannedTask, invocation kernel.WorkInvocation, authority kernel.PrincipalRef) bool {
+	if (task.Purpose != kernel.PurposeValidation && task.Purpose != kernel.PurposeReview) || len(task.Validates) == 0 || invocation.TaskID != task.ID || invocation.Purpose != task.Purpose || invocation.State != kernel.InvocationSucceeded || invocation.OutputDigest == nil {
+		return false
+	}
+	payload, exact := exactStructuredDecisionBlockPayload(event, task, invocation, authority)
+	const prefix = "task reported blocked: "
+	return exact && strings.HasPrefix(payload.Reason, prefix) && strings.TrimSpace(strings.TrimPrefix(payload.Reason, prefix)) != ""
+}
+
+func exactStructuredDecisionBlockPayload(event kernel.DomainEvent, task organization.PlannedTask, invocation kernel.WorkInvocation, authority kernel.PrincipalRef) (planningOutputBlockPayload, bool) {
+	if event.EventID == "" || event.EventType != "tekroo.event.work.blocked" || event.Aggregate != (kernel.AggregateRef{Kind: kernel.AggregateTask, ID: task.ID}) || event.Authority != authority || event.ActorFQN == nil || *event.ActorFQN != invocation.ActorFQN || event.Execution == nil || *event.Execution != invocation.Execution || len(event.Parents) != 1 || event.Parents[0] != (kernel.DagParent{ParentEventID: invocation.LastEventID, EdgeKind: kernel.EdgeResponse}) {
+		return planningOutputBlockPayload{}, false
 	}
 	var payload planningOutputBlockPayload
 	if json.Unmarshal(event.Payload, &payload) != nil {
-		return false
+		return planningOutputBlockPayload{}, false
 	}
-	recoverableReason := payload.Reason == invalidStructuredOutputReason || strings.HasPrefix(payload.Reason, "whole-feature validation did not pass:") || strings.HasPrefix(payload.Reason, "product acceptance did not pass:")
-	return len(payload.BlockerRefs) == 1 && payload.BlockerRefs[0] == "teams://work-invocation/"+string(invocation.ID) && recoverableReason && payload.ReviewPolicy == invalidStructuredReviewPolicy
+	return payload, len(payload.BlockerRefs) == 1 && payload.BlockerRefs[0] == "teams://work-invocation/"+string(invocation.ID) && payload.ReviewPolicy == invalidStructuredReviewPolicy
 }
 
 func isExactReportedDecisionBlock(event kernel.DomainEvent, task organization.PlannedTask, invocation kernel.WorkInvocation, authority kernel.PrincipalRef) bool {
