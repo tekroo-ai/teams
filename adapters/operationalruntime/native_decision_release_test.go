@@ -141,6 +141,7 @@ func TestPreparePMDecisionContractRelease(t *testing.T) {
 			ResultProtocol: &application.ExecutionResultProtocol{SchemaVersion: "1.0.0", Marker: application.OrganizationalResultMarker, Instruction: "Submit the structured handler result."},
 		}
 		settings := p.NativeSettings
+		capturedHTTP := &http.Client{Timeout: 10 * time.Minute, Transport: &nativeHTTPCapture{directory: output, scenario: scenario.name}}
 		journal := &nativeReleaseJournal{path: filepath.Join(output, scenario.name+"-journal.json")}
 		binding := nativeReleaseBinding{authority: agenttools.Authority{WorkspaceRoot: root, Permissions: bundle.Permissions, Purpose: brief.Purpose, EffectPolicyDigest: p.EffectPolicyDigest}}
 		cfg := nativeagent.Config{Bindings: binding, Gateway: agenttools.Gateway{Bindings: binding, Host: agenttools.Host{Timeout: time.Minute}}, Journal: journal, HTTP: &http.Client{Timeout: 10 * time.Minute}, Profile: nativeagent.Profile{RoleFQRN: p.RoleFQRN, RoleBundleDigest: roleDigest, ModelProfileDigest: p.ModelProfileDigest, RuntimeIdentityDigest: p.RuntimeIdentityDigest, ToolPolicyDigest: p.ToolPolicyDigest, EffectPolicyDigest: p.EffectPolicyDigest, BaseURL: settings.BaseURL, Model: settings.Model, ModelInstructions: settings.ModelInstructions, ResponseMode: settings.ResponseMode, MaxOutputTokens: settings.MaxOutputTokens, MaxTurns: settings.MaxTurns, Reasoning: settings.Reasoning, AllowedReadTools: readTools}}
@@ -154,6 +155,7 @@ func TestPreparePMDecisionContractRelease(t *testing.T) {
 			cfg.PlanFinalization = &nativeagent.PlanFinalizationBinding{SourceOutput: raw, SourceDigest: digestBytes(raw)}
 			brief.Task.Description += "\nARCHITECT_PROPOSAL_JSON:\n" + string(raw)
 		}
+		cfg.HTTP = capturedHTTP
 		raw := mustJSON(brief)
 		ctx, cancel := context.WithTimeout(t.Context(), 10*time.Minute)
 		session, err := nativeagent.PrepareReadOnly(ctx, brief, digestBytes(raw), cfg)

@@ -53,7 +53,7 @@ var specs = []Spec{
 	{"find_references", "Find semantically resolved Go references to the declaration at path and line. Returns bounded file/line locations and explicitly reports unresolved packages. Never labels plain text matches as symbol references.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path","line"],"properties":{"path":{"type":"string","minLength":1},"line":{"type":"integer","minimum":1}}}`), "repository.read"},
 	{"check_go_build_worktree", "Compile production and test packages across the module from a disposable working-tree snapshot without executing candidate binaries, initializers or TestMain. Returns snapshot identity and compiler diagnostics. This is a compile check, not a test-suite or acceptance verdict.", json.RawMessage(`{"type":"object","additionalProperties":false}`), "test.execute"},
 	{"read_file", "Read one workspace file starting at start_line (default 1), for line_count lines (default 400, maximum 400). Returns total file line_count, full-file SHA-256, actual start/end lines, and next_start_line when more lines remain. Stops at EOF. A missing file returns status NOT_FOUND without reading any alternative; use find_files to discover its actual path. Use read_evidence for evidence IDs.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path"],"properties":{"path":{"type":"string","minLength":1,"description":"Relative path to a workspace file; never an evidence_id."},"start_line":{"type":"integer","minimum":1,"default":1},"line_count":{"type":"integer","minimum":1,"maximum":400,"default":400,"description":"Number of lines requested, not an ending line number."}}}`), "repository.read"},
-	{"check_go_format", "Check whether named workspace Go files are gofmt-clean without changing them; format_clean is true only when all named files match gofmt output.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["paths"],"properties":{"paths":{"type":"array","minItems":1,"maxItems":32,"uniqueItems":true,"items":{"type":"string","minLength":1}}}}`), "repository.read"},
+	{"check_go_format", "Check existing workspace-relative .go files for gofmt cleanliness without changing them. Supply actual file paths, never prose, acceptance criteria or placeholders. Files must exist and be regular files; discover them first if unknown. format_clean is true only when all named files match gofmt output.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["paths"],"properties":{"paths":{"type":"array","minItems":1,"maxItems":32,"uniqueItems":true,"items":{"type":"string","minLength":1,"pattern":"\\.go$","description":"An existing workspace-relative regular Go file path ending in .go; not prose or a placeholder."}}}}`), "repository.read"},
 	{"list_files", "List one workspace directory without recursing. If truncated, continue with next_after as start_after.", json.RawMessage(`{"type":"object","additionalProperties":false,"properties":{"path":{"type":"string"},"start_after":{"type":"string"},"limit":{"type":"integer","minimum":1,"maximum":200}}}`), "repository.read"},
 	{"find_files", "Find workspace files matching a filename glob; ** matches directories. Results are bounded and sorted.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["filename_glob"],"properties":{"filename_glob":{"type":"string","minLength":1,"maxLength":256},"directory":{"type":"string"},"start_after":{"type":"string"},"limit":{"type":"integer","minimum":1,"maximum":200},"summary":{"type":"string"}}}`), "repository.read"},
 	{"search_text", "Find literal text in workspace files. Punctuation such as parentheses, brackets and | is literal; no escaping or regex syntax is needed. Select matching lines, filenames, or a total count. Results are bounded and skipped files reported.", searchInputSchema("text"), "repository.read"},
@@ -253,8 +253,11 @@ func (host Host) execute(ctx context.Context, authority Authority, call Call) (R
 		var args struct {
 			Paths []string `json:"paths"`
 		}
-		if decode(call.Arguments, &args) != nil || len(args.Paths) < 1 || len(args.Paths) > 32 {
-			return Result{}, ErrInvalidCall
+		if decodeErr := decode(call.Arguments, &args); decodeErr != nil {
+			return Result{}, fmt.Errorf("check_go_format: expected an object containing paths: %w", decodeErr)
+		}
+		if len(args.Paths) < 1 || len(args.Paths) > 32 {
+			return Result{}, fmt.Errorf("check_go_format: expected 1..32 paths, got %d: %w", len(args.Paths), ErrInvalidCall)
 		}
 		result.Files, err = checkGoFormat(root, args.Paths)
 		if err == nil {
@@ -642,21 +645,27 @@ func readFile(root, relative string, start, count int) (string, string, int, err
 func checkGoFormat(root string, paths []string) ([]string, error) {
 	unformatted := make([]string, 0)
 	seen := make(map[string]bool, len(paths))
-	for _, relative := range paths {
-		if seen[relative] || filepath.Ext(relative) != ".go" {
-			return nil, ErrInvalidCall
+	for index, relative := range paths {
+		if seen[relative] {
+			return nil, fmt.Errorf("check_go_format paths[%d]=%q: duplicate path: %w", index, relative, ErrInvalidCall)
+		}
+		if filepath.Ext(relative) != ".go" {
+			return nil, fmt.Errorf("check_go_format paths[%d]=%q: expected an existing workspace-relative Go file ending in .go: %w", index, relative, ErrInvalidCall)
 		}
 		seen[relative] = true
 		path, err := existingPath(root, relative)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("check_go_format paths[%d]=%q: cannot resolve existing workspace file: %w", index, relative, err)
 		}
 		info, err := os.Stat(path)
-		if err != nil || !info.Mode().IsRegular() {
-			return nil, ErrInvalidCall
+		if err != nil {
+			return nil, fmt.Errorf("check_go_format paths[%d]=%q: cannot inspect file: %w", index, relative, err)
+		}
+		if !info.Mode().IsRegular() {
+			return nil, fmt.Errorf("check_go_format paths[%d]=%q: expected a regular file: %w", index, relative, ErrInvalidCall)
 		}
 		if info.Size() > 1<<20 {
-			return nil, ErrTooLarge
+			return nil, fmt.Errorf("check_go_format paths[%d]=%q: file exceeds 1 MiB: %w", index, relative, ErrTooLarge)
 		}
 		content, err := os.ReadFile(path)
 		if err != nil {

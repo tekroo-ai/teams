@@ -349,6 +349,15 @@ func TestPrepareNativeToolDeltaRelease(t *testing.T) {
 
 func bindToolDeltaQualification(t *testing.T, p *ProductionProfile, surface kernel.Digest, id kernel.UUIDv7, efficiency bool, ids *UUIDv7Source) {
 	t.Helper()
+	scenario := "native-tool-delta-file-recovery"
+	if efficiency {
+		scenario = "native-tool-delta-workspace-efficiency"
+	}
+	bindNamedToolDeltaQualification(t, p, surface, id, scenario, ids)
+}
+
+func bindNamedToolDeltaQualification(t *testing.T, p *ProductionProfile, surface kernel.Digest, id kernel.UUIDv7, scenario string, ids *UUIDv7Source) {
+	t.Helper()
 	p.ToolPolicyDigest = surface
 	corpus := *p.QualificationCorpus
 	corpus.Revision++
@@ -356,10 +365,6 @@ func bindToolDeltaQualification(t *testing.T, p *ProductionProfile, surface kern
 	corpus.ScenarioIDs = slices.Clone(corpus.ScenarioIDs)
 	// Requalifying the same capability on a new catalog retains its
 	// scenario identity; duplicate IDs make the corpus invalid.
-	scenario := "native-tool-delta-file-recovery"
-	if efficiency {
-		scenario = "native-tool-delta-workspace-efficiency"
-	}
 	if !slices.Contains(corpus.ScenarioIDs, scenario) {
 		corpus.ScenarioIDs = append(corpus.ScenarioIDs, scenario)
 	}
