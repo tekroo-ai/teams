@@ -108,6 +108,14 @@ func TestPreparePMDecisionContractRelease(t *testing.T) {
 	}
 	root := t.TempDir()
 	writeText(t, filepath.Join(root, "AGENTS.md"), "This qualification repository supplies only the admitted product request. No implementation discovery is required; preserve its criteria.\n", 0600)
+	// Repository-read tools remain available under the unchanged PM profile.
+	// Give them a real Git root; a plain temporary directory is not an
+	// equivalent fixture and rejects otherwise valid git_log/status calls.
+	candidateGit(t, root, "init", "--initial-branch=qualification")
+	candidateGit(t, root, "config", "user.name", "PM Contract Qualification")
+	candidateGit(t, root, "config", "user.email", "qualification@example.test")
+	candidateGit(t, root, "add", "AGENTS.md")
+	candidateGit(t, root, "-c", "core.hooksPath=/dev/null", "commit", "-m", "Admitted contract qualification input")
 	readTools := []string{}
 	for _, tool := range agenttools.ReadOnlyDefinitions(bundle.Permissions) {
 		readTools = append(readTools, tool.Name)
