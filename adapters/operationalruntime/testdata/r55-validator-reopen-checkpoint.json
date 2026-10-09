@@ -1,0 +1,461 @@
+{
+  "captured_at": "2026-10-09T01:24:27.915Z",
+  "database": "tekroo_teams_v4_phase10_prod_r55",
+  "task_id": "a59dc4a8-5104-7dcf-8a36-f9facca22915",
+  "state": {
+    "kind": "task",
+    "id": "a59dc4a8-5104-7dcf-8a36-f9facca22915",
+    "revision": 12,
+    "lifecycle_epoch": 2,
+    "scope_revision": 2,
+    "phase": "ACTIVE",
+    "condition": "RUNNABLE",
+    "ownership": {
+      "owner_fqn": "teams::tester-1",
+      "ownership_version": 1,
+      "assigned_event_id": "01a11d63-e441-7143-9990-a3d16177b6a6"
+    }
+  },
+  "profile": {
+    "task": {
+      "kind": "task",
+      "id": "a59dc4a8-5104-7dcf-8a36-f9facca22915"
+    },
+    "profile": {
+      "profile": {
+        "task_id": "a59dc4a8-5104-7dcf-8a36-f9facca22915",
+        "profile_id": "265cb9f0-b4f3-7108-8a87-eb06d94d7e23",
+        "profile_revision": 2,
+        "profile_digest": "e7bbb874e2ed79feaef4e81c1e237f7f8423ad8b51d6a302f874f3fd846a80e1",
+        "lifecycle_epoch": 1,
+        "scope_revision": 1,
+        "work_kind": "VALIDATION",
+        "ambiguity": "MEDIUM",
+        "novelty": "ROUTINE",
+        "blast_radius": "LOCAL",
+        "security_sensitivity": "ORDINARY",
+        "minimum_decision_route": "BOUNDED_EXECUTION",
+        "acceptance_criteria_digest": "8afb238c0eb5666d1c14d200a4dc6c4ab9883c52f0c9fdc410ddd72bb680ab03",
+        "required_deterministic_gate_ids": [
+          "go-compile"
+        ],
+        "required_validation_branches": 1,
+        "required_independence_dimensions": [
+          "PRINCIPAL",
+          "METHOD"
+        ],
+        "implementation_variant_count": 1,
+        "valid_candidate_quorum": 1,
+        "verification_topology_digest": "0c58fd2c7cb06369db332303e1bcc873cf52f961083879aa9c5cf6c00f8d367a",
+        "classification_policy_revision": 4,
+        "classification_policy_digest": "a5497bda86b9f33765b7ea229bb42286b6aaf11182566c24d60193e98cf7d6d4",
+        "promotion_policy_revision": 4,
+        "promotion_policy_digest": "69e124e22aa72b81ccb347cf519b023d8e17bdf9a5c268962eb2ad0cc6c3cee6",
+        "budgets": {
+          "attempt_limit": 2,
+          "review_round_limit": 1,
+          "promotion_limit": 1,
+          "escalation_limit": 1,
+          "deadline_at": "2026-10-09T03:35:00Z"
+        },
+        "classification_authority": {
+          "kind": "HUMAN",
+          "id": "principal"
+        },
+        "classification_evidence_ids": [
+          "2c0ada6f-4d40-7e7c-84ca-d6056fdd2f71",
+          "5e55a616-07b2-7498-88e0-33f8c4db6f78"
+        ],
+        "supersedes_profile_id": "5b63ae27-2b64-741c-828b-5264891c9717"
+      },
+      "bound_event_id": "01a11ddf-b254-7ee1-88af-2736322a3751",
+      "task_revision": 9
+    }
+  },
+  "reopened_event": {
+    "contract_manifest": "tekroo.kernel.contracts/0.12.0",
+    "event_id": "01a11e2c-09c0-797f-b8fa-ffd2f7e63ee2",
+    "event_type": "tekroo.event.work.reopened",
+    "event_version": "1.6.0",
+    "aggregate": {
+      "kind": "task",
+      "id": "a59dc4a8-5104-7dcf-8a36-f9facca22915"
+    },
+    "aggregate_revision": 12,
+    "lifecycle_epoch": 2,
+    "command_id": "99addc2b-ba1a-72a1-815e-c5ffb7f2bc41",
+    "authority": {
+      "kind": "POLICY",
+      "id": "teams-admission-policy"
+    },
+    "actor_fqn": "teams::tester-1",
+    "execution": {
+      "execution_id": "01a11e2b-d573-7733-a398-6d64eb84a4e4",
+      "fencing_epoch": 3
+    },
+    "parents": [
+      {
+        "parent_event_id": "01a11de3-0eb8-7066-9630-368b5b593fdf",
+        "edge_kind": "RESPONSE"
+      }
+    ],
+    "committed_at": "2026-10-09T00:59:24.992284Z",
+    "payload": {
+      "evidence_ids": [
+        "2c0ada6f-4d40-7e7c-84ca-d6056fdd2f71",
+        "8821425b-b7f0-73de-8db6-b0e73431853a",
+        "f9d13b61-369a-7e15-8cf1-0c6fc5593b51"
+      ],
+      "new_scope_revision": 2,
+      "owner_carry_forward": true,
+      "prior_epoch": 1,
+      "reason": "A validated dependency produced a changed candidate; revalidate only this dependent task against the new immutable candidate."
+    },
+    "provenance_digest": "73671bff43108a0dfbf8837a2776f0b5d77aa6c0982671eb8761b1e0e97bfad9"
+  },
+  "receipts": [
+    {
+      "contract_manifest": "tekroo.kernel.contracts/0.12.0",
+      "command_id": "8e2d9123-f8ab-730f-8deb-63e532e17ad7",
+      "command_type": "tekroo.command.task.authorize-qualified-assignment",
+      "target": {
+        "kind": "task",
+        "id": "a59dc4a8-5104-7dcf-8a36-f9facca22915"
+      },
+      "outcome_code": "REJECTED_CONFLICT",
+      "reason_code": "LIFECYCLE_EPOCH_CONFLICT",
+      "state_changed": false,
+      "resulting_revision": null,
+      "event_ids": null,
+      "received_at": "2026-10-09T00:59:27.243332Z",
+      "decided_at": "2026-10-09T00:59:27.243332Z",
+      "provenance_digest": "f8b204bc2b2bd60674b7b9851540694f34b865a780bc067043a83c03ea193975"
+    },
+    {
+      "contract_manifest": "tekroo.kernel.contracts/0.12.0",
+      "command_id": "99addc2b-ba1a-72a1-815e-c5ffb7f2bc41",
+      "command_type": "tekroo.command.work.reopen",
+      "target": {
+        "kind": "task",
+        "id": "a59dc4a8-5104-7dcf-8a36-f9facca22915"
+      },
+      "outcome_code": "APPLIED",
+      "reason_code": "APPLIED",
+      "state_changed": true,
+      "resulting_revision": 12,
+      "event_ids": [
+        "01a11e2c-09c0-797f-b8fa-ffd2f7e63ee2"
+      ],
+      "received_at": "2026-10-09T00:59:24.992284Z",
+      "decided_at": "2026-10-09T00:59:24.992284Z",
+      "provenance_digest": "73671bff43108a0dfbf8837a2776f0b5d77aa6c0982671eb8761b1e0e97bfad9"
+    },
+    {
+      "contract_manifest": "tekroo.kernel.contracts/0.12.0",
+      "command_id": "ec463f6f-123f-7f4b-8617-c728492a41aa",
+      "command_type": "tekroo.command.task.bind-work-profile",
+      "target": {
+        "kind": "task",
+        "id": "a59dc4a8-5104-7dcf-8a36-f9facca22915"
+      },
+      "outcome_code": "REJECTED_UNAUTHORIZED",
+      "reason_code": "UNAUTHORIZED",
+      "state_changed": false,
+      "resulting_revision": null,
+      "event_ids": null,
+      "received_at": "2026-10-09T00:59:25.006033Z",
+      "decided_at": "2026-10-09T00:59:25.006033Z",
+      "provenance_digest": "bb35be865408391c4ce214403180bde1b9956396a321d189657fcd962ab07362"
+    }
+  ],
+  "authorities": [
+    {
+      "command_id": "8e2d9123-f8ab-730f-8deb-63e532e17ad7",
+      "authority": {
+        "principal": {
+          "kind": "POLICY",
+          "id": "teams-admission-policy"
+        },
+        "allowed": true,
+        "can_read_target": true,
+        "reason": "AUTHORIZED",
+        "policy_digest": "2b3035bb3dff604b9ddb4676c73c0ff6de5e16b76f101af4072e06924ae8c17e",
+        "policy_revision": 7,
+        "grant_digests": [
+          "44bfd415e5a12242e2c3af7794fbeca1135fe2da0538e8ceedcbd6456ce23857"
+        ],
+        "delegation_digests": null
+      }
+    },
+    {
+      "command_id": "99addc2b-ba1a-72a1-815e-c5ffb7f2bc41",
+      "authority": {
+        "principal": {
+          "kind": "POLICY",
+          "id": "teams-admission-policy"
+        },
+        "allowed": true,
+        "can_read_target": true,
+        "reason": "AUTHORIZED",
+        "policy_digest": "2b3035bb3dff604b9ddb4676c73c0ff6de5e16b76f101af4072e06924ae8c17e",
+        "policy_revision": 7,
+        "grant_digests": [
+          "44bfd415e5a12242e2c3af7794fbeca1135fe2da0538e8ceedcbd6456ce23857"
+        ],
+        "delegation_digests": null
+      }
+    },
+    {
+      "command_id": "ec463f6f-123f-7f4b-8617-c728492a41aa",
+      "authority": {
+        "principal": {
+          "kind": "POLICY",
+          "id": "teams-admission-policy"
+        },
+        "allowed": true,
+        "can_read_target": true,
+        "reason": "AUTHORIZED",
+        "policy_digest": "2b3035bb3dff604b9ddb4676c73c0ff6de5e16b76f101af4072e06924ae8c17e",
+        "policy_revision": 7,
+        "grant_digests": [
+          "44bfd415e5a12242e2c3af7794fbeca1135fe2da0538e8ceedcbd6456ce23857"
+        ],
+        "delegation_digests": null
+      }
+    }
+  ],
+  "provenance": [
+    {
+      "command_id": "99addc2b-ba1a-72a1-815e-c5ffb7f2bc41",
+      "command_fingerprint": "63245c299ea1b9f2ff41eae9c718d37a925eb0c5f1d0409e921183fce0c28b06",
+      "parents": [
+        {
+          "parent_event_id": "01a11de3-0eb8-7066-9630-368b5b593fdf",
+          "edge_kind": "RESPONSE"
+        }
+      ],
+      "evidence_refs": [
+        {
+          "evidence_id": "2c0ada6f-4d40-7e7c-84ca-d6056fdd2f71",
+          "sha256": "9a4dd586162780dedddfec70b967b3b7adb88c6d4a92f58b6ab2727be874aa1d"
+        },
+        {
+          "evidence_id": "8821425b-b7f0-73de-8db6-b0e73431853a",
+          "sha256": "5f65ab6ed58a7710f7c2004202789ae65207afe753dd7ce18a4a2725fd8879a3"
+        },
+        {
+          "evidence_id": "f9d13b61-369a-7e15-8cf1-0c6fc5593b51",
+          "sha256": "533e83b4b3c5fe1d070f897632d4b4a08a661b4276e9f3f295b46fcbfa9e2214"
+        }
+      ]
+    },
+    {
+      "command_id": "ec463f6f-123f-7f4b-8617-c728492a41aa",
+      "command_fingerprint": "d6b8b98bfd3e3dd97f24c52a2522db7a76f2d90bc77443c8e661e4d8e5f14bfb",
+      "parents": [
+        {
+          "parent_event_id": "01a11e2c-09c0-797f-b8fa-ffd2f7e63ee2",
+          "edge_kind": "CAUSAL"
+        }
+      ],
+      "evidence_refs": [
+        {
+          "evidence_id": "2c0ada6f-4d40-7e7c-84ca-d6056fdd2f71",
+          "sha256": "9a4dd586162780dedddfec70b967b3b7adb88c6d4a92f58b6ab2727be874aa1d"
+        },
+        {
+          "evidence_id": "8821425b-b7f0-73de-8db6-b0e73431853a",
+          "sha256": "5f65ab6ed58a7710f7c2004202789ae65207afe753dd7ce18a4a2725fd8879a3"
+        },
+        {
+          "evidence_id": "f9d13b61-369a-7e15-8cf1-0c6fc5593b51",
+          "sha256": "533e83b4b3c5fe1d070f897632d4b4a08a661b4276e9f3f295b46fcbfa9e2214"
+        }
+      ]
+    },
+    {
+      "command_id": "8e2d9123-f8ab-730f-8deb-63e532e17ad7",
+      "command_fingerprint": "3793a366d0895954aaca309cfd73f657956d7288a5cb40eee3bfa1dc79ce0973",
+      "parents": [
+        {
+          "parent_event_id": "01a11e2c-09c0-797f-b8fa-ffd2f7e63ee2",
+          "edge_kind": "CAUSAL"
+        }
+      ],
+      "evidence_refs": [
+        {
+          "evidence_id": "1545ad3e-2227-76bf-8cd8-aff6fa9da056",
+          "sha256": "5cbdbfa748d919c19a6eae27b9a43c1abf42dff76bdd8447566906af9dd529c6"
+        },
+        {
+          "evidence_id": "2c0ada6f-4d40-7e7c-84ca-d6056fdd2f71",
+          "sha256": "9a4dd586162780dedddfec70b967b3b7adb88c6d4a92f58b6ab2727be874aa1d"
+        },
+        {
+          "evidence_id": "b1329671-af03-7615-8aec-a4a5505193d9",
+          "sha256": "270f81e228d2719ea92a7b87ed1ff2f8b1b00129bc6b817aae8f4ec5ef115c3e"
+        }
+      ]
+    }
+  ],
+  "computed": {
+    "reconstructed_successor_classification_evidence_ids": [
+      "2c0ada6f-4d40-7e7c-84ca-d6056fdd2f71",
+      "5e55a616-07b2-7498-88e0-33f8c4db6f78",
+      "8821425b-b7f0-73de-8db6-b0e73431853a",
+      "f9d13b61-369a-7e15-8cf1-0c6fc5593b51"
+    ],
+    "missing_from_binding_evidence_refs": [
+      "5e55a616-07b2-7498-88e0-33f8c4db6f78"
+    ]
+  },
+  "invocations": [
+    {
+      "id": "01a11b5e-0964-7529-bba7-9fb1b6867986",
+      "task_id": "0d243222-35a3-75e0-8a2c-abb06eacf697",
+      "state": "SUCCEEDED",
+      "purpose": "HANDOFF",
+      "started_at": "2026-10-08T11:55:50.758698Z",
+      "finished_at": "2026-10-08T11:57:53.345862Z"
+    },
+    {
+      "id": "01a11b60-8bde-76e3-91e5-68613739d60c",
+      "task_id": "4a7ca9ce-ebd6-7e0f-802d-884e034438dd",
+      "state": "SUCCEEDED",
+      "purpose": "HANDOFF",
+      "started_at": "2026-10-08T11:57:54.743939Z",
+      "finished_at": "2026-10-08T11:58:38.374618Z"
+    },
+    {
+      "id": "01a11b61-38f3-7b01-aa17-4606c1143a50",
+      "task_id": "4666312f-3db0-7119-87c1-0eecb2817c9a",
+      "state": "SUCCEEDED",
+      "purpose": "HANDOFF",
+      "started_at": "2026-10-08T11:58:39.095715Z",
+      "finished_at": "2026-10-08T12:03:42.758578Z"
+    },
+    {
+      "id": "01a11b65-dcfb-72e9-8d57-5783246a04ee",
+      "task_id": "2bfdb559-f232-7f31-862f-d03ce69d102d",
+      "state": "SUCCEEDED",
+      "purpose": "HANDOFF",
+      "started_at": "2026-10-08T12:03:43.184117Z",
+      "finished_at": "2026-10-08T12:06:59.510905Z"
+    },
+    {
+      "id": "98ee1f14-bdb3-7331-83ca-521d80287aaa",
+      "task_id": "11dce475-04d9-76af-89d4-e63e65eecc18",
+      "state": "SUCCEEDED",
+      "purpose": "IMPLEMENTATION",
+      "started_at": "2026-10-08T12:07:03.673265Z",
+      "finished_at": "2026-10-08T12:12:37.9298Z"
+    },
+    {
+      "id": "41d837b6-16a4-7895-8213-3f0f0c9f2a4d",
+      "task_id": "8a855512-2297-7499-8cfc-9af20cdc726c",
+      "state": "SUCCEEDED",
+      "purpose": "IMPLEMENTATION",
+      "started_at": "2026-10-08T12:12:41.82646Z",
+      "finished_at": "2026-10-08T12:36:31.234576Z"
+    },
+    {
+      "id": "db343e55-6f91-783c-8597-8db3f3716876",
+      "task_id": "7beac884-95cb-72e9-89e2-dbbe0328d530",
+      "state": "SUCCEEDED",
+      "purpose": "IMPLEMENTATION",
+      "started_at": "2026-10-08T12:36:35.246226Z",
+      "finished_at": "2026-10-08T12:45:48.420413Z"
+    },
+    {
+      "id": "f803d6f9-ed87-76ca-86a0-a12818c19cb5",
+      "task_id": "9b2712ef-851d-7d37-8bfc-5e6964af049b",
+      "state": "SUCCEEDED",
+      "purpose": "VALIDATION",
+      "started_at": "2026-10-08T12:36:55.300002Z",
+      "finished_at": "2026-10-08T12:43:52.87138Z"
+    },
+    {
+      "id": "273b9430-dc1a-7db0-8848-78f58afc26d3",
+      "task_id": "5949f328-c413-7fd3-8e51-cd544a1c31af",
+      "state": "SUCCEEDED",
+      "purpose": "IMPLEMENTATION",
+      "started_at": "2026-10-08T12:45:52.949929Z",
+      "finished_at": "2026-10-08T14:31:58.175527Z"
+    },
+    {
+      "id": "6795d5a8-e6db-731e-8715-c6077492752b",
+      "task_id": "70a8d993-b439-7ef0-8129-de59192db1d4",
+      "state": "SUCCEEDED",
+      "purpose": "VALIDATION",
+      "started_at": "2026-10-08T12:46:07.325002Z",
+      "finished_at": "2026-10-08T12:54:39.775014Z"
+    },
+    {
+      "id": "1669b372-52f6-792b-80af-d0974312f985",
+      "task_id": "a59dc4a8-5104-7dcf-8a36-f9facca22915",
+      "state": "SUCCEEDED",
+      "purpose": "VALIDATION",
+      "started_at": "2026-10-08T23:36:05.111747Z",
+      "finished_at": "2026-10-08T23:39:18.598187Z"
+    },
+    {
+      "id": "10003135-ca18-7475-8423-897e991c3e73",
+      "task_id": "5949f328-c413-7fd3-8e51-cd544a1c31af",
+      "state": "SUCCEEDED",
+      "purpose": "REPAIR",
+      "started_at": "2026-10-09T00:43:52.246628Z",
+      "finished_at": "2026-10-09T00:59:10.311881Z"
+    }
+  ],
+  "plan_task": {
+    "id": "a59dc4a8-5104-7dcf-8a36-f9facca22915",
+    "story_id": "35536a73-699c-7b22-8da2-cec9d9c46d9f",
+    "title": "Validate: Accept alias tokens and expose alias assignment on operator surfaces (CLI, HTTP, MCP)",
+    "description": "Independently inspect the implementation, run the acceptance checks, and report the structured validation result.\n\nTeams will materialize and preflight one immutable candidate workspace before this task starts. Validate only the candidate identity supplied in the execution brief. Do not locate, enumerate, or switch branches, and do not modify the candidate.\nHandoff operationalruntime-service-alias-resolution-assignment to verify:\nProvided interface: Operationalruntime service methods that (a) resolve an actor-or-alias token to a canonical kernel.ActorFQN (byte-identical passthrough for an already-valid FQN, observable not-found for unknown) applied before Host delegation for role-lifecycle/inbox/dead-letter, and (b) assign/list aliases.\nRequired inputs:\n- service resolution method for actor-or-alias tokens: task 1 write_scope adapters/operationalruntime/production.go\n- service alias assign/list methods: task 1 write_scope adapters/operationalruntime/production.go\nConsumer usage: Task 3's CLI, HTTP handler, and MCP/operatortools surfaces call these service methods instead of pre-validating operands as ActorFQN, and widen the Organization/RoleOperations interfaces against the existing real implementation; examples use <actor-fqn>/<alias> placeholders.\nProvider verification: Task 3 scoped tests on each surface prove an alias resolves to the same instance as its <actor-fqn> and that assignment-then-address-by-alias works end to end, while existing FQN-path tests stay green against the unchanged real service implementation.",
+    "acceptance_criteria": [
+      "CLI, HTTP, and MCP surfaces resolve a supplied <alias> to the same instance as its <actor-fqn>, proven by scoped tests on each surface.",
+      "Supplied canonical FQN operands continue to work unchanged (no regression in existing handler/service/CLI tests).",
+      "An operator can assign an alias to an instance through an operator surface and then address that instance by alias (end-to-end AC0 exercised).",
+      "Test doubles for the widened operator interfaces compile and pass; every committed step keeps HEAD buildable.",
+      "Alias operands that are neither a valid alias nor a valid FQN are rejected with a clear error rather than silently routed.",
+      "For each dependency-produced interface this task consumes, focused verification exercises the consumer's actual call or data exchange against the completed dependency implementation; a stand-in that assumes the interface is insufficient.",
+      "Verify handoff operationalruntime-service-alias-resolution-assignment is usable through the provider's actual delivered boundary with the agreed inputs from consumer task 5949f328-c413-7fd3-8e51-cd544a1c31af's scope. For runtime API handoffs, interface assertions or nil/test-double-only construction are not runtime construction proof."
+    ],
+    "depends_on": [
+      "5949f328-c413-7fd3-8e51-cd544a1c31af",
+      "8a855512-2297-7499-8cfc-9af20cdc726c"
+    ],
+    "validates": [
+      "5949f328-c413-7fd3-8e51-cd544a1c31af"
+    ],
+    "owner": "teams::tester-1",
+    "model_profile_digest": "dc1e5affd399607946072b0d09cc4434ca258dfd0f4d259218cbbd55c1a904c6",
+    "decision_route": "BOUNDED_EXECUTION",
+    "purpose": "VALIDATION",
+    "complexity": 6,
+    "risk": "MODERATE",
+    "critical_path": true,
+    "attempt_limit": 2,
+    "review_round_limit": 1
+  },
+  "dependency_invocations": [
+    {
+      "id": "41d837b6-16a4-7895-8213-3f0f0c9f2a4d",
+      "task_id": "8a855512-2297-7499-8cfc-9af20cdc726c",
+      "output_digest": "98e6494cdd0882291287ada23ff034f5ab042220b5a29bcb13c057ebf6140a89",
+      "global_debit_ordinal": 6
+    },
+    {
+      "id": "273b9430-dc1a-7db0-8848-78f58afc26d3",
+      "task_id": "5949f328-c413-7fd3-8e51-cd544a1c31af",
+      "output_digest": "87d71af5d09ed2f904fa3897b8f670396bd7307f5b37c9cff47d0e2f043dced8",
+      "global_debit_ordinal": 9
+    },
+    {
+      "id": "10003135-ca18-7475-8423-897e991c3e73",
+      "task_id": "5949f328-c413-7fd3-8e51-cd544a1c31af",
+      "output_digest": "2fa71526a3194a7689e167fbdc901b9144baab29af22bdd2a63a6922829335c2",
+      "global_debit_ordinal": 12
+    }
+  ]
+}

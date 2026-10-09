@@ -382,6 +382,12 @@ func (service *ProductionService) reconcileFeatureProfileDeadlines(ctx context.C
 			return false, organization.ErrInvalidFeature
 		}
 		current := profileSnapshot.Profile
+		// A reopen may have committed before its successor profile binding.
+		// Complete that checkpoint in validation reconciliation before attempting
+		// maintenance commands against the predecessor lifecycle.
+		if !current.Binding().TaskBindingMatches(state) {
+			continue
+		}
 		// An invocation owns deadline recovery only while it is bound to the
 		// task's current lifecycle, scope, and profile. A reopened validator keeps
 		// its prior invocation as history; that stale invocation must not prevent
@@ -655,6 +661,14 @@ func (service *ProductionService) reconcileValidationRounds(ctx context.Context,
 		if digestErr != nil {
 			return false, digestErr
 		}
+		if !profileSnapshot.Profile.Binding().TaskBindingMatches(state) {
+			// Reopen and profile binding are separate durable commands. A rejected
+			// binding must not fall through to assignment using the old epoch.
+			if err := service.resumeChangedCandidateValidatorProfile(ctx, feature, validator, state, heads[validator.ID], profileSnapshot.Profile, expectedCondition); err != nil {
+				return false, err
+			}
+			return true, nil // Reload the bound successor before any admission.
+		}
 		// An operator-authorized revalidation also binds its recovery condition.
 		// Use the same exact-lineage check as completion reconciliation so that a
 		// valid successor is not mistaken for a still-stale validator and charged
@@ -753,21 +767,87 @@ func (service *ProductionService) reopenCompletedValidatorForChangedCandidate(ct
 		Reason:         "A validated dependency produced a changed candidate; revalidate only this dependent task against the new immutable candidate.",
 		IdempotencyKey: "changed-candidate-" + string(condition),
 	}
+	successor, err := reopenedTaskRecoveryProfile(current, service.planning, condition, current.Budgets.DeadlineAt, evidenceIDs, state.LifecycleEpoch+1, state.ScopeRevision+1)
+	if err != nil {
+		return kernel.AggregateState{}, "", kernel.WorkRiskProfile{}, err
+	}
+	// Resolve the complete retained+candidate set before committing the reopen.
+	profileEvidence, err := service.changedCandidateProfileEvidence(ctx, validator.ID, successor)
+	if err != nil {
+		return kernel.AggregateState{}, "", kernel.WorkRiskProfile{}, err
+	}
 	updated, updatedHead, err := service.reopenCompletedTaskForRecovery(ctx, feature, validator, state, head, request, evidence)
 	if err != nil {
 		return kernel.AggregateState{}, "", kernel.WorkRiskProfile{}, err
 	}
-	successor, err := reopenedTaskRecoveryProfile(current, service.planning, condition, current.Budgets.DeadlineAt, evidenceIDs, updated.LifecycleEpoch, updated.ScopeRevision)
-	if err != nil {
-		return kernel.AggregateState{}, "", kernel.WorkRiskProfile{}, err
-	}
 	tracked := &trackedTask{plan: validator, revision: updated.Revision, last: updatedHead, profile: successor}
-	profileKey := fmt.Sprintf("changed-candidate-profile-%d-%s", successor.ProfileRevision, successor.ProfileDigest)
-	if err := service.applyTaskCommand(ctx, feature, tracked, "tekroo.command.task.bind-work-profile", kernel.SchemaVersion, service.policyAuthority, successor, evidence, nil, profileKey); err != nil {
+	if err := service.bindChangedCandidateProfile(ctx, feature, tracked, profileEvidence); err != nil {
 		return kernel.AggregateState{}, "", kernel.WorkRiskProfile{}, err
 	}
 	updated.Revision = tracked.revision
 	return updated, tracked.last, successor, nil
+}
+
+func (service *ProductionService) changedCandidateProfileEvidence(ctx context.Context, taskID kernel.UUIDv7, profile kernel.WorkRiskProfile) ([]kernel.EvidenceRef, error) {
+	snapshot, err := service.Store.LoadDecision(ctx, kernel.KernelCommand{Target: kernel.AggregateRef{Kind: kernel.AggregateTask, ID: taskID}})
+	if err != nil {
+		return nil, err
+	}
+	return evidenceRefsForIDs(snapshot, profile.ClassificationEvidenceIDs)
+}
+
+func (service *ProductionService) bindChangedCandidateProfile(ctx context.Context, feature organization.FeatureRequest, tracked *trackedTask, evidence []kernel.EvidenceRef) error {
+	// v2 preserves the historical rejected receipt: corrected evidence changes
+	// the command fingerprint and cannot reuse its old idempotency identity.
+	key := fmt.Sprintf("changed-candidate-profile-v2-%d-%s", tracked.profile.ProfileRevision, tracked.profile.ProfileDigest)
+	return service.applyTaskCommand(ctx, feature, tracked, "tekroo.command.task.bind-work-profile", kernel.SchemaVersion, service.policyAuthority, tracked.profile, evidence, nil, key)
+}
+
+func (service *ProductionService) resumeChangedCandidateValidatorProfile(ctx context.Context, feature organization.FeatureRequest, validator organization.PlannedTask, state kernel.AggregateState, head kernel.UUIDv7, current kernel.WorkRiskProfile, condition kernel.Digest) error {
+	event, found, err := service.Store.ReadEvent(ctx, head)
+	if err != nil {
+		return err
+	}
+	if !found || !changedCandidateReopenCheckpointMatches(validator, state, current, condition, event, service.policyAuthority) {
+		return fmt.Errorf("changed-candidate profile checkpoint does not match task %s: %w", validator.ID, organization.ErrInvalidFeature)
+	}
+	var payload struct {
+		EvidenceIDs []kernel.UUIDv7 `json:"evidence_ids"`
+	}
+	if err := json.Unmarshal(event.Payload, &payload); err != nil {
+		return err
+	}
+	successor, err := reopenedTaskRecoveryProfile(current, service.planning, condition, current.Budgets.DeadlineAt, payload.EvidenceIDs, state.LifecycleEpoch, state.ScopeRevision)
+	if err != nil {
+		return err
+	}
+	evidence, err := service.changedCandidateProfileEvidence(ctx, validator.ID, successor)
+	if err != nil {
+		return err
+	}
+	tracked := &trackedTask{plan: validator, revision: state.Revision, last: head, profile: successor}
+	return service.bindChangedCandidateProfile(ctx, feature, tracked, evidence)
+}
+
+func changedCandidateReopenCheckpointMatches(validator organization.PlannedTask, state kernel.AggregateState, current kernel.WorkRiskProfile, condition kernel.Digest, event kernel.DomainEvent, authority kernel.PrincipalRef) bool {
+	if len(validator.Validates) == 0 || state.Kind != kernel.AggregateTask || state.ID != validator.ID || state.Phase != kernel.PhaseActive || state.Condition != kernel.ConditionRunnable || state.Ownership.OwnerFQN == nil || *state.Ownership.OwnerFQN != validator.Owner || !current.Valid() || current.TaskID != validator.ID || !condition.Valid() || state.LifecycleEpoch != current.LifecycleEpoch+1 || state.ScopeRevision != current.ScopeRevision+1 {
+		return false
+	}
+	if event.EventType != "tekroo.event.work.reopened" || event.Aggregate != (kernel.AggregateRef{Kind: kernel.AggregateTask, ID: validator.ID}) || event.AggregateRevision != state.Revision || event.LifecycleEpoch != state.LifecycleEpoch || event.Authority != authority || event.ActorFQN == nil || *event.ActorFQN != validator.Owner || event.Execution == nil || !event.Execution.Valid() {
+		return false
+	}
+	var payload struct {
+		PriorEpoch        uint64          `json:"prior_epoch"`
+		NewScopeRevision  uint64          `json:"new_scope_revision"`
+		OwnerCarryForward bool            `json:"owner_carry_forward"`
+		Reason            string          `json:"reason"`
+		EvidenceIDs       []kernel.UUIDv7 `json:"evidence_ids"`
+	}
+	if json.Unmarshal(event.Payload, &payload) != nil || payload.PriorEpoch != current.LifecycleEpoch || payload.NewScopeRevision != state.ScopeRevision || !payload.OwnerCarryForward || payload.Reason != "A validated dependency produced a changed candidate; revalidate only this dependent task against the new immutable candidate." || len(payload.EvidenceIDs) == 0 {
+		return false
+	}
+	key := fmt.Sprintf("operator-task-recovery-reopen-%s-changed-candidate-%s:execution:%s:%d", validator.ID, condition, event.Execution.ExecutionID, event.Execution.FencingEpoch)
+	return event.CommandID == deterministicOperationalUUID("standalone-command", "tekroo.command.work.reopen", string(validator.ID), key)
 }
 
 func (service *ProductionService) unblockValidationForChangedCandidate(ctx context.Context, task *trackedTask, prior kernel.WorkInvocation, workspace ProductionWorkspace, evidence []kernel.EvidenceRef) error {
