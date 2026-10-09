@@ -82,14 +82,14 @@ func (manager *candidateWorkspaceManager) readGateCache(key string, gate Product
 	r := record.Receipt
 	out, outErr := base64.StdEncoding.DecodeString(r.StdoutBase64)
 	stderr, stderrErr := base64.StdEncoding.DecodeString(r.StderrBase64)
-	if digestBytes(receiptBytes) != record.ReceiptSHA256 || r.GateID != gate.GateID || !slices.Equal(r.Command, gate.Command) || r.ExitCode != 0 || r.ExecutionError != "" || !r.ReceiptID.Valid() || outErr != nil || stderrErr != nil || digestBytes(out) != r.StdoutSHA256 || digestBytes(stderr) != r.StderrSHA256 {
+	if digestBytes(receiptBytes) != record.ReceiptSHA256 || r.GateID != gate.GateID || !slices.Equal(r.Command, gate.Command) || r.ExitCode != 0 || r.ExecutionError != "" || r.Outcome != "" || r.TimeoutEvidence != "" || !r.ReceiptID.Valid() || outErr != nil || stderrErr != nil || digestBytes(out) != r.StdoutSHA256 || digestBytes(stderr) != r.StderrSHA256 {
 		return candidateGateReceipt{}, false, errInvalidCandidateWorkspace
 	}
 	return r, true, nil
 }
 
 func (manager *candidateWorkspaceManager) writeGateCache(key string, receipt candidateGateReceipt) error {
-	if key == "" || receipt.ExitCode != 0 || receipt.ExecutionError != "" {
+	if key == "" || receipt.ExitCode != 0 || receipt.ExecutionError != "" || receipt.Outcome != "" || receipt.TimeoutEvidence != "" {
 		return nil
 	}
 	root := filepath.Join(manager.root, "gate-cache")

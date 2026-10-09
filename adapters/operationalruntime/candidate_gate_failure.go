@@ -9,10 +9,12 @@ import (
 	"path/filepath"
 	"slices"
 
+	"github.com/tekroo-ai/teams/internal/verification"
 	"github.com/tekroo-ai/teams/kernel"
 )
 
 var errCandidateGateFailed = errors.New("candidate verification gate failed")
+var errCandidateGateExecutionTimeout = errors.New("verification execution timed out; candidate verdict INCONCLUSIVE")
 
 // Kept separately from successful candidate receipts: a failed gate must never
 // qualify a candidate, and restarting the daemon must not erase its finding.
@@ -25,10 +27,15 @@ type candidateGateFailure struct {
 }
 
 func (failure *candidateGateFailure) Error() string {
-	return fmt.Sprintf("%s: gate %s, commit %s, exit %d, input %s, receipt %s", errCandidateGateFailed, failure.Receipt.GateID, failure.Commit, failure.Receipt.ExitCode, failure.InputSHA256, failure.Receipt.ReceiptID)
+	return fmt.Sprintf("%s: gate %s, commit %s, exit %d, input %s, receipt %s", failure.Unwrap(), failure.Receipt.GateID, failure.Commit, failure.Receipt.ExitCode, failure.InputSHA256, failure.Receipt.ReceiptID)
 }
 
-func (*candidateGateFailure) Unwrap() error { return errCandidateGateFailed }
+func (failure *candidateGateFailure) Unwrap() error {
+	if failure.Receipt.Outcome == "EXECUTION_TIMEOUT" {
+		return errCandidateGateExecutionTimeout
+	}
+	return errCandidateGateFailed
+}
 
 func (manager *candidateWorkspaceManager) gateFailurePath(key string) string {
 	return filepath.Join(manager.root, "gate-failures", key+".json")
@@ -52,6 +59,16 @@ func (manager *candidateWorkspaceManager) readGateFailure(key string, gate Produ
 	stderr, stderrErr := base64.StdEncoding.DecodeString(r.StderrBase64)
 	if marshalErr != nil || digestBytes(receiptBytes) != failure.ReceiptSHA256 || failure.InputSHA256 != kernel.Digest(key) || failure.Directory != directory || failure.Commit != commit || r.GateID != gate.GateID || !slices.Equal(r.Command, gate.Command) || r.ExitCode <= 0 || !r.ReceiptID.Valid() || outErr != nil || stderrErr != nil || digestBytes(out) != r.StdoutSHA256 || digestBytes(stderr) != r.StderrSHA256 {
 		return nil, errInvalidCandidateWorkspace
+	}
+	if r.Outcome != "" && r.Outcome != "EXECUTION_TIMEOUT" {
+		return nil, errInvalidCandidateWorkspace
+	}
+	if r.Outcome == "EXECUTION_TIMEOUT" {
+		var detector verification.TimeoutDetector
+		_, _ = detector.Write([]byte(r.TimeoutEvidence))
+		if !detector.TimedOut() {
+			return nil, errInvalidCandidateWorkspace
+		}
 	}
 	return &failure, nil
 }

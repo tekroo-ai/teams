@@ -18,6 +18,7 @@ import (
 type SearchMatch struct {
 	Path          string   `json:"path"`
 	Line          int      `json:"line"`
+	EndLine       int      `json:"end_line,omitempty"`
 	Text          string   `json:"text"`
 	After         []string `json:"after,omitempty"`
 	TextTruncated bool     `json:"text_truncated,omitempty"`
@@ -30,6 +31,7 @@ type contentSearchQuery struct {
 	Regex        string
 	Literal      string
 	IgnoreCase   bool
+	Multiline    bool
 	ResultMode   string
 	AfterLines   int
 	MaxResults   int
@@ -164,7 +166,7 @@ func findFiles(ctx context.Context, root, relativeDirectory, pattern, startAfter
 }
 
 func searchFileContents(ctx context.Context, root string, query contentSearchQuery) (contentSearchResult, error) {
-	if (query.Regex == "") == (query.Literal == "") || len(query.Regex) > 4096 || len(query.Literal) > 4096 || query.MaxResults < 1 || query.MaxResults > 100 || query.AfterLines < 0 || query.AfterLines > 40 {
+	if (query.Regex == "") == (query.Literal == "") || query.Multiline && query.Literal != "" || len(query.Regex) > 4096 || len(query.Literal) > 4096 || query.MaxResults < 1 || query.MaxResults > 100 || query.AfterLines < 0 || query.AfterLines > 40 {
 		return contentSearchResult{}, ErrInvalidCall
 	}
 	if query.ResultMode == "" {
@@ -187,7 +189,7 @@ func searchFileContents(ctx context.Context, root string, query contentSearchQue
 	if query.IgnoreCase {
 		expression = "(?i:" + expression + ")"
 	}
-	re, err := regexp.Compile(expression)
+	re, err := compileSearchRegex(expression)
 	if err != nil {
 		return contentSearchResult{}, fmt.Errorf("%w: search_regex regex=%q: %v", ErrInvalidCall, query.Regex, err)
 	}
@@ -206,6 +208,9 @@ func searchFileContents(ctx context.Context, root string, query contentSearchQue
 	}
 	scannedBytes, outputBytes := int64(0), 0
 	visit := func(absolute, relative string) error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		if !filenameGlobMatches(query.FilenameGlob, relative) || query.ExcludeGlob != "" && filenameGlobMatches(query.ExcludeGlob, relative) {
 			return nil
 		}
@@ -215,7 +220,7 @@ func searchFileContents(ctx context.Context, root string, query contentSearchQue
 		}
 		// Return an explicitly incomplete result for oversized or binary files,
 		// instead of silently treating them as evidence of absence.
-		if info.Size() > 2<<20 {
+		if info.Size() > 2<<20 || query.Multiline && info.Size() > 256<<10 {
 			result.SkippedFiles++
 			return nil
 		}
@@ -235,6 +240,49 @@ func searchFileContents(ctx context.Context, root string, query contentSearchQue
 			return nil
 		}
 		lines := strings.Split(strings.TrimSuffix(string(content), "\n"), "\n")
+		if query.Multiline {
+			limit := query.MaxResults + 1
+			if query.ResultMode == "count" {
+				limit = -1
+			}
+			if query.ResultMode == "filenames" {
+				limit = 1
+			}
+			for _, bounds := range re.FindAllIndex(content, limit) {
+				if err := ctx.Err(); err != nil {
+					return err
+				}
+				switch query.ResultMode {
+				case "count":
+					*result.MatchCount++
+				case "filenames":
+					if len(result.Files) == query.MaxResults {
+						result.Truncated = true
+						return errSearchLimit
+					}
+					result.Files = append(result.Files, relative)
+					return nil
+				case "lines":
+					start := 1 + bytes.Count(content[:bounds[0]], []byte{'\n'})
+					end := 1 + bytes.Count(content[:max(bounds[0], bounds[1]-1)], []byte{'\n'})
+					text, clipped := boundedSearchLine(string(content[bounds[0]:bounds[1]]), 2048)
+					match := SearchMatch{Path: relative, Line: start, EndLine: end, Text: text, TextTruncated: clipped}
+					size := len(relative) + len(text) + 48
+					for next := end; next < len(lines) && next < end+query.AfterLines; next++ {
+						following, _ := boundedSearchLine(lines[next], 2048)
+						match.After = append(match.After, following)
+						size += len(following) + 4
+					}
+					if len(result.Matches) == query.MaxResults || outputBytes+size > 64<<10 {
+						result.Truncated = true
+						return errSearchLimit
+					}
+					outputBytes += size
+					result.Matches = append(result.Matches, match)
+				}
+			}
+			return nil
+		}
 		for index, line := range lines {
 			if !re.MatchString(line) {
 				continue

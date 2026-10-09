@@ -17,6 +17,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/tekroo-ai/teams/internal/verification"
 )
 
 const (
@@ -55,6 +57,11 @@ func (host Host) runIsolatedGoTestsFrom(ctx context.Context, root, pattern strin
 	}
 	operation, cancel := context.WithTimeout(ctx, host.Timeout)
 	defer cancel()
+	release, err := verification.Acquire(operation)
+	if err != nil {
+		return result, fmt.Errorf("verification queue: %w", err)
+	}
+	defer release()
 	if runtime.GOOS != "darwin" {
 		return result, fmt.Errorf("isolated Go tests require the qualified macOS sandbox")
 	}
@@ -154,6 +161,8 @@ func (host Host) runIsolatedGoTestsFrom(ctx context.Context, root, pattern strin
 		arguments = append(arguments, "-trimpath", "-c", "-o", compiled+string(filepath.Separator))
 	}
 	arguments = append(arguments, pattern)
+	boundedCommand, _ := verification.GoCommand(append([]string{goBinary}, arguments...))
+	arguments = boundedCommand[1:]
 	command := exec.CommandContext(operation, goBinary, arguments...)
 	if !host.LocalTestExecution || compileOnly {
 		command = exec.CommandContext(operation, "/usr/bin/sandbox-exec", append([]string{"-p", profile, goBinary}, arguments...)...)
@@ -172,6 +181,7 @@ func (host Host) runIsolatedGoTestsFrom(ctx context.Context, root, pattern strin
 		"CGO_ENABLED=0",
 		"GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null", "GIT_TERMINAL_PROMPT=0", "GIT_ATTR_NOSYSTEM=1",
 	)
+	command.Env = verification.Environment(command.Env)
 	if err := host.seedCompilationCache(operation, workspace, source, goBinary, profile, command.Env, pattern); err != nil {
 		return result, err
 	}
@@ -184,7 +194,10 @@ func (host Host) runIsolatedGoTestsFrom(ctx context.Context, root, pattern strin
 	}
 	command.WaitDelay = 2 * time.Second
 	output := &boundedOutput{limit: 128 << 10}
-	command.Stdout, command.Stderr = output, output
+	var timeout verification.TimeoutDetector
+	// Use one shared writer, so os/exec serializes stdout/stderr observations.
+	observations := io.MultiWriter(output, &timeout)
+	command.Stdout, command.Stderr = observations, observations
 	if err := command.Start(); err != nil {
 		return result, fmt.Errorf("isolated Go test process failed: %w", err)
 	}
@@ -227,6 +240,13 @@ finished:
 	var exit *exec.ExitError
 	if errors.As(err, &exit) {
 		result.ExitCode = exit.ExitCode()
+		if timeout.TimedOut() {
+			actualExit := result.ExitCode
+			result.ProcessExitCode = &actualExit
+			result.ExitCode = -1 // Incomplete suite; preserve the process exit separately.
+			result.ExecutionError = "Go test execution timed out; candidate verdict INCONCLUSIVE"
+			result.TimeoutEvidence = timeout.Evidence()
+		}
 		return result, nil
 	}
 	if err != nil {

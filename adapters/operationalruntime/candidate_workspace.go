@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/tekroo-ai/teams/adapters/openhands"
+	"github.com/tekroo-ai/teams/internal/verification"
 	"github.com/tekroo-ai/teams/kernel"
 	"github.com/tekroo-ai/teams/organization"
 )
@@ -63,6 +64,10 @@ type candidateGateReceipt struct {
 	FullStderrSHA256 kernel.Digest `json:"full_stderr_sha256,omitempty"`
 	ReusedFrom       string        `json:"-"`
 	PackageTargets   []string      `json:"package_targets,omitempty"`
+	ExecutionPolicy  string        `json:"execution_policy,omitempty"`
+	Outcome          string        `json:"outcome,omitempty"`
+	TimeoutEvidence  string        `json:"timeout_evidence,omitempty"`
+	QueueStartedAt   time.Time     `json:"-"`
 }
 
 type candidateReceipt struct {
@@ -553,6 +558,8 @@ func (manager *candidateWorkspaceManager) runGates(ctx context.Context, director
 			return nil, errInvalidCandidateWorkspace
 		}
 		seen[gateID] = struct{}{}
+		boundedCommand, heavy := verification.GoCommand(gate.Command)
+		gate.Command = boundedCommand
 		identity, err := manager.git(ctx, directory, "rev-parse", "HEAD")
 		if err != nil {
 			return receipts, err
@@ -566,6 +573,9 @@ func (manager *candidateWorkspaceManager) runGates(ctx context.Context, director
 		command := exec.CommandContext(gateCtx, gate.Command[0], gate.Command[1:]...)
 		command.Dir = directory
 		command.Env = append(os.Environ(), "CI=1", "GIT_PAGER=cat", "PAGER=cat", "GIT_TERMINAL_PROMPT=0")
+		if heavy {
+			command.Env = verification.Environment(command.Env)
+		}
 		inputKey, err := candidateGateInputKey(ctx, gate, command.Env, directory, strings.TrimSpace(string(identity)), strings.TrimSpace(string(tree)))
 		if err != nil {
 			cancel()
@@ -596,6 +606,15 @@ func (manager *candidateWorkspaceManager) runGates(ctx context.Context, director
 			receipts = append(receipts, cached)
 			continue
 		}
+		queueStarted := time.Now().UTC()
+		var release func()
+		if heavy {
+			release, err = verification.Acquire(gateCtx)
+			if err != nil {
+				cancel()
+				return receipts, fmt.Errorf("verification queue: %w", err)
+			}
+		}
 		stdout, stderr := newGateOutput(), newGateOutput()
 		command.Stdout, command.Stderr = stdout, stderr
 		command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
@@ -609,6 +628,9 @@ func (manager *candidateWorkspaceManager) runGates(ctx context.Context, director
 		started := time.Now()
 		runErr := command.Run()
 		finished := time.Now()
+		if release != nil {
+			release()
+		}
 		gateContextErr := gateCtx.Err()
 		log.Printf("candidate_gate gate=%s elapsed=%s error=%t", gateID, time.Since(started), runErr != nil)
 		cancel()
@@ -628,6 +650,17 @@ func (manager *candidateWorkspaceManager) runGates(ctx context.Context, director
 			StdoutSHA256: stdoutDigest, StderrSHA256: stderrDigest,
 			StartedAt: started.UTC(), FinishedAt: finished.UTC(),
 			PackageTargets: append([]string(nil), gate.packageTargets...),
+			QueueStartedAt: queueStarted,
+		}
+		if heavy {
+			receipt.ExecutionPolicy = verification.Policy
+		}
+		if runErr != nil && exitCode > 0 && heavy && gate.Command[1] == "test" && (stdout.timeout.TimedOut() || stderr.timeout.TimedOut()) {
+			receipt.Outcome = "EXECUTION_TIMEOUT"
+			receipt.TimeoutEvidence = stdout.timeout.Evidence()
+			if receipt.TimeoutEvidence == "" {
+				receipt.TimeoutEvidence = stderr.timeout.Evidence()
+			}
 		}
 		if runErr != nil {
 			receipt.ExecutionError = runErr.Error()
@@ -645,8 +678,9 @@ func (manager *candidateWorkspaceManager) runGates(ctx context.Context, director
 		}
 		receipts = append(receipts, receipt)
 		if runErr != nil {
-			// Cancellation and timeout are infrastructure outcomes, not a negative
-			// verdict about the candidate. Never persist them as compiler findings.
+			// An internal Go timeout exits positively before the outer deadline.
+			// Retain its INCONCLUSIVE execution block without labeling it a
+			// candidate defect or repeatedly executing the same failed preflight.
 			if exitCode > 0 && gateContextErr == nil {
 				failure := &candidateGateFailure{InputSHA256: kernel.Digest(inputKey), Directory: directory, Commit: strings.TrimSpace(string(identity)), Receipt: receipt}
 				if err := manager.retainGateFailure(failure); err != nil {
@@ -679,7 +713,8 @@ func (manager *candidateWorkspaceManager) retainGateAttempt(directory, commit, t
 		FinishedAt      time.Time            `json:"finished_at"`
 		Receipt         candidateGateReceipt `json:"receipt"`
 		ReusedFrom      string               `json:"reused_from,omitempty"`
-	}{directory, commit, tree, receipt.StartedAt, receipt.FinishedAt, receipt, receipt.ReusedFrom})
+		QueueStartedAt  time.Time            `json:"queue_started_at,omitempty"`
+	}{directory, commit, tree, receipt.StartedAt, receipt.FinishedAt, receipt, receipt.ReusedFrom, receipt.QueueStartedAt})
 	if err != nil {
 		return err
 	}
@@ -689,20 +724,26 @@ func (manager *candidateWorkspaceManager) retainGateAttempt(directory, commit, t
 // Bound retained output while hashing the complete stream. Child output must
 // never exhaust the supervisor's memory or block draining a failed process.
 type gateOutput struct {
-	bytes.Buffer
+	// Do not embed bytes.Buffer: its promoted ReadFrom lets io.Copy bypass
+	// Write, losing both the output bound and streaming timeout/hash evidence.
+	buffer    bytes.Buffer
 	hash      hash.Hash
 	truncated bool
+	timeout   verification.TimeoutDetector
 }
 
-func newGateOutput() *gateOutput { return &gateOutput{hash: sha256.New()} }
+func newGateOutput() *gateOutput         { return &gateOutput{hash: sha256.New()} }
+func (output *gateOutput) Len() int      { return output.buffer.Len() }
+func (output *gateOutput) Bytes() []byte { return output.buffer.Bytes() }
 func (output *gateOutput) Write(data []byte) (int, error) {
+	_, _ = output.timeout.Write(data)
 	_, _ = output.hash.Write(data)
 	remaining := (256 << 10) - output.Len()
 	if remaining < len(data) {
 		output.truncated = true
 	}
 	if remaining > 0 {
-		_, _ = output.Buffer.Write(data[:min(remaining, len(data))])
+		_, _ = output.buffer.Write(data[:min(remaining, len(data))])
 	}
 	return len(data), nil
 }

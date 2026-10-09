@@ -16,6 +16,7 @@ type Diagnostics struct {
 	Control          ControlStatus                    `json:"control"`
 	Roles            []organization.RoleInstanceState `json:"roles"`
 	ActiveTasks      []mongo.TaskProjection           `json:"active_tasks"`
+	UnprojectedTasks []mongo.TaskStateDiagnostic      `json:"unprojected_tasks"`
 	PendingMessages  []organization.MessageClaim      `json:"pending_messages"`
 	ClaimedMessages  []organization.MessageClaim      `json:"claimed_messages"`
 	DeadLetters      []organization.MessageClaim      `json:"dead_letters"`
@@ -44,6 +45,10 @@ func (service *ProductionService) Diagnostics(ctx context.Context) (Diagnostics,
 	if err != nil {
 		return Diagnostics{}, err
 	}
+	unprojected, err := service.Store.ListUnprojectedTasks(ctx, 1000)
+	if err != nil {
+		return Diagnostics{}, err
+	}
 	pending, err := service.Store.ListMessageClaims(ctx, organization.MessagePending, 1000)
 	if err != nil {
 		return Diagnostics{}, err
@@ -60,7 +65,7 @@ func (service *ProductionService) Diagnostics(ctx context.Context) (Diagnostics,
 	if err != nil {
 		return Diagnostics{}, err
 	}
-	return Diagnostics{ObservedAt: service.clock.Now().UTC(), Control: service.Status(), Roles: roles, ActiveTasks: activeTasks, PendingMessages: pending, ClaimedMessages: claimed, DeadLetters: deadLetters, ProjectionFaults: faults, RoleLibraries: service.RoleLibraries(), RecoveryFaults: service.readRecoveryFaults()}, nil
+	return Diagnostics{ObservedAt: service.clock.Now().UTC(), Control: service.Status(), Roles: roles, ActiveTasks: activeTasks, UnprojectedTasks: unprojected, PendingMessages: pending, ClaimedMessages: claimed, DeadLetters: deadLetters, ProjectionFaults: faults, RoleLibraries: service.RoleLibraries(), RecoveryFaults: service.readRecoveryFaults()}, nil
 }
 
 func (service *ProductionService) recordRecoveryFault(scope string, cause error) {

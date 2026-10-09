@@ -122,7 +122,25 @@ func (contract *StructuredTurnContract) decode(raw json.RawMessage, responseID s
 		return Completion{}, fmt.Errorf("%w: decode structured turn: %v", ErrInvalidTurn, err)
 	}
 	if err := contract.compiled.Validate(instance); err != nil {
-		return Completion{}, &RejectedTurnError{ResponseID: responseID, Response: append(json.RawMessage(nil), raw...), Problem: fmt.Sprintf("%s: structured turn schema: %v", ErrInvalidTurn, err)}
+		problem := fmt.Sprintf("%s: structured turn schema: %v", ErrInvalidTurn, err)
+		// Add actionable pagination guidance only for an actual oversized read.
+		// Keep schema enforcement intact and dispatch none of the rejected batch.
+		var proposal struct {
+			Calls []map[string]json.RawMessage `json:"calls"`
+		}
+		if json.Unmarshal(raw, &proposal) == nil {
+			for _, call := range proposal.Calls {
+				for _, name := range []string{"read_file", "read_file_from_commit"} {
+					var read struct {
+						Count int `json:"line_count"`
+					}
+					if json.Unmarshal(call[name], &read) == nil && read.Count > 400 {
+						problem += "; " + name + ": maximum 400 lines PER CALL; use line_count=400 (or omit it), then continue at returned next_start_line. line_count is not an ending line or total file length"
+					}
+				}
+			}
+		}
+		return Completion{}, &RejectedTurnError{ResponseID: responseID, Response: append(json.RawMessage(nil), raw...), Problem: problem}
 	}
 	var turn map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &turn); err != nil {

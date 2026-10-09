@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/tekroo-ai/teams/internal/verification"
 	"github.com/tekroo-ai/teams/kernel"
 )
 
@@ -108,6 +109,7 @@ func (manager *candidateWorkspaceManager) withGateScope(directory string, requir
 			gate.packageTargets = packages
 			gate.Command = append(append([]string(nil), gate.Command[:2]...), packages...)
 		}
+		gate.Command, _ = verification.GoCommand(gate.Command)
 		copy.gates[id] = gate
 		policy = append(policy, gate)
 	}
@@ -119,6 +121,16 @@ func (manager *candidateWorkspaceManager) withGateScope(directory string, requir
 }
 
 func gateReceiptMatchesScope(receipt candidateGateReceipt, gate ProductionCandidateGate) bool {
+	originalScopeValid := validGateScope(gate)
+	if len(gate.Command) < 2 {
+		return false
+	}
+	if receipt.ExecutionPolicy != "" {
+		if receipt.ExecutionPolicy != verification.Policy {
+			return false
+		}
+		gate.Command, _ = verification.GoCommand(gate.Command)
+	}
 	if len(receipt.PackageTargets) == 0 {
 		return len(gate.packageTargets) == 0 && slices.Equal(receipt.Command, gate.Command)
 	}
@@ -133,5 +145,11 @@ func gateReceiptMatchesScope(receipt candidateGateReceipt, gate ProductionCandid
 	if len(gate.packageTargets) != 0 {
 		return slices.Equal(gate.packageTargets, receipt.PackageTargets) && slices.Equal(gate.Command, receipt.Command)
 	}
-	return validGateScope(gate) && slices.Equal(receipt.Command, append(append([]string(nil), gate.Command[:2]...), receipt.PackageTargets...))
+	// Reconstruct the original scoped command before adding execution bounds.
+	command := []string{gate.Command[0], gate.Command[1]}
+	command = append(command, receipt.PackageTargets...)
+	if receipt.ExecutionPolicy != "" {
+		command, _ = verification.GoCommand(command)
+	}
+	return originalScopeValid && gate.Scope == taskPackageGateScope && slices.Equal(receipt.Command, command)
 }

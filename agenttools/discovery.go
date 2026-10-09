@@ -22,6 +22,10 @@ func searchInputSchema(field string) json.RawMessage {
 		"max_results":   map[string]any{"type": "integer", "minimum": 1, "maximum": 100},
 		"summary":       map[string]any{"type": "string"},
 	}
+	if field == "regex" {
+		properties[field] = map[string]any{"type": "string", "minLength": 1, "maxLength": 4096, "description": "RE2 syntax; counted repetition bounds 0..4096, with bounded expanded complexity. No backreferences or lookaround."}
+		properties["multiline"] = map[string]any{"type": "boolean", "default": false, "description": "False: match each line independently. True: match across a whole file of at most 256 KiB; larger files are explicitly skipped. Use (?s) or [\\s\\S] to match newlines; use (?m) for line anchors. Count means non-overlapping matches in multiline mode."}
+	}
 	raw, err := json.Marshal(map[string]any{
 		"type": "object", "additionalProperties": false,
 		"required": []string{field}, "properties": properties,

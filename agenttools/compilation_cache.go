@@ -14,6 +14,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/tekroo-ai/teams/internal/verification"
 )
 
 // Only compile-only go test may write the persistent cache. Test binaries never
@@ -77,7 +79,8 @@ func (host Host) seedCompilationCache(ctx context.Context, workspace, source, go
 	if err := os.Mkdir(compiled, 0700); err != nil {
 		return err
 	}
-	command := exec.CommandContext(ctx, "/usr/bin/sandbox-exec", "-p", compilerProfile, goBinary, "test", "-trimpath", "-c", "-o", compiled+string(filepath.Separator), pattern)
+	args, _ := verification.GoCommand([]string{goBinary, "test", "-trimpath", "-c", "-o", compiled + string(filepath.Separator), pattern})
+	command := exec.CommandContext(ctx, "/usr/bin/sandbox-exec", append([]string{"-p", compilerProfile}, args...)...)
 	command.Dir = source
 	command.Env = replaceEnvironment(environment, "GOCACHE", cache)
 	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
