@@ -1,0 +1,17 @@
+{
+  "source_invocation_id": "1669b372-52f6-792b-80af-d0974312f985",
+  "source_receipt": "1669b372-52f6-792b-80af-d0974312f985:00000000000000000018",
+  "description": "Exact selected fields from submit_result.work_product; no run_go_tests request or observation exists in this invocation's raw entries 1-19. This is an excerpt, not the complete journal.",
+  "verdict": {
+    "schema_version": "1.0.0",
+    "outcome": "PASS",
+    "reasons": [
+      "AC2: Existing FQN-path handler/service/CLI tests are green (zero regressions in the 4 modified packages; go test ./adapters/... ./cmd/tekroo ./organization returns 0 failures)."
+    ],
+    "test_evidence": [
+      "go test ./adapters/operatorhttp -run Alias (pass — HTTP route resolution with alias and FQN operands, invalid token rejection)",
+      "go test ./adapters/operatorhttp -run TestAliasEndToEndAssignThenAddress (pass — assign via service, address via HTTP, same instance)",
+      "go test ./adapters/operatortools -run TestMCPAliasEndToEnd (pass — assign via service, address via MCP, same instance)"
+    ]
+  }
+}

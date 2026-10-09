@@ -188,6 +188,10 @@ func prepare(ctx context.Context, brief application.ExecutionBrief, requestDiges
 	if (brief.Purpose == kernel.PurposeImplementation || brief.Purpose == kernel.PurposeRepair) && slices.Contains(brief.WorkProfile.RequiredDeterministicGateIDs, "go-test") && !slices.Contains(initial.Permissions, "test.execute") {
 		return Session{}, errors.Join(ErrInvalidBinding, ErrRequiredTestToolUnavailable)
 	}
+	if brief.Purpose == kernel.PurposeValidation && slices.Contains(brief.WorkProfile.RequiredDeterministicGateIDs, "go-test") &&
+		(!allowEffects || !slices.Contains(initial.Permissions, "test.execute") || !slices.Contains(profile.AllowedEffectTools, "run_go_tests")) {
+		return Session{}, errors.Join(ErrInvalidBinding, ErrRequiredTestToolUnavailable)
+	}
 	stable := stableBinding{source: config.Bindings, initial: initial}
 	// Both model turns and tool calls pass through the same stability check.
 	// The gateway still reconstructs actual authority at the moment of a call.
@@ -396,6 +400,9 @@ func prepare(ctx context.Context, brief application.ExecutionBrief, requestDiges
 	}
 	if allowEffects && (brief.Purpose == kernel.PurposeImplementation || brief.Purpose == kernel.PurposeRepair) {
 		config.ValidateFinalResult = implementationCompletionCheck(brief, requestDigest, config.Gateway, config.Effects, config.ValidateFinalResult)
+	}
+	if brief.Purpose == kernel.PurposeValidation && slices.Contains(brief.WorkProfile.RequiredDeterministicGateIDs, "go-test") {
+		config.ValidateFinalResult = validationCompletionCheck(brief, requestDigest, config.Gateway, config.Journal, config.Effects, config.ValidateFinalResult)
 	}
 	return Session{
 		Runner: agentruntime.Runner{
