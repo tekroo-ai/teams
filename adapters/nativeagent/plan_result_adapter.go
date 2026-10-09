@@ -68,6 +68,14 @@ func modelFacingPlanSchema(handlerSchema json.RawMessage, plan *PlanFinalization
 	if err := replaceEnvelopeProperty(schema, "work_product", properties["work_product"]); err != nil {
 		return nil, err
 	}
+	// Non-completion is a decision report, not authorization to change the DAG.
+	// Keep one transport shape, but require both delta arrays to be empty.
+	var constraints []json.RawMessage
+	if raw := schema["allOf"]; raw != nil && json.Unmarshal(raw, &constraints) != nil {
+		return nil, ErrInvalidBinding
+	}
+	constraints = append(constraints, json.RawMessage(`{"anyOf":[{"required":["outcome"],"properties":{"outcome":{"const":"completed"}}},{"required":["outcome","work_product"],"properties":{"outcome":{"enum":["needs_decision","blocked","failed"]},"work_product":{"properties":{"task_dependencies":{"maxItems":0},"handoffs":{"maxItems":0}}}}}]} `))
+	schema["allOf"], _ = json.Marshal(constraints)
 	return json.Marshal(schema)
 }
 
@@ -107,12 +115,8 @@ func bindHandlerPlanResult(arguments json.RawMessage, plan *PlanFinalizationBind
 	if json.Unmarshal(envelope["outcome"], &outerOutcome) != nil {
 		return nil, fmt.Errorf("%w: outcome must be a string", ErrInvalidPlanDelta)
 	}
-	if outerOutcome != "completed" {
-		return arguments, nil
-	}
-	source, tasks, err := acceptedPlanWorkProduct(plan)
-	if err != nil {
-		return nil, err
+	if outerOutcome != "completed" && outerOutcome != "needs_decision" && outerOutcome != "blocked" && outerOutcome != "failed" {
+		return nil, fmt.Errorf("%w: unsupported outcome %q", ErrInvalidPlanDelta, outerOutcome)
 	}
 	var delta struct {
 		TaskDependencies []struct {
@@ -128,6 +132,23 @@ func bindHandlerPlanResult(arguments json.RawMessage, plan *PlanFinalizationBind
 	}
 	if decoder.Decode(&struct{}{}) != io.EOF || delta.TaskDependencies == nil || delta.Handoffs == nil {
 		return nil, fmt.Errorf("%w: task_dependencies and handoffs must be arrays in one object", ErrInvalidPlanDelta)
+	}
+	var handoffs []json.RawMessage
+	if json.Unmarshal(delta.Handoffs, &handoffs) != nil || handoffs == nil {
+		return nil, fmt.Errorf("%w: handoffs must be an array", ErrInvalidPlanDelta)
+	}
+	if outerOutcome != "completed" {
+		if len(delta.TaskDependencies) != 0 || len(handoffs) != 0 {
+			return nil, fmt.Errorf("%w: non-completed results require empty dependency and handoff arrays", ErrInvalidPlanDelta)
+		}
+		// Remove only validated empty transport metadata. Preserve the disposition,
+		// summary, and evidence; never assemble a plan from a decision report.
+		envelope["work_product"] = json.RawMessage(`{}`)
+		return json.Marshal(envelope)
+	}
+	source, tasks, err := acceptedPlanWorkProduct(plan)
+	if err != nil {
+		return nil, err
 	}
 	seen := make(map[uint32]bool, len(delta.TaskDependencies))
 	for _, change := range delta.TaskDependencies {
@@ -154,10 +175,6 @@ func bindHandlerPlanResult(arguments json.RawMessage, plan *PlanFinalizationBind
 			existing = append(existing, dependency)
 		}
 		task["depends_on"], _ = json.Marshal(existing)
-	}
-	var handoffs []json.RawMessage
-	if json.Unmarshal(delta.Handoffs, &handoffs) != nil || handoffs == nil {
-		return nil, fmt.Errorf("%w: handoffs must be an array", ErrInvalidPlanDelta)
 	}
 	for index, raw := range handoffs {
 		var handoff map[string]json.RawMessage

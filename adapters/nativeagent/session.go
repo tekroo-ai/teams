@@ -48,6 +48,7 @@ type Config struct {
 	// ContextSource is supplied by the coordinator through BindContextFork.
 	ContextSource     *agentruntime.ForkSource
 	ContextInvocation *kernel.WorkInvocation
+	ContextReturn     *ContextReturnBinding
 	Bindings          agenttools.BindingSource
 	Gateway           agenttools.Gateway
 	Journal           agentruntime.Journal
@@ -67,6 +68,7 @@ type Config struct {
 	// ResultArrayLimits narrow the generation schema to coordinator-owned
 	// admission limits. They do not change the signed role result contract.
 	ResultArrayLimits []ResultArrayLimit
+	ResultEnumLimits  []ResultEnumLimit
 	// ValidateFinalResult applies workflow-level semantics before the native
 	// runner commits a final result, while the same model turn can still repair it.
 	ValidateFinalResult func(context.Context, []byte) error
@@ -227,11 +229,11 @@ func prepare(ctx context.Context, brief application.ExecutionBrief, requestDiges
 	}
 	var inherited *agentruntime.ContextFork
 	var priorTool *priorTurnsTool
-	if (config.ContextSource == nil) != (config.ContextInvocation == nil) {
+	if (config.ContextSource == nil) != (config.ContextInvocation == nil) || config.ContextSource == nil && config.ContextReturn != nil {
 		return Session{}, ErrInvalidBinding
 	}
 	if config.ContextSource != nil {
-		authorized, err := BindContextFork(ctx, config.Journal, brief, *config.ContextInvocation)
+		authorized, err := BindContextFork(ctx, config.Journal, brief, *config.ContextInvocation, config.ContextReturn)
 		if err != nil || *authorized != *config.ContextSource {
 			return Session{}, errors.Join(ErrInvalidBinding, err)
 		}
@@ -308,6 +310,9 @@ func prepare(ctx context.Context, brief application.ExecutionBrief, requestDiges
 			}
 		}
 		modelSchema, err = narrowResultArrays(modelSchema, config.ResultArrayLimits)
+		if err == nil {
+			modelSchema, err = narrowResultEnums(modelSchema, config.ResultEnumLimits)
+		}
 		if err != nil {
 			return Session{}, err
 		}

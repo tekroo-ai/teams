@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -148,12 +149,10 @@ func (service *ProductionService) reconcileFeaturePlanning(ctx context.Context) 
 			}
 		}
 		if state.Phase != kernel.PhaseCompleted {
-			if stage == stagePlanFinalization && !revisionRequested {
-				outcome, summary, recognized := roleHandlerDisposition(output)
-				if recognized && outcome == "needs_decision" {
-					reason := planDecisionRequiredReason + ": " + summary
-					if _, blockErr := service.blockStructuredDecisionTask(ctx, feature, task, state, invocation, snapshot, reason, "plan-decision-required"); blockErr != nil {
-						return fmt.Errorf("feature %s %s decision block: %w", feature.ID, stage, blockErr)
+			if !revisionRequested {
+				if reason, key, reported := planningNonCompletion(stage, output); reported {
+					if _, blockErr := service.blockStructuredDecisionTask(ctx, feature, task, state, invocation, snapshot, reason, key); blockErr != nil {
+						return fmt.Errorf("feature %s %s reported non-completion block: %w", feature.ID, stage, blockErr)
 					}
 					continue
 				}
@@ -602,14 +601,14 @@ func (service *ProductionService) ensureFeaturePlanningTaskForRound(ctx context.
 		return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, err
 	}
 	var owner organization.RoleInstanceState
-	if stage == stageArchitecture && architectureRound == 1 && feature.DesignRevision != nil {
-		source, _, sourceErr := service.featureArchitectureCandidateForRound(ctx, feature, 0)
-		if sourceErr != nil {
-			return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, sourceErr
-		}
+	returnSource, sourceErr := service.planningReturnSource(ctx, feature, stage, architectureRound)
+	if sourceErr != nil {
+		return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, sourceErr
+	}
+	if returnSource != nil {
 		// A consultation belongs to the original decision owner, including
 		// after its process restarts. Do not substitute another role instance.
-		owner, err = service.ensurePlanningActorExcept(ctx, []kernel.ActorFQN{source.ActorFQN}, "")
+		owner, err = service.ensurePlanningActorExcept(ctx, []kernel.ActorFQN{returnSource.ActorFQN}, "")
 	} else {
 		owner, err = service.ensureExactPlanningRoleExcept(ctx, role, excludedActor)
 	}
@@ -629,10 +628,10 @@ func (service *ProductionService) ensureFeaturePlanningTaskForRound(ctx context.
 	if err != nil {
 		return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, err
 	}
-	if stage == stageArchitecture && architectureRound == 1 && feature.DesignRevision != nil {
-		source, _, sourceErr := service.featureArchitectureCandidateForRound(ctx, feature, 0)
-		if sourceErr != nil || source.OutputDigest == nil || *source.OutputDigest != feature.DesignRevision.PriorDesignDigest || source.ActorFQN != owner.ActorFQN {
-			return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, errors.Join(organization.ErrInvalidFeature, sourceErr)
+	if returnSource != nil {
+		source := *returnSource
+		if source.ActorFQN != owner.ActorFQN {
+			return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, organization.ErrInvalidFeature
 		}
 		priorSnapshot, loadErr := service.Store.LoadDecision(ctx, kernel.KernelCommand{Target: source.Ref()})
 		if loadErr != nil {
@@ -656,6 +655,16 @@ func (service *ProductionService) ensureFeaturePlanningTaskForRound(ctx context.
 			return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, organization.ErrInvalidFeature
 		}
 	}
+	if stage == stageArchitecture && feature.SpecificationCorrection != nil && feature.SpecificationCorrection.ArchitectureRound == architectureRound {
+		if feature.SpecificationCorrection.Validate(feature) != nil {
+			return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, organization.ErrInvalidFeature
+		}
+		for _, ref := range feature.SpecificationCorrection.EvidenceRefs {
+			if !slices.Contains(evidence, ref) {
+				evidence = append(evidence, ref)
+			}
+		}
+	}
 	deadline := feature.CreatedAt.Add(service.planningDeadline)
 	budget, err := service.ensureFeatureWorkBudget(ctx, feature, evidenceID, evidence, deadline)
 	if err != nil {
@@ -666,6 +675,10 @@ func (service *ProductionService) ensureFeaturePlanningTaskForRound(ctx context.
 
 	dependsOn := []kernel.UUIDv7{}
 	parents := []kernel.DagParent{{ParentEventID: storyEvent, EdgeKind: kernel.EdgeCausal}}
+	if returnSource != nil && stage == stagePlanFinalization {
+		dependsOn = append(dependsOn, returnSource.TaskID)
+		parents = append(parents, kernel.DagParent{ParentEventID: returnSource.LastEventID, EdgeKind: kernel.EdgeCausal})
+	}
 	if prior, hasPrior := priorPlanningStage(stage); hasPrior {
 		priorID := deterministicOperationalUUID("feature-planning-task", string(feature.ID), string(prior))
 		priorState, priorHead, priorFound, priorErr := service.Store.ReadAggregateHead(ctx, kernel.AggregateRef{Kind: kernel.AggregateTask, ID: priorID})
@@ -1684,6 +1697,12 @@ func (service *ProductionService) retainPlanningEvidenceBlob(ctx context.Context
 }
 
 func (service *ProductionService) validateFeatureStageOutputWithEvidence(ctx context.Context, feature organization.FeatureRequest, stage featurePlanningStage, output []byte) error {
+	// The signed role schema is checked at the native boundary first. A valid
+	// non-completion report must not be parsed as a completed plan; reconciliation
+	// routes the one admitted revision or records a durable block instead.
+	if _, _, reported := planningNonCompletion(stage, output); reported {
+		return nil
+	}
 	if err := service.validateFeatureStageOutput(feature, stage, output); err != nil || stage != stagePlanFinalization {
 		return err
 	}

@@ -184,19 +184,51 @@ func configuredNativeSession(ctx context.Context, service *ProductionService, pr
 	}
 	if planning {
 		result.ResultArrayLimits = featureStageResultArrayLimits(stage, feature.Input.MaximumTasks)
-	}
-	if planning && stage == stageArchitecture && round == 1 && feature.DesignRevision != nil {
-		// This is a new forward node, not a restart of the completed design.
-		// Resolve the original invocation from Teams state, never a model ID.
-		source, _, sourceErr := service.featureArchitectureCandidateForRound(ctx, feature, 0)
-		if sourceErr != nil || source.OutputDigest == nil || *source.OutputDigest != feature.DesignRevision.PriorDesignDigest {
-			return nativeagent.Config{}, errors.Join(nativeagent.ErrInvalidBinding, sourceErr)
+		if stage == stageArchitecture {
+			routing, routingErr := service.workflowTaskRoutingPolicy(service.clock.Now().UTC())
+			if routingErr != nil {
+				return nativeagent.Config{}, routingErr
+			}
+			allowed := make([]string, 0, len(routing.PurposeRoutes))
+			for _, route := range routing.PurposeRoutes {
+				allowed = append(allowed, string(route.Purpose))
+			}
+			result.ResultEnumLimits = []nativeagent.ResultEnumLimit{{PropertyPath: []string{"work_product", "tasks", "*", "purpose"}, Values: allowed}}
 		}
-		ref, bindErr := nativeagent.BindContextFork(ctx, service.Store, brief, source)
+	}
+	returnSource, recordedContext, sourceErr := service.recordedReturnContext(ctx, brief)
+	if sourceErr != nil {
+		return nativeagent.Config{}, sourceErr
+	}
+	if !recordedContext {
+		returnSource, sourceErr = service.nativeReturnedInvocation(ctx, brief)
+		if sourceErr != nil {
+			return nativeagent.Config{}, sourceErr
+		}
+	}
+	if !recordedContext && returnSource == nil && planning {
+		returnSource, sourceErr = service.planningReturnSource(ctx, feature, stage, round)
+		if sourceErr != nil {
+			return nativeagent.Config{}, sourceErr
+		}
+	}
+	if returnSource != nil {
+		if result.ContextInvocation != nil && result.ContextInvocation.ID != returnSource.ID {
+			return nativeagent.Config{}, nativeagent.ErrInvalidBinding
+		}
+		var returnBinding *nativeagent.ContextReturnBinding
+		if !slices.Contains(brief.Task.DependsOn, returnSource.TaskID) && brief.RetryOfInvocationID == nil && brief.Purpose != kernel.PurposeRepair {
+			returnBinding, sourceErr = service.correctedPlanningReturn(ctx, feature, stage, round, planning, brief, *returnSource)
+			if sourceErr != nil {
+				return nativeagent.Config{}, sourceErr
+			}
+		}
+		ref, bindErr := nativeagent.BindContextFork(ctx, service.Store, brief, *returnSource, returnBinding)
 		if bindErr != nil {
 			return nativeagent.Config{}, bindErr
 		}
-		result.ContextSource, result.ContextInvocation = ref, &source
+		result.ContextSource, result.ContextInvocation = ref, returnSource
+		result.ContextReturn = returnBinding
 	}
 	if planning && stage == stagePlanFinalization {
 		_, architectureOutput, sourceErr := service.featureArchitectureCandidate(ctx, feature)

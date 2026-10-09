@@ -49,7 +49,7 @@ func nativeProtocolPrompt(brief application.ExecutionBrief, digest kernel.Digest
 func nativeHandlerPrompt(brief application.ExecutionBrief, digest kernel.Digest, encoded []byte, planFinalization bool) (string, error) {
 	guidance := nativeResultGuidance
 	if planFinalization {
-		guidance += " For plan finalization, work_product contains only task_dependencies and handoffs. Teams preserves the accepted architecture, decisions, assumptions, tasks, and source digest and assembles FEATURE_EXECUTION_PLAN."
+		guidance += " For plan finalization, work_product contains only task_dependencies and handoffs. With completed, Teams preserves the accepted architecture, decisions, assumptions, tasks, and source digest and assembles FEATURE_EXECUTION_PLAN. With needs_decision, blocked, or failed, both arrays must be empty: put the exact deficiency in summary and inspected support in evidence; Teams records a non-completion report, not an executable plan."
 	} else if validationPurpose(brief.Purpose) {
 		guidance += " For validation or acceptance, work_product contains only the verdict fields allowed by the tool schema; Teams binds candidate identity."
 	}

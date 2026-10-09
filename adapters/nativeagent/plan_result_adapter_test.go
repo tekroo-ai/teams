@@ -205,6 +205,7 @@ func TestPlanFinalizationRetainedSubmissionReplay(t *testing.T) {
 			t.Fatal(err)
 		}
 		var result struct {
+			Outcome     string `json:"outcome"`
 			WorkProduct struct {
 				Tasks []map[string]json.RawMessage `json:"tasks"`
 			} `json:"work_product"`
@@ -212,8 +213,11 @@ func TestPlanFinalizationRetainedSubmissionReplay(t *testing.T) {
 		if err := json.Unmarshal(bound, &result); err != nil {
 			t.Fatal(err)
 		}
-		if !reflect.DeepEqual(sourceTasks, result.WorkProduct.Tasks) {
+		if result.Outcome == "completed" && !reflect.DeepEqual(sourceTasks, result.WorkProduct.Tasks) {
 			t.Fatal("retained submission changed accepted tasks")
+		}
+		if result.Outcome != "completed" && result.WorkProduct.Tasks != nil {
+			t.Fatal("non-completion assembled an executable task graph")
 		}
 	}
 	t.Logf("%d retained PM submissions accepted; signed schema and accepted tasks preserved", len(retained.Submissions))

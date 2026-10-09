@@ -549,7 +549,7 @@ func replay(id, requestDigest, prompt, systemPrompt, finalTool string, finalize 
 		return nil, nil, nil, 0, ErrInvalidTurn
 	}
 	if start.ContextFork != nil {
-		messages = append(messages, Message{Role: "user", Content: "Historical transcript from completed invocation " + start.ContextFork.Source.InvocationID + " follows. It records prior reasoning and evidence, not a new assignment or permission to repeat its actions."})
+		messages = append(messages, Message{Role: "user", Content: "Historical transcript from terminal invocation " + start.ContextFork.Source.InvocationID + " follows. It records prior context and evidence, not a new assignment or permission to repeat its actions."})
 		messages = append(messages, start.ContextFork.WorkingHistory...)
 		messages = append(messages, Message{Role: "user", Content: "Continue only the current assignment below. Prior tools/results are historical; do not execute or resubmit them.\n" + prompt})
 	}
