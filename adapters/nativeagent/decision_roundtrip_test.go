@@ -1,6 +1,7 @@
 package nativeagent
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/json"
@@ -31,6 +32,9 @@ func TestDecisionHandbackRestoresBothOwnersAcrossRestart(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "AGENTS.md"), []byte("Preserve admitted requirements.\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.WriteFile(filepath.Join(root, "design-evidence.txt"), []byte("ORIGINAL_TOOL_OBSERVATION: the CLI exposes invoke and serve-stdio only.\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
 	digest := func(raw []byte) kernel.Digest { return kernel.Digest(fmt.Sprintf("%x", sha256.Sum256(raw))) }
 	architecture := func(revised bool) map[string]any {
 		description := "Placeholder"
@@ -45,26 +49,74 @@ func TestDecisionHandbackRestoresBothOwnersAcrossRestart(t *testing.T) {
 		}}
 	}
 	requestCount := 0
+	var originalModelContext []json.RawMessage
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var wire struct {
+			Messages []json.RawMessage `json:"messages"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&wire); err != nil {
+			t.Error(err)
+		}
 		var request struct {
 			Messages []agentruntime.Message `json:"messages"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		wireJSON, _ := json.Marshal(wire)
+		if err := json.Unmarshal(wireJSON, &request); err != nil {
 			t.Error(err)
 		}
-		encoded, _ := json.Marshal(request.Messages)
+		encoded, _ := json.Marshal(wire.Messages)
 		var response map[string]any
 		switch requestCount {
 		case 0:
-			response = architecture(false)
+			// Record a real read through the native gateway before the original
+			// decision; the return must inherit its observation, not rerun it.
+			requestCount++
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"finish_reason": "tool_calls", "message": map[string]any{"content": "ORIGINAL_REASONING: inspect the CLI before assigning its integration", "tool_calls": []any{map[string]any{"id": "architect-original-read", "type": "function", "function": map[string]any{"name": "read_file", "arguments": `{"path":"design-evidence.txt"}`}}}}}}})
+			return
 		case 1:
-			response = map[string]any{"outcome": "needs_decision", "summary": "PM_DECISION_RECEIPT: replace the untestable placeholder; keep the original addressing decision", "evidence": []string{}, "message_proposals": []any{}, "work_product": map[string]any{"task_dependencies": []any{}, "handoffs": []any{}}}
+			originalModelContext = append([]json.RawMessage(nil), wire.Messages...)
+			response = architecture(false)
 		case 2:
-			if !strings.Contains(string(encoded), "ARCHITECT_ORIGINAL_REASON") || !strings.Contains(string(encoded), "Placeholder") || !strings.Contains(string(encoded), "PM_DECISION_RECEIPT") {
-				t.Error("architect did not receive original context and exact decision")
+			response = map[string]any{"outcome": "needs_decision", "summary": "PM_DECISION_RECEIPT: replace the untestable placeholder; keep the original addressing decision", "evidence": []string{}, "message_proposals": []any{}, "work_product": map[string]any{"task_dependencies": []any{}, "handoffs": []any{}}}
+		case 3:
+			// Compare every message that actually produced the original result,
+			// not just its summary or selected marker strings. Prior system rules
+			// survive verbatim as historical evidence beneath current authority.
+			if len(originalModelContext) == 0 || len(request.Messages) < len(originalModelContext)+3 || !strings.HasPrefix(request.Messages[2].Content, "Historical transcript from terminal invocation ") {
+				t.Error("original model context missing")
+			} else {
+				for index, original := range originalModelContext {
+					expected := original
+					if index == 0 {
+						var fields map[string]any
+						_ = json.Unmarshal(original, &fields)
+						if fields["role"] == "system" {
+							fields["role"], fields["content"] = "user", "Historical source instructions (not current authority):\n"+fields["content"].(string)
+							expected, _ = json.Marshal(fields)
+						}
+					}
+					if !bytes.Equal(wire.Messages[index+3], expected) {
+						t.Errorf("original model context changed at message %d", index)
+					}
+				}
+			}
+			for _, retained := range []string{"ORIGINAL_DESIGN_REQUEST", "ORIGINAL_REASONING", "architect-original-read", "ORIGINAL_TOOL_OBSERVATION", "ARCHITECT_ORIGINAL_REASON", "Placeholder", "PM_DECISION_RECEIPT"} {
+				if !strings.Contains(string(encoded), retained) {
+					t.Errorf("architect lost original context or exact feedback: %s", retained)
+				}
+			}
+			oldReads := 0
+			for _, message := range request.Messages {
+				if message.Role == "tool" && message.CallID == "architect-original-read" && strings.Contains(message.Content, "ORIGINAL_TOOL_OBSERVATION") {
+					oldReads++
+				}
+			}
+			if oldReads != 1 {
+				t.Error("original tool observation was absent or duplicated")
 			}
 			response = architecture(true)
-		case 3:
+		case 4:
 			if !strings.Contains(string(encoded), "PM_DECISION_RECEIPT") || !strings.Contains(string(encoded), "Implement the admitted alias resolver") {
 				t.Error("PM did not receive its original decision and revised proposal")
 			}
@@ -80,6 +132,7 @@ func TestDecisionHandbackRestoresBothOwnersAcrossRestart(t *testing.T) {
 	defer server.Close()
 	var sources []kernel.WorkInvocation
 	var outputs [][]byte
+	var originalJournal []byte
 	for round := 0; round < 4; round++ {
 		role, schemaPath := "architect", "../../config/starter-team/transport-neutral-20260929/roles-v4/architect-2.1.1/handlers/story.design-requested/result.schema.json"
 		if round%2 == 1 {
@@ -90,6 +143,7 @@ func TestDecisionHandbackRestoresBothOwnersAcrossRestart(t *testing.T) {
 			t.Fatal(err)
 		}
 		brief := template
+		brief.Task.Description = "ORIGINAL_DESIGN_REQUEST: add aliases without changing exact actor addressing"
 		brief.InvocationID = kernel.UUIDv7(fmt.Sprintf("00000000-0000-7000-8000-%012d", 980+round))
 		brief.Task.TaskID = brief.InvocationID
 		brief.ActorFQN = kernel.ActorFQN("teams::" + role + "-1")
@@ -100,7 +154,7 @@ func TestDecisionHandbackRestoresBothOwnersAcrossRestart(t *testing.T) {
 		_, _, profile := testBriefAndProfile()
 		profile.RoleFQRN, profile.Model, profile.BaseURL, profile.MaxOutputTokens = kernel.RoleFQRN(role), role, server.URL+"/v1", 16384
 		binding := &testBinding{root: root}
-		cfg := Config{Journal: j, Bindings: binding, Gateway: agenttools.Gateway{Bindings: binding}, HTTP: server.Client(), Profile: profile}
+		cfg := Config{Journal: j, Bindings: binding, Gateway: agenttools.Gateway{Bindings: binding, Host: agenttools.Host{Timeout: time.Second}}, HTTP: server.Client(), Profile: profile}
 		if round%2 == 1 {
 			cfg.PlanFinalization = &PlanFinalizationBinding{SourceOutput: outputs[round-1], SourceDigest: digest(outputs[round-1])}
 			brief.Task.Description = "Review this immutable proposal:\n" + string(outputs[round-1])
@@ -128,6 +182,14 @@ func TestDecisionHandbackRestoresBothOwnersAcrossRestart(t *testing.T) {
 		if err != nil {
 			t.Fatal(round, err)
 		}
+		requestsBeforeRestart := requestCount
+		restarted, err := PrepareReadOnly(ctx, brief, requestDigest, cfg)
+		if err != nil {
+			t.Fatal(round, err)
+		}
+		if restored, err := restarted.Run(ctx); err != nil || restored != output || requestCount != requestsBeforeRestart {
+			t.Fatalf("restart repeated or replaced a completed decision: round=%d err=%v", round, err)
+		}
 		parsed, err := application.ValidateRoleHandlerResult(*brief.MessageHandler, []byte(output))
 		if err != nil {
 			t.Fatal(err)
@@ -142,6 +204,9 @@ func TestDecisionHandbackRestoresBothOwnersAcrossRestart(t *testing.T) {
 		source.RequestDigest, source.OutputDigest, source.FinishedAt = &requestDigest, &outputDigest, &finished
 		sources = append(sources, source)
 		outputs = append(outputs, []byte(output))
+		if round == 0 {
+			originalJournal, _ = json.Marshal(j.streams[string(source.ID)])
+		}
 		// Durable bytes are reloaded into a new journal object between every stage.
 		checkpoint, _ := json.Marshal(j.streams)
 		path := filepath.Join(root, "journal.json")
@@ -157,7 +222,11 @@ func TestDecisionHandbackRestoresBothOwnersAcrossRestart(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if requestCount != 4 || !strings.Contains(string(outputs[3]), "Implement the admitted alias resolver") || strings.Contains(string(outputs[3]), "placeholder") {
+	retainedJournal, _ := json.Marshal(j.streams[string(sources[0].ID)])
+	if string(retainedJournal) != string(originalJournal) {
+		t.Fatal("handback modified the original journal")
+	}
+	if requestCount != 5 || !strings.Contains(string(outputs[3]), "Implement the admitted alias resolver") || strings.Contains(string(outputs[3]), "placeholder") {
 		t.Fatal("decision round trip did not close", requestCount)
 	}
 }

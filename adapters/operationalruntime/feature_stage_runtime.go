@@ -810,7 +810,7 @@ func (service *ProductionService) ensureFeaturePlanningTaskForRound(ctx context.
 		if !existing.Valid() || existingErr != nil || profileErr != nil || !bytes.Equal(existingJSON, profileJSON) {
 			return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, organization.ErrInvalidFeature
 		}
-	} else if err := service.applyTaskCommand(ctx, feature, tracked, "tekroo.command.task.bind-work-profile", kernel.SchemaVersion, service.policyAuthority, profile, evidence, nil, "profile"); err != nil {
+	} else if err := service.bindPlanningWorkProfile(ctx, feature, tracked, evidence); err != nil {
 		return organization.PlannedTask{}, kernel.AggregateState{}, "", kernel.WorkInvocation{}, kernel.Snapshot{}, err
 	}
 	dependencyEvents := make([]kernel.UUIDv7, 0, len(dependsOn))
@@ -853,6 +853,40 @@ func (service *ProductionService) ensureFeaturePlanningTaskForRound(ctx context.
 	}
 	invocation, _ := latestTaskInvocation(snapshot.WorkInvocations, task.ID)
 	return task, state, head, invocation, snapshot, nil
+}
+
+// Classification and retained history have different authority bindings. Keep
+// all history evidence for assignment/context admission, but attach only the
+// profile's declared classification evidence to the profile command.
+func (service *ProductionService) bindPlanningWorkProfile(ctx context.Context, feature organization.FeatureRequest, task *trackedTask, evidence []kernel.EvidenceRef) error {
+	if task == nil || !task.profile.Valid() {
+		return organization.ErrInvalidFeature
+	}
+	classification := make([]kernel.EvidenceRef, 0, len(task.profile.ClassificationEvidenceIDs))
+	for _, id := range task.profile.ClassificationEvidenceIDs {
+		found := false
+		for _, ref := range evidence {
+			if ref.EvidenceID != id {
+				continue
+			}
+			if found || !ref.SHA256.Valid() {
+				return organization.ErrInvalidFeature
+			}
+			classification = append(classification, ref)
+			found = true
+		}
+		if !found {
+			return organization.ErrInvalidFeature
+		}
+	}
+	key := "profile"
+	if !sameEvidenceSet(classification, evidence) {
+		// A pre-fix return may already have a durable rejected "profile"
+		// receipt. Use a distinct identity for the corrected command, without
+		// changing that receipt or dropping history from subsequent admission.
+		key = "planning-profile-classification-" + string(digestBytes(mustJSON(classification)))
+	}
+	return service.applyTaskCommand(ctx, feature, task, "tekroo.command.task.bind-work-profile", kernel.SchemaVersion, service.policyAuthority, task.profile, classification, nil, key)
 }
 
 // legacyPlanningStageDefinition preserves pre-Phase-10 deployments that do not
