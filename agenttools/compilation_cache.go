@@ -19,7 +19,7 @@ import (
 // Only compile-only go test may write the persistent cache. Test binaries never
 // receive that path: seed files are copied, not linked, into their private cache.
 // Go's action IDs bind source, imports, compiler flags and toolchain content.
-// Both compiler phases use -trimpath: disposable source paths must not make
+// Non-executing precompilation uses -trimpath: disposable source paths must not make
 // unchanged local packages miss the cache. Retention runs under the same lock
 // as compilation and copying; Go treats evicted index/data files as misses.
 func (host Host) seedCompilationCache(ctx context.Context, workspace, source, goBinary, profile string, environment []string, pattern string) error {

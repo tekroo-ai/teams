@@ -100,6 +100,7 @@ type Result struct {
 	Name            string              `json:"name"`
 	Path            string              `json:"path,omitempty"`
 	Output          string              `json:"output,omitempty"`
+	Stderr          string              `json:"stderr,omitempty"`
 	Files           []string            `json:"files,omitempty"`
 	Matches         []SearchMatch       `json:"matches,omitempty"`
 	MatchCount      *int                `json:"match_count,omitempty"`
@@ -134,6 +135,9 @@ type Host struct {
 	GoBinary         string
 	Timeout          time.Duration
 	CompilationCache string
+	// Explicit opt-in for trusted local test deployments. Candidate selection,
+	// disposable snapshots, deadlines and receipt checks remain unchanged.
+	LocalTestExecution bool
 }
 
 // Available exposes only tools permitted by the admitted role. repository.edit
@@ -911,9 +915,11 @@ func (host Host) command(ctx context.Context, root, name, binary string, argumen
 	command.Dir = root
 	command.Env = toolEnvironment()
 	output := &boundedOutput{limit: 128 << 10}
-	command.Stdout, command.Stderr = output, output
+	diagnostics := &boundedOutput{limit: 128 << 10}
+	// Git stdout is a machine-readable protocol; warnings are not hashes/status.
+	command.Stdout, command.Stderr = output, diagnostics
 	err := command.Run()
-	result := Result{Name: name, Output: string(output.data)}
+	result := Result{Name: name, Output: string(output.data), Stderr: string(diagnostics.data)}
 	if operation.Err() != nil {
 		return result, operation.Err()
 	}
@@ -947,7 +953,9 @@ func toolEnvironment() []string {
 			environment = append(environment, entry)
 		}
 	}
-	return append(environment, "LC_ALL=C", "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1", "GIT_TERMINAL_PROMPT=0", "GIT_NO_LAZY_FETCH=1", "GOPROXY=off", "GOSUMDB=off", "GOTOOLCHAIN=local", "GOENV=off", "GOWORK=off")
+	// Machine-readable Git output must not depend on host system attributes.
+	// Reassert this after dropping inherited overrides, including nested tests.
+	return append(environment, "LC_ALL=C", "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1", "GIT_ATTR_NOSYSTEM=1", "GIT_TERMINAL_PROMPT=0", "GIT_NO_LAZY_FETCH=1", "GOPROXY=off", "GOSUMDB=off", "GOTOOLCHAIN=local", "GOENV=off", "GOWORK=off")
 }
 
 func (host Host) requireGitRoot(ctx context.Context, root string) error {

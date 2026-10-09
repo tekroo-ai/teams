@@ -23,20 +23,21 @@ const workInvocationAuthorized = "WORK_INVOCATION_AUTHORIZED"
 // task execution. The caller owns Store; Runtime owns only the intent feed it
 // opens while assembling this graph.
 type Config struct {
-	Store                  *mongo.Store
-	Catalogue              kernel.CatalogueSnapshot
-	Clock                  kernel.Clock
-	IDs                    kernel.IDSource
-	OpenHandsBaseURL       string
-	OpenHandsSessionAPIKey string
-	AgentToolBaseURL       string
-	AgentToolSigningKey    []byte
-	AgentGoBinary          string
-	AgentCompilationCache  bool
-	HTTPClient             *http.Client
-	WorkspaceBindings      []openhands.WorkspaceBinding
-	WorkspaceResolver      openhands.WorkspaceResolver
-	ExecutionProfiles      []openhands.ExecutionProfile
+	Store                   *mongo.Store
+	Catalogue               kernel.CatalogueSnapshot
+	Clock                   kernel.Clock
+	IDs                     kernel.IDSource
+	OpenHandsBaseURL        string
+	OpenHandsSessionAPIKey  string
+	AgentToolBaseURL        string
+	AgentToolSigningKey     []byte
+	AgentGoBinary           string
+	AgentCompilationCache   bool
+	AgentLocalTestExecution bool
+	HTTPClient              *http.Client
+	WorkspaceBindings       []openhands.WorkspaceBinding
+	WorkspaceResolver       openhands.WorkspaceResolver
+	ExecutionProfiles       []openhands.ExecutionProfile
 	// ExecutionBoundary is an explicit opt-in for a qualified Teams-native
 	// boundary. Nil retains the deployed OpenHands path.
 	ExecutionBoundary        application.AgentExecutionBoundary
@@ -95,7 +96,7 @@ func New(ctx context.Context, config Config) (*Runtime, error) {
 		Reader: executionReader, Roles: config.RoleGrounding,
 		Workspaces:   toolWorkspaceAdapter{resolver: workspaces},
 		MaximumBytes: config.ExecutionPolicy.MaximumBriefBytes, Now: config.Clock.Now,
-	}, Host: agenttools.Host{Timeout: config.ExecutionPolicy.OperationTimeout, GoBinary: config.AgentGoBinary}}
+	}, Host: agenttools.Host{Timeout: config.ExecutionPolicy.OperationTimeout, GoBinary: config.AgentGoBinary, LocalTestExecution: config.AgentLocalTestExecution}}
 	if config.AgentCompilationCache {
 		root, err := filepath.EvalSymlinks(config.EvidenceRoot)
 		if err != nil {

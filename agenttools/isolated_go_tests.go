@@ -29,8 +29,8 @@ const (
 )
 
 // runIsolatedGoTests executes only committed source. The disposable checkout is
-// deliberately not a Git worktree: test code cannot modify the candidate or
-// gain a writable .git directory.
+// never a linked Git worktree. Local test deployments receive independent Git
+// metadata so repository self-tests work without sharing candidate objects.
 func (host Host) runIsolatedGoTests(ctx context.Context, root, pattern string) (Result, error) {
 	return host.runIsolatedGoTestsFrom(ctx, root, pattern, false, false)
 }
@@ -89,6 +89,14 @@ func (host Host) runIsolatedGoTestsFrom(ctx context.Context, root, pattern strin
 	if err != nil {
 		return result, err
 	}
+	if host.LocalTestExecution && !compileOnly {
+		if err := host.prepareLocalTestRepository(operation, root, source, result.CommitSHA); err != nil {
+			return result, err
+		}
+		if err := boundedWorkspace(workspace); err != nil {
+			return result, err
+		}
+	}
 	goBinary, err := exec.LookPath(host.goBinary())
 	if err != nil {
 		return result, err
@@ -133,7 +141,9 @@ func (host Host) runIsolatedGoTestsFrom(ctx context.Context, root, pattern strin
 	if err != nil {
 		return result, err
 	}
-	arguments := []string{"-p", profile, goBinary, "test", "-trimpath", "-count=1"}
+	// Executing tests may locate checked-in fixtures using runtime.Caller. Keep
+	// source paths intact; -trimpath is reserved for non-executing compilation.
+	arguments := []string{"test", "-count=1"}
 	if compileOnly {
 		// -run '^$' still executes init/TestMain. Compile-only means -c: no
 		// candidate executable or test initializer is run, even with side effects.
@@ -141,10 +151,13 @@ func (host Host) runIsolatedGoTestsFrom(ctx context.Context, root, pattern strin
 		if err := os.Mkdir(compiled, 0700); err != nil {
 			return result, err
 		}
-		arguments = append(arguments, "-c", "-o", compiled+string(filepath.Separator))
+		arguments = append(arguments, "-trimpath", "-c", "-o", compiled+string(filepath.Separator))
 	}
 	arguments = append(arguments, pattern)
-	command := exec.CommandContext(operation, "/usr/bin/sandbox-exec", arguments...)
+	command := exec.CommandContext(operation, goBinary, arguments...)
+	if !host.LocalTestExecution || compileOnly {
+		command = exec.CommandContext(operation, "/usr/bin/sandbox-exec", append([]string{"-p", profile, goBinary}, arguments...)...)
+	}
 	command.Dir = source
 	command.Env = append(toolEnvironment(),
 		// Fixture subprocesses must select the same concrete Git admitted by
@@ -220,6 +233,24 @@ finished:
 		return result, fmt.Errorf("isolated Go test process failed: %w", err)
 	}
 	return result, nil
+}
+
+func (host Host) prepareLocalTestRepository(ctx context.Context, root, source, commit string) error {
+	// Fetch one commit into a new object store, not a linked worktree, shared
+	// repository or hard-linked clone. This preserves the exact HEAD/tree for
+	// nested repository tools while keeping their writes in the disposable copy.
+	for _, arguments := range [][]string{
+		{"init", "--quiet"},
+		{"-c", "core.hooksPath=/dev/null", "fetch", "--quiet", "--no-tags", "--depth=1", "--", root, commit},
+		{"update-ref", "HEAD", commit},
+		{"read-tree", commit},
+	} {
+		result, err := host.command(ctx, source, "prepare_local_test_repository", host.gitBinary(), arguments)
+		if err != nil || result.ExitCode != 0 {
+			return fmt.Errorf("prepare disposable test checkout: %s: %w", result.Stderr, errors.Join(ErrInvalidCall, err))
+		}
+	}
+	return nil
 }
 
 func boundedWorkspace(root string) error {

@@ -117,14 +117,15 @@ type ProductionOpenHandsConfig struct {
 type ProductionNativeConfig struct {
 	// Pin the executable independently of launchd/login-shell PATH. If omitted,
 	// Go-capable teams resolve it once at startup, not during an agent turn.
-	GoBinary         string                         `json:"go_binary,omitempty"`
-	CompilationCache bool                           `json:"compilation_cache,omitempty"`
-	Owner            string                         `json:"owner"`
-	LeaseDuration    string                         `json:"lease_duration"`
-	Heartbeat        string                         `json:"heartbeat"`
-	RequestTimeout   string                         `json:"request_timeout"`
-	WorkflowTriggers []string                       `json:"workflow_triggers"`
-	ResultSchemas    []ProductionNativeResultSchema `json:"result_schemas"`
+	GoBinary           string                         `json:"go_binary,omitempty"`
+	CompilationCache   bool                           `json:"compilation_cache,omitempty"`
+	LocalTestExecution bool                           `json:"local_test_execution,omitempty"`
+	Owner              string                         `json:"owner"`
+	LeaseDuration      string                         `json:"lease_duration"`
+	Heartbeat          string                         `json:"heartbeat"`
+	RequestTimeout     string                         `json:"request_timeout"`
+	WorkflowTriggers   []string                       `json:"workflow_triggers"`
+	ResultSchemas      []ProductionNativeResultSchema `json:"result_schemas"`
 }
 
 type ProductionNativeResultSchema struct {
@@ -1082,9 +1083,10 @@ func NewProductionService(ctx context.Context, config ProductionConfig) (*Produc
 	}
 	runtime, err := New(ctx, Config{
 		Store: store, Catalogue: catalogue, Clock: clock, IDs: ids,
-		AgentGoBinary:         resolved.nativeGoBinary,
-		AgentCompilationCache: nativeSelected && config.Native != nil && config.Native.CompilationCache,
-		OpenHandsBaseURL:      config.OpenHands.BaseURL, OpenHandsSessionAPIKey: resolved.sessionAPIKey,
+		AgentGoBinary:           resolved.nativeGoBinary,
+		AgentCompilationCache:   nativeSelected && config.Native != nil && config.Native.CompilationCache,
+		AgentLocalTestExecution: nativeSelected && config.Native != nil && config.Native.LocalTestExecution,
+		OpenHandsBaseURL:        config.OpenHands.BaseURL, OpenHandsSessionAPIKey: resolved.sessionAPIKey,
 		AgentToolBaseURL: agentToolBaseURL, AgentToolSigningKey: agentToolSigningKey,
 		HTTPClient: &http.Client{Timeout: resolved.requestTimeout}, WorkspaceBindings: workspaces, WorkspaceResolver: workspaceResolver, ExecutionProfiles: profiles, ExecutionBoundary: boundary, RoleGrounding: roleGrounding, DeadlineExtensionReader: store,
 		OpenHandsPollInterval: resolved.pollInterval, OpenHandsMaximumPages: config.OpenHands.MaximumPages,
