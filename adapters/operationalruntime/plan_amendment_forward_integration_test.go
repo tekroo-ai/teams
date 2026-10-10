@@ -47,12 +47,17 @@ func TestAmendmentForwardCoordinatorWithBoundedArchitect(t *testing.T) {
 	amendmentForwardRoundTrip(t, false, kernel.RouteBoundedExecution)
 }
 
-func amendmentForwardRoundTrip(t *testing.T, inScope bool, architectRoute kernel.DecisionRoute) {
+func TestAmendmentDraftAttemptResetCorrectedWithinSameInvocation(t *testing.T) {
+	amendmentForwardRoundTrip(t, false, kernel.RouteBoundedExecution, true)
+}
+
+func amendmentForwardRoundTrip(t *testing.T, inScope bool, architectRoute kernel.DecisionRoute, badDraft ...bool) {
 	process, uri := startRuntimeMongod(t)
 	defer stopRuntimeMongod(process)
 	ctx, cancel := context.WithTimeout(t.Context(), 6*time.Minute)
 	defer cancel()
 	model := &amendmentForwardModel{t: t, calls: make(map[string]int), inScope: inScope}
+	model.badDraft = len(badDraft) != 0 && badDraft[0]
 	server := httptest.NewServer(http.HandlerFunc(model.serve))
 	defer server.Close()
 	path, config := amendmentForwardConfig(t, uri, server.URL+"/v1", architectRoute)
@@ -599,7 +604,11 @@ func amendmentForwardRoundTrip(t *testing.T, inScope bool, architectRoute kernel
 	}
 	model.mu.Lock()
 	defer model.mu.Unlock()
-	if model.calls["architect"] != 2 || model.calls["project-manager"] != 2 || model.calls["coder"] != 1 {
+	pmCalls := 2
+	if model.badDraft {
+		pmCalls++
+	}
+	if model.calls["architect"] != 2 || model.calls["project-manager"] != pmCalls || model.calls["coder"] != 1 {
 		t.Fatal("extra model assessment or lost source", model.calls)
 	}
 	t.Logf("APPLIED assessment=%s invocation=%s source_architect=%s source_pm=%s successor=%s budget_used=%d; no seeded terminal/approved/applied state", assessmentID, assessment.ID, designInv.ID, pmInv.ID, freshInvocation.ID, frontierBudget.ModelInvocationsUsed)
@@ -621,6 +630,7 @@ type amendmentForwardModel struct {
 	design, plan any
 	feature      organization.FeatureRequest
 	inScope      bool
+	badDraft     bool
 }
 
 func (model *amendmentForwardModel) serve(w http.ResponseWriter, r *http.Request) {
@@ -655,6 +665,9 @@ func (model *amendmentForwardModel) serve(w http.ResponseWriter, r *http.Request
 		if ordinal == 1 {
 			result = model.plan
 		} else {
+			if model.badDraft && ordinal == 3 && !strings.Contains(string(request.Messages), "ATTEMPT_ALLOWANCE_EXHAUSTED") {
+				model.t.Error("semantic correction not delivered to retained assessment context")
+			}
 			if !strings.Contains(string(request.Messages), "source_outputs") || !strings.Contains(string(request.Messages), "NEEDS_SCOPE_CHANGE") {
 				model.t.Error("raw amendment input/source context absent")
 			}
@@ -681,6 +694,9 @@ func (model *amendmentForwardModel) serve(w http.ResponseWriter, r *http.Request
 			newWork, newTest := successor.Tasks[1], successor.Tasks[2]
 			newWork.ID, newTest.ID = id(51008), id(51009)
 			newWork.AttemptLimit = 1
+			if model.badDraft && ordinal == 2 {
+				newWork.AttemptLimit = a.PriorPlan.Tasks[1].AttemptLimit
+			}
 			newWork.WriteScope = []string{"service/consumer.go", "cmd/main.go"}
 			newTest.DependsOn, newTest.Validates = []kernel.UUIDv7{newWork.ID}, []kernel.UUIDv7{newWork.ID}
 			successor.Tasks[1], successor.Tasks[2] = newWork, newTest

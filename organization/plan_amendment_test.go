@@ -201,6 +201,92 @@ func TestPlanAmendmentPreservesCompletedWorkAndRequiresIndependentPolicy(t *test
 	}
 }
 
+func TestAmendmentDraftAndTerminalDecisionShareBudgetAndAttemptChecks(t *testing.T) {
+	for _, kind := range []string{"accepted", "capacity", "attempt-reset", "deadline"} {
+		t.Run(kind, func(t *testing.T) {
+			feature, proposal, witness := amendmentFixture(t)
+			if kind == "capacity" {
+				feature.Input.MaximumTasks = uint32(len(feature.Plan.Tasks))
+			}
+			request := organization.PlanAmendmentReservation{AssessmentID: featureUUID(30), BlockedTaskID: proposal.BlockedTaskID, BlockedTaskRevision: proposal.BlockedTaskRevision, BlockedInvocationID: proposal.BlockedInvocationID, ConsultationID: proposal.ConsultationID, AnswerDigest: proposal.AnswerDigest}
+			reserved, err := organization.ReservePlanAmendment(feature, request, witness)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if kind == "attempt-reset" {
+				proposal.SuccessorPlan.Tasks[2].AttemptLimit = 2
+			}
+			if kind == "deadline" {
+				witness.Now = reserved.PlanAmendment.DeadlineAt
+			}
+			policy := organization.PlanAmendmentPolicy{ContractVersion: organization.PlanAmendmentContractVersion, ManifestDigest: featureDigest('f'), Authority: kernel.PrincipalRef{Kind: kernel.PrincipalPolicy, ID: "bounded-amendment-policy"}, AllowedRoots: witness.AllowedRoots}
+			raw, _ := json.Marshal(proposal)
+			before := organization.PlanAmendmentDigest(reserved)
+			draft := organization.CheckPlanAmendmentDraft(reserved, raw, witness, policy)
+			if organization.PlanAmendmentDigest(reserved) != before {
+				t.Fatal("preview mutated reservation")
+			}
+			terminal, err := organization.RecordPlanAmendmentDecision(reserved, raw, witness, policy, policy.Authority)
+			if err != nil || terminal.PlanAmendment.Decision == nil || *terminal.PlanAmendment.Decision != draft {
+				t.Fatalf("draft/terminal diverged: %+v %v", draft, err)
+			}
+			want := map[string]string{"accepted": "APPROVED", "capacity": "BUDGET_EXHAUSTED", "attempt-reset": "ATTEMPT_ALLOWANCE_EXHAUSTED", "deadline": "DEADLINE_EXPIRED"}[kind]
+			if draft.Code != want || draft.Accepted != (kind == "accepted") {
+				t.Fatalf("got %+v, want %s", draft, want)
+			}
+		})
+	}
+}
+
+func TestRemainingPlanTaskAllowancesIncludeFailuresAndSaturate(t *testing.T) {
+	feature, _, witness := amendmentFixture(t)
+	task := feature.Plan.Tasks[2]
+	task.AttemptLimit, task.ReviewRoundLimit = 4, 2
+	for index, ordinal := range []uint64{1, 3, 2} {
+		inv := kernel.WorkInvocation{ID: featureUUID(70 + index), TaskID: task.ID, Purpose: task.Purpose, AttemptOrdinal: ordinal, State: kernel.InvocationFailed}
+		witness.Invocations[inv.Ref()] = inv
+	}
+	if ordinary, repair := organization.RemainingPlanTaskAllowances(task, witness.Invocations); ordinary != 1 || repair != 2 {
+		t.Fatalf("allowances %d/%d", ordinary, repair)
+	}
+	inv := kernel.WorkInvocation{ID: featureUUID(75), TaskID: task.ID, Purpose: kernel.PurposeRepair, AttemptOrdinal: 9, State: kernel.InvocationFailed}
+	witness.Invocations[inv.Ref()] = inv
+	if ordinary, repair := organization.RemainingPlanTaskAllowances(task, witness.Invocations); ordinary != 1 || repair != 0 {
+		t.Fatalf("allowances %d/%d", ordinary, repair)
+	}
+}
+
+func TestAmendmentDraftExemptsOnlyBoundReadOnlyAssessment(t *testing.T) {
+	for _, kind := range []string{"assessment", "other-task", "other-actor", "other-execution", "other-purpose", "second-attempt"} {
+		t.Run(kind, func(t *testing.T) {
+			feature, proposal, witness := amendmentFixture(t)
+			request := organization.PlanAmendmentReservation{AssessmentID: featureUUID(30), BlockedTaskID: proposal.BlockedTaskID, BlockedTaskRevision: proposal.BlockedTaskRevision, BlockedInvocationID: proposal.BlockedInvocationID, ConsultationID: proposal.ConsultationID, AnswerDigest: proposal.AnswerDigest}
+			reserved, err := organization.ReservePlanAmendment(feature, request, witness)
+			if err != nil {
+				t.Fatal(err)
+			}
+			inv := kernel.WorkInvocation{ID: featureUUID(80), TaskID: request.AssessmentID, ActorFQN: witness.PM, Execution: witness.PMExecution, Purpose: kernel.PurposeHandoff, AttemptOrdinal: 1, State: kernel.InvocationStarted}
+			switch kind {
+			case "other-task":
+				inv.TaskID = featureUUID(81)
+			case "other-actor":
+				inv.ActorFQN = "teams::project-manager-2"
+			case "other-execution":
+				inv.Execution.FencingEpoch++
+			case "other-purpose":
+				inv.Purpose = kernel.PurposeImplementation
+			case "second-attempt":
+				inv.AttemptOrdinal++
+			}
+			witness.Invocations[inv.Ref()] = inv
+			d := organization.EvaluatePlanAmendment(reserved, proposal, witness)
+			if (kind == "assessment") != d.Accepted {
+				t.Fatalf("%s: %+v", kind, d)
+			}
+		})
+	}
+}
+
 func TestPlanAmendmentRejectsUnsafePlans(t *testing.T) {
 	cases := []struct {
 		name   string

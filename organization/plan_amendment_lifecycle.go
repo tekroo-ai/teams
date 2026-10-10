@@ -126,6 +126,25 @@ func amendmentSourceAttemptAllowed(task PlannedTask, invocation kernel.WorkInvoc
 	}
 }
 
+// CheckPlanAmendmentDraft is a read-only preview of the authoritative decision.
+// It consumes no allowance and authorizes no publication. Callers must reload
+// state and fence it again when recording the terminal decision.
+func CheckPlanAmendmentDraft(feature FeatureRequest, raw []byte, witness PlanAmendmentWitness, policy PlanAmendmentPolicy) PlanAmendmentDecision {
+	if !policy.Valid() || feature.PlanAmendment == nil {
+		return amendmentReject("FEATURE_NOT_AMENDABLE")
+	}
+	proposal, err := DecodePlanAmendmentProposal(raw)
+	witness.AllowedRoots = append([]string(nil), policy.AllowedRoots...)
+	decision := amendmentReject("INVALID_PROPOSAL_SCHEMA")
+	if err == nil {
+		decision = EvaluatePlanAmendment(feature, proposal, witness)
+	}
+	if !witness.Now.Before(feature.PlanAmendment.DeadlineAt) {
+		decision = amendmentReject("DEADLINE_EXPIRED")
+	}
+	return decision
+}
+
 // RecordPlanAmendmentDecision retains rejection as a terminal decision. It
 // does not publish a plan or materialize/activate any work.
 func RecordPlanAmendmentDecision(feature FeatureRequest, raw []byte, witness PlanAmendmentWitness, policy PlanAmendmentPolicy, authority kernel.PrincipalRef) (FeatureRequest, error) {
@@ -149,14 +168,7 @@ func RecordPlanAmendmentDecision(feature FeatureRequest, raw []byte, witness Pla
 	if witness.Now.Before(feature.UpdatedAt) {
 		return FeatureRequest{}, ErrPlanAmendment
 	}
-	witness.AllowedRoots = append([]string(nil), policy.AllowedRoots...)
-	decision := amendmentReject("INVALID_PROPOSAL_SCHEMA")
-	if decodeErr == nil {
-		decision = EvaluatePlanAmendment(feature, proposal, witness)
-	}
-	if !witness.Now.Before(old.DeadlineAt) {
-		decision = amendmentReject("DEADLINE_EXPIRED")
-	}
+	decision := CheckPlanAmendmentDraft(feature, raw, witness, policy)
 	next := feature
 	next.Revision++
 	next.UpdatedAt = witness.Now.UTC()

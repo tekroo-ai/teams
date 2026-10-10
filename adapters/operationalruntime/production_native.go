@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -151,12 +152,32 @@ func configuredNativeSession(ctx context.Context, service *ProductionService, pr
 				return nativeagent.Config{}, errors.Join(nativeagent.ErrInvalidBinding, err)
 			}
 			result.ResultInput = &nativeagent.ResultInput{Evidence: *input, Value: append(json.RawMessage(nil), raw...)}
+			if feature.PlanAmendment.State == organization.AmendmentAssessing {
+				featureID := feature.ID
+				result.ValidateFinalResult = func(finalCtx context.Context, output []byte) error {
+					current, found, err := service.Store.LoadFeature(finalCtx, featureID)
+					if err != nil || !found || current.PlanAmendment == nil || current.PlanAmendment.AssessmentID != brief.Task.TaskID {
+						return errors.Join(nativeagent.ErrInvalidBinding, err)
+					}
+					witness, _, _, err := service.amendmentWitness(finalCtx, current, current.PlanAmendment.BlockedInvocationID, current.PlanAmendment.ConsultationID)
+					if err != nil {
+						return err
+					}
+					witness.PM, witness.PMExecution = brief.ActorFQN, brief.Execution
+					raw := bytes.TrimSpace(bytes.TrimPrefix(output, []byte(application.OrganizationalResultMarker)))
+					decision := organization.CheckPlanAmendmentDraft(current, raw, witness, service.planning.PlanAmendment.Policy)
+					if !decision.Accepted {
+						return fmt.Errorf("%w: amendment draft rejected: %s; correct the proposal using the authoritative reservation, remaining_task_allowances and cumulative task budget; no decision or publication has occurred", organization.ErrPlanAmendment, decision.Code)
+					}
+					return nil
+				}
+			}
 		}
 		if result.ResultInput == nil {
 			return nativeagent.Config{}, nativeagent.ErrInvalidBinding
 		}
 	}
-	if consultationSource != nil {
+	if consultationSource != nil && result.ValidateFinalResult == nil {
 		result.ValidateFinalResult = func(_ context.Context, output []byte) error {
 			if amendmentAssessment {
 				raw := bytes.TrimSpace(bytes.TrimPrefix(output, []byte(application.OrganizationalResultMarker)))
@@ -188,7 +209,7 @@ func configuredNativeSession(ctx context.Context, service *ProductionService, pr
 		return nativeagent.Config{}, nativeagent.ErrInvalidBinding
 	}
 	if planning {
-		result.ResultArrayLimits = featureStageResultArrayLimits(stage, feature.Input.MaximumTasks)
+		result.ResultArrayLimits = featureStageResultArrayLimits(stage, service.planning.initialTaskLimit(feature))
 		if stage == stageArchitecture {
 			routing, routingErr := service.workflowTaskRoutingPolicy(service.clock.Now().UTC())
 			if routingErr != nil {

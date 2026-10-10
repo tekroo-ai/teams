@@ -303,6 +303,9 @@ func sameWorkKinds(left, right []kernel.WorkKind) bool {
 }
 
 type ProductionPlanning struct {
+	// Zero preserves legacy behavior. A lower initial bound reserves cumulative
+	// FeatureRequestInput.MaximumTasks capacity for the accepted amendment policy.
+	InitialPlanTaskLimit       uint32                                            `json:"initial_plan_task_limit,omitempty"`
 	PlanAmendment              *ProductionPlanAmendment                          `json:"plan_amendment,omitempty"`
 	PolicyRevision             uint64                                            `json:"policy_revision"`
 	ClassificationPolicyDigest kernel.Digest                                     `json:"classification_policy_digest"`
@@ -648,6 +651,9 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 	}
 	if err := config.Planning.PlanAmendment.validate(); err != nil {
 		return resolvedProductionConfig{}, err
+	}
+	if config.Planning.InitialPlanTaskLimit > organization.MaximumFeatureTasks {
+		return resolvedProductionConfig{}, invalidConfig("planning initial task limit exceeds feature task capacity")
 	}
 	configuredGates := make(map[string]struct{}, len(config.Planning.CandidateGates))
 	for _, gate := range config.Planning.CandidateGates {

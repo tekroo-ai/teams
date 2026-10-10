@@ -289,6 +289,36 @@ Qualification receipts:
   results pass, with no failure events. Nativeagent, organization and
   operationalruntime also pass race tests (`review-race.txt`).
 
+## Recovery capacity and pre-submission checks (2026-10-10)
+
+`planning.initial_plan_task_limit` is an optional administrator-owned ceiling
+on the initial materialized plan. Zero retains the feature's existing limit.
+The ceiling is never greater than `FeatureRequestInput.MaximumTasks`; the latter
+remains the cumulative capacity counting retired and fresh amendment nodes under
+the frozen 0.15.0 policy. The architect's budget, native array bounds, structural
+validation and assembled-plan validation use the same initial ceiling. A run may
+therefore reserve recovery capacity without inviting a larger initial design.
+For example, initial 16 and cumulative 34 leave 18 slots: one replacement of
+every possible initial node plus a two-node compatibility implementation/check.
+Invocation, purpose, attempt and deadline limits remain independent and finite.
+
+Native PM assessments call the same pure `CheckPlanAmendmentDraft` used by the
+terminal decision, reloading authoritative state before each submission. Invalid
+drafts receive the existing bounded same-invocation correction; this neither
+records approval nor creates another assessment. Terminal recording/publication
+still reload and fence state. The exact bound read-only assessment is not a
+concurrent implementation writer; other active work remains checked. Historical
+completed journals retain their recorded schema-only reconstruction.
+
+`RemainingPlanTaskAllowances` supplies both the admitted input and validator,
+including failed attempt ordinals and saturating subtraction. Replacement IDs
+cannot restore consumed allowances. Tests cover draft/terminal decision parity,
+read-only-assessment identity exclusions, reserve enforcement, and correction,
+restart/publication, checkpoint preservation and one invocation debit. The
+opt-in raw r60 replay pins its private receipt SHA and distinguishes reconstructed
+terminal-evidence availability from reloading Mongo metadata. It makes only
+local hypothetical corrections; it does not alter the rejected run.
+
 These receipts qualify the isolated harness and its supplied signed role fixtures,
 not the current production-role/live model. The next experiment requires the
 exact independent activation receipt and a fresh isolated feature run, preserving

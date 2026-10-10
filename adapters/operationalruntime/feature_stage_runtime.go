@@ -598,7 +598,7 @@ func (service *ProductionService) ensureFeaturePlanningTaskForRound(ctx context.
 			routing, err = service.workflowTaskRoutingPolicy(service.clock.Now().UTC())
 		}
 		if err == nil {
-			description, err = featurePlanningDescription(feature, stage, description, routing)
+			description, err = featurePlanningDescription(feature, stage, description, routing, service.planning.initialTaskLimit(feature))
 		}
 	}
 	if err != nil {
@@ -922,7 +922,20 @@ func legacyPlanningStageDefinition(stage featurePlanningStage) (string, kernel.W
 	}
 }
 
-func featurePlanningDescription(feature organization.FeatureRequest, stage featurePlanningStage, instruction string, executionRouting workflowTaskRoutingPolicy) (string, error) {
+func (planning ProductionPlanning) initialTaskLimit(feature organization.FeatureRequest) uint32 {
+	return initialFeatureTaskLimit(feature, planning.InitialPlanTaskLimit)
+}
+
+func initialFeatureTaskLimit(feature organization.FeatureRequest, initialLimit ...uint32) uint32 {
+	limit := feature.Input.MaximumTasks
+	if len(initialLimit) != 0 && initialLimit[0] != 0 && initialLimit[0] < limit {
+		limit = initialLimit[0]
+	}
+	return limit
+}
+
+func featurePlanningDescription(feature organization.FeatureRequest, stage featurePlanningStage, instruction string, executionRouting workflowTaskRoutingPolicy, initialLimit ...uint32) (string, error) {
+	limit := initialFeatureTaskLimit(feature, initialLimit...)
 	type sourceDigests struct {
 		Input         kernel.Digest `json:"input_sha256"`
 		Refinement    kernel.Digest `json:"refinement_sha256"`
@@ -987,6 +1000,8 @@ func featurePlanningDescription(feature organization.FeatureRequest, stage featu
 		}
 		type taskBudget struct {
 			MaximumTotalTasks                                 uint32 `json:"maximum_total_tasks"`
+			MaximumCumulativeTasks                            uint32 `json:"maximum_cumulative_tasks"`
+			ReservedAmendmentTasks                            uint32 `json:"reserved_amendment_tasks"`
 			ValidationTasksPerImplementation                  uint32 `json:"validation_tasks_per_implementation"`
 			ValidationTasksPerHandoffImplementation           uint32 `json:"validation_tasks_per_handoff_implementation"`
 			ValidationTasksPerHighRiskImplementation          uint32 `json:"validation_tasks_per_high_risk_implementation"`
@@ -1002,7 +1017,7 @@ func featurePlanningDescription(feature organization.FeatureRequest, stage featu
 			RoleSelectionOwner    string               `json:"role_selection_owner"`
 			TasksAreSerialized    bool                 `json:"tasks_are_serialized"`
 		}
-		maximumImplementationTasks := maximumBudgetedImplementationTasks(feature.Input.MaximumTasks)
+		maximumImplementationTasks := maximumBudgetedImplementationTasks(limit)
 		state = struct {
 			FeatureID          kernel.UUIDv7                     `json:"feature_id"`
 			Sources            sourceDigests                     `json:"source_sha256"`
@@ -1021,9 +1036,9 @@ func featurePlanningDescription(feature organization.FeatureRequest, stage featu
 			Sources:      sourceDigests{Input: inputDigest, Refinement: refinementDigest, Specification: specificationDigest},
 			RequestTitle: feature.Input.Title, RequestDescription: feature.Input.Description,
 			Repository: feature.Input.Repository, RequestConstraints: append([]string(nil), feature.Input.Constraints...),
-			MaximumTasks: feature.Input.MaximumTasks, MaximumHops: feature.Input.MaximumHops,
+			MaximumTasks: limit, MaximumHops: feature.Input.MaximumHops,
 			TaskBudget: taskBudget{
-				MaximumTotalTasks: feature.Input.MaximumTasks, ValidationTasksPerImplementation: 0,
+				MaximumTotalTasks: limit, MaximumCumulativeTasks: feature.Input.MaximumTasks, ReservedAmendmentTasks: feature.Input.MaximumTasks - limit, ValidationTasksPerImplementation: 0,
 				ValidationTasksPerHandoffImplementation: 1, ValidationTasksPerHighRiskImplementation: 1,
 				AdditionalSecurityReviewPerHighRiskImplementation: 1, ReservedFeatureValidationTasks: 1, ReservedProductAcceptanceTasks: 1,
 				MaximumModerateOrLowerImplementationTasks: maximumImplementationTasks,
@@ -1294,7 +1309,7 @@ func (service *ProductionService) featureArchitectureSuccessorDescription(ctx co
 		if err != nil {
 			return "", err
 		}
-		base, err := featurePlanningDescription(feature, stageArchitecture, instruction, routing)
+		base, err := featurePlanningDescription(feature, stageArchitecture, instruction, routing, service.planning.initialTaskLimit(feature))
 		if err != nil {
 			return "", err
 		}
@@ -1322,7 +1337,7 @@ func (service *ProductionService) featureArchitectureSuccessorDescription(ctx co
 		if routingErr != nil {
 			return "", routingErr
 		}
-		base, baseErr := featurePlanningDescription(feature, stageArchitecture, instruction, routing)
+		base, baseErr := featurePlanningDescription(feature, stageArchitecture, instruction, routing, service.planning.initialTaskLimit(feature))
 		if baseErr != nil {
 			return "", baseErr
 		}
@@ -1341,7 +1356,7 @@ func (service *ProductionService) featureArchitectureSuccessorDescription(ctx co
 	if err != nil {
 		return "", err
 	}
-	base, err := featurePlanningDescription(feature, stageArchitecture, instruction, routing)
+	base, err := featurePlanningDescription(feature, stageArchitecture, instruction, routing, service.planning.initialTaskLimit(feature))
 	if err != nil {
 		return "", err
 	}
@@ -1853,7 +1868,7 @@ func (service *ProductionService) validateFeatureStageOutput(feature organizatio
 		if err != nil {
 			return err
 		}
-		_, err = normalizeArchitecturePlanTasks(feature, result.Tasks, structuralTaskRoutingPolicy())
+		_, err = normalizeArchitecturePlanTasks(feature, result.Tasks, structuralTaskRoutingPolicy(), service.planning.initialTaskLimit(feature))
 		return err
 	case stagePlanFinalization:
 		result, err := parsePlanFinalizationStageResult(output, allowedMarkers, allowedActorFQNs...)
@@ -1866,7 +1881,7 @@ func (service *ProductionService) validateFeatureStageOutput(feature organizatio
 		if result.SourceDesignDigest != feature.Design.OutputDigest {
 			return fmt.Errorf("%w: final plan source_design_digest %s does not match accepted design %s", organization.ErrInvalidFeature, result.SourceDesignDigest, feature.Design.OutputDigest)
 		}
-		_, err = normalizeArchitecturePlanTasks(feature, result.Tasks, structuralTaskRoutingPolicy())
+		_, err = normalizeArchitecturePlanTasks(feature, result.Tasks, structuralTaskRoutingPolicy(), service.planning.initialTaskLimit(feature))
 		if err != nil {
 			return fmt.Errorf("%w: final plan task graph: %v", organization.ErrInvalidFeature, err)
 		}
@@ -1956,7 +1971,7 @@ func (service *ProductionService) buildExecutableFeaturePlan(ctx context.Context
 	// A normalized dependency may exist only to serialize overlapping write
 	// scopes. Review actual handoffs, not scheduling edges Teams added itself.
 	authoredHandoffs := authoredImplementationHandoffs(result.Tasks)
-	normalizedTasks, err := normalizeArchitecturePlanTasks(feature, result.Tasks, routing)
+	normalizedTasks, err := normalizeArchitecturePlanTasks(feature, result.Tasks, routing, service.planning.initialTaskLimit(feature))
 	if err != nil {
 		return organization.FeaturePlan{}, err
 	}
@@ -2021,6 +2036,9 @@ func (service *ProductionService) buildExecutableFeaturePlan(ctx context.Context
 	if err != nil {
 		return organization.FeaturePlan{}, fmt.Errorf("build plan: story acceptance tasks: %w", err)
 	}
+	if len(tasks) > int(service.planning.initialTaskLimit(feature)) {
+		return organization.FeaturePlan{}, fmt.Errorf("%w: assembled initial plan exceeds reserved task limit", organization.ErrInvalidFeature)
+	}
 	tasks, err = service.bindValidationWorkspaceContext(ctx, tasks)
 	if err != nil {
 		return organization.FeaturePlan{}, fmt.Errorf("build plan: validation workspace bindings: %w", err)
@@ -2043,12 +2061,13 @@ func (service *ProductionService) buildExecutableFeaturePlan(ctx context.Context
 	return plan, nil
 }
 
-func normalizeArchitecturePlanTasks(feature organization.FeatureRequest, tasks []architectureTaskResult, routing workflowTaskRoutingPolicy) ([]architectureTaskResult, error) {
+func normalizeArchitecturePlanTasks(feature organization.FeatureRequest, tasks []architectureTaskResult, routing workflowTaskRoutingPolicy, initialLimit ...uint32) ([]architectureTaskResult, error) {
 	if feature.Specification == nil {
 		return nil, organization.ErrInvalidFeature
 	}
-	if materialized := requiredMaterializedTaskCount(tasks); materialized > int(feature.Input.MaximumTasks) {
-		return nil, fmt.Errorf("%w: authored plan requires %d total tasks, authorized maximum is %d; retain coherent task boundaries and request a budget decision rather than merging unrelated work merely to fit", organization.ErrInvalidFeature, materialized, feature.Input.MaximumTasks)
+	limit := initialFeatureTaskLimit(feature, initialLimit...)
+	if materialized := requiredMaterializedTaskCount(tasks); materialized > int(limit) {
+		return nil, fmt.Errorf("%w: authored plan requires %d total tasks, authorized initial maximum is %d; retain coherent task boundaries and request a budget decision rather than merging unrelated work merely to fit", organization.ErrInvalidFeature, materialized, limit)
 	}
 	normalizedTasks, err := normalizeArchitectureTaskCriteria(*feature.Specification, tasks)
 	if err != nil {

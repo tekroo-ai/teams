@@ -73,6 +73,31 @@ type PlanAmendmentDecision struct {
 
 func amendmentReject(code string) PlanAmendmentDecision { return PlanAmendmentDecision{Code: code} }
 
+// RemainingPlanTaskAllowances is shared by the model input and the decision
+// validator. Highest ordinals include failed attempts; a new ID cannot refill
+// the predecessor's ordinary or repair allowance.
+func RemainingPlanTaskAllowances(task PlannedTask, invocations map[kernel.AggregateRef]kernel.WorkInvocation) (ordinary, repair uint64) {
+	var attempts, repairs uint64
+	for _, invocation := range invocations {
+		if invocation.TaskID != task.ID {
+			continue
+		}
+		if invocation.Purpose == task.Purpose && invocation.AttemptOrdinal > attempts {
+			attempts = invocation.AttemptOrdinal
+		}
+		if invocation.Purpose == kernel.PurposeRepair && invocation.AttemptOrdinal > repairs {
+			repairs = invocation.AttemptOrdinal
+		}
+	}
+	if uint64(task.AttemptLimit) > attempts {
+		ordinary = uint64(task.AttemptLimit) - attempts
+	}
+	if uint64(task.ReviewRoundLimit) > repairs {
+		repair = uint64(task.ReviewRoundLimit) - repairs
+	}
+	return ordinary, repair
+}
+
 // EvaluatePlanAmendment is deliberately pure: acceptance authorizes no writes.
 // A durable assessment consumes the single-use allowance before this function
 // runs, including when the proposal is invalid or the PM fails.
@@ -191,19 +216,8 @@ func EvaluatePlanAmendment(feature FeatureRequest, proposal PlanAmendmentProposa
 		// A successor ID cannot reset an exhausted task family. New unrelated
 		// compatibility nodes have their own finite limits, but a replacement
 		// inherits only the predecessor's unspent ordinary/repair allowance.
-		var attempts, repairs uint64
-		for _, invocation := range witness.Invocations {
-			if invocation.TaskID != old.ID {
-				continue
-			}
-			if invocation.Purpose == old.Purpose && invocation.AttemptOrdinal > attempts {
-				attempts = invocation.AttemptOrdinal
-			}
-			if invocation.Purpose == kernel.PurposeRepair && invocation.AttemptOrdinal > repairs {
-				repairs = invocation.AttemptOrdinal
-			}
-		}
-		if attempts >= uint64(old.AttemptLimit) || repairs >= uint64(old.ReviewRoundLimit) || uint64(fresh.AttemptLimit) > uint64(old.AttemptLimit)-attempts || uint64(fresh.ReviewRoundLimit) > uint64(old.ReviewRoundLimit)-repairs {
+		ordinary, repair := RemainingPlanTaskAllowances(old, witness.Invocations)
+		if ordinary == 0 || repair == 0 || uint64(fresh.AttemptLimit) > ordinary || uint64(fresh.ReviewRoundLimit) > repair {
 			return amendmentReject("ATTEMPT_ALLOWANCE_EXHAUSTED")
 		}
 		removed[old.ID], usedSuccessors[fresh.ID] = fresh.ID, true
@@ -344,6 +358,12 @@ func EvaluatePlanAmendment(feature FeatureRequest, proposal PlanAmendmentProposa
 		}
 		for _, invocation := range witness.Invocations {
 			if invocation.State.Terminal() {
+				continue
+			}
+			// During draft validation the exact read-only PM assessment is still
+			// active. It owns no implementation write scope. Do not exempt any
+			// other task, actor, purpose, execution or additional attempt.
+			if a := feature.PlanAmendment; a != nil && a.State == AmendmentAssessing && invocation.TaskID == a.AssessmentID && invocation.ActorFQN == witness.PM && invocation.Execution == witness.PMExecution && invocation.Purpose == kernel.PurposeHandoff && invocation.AttemptOrdinal == 1 {
 				continue
 			}
 			active, exists := prior[invocation.TaskID]

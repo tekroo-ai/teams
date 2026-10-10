@@ -433,25 +433,7 @@ func (service *ProductionService) registerAmendmentInput(ctx context.Context, fe
 	}
 	remaining := make(map[kernel.UUIDv7]map[string]uint64)
 	for _, task := range a.PriorPlan.Tasks {
-		var attempts, repairs uint64
-		for _, invocation := range w.Invocations {
-			if invocation.TaskID != task.ID {
-				continue
-			}
-			if invocation.Purpose == task.Purpose && invocation.AttemptOrdinal > attempts {
-				attempts = invocation.AttemptOrdinal
-			}
-			if invocation.Purpose == kernel.PurposeRepair && invocation.AttemptOrdinal > repairs {
-				repairs = invocation.AttemptOrdinal
-			}
-		}
-		ordinary, repair := uint64(0), uint64(0)
-		if uint64(task.AttemptLimit) > attempts {
-			ordinary = uint64(task.AttemptLimit) - attempts
-		}
-		if uint64(task.ReviewRoundLimit) > repairs {
-			repair = uint64(task.ReviewRoundLimit) - repairs
-		}
+		ordinary, repair := organization.RemainingPlanTaskAllowances(task, w.Invocations)
 		remaining[task.ID] = map[string]uint64{"ordinary": ordinary, "repair": repair}
 	}
 	// The reservation can outlive a role restart. Current execution authority

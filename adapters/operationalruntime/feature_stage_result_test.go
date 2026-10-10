@@ -470,6 +470,22 @@ func TestRequiredMaterializedTaskCountSelectsReviewWorkByRisk(t *testing.T) {
 	}
 }
 
+func TestInitialTaskLimitCannotSpendAmendmentReserve(t *testing.T) {
+	feature := organization.FeatureRequest{Input: organization.FeatureRequestInput{MaximumTasks: 34}, Specification: &organization.FeatureSpecification{}}
+	planning := ProductionPlanning{InitialPlanTaskLimit: 16}
+	if planning.initialTaskLimit(feature) != 16 || (ProductionPlanning{}).initialTaskLimit(feature) != 34 {
+		t.Fatal("initial cap/default")
+	}
+	tasks := make([]architectureTaskResult, 15) // plus two mandatory nodes exceeds 16, but not 34
+	if _, err := normalizeArchitecturePlanTasks(feature, tasks, structuralTaskRoutingPolicy(), planning.initialTaskLimit(feature)); err == nil || !strings.Contains(err.Error(), "authorized initial maximum is 16") {
+		t.Fatalf("reserve spent: %v", err)
+	}
+	feature.Input.MaximumTasks = 8
+	if planning.initialTaskLimit(feature) != 8 {
+		t.Fatal("initial cap raised feature authority")
+	}
+}
+
 func TestPreAssignmentPlanningResultsRejectOperationalIdentity(t *testing.T) {
 	refinement := []byte(application.OrganizationalResultMarker + "\n{\"schema_version\":\"1.0.0\",\"result_type\":\"FEATURE_REFINEMENT\",\"acceptance_criteria_disposition\":\"PRESERVE_SUBMITTED\",\"clarification_questions\":[\"Implementation is committed on tekroo/product-owner-1\"],\"priority\":\"HIGH\"}")
 	if _, err := parseRefinementStageResult(refinement, nil); err == nil {
