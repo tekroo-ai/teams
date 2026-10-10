@@ -35,7 +35,7 @@ func TestTestGatewayReturnsDurableReceiptWithoutRerun(t *testing.T) {
 	ledger := &memoryEffectLedger{}
 	gateway := TestGateway{Bindings: effectBinding{authority: Authority{WorkspaceRoot: root,
 		Permissions: []string{"repository.read", "test.execute"}, Purpose: kernel.PurposeValidation, EffectPolicyDigest: digest}},
-		Host: Host{Timeout: 30 * time.Second}, Ledger: ledger, Policy: digest}
+		Host: cachedFixtureHost(t, Host{Timeout: 30 * time.Second}), Ledger: ledger, Policy: digest}
 	request := Request{InvocationID: kernel.UUIDv7("00000000-0000-7000-8000-000000000999"), RequestDigest: digest,
 		ToolCallID: "test-1", Call: Call{Name: "run_go_tests", Arguments: json.RawMessage(`{"package":"./..."}`)}}
 	first, err := gateway.Execute(context.Background(), request)
@@ -144,7 +144,7 @@ func TestWorktreeTestGatewayReplaysCapturedResult(t *testing.T) {
 	digest := kernel.Digest("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 	ledger := &memoryEffectLedger{}
 	authority := Authority{WorkspaceRoot: root, Permissions: []string{"repository.read", "test.execute"}, Purpose: kernel.PurposeImplementation, EffectPolicyDigest: digest}
-	gateway := TestGateway{Bindings: effectBinding{authority: authority}, Host: Host{Timeout: 2 * time.Minute}, Ledger: ledger, Policy: digest}
+	gateway := TestGateway{Bindings: effectBinding{authority: authority}, Host: cachedFixtureHost(t, Host{Timeout: 2 * time.Minute}), Ledger: ledger, Policy: digest}
 	request := Request{InvocationID: kernel.UUIDv7("00000000-0000-7000-8000-000000000997"), RequestDigest: digest,
 		ToolCallID: "worktree-test-1", Call: Call{Name: "run_go_tests_worktree", Arguments: json.RawMessage(`{"package":"./..."}`)}}
 	first, err := gateway.Execute(context.Background(), request)

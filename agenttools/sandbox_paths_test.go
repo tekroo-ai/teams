@@ -35,7 +35,7 @@ func TestCanonicalPath(t *testing.T) {
 	fixtureGit(t, root, "init", "-q")
 	fixtureGit(t, root, "add", "--", "go.mod", "paths_test.go", "data/value.txt")
 	fixtureGit(t, root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "baseline")
-	host := Host{Timeout: 2 * time.Minute}
+	host := cachedFixtureHost(t, Host{Timeout: 2 * time.Minute})
 	authority := Authority{WorkspaceRoot: root, Permissions: []string{"repository.read", "test.execute"}, Purpose: kernel.PurposeImplementation}
 	for _, tool := range []string{"run_go_tests", "run_go_tests_worktree"} {
 		t.Run(tool, func(t *testing.T) {
@@ -52,7 +52,7 @@ func TestSandboxRunsRepositoryOrganizationRolePackageChecks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	host := Host{Timeout: 2 * time.Minute}
+	host := cachedFixtureHost(t, Host{Timeout: 2 * time.Minute})
 	authority := Authority{WorkspaceRoot: root, Permissions: []string{"repository.read", "test.execute"}, Purpose: kernel.PurposeImplementation}
 	result, err := host.execute(t.Context(), authority, call("run_go_tests_worktree", `{"package":"./organization"}`))
 	if err != nil || result.ExitCode != 0 || !strings.Contains(result.Output, "ok") {

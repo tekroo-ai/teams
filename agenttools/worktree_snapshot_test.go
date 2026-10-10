@@ -22,7 +22,7 @@ func TestWorktreeGoTestsRedGreenBeforeSingleCommit(t *testing.T) {
 	fixtureGit(t, root, "-c", "user.name=Test", "-c", "user.email=test@example.test", "commit", "-qm", "baseline")
 	baseline := strings.TrimSpace(fixtureGit(t, root, "rev-parse", "HEAD"))
 	authority := Authority{WorkspaceRoot: root, Permissions: []string{"repository.read", "test.execute"}, Purpose: kernel.PurposeImplementation}
-	host := Host{Timeout: 2 * time.Minute}
+	host := cachedFixtureHost(t, Host{Timeout: 2 * time.Minute})
 	writeSnapshotFixture(t, root, "value_test.go", "package worktree\nimport \"testing\"\nfunc TestValue(t *testing.T) { if Value() != 42 { t.Fatal(\"wrong value\") } }\n")
 	red, err := host.execute(context.Background(), authority, call("run_go_tests_worktree", `{"package":"./..."}`))
 	if err != nil || red.ExitCode == 0 || !validExpectedSHA(red.SnapshotSHA256) || red.CommitSHA != baseline {
@@ -58,7 +58,7 @@ func TestWorktreeGoTestsRejectValidationAndSymlinkEscape(t *testing.T) {
 	fixtureGit(t, root, "init", "-q")
 	fixtureGit(t, root, "add", "go.mod")
 	fixtureGit(t, root, "-c", "user.name=Test", "-c", "user.email=test@example.test", "commit", "-qm", "baseline")
-	host := Host{Timeout: 2 * time.Minute}
+	host := cachedFixtureHost(t, Host{Timeout: 2 * time.Minute})
 	permissions := []string{"repository.read", "test.execute"}
 	_, err := host.execute(context.Background(), Authority{WorkspaceRoot: root, Permissions: permissions, Purpose: kernel.PurposeValidation}, call("run_go_tests_worktree", `{"package":"./..."}`))
 	if !errors.Is(err, ErrForbidden) {

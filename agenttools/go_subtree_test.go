@@ -28,7 +28,7 @@ func TestBothGoToolsExecuteRecursiveSubtreeInSandbox(t *testing.T) {
 	fixtureGit(t, root, "init", "-q")
 	fixtureGit(t, root, "add", "--", ".")
 	fixtureGit(t, root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "baseline")
-	host := Host{Timeout: time.Minute}
+	host := cachedFixtureHost(t, Host{Timeout: time.Minute})
 	permissions := []string{"repository.read", "test.execute"}
 	authority := Authority{WorkspaceRoot: root, Permissions: permissions, Purpose: kernel.PurposeImplementation}
 	for _, spec := range Available(permissions) {

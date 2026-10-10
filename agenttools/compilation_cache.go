@@ -12,22 +12,52 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
 	"github.com/tekroo-ai/teams/internal/verification"
 )
 
+// This is only a bounded compiler-priming hint, never a test-result cache.
+// The consumer still runs go test -count=1 and Go checks its action IDs itself;
+// missing/evicted artifacts are compiled in the fresh private cache. A changed
+// snapshot, environment, selector or mode requires a new persistent primer.
+var compilationPrimers = struct {
+	sync.Mutex
+	last map[string][32]byte
+}{last: make(map[string][32]byte)}
+
+func hasCompilationPrimer(namespace string, key [32]byte) bool {
+	compilationPrimers.Lock()
+	defer compilationPrimers.Unlock()
+	previous, found := compilationPrimers.last[namespace]
+	return found && previous == key
+}
+
+func rememberCompilationPrimer(namespace string, key [32]byte) {
+	compilationPrimers.Lock()
+	defer compilationPrimers.Unlock()
+	// Cache configurations are normally fixed for the process lifetime. Keep
+	// test fixtures/dynamic configurations bounded; clearing only causes misses.
+	if len(compilationPrimers.last) >= 32 {
+		clear(compilationPrimers.last)
+	}
+	compilationPrimers.last[namespace] = key
+}
+
 // Only compile-only go test may write the persistent cache. Test binaries never
 // receive that path: seed files are copied, not linked, into their private cache.
 // Go's action IDs bind source, imports, compiler flags and toolchain content.
-// Non-executing precompilation uses -trimpath: disposable source paths must not make
-// unchanged local packages miss the cache. Retention runs under the same lock
+// Precompilation must match the consumer's compiler flags: -trimpath artifacts
+// cannot seed an untrimmed execution. Retention runs under the same lock
 // as compilation and copying; Go treats evicted index/data files as misses.
-func (host Host) seedCompilationCache(ctx context.Context, workspace, source, goBinary, profile string, environment []string, pattern string) error {
+func (host Host) seedCompilationCache(ctx context.Context, workspace, source, goBinary, profile string, environment []string, pattern, sourceIdentity string, compileOnly bool, timings *VerificationTimings) error {
 	if host.CompilationCache == "" {
 		return nil
 	}
+	cacheStarted := time.Now()
+	defer func() { timings.CacheNS += time.Since(cacheStarted).Nanoseconds() }()
 	cache := host.CompilationCache
 	if !filepath.IsAbs(cache) || strings.ContainsAny(cache, "\x00\r\n") {
 		return ErrBoundary
@@ -53,13 +83,25 @@ func (host Host) seedCompilationCache(ctx context.Context, workspace, source, go
 	if err := os.MkdirAll(cache, 0700); err != nil {
 		return err
 	}
+	started := time.Now()
 	unlock, err := lockEffectPath(ctx, cache, "")
+	timings.CacheLockNS += time.Since(started).Nanoseconds()
 	if err != nil {
 		return err
 	}
 	defer unlock()
-	if err := retainCompilationCache(ctx, cache, 512<<20, maxTestWorkspaceFiles/2); err != nil {
+	started = time.Now()
+	err = retainCompilationCache(ctx, cache, 512<<20, maxTestWorkspaceFiles/2)
+	timings.CacheRetentionNS += time.Since(started).Nanoseconds()
+	if err != nil {
 		return fmt.Errorf("compilation cache retention: %w", err)
+	}
+	key := sha256.Sum256([]byte(strings.Join(append([]string{sourceIdentity, source, pattern, strconv.FormatBool(compileOnly), profile}, environment...), "\x00")))
+	if sourceIdentity != "" && hasCompilationPrimer(cache, key) {
+		started = time.Now()
+		err = copyCompilationCache(ctx, cache, filepath.Join(workspace, "cache"))
+		timings.CacheCopyNS += time.Since(started).Nanoseconds()
+		return err
 	}
 	// The compiler can execute its installed tools, never a generated binary,
 	// custom tool, repository script or shell. No build-time network is needed.
@@ -79,7 +121,8 @@ func (host Host) seedCompilationCache(ctx context.Context, workspace, source, go
 	if err := os.Mkdir(compiled, 0700); err != nil {
 		return err
 	}
-	args, _ := verification.GoCommand([]string{goBinary, "test", "-trimpath", "-c", "-o", compiled + string(filepath.Separator), pattern})
+	args := append([]string{goBinary, "test"}, goTestCompileFlags(compileOnly)...)
+	args, _ = verification.GoCommand(append(args, "-c", "-o", compiled+string(filepath.Separator), pattern))
 	command := exec.CommandContext(ctx, "/usr/bin/sandbox-exec", append([]string{"-p", compilerProfile}, args...)...)
 	command.Dir = source
 	command.Env = replaceEnvironment(environment, "GOCACHE", cache)
@@ -95,7 +138,10 @@ func (host Host) seedCompilationCache(ctx context.Context, workspace, source, go
 	command.Stdout, command.Stderr = output, output
 	// A compile failure is a normal test observation, not a cache failure.
 	// The test phase still runs and records its own exact output and exit code.
+	started = time.Now()
 	err = command.Run()
+	compiledSuccessfully := err == nil
+	timings.CacheCompileNS += time.Since(started).Nanoseconds()
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
@@ -104,10 +150,19 @@ func (host Host) seedCompilationCache(ctx context.Context, workspace, source, go
 			return fmt.Errorf("compilation cache process: %w", err)
 		}
 	}
-	if err := retainCompilationCache(ctx, cache, 512<<20, maxTestWorkspaceFiles/2); err != nil {
+	started = time.Now()
+	err = retainCompilationCache(ctx, cache, 512<<20, maxTestWorkspaceFiles/2)
+	timings.CacheRetentionNS += time.Since(started).Nanoseconds()
+	if err != nil {
 		return fmt.Errorf("compilation cache retention: %w", err)
 	}
-	return copyCompilationCache(ctx, cache, filepath.Join(workspace, "cache"))
+	started = time.Now()
+	err = copyCompilationCache(ctx, cache, filepath.Join(workspace, "cache"))
+	timings.CacheCopyNS += time.Since(started).Nanoseconds()
+	if err == nil && compiledSuccessfully && sourceIdentity != "" {
+		rememberCompilationPrimer(cache, key)
+	}
+	return err
 }
 
 func replaceEnvironment(environment []string, name, value string) []string {
@@ -164,6 +219,10 @@ func retainCompilationCache(ctx context.Context, root string, maximumBytes int64
 	if err != nil {
 		return err
 	}
+	// Validate every entry, but sorting is useful only when eviction is needed.
+	if bytes <= maximumBytes && entries <= maximumEntries {
+		return nil
+	}
 	sort.Slice(files, func(i, j int) bool {
 		if files[i].info.ModTime().Equal(files[j].info.ModTime()) {
 			return files[i].path < files[j].path
@@ -214,6 +273,9 @@ func copyCompilationCache(ctx context.Context, source, destination string) error
 		}
 		if !info.Mode().IsRegular() {
 			return ErrBoundary
+		}
+		if cloned, err := cloneCacheFile(path, target); cloned || err != nil {
+			return err
 		}
 		in, err := os.Open(path)
 		if err != nil {

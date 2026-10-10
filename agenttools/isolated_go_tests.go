@@ -44,8 +44,11 @@ func (host Host) runIsolatedGoTestsWorktree(ctx context.Context, root, pattern s
 	return host.runIsolatedGoTestsFrom(ctx, root, pattern, true, false)
 }
 
-func (host Host) runIsolatedGoTestsFrom(ctx context.Context, root, pattern string, worktree, compileOnly bool) (Result, error) {
-	result := Result{Name: "run_go_tests"}
+func (host Host) runIsolatedGoTestsFrom(ctx context.Context, root, pattern string, worktree, compileOnly bool) (result Result, returnedErr error) {
+	started := time.Now()
+	timings := &VerificationTimings{}
+	result = Result{Name: "run_go_tests", VerificationTimings: timings}
+	defer func() { timings.TotalNS = time.Since(started).Nanoseconds() }()
 	if compileOnly {
 		result.Name = "verify_go_build"
 	}
@@ -57,11 +60,20 @@ func (host Host) runIsolatedGoTestsFrom(ctx context.Context, root, pattern strin
 	}
 	operation, cancel := context.WithTimeout(ctx, host.Timeout)
 	defer cancel()
+	phaseStarted := time.Now()
 	release, err := verification.Acquire(operation)
+	timings.QueueNS = time.Since(phaseStarted).Nanoseconds()
 	if err != nil {
 		return result, fmt.Errorf("verification queue: %w", err)
 	}
 	defer release()
+	phaseStarted = time.Now()
+	preparationStarted := phaseStarted
+	defer func() {
+		if timings.PreparationNS == 0 {
+			timings.PreparationNS = time.Since(preparationStarted).Nanoseconds() - timings.CleanupNS
+		}
+	}()
 	if runtime.GOOS != "darwin" {
 		return result, fmt.Errorf("isolated Go tests require the qualified macOS sandbox")
 	}
@@ -73,12 +85,19 @@ func (host Host) runIsolatedGoTestsFrom(ctx context.Context, root, pattern strin
 		return result, ErrInvalidCall
 	}
 	result.CommitSHA = strings.TrimSpace(head.Output)
-	workspace, err := os.MkdirTemp("", "tekroo-go-test-")
+	workspace, err := host.newVerificationWorkspace()
 	if err != nil {
 		return result, err
 	}
-	defer os.RemoveAll(workspace)
-	workspace, err = filepath.EvalSymlinks(workspace)
+	createdWorkspace := workspace
+	defer func() {
+		cleanupStarted := time.Now()
+		if err := os.RemoveAll(createdWorkspace); err != nil {
+			returnedErr = errors.Join(returnedErr, fmt.Errorf("verification workspace cleanup: %w", err))
+		}
+		timings.CleanupNS = time.Since(cleanupStarted).Nanoseconds()
+	}()
+	workspace, err = resolveVerificationWorkspace(createdWorkspace)
 	if err != nil {
 		return result, err
 	}
@@ -88,22 +107,28 @@ func (host Host) runIsolatedGoTestsFrom(ctx context.Context, root, pattern strin
 			return result, err
 		}
 	}
+	snapshotStarted := time.Now()
 	if worktree {
 		result.SnapshotSHA256, err = snapshotWorkingTree(operation, root, source, host.gitBinary())
 	} else {
 		err = archiveCommittedTree(operation, root, result.CommitSHA, source, host.gitBinary())
 	}
+	timings.SnapshotNS = time.Since(snapshotStarted).Nanoseconds()
 	if err != nil {
 		return result, err
 	}
 	if host.LocalTestExecution && !compileOnly {
-		if err := host.prepareLocalTestRepository(operation, root, source, result.CommitSHA); err != nil {
+		repositoryStarted := time.Now()
+		err := host.prepareLocalTestRepository(operation, root, source, result.CommitSHA)
+		timings.RepositoryNS = time.Since(repositoryStarted).Nanoseconds()
+		if err != nil {
 			return result, err
 		}
 		if err := boundedWorkspace(workspace); err != nil {
 			return result, err
 		}
 	}
+	toolchainStarted := time.Now()
 	goBinary, err := exec.LookPath(host.goBinary())
 	if err != nil {
 		return result, err
@@ -145,12 +170,13 @@ func (host Host) runIsolatedGoTestsFrom(ctx context.Context, root, pattern strin
 		}
 	}
 	profile, err := goTestSandboxProfileWithGit(workspace, goBinary, modCache, gitBinary)
+	timings.ToolchainNS = time.Since(toolchainStarted).Nanoseconds()
 	if err != nil {
 		return result, err
 	}
 	// Executing tests may locate checked-in fixtures using runtime.Caller. Keep
 	// source paths intact; -trimpath is reserved for non-executing compilation.
-	arguments := []string{"test", "-count=1"}
+	arguments := append([]string{"test", "-count=1"}, goTestCompileFlags(compileOnly)...)
 	if compileOnly {
 		// -run '^$' still executes init/TestMain. Compile-only means -c: no
 		// candidate executable or test initializer is run, even with side effects.
@@ -158,7 +184,7 @@ func (host Host) runIsolatedGoTestsFrom(ctx context.Context, root, pattern strin
 		if err := os.Mkdir(compiled, 0700); err != nil {
 			return result, err
 		}
-		arguments = append(arguments, "-trimpath", "-c", "-o", compiled+string(filepath.Separator))
+		arguments = append(arguments, "-c", "-o", compiled+string(filepath.Separator))
 	}
 	arguments = append(arguments, pattern)
 	boundedCommand, _ := verification.GoCommand(append([]string{goBinary}, arguments...))
@@ -168,21 +194,13 @@ func (host Host) runIsolatedGoTestsFrom(ctx context.Context, root, pattern strin
 		command = exec.CommandContext(operation, "/usr/bin/sandbox-exec", append([]string{"-p", profile, goBinary}, arguments...)...)
 	}
 	command.Dir = source
-	command.Env = append(toolEnvironment(),
-		// Fixture subprocesses must select the same concrete Git admitted by
-		// policy, not a different launcher inherited from the daemon's PATH.
-		"PATH="+filepath.Dir(gitBinary)+string(os.PathListSeparator)+os.Getenv("PATH"),
-		"HOME="+filepath.Join(workspace, "home"),
-		"TMPDIR="+filepath.Join(workspace, "tmp"),
-		"GOCACHE="+filepath.Join(workspace, "cache"),
-		"GOPATH="+filepath.Join(workspace, "gopath"),
-		"GOMODCACHE="+modCache,
-		"XDG_CACHE_HOME="+filepath.Join(workspace, "cache"),
-		"CGO_ENABLED=0",
-		"GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null", "GIT_TERMINAL_PROMPT=0", "GIT_ATTR_NOSYSTEM=1",
-	)
-	command.Env = verification.Environment(command.Env)
-	if err := host.seedCompilationCache(operation, workspace, source, goBinary, profile, command.Env, pattern); err != nil {
+	command.Env = goTestEnvironment(workspace, gitBinary, modCache)
+	timings.PreparationNS = time.Since(phaseStarted).Nanoseconds()
+	sourceIdentity := "commit:" + result.CommitSHA
+	if worktree {
+		sourceIdentity = "snapshot:" + result.SnapshotSHA256
+	}
+	if err := host.seedCompilationCache(operation, workspace, source, goBinary, profile, command.Env, pattern, sourceIdentity, compileOnly, timings); err != nil {
 		return result, err
 	}
 	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
@@ -198,6 +216,7 @@ func (host Host) runIsolatedGoTestsFrom(ctx context.Context, root, pattern strin
 	// Use one shared writer, so os/exec serializes stdout/stderr observations.
 	observations := io.MultiWriter(output, &timeout)
 	command.Stdout, command.Stderr = observations, observations
+	phaseStarted = time.Now()
 	if err := command.Start(); err != nil {
 		return result, fmt.Errorf("isolated Go test process failed: %w", err)
 	}
@@ -211,7 +230,9 @@ func (host Host) runIsolatedGoTestsFrom(ctx context.Context, root, pattern strin
 		case err = <-waited:
 			goto finished
 		case <-ticker.C:
+			scanStarted := time.Now()
 			workspaceErr = boundedWorkspace(workspace)
+			timings.QuotaScanNS += time.Since(scanStarted).Nanoseconds()
 			if workspaceErr != nil {
 				_ = syscall.Kill(-command.Process.Pid, syscall.SIGKILL)
 				err = <-waited
@@ -223,6 +244,7 @@ func (host Host) runIsolatedGoTestsFrom(ctx context.Context, root, pattern strin
 		}
 	}
 finished:
+	timings.ExecutionNS = time.Since(phaseStarted).Nanoseconds()
 	result.Output = string(output.data)
 	foldedOutput := strings.ToLower(result.Output)
 	result.PermissionDenial = strings.Contains(foldedOutput, "operation not permitted") || strings.Contains(foldedOutput, "permission denied")
@@ -253,6 +275,71 @@ finished:
 		return result, fmt.Errorf("isolated Go test process failed: %w", err)
 	}
 	return result, nil
+}
+
+// Acquire must be held by the caller. One fresh directory at a stable pathname
+// per process/cache lets Go reuse local-package action IDs without -trimpath.
+// Contents are never reused: snapshots/Git metadata are rebuilt and removed
+// after every call. Separate processes cannot share a writable checkout; a
+// leftover directory fails closed rather than deleting an unknown prior run.
+func (host Host) newVerificationWorkspace() (string, error) {
+	if host.CompilationCache == "" {
+		return os.MkdirTemp("", "tekroo-go-test-")
+	}
+	key := sha256.Sum256([]byte(host.CompilationCache))
+	parent, err := filepath.EvalSymlinks(os.TempDir())
+	if err != nil {
+		return "", err
+	}
+	workspace := filepath.Join(parent, "tekroo-go-test-"+strconv.Itoa(os.Getpid())+"-"+hex.EncodeToString(key[:]))
+	if err := os.Mkdir(workspace, 0700); err != nil {
+		return "", fmt.Errorf("fresh verification workspace required at %s (prior contents preserved): %w", workspace, err)
+	}
+	return workspace, nil
+}
+
+func resolveVerificationWorkspace(created string) (string, error) {
+	parent, err := filepath.EvalSymlinks(filepath.Dir(created))
+	if err != nil {
+		return "", err
+	}
+	resolved, err := filepath.EvalSymlinks(created)
+	if err != nil {
+		return "", err
+	}
+	// Resolve platform temp-directory aliases, but never follow a replaced leaf
+	// into another directory. Cleanup keeps the original path for the same reason.
+	if resolved != filepath.Join(parent, filepath.Base(created)) {
+		return "", ErrBoundary
+	}
+	return resolved, nil
+}
+
+func goTestEnvironment(workspace, gitBinary, modCache string) []string {
+	environment := append(toolEnvironment(),
+		// Fixture subprocesses must select the same concrete Git admitted by
+		// policy, not a different launcher inherited from the daemon's PATH.
+		"PATH="+filepath.Dir(gitBinary)+string(os.PathListSeparator)+os.Getenv("PATH"),
+		"HOME="+filepath.Join(workspace, "home"),
+		"TMPDIR="+filepath.Join(workspace, "tmp"),
+		"GOCACHE="+filepath.Join(workspace, "cache"),
+		"GOPATH="+filepath.Join(workspace, "gopath"),
+		"GOMODCACHE="+modCache,
+		"XDG_CACHE_HOME="+filepath.Join(workspace, "cache"),
+		"CGO_ENABLED=0",
+		"GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null", "GIT_TERMINAL_PROMPT=0", "GIT_ATTR_NOSYSTEM=1",
+	)
+	return verification.Environment(environment)
+}
+
+// Cache preparation and execution must agree on path-sensitive compiler flags.
+// Executed fixtures need runtime.Caller's absolute paths; compile-only checks
+// can normalize paths because they never run candidate code.
+func goTestCompileFlags(compileOnly bool) []string {
+	if compileOnly {
+		return []string{"-trimpath"}
+	}
+	return nil
 }
 
 func (host Host) prepareLocalTestRepository(ctx context.Context, root, source, commit string) error {

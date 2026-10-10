@@ -343,6 +343,7 @@ func TestGoTestsAreTypedAndBounded(t *testing.T) {
 		t.Fatal(err)
 	}
 	authority := Authority{WorkspaceRoot: root, Permissions: []string{"repository.read", "test.execute"}}
+	// Keep explicit successful cold/no-cache execution coverage as well.
 	host := Host{Timeout: 2 * time.Minute}
 	result, err := host.execute(context.Background(), authority, call("run_go_tests", `{"package":"./..."}`))
 	if err != nil || result.ExitCode != 0 || !strings.Contains(result.Output, "ok") {
@@ -399,7 +400,7 @@ func TestGoTestsKeepFilesystemBoundaryAndAllowLoopback(t *testing.T) {
 			t.Fatalf("git %v: %v: %s", arguments, err, output)
 		}
 	}
-	host := Host{Timeout: 2 * time.Minute}
+	host := cachedFixtureHost(t, Host{Timeout: 2 * time.Minute})
 	result, err := host.execute(context.Background(), Authority{WorkspaceRoot: root, Permissions: []string{"repository.read", "test.execute"}}, call("run_go_tests", `{"package":"./..."}`))
 	if err != nil || result.ExitCode != 0 || !strings.Contains(result.Output, "ok") {
 		t.Fatalf("sandbox boundary: %+v, %v", result, err)

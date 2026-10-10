@@ -41,7 +41,7 @@ func TestFixture(t *testing.T) {
 	}
 	for _, binary := range []string{"", "/usr/bin/git"} {
 		t.Run(binary, func(t *testing.T) {
-			result, err := (Host{Timeout: 2 * time.Minute, GitBinary: binary}).execute(context.Background(), Authority{WorkspaceRoot: root, Permissions: []string{"repository.read", "test.execute"}}, call("run_go_tests", `{"package":"./..."}`))
+			result, err := cachedFixtureHost(t, Host{Timeout: 2 * time.Minute, GitBinary: binary}).execute(context.Background(), Authority{WorkspaceRoot: root, Permissions: []string{"repository.read", "test.execute"}}, call("run_go_tests", `{"package":"./..."}`))
 			if err != nil || result.ExitCode != 0 || !strings.Contains(result.Output, "ok") || result.PermissionDenial {
 				t.Fatalf("isolated Git fixtures: %+v %v", result, err)
 			}

@@ -126,10 +126,32 @@ type Result struct {
 	ExitCode        int                 `json:"exit_code,omitempty"`
 	// A known preparation/process failure is a completed receipt, not an
 	// unknown effect. ExitCode -1 means no completed test-suite result.
-	ExecutionError   string `json:"execution_error,omitempty"`
-	ProcessExitCode  *int   `json:"process_exit_code,omitempty"`
-	TimeoutEvidence  string `json:"timeout_evidence,omitempty"`
-	PermissionDenial bool   `json:"permission_denial,omitempty"`
+	ExecutionError      string               `json:"execution_error,omitempty"`
+	ProcessExitCode     *int                 `json:"process_exit_code,omitempty"`
+	TimeoutEvidence     string               `json:"timeout_evidence,omitempty"`
+	PermissionDenial    bool                 `json:"permission_denial,omitempty"`
+	VerificationTimings *VerificationTimings `json:"verification_timings,omitempty"`
+}
+
+// Durations use monotonic clocks. Snapshot/Repository/Toolchain are subsets of
+// Preparation; cache detail is a subset of Cache; QuotaScan is part of Execution.
+// These diagnostic subsets must not be added to their parent durations.
+// Total includes cleanup and unclassified setup overhead, never parallel sums.
+type VerificationTimings struct {
+	QueueNS          int64 `json:"queue_ns"`
+	PreparationNS    int64 `json:"preparation_ns"`
+	SnapshotNS       int64 `json:"snapshot_ns"`
+	RepositoryNS     int64 `json:"repository_ns"`
+	ToolchainNS      int64 `json:"toolchain_ns"`
+	CacheNS          int64 `json:"cache_ns"`
+	CacheLockNS      int64 `json:"cache_lock_ns"`
+	CacheRetentionNS int64 `json:"cache_retention_ns"`
+	CacheCompileNS   int64 `json:"cache_compile_ns"`
+	CacheCopyNS      int64 `json:"cache_copy_ns"`
+	ExecutionNS      int64 `json:"execution_ns"`
+	QuotaScanNS      int64 `json:"quota_scan_ns"`
+	CleanupNS        int64 `json:"cleanup_ns"`
+	TotalNS          int64 `json:"total_ns"`
 }
 
 type Host struct {

@@ -18,7 +18,7 @@ func TestCompileCheckNeverRunsInitOrTestMainAndFindsTestCompileErrors(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
-	host := Host{Timeout: time.Minute}
+	host := cachedFixtureHost(t, Host{Timeout: time.Minute})
 	result, err := host.runIsolatedGoTestsFrom(t.Context(), root, "./...", true, true)
 	if err != nil || result.ExitCode != 0 || !validExpectedSHA(result.SnapshotSHA256) {
 		t.Fatalf("compile ran candidate: %+v %v", result, err)

@@ -39,7 +39,7 @@ func TestFixture(t *testing.T) {
 }
 `)
 	writeSnapshotFixture(t, root, "local_test.go", "invalid uncommitted source")
-	host := Host{Timeout: 2 * time.Minute, LocalTestExecution: true}
+	host := cachedFixtureHost(t, Host{Timeout: 2 * time.Minute, LocalTestExecution: true})
 	result, err := host.runIsolatedGoTests(t.Context(), root, "./...")
 	if err != nil || result.ExitCode != 0 || result.CommitSHA != head || !validExpectedSHA(result.SHA256) || !strings.Contains(result.Output, "ok") {
 		t.Fatalf("local committed execution: %+v %v", result, err)
@@ -61,7 +61,7 @@ func TestLocalTestExecutionStillStopsAtDeadline(t *testing.T) {
 
 func TestLocalTestExecutionDoesNotMakeCompileCheckRunInitializers(t *testing.T) {
 	root, _ := localTestFixture(t, "package localexecution\nimport \"testing\"\nfunc init() { panic(\"must not execute\") }\nfunc TestFixture(t *testing.T) {}\n")
-	host := Host{Timeout: 2 * time.Minute, LocalTestExecution: true}
+	host := cachedFixtureHost(t, Host{Timeout: 2 * time.Minute, LocalTestExecution: true})
 	result, err := host.runIsolatedGoTestsFrom(t.Context(), root, "./...", false, true)
 	if err != nil || result.ExitCode != 0 {
 		t.Fatalf("compile-only ran initializer: %+v %v", result, err)
