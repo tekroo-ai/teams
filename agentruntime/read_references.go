@@ -1,6 +1,7 @@
 package agentruntime
 
 import (
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"strings"
@@ -15,7 +16,8 @@ type readExcerpt struct {
 }
 
 type readReference struct {
-	CallID    string `json:"tool_call_id"`
+	CallID    string `json:"tool_call_id,omitempty"`
+	Source    string `json:"source,omitempty"`
 	Path      string `json:"path"`
 	SHA256    string `json:"sha256"`
 	StartLine int    `json:"start_line"`
@@ -29,6 +31,7 @@ type readReference struct {
 func referenceRepeatedReads(messages []Message) []Message {
 	var result []Message
 	seen := make(map[readExcerpt]string)
+	project, projectHash := pinnedProjectInstructions(messages)
 	for index, message := range messages {
 		if message.Role != "tool" || message.Name != "read_file" || message.CallID == "" {
 			continue
@@ -42,7 +45,8 @@ func referenceRepeatedReads(messages []Message) []Message {
 			continue
 		}
 		previous, duplicate := seen[excerpt]
-		if !duplicate {
+		pinned := excerpt.Path == "AGENTS.md" && excerpt.SHA256 == projectHash && exactProjectExcerpt(project, excerpt)
+		if !duplicate && !pinned {
 			seen[excerpt] = message.CallID
 			continue
 		}
@@ -54,7 +58,11 @@ func referenceRepeatedReads(messages []Message) []Message {
 		}
 		delete(fields, "output")
 		fields["content_delivery"] = json.RawMessage(`"IN_CONTEXT_REFERENCE"`)
-		fields["content_reference"], _ = json.Marshal(readReference{previous, excerpt.Path, excerpt.SHA256, excerpt.StartLine, excerpt.EndLine})
+		reference := readReference{CallID: previous, Path: excerpt.Path, SHA256: excerpt.SHA256, StartLine: excerpt.StartLine, EndLine: excerpt.EndLine}
+		if pinned {
+			reference.CallID, reference.Source = "", "PINNED_PROJECT_LAYER"
+		}
+		fields["content_reference"], _ = json.Marshal(reference)
 		encoded, err := json.Marshal(fields)
 		if err != nil || len(encoded) >= len(message.Content) {
 			continue
@@ -68,4 +76,40 @@ func referenceRepeatedReads(messages []Message) []Message {
 		return messages
 	}
 	return result
+}
+
+// Only a digest-verified, currently visible pinned layer can replace duplicate
+// instruction bytes. A changed file, modified excerpt or absent layer stays raw.
+func pinnedProjectInstructions(messages []Message) (string, string) {
+	const prefix = "[PROJECT | source=workspace AGENTS.md | sha256="
+	for _, message := range messages {
+		if message.Role != "system" {
+			continue
+		}
+		_, rest, found := strings.Cut(message.Content, prefix)
+		if !found {
+			continue
+		}
+		hash, rest, found := strings.Cut(rest, "]\n")
+		if !found {
+			continue
+		}
+		content, _, found := strings.Cut(rest, "\n[/ PROJECT]\n")
+		if !found {
+			continue
+		}
+		sum := sha256.Sum256([]byte(content))
+		if hash == hex.EncodeToString(sum[:]) {
+			return content, hash
+		}
+	}
+	return "", ""
+}
+
+func exactProjectExcerpt(project string, excerpt readExcerpt) bool {
+	if project == "" {
+		return false
+	}
+	lines := strings.Split(strings.TrimSuffix(project, "\n"), "\n")
+	return excerpt.EndLine <= len(lines) && strings.Join(lines[excerpt.StartLine-1:excerpt.EndLine], "\n") == excerpt.Output
 }

@@ -849,6 +849,29 @@ func TestNormalizeArchitectureTaskRelationsOrdersOverlappingWriteScopes(t *testi
 	}
 }
 
+func TestContractProviderCanFeedTwoDisjointImplementationsWithoutInventedEdge(t *testing.T) {
+	tasks := []architectureTaskResult{
+		{Purpose: kernel.PurposeImplementation, Complexity: 2, WriteScope: []string{"organization/transport_contract.go"}},
+		{Purpose: kernel.PurposeImplementation, Complexity: 3, DependsOn: []uint32{0}, WriteScope: []string{"adapters/operatorhttp/transport.go"}},
+		{Purpose: kernel.PurposeImplementation, Complexity: 3, DependsOn: []uint32{0}, WriteScope: []string{"cmd/tekroo/transport.go"}},
+	}
+	normalized, err := normalizeArchitectureTaskRelations(tasks, softwareDevelopmentTaskRoutingPolicy())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, index := range []int{1, 2} {
+		if !reflect.DeepEqual(normalized[index].DependsOn, []uint32{0}) {
+			t.Fatalf("disjoint contract consumer serialized: %v", normalized[index].DependsOn)
+		}
+	}
+	// A real provider dependency is authority, not an optimization hint.
+	tasks[2].DependsOn = []uint32{0, 1}
+	normalized, err = normalizeArchitectureTaskRelations(tasks, softwareDevelopmentTaskRoutingPolicy())
+	if err != nil || !reflect.DeepEqual(normalized[2].DependsOn, []uint32{0, 1}) {
+		t.Fatalf("real dependency removed: %v %v", normalized, err)
+	}
+}
+
 func TestNormalizeArchitectureTaskRelationsUsesConfigurableNonSoftwareRoles(t *testing.T) {
 	policy := workflowTaskRoutingPolicy{PurposeRoutes: []purposeTaskRoutingPolicy{{
 		Purpose:                  kernel.PurposeInvestigation,

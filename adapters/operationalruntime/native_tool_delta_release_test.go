@@ -34,6 +34,14 @@ func TestPrepareNativeToolDeltaRelease(t *testing.T) {
 		t.Skip("explicit source and new output directory required")
 	}
 	efficiency := os.Getenv("TEKROO_NATIVE_DELTA_KIND") == "workspace-efficiency"
+	execution := os.Getenv("TEKROO_NATIVE_DELTA_KIND") == "execution-efficiency"
+	bind := func(p *ProductionProfile, surface kernel.Digest, id kernel.UUIDv7, ids *UUIDv7Source) {
+		if execution {
+			bindNamedToolDeltaQualification(t, p, surface, id, "native-tool-delta-git-parent-directory", ids)
+		} else {
+			bindToolDeltaQualification(t, p, surface, id, efficiency, ids)
+		}
+	}
 	var config ProductionConfig
 	if err := readStrictJSONFile(source, &config); err != nil {
 		t.Fatal(err)
@@ -151,7 +159,7 @@ func TestPrepareNativeToolDeltaRelease(t *testing.T) {
 						t.Fatal("retained tool count mismatch")
 					}
 				}
-				bindToolDeltaQualification(t, p, surface, retained.ID, efficiency, ids)
+				bind(p, surface, retained.ID, ids)
 				t.Logf("retained completed role=%s invocation=%s", p.RoleFQRN, retained.ID)
 				continue
 			} else if !os.IsNotExist(readErr) {
@@ -164,7 +172,7 @@ func TestPrepareNativeToolDeltaRelease(t *testing.T) {
 		}
 		editable := slices.Contains(bundle.Permissions, "repository.edit")
 		before := "package mongo\n\nconst Value = 2\n" + strings.Repeat("// retained unrelated content\n", 600)
-		if efficiency {
+		if efficiency || execution {
 			before = "package mongo\n\nconst Value = 2\n" + strings.Repeat("// retained unrelated content\n", 16)
 			formatted, err := format.Source([]byte(before))
 			if err != nil {
@@ -181,7 +189,14 @@ func TestPrepareNativeToolDeltaRelease(t *testing.T) {
 			nativeQualificationGit(t, root, args...)
 		}
 		head := strings.TrimSpace(nativeQualificationGit(t, root, "rev-parse", "HEAD"))
-		if editable && !efficiency {
+		if execution {
+			if err := os.WriteFile(filepath.Join(root, "adapters/mongo/value.go"), []byte(before+"// second commit\n"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			nativeQualificationGit(t, root, "add", ".")
+			nativeQualificationGit(t, root, "-c", "user.name=Tool Delta", "-c", "user.email=delta@example.test", "commit", "-qm", "second")
+		}
+		if editable && !efficiency && !execution {
 			if err := os.WriteFile(filepath.Join(root, "adapters/mongo/value.go"), []byte(strings.Replace(before, "const Value = 2", "const Value = 1", 1)), 0600); err != nil {
 				t.Fatal(err)
 			}
@@ -203,11 +218,11 @@ func TestPrepareNativeToolDeltaRelease(t *testing.T) {
 		// qualification; the capability check cannot drift into unrelated work.
 		definitions := []agentruntime.ToolDefinition{}
 		for _, definition := range agenttools.ReadOnlyDefinitions(bundle.Permissions) {
-			if definition.Name == "read_file" || !efficiency && definition.Name == "read_file_from_commit" || efficiency && slices.Contains([]string{"find_definitions", "find_references", "file_change_history"}, definition.Name) {
+			if definition.Name == "read_file" || execution && slices.Contains([]string{"git_show", "git_diff"}, definition.Name) || !execution && (!efficiency && definition.Name == "read_file_from_commit" || efficiency && slices.Contains([]string{"find_definitions", "find_references", "file_change_history"}, definition.Name)) {
 				definitions = append(definitions, definition)
 			}
 		}
-		if editable {
+		if editable && !execution {
 			for _, definition := range agenttools.MutationDefinitions(bundle.Permissions) {
 				if !efficiency && slices.Contains([]string{"edit_file", "create_file", "undo_file_change", "restore_file_from_commit"}, definition.Name) || efficiency && slices.Contains([]string{"make_directory", "format_go_files", "move_file", "remove_file", "create_file", "undo_file_change"}, definition.Name) {
 					definitions = append(definitions, definition)
@@ -215,7 +230,7 @@ func TestPrepareNativeToolDeltaRelease(t *testing.T) {
 			}
 		}
 		for _, definition := range agenttools.TestDefinitions(bundle.Permissions) {
-			if editable && (definition.Name == "run_go_tests_worktree" && !efficiency || definition.Name == "check_go_build_worktree" && efficiency) || !editable && definition.Name == "run_go_tests" {
+			if !execution && (editable && (definition.Name == "run_go_tests_worktree" && !efficiency || definition.Name == "check_go_build_worktree" && efficiency) || !editable && definition.Name == "run_go_tests") {
 				definitions = append(definitions, definition)
 			}
 		}
@@ -231,6 +246,11 @@ func TestPrepareNativeToolDeltaRelease(t *testing.T) {
 			}
 		}
 		runner := agentruntime.Runner{Journal: journal, Tools: agenttools.ReadOnlyTurnAdapter{Gateway: agenttools.Gateway{Bindings: binding, Host: host, History: store}, InvocationID: id, RequestDigest: requestDigest}, Effects: toolDeltaEffects{mutation: mutation, tests: tests}, Model: agentruntime.OpenAIModel{Client: &http.Client{Timeout: 10 * time.Minute}, BaseURL: p.NativeSettings.BaseURL, Model: p.NativeSettings.Model, MaxTokens: p.NativeSettings.MaxOutputTokens, Reasoning: p.NativeSettings.Reasoning, Tools: definitions, FinalTool: "submit_result", FinalSchema: definitions[len(definitions)-1].Parameters, TurnContract: contract}, FinalTool: "submit_result", Finalize: func(raw json.RawMessage) (string, error) { return string(raw), nil }, SystemPrompt: agentruntime.StructuredTurnInstruction, MaxTurns: 20}
+		if execution {
+			model := runner.Model.(agentruntime.OpenAIModel)
+			model.Client.Transport = &nativeHTTPCapture{directory: output, scenario: string(p.RoleFQRN)}
+			runner.Model = model
+		}
 		prompt := "Read AGENTS.md. This is a bounded tool capability check in a disposable repository, not feature work. "
 		prompt += "Use read_file_from_commit to read the first 20 lines of adapters/mongo/value.go at exact commit " + head + ". "
 		if editable {
@@ -259,6 +279,9 @@ func TestPrepareNativeToolDeltaRelease(t *testing.T) {
 				}
 			}
 			prompt += "Finish with submit_result outcome completed. Do not commit or do unrelated work."
+		}
+		if execution {
+			prompt = "Read AGENTS.md. This is a bounded compatibility check of changed Git tool contracts, not feature work. Use git_show for HEAD, format stat. Take the full parent SHA only from that tool's Parents header. Use git_diff from that parent SHA to HEAD with path adapters/mongo/ and format stat; then use git_diff with the same revisions and path but format patch. Confirm the patch contains the added comment second commit. Finish with submit_result outcome completed. No edits, tests or extra exploration are needed."
 		}
 		ctx, cancel := context.WithTimeout(t.Context(), 10*time.Minute)
 		t.Logf("checking role=%s invocation=%s", p.RoleFQRN, id)
@@ -292,7 +315,7 @@ func TestPrepareNativeToolDeltaRelease(t *testing.T) {
 				seen[done.Name]++
 			}
 		}
-		if editable && !efficiency {
+		if editable && !efficiency && !execution {
 			got, err := os.ReadFile(filepath.Join(root, "adapters/mongo/value.go"))
 			if err != nil || string(got) != before || seen["edit_file"] != 1 || seen["undo_file_change"] != 2 || seen["restore_file_from_commit"] != 1 || seen["create_file"] != 1 {
 				t.Fatal("edit, uncommitted undo, committed restore and create/undo did not execute exactly")
@@ -323,10 +346,14 @@ func TestPrepareNativeToolDeltaRelease(t *testing.T) {
 					}
 				}
 			}
+		} else if execution {
+			if seen["read_file"] != 1 || seen["git_show"] != 1 || seen["git_diff"] != 2 {
+				t.Fatalf("changed Git delta was not exercised exactly: %v", seen)
+			}
 		} else if seen["read_file_from_commit"] != 1 {
 			t.Fatal("historical file contents were not read exactly once")
 		}
-		if slices.Contains(bundle.Permissions, "test.execute") {
+		if slices.Contains(bundle.Permissions, "test.execute") && !execution {
 			name := "run_go_tests"
 			if editable {
 				name = "run_go_tests_worktree"
@@ -339,7 +366,7 @@ func TestPrepareNativeToolDeltaRelease(t *testing.T) {
 			}
 		}
 		write(string(p.RoleFQRN)+"-measurement.json", map[string]any{"invocation_id": id, "model_profile_digest": p.ModelProfileDigest, "tool_surface_digest": surface, "result": json.RawMessage(result), "tool_counts": seen})
-		bindToolDeltaQualification(t, p, surface, id, efficiency, ids)
+		bind(p, surface, id, ids)
 	}
 	write("tekrood.native-candidate.json", config)
 	if _, err := LoadProductionConfig(filepath.Join(output, "tekrood.native-candidate.json")); err != nil {

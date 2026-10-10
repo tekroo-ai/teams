@@ -15,14 +15,12 @@ import (
 	"sync"
 	"syscall"
 	"time"
-
-	"github.com/tekroo-ai/teams/internal/verification"
 )
 
 // This is only a bounded compiler-priming hint, never a test-result cache.
 // The consumer still runs go test -count=1 and Go checks its action IDs itself;
 // missing/evicted artifacts are compiled in the fresh private cache. A changed
-// snapshot, environment, selector or mode requires a new persistent primer.
+// snapshot, environment or selector requires a new persistent primer.
 var compilationPrimers = struct {
 	sync.Mutex
 	last map[string][32]byte
@@ -46,13 +44,13 @@ func rememberCompilationPrimer(namespace string, key [32]byte) {
 	compilationPrimers.last[namespace] = key
 }
 
-// Only compile-only go test may write the persistent cache. Test binaries never
+// Only archive-only Go compilation may write the persistent cache. Test binaries never
 // receive that path: seed files are copied, not linked, into their private cache.
 // Go's action IDs bind source, imports, compiler flags and toolchain content.
-// Precompilation must match the consumer's compiler flags: -trimpath artifacts
-// cannot seed an untrimmed execution. Retention runs under the same lock
+// Both consumers preserve source paths at the same stable workspace pathname;
+// a trimmed build cannot seed an untrimmed test. Retention runs under the same lock
 // as compilation and copying; Go treats evicted index/data files as misses.
-func (host Host) seedCompilationCache(ctx context.Context, workspace, source, goBinary, profile string, environment []string, pattern, sourceIdentity string, compileOnly bool, timings *VerificationTimings) error {
+func (host Host) seedCompilationCache(ctx context.Context, workspace, source, goBinary, profile string, environment []string, pattern, sourceIdentity string, timings *VerificationTimings) error {
 	if host.CompilationCache == "" {
 		return nil
 	}
@@ -96,7 +94,7 @@ func (host Host) seedCompilationCache(ctx context.Context, workspace, source, go
 	if err != nil {
 		return fmt.Errorf("compilation cache retention: %w", err)
 	}
-	key := sha256.Sum256([]byte(strings.Join(append([]string{sourceIdentity, source, pattern, strconv.FormatBool(compileOnly), profile}, environment...), "\x00")))
+	key := sha256.Sum256([]byte(strings.Join(append([]string{sourceIdentity, source, pattern, profile}, environment...), "\x00")))
 	if sourceIdentity != "" && hasCompilationPrimer(cache, key) {
 		started = time.Now()
 		err = copyCompilationCache(ctx, cache, filepath.Join(workspace, "cache"))
@@ -117,12 +115,7 @@ func (host Host) seedCompilationCache(ctx context.Context, workspace, source, go
 			break
 		}
 	}
-	compiled := filepath.Join(workspace, "compiled")
-	if err := os.Mkdir(compiled, 0700); err != nil {
-		return err
-	}
-	args := append([]string{goBinary, "test"}, goTestCompileFlags(compileOnly)...)
-	args, _ = verification.GoCommand(append(args, "-c", "-o", compiled+string(filepath.Separator), pattern))
+	args := compilationPrimerArguments(goBinary, pattern)
 	command := exec.CommandContext(ctx, "/usr/bin/sandbox-exec", append([]string{"-p", compilerProfile}, args...)...)
 	command.Dir = source
 	command.Env = replaceEnvironment(environment, "GOCACHE", cache)
@@ -163,6 +156,14 @@ func (host Host) seedCompilationCache(ctx context.Context, workspace, source, go
 		rememberCompilationPrimer(cache, key)
 	}
 	return err
+}
+
+// Export production/test archives, never link binaries in the preparatory pass.
+// The consumer still links (and, for tests, executes) with its original verdict
+// semantics. -p=1 matches the shared verification policy; list has no parallel
+// test flag because it does not execute initializers, TestMain or tests.
+func compilationPrimerArguments(goBinary, pattern string) []string {
+	return []string{goBinary, "list", "-p=1", "-export", "-test", "-deps", "-f={{.ImportPath}}", pattern}
 }
 
 func replaceEnvironment(environment []string, name, value string) []string {

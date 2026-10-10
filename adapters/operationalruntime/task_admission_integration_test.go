@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -29,6 +30,16 @@ import (
 )
 
 func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
+	runTaskAdmissionFixture(t, false)
+}
+
+// Keep the worker-overlap qualification independent of the legacy fixture's
+// planning/recovery scenarios, which have separate protocol expectations.
+func TestIndependentDAGRootsActuallyOverlap(t *testing.T) {
+	runTaskAdmissionFixture(t, true)
+}
+
+func runTaskAdmissionFixture(t *testing.T, parallelOnly bool) {
 	process, uri := startRuntimeMongod(t)
 	defer stopRuntimeMongod(process)
 
@@ -80,6 +91,13 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 		t.Fatal(err)
 	}
 	workspace, baseline, _ := candidateRepository(t)
+	hook, err := canonicalRuntimeHook()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(workspace, ".openhands", "hooks", "sma_context_hook.py"), hook, 0o700); err != nil {
+		t.Fatal(err)
+	}
 	serverState := &integratedOpenHands{t: t, conversations: make(map[string]*integratedConversation), delays: make(map[string]time.Duration)}
 	server := httptest.NewServer(http.HandlerFunc(serverState.serveHTTP))
 	defer server.Close()
@@ -87,6 +105,11 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 	runtimeDigest := digestByte('3')
 	toolDigest := digestByte('4')
 	effectDigest := digestByte('5')
+	team := loadStarterTeam(t)
+	roleByModel := make(map[kernel.Digest]organization.LoadedRole, len(team.Roles))
+	for _, role := range team.Roles {
+		roleByModel[role.Binding.ModelProfileDigest] = role
+	}
 	modelDigests := []kernel.Digest{digestByte('1'), modelDigest, digestByte('4'), digestByte('5'), digestByte('7'), digestByte('8')}
 	executionProfiles := make([]openhands.ExecutionProfile, 0, len(modelDigests))
 	productionProfiles := make(map[kernel.Digest]ProductionProfile, len(modelDigests))
@@ -99,9 +122,24 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 		if profileErr != nil {
 			t.Fatal(profileErr)
 		}
+		// Handler-bound invocations require an explicit tool surface; the
+		// immutable Step-15 profile predates that requirement.
+		var settings map[string]any
+		if err := json.Unmarshal(profile.AgentSettings, &settings); err != nil {
+			t.Fatal(err)
+		}
+		settings["tools"] = []any{map[string]any{"name": "repository_view", "params": map[string]any{}}}
+		profile.AgentSettings, err = json.Marshal(settings)
+		if err != nil {
+			t.Fatal(err)
+		}
 		executionProfiles = append(executionProfiles, profile)
-		corpus, qualification := testQualificationBundle(t, currentModel, "programmer", route, toolDigest, allTestWorkKinds(), now.Add(-time.Minute))
-		productionProfiles[currentModel] = ProductionProfile{ModelProfileDigest: currentModel, RoleFQRN: "programmer", DecisionRoute: route, RuntimeIdentityDigest: runtimeDigest, ToolPolicyDigest: toolDigest, EffectPolicyDigest: effectDigest, MaximumIterations: 24, QualificationCorpus: corpus, Qualification: qualification}
+		role, found := roleByModel[currentModel]
+		if !found {
+			t.Fatalf("fixture profile %s has no signed role binding", currentModel)
+		}
+		corpus, qualification := testQualificationBundle(t, currentModel, kernel.RoleFQRN(role.Binding.Role), route, toolDigest, allTestWorkKinds(), now.Add(-time.Minute))
+		productionProfiles[currentModel] = ProductionProfile{ModelProfileDigest: currentModel, RoleFQRN: kernel.RoleFQRN(role.Binding.Role), RoleBundleDigest: role.Binding.BundleDigest, DecisionRoute: route, RuntimeIdentityDigest: runtimeDigest, ToolPolicyDigest: toolDigest, EffectPolicyDigest: effectDigest, MaximumIterations: 24, QualificationCorpus: corpus, Qualification: qualification}
 	}
 	clock := SystemClock{}
 	ids, err := NewUUIDv7Source(clock)
@@ -124,7 +162,6 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	team := loadStarterTeam(t)
 	roleGrounding, err := newBoundRoleGroundingResolver(team)
 	if err != nil {
 		t.Fatal(err)
@@ -137,7 +174,7 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 		OpenHandsMaximumPages: 8, OpenHandsMaximumEvidence: 1 << 20, EvidenceRoot: evidenceRoot,
 		ExecutionPolicy: application.OperationalExecutionPolicy{OperationTimeout: time.Second, MaximumBriefBytes: 1 << 20, ConsumerID: "phase6-admission", PolicyRevision: 1, ServiceAuthority: kernel.PrincipalRef{Kind: kernel.PrincipalService, ID: "teams-operational-runtime"}, ExpiryAuthority: kernel.PrincipalRef{Kind: kernel.PrincipalPolicy, ID: "teams-admission-policy"}, Provenance: provenance},
 		EvidencePolicy:  application.CommandEvidenceRecorderPolicy{PolicyRevision: 1, Authority: kernel.PrincipalRef{Kind: kernel.PrincipalService, ID: "teams-operational-runtime"}, Provenance: provenance, ProducingVersion: "phase6", RetentionPolicy: "phase6"},
-		WorkerPolicy:    executionruntime.Policy{ConsumerID: "phase6-admission", LeaseDuration: 3 * time.Second, ReconciliationInterval: 10 * time.Millisecond, MaximumReconciliations: 2, MaximumConcurrentInvocations: 1, LeaseOperationTimeout: time.Second},
+		WorkerPolicy:    executionruntime.Policy{ConsumerID: "phase6-admission", LeaseDuration: 3 * time.Second, ReconciliationInterval: 10 * time.Millisecond, MaximumReconciliations: 2, MaximumConcurrentInvocations: 2, LeaseOperationTimeout: time.Second},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -237,6 +274,15 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 			t.Errorf("runtime stop during cleanup = %v", err)
 		}
 	}()
+	if parallelOnly {
+		for _, actor := range []kernel.ActorFQN{"example::tester-1", "example::tester-2"} {
+			if _, err := roleHost.EnsureStarted(contextWithTimeout(t), actor); err != nil {
+				t.Fatal(err)
+			}
+		}
+		exerciseParallelDAGAdmission(t, service, store, serverState, modelDigest, digestByte('8'), now)
+		return
+	}
 	service.suspendNewInvocations = true
 	if err := service.MaterializeFeaturePlan(contextWithTimeout(t), feature, plan); err != nil {
 		t.Fatal(err)
@@ -255,7 +301,7 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 	if err := service.reconcileFeaturePlan(contextWithTimeout(t), feature, plan); err != nil {
 		t.Fatalf("resume root-task admission: %v", err)
 	}
-	waitForInvocationState(t, store, firstInvocationID, kernel.InvocationSucceeded)
+	waitForInvocationState(t, store, firstInvocationID, kernel.InvocationSucceeded, runtime)
 	serverState.mu.Lock()
 	serverState.commitResults = false
 	serverState.mu.Unlock()
@@ -894,6 +940,10 @@ func exerciseParallelDAGAdmission(t *testing.T, service *ProductionService, stor
 	}
 	firstInvocation, firstFound := latestTaskInvocation(snapshot.WorkInvocations, firstID)
 	secondInvocation, secondFound := latestTaskInvocation(snapshot.WorkInvocations, secondID)
+	if firstInvocation.StartedAt == nil || firstInvocation.FinishedAt == nil || secondInvocation.StartedAt == nil || secondInvocation.FinishedAt == nil || !firstInvocation.StartedAt.Before(*secondInvocation.FinishedAt) || !secondInvocation.StartedAt.Before(*firstInvocation.FinishedAt) {
+		t.Fatalf("parallel admission did not produce overlapping raw execution intervals: first=%+v second=%+v", firstInvocation, secondInvocation)
+	}
+	t.Logf("raw parallel DAG receipt: first=%s started=%s finished=%s second=%s started=%s finished=%s", firstInvocation.ID, firstInvocation.StartedAt.Format(time.RFC3339Nano), firstInvocation.FinishedAt.Format(time.RFC3339Nano), secondInvocation.ID, secondInvocation.StartedAt.Format(time.RFC3339Nano), secondInvocation.FinishedAt.Format(time.RFC3339Nano))
 	consumer := organization.PlannedTask{ID: kernel.UUIDv7("00000000-0000-7000-8000-000000006031"), StoryID: storyID, Purpose: kernel.PurposeValidation, DependsOn: []kernel.UUIDv7{firstID, secondID}, Validates: []kernel.UUIDv7{secondID}, Owner: "example::tester-1", ModelProfile: testerModel}
 	assembledPlan := plan
 	assembledPlan.Tasks = append(append([]organization.PlannedTask(nil), plan.Tasks...), consumer)
@@ -1108,7 +1158,7 @@ func submitAutomatedFeature(t *testing.T, service *ProductionService) (organizat
 	return returnValue, created
 }
 
-func waitForInvocationState(t *testing.T, store *mongo.Store, invocationID kernel.UUIDv7, expected kernel.WorkInvocationState) {
+func waitForInvocationState(t *testing.T, store *mongo.Store, invocationID kernel.UUIDv7, expected kernel.WorkInvocationState, diagnostics ...*Runtime) {
 	t.Helper()
 	deadline := time.Now().Add(10 * time.Second)
 	for {
@@ -1120,6 +1170,9 @@ func waitForInvocationState(t *testing.T, store *mongo.Store, invocationID kerne
 			t.Fatalf("invocation %s reached unexpected terminal state: %#v", invocationID, current.Invocation)
 		}
 		if time.Now().After(deadline) {
+			for _, runtime := range diagnostics {
+				t.Logf("admission failure diagnostics: validation=%v worker=%+v invocation=%+v", current.Validate(time.Now().UTC()), runtime.worker.Status(), current.Invocation)
+			}
 			t.Fatalf("invocation %s state=%s err=%v", invocationID, current.Invocation.State, err)
 		}
 		time.Sleep(10 * time.Millisecond)
@@ -1202,7 +1255,15 @@ func loadStarterTeam(t *testing.T) organization.LoadedTeam {
 	if err != nil {
 		t.Fatal(err)
 	}
-	team, err := organization.LoadTeamManifest(manifestPath, kernel.Digest(hex.EncodeToString(manifestHash[:])), map[string]ed25519.PublicKey{"tekroo-message-handlers-20260913": publicKey, "tekroo-message-handlers-qualification-20260913": qualificationKey})
+	amendmentRaw, err := os.ReadFile(filepath.Join(filepath.Dir(manifestPath), "role-amendment-publisher.pub"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	amendmentKey, err := base64.StdEncoding.Strict().DecodeString(strings.TrimSpace(string(amendmentRaw)))
+	if err != nil || len(amendmentKey) != ed25519.PublicKeySize {
+		t.Fatalf("published amendment key: %v", err)
+	}
+	team, err := organization.LoadTeamManifest(manifestPath, kernel.Digest(hex.EncodeToString(manifestHash[:])), map[string]ed25519.PublicKey{"tekroo-message-handlers-20260913": publicKey, "tekroo-message-handlers-qualification-20260913": qualificationKey, "tekroo-teams-amendment-20260917": amendmentKey})
 	if err != nil {
 		t.Fatal(err)
 	}

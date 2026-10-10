@@ -2,6 +2,7 @@ package agenttools
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -27,5 +28,19 @@ func TestCompileCheckNeverRunsInitOrTestMainAndFindsTestCompileErrors(t *testing
 	result, err = host.runIsolatedGoTestsFrom(t.Context(), root, "./...", true, true)
 	if err != nil || result.ExitCode == 0 {
 		t.Fatalf("test compilation failure missed: %+v %v", result, err)
+	}
+}
+
+func TestCompileCheckRetainsLinkerErrorsAfterArchivePrimer(t *testing.T) {
+	root, _ := localTestFixture(t, `package localexecution
+import (_ "unsafe"; "testing")
+//go:linkname unresolved example.invalid/missing
+func unresolved()
+func TestLink(t *testing.T) { unresolved() }
+`)
+	host := cachedFixtureHost(t, Host{Timeout: time.Minute})
+	result, err := host.runIsolatedGoTestsFrom(t.Context(), root, "./...", true, true)
+	if err != nil || result.ExitCode == 0 || !strings.Contains(result.Output, "relocation target example.invalid/missing not defined") {
+		t.Fatalf("archive-only primer hid linker failure: %+v %v", result, err)
 	}
 }

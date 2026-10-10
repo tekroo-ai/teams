@@ -61,7 +61,11 @@ func (host Host) runIsolatedGoTestsFrom(ctx context.Context, root, pattern strin
 	operation, cancel := context.WithTimeout(ctx, host.Timeout)
 	defer cancel()
 	phaseStarted := time.Now()
-	release, err := verification.Acquire(operation)
+	class := verification.WholeModule
+	if compileOnly || !strings.HasSuffix(pattern, "/...") && pattern != "..." {
+		class = verification.Focused
+	}
+	release, err := verification.AcquireClass(operation, class)
 	timings.QueueNS = time.Since(phaseStarted).Nanoseconds()
 	if err != nil {
 		return result, fmt.Errorf("verification queue: %w", err)
@@ -174,9 +178,10 @@ func (host Host) runIsolatedGoTestsFrom(ctx context.Context, root, pattern strin
 	if err != nil {
 		return result, err
 	}
-	// Executing tests may locate checked-in fixtures using runtime.Caller. Keep
-	// source paths intact; -trimpath is reserved for non-executing compilation.
-	arguments := append([]string{"test", "-count=1"}, goTestCompileFlags(compileOnly)...)
+	// Both build checks and executing tests use the same path-sensitive compiler
+	// artifacts. The stable workspace pathname permits reuse without -trimpath;
+	// executed fixtures retain their absolute runtime.Caller source paths.
+	arguments := []string{"test", "-count=1"}
 	if compileOnly {
 		// -run '^$' still executes init/TestMain. Compile-only means -c: no
 		// candidate executable or test initializer is run, even with side effects.
@@ -200,7 +205,7 @@ func (host Host) runIsolatedGoTestsFrom(ctx context.Context, root, pattern strin
 	if worktree {
 		sourceIdentity = "snapshot:" + result.SnapshotSHA256
 	}
-	if err := host.seedCompilationCache(operation, workspace, source, goBinary, profile, command.Env, pattern, sourceIdentity, compileOnly, timings); err != nil {
+	if err := host.seedCompilationCache(operation, workspace, source, goBinary, profile, command.Env, pattern, sourceIdentity, timings); err != nil {
 		return result, err
 	}
 	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
@@ -330,16 +335,6 @@ func goTestEnvironment(workspace, gitBinary, modCache string) []string {
 		"GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null", "GIT_TERMINAL_PROMPT=0", "GIT_ATTR_NOSYSTEM=1",
 	)
 	return verification.Environment(environment)
-}
-
-// Cache preparation and execution must agree on path-sensitive compiler flags.
-// Executed fixtures need runtime.Caller's absolute paths; compile-only checks
-// can normalize paths because they never run candidate code.
-func goTestCompileFlags(compileOnly bool) []string {
-	if compileOnly {
-		return []string{"-trimpath"}
-	}
-	return nil
 }
 
 func (host Host) prepareLocalTestRepository(ctx context.Context, root, source, commit string) error {

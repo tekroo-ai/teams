@@ -2,6 +2,8 @@ package agentruntime
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"reflect"
@@ -9,6 +11,33 @@ import (
 	"testing"
 	"time"
 )
+
+func TestPinnedProjectReferenceVerifiesDigestBytesAndVisibleSource(t *testing.T) {
+	project := strings.Repeat("instruction line\n", 100)
+	sum := sha256.Sum256([]byte(project))
+	hash := hex.EncodeToString(sum[:])
+	system := Message{Role: "system", Content: "[PROJECT | source=workspace AGENTS.md | sha256=" + hash + "]\n" + project + "\n[/ PROJECT]\n"}
+	excerpt := readMessage("read", "AGENTS.md", hash, 1, 50, strings.TrimSuffix(strings.Repeat("instruction line\n", 50), "\n"))
+	messages := []Message{system, excerpt}
+	delivered := referenceRepeatedReads(messages)
+	if !reflect.DeepEqual(delivered[0], system) || !reflect.DeepEqual(messages[1], excerpt) || !strings.Contains(delivered[1].Content, `"source":"PINNED_PROJECT_LAYER"`) || strings.Contains(delivered[1].Content, `"output"`) {
+		t.Fatalf("lost pin or raw read: %+v", delivered)
+	}
+	for _, candidate := range [][]Message{
+		{excerpt},
+		{{Role: "system", Content: strings.Replace(system.Content, "instruction line", "changed", 1)}, excerpt},
+		{system, readMessage("changed", "AGENTS.md", strings.Repeat("b", 64), 1, 50, strings.TrimSuffix(strings.Repeat("instruction line\n", 50), "\n"))},
+		{system, readMessage("bytes", "AGENTS.md", hash, 1, 50, "not the pinned bytes")},
+		{system, readMessage("range", "AGENTS.md", hash, 1, 1000, excerpt.Content)},
+	} {
+		if got := referenceRepeatedReads(candidate); !reflect.DeepEqual(got, candidate) {
+			t.Fatalf("unverified reference: %+v", got)
+		}
+	}
+	if got := referenceRepeatedReads(messages); !reflect.DeepEqual(got, delivered) {
+		t.Fatal("restart reference differs")
+	}
+}
 
 func readMessage(id, path, hash string, start, end int, content string) Message {
 	payload, _ := json.Marshal(map[string]any{"name": "read_file", "path": path, "sha256": hash, "start_line": start, "end_line": end, "output": content, "line_count": 20, "truncated": true})

@@ -48,6 +48,27 @@ func TestStructuredTurnSameFileMutationsAreRejectedBeforeDispatch(t *testing.T) 
 	}
 }
 
+func TestStructuredTurnNoOpEditRejectsWholeBatchWithoutLosingCorrectedEdit(t *testing.T) {
+	contract, err := NewStructuredTurnContract([]ToolDefinition{
+		{Name: "read_file", Parameters: json.RawMessage(`{"type":"object"}`)},
+		{Name: "edit_file", Parameters: json.RawMessage(`{"type":"object","required":["edits"],"properties":{"edits":{"type":"array","items":{"type":"object","required":["old_text","new_text"],"properties":{"old_text":{"type":"string"},"new_text":{"type":"string"}}}}}}`)},
+		{Name: "submit_result", Parameters: json.RawMessage(`{"type":"object"}`)},
+	}, "submit_result")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bad := json.RawMessage(`{"calls":[{"read_file":{}},{"edit_file":{"edits":[{"old_text":"unchanged","new_text":"unchanged"}]}}]}`)
+	result, err := contract.decode(bad, "no-op")
+	var rejection *RejectedTurnError
+	if !errors.As(err, &rejection) || len(result.ToolCalls) != 0 || !strings.Contains(rejection.Problem, "no-op") {
+		t.Fatalf("no-op accepted: %+v %v", result, err)
+	}
+	good := json.RawMessage(`{"calls":[{"edit_file":{"edits":[{"old_text":"before","new_text":"after"}]}}]}`)
+	if result, err := contract.decode(good, "corrected"); err != nil || len(result.ToolCalls) != 1 {
+		t.Fatalf("corrected draft rejected: %+v %v", result, err)
+	}
+}
+
 func TestStructuredTurnRejectsMalformedCallsBeforeDispatch(t *testing.T) {
 	contract := structuredTestContract(t)
 	for _, raw := range []string{

@@ -273,6 +273,21 @@ func TestGitInspectionUsesAssignedRepository(t *testing.T) {
 	if err != nil || between.ExitCode != 0 || !strings.Contains(between.Output, "change.txt") {
 		t.Fatalf("commit-to-commit diff: %+v, %v", between, err)
 	}
+	parent, err := host.execute(t.Context(), authority, call("git_show", `{"commit":"HEAD","format":"stat"}`))
+	if err != nil || !strings.Contains(parent.Output, "Parents: "+status.HEAD) {
+		t.Fatalf("full parent SHA unavailable: %+v %v", parent, err)
+	}
+	for _, path := range []string{"kernel", "kernel/"} {
+		result, err := host.execute(t.Context(), authority, call("git_diff", fmt.Sprintf(`{"path":%q}`, path)))
+		if err != nil || result.ExitCode != 0 {
+			t.Fatalf("safe directory %q rejected: %+v %v", path, result, err)
+		}
+	}
+	for _, path := range []string{"../", "/", "kernel/../../", "kernel//"} {
+		if _, err := host.execute(t.Context(), authority, call("git_diff", fmt.Sprintf(`{"path":%q}`, path))); !errors.Is(err, ErrBoundary) {
+			t.Fatalf("boundary widened for %q: %v", path, err)
+		}
+	}
 }
 
 func TestGitStatusStillWorksBeforeFirstCommit(t *testing.T) {

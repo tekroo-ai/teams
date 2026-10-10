@@ -475,6 +475,17 @@ func (server *integratedOpenHands) serveHTTP(writer http.ResponseWriter, request
 		writer.WriteHeader(http.StatusNotFound)
 		return
 	}
+	if request.Method == http.MethodPatch && len(parts) == 3 {
+		var payload struct {
+			Title string `json:"title"`
+		}
+		if json.NewDecoder(request.Body).Decode(&payload) != nil || payload.Title == "" {
+			writer.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		writeIntegratedJSON(writer, map[string]any{"id": conversationID, "title": payload.Title})
+		return
+	}
 	if request.Method == http.MethodGet && len(parts) == 3 {
 		server.refresh(conversation)
 		status := "idle"

@@ -12,7 +12,7 @@ import (
 
 // StructuredTurnInstruction describes a transport, not a role or work method.
 // The same tool names, argument schemas, and execution authorities still apply.
-const StructuredTurnInstruction = "Respond with one JSON object matching the response schema. To continue working, return a calls array; each item has exactly one property naming an available tool, whose value is the actual argument object. To finish, return submit_result with its actual result object instead of calls. The response has exactly one top-level property: calls or submit_result, never both. There is no separate readiness call. Never JSON-encode argument objects or arrays in strings."
+const StructuredTurnInstruction = "Respond with one JSON object matching the response schema. To continue working, return a calls array; each item has exactly one property naming an available tool, whose value is the actual argument object. To finish, return submit_result with its actual result object instead of calls. The response has exactly one top-level property: calls or submit_result, never both. There is no separate readiness call. Never JSON-encode argument objects or arrays in strings. Combine same-file replacements in one edit_file.edits array against one hash; never propose identical old_text and new_text. Group independent reads; inspect their results before proposing dependent calls."
 
 // StructuredTurnContract puts each tool's argument schema under its own name.
 // This avoids a union of generic name/arguments objects: model servers that
@@ -169,6 +169,21 @@ func (contract *StructuredTurnContract) decode(raw json.RawMessage, responseID s
 	// atomic ordered list for this case. Different files may still be batched.
 	paths := make(map[string]bool)
 	for _, call := range result.ToolCalls {
+		if call.Name == "edit_file" {
+			var edit struct {
+				Edits []struct {
+					Old string `json:"old_text"`
+					New string `json:"new_text"`
+				} `json:"edits"`
+			}
+			if json.Unmarshal(call.Arguments, &edit) == nil {
+				for index, replacement := range edit.Edits {
+					if replacement.Old == replacement.New {
+						return Completion{}, &RejectedTurnError{ResponseID: responseID, Response: append(json.RawMessage(nil), raw...), Problem: fmt.Sprintf("edit_file.edits[%d] is a no-op: old_text equals new_text; no tools dispatched; omit the replacement", index)}
+					}
+				}
+			}
+		}
 		if call.Name != "write_file" && call.Name != "create_file" && call.Name != "restore_file_from_commit" && call.Name != "edit_file" {
 			continue
 		}

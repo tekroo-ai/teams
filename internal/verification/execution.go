@@ -13,24 +13,12 @@ import (
 
 const Policy = "single-verifier/go-p1-procs2/v1"
 
-var slot = make(chan struct{}, 1)
+var slots verificationQueue
 
 // Acquire shares one slot across candidate preflights and native test tools.
 // Queueing consumes the caller's existing deadline; cancellation never leaks it.
 func Acquire(ctx context.Context) (func(), error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	select {
-	case slot <- struct{}{}:
-		if err := ctx.Err(); err != nil {
-			<-slot
-			return nil, err
-		}
-		return func() { <-slot }, nil
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	}
+	return AcquireClass(ctx, WholeModule)
 }
 
 // GoCommand bounds package compilation and in-package parallel tests without

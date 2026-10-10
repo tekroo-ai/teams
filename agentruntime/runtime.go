@@ -89,6 +89,13 @@ type ReadOnlyTools interface {
 	ExecuteReadOnly(context.Context, ToolCall) (json.RawMessage, error)
 }
 
+// ParallelReadOnlyTools explicitly qualifies independent, non-effecting calls.
+// A tool merely being outside Effects is not sufficient for concurrency.
+type ParallelReadOnlyTools interface {
+	ReadOnlyTools
+	ParallelSafe(string) bool
+}
+
 type Effects interface {
 	Handles(string) bool
 	ExecuteEffect(context.Context, ToolCall) (json.RawMessage, error)
@@ -110,11 +117,14 @@ type SemanticContextProvider interface {
 type Runner struct {
 	Journal Journal
 	// ContextFork is a Teams-authorized immutable ancestor, not executable work.
-	ContextFork  *ContextFork
-	Model        Model
-	Tools        ReadOnlyTools
-	Effects      Effects
-	SystemPrompt string
+	ContextFork *ContextFork
+	Model       Model
+	Tools       ReadOnlyTools
+	// Zero/one retains sequential dispatch. Only all-qualified-read batches may
+	// overlap; mutations, verification and completion retain their ordering.
+	MaxParallelReads int
+	Effects          Effects
+	SystemPrompt     string
 	// Condenser can reduce only post-start conversation history. The system
 	// instructions and original admitted task are always reattached verbatim.
 	Condenser HistoryCondenser
@@ -226,6 +236,23 @@ func (runner Runner) Run(ctx context.Context, invocationID, requestDigest, promp
 			return "", err
 		}
 		if len(pending) > 0 {
+			if runner.parallelReadBatch(pending) {
+				results := runner.executeParallelReads(ctx, pending)
+				for _, result := range results {
+					if err := runner.checkOwnership(ctx); err != nil {
+						return "", err
+					}
+					if result.Error == "" && !json.Valid(result.Output) {
+						return "", fmt.Errorf("%w: tool output is not JSON", ErrInvalidTurn)
+					}
+					payload, _ := json.Marshal(result)
+					entries, err = runner.append(ctx, invocationID, entries, ToolDone, payload)
+					if err != nil {
+						return "", err
+					}
+				}
+				continue
+			}
 			call := pending[0]
 			if call.Name == runner.FinalTool && runner.FinalTool != "" {
 				output, finalizeErr := runner.Finalize(call.Arguments)

@@ -64,5 +64,9 @@ func assembleInstructions(brief application.ExecutionBrief, profile Profile, wor
 		digest := sha256.Sum256([]byte(content))
 		fmt.Fprintf(&prompt, "\n[%s | source=%s | sha256=%s]\n%s\n[/ %s]\n", layer.name, layer.source, hex.EncodeToString(digest[:]), content, layer.name)
 	}
+	if project != "" {
+		prompt.WriteString("\nRepository delivery: the PROJECT layer above already contains the complete, digest-pinned AGENTS.md. Treat it as read; do not fetch the same instructions again merely to establish readiness. Read the file only to investigate an actual suspected workspace change.\n")
+	}
+	prompt.WriteString("\nTool delivery: group independent read-only inspections in one calls array; do not mix them with mutations or verification. Combine all replacements to one file into one edit_file call; omit replacements whose old_text and new_text are identical. Git revisions accept HEAD or a concrete hexadecimal commit, not HEAD~1; get parent commits from git_show first.\n")
 	return prompt.String(), nil
 }

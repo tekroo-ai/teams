@@ -609,7 +609,7 @@ func (manager *candidateWorkspaceManager) runGates(ctx context.Context, director
 		queueStarted := time.Now().UTC()
 		var release func()
 		if heavy {
-			release, err = verification.Acquire(gateCtx)
+			release, err = verification.AcquireClass(gateCtx, verification.CommandClass(command.Args))
 			if err != nil {
 				cancel()
 				return receipts, fmt.Errorf("verification queue: %w", err)

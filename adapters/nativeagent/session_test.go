@@ -37,6 +37,27 @@ func (binding *testBinding) BindToolInvocation(_ context.Context, _ kernel.UUIDv
 	return agenttools.Authority{WorkspaceRoot: root, Permissions: []string{"repository.read"}}, nil
 }
 
+func TestNativeParallelReadAllowlistNeverQualifiesEffectsOrUnboundTools(t *testing.T) {
+	tools := allowedReadTools{allowed: map[string]struct{}{}}
+	for _, name := range []string{"read_file", "find_files", "list_files", "search_text", "search_regex", "find_definitions", "check_go_format", "git_status", "git_diff", "read_prior_turns", "read_evidence", "run_go_tests", "edit_file"} {
+		tools.allowed[name] = struct{}{}
+	}
+	for _, name := range []string{"read_file", "find_files", "list_files", "search_text", "search_regex", "find_definitions", "check_go_format"} {
+		if !tools.ParallelSafe(name) {
+			t.Fatalf("qualified reader %q serialized", name)
+		}
+	}
+	for _, name := range []string{"git_status", "git_diff", "read_prior_turns", "read_evidence", "run_go_tests", "edit_file", "unknown"} {
+		if tools.ParallelSafe(name) {
+			t.Fatalf("unqualified tool %q parallelized", name)
+		}
+	}
+	delete(tools.allowed, "read_file")
+	if tools.ParallelSafe("read_file") {
+		t.Fatal("unbound reader qualified")
+	}
+}
+
 type testJournal struct{ entries []agentruntime.Entry }
 
 func (journal *testJournal) Load(_ context.Context, _ string) ([]agentruntime.Entry, error) {

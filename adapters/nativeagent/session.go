@@ -429,6 +429,7 @@ func prepare(ctx context.Context, brief application.ExecutionBrief, requestDiges
 			Finalize:            finalize,
 			ValidateFinalResult: config.ValidateFinalResult,
 			MaxFinalSubmissions: 3,
+			MaxParallelReads:    4,
 			MaxTurns:            profile.MaxTurns,
 		},
 		InvocationID: string(brief.InvocationID), RequestDigest: string(requestDigest), Prompt: prompt,
@@ -440,6 +441,19 @@ type allowedReadTools struct {
 	inner    agentruntime.ReadOnlyTools
 	allowed  map[string]struct{}
 	evidence *admittedEvidenceTool
+}
+
+func (tools allowedReadTools) ParallelSafe(name string) bool {
+	if _, allowed := tools.allowed[name]; !allowed {
+		return false
+	}
+	// Explicit allowlist: no Git subprocesses, type-checking, test execution,
+	// durable effects, prior-turn or evidence-resolver implementations.
+	switch name {
+	case "read_file", "list_files", "find_files", "search_text", "search_regex", "find_definitions", "check_go_format":
+		return true
+	}
+	return false
 }
 
 type allowedEffects struct {

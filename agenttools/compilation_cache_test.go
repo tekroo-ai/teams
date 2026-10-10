@@ -130,16 +130,30 @@ func TestCompilationCacheSeedsFreshIsolatedGoTests(t *testing.T) {
 	}
 }
 
-func TestCompilationFlagsMatchConsumerPathSemantics(t *testing.T) {
-	if flags := goTestCompileFlags(false); len(flags) != 0 {
-		t.Fatalf("executing fixture paths trimmed: %v", flags)
-	}
-	if flags := goTestCompileFlags(true); !slices.Equal(flags, []string{"-trimpath"}) {
-		t.Fatalf("compile-only normalization missing: %v", flags)
+func TestCompilationPrimerBuildsArchivesWithoutLinking(t *testing.T) {
+	want := []string{"/opt/bin/go", "list", "-p=1", "-export", "-test", "-deps", "-f={{.ImportPath}}", "./..."}
+	if args := compilationPrimerArguments("/opt/bin/go", "./..."); !slices.Equal(args, want) {
+		t.Fatalf("archive-only compilation changed: %v", args)
 	}
 }
 
-func TestCompilationCacheTrimmedBuildKeepsLocalArtifactsStable(t *testing.T) {
+func TestCompilationCacheBuildThenTestReusesPrimerButStillExecutes(t *testing.T) {
+	root, _ := localTestFixture(t, "package localexecution\nimport \"testing\"\nfunc TestFixture(t *testing.T) { t.Fatal(\"TEST_ACTUALLY_EXECUTED\") }\n")
+	host := cachedFixtureHost(t, Host{Timeout: time.Minute})
+	build, err := host.runIsolatedGoTestsFrom(t.Context(), root, "./...", true, true)
+	if err != nil || build.ExitCode != 0 || build.VerificationTimings.CacheCompileNS == 0 {
+		t.Fatalf("build check: %+v %v", build, err)
+	}
+	execution, err := host.runIsolatedGoTestsFrom(t.Context(), root, "./...", true, false)
+	if err != nil || execution.ExitCode != 1 || !strings.Contains(execution.Output, "TEST_ACTUALLY_EXECUTED") {
+		t.Fatalf("build result replaced real test execution: %+v %v", execution, err)
+	}
+	if execution.SnapshotSHA256 != build.SnapshotSHA256 || execution.VerificationTimings.CacheCompileNS != 0 {
+		t.Fatalf("unchanged build/test source repeated preparation: %+v", execution)
+	}
+}
+
+func TestCompilationCacheUntrimmedBuildKeepsLocalArtifactsStable(t *testing.T) {
 	root, _ := localTestFixture(t, "package localexecution\nimport \"testing\"\nfunc init() { panic(\"compile-only must never execute\") }\nfunc TestFixture(t *testing.T) {}\n")
 	host := cachedFixtureHost(t, Host{Timeout: time.Minute})
 	var first map[string]int64
@@ -155,7 +169,7 @@ func TestCompilationCacheTrimmedBuildKeepsLocalArtifactsStable(t *testing.T) {
 		}
 		for name, size := range current {
 			if strings.HasSuffix(name, "-d") && first[name] != size {
-				t.Fatalf("unchanged trimmed snapshot added cached output %s (%d bytes)", name, size)
+				t.Fatalf("unchanged stable-path snapshot added cached output %s (%d bytes)", name, size)
 			}
 		}
 	}
@@ -209,7 +223,13 @@ func TestExecuted(t *testing.T) {
 			environment := goTestEnvironment(workspace, "/usr/bin/git", modCache)
 			timings := &VerificationTimings{}
 			host := cachedFixtureHost(t, Host{Timeout: time.Minute})
-			if err := host.seedCompilationCache(t.Context(), workspace, source, goBinary, profile, environment, ".", "", test.seedTrimmed, timings); err != nil {
+			seedEnvironment := environment
+			if test.seedTrimmed {
+				// Retain the old flag mismatch as a counterexample; the production
+				// primer and consumer now deliberately use untrimmed archives.
+				seedEnvironment = replaceEnvironment(environment, "GOFLAGS", "-trimpath")
+			}
+			if err := host.seedCompilationCache(t.Context(), workspace, source, goBinary, profile, seedEnvironment, ".", "", timings); err != nil {
 				t.Fatal(err)
 			}
 			cmd := exec.CommandContext(t.Context(), "/usr/bin/sandbox-exec", "-p", profile, goBinary, "test", "-p=1", "-parallel=2", "-count=1", "-x", "-v", ".")
