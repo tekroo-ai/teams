@@ -286,29 +286,18 @@ func configuredNativeSession(ctx context.Context, service *ProductionService, pr
 	}
 	if planning {
 		result.ValidateFinalResult = func(finalCtx context.Context, output []byte) error {
-			if err := service.validateFeatureStageOutputWithEvidence(finalCtx, feature, stage, output); err != nil {
-				return err
-			}
+			validationErr := service.validateFeatureStageOutputWithEvidence(finalCtx, feature, stage, output)
 			if _, _, reported := planningNonCompletion(stage, output); reported {
-				return nil
+				return validationErr
 			}
 			if stage != stageArchitecture && stage != stagePlanFinalization {
-				return nil
+				return validationErr
 			}
 			workspace, err := service.workspaceResolver.ResolveWorkspace(finalCtx, brief.Scope)
 			if err != nil {
-				return err
+				return errors.Join(validationErr, err)
 			}
-			var plan architectureStageResult
-			if stage == stageArchitecture {
-				plan, err = parseArchitectureStageResult(output, featureInputOperationalMarkers(feature), featureAuthorizedActorFQNs(feature)...)
-			} else {
-				plan, err = parsePlanFinalizationStageResult(output, featureInputOperationalMarkers(feature), featureAuthorizedActorFQNs(feature)...)
-			}
-			if err != nil {
-				return err
-			}
-			return checkPlanGoDeclarations(finalCtx, workspace.WorkingDirectory, plan)
+			return planningDeclarationFindings(finalCtx, workspace.WorkingDirectory, stage, output, validationErr)
 		}
 	}
 	return result, nil

@@ -427,14 +427,32 @@ func parseSpecificationStageResult(output []byte, allowedMarkers []string, allow
 }
 
 func parseArchitectureStageResult(output []byte, allowedMarkers []string, allowedActorFQNs ...kernel.ActorFQN) (architectureStageResult, error) {
-	var result architectureStageResult
-	if decodeOrganizationalStageResult(output, &result) != nil || result.ResultType != "FEATURE_PLAN" || result.SourceDesignDigest != "" || len(result.Handoffs) != 0 {
-		return architectureStageResult{}, organization.ErrInvalidFeature
+	result, err := decodeArchitectureStageResult(output)
+	if err != nil {
+		return architectureStageResult{}, err
 	}
 	return validateArchitectureStageResult(result, allowedMarkers, allowedActorFQNs...)
 }
 
+// Decode separately from semantic validation so independent declaration
+// findings can be returned alongside a graph error, never instead of it.
+func decodeArchitectureStageResult(output []byte) (architectureStageResult, error) {
+	var result architectureStageResult
+	if decodeOrganizationalStageResult(output, &result) != nil || result.ResultType != "FEATURE_PLAN" || result.SourceDesignDigest != "" || len(result.Handoffs) != 0 {
+		return architectureStageResult{}, organization.ErrInvalidFeature
+	}
+	return result, nil
+}
+
 func parsePlanFinalizationStageResult(output []byte, allowedMarkers []string, allowedActorFQNs ...kernel.ActorFQN) (architectureStageResult, error) {
+	result, err := decodePlanFinalizationStageResult(output)
+	if err != nil {
+		return architectureStageResult{}, err
+	}
+	return validateArchitectureStageResult(result, allowedMarkers, allowedActorFQNs...)
+}
+
+func decodePlanFinalizationStageResult(output []byte) (architectureStageResult, error) {
 	var result architectureStageResult
 	if err := decodeOrganizationalStageResult(output, &result); err != nil {
 		return architectureStageResult{}, fmt.Errorf("%w: final plan envelope: %v", organization.ErrInvalidFeature, err)
@@ -456,7 +474,7 @@ func parsePlanFinalizationStageResult(output []byte, allowedMarkers []string, al
 			return architectureStageResult{}, organization.ErrInvalidFeature
 		}
 	}
-	return validateArchitectureStageResult(result, allowedMarkers, allowedActorFQNs...)
+	return result, nil
 }
 
 func validateArchitectureStageResult(result architectureStageResult, allowedMarkers []string, allowedActorFQNs ...kernel.ActorFQN) (architectureStageResult, error) {

@@ -10,6 +10,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/tekroo-ai/teams/internal/validation"
 )
 
 // ProposedGoSource is explicit Go syntax, never names inferred from prose.
@@ -35,15 +37,21 @@ func CheckNewGoDeclarations(ctx context.Context, root string, proposals []Propos
 	packages := map[string]*packageNames{}
 	seenPaths := map[string]string{}
 	total := 0
+	var findings validation.Findings
 	for _, proposal := range proposals {
+		if findings.Full() {
+			break
+		}
 		if err := ctx.Err(); err != nil {
 			return err
 		}
 		if err := safeMutationPath(proposal.Path); err != nil {
-			return err
+			findings.Add(fmt.Errorf("declaration path %q: %w", proposal.Path, err))
+			continue
 		}
 		if filepath.Ext(proposal.Path) != ".go" || strings.HasSuffix(proposal.Path, "_test.go") {
-			return fmt.Errorf("declaration check requires non-test Go source: %w", ErrInvalidCall)
+			findings.Add(fmt.Errorf("declaration check requires non-test Go source %q: %w", proposal.Path, ErrInvalidCall))
+			continue
 		}
 		total += len(proposal.Source)
 		if total > 2<<20 {
@@ -51,7 +59,7 @@ func CheckNewGoDeclarations(ctx context.Context, root string, proposals []Propos
 		}
 		if old, exists := seenPaths[proposal.Path]; exists {
 			if old != proposal.Source {
-				return fmt.Errorf("conflicting proposed source for %q: %w", proposal.Path, ErrConflict)
+				findings.Add(fmt.Errorf("conflicting proposed source for %q: %w", proposal.Path, ErrConflict))
 			}
 			continue
 		}
@@ -59,7 +67,8 @@ func CheckNewGoDeclarations(ctx context.Context, root string, proposals []Propos
 		fset := token.NewFileSet()
 		file, err := parser.ParseFile(fset, proposal.Path, proposal.Source, parser.SkipObjectResolution)
 		if err != nil {
-			return fmt.Errorf("proposed Go declarations %q: %w", proposal.Path, err)
+			findings.Add(fmt.Errorf("proposed Go declarations %q: %w; use a package clause, complete type/var/const syntax and bodyless function signatures; do not use { ... }", proposal.Path, err))
+			continue
 		}
 		directory := filepath.Dir(proposal.Path)
 		key := directory + "/" + file.Name.Name
@@ -128,13 +137,17 @@ func CheckNewGoDeclarations(ctx context.Context, root string, proposals []Propos
 		}
 		for _, name := range packageIdentifiers(file) {
 			if previous, found := group.names[name.Name]; found {
-				return fmt.Errorf("new declaration %s in %s conflicts with %s:%d; choose a distinct name or explicitly modify/reuse the existing declaration: %w", name.Name, proposal.Path, previous.Path, previous.Line, ErrConflict)
+				findings.Add(fmt.Errorf("new declaration %s in %s conflicts with %s:%d; choose a distinct name or explicitly modify/reuse the existing declaration: %w", name.Name, proposal.Path, previous.Path, previous.Line, ErrConflict))
+				if findings.Full() {
+					break
+				}
+				continue
 			}
 			position := fset.Position(name.Pos())
 			group.names[name.Name] = SymbolLocation{Path: proposal.Path, Line: position.Line, Symbol: name.Name}
 		}
 	}
-	return nil
+	return findings.Err()
 }
 
 func packageIdentifiers(file *ast.File) []*ast.Ident {

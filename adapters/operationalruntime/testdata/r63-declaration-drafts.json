@@ -1,0 +1,660 @@
+{
+  "source_snapshot_sha256": "09c9a04179d53524a0296cb9b1f4b19a15517aea457d0a2ad7432a18a41e1a43",
+  "invocation_id": "01a1277a-5fd2-70ed-bab9-fe1dd1cf60a1",
+  "drafts": [
+    {
+      "receipt": "01a1277a-5fd2-70ed-bab9-fe1dd1cf60a1:00000000000000000089",
+      "arguments": {
+        "evidence": [
+          "3b71adcf-f1d6-7db2-808e-ea37facba1e9"
+        ],
+        "message_proposals": [],
+        "outcome": "completed",
+        "summary": "Repository-grounded design for human-readable operator aliases on agent instances. Five implementation tasks in a DAG: (1) domain types + store interface + in-memory store, (2) MongoDB store, (3) ProductionService alias wiring + operator HTTP alias-aware resolution and CRUD endpoints, (4) CLI alias subcommands + alias-aware role operations, (5) MCP operatortools alias tools + alias-aware resolution in existing role tools. Tasks 4 and 5 are parallel with disjoint write scopes. FQN validation is never weakened; alias resolution is an additive lookup that precedes it, guaranteeing backward compatibility.",
+        "work_product": {
+          "architecture": [
+            "The feature introduces a local operator-facing alias layer that is architecturally separate from the existing federation alias subsystem (organization/federation.go). Federation AliasBinding carries route ID, deployment identity, and trust-grant semantics; a local RoleAlias is simply a validated short name bound to an ActorFQN. Reusing federation types would entangle operator ergonomics with cross-deployment trust and force every alias operation through federation authorization.",
+            "The resolution point is at every operator-facing transport boundary (operatorhttp, CLI, MCP operatortools), not inside ProductionService.StartRole/StopRole or other domain-level methods. This preserves the existing kernel.ActorFQN-typed service interface: the service always receives a valid ActorFQN. Resolution is adapter logic — a helper (ResolveRoleAlias) that tries kernel.ActorFQN(name) first, and if that fails, looks up the name in a RoleAliasStore. If neither path yields a valid FQN, the adapter returns an error. This guarantees zero behavioral change for callers that already pass FQNs.",
+            "The ProductionService gains a RoleAliasStore field (organization.RoleAliasStore interface) and four additive methods — SetRoleAlias, UnsetRoleAlias, ListRoleAliases, ResolveRoleAlias — in a new file (role_alias_service.go) to avoid modifying the already-1500-line production.go beyond the single struct field addition. These methods are exposed through the operator HTTP interface as new Service interface methods and through a new operatortools Organization interface group.",
+            "The operator HTTP handler (adapters/operatorhttp/handler.go) routing is extended with /v1/role-aliases CRUD routes. In the existing /v1/roles/<operand>/<action> and /v1/roles/<operand>/inbox paths, the roleControl and roleInbox methods insert an alias-resolution step before the FQN validation gate. The deadLetters path (query parameter actor) receives the same treatment. The FQN validation kernel.ActorFQN(parts[0]).Valid() remains the guard; resolution merely produces a valid FQN string from an alias before the check.",
+            "The CLI (cmd/tekroo/main.go) gains an 'alias' subcommand family (set/unset/list) that calls the new HTTP endpoints, and existing 'role', 'inbox', and 'deadletters' commands gain alias resolution by calling a resolve endpoint (GET /v1/role-aliases/<name>) before making their primary call. The usage string and roleOperation/actorRead helper signatures are updated.",
+            "The MCP operatortools Service (adapters/operatortools/service.go) gains three new tool names (tekroo.role.alias.set, tekroo.role.alias.unset, tekroo.role.alias.list) and a resolver that runs before the existing role-control tool handlers call Organization.StartRole etc. The MCP handler (adapters/mcp/handler.go) registers the new tool schemas. The Organization interface in operatortools gains the four alias methods, which ProductionService satisfies structurally."
+          ],
+          "assumptions": [
+            "Local operator aliases are set at runtime via the new endpoints/tools; no static config-seeded alias list is required by the specification.",
+            "Alias names share the same character class as federation alias names (lowercase alphanumeric, hyphen, dot, max 64 chars) but are stored and validated in a separate namespace.",
+            "A given alias maps to at most one ActorFQN at a time; re-setting an alias overwrites the previous binding (operator is responsible for re-binding).",
+            "No alias hierarchy, wildcards, or team-level aliasing is needed; the operator story asks for a flat 1:1 name→FQN mapping."
+          ],
+          "design_decisions": [
+            {
+              "decision": "Separate RoleAlias from federation AliasBinding",
+              "rationale": "Federation AliasBinding is bound to route_id, route_revision, and deployment_identity with federation authorization semantics. A local operator alias has no route or deployment concern. Coupling them would force every local alias operation through federation trust checks and make the federation test surface a dependency of trivial operator ergonomics."
+            },
+            {
+              "decision": "Resolve aliases at the transport boundary, not inside ProductionService domain methods",
+              "rationale": "Every operator path (operatorhttp handler, CLI, MCP operatortools) already parses a string into kernel.ActorFQN before calling service methods. Adding resolution at this single point per path (4 sites) is lower-risk than modifying the service interface signature to accept untyped strings and resolving internally, which would blur the boundary between validated FQN identity and raw user input."
+            },
+            {
+              "decision": "New file role_alias_service.go for ProductionService alias methods",
+              "rationale": "production.go is already approximately 1500 lines. Adding 4 methods (Set/Unset/List/Resolve) plus their wiring there would make the file harder to review. The new file is the same package (operationalruntime) so the methods are accessible with zero import changes; only the struct field addition goes into production.go."
+            },
+            {
+              "decision": "Alias resolution helper in organization package as a free function, not a method on a new type",
+              "rationale": "The resolution logic is two lines: try FQN parse, else store lookup. Wrapping it in a dedicated resolver type adds indirection without testability gain. A package-level function that accepts a RoleAliasStore parameter is composable at every call site without requiring a new field on each adapter."
+            }
+          ],
+          "result_type": "FEATURE_PLAN",
+          "schema_version": "1.0.0",
+          "tasks": [
+            {
+              "acceptance_criteria": [
+                "organization/role_alias.go defines RoleAlias struct with SchemaVersion, Name (validated by ValidateRoleAliasName), ActorFQN (kernel.ActorFQN), Revision, CreatedAt fields with JSON tags and a Validate() method.",
+                "organization/role_alias.go defines RoleAliasStore interface with Load(ctx, name) (RoleAlias, bool, error), Save(ctx, RoleAlias) error, Delete(ctx, name) error, List(ctx) ([]RoleAlias, error).",
+                "organization/role_alias.go defines ValidateRoleAliasName(name string) error rejecting empty strings, uppercase, whitespace, wildcard characters, and names longer than 64 bytes; accepting lowercase alphanumeric, hyphen, dot.",
+                "organization/role_alias.go defines ResolveRoleAlias(ctx context.Context, store RoleAliasStore, name string) (kernel.ActorFQN, error) that returns the parsed FQN if name is a valid ActorFQN, else returns the alias's bound FQN, else returns ErrRoleAliasNotFound.",
+                "adapters/memory/role_alias_store.go implements organization.RoleAliasStore with a sync.Mutex-protected map; NewRoleAliasStore() *RoleAliasStore constructor.",
+                "Unit tests cover: validation rejects bad names; in-memory store round-trips Load/Save/Delete/List; ResolveRoleAlias prefers FQN over alias lookup; unknown name returns ErrRoleAliasNotFound.",
+                "go test ./organization/ ./adapters/memory/ passes; gofmt reports both new non-test files clean."
+              ],
+              "attempt_limit": 2,
+              "complexity": 2,
+              "critical_path": true,
+              "depends_on": [],
+              "description": "Define the foundational RoleAlias value type, alias-name validation, RoleAliasStore interface, a package-level ResolveRoleAlias helper, a sentinel error ErrRoleAliasNotFound, and an in-memory store implementation.\n\nProposed declarations for organization/role_alias.go:\n```go\n// path: organization/role_alias.go\npackage organization\n\nimport (\n\t\"context\"\n\t\"errors\"\n\t\"regexp\"\n\t\"time\"\n\n\t\"github.com/tekroo-ai/teams/kernel\"\n)\n\nvar ErrRoleAliasNotFound = errors.New(\"role alias not found\")\n\nvar roleAliasPattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9.-]{0,62}[a-z0-9])?$`)\n\ntype RoleAlias struct {\n\tSchemaVersion string          `json:\"schema_version\"`\n\tName          string          `json:\"name\"`\n\tActorFQN      kernel.ActorFQN `json:\"actor_fqn\"`\n\tRevision      uint64          `json:\"revision\"`\n\tCreatedAt     time.Time       `json:\"created_at\"`\n}\n\nfunc (alias RoleAlias) Validate() error { ... }\nfunc ValidateRoleAliasName(name string) error { ... }\n\ntype RoleAliasStore interface {\n\tLoad(ctx context.Context, name string) (RoleAlias, bool, error)\n\tSave(ctx context.Context, alias RoleAlias) error\n\tDelete(ctx context.Context, name string) error\n\tList(ctx context.Context) ([]RoleAlias, error)\n}\n\nfunc ResolveRoleAlias(ctx context.Context, store RoleAliasStore, name string) (kernel.ActorFQN, error) { ... }\n```\n\nProposed declarations for adapters/memory/role_alias_store.go:\n```go\n// path: adapters/memory/role_alias_store.go\npackage memory\n\nimport (\n\t\"context\"\n\t\"sync\"\n\n\t\"github.com/tekroo-ai/teams/organization\"\n)\n\ntype RoleAliasStore struct { ... }\n\nfunc NewRoleAliasStore() *RoleAliasStore { ... }\n```\nThe in-memory store guards a map[string]organization.RoleAlias behind a sync.Mutex. Save performs Revision increment; Load and Delete return ErrRoleAliasNotFound when the key is absent. List returns a sorted copy.",
+              "purpose": "IMPLEMENTATION",
+              "risk": "LOW",
+              "story_index": 0,
+              "title": "RoleAlias domain type, store interface, validation, resolver, and in-memory store",
+              "write_scope": [
+                "organization/role_alias.go",
+                "organization/role_alias_test.go",
+                "adapters/memory/role_alias_store.go",
+                "adapters/memory/role_alias_store_test.go"
+              ],
+              "covers": [
+                0,
+                1
+              ],
+              "validates": [
+                1,
+                2,
+                3,
+                4
+              ],
+              "review_round_limit": 1
+            },
+            {
+              "acceptance_criteria": [
+                "adapters/mongo/role_alias_store.go implements organization.RoleAliasStore using a *mongo.Database / *mongo.Collection; NewRoleAliasStore(db *mongo.Database) *RoleAliasStore constructor.",
+                "Save performs upsert keyed on Name, incrementing Revision, with an index on Name enforcing uniqueness.",
+                "Load returns ErrRoleAliasNotFound when the document is absent.",
+                "Delete removes the document by Name and returns ErrRoleAliasNotFound when absent.",
+                "List returns all documents sorted by Name.",
+                "Integration test (build-tagged or gated by MONGO_URI env var) proves round-trip Load/Save/Delete/List, uniqueness, and ErrRoleAliasNotFound semantics against a real or testcontainer MongoDB.",
+                "All existing adapters/mongo tests continue to pass unmodified.",
+                "gofmt reports the new non-test file clean."
+              ],
+              "attempt_limit": 3,
+              "complexity": 3,
+              "critical_path": true,
+              "depends_on": [
+                0
+              ],
+              "description": "Implement a MongoDB-backed organization.RoleAliasStore so that operator aliases survive daemon restarts, matching the durability guarantee of RoleStateStore in the same package.\n\nProposed declarations for adapters/mongo/role_alias_store.go:\n```go\n// path: adapters/mongo/role_alias_store.go\npackage mongo\n\nimport (\n\t\"context\"\n\n\t\"go.mongodb.org/mongo-driver/v2/mongo\"\n\n\t\"github.com/tekroo-ai/teams/organization\"\n)\n\ntype RoleAliasStore struct {\n\tcollection *mongo.Collection\n}\n\nfunc NewRoleAliasStore(db *mongo.Database) *RoleAliasStore { ... }\n\nfunc (s *RoleAliasStore) Load(ctx context.Context, name string) (organization.RoleAlias, bool, error) { ... }\nfunc (s *RoleAliasStore) Save(ctx context.Context, alias organization.RoleAlias) error { ... }\nfunc (s *RoleAliasStore) Delete(ctx context.Context, name string) error { ... }\nfunc (s *RoleAliasStore) List(ctx context.Context) ([]organization.RoleAlias, error) { ... }\n```\nThe collection name is \"role_aliases\". Save uses a single-document updateOne with upsert:true and a $inc on revision to prevent lost updates. An ensureIndexes call creates a unique index on Name. Load and Delete return organization.ErrRoleAliasNotFound when no document matches.",
+              "purpose": "IMPLEMENTATION",
+              "risk": "MODERATE",
+              "story_index": 0,
+              "title": "MongoDB RoleAliasStore implementation",
+              "write_scope": [
+                "adapters/mongo/role_alias_store.go",
+                "adapters/mongo/role_alias_store_test.go"
+              ],
+              "covers": [
+                0,
+                1
+              ],
+              "validates": [
+                1,
+                2,
+                3,
+                4
+              ],
+              "review_round_limit": 1
+            },
+            {
+              "acceptance_criteria": [
+                "ProductionService struct gains a RoleAliasStore organization.RoleAliasStore field; LoadProductionConfig and NewProductionService initialize it (Mongo-backed when a MongoDB connection is available, otherwise in-memory).",
+                "adapters/operationalruntime/role_alias_service.go defines SetRoleAlias(ctx, name string, actor kernel.ActorFQN) (organization.RoleAlias, error), UnsetRoleAlias(ctx, name string) error, ListRoleAliases(ctx) ([]organization.RoleAlias, error), and ResolveRoleAlias(ctx, name string) (kernel.ActorFQN, error) on *ProductionService.",
+                "The operatorhttp Service interface gains the four alias methods; the operatorhttp Handler routes POST /v1/role-aliases (create/update), DELETE /v1/role-aliases/<name>, GET /v1/role-aliases (list), GET /v1/role-aliases/<name> (read single).",
+                "roleControl and roleInbox in the operatorhttp handler resolve the path component through the Service's alias resolution before the existing kernel.ActorFQN validation; an unresolvable name that is also not a valid FQN receives INVALID_ROLE_OPERATION.",
+                "Existing integration tests in handler_integration_test.go and unit tests in handler_test.go pass without modification (FQN path unchanged).",
+                "New tests cover: alias create→read→use-in-role-path→delete; FQN and alias both resolve to same actor; unresolvable name produces 400; list returns sorted aliases.",
+                "go test ./adapters/operatorhttp/ ./adapters/operationalruntime/ passes; gofmt reports changed and new files clean."
+              ],
+              "attempt_limit": 3,
+              "complexity": 4,
+              "critical_path": true,
+              "depends_on": [
+                0,
+                1
+              ],
+              "description": "Wire the alias store into ProductionService and expose alias CRUD + alias-aware resolution through the operator HTTP boundary.\n\n**ProductionService field (production.go, single additive line in struct):** add `RoleAliasStore organization.RoleAliasStore` to the ProductionService struct. NewProductionService initializes it from the Mongo database handle when present, falling back to memory.NewRoleAliasStore().\n\n**New file role_alias_service.go — proposed declarations:**\n```go\n// path: adapters/operationalruntime/role_alias_service.go\npackage operationalruntime\n\nimport (\n\t\"context\"\n\t\"errors\"\n\t\"time\"\n\n\t\"github.com/tekroo-ai/teams/kernel\"\n\t\"github.com/tekroo-ai/teams/organization\"\n)\n\nfunc (service *ProductionService) SetRoleAlias(ctx context.Context, name string, actor kernel.ActorFQN) (organization.RoleAlias, error) { ... }\nfunc (service *ProductionService) UnsetRoleAlias(ctx context.Context, name string) error { ... }\nfunc (service *ProductionService) ListRoleAliases(ctx context.Context) ([]organization.RoleAlias, error) { ... }\nfunc (service *ProductionService) ResolveRoleAlias(ctx context.Context, name string) (kernel.ActorFQN, error) { ... }\n```\nSetRoleAlias validates name via ValidateRoleAliasName and actor via ActorFQN.Valid(), constructs a RoleAlias with Revision 1 and CreatedAt from the service clock, and calls store.Save (which increments revision on re-set). ResolveRoleAlias delegates to organization.ResolveRoleAlias(ctx, service.RoleAliasStore, name).\n\n**operatorhttp handler changes:**\n- Service interface: add SetRoleAlias, UnsetRoleAlias, ListRoleAliases, ResolveRoleAlias.\n- Routing in ServeHTTP: add cases for POST/DELETE/GET /v1/role-aliases[/name].\n- roleControl: before `kernel.ActorFQN(parts[0]).Valid()`, attempt alias resolution. If resolution succeeds, replace parts[0] with the resolved FQN. If the name is a valid FQN, skip resolution entirely. Only fall through to INVALID_ROLE_OPERATION when neither FQN parse nor alias lookup succeeds.\n- roleInbox: same resolution pattern.\n- deadLetters: resolve the optional actor query parameter the same way.\n\n**Test updates:** Add alias lifecycle and role-control-with-alias cases. Ensure the existing FQN-only role control tests pass with zero behavioral change. The fake Service in handler_test.go gains no-op implementations of the new interface methods.",
+              "purpose": "IMPLEMENTATION",
+              "risk": "MODERATE",
+              "story_index": 0,
+              "title": "ProductionService alias methods, operator HTTP CRUD endpoints, and alias-aware role resolution",
+              "write_scope": [
+                "adapters/operatorhttp/handler.go",
+                "adapters/operatorhttp/handler_test.go",
+                "adapters/operatorhttp/handler_integration_test.go",
+                "adapters/operationalruntime/production.go",
+                "adapters/operationalruntime/role_alias_service.go",
+                "adapters/operationalruntime/role_alias_service_test.go"
+              ],
+              "covers": [
+                0,
+                1
+              ],
+              "validates": [
+                1,
+                2,
+                3,
+                4
+              ],
+              "review_round_limit": 1
+            },
+            {
+              "acceptance_criteria": [
+                "A new 'alias' subcommand exists with operands 'set <name> <actor-fqn>', 'unset <name>', 'list', and 'resolve <name>', each issuing the corresponding HTTP request to the daemon.",
+                "roleOperation and actorRead helper functions resolve their actor operand: if kernel.ActorFQN(operand).Valid() is false, GET /v1/role-aliases/<operand> is attempted to obtain the FQN; on success, the FQN is substituted. If resolution fails, the existing usageError() is returned.",
+                "The usage string is updated to include the alias subcommand family.",
+                "cmd/tekroo/main_test.go covers: alias set→role-by-alias-start round-trip, alias unset→FQN-still-works, resolve of unknown alias produces a clear error, FQN operands bypass resolution.",
+                "go test ./cmd/tekroo/ passes; gofmt reports changed files clean."
+              ],
+              "attempt_limit": 2,
+              "complexity": 3,
+              "depends_on": [
+                2
+              ],
+              "description": "Add alias management subcommands and alias-aware resolution to the tekroo CLI binary.\n\n**CLI subcommand design:**\n- `tekroo -config <c> alias set <name> <actor-fqn>` → POST /v1/role-aliases with body `{\"name\":\"<name>\",\"actor_fqn\":\"<actor-fqn>\"}`.\n- `tekroo -config <c> alias unset <name>` → DELETE /v1/role-aliases/<name>.\n- `tekroo -config <c> alias list` → GET /v1/role-aliases.\n- `tekroo -config <c> alias resolve <name>` → GET /v1/role-aliases/<name>, prints resolved FQN.\n\n**Resolution in role/inbox/deadletters:**\n- In `roleOperation` (line 223), before FQN validation of `operands[0]`, if `kernel.ActorFQN(operands[0]).Valid()` is false, issue GET /v1/role-aliases/<operands[0]> to the daemon; on 200, extract actor_fqn and proceed with that FQN. On 404, fall through to usageError.\n- Same pattern in `actorRead` (line 256) for the inbox path and in the `deadletters` command's optional actor operand.\n- A `resolveOrFQN` helper in cmd/tekroo/main.go encapsulates the FQN-parse-then-alias-resolve pattern used by all three sites.\n\nThe usage error string (line 618) gains `alias set|unset|list|resolve` in the command list.",
+              "purpose": "IMPLEMENTATION",
+              "risk": "LOW",
+              "story_index": 0,
+              "title": "CLI alias subcommands and alias-aware role/inbox/deadletters commands",
+              "write_scope": [
+                "cmd/tekroo/main.go",
+                "cmd/tekroo/main_test.go"
+              ],
+              "covers": [
+                0,
+                1
+              ],
+              "validates": [
+                1,
+                2,
+                3,
+                4
+              ],
+              "review_round_limit": 1
+            },
+            {
+              "acceptance_criteria": [
+                "adapters/mcp/handler.go registers three new tool entries: tekroo.role.alias.set (required: name, actor_fqn), tekroo.role.alias.unset (required: name), tekroo.role.alias.list (no required fields), each with appropriate inputSchema.",
+                "adapters/operatortools/service.go Organization interface gains SetRoleAlias, UnsetRoleAlias, ListRoleAliases, ResolveRoleAlias methods matching ProductionService signatures.",
+                "Service.CallTool handles the three new tool names by decoding arguments, validating, and delegating to Organization.",
+                "Every existing tool case that parses an actor_fqn string argument (role.start, role.stop, role.restart, role.pause, role.resume, role.inbox, message.deadletters) calls ResolveRoleAlias on the parsed name before passing it to the Organization method. If the name is already a valid FQN, the resolve is a pass-through.",
+                "The Operatortools fake Organization in service_test.go implements the new interface methods.",
+                "Tests cover: alias set→use in role.start→same actor resolved; FQN path unchanged; unknown alias produces a clear error not a panic; list returns expected aliases.",
+                "go test ./adapters/mcp/ ./adapters/operatortools/ passes; gofmt reports changed files clean."
+              ],
+              "attempt_limit": 2,
+              "complexity": 3,
+              "depends_on": [
+                2
+              ],
+              "description": "Register alias CRUD tools in the MCP handler and add alias-aware resolution to existing MCP role-control tool paths in operatortools.\n\n**MCP handler (adapters/mcp/handler.go) — new tool names and constants:**\n```go\nRoleAliasSetName   = \"tekroo.role.alias.set\"\nRoleAliasUnsetName = \"tekroo.role.alias.unset\"\nRoleAliasListName  = \"tekroo.role.alias.list\"\n```\nThree new entries in the tools list with inputSchema: set requires `name` (string, minLength 1, maxLength 64) and `actor_fqn` (string, minLength 1); unset requires `name`; list requires nothing.\n\n**operatortools/service.go:**\n- Organization interface gains: `SetRoleAlias(ctx, string, kernel.ActorFQN) (organization.RoleAlias, error)`, `UnsetRoleAlias(ctx, string) error`, `ListRoleAliases(ctx) ([]organization.RoleAlias, error)`, `ResolveRoleAlias(ctx, string) (kernel.ActorFQN, error)`.\n- CallTool gains three new cases for the tool names, decoding strict JSON, calling the Organization method.\n- A `resolveActor(ctx, name string) (kernel.ActorFQN, error)` private helper is added: if kernel.ActorFQN(name).Valid() return it; else call service.organization.ResolveRoleAlias(ctx, name). Existing role.tool cases that currently do `kernel.ActorFQN(input.ActorFQN)` switch to calling this helper.\n\nThe operatortools fakeOrganization test double gains trivial implementations of the four new Organization methods.",
+              "purpose": "IMPLEMENTATION",
+              "risk": "MODERATE",
+              "story_index": 0,
+              "title": "MCP and operatortools alias tools and alias-aware resolution",
+              "write_scope": [
+                "adapters/mcp/handler.go",
+                "adapters/mcp/handler_test.go",
+                "adapters/operatortools/service.go",
+                "adapters/operatortools/service_test.go"
+              ],
+              "covers": [
+                0,
+                1
+              ],
+              "validates": [
+                1,
+                2,
+                3,
+                4
+              ],
+              "review_round_limit": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "receipt": "01a1277a-5fd2-70ed-bab9-fe1dd1cf60a1:00000000000000000091",
+      "arguments": {
+        "evidence": [
+          "3b71adcf-f1d6-7db2-808e-ea37facba1e9"
+        ],
+        "message_proposals": [],
+        "outcome": "completed",
+        "summary": "Repository-grounded design for human-readable operator aliases on agent instances. Five implementation tasks in a DAG: (1) domain types + store interface + in-memory store, (2) MongoDB store, (3) ProductionService alias wiring + operator HTTP alias-aware resolution and CRUD endpoints, (4) CLI alias subcommands + alias-aware role operations, (5) MCP operatortools alias tools + alias-aware resolution in existing role tools. Tasks 4 and 5 are parallel with disjoint write scopes. FQN validation is never weakened; alias resolution is an additive lookup that precedes it, guaranteeing backward compatibility.",
+        "work_product": {
+          "architecture": [
+            "The feature introduces a local operator-facing alias layer that is architecturally separate from the existing federation alias subsystem (organization/federation.go). Federation AliasBinding carries route ID, deployment identity, and trust-grant semantics; a local RoleAlias is simply a validated short name bound to an ActorFQN. Reusing federation types would entangle operator ergonomics with cross-deployment trust and force every alias operation through federation authorization.",
+            "The resolution point is at every operator-facing transport boundary (operatorhttp, CLI, MCP operatortools), not inside ProductionService.StartRole/StopRole or other domain-level methods. This preserves the existing kernel.ActorFQN-typed service interface: the service always receives a valid ActorFQN. Resolution is adapter logic — a helper (ResolveRoleAlias) that tries kernel.ActorFQN(name) first, and if that fails, looks up the name in a RoleAliasStore. If neither path yields a valid FQN, the adapter returns an error. This guarantees zero behavioral change for callers that already pass FQNs.",
+            "The ProductionService gains a RoleAliasStore field (organization.RoleAliasStore interface) and four additive methods — SetRoleAlias, UnsetRoleAlias, ListRoleAliases, ResolveRoleAlias — in a new file (role_alias_service.go) to avoid modifying the already-1500-line production.go beyond the single struct field addition. These methods are exposed through the operator HTTP interface as new Service interface methods and through a new operatortools Organization interface group.",
+            "The operator HTTP handler (adapters/operatorhttp/handler.go) routing is extended with /v1/role-aliases CRUD routes. In the existing /v1/roles/<operand>/<action> and /v1/roles/<operand>/inbox paths, the roleControl and roleInbox methods insert an alias-resolution step before the FQN validation gate. The deadLetters path (query parameter actor) receives the same treatment. The FQN validation kernel.ActorFQN(parts[0]).Valid() remains the guard; resolution merely produces a valid FQN string from an alias before the check.",
+            "The CLI (cmd/tekroo/main.go) gains an 'alias' subcommand family (set/unset/list) that calls the new HTTP endpoints, and existing 'role', 'inbox', and 'deadletters' commands gain alias resolution by calling a resolve endpoint (GET /v1/role-aliases/<name>) before making their primary call. The usage string and roleOperation/actorRead helper signatures are updated.",
+            "The MCP operatortools Service (adapters/operatortools/service.go) gains three new tool names (tekroo.role.alias.set, tekroo.role.alias.unset, tekroo.role.alias.list) and a resolver that runs before the existing role-control tool handlers call Organization.StartRole etc. The MCP handler (adapters/mcp/handler.go) registers the new tool schemas. The Organization interface in operatortools gains the four alias methods, which ProductionService satisfies structurally."
+          ],
+          "assumptions": [
+            "Local operator aliases are set at runtime via the new endpoints/tools; no static config-seeded alias list is required by the specification.",
+            "Alias names share the same character class as federation alias names (lowercase alphanumeric, hyphen, dot, max 64 chars) but are stored and validated in a separate namespace.",
+            "A given alias maps to at most one ActorFQN at a time; re-setting an alias overwrites the previous binding (operator is responsible for re-binding).",
+            "No alias hierarchy, wildcards, or team-level aliasing is needed; the operator story asks for a flat 1:1 name to FQN mapping."
+          ],
+          "design_decisions": [
+            {
+              "decision": "Separate RoleAlias from federation AliasBinding",
+              "rationale": "Federation AliasBinding is bound to route_id, route_revision, and deployment_identity with federation authorization semantics. A local operator alias has no route or deployment concern. Coupling them would force every local alias operation through federation trust checks and make the federation test surface a dependency of trivial operator ergonomics."
+            },
+            {
+              "decision": "Resolve aliases at the transport boundary, not inside ProductionService domain methods",
+              "rationale": "Every operator path (operatorhttp handler, CLI, MCP operatortools) already parses a string into kernel.ActorFQN before calling service methods. Adding resolution at this single point per path (4 sites) is lower-risk than modifying the service interface signature to accept untyped strings and resolving internally, which would blur the boundary between validated FQN identity and raw user input."
+            },
+            {
+              "decision": "New file role_alias_service.go for ProductionService alias methods",
+              "rationale": "production.go is already approximately 1500 lines. Adding 4 methods (Set/Unset/List/Resolve) plus their wiring there would make the file harder to review. The new file is the same package (operationalruntime) so the methods are accessible with zero import changes; only the struct field addition goes into production.go."
+            },
+            {
+              "decision": "Alias resolution helper in organization package as a free function, not a method on a new type",
+              "rationale": "The resolution logic is two lines: try FQN parse, else store lookup. Wrapping it in a dedicated resolver type adds indirection without testability gain. A package-level function that accepts a RoleAliasStore parameter is composable at every call site without requiring a new field on each adapter."
+            }
+          ],
+          "result_type": "FEATURE_PLAN",
+          "schema_version": "1.0.0",
+          "tasks": [
+            {
+              "acceptance_criteria": [
+                "organization/role_alias.go defines RoleAlias struct with SchemaVersion, Name (validated by ValidateRoleAliasName), ActorFQN (kernel.ActorFQN), Revision, CreatedAt fields with JSON tags and a Validate() method.",
+                "organization/role_alias.go defines RoleAliasStore interface with Load(ctx, name) (RoleAlias, bool, error), Save(ctx, RoleAlias) error, Delete(ctx, name) error, List(ctx) ([]RoleAlias, error).",
+                "organization/role_alias.go defines ValidateRoleAliasName(name string) error rejecting empty strings, uppercase, whitespace, wildcard characters, and names longer than 64 bytes; accepting lowercase alphanumeric, hyphen, dot.",
+                "organization/role_alias.go defines ResolveRoleAlias(ctx context.Context, store RoleAliasStore, name string) (kernel.ActorFQN, error) that returns the parsed FQN if name is a valid ActorFQN, else returns the alias's bound FQN, else returns ErrRoleAliasNotFound.",
+                "adapters/memory/role_alias_store.go implements organization.RoleAliasStore with a sync.Mutex-protected map; NewRoleAliasStore() *RoleAliasStore constructor.",
+                "Unit tests cover: validation rejects bad names; in-memory store round-trips Load/Save/Delete/List; ResolveRoleAlias prefers FQN over alias lookup; unknown name returns ErrRoleAliasNotFound.",
+                "go test ./organization/ ./adapters/memory/ passes; gofmt reports both new non-test files clean."
+              ],
+              "attempt_limit": 2,
+              "complexity": 2,
+              "critical_path": true,
+              "depends_on": [],
+              "description": "Define the foundational RoleAlias value type, alias-name validation, RoleAliasStore interface, a package-level ResolveRoleAlias helper, a sentinel error ErrRoleAliasNotFound, and an in-memory store implementation.\n\nProposed declarations for organization/role_alias.go:\n```go\n// path: organization/role_alias.go\npackage organization\n\nimport (\n\t\"context\"\n\t\"errors\"\n\t\"regexp\"\n\t\"time\"\n\n\t\"github.com/tekroo-ai/teams/kernel\"\n)\n\nvar ErrRoleAliasNotFound = errors.New(\"role alias not found\")\n\nvar roleAliasPattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9.-]{0,62}[a-z0-9])?$`)\n\ntype RoleAlias struct {\n\tSchemaVersion string          `json:\"schema_version\"`\n\tName          string          `json:\"name\"`\n\tActorFQN      kernel.ActorFQN `json:\"actor_fqn\"`\n\tRevision      uint64          `json:\"revision\"`\n\tCreatedAt     time.Time       `json:\"created_at\"`\n}\n\nfunc (alias RoleAlias) Validate() error { ... }\nfunc ValidateRoleAliasName(name string) error { ... }\n\ntype RoleAliasStore interface {\n\tLoad(ctx context.Context, name string) (RoleAlias, bool, error)\n\tSave(ctx context.Context, alias RoleAlias) error\n\tDelete(ctx context.Context, name string) error\n\tList(ctx context.Context) ([]RoleAlias, error)\n}\n\nfunc ResolveRoleAlias(ctx context.Context, store RoleAliasStore, name string) (kernel.ActorFQN, error) { ... }\n```\n\nProposed declarations for adapters/memory/role_alias_store.go:\n```go\n// path: adapters/memory/role_alias_store.go\npackage memory\n\nimport (\n\t\"context\"\n\t\"sync\"\n\n\t\"github.com/tekroo-ai/teams/organization\"\n)\n\ntype RoleAliasStore struct { ... }\n\nfunc NewRoleAliasStore() *RoleAliasStore { ... }\n```\nThe in-memory store guards a map[string]organization.RoleAlias behind a sync.Mutex. Save performs Revision increment; Load and Delete return ErrRoleAliasNotFound when the key is absent. List returns a sorted copy.",
+              "purpose": "IMPLEMENTATION",
+              "risk": "LOW",
+              "story_index": 0,
+              "title": "RoleAlias domain type, store interface, validation, resolver, and in-memory store",
+              "write_scope": [
+                "organization/role_alias.go",
+                "organization/role_alias_test.go",
+                "adapters/memory/role_alias_store.go",
+                "adapters/memory/role_alias_store_test.go"
+              ],
+              "covers": [
+                0,
+                1
+              ],
+              "review_round_limit": 1
+            },
+            {
+              "acceptance_criteria": [
+                "adapters/mongo/role_alias_store.go implements organization.RoleAliasStore using a *mongo.Database / *mongo.Collection; NewRoleAliasStore(db *mongo.Database) *RoleAliasStore constructor.",
+                "Save performs upsert keyed on Name, incrementing Revision, with an index on Name enforcing uniqueness.",
+                "Load returns ErrRoleAliasNotFound when the document is absent.",
+                "Delete removes the document by Name and returns ErrRoleAliasNotFound when absent.",
+                "List returns all documents sorted by Name.",
+                "Integration test (build-tagged or gated by MONGO_URI env var) proves round-trip Load/Save/Delete/List, uniqueness, and ErrRoleAliasNotFound semantics against a real or testcontainer MongoDB.",
+                "All existing adapters/mongo tests continue to pass unmodified.",
+                "gofmt reports the new non-test file clean."
+              ],
+              "attempt_limit": 3,
+              "complexity": 3,
+              "critical_path": true,
+              "depends_on": [
+                0
+              ],
+              "description": "Implement a MongoDB-backed organization.RoleAliasStore so that operator aliases survive daemon restarts, matching the durability guarantee of RoleStateStore in the same package.\n\nProposed declarations for adapters/mongo/role_alias_store.go:\n```go\n// path: adapters/mongo/role_alias_store.go\npackage mongo\n\nimport (\n\t\"context\"\n\n\t\"go.mongodb.org/mongo-driver/v2/mongo\"\n\n\t\"github.com/tekroo-ai/teams/organization\"\n)\n\ntype RoleAliasStore struct {\n\tcollection *mongo.Collection\n}\n\nfunc NewRoleAliasStore(db *mongo.Database) *RoleAliasStore { ... }\n\nfunc (s *RoleAliasStore) Load(ctx context.Context, name string) (organization.RoleAlias, bool, error) { ... }\nfunc (s *RoleAliasStore) Save(ctx context.Context, alias organization.RoleAlias) error { ... }\nfunc (s *RoleAliasStore) Delete(ctx context.Context, name string) error { ... }\nfunc (s *RoleAliasStore) List(ctx context.Context) ([]organization.RoleAlias, error) { ... }\n```\nThe collection name is \"role_aliases\". Save uses a single-document updateOne with upsert:true and a $inc on revision to prevent lost updates. An ensureIndexes call creates a unique index on Name. Load and Delete return organization.ErrRoleAliasNotFound when no document matches.",
+              "purpose": "IMPLEMENTATION",
+              "risk": "MODERATE",
+              "story_index": 0,
+              "title": "MongoDB RoleAliasStore implementation",
+              "write_scope": [
+                "adapters/mongo/role_alias_store.go",
+                "adapters/mongo/role_alias_store_test.go"
+              ],
+              "covers": [
+                0,
+                1
+              ],
+              "review_round_limit": 1
+            },
+            {
+              "acceptance_criteria": [
+                "ProductionService struct gains a RoleAliasStore organization.RoleAliasStore field; LoadProductionConfig and NewProductionService initialize it (Mongo-backed when a MongoDB connection is available, otherwise in-memory).",
+                "adapters/operationalruntime/role_alias_service.go defines SetRoleAlias(ctx, name string, actor kernel.ActorFQN) (organization.RoleAlias, error), UnsetRoleAlias(ctx, name string) error, ListRoleAliases(ctx) ([]organization.RoleAlias, error), and ResolveRoleAlias(ctx, name string) (kernel.ActorFQN, error) on *ProductionService.",
+                "The operatorhttp Service interface gains the four alias methods; the operatorhttp Handler routes POST /v1/role-aliases (create/update), DELETE /v1/role-aliases/<name>, GET /v1/role-aliases (list), GET /v1/role-aliases/<name> (read single).",
+                "roleControl and roleInbox in the operatorhttp handler resolve the path component through the Service's alias resolution before the existing kernel.ActorFQN validation; an unresolvable name that is also not a valid FQN receives INVALID_ROLE_OPERATION.",
+                "Existing integration tests in handler_integration_test.go and unit tests in handler_test.go pass without modification (FQN path unchanged).",
+                "New tests cover: alias create then read then use-in-role-path then delete; FQN and alias both resolve to same actor; unresolvable name produces 400; list returns sorted aliases.",
+                "go test ./adapters/operatorhttp/ ./adapters/operationalruntime/ passes; gofmt reports changed and new files clean."
+              ],
+              "attempt_limit": 3,
+              "complexity": 4,
+              "critical_path": true,
+              "depends_on": [
+                0,
+                1
+              ],
+              "description": "Wire the alias store into ProductionService and expose alias CRUD plus alias-aware resolution through the operator HTTP boundary.\n\nProductionService field (production.go, single additive line in struct): add `RoleAliasStore organization.RoleAliasStore` to the ProductionService struct. NewProductionService initializes it from the Mongo database handle when present, falling back to memory.NewRoleAliasStore().\n\nNew file role_alias_service.go proposed declarations:\n```go\n// path: adapters/operationalruntime/role_alias_service.go\npackage operationalruntime\n\nimport (\n\t\"context\"\n\t\"errors\"\n\t\"time\"\n\n\t\"github.com/tekroo-ai/teams/kernel\"\n\t\"github.com/tekroo-ai/teams/organization\"\n)\n\nfunc (service *ProductionService) SetRoleAlias(ctx context.Context, name string, actor kernel.ActorFQN) (organization.RoleAlias, error) { ... }\nfunc (service *ProductionService) UnsetRoleAlias(ctx context.Context, name string) error { ... }\nfunc (service *ProductionService) ListRoleAliases(ctx context.Context) ([]organization.RoleAlias, error) { ... }\nfunc (service *ProductionService) ResolveRoleAlias(ctx context.Context, name string) (kernel.ActorFQN, error) { ... }\n```\nSetRoleAlias validates name via ValidateRoleAliasName and actor via ActorFQN.Valid(), constructs a RoleAlias with Revision 1 and CreatedAt from the service clock, and calls store.Save (which increments revision on re-set). ResolveRoleAlias delegates to organization.ResolveRoleAlias(ctx, service.RoleAliasStore, name).\n\noperatorhttp handler changes:\n- Service interface: add SetRoleAlias, UnsetRoleAlias, ListRoleAliases, ResolveRoleAlias.\n- Routing in ServeHTTP: add cases for POST/DELETE/GET /v1/role-aliases[/name].\n- roleControl: before kernel.ActorFQN(parts[0]).Valid(), attempt alias resolution. If resolution succeeds, replace parts[0] with the resolved FQN. If the name is a valid FQN, skip resolution entirely. Only fall through to INVALID_ROLE_OPERATION when neither FQN parse nor alias lookup succeeds.\n- roleInbox: same resolution pattern.\n- deadLetters: resolve the optional actor query parameter the same way.\n\nTest updates: Add alias lifecycle and role-control-with-alias cases. Ensure the existing FQN-only role control tests pass with zero behavioral change. The fake Service in handler_test.go gains no-op implementations of the new interface methods.",
+              "purpose": "IMPLEMENTATION",
+              "risk": "MODERATE",
+              "story_index": 0,
+              "title": "ProductionService alias methods, operator HTTP CRUD endpoints, and alias-aware role resolution",
+              "write_scope": [
+                "adapters/operatorhttp/handler.go",
+                "adapters/operatorhttp/handler_test.go",
+                "adapters/operatorhttp/handler_integration_test.go",
+                "adapters/operationalruntime/production.go",
+                "adapters/operationalruntime/role_alias_service.go",
+                "adapters/operationalruntime/role_alias_service_test.go"
+              ],
+              "covers": [
+                0,
+                1
+              ],
+              "review_round_limit": 1
+            },
+            {
+              "acceptance_criteria": [
+                "A new 'alias' subcommand exists with operands 'set <name> <actor-fqn>', 'unset <name>', 'list', and 'resolve <name>', each issuing the corresponding HTTP request to the daemon.",
+                "roleOperation and actorRead helper functions resolve their actor operand: if kernel.ActorFQN(operand).Valid() is false, GET /v1/role-aliases/<operand> is attempted to obtain the FQN; on success, the FQN is substituted. If resolution fails, the existing usageError() is returned.",
+                "The usage string is updated to include the alias subcommand family.",
+                "cmd/tekroo/main_test.go covers: alias set then role-by-alias-start round-trip, alias unset then FQN-still-works, resolve of unknown alias produces a clear error, FQN operands bypass resolution.",
+                "go test ./cmd/tekroo/ passes; gofmt reports changed files clean."
+              ],
+              "attempt_limit": 2,
+              "complexity": 3,
+              "depends_on": [
+                2
+              ],
+              "description": "Add alias management subcommands and alias-aware resolution to the tekroo CLI binary.\n\nCLI subcommand design:\n- `tekroo -config <c> alias set <name> <actor-fqn>` sends POST /v1/role-aliases with body {\"name\":\"<name>\",\"actor_fqn\":\"<actor-fqn>\"}.\n- `tekroo -config <c> alias unset <name>` sends DELETE /v1/role-aliases/<name>.\n- `tekroo -config <c> alias list` sends GET /v1/role-aliases.\n- `tekroo -config <c> alias resolve <name>` sends GET /v1/role-aliases/<name>, prints resolved FQN.\n\nResolution in role/inbox/deadletters:\n- In roleOperation (line 223), before FQN validation of operands[0], if kernel.ActorFQN(operands[0]).Valid() is false, issue GET /v1/role-aliases/<operands[0]> to the daemon; on 200, extract actor_fqn and proceed with that FQN. On 404, fall through to usageError.\n- Same pattern in actorRead (line 256) for the inbox path and in the deadletters command's optional actor operand.\n- A resolveOrFQN helper in cmd/tekroo/main.go encapsulates the FQN-parse-then-alias-resolve pattern used by all three sites.\n\nThe usage error string (line 618) gains alias set|unset|list|resolve in the command list.",
+              "purpose": "IMPLEMENTATION",
+              "risk": "LOW",
+              "story_index": 0,
+              "title": "CLI alias subcommands and alias-aware role/inbox/deadletters commands",
+              "write_scope": [
+                "cmd/tekroo/main.go",
+                "cmd/tekroo/main_test.go"
+              ],
+              "covers": [
+                0,
+                1
+              ],
+              "review_round_limit": 1
+            },
+            {
+              "acceptance_criteria": [
+                "adapters/mcp/handler.go registers three new tool entries: tekroo.role.alias.set (required: name, actor_fqn), tekroo.role.alias.unset (required: name), tekroo.role.alias.list (no required fields), each with appropriate inputSchema.",
+                "adapters/operatortools/service.go Organization interface gains SetRoleAlias, UnsetRoleAlias, ListRoleAliases, ResolveRoleAlias methods matching ProductionService signatures.",
+                "Service.CallTool handles the three new tool names by decoding arguments, validating, and delegating to Organization.",
+                "Every existing tool case that parses an actor_fqn string argument (role.start, role.stop, role.restart, role.pause, role.resume, role.inbox, message.deadletters) calls ResolveRoleAlias on the parsed name before passing it to the Organization method. If the name is already a valid FQN, the resolve is a pass-through.",
+                "The Operatortools fake Organization in service_test.go implements the new interface methods.",
+                "Tests cover: alias set then use in role.start then same actor resolved; FQN path unchanged; unknown alias produces a clear error not a panic; list returns expected aliases.",
+                "go test ./adapters/mcp/ ./adapters/operatortools/ passes; gofmt reports changed files clean."
+              ],
+              "attempt_limit": 2,
+              "complexity": 3,
+              "depends_on": [
+                2
+              ],
+              "description": "Register alias CRUD tools in the MCP handler and add alias-aware resolution to existing MCP role-control tool paths in operatortools.\n\nMCP handler (adapters/mcp/handler.go) new tool names and constants:\n```go\n// path: adapters/mcp/handler.go\n// Add constants alongside existing FederationResolveName etc:\nRoleAliasSetName   = \"tekroo.role.alias.set\"\nRoleAliasUnsetName = \"tekroo.role.alias.unset\"\nRoleAliasListName  = \"tekroo.role.alias.list\"\n```\nThree new entries in the tools list with inputSchema: set requires name (string, minLength 1, maxLength 64) and actor_fqn (string, minLength 1); unset requires name; list requires nothing.\n\noperatortools/service.go:\n- Organization interface gains: SetRoleAlias(ctx, string, kernel.ActorFQN) (organization.RoleAlias, error), UnsetRoleAlias(ctx, string) error, ListRoleAliases(ctx) ([]organization.RoleAlias, error), ResolveRoleAlias(ctx, string) (kernel.ActorFQN, error).\n- CallTool gains three new cases for the tool names, decoding strict JSON, calling the Organization method.\n- A resolveActor(ctx, name string) (kernel.ActorFQN, error) private helper is added: if kernel.ActorFQN(name).Valid() return it; else call service.organization.ResolveRoleAlias(ctx, name). Existing role.tool cases that currently do kernel.ActorFQN(input.ActorFQN) switch to calling this helper.\n\nThe operatortools fakeOrganization test double gains trivial implementations of the four new Organization methods.",
+              "purpose": "IMPLEMENTATION",
+              "risk": "MODERATE",
+              "story_index": 0,
+              "title": "MCP and operatortools alias tools and alias-aware resolution",
+              "write_scope": [
+                "adapters/mcp/handler.go",
+                "adapters/mcp/handler_test.go",
+                "adapters/operatortools/service.go",
+                "adapters/operatortools/service_test.go"
+              ],
+              "covers": [
+                0,
+                1
+              ],
+              "review_round_limit": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "receipt": "01a1277a-5fd2-70ed-bab9-fe1dd1cf60a1:00000000000000000093",
+      "arguments": {
+        "evidence": [
+          "3b71adcf-f1d6-7db2-808e-ea37facba1e9"
+        ],
+        "message_proposals": [],
+        "outcome": "completed",
+        "summary": "Repository-grounded design for human-readable operator aliases on agent instances. Five implementation tasks in a DAG: (1) domain types + store interface + in-memory store, (2) MongoDB store, (3) ProductionService alias wiring + operator HTTP alias-aware resolution and CRUD endpoints, (4) CLI alias subcommands + alias-aware role operations, (5) MCP operatortools alias tools + alias-aware resolution in existing role tools. Tasks 4 and 5 are parallel with disjoint write scopes. FQN validation is never weakened; alias resolution is an additive lookup that precedes it, guaranteeing backward compatibility.",
+        "work_product": {
+          "architecture": [
+            "The feature introduces a local operator-facing alias layer that is architecturally separate from the existing federation alias subsystem (organization/federation.go). Federation AliasBinding carries route ID, deployment identity, and trust-grant semantics; a local RoleAlias is simply a validated short name bound to an ActorFQN. Reusing federation types would entangle operator ergonomics with cross-deployment trust and force every alias operation through federation authorization.",
+            "The resolution point is at every operator-facing transport boundary (operatorhttp, CLI, MCP operatortools), not inside ProductionService.StartRole/StopRole or other domain-level methods. This preserves the existing kernel.ActorFQN-typed service interface: the service always receives a valid ActorFQN. Resolution is adapter logic — a helper (ResolveRoleAlias) that tries kernel.ActorFQN(name) first, and if that fails, looks up the name in a RoleAliasStore. If neither path yields a valid FQN, the adapter returns an error. This guarantees zero behavioral change for callers that already pass FQNs.",
+            "The ProductionService gains a RoleAliasStore field (organization.RoleAliasStore interface) and four additive methods — SetRoleAlias, UnsetRoleAlias, ListRoleAliases, ResolveRoleAlias — in a new file (role_alias_service.go) to avoid modifying the already-1500-line production.go beyond the single struct field addition. These methods are exposed through the operator HTTP interface as new Service interface methods and through a new operatortools Organization interface group.",
+            "The operator HTTP handler (adapters/operatorhttp/handler.go) routing is extended with /v1/role-aliases CRUD routes. In the existing /v1/roles/<operand>/<action> and /v1/roles/<operand>/inbox paths, the roleControl and roleInbox methods insert an alias-resolution step before the FQN validation gate. The deadLetters path (query parameter actor) receives the same treatment. The FQN validation kernel.ActorFQN(parts[0]).Valid() remains the guard; resolution merely produces a valid FQN string from an alias before the check.",
+            "The CLI (cmd/tekroo/main.go) gains an 'alias' subcommand family (set/unset/list/resolve) that calls the new HTTP endpoints, and existing 'role', 'inbox', and 'deadletters' commands gain alias resolution by calling a resolve endpoint (GET /v1/role-aliases/<name>) before making their primary call. The usage string and roleOperation/actorRead helper signatures are updated.",
+            "The MCP operatortools Service (adapters/operatortools/service.go) gains three new tool names (tekroo.role.alias.set, tekroo.role.alias.unset, tekroo.role.alias.list) and a resolver that runs before the existing role-control tool handlers call Organization.StartRole etc. The MCP handler (adapters/mcp/handler.go) registers the new tool schemas. The Organization interface in operatortools gains the four alias methods, which ProductionService satisfies structurally."
+          ],
+          "assumptions": [
+            "Local operator aliases are set at runtime via the new endpoints/tools; no static config-seeded alias list is required by the specification.",
+            "Alias names share the same character class as federation alias names (lowercase alphanumeric, hyphen, dot, max 64 chars) but are stored and validated in a separate namespace.",
+            "A given alias maps to at most one ActorFQN at a time; re-setting an alias overwrites the previous binding (operator is responsible for re-binding).",
+            "No alias hierarchy, wildcards, or team-level aliasing is needed; the operator story asks for a flat 1:1 name to FQN mapping."
+          ],
+          "design_decisions": [
+            {
+              "decision": "Separate RoleAlias from federation AliasBinding",
+              "rationale": "Federation AliasBinding is bound to route_id, route_revision, and deployment_identity with federation authorization semantics. A local operator alias has no route or deployment concern. Coupling them would force every local alias operation through federation trust checks and make the federation test surface a dependency of trivial operator ergonomics."
+            },
+            {
+              "decision": "Resolve aliases at the transport boundary, not inside ProductionService domain methods",
+              "rationale": "Every operator path (operatorhttp handler, CLI, MCP operatortools) already parses a string into kernel.ActorFQN before calling service methods. Adding resolution at this single point per path (4 sites) is lower-risk than modifying the service interface signature to accept untyped strings and resolving internally, which would blur the boundary between validated FQN identity and raw user input."
+            },
+            {
+              "decision": "New file role_alias_service.go for ProductionService alias methods",
+              "rationale": "production.go is already approximately 1500 lines. Adding 4 methods (Set/Unset/List/Resolve) plus their wiring there would make the file harder to review. The new file is the same package (operationalruntime) so the methods are accessible with zero import changes; only the struct field addition goes into production.go."
+            },
+            {
+              "decision": "Alias resolution helper in organization package as a free function, not a method on a new type",
+              "rationale": "The resolution logic is two lines: try FQN parse, else store lookup. Wrapping it in a dedicated resolver type adds indirection without testability gain. A package-level function that accepts a RoleAliasStore parameter is composable at every call site without requiring a new field on each adapter."
+            }
+          ],
+          "result_type": "FEATURE_PLAN",
+          "schema_version": "1.0.0",
+          "tasks": [
+            {
+              "acceptance_criteria": [
+                "organization/role_alias.go defines RoleAlias struct with SchemaVersion, Name (validated by ValidateRoleAliasName), ActorFQN (kernel.ActorFQN), Revision, CreatedAt fields with JSON tags and a Validate() method.",
+                "organization/role_alias.go defines RoleAliasStore interface with Load, Save, Delete, List methods.",
+                "organization/role_alias.go defines ValidateRoleAliasName(name string) error rejecting empty, uppercase, whitespace, wildcards, names >64 bytes.",
+                "organization/role_alias.go defines ResolveRoleAlias(ctx, store, name) that returns parsed FQN if name is valid ActorFQN, else alias lookup, else ErrRoleAliasNotFound.",
+                "organization/role_alias.go declares ErrRoleAliasNotFound sentinel.",
+                "adapters/memory/role_alias_store.go implements organization.RoleAliasStore with sync.Mutex-protected map and NewRoleAliasStore constructor.",
+                "Unit tests cover validation rejections, store round-trips, FQN-preference resolution, not-found.",
+                "go test ./organization/ ./adapters/memory/ passes; gofmt clean."
+              ],
+              "attempt_limit": 2,
+              "complexity": 2,
+              "critical_path": true,
+              "depends_on": [],
+              "description": "Define the foundational RoleAlias value type, alias-name validation, RoleAliasStore interface, a package-level ResolveRoleAlias helper, a sentinel error ErrRoleAliasNotFound, and an in-memory store implementation.\n\nProposed declarations for organization/role_alias.go:\n```go\n// path: organization/role_alias.go\npackage organization\n\nimport (\n\t\"context\"\n\t\"errors\"\n\t\"regexp\"\n\t\"time\"\n\n\t\"github.com/tekroo-ai/teams/kernel\"\n)\n\nvar ErrRoleAliasNotFound = errors.New(\"role alias not found\")\n\nvar roleAliasPattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9.-]{0,62}[a-z0-9])?$`)\n\ntype RoleAlias struct {\n\tSchemaVersion string          \"json:\\\"schema_version\\\"\"\n\tName          string          \"json:\\\"name\\\"\"\n\tActorFQN      kernel.ActorFQN \"json:\\\"actor_fqn\\\"\"\n\tRevision      uint64          \"json:\\\"revision\\\"\"\n\tCreatedAt     time.Time       \"json:\\\"created_at\\\"\"\n}\n\nfunc (alias RoleAlias) Validate() error\n\nfunc ValidateRoleAliasName(name string) error\n\ntype RoleAliasStore interface {\n\tLoad(ctx context.Context, name string) (RoleAlias, bool, error)\n\tSave(ctx context.Context, alias RoleAlias) error\n\tDelete(ctx context.Context, name string) error\n\tList(ctx context.Context) ([]RoleAlias, error)\n}\n\nfunc ResolveRoleAlias(ctx context.Context, store RoleAliasStore, name string) (kernel.ActorFQN, error)\n```\n\nProposed declarations for adapters/memory/role_alias_store.go:\n```go\n// path: adapters/memory/role_alias_store.go\npackage memory\n\nimport (\n\t\"context\"\n\t\"sync\"\n\n\t\"github.com/tekroo-ai/teams/organization\"\n)\n\ntype RoleAliasStore struct {\n\tmu   sync.Mutex\n\tdata map[string]organization.RoleAlias\n}\n\nfunc NewRoleAliasStore() *RoleAliasStore\n\nfunc (s *RoleAliasStore) Load(ctx context.Context, name string) (organization.RoleAlias, bool, error)\nfunc (s *RoleAliasStore) Save(ctx context.Context, alias organization.RoleAlias) error\nfunc (s *RoleAliasStore) Delete(ctx context.Context, name string) error\nfunc (s *RoleAliasStore) List(ctx context.Context) ([]organization.RoleAlias, error)\n```\nThe in-memory store guards a map behind a sync.Mutex. Save performs Revision increment; Load and Delete return ErrRoleAliasNotFound when the key is absent. List returns a sorted copy.",
+              "purpose": "IMPLEMENTATION",
+              "risk": "LOW",
+              "story_index": 0,
+              "title": "RoleAlias domain type, store interface, validation, resolver, and in-memory store",
+              "write_scope": [
+                "organization/role_alias.go",
+                "organization/role_alias_test.go",
+                "adapters/memory/role_alias_store.go",
+                "adapters/memory/role_alias_store_test.go"
+              ],
+              "covers": [
+                0,
+                1
+              ],
+              "review_round_limit": 1
+            },
+            {
+              "acceptance_criteria": [
+                "adapters/mongo/role_alias_store.go implements organization.RoleAliasStore with *mongo.Database constructor.",
+                "Save upserts keyed on Name with $inc revision and unique index.",
+                "Load/Delete return ErrRoleAliasNotFound when absent.",
+                "List returns all documents sorted by Name.",
+                "Integration test proves round-trip against real or testcontainer MongoDB.",
+                "All existing adapters/mongo tests pass unmodified.",
+                "gofmt clean."
+              ],
+              "attempt_limit": 3,
+              "complexity": 3,
+              "critical_path": true,
+              "depends_on": [
+                0
+              ],
+              "description": "Implement a MongoDB-backed organization.RoleAliasStore so that operator aliases survive daemon restarts, matching the durability guarantee of RoleStateStore in the same package.\n\nProposed declarations for adapters/mongo/role_alias_store.go:\n```go\n// path: adapters/mongo/role_alias_store.go\npackage mongo\n\nimport (\n\t\"context\"\n\n\t\"go.mongodb.org/mongo-driver/v2/mongo\"\n\n\t\"github.com/tekroo-ai/teams/organization\"\n)\n\ntype RoleAliasStore struct {\n\tcollection *mongo.Collection\n}\n\nfunc NewRoleAliasStore(db *mongo.Database) *RoleAliasStore\n\nfunc (s *RoleAliasStore) Load(ctx context.Context, name string) (organization.RoleAlias, bool, error)\nfunc (s *RoleAliasStore) Save(ctx context.Context, alias organization.RoleAlias) error\nfunc (s *RoleAliasStore) Delete(ctx context.Context, name string) error\nfunc (s *RoleAliasStore) List(ctx context.Context) ([]organization.RoleAlias, error)\n```\nThe collection name is role_aliases. Save uses updateOne with upsert:true and $inc on revision to prevent lost updates. An ensureIndexes call creates a unique index on Name. Load and Delete return organization.ErrRoleAliasNotFound when no document matches.",
+              "purpose": "IMPLEMENTATION",
+              "risk": "MODERATE",
+              "story_index": 0,
+              "title": "MongoDB RoleAliasStore implementation",
+              "write_scope": [
+                "adapters/mongo/role_alias_store.go",
+                "adapters/mongo/role_alias_store_test.go"
+              ],
+              "covers": [
+                0,
+                1
+              ],
+              "review_round_limit": 1
+            },
+            {
+              "acceptance_criteria": [
+                "ProductionService struct gains RoleAliasStore field; initialization wires Mongo-backed or in-memory store.",
+                "adapters/operationalruntime/role_alias_service.go defines SetRoleAlias, UnsetRoleAlias, ListRoleAliases, ResolveRoleAlias on *ProductionService.",
+                "operatorhttp Service interface gains the four alias methods; Handler routes POST/DELETE/GET /v1/role-aliases endpoints.",
+                "roleControl and roleInbox resolve path component through alias resolution before FQN validation.",
+                "Existing handler_integration_test.go and handler_test.go pass without modification.",
+                "New tests cover alias create/read/use/delete cycle; FQN path unchanged; unresolvable name produces 400.",
+                "go test ./adapters/operatorhttp/ ./adapters/operationalruntime/ passes; gofmt clean."
+              ],
+              "attempt_limit": 3,
+              "complexity": 4,
+              "critical_path": true,
+              "depends_on": [
+                0,
+                1
+              ],
+              "description": "Wire the alias store into ProductionService and expose alias CRUD plus alias-aware resolution through the operator HTTP boundary.\n\nProductionService field (production.go, single additive line in struct): add RoleAliasStore organization.RoleAliasStore to the ProductionService struct. NewProductionService initializes it from the Mongo database handle when present, falling back to memory.NewRoleAliasStore().\n\nNew file role_alias_service.go proposed declarations:\n```go\n// path: adapters/operationalruntime/role_alias_service.go\npackage operationalruntime\n\nimport (\n\t\"context\"\n\n\t\"github.com/tekroo-ai/teams/kernel\"\n\t\"github.com/tekroo-ai/teams/organization\"\n)\n\nfunc (service *ProductionService) SetRoleAlias(ctx context.Context, name string, actor kernel.ActorFQN) (organization.RoleAlias, error)\nfunc (service *ProductionService) UnsetRoleAlias(ctx context.Context, name string) error\nfunc (service *ProductionService) ListRoleAliases(ctx context.Context) ([]organization.RoleAlias, error)\nfunc (service *ProductionService) ResolveRoleAlias(ctx context.Context, name string) (kernel.ActorFQN, error)\n```\nSetRoleAlias validates name via ValidateRoleAliasName and actor via ActorFQN.Valid(), constructs a RoleAlias with Revision 1 and CreatedAt from the service clock, and calls store.Save. ResolveRoleAlias delegates to organization.ResolveRoleAlias(ctx, service.RoleAliasStore, name).\n\noperatorhttp handler changes:\n- Service interface: add SetRoleAlias, UnsetRoleAlias, ListRoleAliases, ResolveRoleAlias.\n- Routing in ServeHTTP: add cases for POST/DELETE/GET /v1/role-aliases[/name].\n- roleControl: before kernel.ActorFQN(parts[0]).Valid(), attempt alias resolution. If resolution succeeds, replace parts[0] with the resolved FQN. If the name is a valid FQN, skip resolution entirely. Only fall through to INVALID_ROLE_OPERATION when neither FQN parse nor alias lookup succeeds.\n- roleInbox: same resolution pattern.\n- deadLetters: resolve the optional actor query parameter the same way.\n\nTest updates: Add alias lifecycle and role-control-with-alias cases. Ensure the existing FQN-only role control tests pass with zero behavioral change. The fake Service in handler_test.go gains no-op implementations of the new interface methods.",
+              "purpose": "IMPLEMENTATION",
+              "risk": "MODERATE",
+              "story_index": 0,
+              "title": "ProductionService alias methods, operator HTTP CRUD endpoints, and alias-aware role resolution",
+              "write_scope": [
+                "adapters/operatorhttp/handler.go",
+                "adapters/operatorhttp/handler_test.go",
+                "adapters/operatorhttp/handler_integration_test.go",
+                "adapters/operationalruntime/production.go",
+                "adapters/operationalruntime/role_alias_service.go",
+                "adapters/operationalruntime/role_alias_service_test.go"
+              ],
+              "covers": [
+                0,
+                1
+              ],
+              "review_round_limit": 1
+            },
+            {
+              "acceptance_criteria": [
+                "A new alias subcommand exists with operands set/unset/list/resolve, each issuing the corresponding HTTP request.",
+                "roleOperation and actorRead resolve their actor operand via GET /v1/role-aliases/<operand> when the operand is not a valid FQN.",
+                "The usage string is updated to include the alias subcommand family.",
+                "main_test.go covers alias set then role-by-alias-start round-trip, alias unset then FQN-still-works, resolve of unknown alias produces clear error, FQN operands bypass resolution.",
+                "go test ./cmd/tekroo/ passes; gofmt clean."
+              ],
+              "attempt_limit": 2,
+              "complexity": 3,
+              "depends_on": [
+                2
+              ],
+              "description": "Add alias management subcommands and alias-aware resolution to the tekroo CLI binary.\n\nCLI subcommand design:\n- tekroo -config <c> alias set <name> <actor-fqn> sends POST /v1/role-aliases with body {\"name\":\"<name>\",\"actor_fqn\":\"<actor-fqn>\"}.\n- tekroo -config <c> alias unset <name> sends DELETE /v1/role-aliases/<name>.\n- tekroo -config <c> alias list sends GET /v1/role-aliases.\n- tekroo -config <c> alias resolve <name> sends GET /v1/role-aliases/<name>, prints resolved FQN.\n\nResolution in role/inbox/deadletters:\n- In roleOperation (line 223), before FQN validation of operands[0], if kernel.ActorFQN(operands[0]).Valid() is false, issue GET /v1/role-aliases/<operands[0]> to the daemon; on 200, extract actor_fqn and proceed with that FQN. On 404, fall through to usageError.\n- Same pattern in actorRead (line 256) for the inbox path and in the deadletters command optional actor operand.\n- A resolveOrFQN helper in cmd/tekroo/main.go encapsulates the FQN-parse-then-alias-resolve pattern used by all three sites.\n\nThe usage error string (line 618) gains alias set|unset|list|resolve in the command list.",
+              "purpose": "IMPLEMENTATION",
+              "risk": "LOW",
+              "story_index": 0,
+              "title": "CLI alias subcommands and alias-aware role/inbox/deadletters commands",
+              "write_scope": [
+                "cmd/tekroo/main.go",
+                "cmd/tekroo/main_test.go"
+              ],
+              "covers": [
+                0,
+                1
+              ],
+              "review_round_limit": 1
+            },
+            {
+              "acceptance_criteria": [
+                "adapters/mcp/handler.go registers three new tool entries: tekroo.role.alias.set, tekroo.role.alias.unset, tekroo.role.alias.list.",
+                "adapters/operatortools/service.go Organization interface gains SetRoleAlias, UnsetRoleAlias, ListRoleAliases, ResolveRoleAlias.",
+                "Service.CallTool handles the three new tool names by decoding and delegating.",
+                "Every existing tool case that parses an actor_fqn string calls ResolveRoleAlias before passing to Organization.",
+                "The operatortools fake Organization in service_test.go implements the new interface methods.",
+                "Tests cover alias set then use in role.start then same actor resolved; FQN path unchanged; unknown alias produces clear error.",
+                "go test ./adapters/mcp/ ./adapters/operatortools/ passes; gofmt clean."
+              ],
+              "attempt_limit": 2,
+              "complexity": 3,
+              "depends_on": [
+                2
+              ],
+              "description": "Register alias CRUD tools in the MCP handler and add alias-aware resolution to existing MCP role-control tool paths in operatortools.\n\nMCP handler (adapters/mcp/handler.go) new tool name constants added alongside existing FederationResolveName:\n```go\n// path: adapters/mcp/handler.go (new constants, existing file)\nconst (\n\tRoleAliasSetName   = \"tekroo.role.alias.set\"\n\tRoleAliasUnsetName = \"tekroo.role.alias.unset\"\n\tRoleAliasListName  = \"tekroo.role.alias.list\"\n)\n```\nThree new entries in the tools list with inputSchema: set requires name (string, minLength 1, maxLength 64) and actor_fqn (string, minLength 1); unset requires name; list requires nothing.\n\noperatortools/service.go:\n- Organization interface gains: SetRoleAlias(ctx, string, kernel.ActorFQN) (organization.RoleAlias, error), UnsetRoleAlias(ctx, string) error, ListRoleAliases(ctx) ([]organization.RoleAlias, error), ResolveRoleAlias(ctx, string) (kernel.ActorFQN, error).\n- CallTool gains three new cases for the tool names, decoding strict JSON, calling the Organization method.\n- A resolveActor(ctx, name string) (kernel.ActorFQN, error) private helper is added: if kernel.ActorFQN(name).Valid() return it; else call service.organization.ResolveRoleAlias(ctx, name). Existing role.tool cases that currently do kernel.ActorFQN(input.ActorFQN) switch to calling this helper.\n\nThe operatortools fakeOrganization test double gains trivial implementations of the four new Organization methods.",
+              "purpose": "IMPLEMENTATION",
+              "risk": "MODERATE",
+              "story_index": 0,
+              "title": "MCP and operatortools alias tools and alias-aware resolution",
+              "write_scope": [
+                "adapters/mcp/handler.go",
+                "adapters/mcp/handler_test.go",
+                "adapters/operatortools/service.go",
+                "adapters/operatortools/service_test.go"
+              ],
+              "covers": [
+                0,
+                1
+              ],
+              "review_round_limit": 1
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

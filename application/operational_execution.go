@@ -395,6 +395,17 @@ var noRepositoryExecutionGuidance = []string{
 	"Return the required structured result through result_protocol.",
 }
 
+// GoDeclarationManifestGuidance is shared by admitted planning briefs and the
+// live architect qualification; the syntax contract must not drift between them.
+const GoDeclarationManifestGuidance = "Before naming a new Go package-level declaration, check its exact name in the owning package. Every planned NEW non-test .go file requires a declaration manifest in its task description. Exact syntax example:" +
+	"\n```go\n// path: organization/new_alias.go\npackage organization\ntype NewAlias struct { Name string }\nvar ErrNewAlias error\nfunc ResolveNewAlias(name string) (NewAlias, error)\n```\n" +
+	"The marker contains ONLY the exact workspace-relative non-test .go path, with no parenthetical explanation. Include the package clause and complete Go type/var/const declarations. In the manifest only, omit function bodies entirely: use bodyless signatures as above, never { ... } or type T struct { ... }. " +
+	"The manifest is parsed for declaration names, not compiled or executed; it is not an implementation. Actual IMPLEMENTATION tasks must still deliver working function bodies and runnable, tested code. Do not require bodyless functions in the implementation files or defer their bodies to an unassigned follow-up. Put explanations outside the block. " +
+	"Existing declarations are references, not permission to redeclare a different type under their name. For a modification/example in an EXISTING non-test Go file, use a different marker, // modify: organization/existing.go, or describe it in prose; this is a reference, not a new-file manifest, and cannot satisfy a new file's declaration requirement. A // path: block always proposes new package-level names, even in an existing file. " +
+	"Keep contract definition separate from implementation dependencies: independent disjoint implementations may share a completed contract-provider task, but do not remove an edge when a consumer actually needs its provider's source or verification. " +
+	"Obey authored_task_policy: when may_author_validates=false, omit validates or use []; Teams owns validation links. depends_on contains only zero-based indexes of earlier tasks, never the current or a later task. " +
+	"If submit_result is rejected, correct ALL reported findings using the retained draft and repository evidence before resubmitting; do not repeat discovery or restart the plan merely to correct formatting."
+
 var readOnlyExecutionGuidance = []string{
 	"This task does not authorize repository edits. Do not edit repository files or create implementation artifacts.",
 	"Use only the repository evidence needed for the assigned result; if relevant surfaces are exhausted and evidence remains insufficient, report the concrete blocker.",
@@ -403,7 +414,7 @@ var readOnlyExecutionGuidance = []string{
 	"When the task requires a structured result, validate it against result_protocol and every required field in the task's result schema before submitting it.",
 	"When producing or approving an executable plan, trace each accepted outcome through the real application entry point, concrete implementation, configuration or activation, and verification. Assign necessary integration to a task with the required write scope; interfaces and test doubles alone do not complete a runtime path. If an immutable design omits required integration, report that precise gap rather than silently accepting it or expanding product scope.",
 	"For every capability handoff, establish the callable/data interface, all required inputs and their accessible sources, consumer usage within its write scope, and provider-side verification. Do not accept a constructor requiring an inaccessible resource or a scope change that has no assigned owner. Report needs_decision for a material unresolved conflict rather than certifying it as executable.",
-	"Before naming a new Go package-level declaration, check its exact name in the owning package. For every planned NEW non-test .go file, put explicit proposed declarations in the task description: a ```go code block whose first line is // path: <workspace-relative .go path>, then the package clause and proposed package-level declarations. These are declaration manifests, not implementation bodies; publication checks them against existing package names. Existing declarations are references, not permission to declare a different type under their name; label intended modifications/reuse explicitly outside the block. Keep contract definition separate from implementation dependencies: independent disjoint implementations may share a completed contract-provider task, but do not remove an edge when a consumer actually needs its provider's source or verification.",
+	GoDeclarationManifestGuidance,
 }
 
 var validationExecutionGuidance = []string{

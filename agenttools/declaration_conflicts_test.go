@@ -49,3 +49,24 @@ func TestGoDeclarationCheckPackageAndReceiverNamespaces(t *testing.T) {
 		t.Fatal("invalid syntax certified")
 	}
 }
+
+func TestGoDeclarationCheckCollectsIndependentSyntaxAndNameFindings(t *testing.T) {
+	root := t.TempDir()
+	if err := os.Mkdir(filepath.Join(root, "one"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	writeSnapshotFixture(t, root, "one/source.go", "package one\ntype Existing int\nvar already = 1\n")
+	err := CheckNewGoDeclarations(t.Context(), root, []ProposedGoSource{
+		{Path: "one/bad.go", Source: "package one\nfunc Missing() { ... }"},
+		{Path: "one/collision.go", Source: "package one\ntype Existing string\nvar already = 2"},
+		{Path: "one/other.go", Source: "package one\ntype AlsoBad struct { ... }"},
+	})
+	if !errors.Is(err, ErrConflict) {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"one/bad.go", "one/other.go", "new declaration Existing", "new declaration already", "bodyless function signatures"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("missing %q: %v", want, err)
+		}
+	}
+}
