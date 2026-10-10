@@ -676,7 +676,7 @@ func (model *amendmentForwardModel) serve(w http.ResponseWriter, r *http.Request
 					successor.PreparedExecution = prompt.ExecutionBrief.Execution
 				}
 			}
-			successor.CreatedAt = time.Now().UTC()
+			successor.CreatedAt = a.RequestedAt
 			successor.Tasks = append([]organization.PlannedTask(nil), a.PriorPlan.Tasks...)
 			newWork, newTest := successor.Tasks[1], successor.Tasks[2]
 			newWork.ID, newTest.ID = id(51008), id(51009)

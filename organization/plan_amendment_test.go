@@ -210,6 +210,24 @@ func TestPlanAmendmentRejectsUnsafePlans(t *testing.T) {
 		{"stale digest", func(f *organization.FeatureRequest, p *organization.PlanAmendmentProposal, w *organization.PlanAmendmentWitness) {
 			p.PlanDigest = featureDigest('1')
 		}, "STALE_SOURCE"},
+		{"r59 source confused with successor version", func(f *organization.FeatureRequest, p *organization.PlanAmendmentProposal, w *organization.PlanAmendmentWitness) {
+			p.PlanVersion = p.SuccessorPlan.Version
+		}, "STALE_SOURCE"},
+		{"r59 future proposal timestamp", func(f *organization.FeatureRequest, p *organization.PlanAmendmentProposal, w *organization.PlanAmendmentWitness) {
+			p.SuccessorPlan.CreatedAt = w.Now.Add(6 * time.Hour)
+		}, "INVALID_SUCCESSOR_PLAN"},
+		{"r59 dangling removed dependency", func(f *organization.FeatureRequest, p *organization.PlanAmendmentProposal, w *organization.PlanAmendmentWitness) {
+			p.SuccessorPlan.Tasks[3].DependsOn = []kernel.UUIDv7{p.BlockedTaskID}
+		}, "INVALID_SUCCESSOR_PLAN"},
+		{"r59 impact attributed to retained provider", func(f *organization.FeatureRequest, p *organization.PlanAmendmentProposal, w *organization.PlanAmendmentWitness) {
+			p.Impacts[0].OwnerTaskID = f.Plan.Tasks[0].ID
+		}, "IMPACT_COVERAGE_MISSING"},
+		{"r59 retained unexecuted task rewritten", func(f *organization.FeatureRequest, p *organization.PlanAmendmentProposal, w *organization.PlanAmendmentWitness) {
+			p.SuccessorPlan.Tasks[1].Description += " changed"
+			state := w.Tasks[featureUUID(12)]
+			state.Phase = kernel.PhasePlanned
+			w.Tasks[state.ID] = state
+		}, "TASK_REWRITTEN"},
 		{"stale blocked revision", func(f *organization.FeatureRequest, p *organization.PlanAmendmentProposal, w *organization.PlanAmendmentWitness) {
 			p.BlockedTaskRevision++
 		}, "UNBOUND_QUESTION"},

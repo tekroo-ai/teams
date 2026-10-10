@@ -172,7 +172,7 @@ func (service *ProductionService) amendmentPMSource(ctx context.Context, feature
 
 func amendmentAssessmentTask(feature organization.FeatureRequest, source kernel.WorkInvocation, model kernel.Digest, route kernel.DecisionRoute) organization.PlannedTask {
 	a := feature.PlanAmendment
-	return organization.PlannedTask{ID: a.AssessmentID, StoryID: a.PriorPlan.Tasks[0].StoryID, Title: "Assess bounded execution-plan amendment", Description: "Read the admitted amendment input record, accepted PM plan and architect answer. Propose the smallest execution ownership/dependency/scope repair within the unchanged product specification and technical design. Preserve retained task definitions and completed work exactly. Use fresh IDs only for affected successor tasks; remaining attempt allowances are supplied in input. Do not implement, edit the repository, broaden product behavior, ask another agent, or approve your own proposal. Return a raw structured amendment proposal under the supplied JSON Schema. A rejection or failure is terminal and requires the operator; there is no second assessment.", AcceptanceCriteria: []string{"The proposal binds the original reservation, accepted specification, exact blocked invocation and architect answer, with narrow impact ownership, closed DAG handoffs and independent validation."}, DependsOn: []kernel.UUIDv7{source.TaskID, a.ConsultationID}, Owner: a.PriorPlan.PreparedBy, ModelProfile: model, Purpose: kernel.PurposeHandoff, DecisionRoute: route, Complexity: 4, Risk: organization.RiskModerate, AttemptLimit: 1, ReviewRoundLimit: 1}
+	return organization.PlannedTask{ID: a.AssessmentID, StoryID: a.PriorPlan.Tasks[0].StoryID, Title: "Assess bounded execution-plan amendment", Description: amendmentAssessmentGuidance, AcceptanceCriteria: []string{"The proposal binds the original reservation, accepted specification, exact blocked invocation and architect answer, with narrow impact ownership, closed DAG handoffs and independent validation."}, DependsOn: []kernel.UUIDv7{source.TaskID, a.ConsultationID}, Owner: a.PriorPlan.PreparedBy, ModelProfile: model, Purpose: kernel.PurposeHandoff, DecisionRoute: route, Complexity: 4, Risk: organization.RiskModerate, AttemptLimit: 1, ReviewRoundLimit: 1}
 }
 
 // Reconciliation is durable and forward-only. Reserving freezes new plan work
@@ -489,7 +489,10 @@ func (service *ProductionService) nativePlanAmendment(ctx context.Context, brief
 		if err != nil {
 			return nil, nil, err
 		}
-		schema := organization.PlanAmendmentProposalSchema()
+		schema, err := boundPlanAmendmentSchema(feature, brief)
+		if err != nil {
+			return nil, nil, err
+		}
 		return &nativeagent.ResultContract{TaskID: brief.Task.TaskID, TaskSourceDigest: brief.Task.SourceDigest, SchemaRef: "tekroo.feature.plan-amendment", SchemaSHA256: digestBytes(schema), Schema: schema}, &source, nil
 	}
 	return nil, nil, nil
