@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/tekroo-ai/teams/internal/verification"
 )
 
 func TestVerificationWorkspaceReusesOnlyPathNeverContents(t *testing.T) {
@@ -38,6 +40,33 @@ func TestVerificationWorkspaceReusesOnlyPathNeverContents(t *testing.T) {
 	t.Cleanup(func() { _ = os.RemoveAll(other) })
 	if other == first {
 		t.Fatal("different cache shared checkout")
+	}
+}
+
+func TestVerificationWorkspaceLanesNeverShareWritableContents(t *testing.T) {
+	host := Host{CompilationCache: t.TempDir()}
+	first, err := host.newVerificationWorkspaceForSlot(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(first) })
+	second, err := host.newVerificationWorkspaceForSlot(1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(second) })
+	if first == second {
+		t.Fatal("concurrent lanes shared a checkout")
+	}
+	writeSnapshotFixture(t, first, "sentinel", "lane zero")
+	if _, err := os.Stat(filepath.Join(second, "sentinel")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("cross-lane contents", err)
+	}
+	if _, err := host.newVerificationWorkspaceForSlot(verification.MaxConcurrent); !errors.Is(err, ErrInvalidCall) {
+		t.Fatal("unbounded lane", err)
+	}
+	if _, err := host.newVerificationWorkspaceForSlot(-1); !errors.Is(err, ErrInvalidCall) {
+		t.Fatal("negative lane", err)
 	}
 }
 

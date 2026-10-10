@@ -99,12 +99,12 @@ func TestCompilationCacheSeedsFreshIsolatedGoTests(t *testing.T) {
 		t.Fatalf("toolchain namespace: %v %v", entries, err)
 	}
 	// The hint is not proof that artifacts still exist. Eviction must remain a
-	// safe miss in the actual Go invocation, not a skipped check or false PASS.
+	// safe miss: rebuild compiler artifacts, then actually execute the test.
 	if err := os.RemoveAll(filepath.Join(cache, entries[0].Name())); err != nil {
 		t.Fatal(err)
 	}
 	result, err := host.runIsolatedGoTests(t.Context(), root, "./...")
-	if err != nil || result.ExitCode != 0 || result.VerificationTimings.CacheCompileNS != 0 {
+	if err != nil || result.ExitCode != 0 || result.VerificationTimings.CacheCompileNS <= 0 {
 		t.Fatalf("evicted primer did not fall back to real compilation/execution: %+v %v", result, err)
 	}
 	writeSnapshotFixture(t, root, "value_test.go", "package cached\nimport \"testing\"\nfunc TestValue(t *testing.T) { t.Fatal(\"changed source really executed\") }\n")
@@ -131,7 +131,7 @@ func TestCompilationCacheSeedsFreshIsolatedGoTests(t *testing.T) {
 }
 
 func TestCompilationPrimerBuildsArchivesWithoutLinking(t *testing.T) {
-	want := []string{"/opt/bin/go", "list", "-p=1", "-export", "-test", "-deps", "-f={{.ImportPath}}", "./..."}
+	want := []string{"/opt/bin/go", "list", "-p=2", "-export", "-test", "-deps", "-f={{.ImportPath}}", "./..."}
 	if args := compilationPrimerArguments("/opt/bin/go", "./..."); !slices.Equal(args, want) {
 		t.Fatalf("archive-only compilation changed: %v", args)
 	}

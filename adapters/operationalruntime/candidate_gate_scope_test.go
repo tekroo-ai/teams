@@ -33,7 +33,7 @@ func TestComponentBuildDoesNotRequireUnfinishedConsumerButIntegrationDoes(t *tes
 	gate := ProductionCandidateGate{GateID: "build", Command: []string{goBinary, "build", "./..."}, Timeout: "30s", Scope: taskPackageGateScope}
 	manager := &candidateWorkspaceManager{root: t.TempDir(), gitBinary: "git", timeout: time.Second, gates: map[string]ProductionCandidateGate{gate.GateID: gate}}
 	component, digest, err := manager.withGateScope(dir, []string{gate.GateID}, [][]string{{"provider/"}})
-	if err != nil || !digest.Valid() || !slices.Equal(component.gates[gate.GateID].Command, []string{goBinary, "build", "-p=1", "./provider"}) {
+	if err != nil || !digest.Valid() || !slices.Equal(component.gates[gate.GateID].Command, []string{goBinary, "build", "-p=2", "./provider"}) {
 		t.Fatal("incorrect component boundary", err)
 	}
 	receipts, err := component.runGates(t.Context(), dir, []string{gate.GateID})
@@ -41,7 +41,7 @@ func TestComponentBuildDoesNotRequireUnfinishedConsumerButIntegrationDoes(t *tes
 		t.Fatal("component rejected unfinished integration", err)
 	}
 	whole, fullDigest, err := manager.withGateScope(dir, []string{gate.GateID}, nil)
-	if err != nil || digest == fullDigest || !slices.Equal(whole.gates[gate.GateID].Command, []string{goBinary, "build", "-p=1", "./..."}) {
+	if err != nil || digest == fullDigest || !slices.Equal(whole.gates[gate.GateID].Command, []string{goBinary, "build", "-p=2", "./..."}) {
 		t.Fatal("whole-feature boundary weakened", err)
 	}
 	if _, err := whole.runGates(t.Context(), dir, []string{gate.GateID}); err == nil {

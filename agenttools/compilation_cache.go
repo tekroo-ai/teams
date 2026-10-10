@@ -23,14 +23,18 @@ import (
 // snapshot, environment or selector requires a new persistent primer.
 var compilationPrimers = struct {
 	sync.Mutex
-	last map[string][32]byte
-}{last: make(map[string][32]byte)}
+	last map[string][][32]byte
+}{last: make(map[string][][32]byte)}
 
 func hasCompilationPrimer(namespace string, key [32]byte) bool {
 	compilationPrimers.Lock()
 	defer compilationPrimers.Unlock()
-	previous, found := compilationPrimers.last[namespace]
-	return found && previous == key
+	for _, previous := range compilationPrimers.last[namespace] {
+		if previous == key {
+			return true
+		}
+	}
+	return false
 }
 
 func rememberCompilationPrimer(namespace string, key [32]byte) {
@@ -38,10 +42,21 @@ func rememberCompilationPrimer(namespace string, key [32]byte) {
 	defer compilationPrimers.Unlock()
 	// Cache configurations are normally fixed for the process lifetime. Keep
 	// test fixtures/dynamic configurations bounded; clearing only causes misses.
-	if len(compilationPrimers.last) >= 32 {
+	if _, exists := compilationPrimers.last[namespace]; !exists && len(compilationPrimers.last) >= 32 {
 		clear(compilationPrimers.last)
 	}
-	compilationPrimers.last[namespace] = key
+	keys := compilationPrimers.last[namespace]
+	for _, previous := range keys {
+		if previous == key {
+			return
+		}
+	}
+	// Preserve recent selectors and both stable lanes. This is a bounded hint,
+	// not proof of surviving artifacts and never permission to skip execution.
+	if len(keys) == 16 {
+		keys = append(keys[:0], keys[1:]...)
+	}
+	compilationPrimers.last[namespace] = append(keys, key)
 }
 
 // Only archive-only Go compilation may write the persistent cache. Test binaries never
@@ -95,7 +110,14 @@ func (host Host) seedCompilationCache(ctx context.Context, workspace, source, go
 		return fmt.Errorf("compilation cache retention: %w", err)
 	}
 	key := sha256.Sum256([]byte(strings.Join(append([]string{sourceIdentity, source, pattern, profile}, environment...), "\x00")))
-	if sourceIdentity != "" && hasCompilationPrimer(cache, key) {
+	entries, err := os.ReadDir(cache)
+	if err != nil {
+		return err
+	}
+	// A recreated/empty namespace must be primed again. Compiling only in the
+	// private execution cache after eviction would throw those artifacts away
+	// and force a second cold compile as soon as the selector/source changes.
+	if len(entries) > 0 && sourceIdentity != "" && hasCompilationPrimer(cache, key) {
 		started = time.Now()
 		err = copyCompilationCache(ctx, cache, filepath.Join(workspace, "cache"))
 		timings.CacheCopyNS += time.Since(started).Nanoseconds()
@@ -160,10 +182,10 @@ func (host Host) seedCompilationCache(ctx context.Context, workspace, source, go
 
 // Export production/test archives, never link binaries in the preparatory pass.
 // The consumer still links (and, for tests, executes) with its original verdict
-// semantics. -p=1 matches the shared verification policy; list has no parallel
+// semantics. -p=2 matches the shared verification policy; list has no parallel
 // test flag because it does not execute initializers, TestMain or tests.
 func compilationPrimerArguments(goBinary, pattern string) []string {
-	return []string{goBinary, "list", "-p=1", "-export", "-test", "-deps", "-f={{.ImportPath}}", pattern}
+	return []string{goBinary, "list", "-p=2", "-export", "-test", "-deps", "-f={{.ImportPath}}", pattern}
 }
 
 func replaceEnvironment(environment []string, name, value string) []string {

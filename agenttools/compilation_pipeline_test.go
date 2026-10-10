@@ -44,6 +44,7 @@ func TestExecuted(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
+			seedFixtureCompilerArtifacts(t, cache)
 			primer := compilationPrimerArguments(goBinary, ".")[1:]
 			primer = append(primer[:len(primer)-1], "-x", ".")
 			build := []string{"test", "-p=1", "-parallel=2", "-count=1", "-x", "-c", "-o", filepath.Join(workspace, "compiled", "pipeline.test"), "."}

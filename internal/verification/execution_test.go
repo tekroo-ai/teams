@@ -33,7 +33,7 @@ func TestVerificationSlotWaitIsCancellableAndReleased(t *testing.T) {
 
 func TestBoundedGoCommandPreservesTestSelectionAndArguments(t *testing.T) {
 	in := []string{"/opt/bin/go", "test", "-p", "8", "-parallel=20", "-tags=fixtures", "-timeout=10m", "./...", "-args", "-p=99"}
-	want := []string{"/opt/bin/go", "test", "-p=1", "-parallel=2", "-tags=fixtures", "-timeout=10m", "./...", "-args", "-p=99"}
+	want := []string{"/opt/bin/go", "test", "-p=2", "-parallel=2", "-tags=fixtures", "-timeout=10m", "./...", "-args", "-p=99"}
 	got, bounded := GoCommand(in)
 	if !bounded || !reflect.DeepEqual(got, want) {
 		t.Fatalf("%v", got)
@@ -49,8 +49,12 @@ func TestBoundedGoCommandPreservesTestSelectionAndArguments(t *testing.T) {
 		t.Fatal(got)
 	}
 	got, _ = GoCommand([]string{"go", "test", "-run", "-p=9", "-ldflags", "-parallel=9", "-parallel=1", "./..."})
-	if !reflect.DeepEqual(got, []string{"go", "test", "-p=1", "-parallel=1", "-run", "-p=9", "-ldflags", "-parallel=9", "./..."}) {
+	if !reflect.DeepEqual(got, []string{"go", "test", "-p=2", "-parallel=1", "-run", "-p=9", "-ldflags", "-parallel=9", "./..."}) {
 		t.Fatal("changed non-resource arguments", got)
+	}
+	got, _ = GoCommand([]string{"go", "test", "-p=1", "./..."})
+	if !reflect.DeepEqual(got, []string{"go", "test", "-p=1", "-parallel=2", "./..."}) {
+		t.Fatal("increased an explicit lower bound", got)
 	}
 }
 

@@ -11,11 +11,11 @@ import (
 	"time"
 )
 
-const Policy = "single-verifier/go-p1-procs2/v1"
+const Policy = "two-verifiers/whole-max1/go-p2-procs2/v2"
 
 var slots verificationQueue
 
-// Acquire shares one slot across candidate preflights and native test tools.
+// Acquire shares bounded slots across candidate preflights and native test tools.
 // Queueing consumes the caller's existing deadline; cancellation never leaks it.
 func Acquire(ctx context.Context) (func(), error) {
 	return AcquireClass(ctx, WholeModule)
@@ -28,7 +28,8 @@ func GoCommand(argv []string) ([]string, bool) {
 	if len(argv) < 2 || filepath.Base(argv[0]) != "go" || (argv[1] != "test" && argv[1] != "build") {
 		return argv, false
 	}
-	result := []string{argv[0], argv[1], "-p=1"}
+	result := []string{argv[0], argv[1], "-p=2"}
+	packages := 2
 	parallel := 2
 	for i := 2; i < len(argv); i++ {
 		arg := argv[i]
@@ -51,6 +52,8 @@ func GoCommand(argv []string) ([]string, bool) {
 			}
 			if strings.HasPrefix(arg, "-parallel=") {
 				parallel = min(parallel, n)
+			} else {
+				packages = min(packages, n)
 			}
 			continue
 		}
@@ -68,12 +71,15 @@ func GoCommand(argv []string) ([]string, bool) {
 			}
 			if arg == "-parallel" {
 				parallel = min(parallel, n)
+			} else {
+				packages = min(packages, n)
 			}
 			i++
 			continue
 		}
 		result = append(result, arg)
 	}
+	result[2] = "-p=" + strconv.Itoa(packages)
 	if argv[1] == "test" {
 		result = append(result[:3], append([]string{"-parallel=" + strconv.Itoa(parallel)}, result[3:]...)...)
 	}

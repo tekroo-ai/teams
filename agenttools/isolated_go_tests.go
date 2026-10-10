@@ -65,7 +65,7 @@ func (host Host) runIsolatedGoTestsFrom(ctx context.Context, root, pattern strin
 	if compileOnly || !strings.HasSuffix(pattern, "/...") && pattern != "..." {
 		class = verification.Focused
 	}
-	release, err := verification.AcquireClass(operation, class)
+	slot, release, err := verification.AcquireSlot(operation, class)
 	timings.QueueNS = time.Since(phaseStarted).Nanoseconds()
 	if err != nil {
 		return result, fmt.Errorf("verification queue: %w", err)
@@ -89,7 +89,7 @@ func (host Host) runIsolatedGoTestsFrom(ctx context.Context, root, pattern strin
 		return result, ErrInvalidCall
 	}
 	result.CommitSHA = strings.TrimSpace(head.Output)
-	workspace, err := host.newVerificationWorkspace()
+	workspace, err := host.newVerificationWorkspaceForSlot(slot)
 	if err != nil {
 		return result, err
 	}
@@ -283,11 +283,18 @@ finished:
 }
 
 // Acquire must be held by the caller. One fresh directory at a stable pathname
-// per process/cache lets Go reuse local-package action IDs without -trimpath.
+// per process/cache/lane lets Go reuse local-package action IDs without -trimpath.
 // Contents are never reused: snapshots/Git metadata are rebuilt and removed
 // after every call. Separate processes cannot share a writable checkout; a
 // leftover directory fails closed rather than deleting an unknown prior run.
 func (host Host) newVerificationWorkspace() (string, error) {
+	return host.newVerificationWorkspaceForSlot(0)
+}
+
+func (host Host) newVerificationWorkspaceForSlot(slot int) (string, error) {
+	if slot < 0 || slot >= verification.MaxConcurrent {
+		return "", ErrInvalidCall
+	}
 	if host.CompilationCache == "" {
 		return os.MkdirTemp("", "tekroo-go-test-")
 	}
@@ -296,7 +303,7 @@ func (host Host) newVerificationWorkspace() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	workspace := filepath.Join(parent, "tekroo-go-test-"+strconv.Itoa(os.Getpid())+"-"+hex.EncodeToString(key[:]))
+	workspace := filepath.Join(parent, "tekroo-go-test-"+strconv.Itoa(os.Getpid())+"-"+hex.EncodeToString(key[:])+"-lane"+strconv.Itoa(slot))
 	if err := os.Mkdir(workspace, 0700); err != nil {
 		return "", fmt.Errorf("fresh verification workspace required at %s (prior contents preserved): %w", workspace, err)
 	}
