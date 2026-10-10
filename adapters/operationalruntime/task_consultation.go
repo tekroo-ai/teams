@@ -40,13 +40,13 @@ func consultationAnswer(output []byte) (string, bool, error) {
 	}
 	d := json.NewDecoder(bytes.NewReader(raw))
 	d.DisallowUnknownFields()
-	if d.Decode(&result) != nil || d.Decode(&struct{}{}) != io.EOF || strings.TrimSpace(result.Answer) == "" || len(result.Answer) > 4096 || result.Disposition != "ANSWERED_WITHIN_SCOPE" && result.Disposition != "NEEDS_SCOPE_CHANGE" {
+	if d.Decode(&result) != nil || d.Decode(&struct{}{}) != io.EOF || strings.TrimSpace(result.Answer) == "" || !resultTextWithinLimit(result.Answer, 4096) || result.Disposition != "ANSWERED_WITHIN_SCOPE" && result.Disposition != "NEEDS_SCOPE_CHANGE" {
 		return "", false, application.ErrInvalidOperationalExecution
 	}
 	return result.Answer, result.Disposition == "ANSWERED_WITHIN_SCOPE", nil
 }
 
-func consultationTask(feature organization.FeatureRequest, task organization.PlannedTask, source kernel.WorkInvocation, blocked kernel.WorkInvocation, question string) organization.PlannedTask {
+func consultationTask(feature organization.FeatureRequest, task organization.PlannedTask, source kernel.WorkInvocation, blocked kernel.WorkInvocation, question string, route kernel.DecisionRoute) organization.PlannedTask {
 	title := "Clarify blocked task: " + task.Title
 	if len(title) > 256 {
 		title = "Clarify blocked task " + string(task.ID)
@@ -56,7 +56,7 @@ func consultationTask(feature organization.FeatureRequest, task organization.Pla
 		Description:        "Blocked invocation: " + string(blocked.ID) + "\nAnswer the reported interface/scope question using the accepted design, supplied task evidence, and retained original reasoning. Do not implement, expand scope, revise the DAG, or ask another agent. If a change of scope or design is necessary, report NEEDS_SCOPE_CHANGE with the exact change for the operator. Otherwise explain an actionable answer within the existing scope. Return one structured object with disposition (ANSWERED_WITHIN_SCOPE or NEEDS_SCOPE_CHANGE) and answer.\nQuestion: " + question,
 		AcceptanceCriteria: []string{"The answer resolves the reported question within accepted scope or identifies the exact change requiring authorization."},
 		DependsOn:          []kernel.UUIDv7{source.TaskID}, Owner: source.ActorFQN, ModelProfile: source.ModelProfileDigest,
-		Purpose: kernel.PurposeHandoff, DecisionRoute: kernel.RouteComplexReasoning, Complexity: 2, Risk: organization.RiskModerate, AttemptLimit: 1, ReviewRoundLimit: 1}
+		Purpose: kernel.PurposeHandoff, DecisionRoute: route, Complexity: 2, Risk: organization.RiskModerate, AttemptLimit: 1, ReviewRoundLimit: 1}
 }
 
 func (service *ProductionService) reconcileTaskConsultations(ctx context.Context, feature organization.FeatureRequest, plan organization.FeaturePlan, states map[kernel.UUIDv7]kernel.AggregateState, invocations map[kernel.UUIDv7]kernel.WorkInvocation) (bool, error) {
@@ -83,7 +83,11 @@ func (service *ProductionService) reconcileTaskConsultations(ctx context.Context
 		if !consultationSourceBound(feature, source) {
 			return false, nativeagent.ErrInvalidBinding
 		}
-		consult := consultationTask(feature, task, source, inv, question)
+		route, err := service.retainedDecisionRoute(ctx, source)
+		if err != nil {
+			return false, err
+		}
+		consult := consultationTask(feature, task, source, inv, question, route)
 		ref := kernel.AggregateRef{Kind: kernel.AggregateTask, ID: consult.ID}
 		state, head, exists, err := service.Store.ReadAggregateHead(ctx, ref)
 		if err != nil {
@@ -146,6 +150,10 @@ func (service *ProductionService) reconcileTaskConsultations(ctx context.Context
 					return false, err
 				}
 				if state.Phase != kernel.PhaseCompleted {
+					if !bound.Profile.Valid() || bound.Profile.Profile.Binding() != latest.WorkProfile {
+						return false, nativeagent.ErrInvalidBinding
+					}
+					consult.DecisionRoute = bound.Profile.Profile.MinimumDecisionRoute
 					if err := service.completeEvidenceTask(ctx, feature, consult, state, head, latest, cs); err != nil {
 						return false, err
 					}
@@ -168,12 +176,14 @@ func (service *ProductionService) reconcileTaskConsultations(ctx context.Context
 		if err != nil {
 			return false, err
 		}
-		profile, configured := service.profilesByModel[owner.ModelProfile]
-		workspace, available := service.workspacesByID[owner.WorkspaceID]
-		if !configured || !available || owner.ModelProfile != source.ModelProfileDigest || workspace.WorkspaceID != source.WorkspaceID {
+		consult.ModelProfile = owner.ModelProfile
+		profile, workspace, err := service.qualifiedDecisionOwner(owner, consult, source)
+		if err != nil {
+			return false, err
+		}
+		if owner.ModelProfile != source.ModelProfileDigest {
 			return false, organization.ErrInvalidFeature
 		}
-		consult.ModelProfile = owner.ModelProfile
 		if !exists {
 			payload, _ := json.Marshal(map[string]any{"story_id": consult.StoryID, "title": consult.Title, "description": consult.Description, "acceptance_criteria": consult.AcceptanceCriteria, "depends_on": consult.DependsOn})
 			_, err = service.submitPlannedCommand(ctx, feature, "tekroo.command.task.create", kernel.AggregateTask, consult.ID, "task-consultation", payload, []kernel.DagParent{{ParentEventID: inv.LastEventID, EdgeKind: kernel.EdgeResponse}, {ParentEventID: source.LastEventID, EdgeKind: kernel.EdgeCausal}})

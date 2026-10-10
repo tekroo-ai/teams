@@ -228,13 +228,26 @@ func ValidateOperationalProfileQualifications(profiles []ProductionProfile, at t
 }
 
 func (profile ProductionProfile) qualifiedFor(required kernel.DecisionRoute, workKind kernel.WorkKind, at time.Time) bool {
-	qualification := profile.Qualification
-	return profile.DecisionRoute.ModelExecutable() &&
-		profile.DecisionRoute.Satisfies(required) &&
-		workKind.Valid() &&
-		profile.qualificationDefinitionValid() &&
-		qualification.EligibleAt(at) &&
-		containsWorkKind(qualification.QualifiedWorkKinds, workKind)
+	return profile.qualificationFailure(required, workKind, at) == ""
+}
+
+func (profile ProductionProfile) qualificationFailure(required kernel.DecisionRoute, workKind kernel.WorkKind, at time.Time) string {
+	if !profile.DecisionRoute.ModelExecutable() || !profile.DecisionRoute.Satisfies(required) {
+		return "selected route does not satisfy required route"
+	}
+	if !workKind.Valid() {
+		return "invalid work kind"
+	}
+	if !profile.qualificationDefinitionValid() {
+		return "qualification package does not match selected profile"
+	}
+	if !profile.Qualification.EligibleAt(at) {
+		return "qualification is not eligible at admission time"
+	}
+	if !containsWorkKind(profile.Qualification.QualifiedWorkKinds, workKind) {
+		return "work kind is not qualified"
+	}
+	return ""
 }
 
 func (profile ProductionProfile) qualificationReceipt() (kernel.AssignmentQualificationReceipt, bool) {

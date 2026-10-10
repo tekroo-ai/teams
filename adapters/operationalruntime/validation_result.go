@@ -56,7 +56,7 @@ func parseStructuredValidationResult(output []byte) (structuredValidationResult,
 	}
 	seen := make(map[string]struct{}, len(result.Reasons))
 	for _, reason := range result.Reasons {
-		if strings.TrimSpace(reason) != reason || reason == "" || len(reason) > 4096 {
+		if strings.TrimSpace(reason) != reason || reason == "" || !resultTextWithinLimit(reason, 4096) {
 			return structuredValidationResult{}, errInvalidValidationResult
 		}
 		if _, duplicate := seen[reason]; duplicate {
@@ -71,7 +71,7 @@ func parseStructuredValidationResult(output []byte) (structuredValidationResult,
 		return structuredValidationResult{}, errInvalidValidationResult
 	}
 	for _, receipt := range result.TestEvidence {
-		if strings.TrimSpace(receipt) != receipt || receipt == "" || len(receipt) > 4096 {
+		if strings.TrimSpace(receipt) != receipt || receipt == "" || !resultTextWithinLimit(receipt, 4096) {
 			return structuredValidationResult{}, errInvalidValidationResult
 		}
 	}

@@ -239,20 +239,6 @@ func (service *ProductionService) preparePlannedTaskSubset(ctx context.Context, 
 	return nil
 }
 
-func (service *ProductionService) qualifiedTaskOwnerProfile(owner organization.RoleInstanceState, item organization.PlannedTask) (ProductionProfile, error) {
-	if service == nil || service.clock == nil || owner.ActorFQN != item.Owner {
-		return ProductionProfile{}, organization.ErrInvalidFeature
-	}
-	// The plan's model digest is historical. A role may be rebound to a newer
-	// qualified model while the feature is in flight; the live role identity,
-	// exact role qualification, and selected decision route are authoritative.
-	profile, found := service.profilesByModel[owner.ModelProfile]
-	if !found || profile.RoleFQRN != kernel.RoleFQRN(owner.Role) || !profile.qualifiedFor(item.DecisionRoute, workKindForPurpose(item.Purpose, item.Risk), service.clock.Now().UTC()) {
-		return ProductionProfile{}, organization.ErrInvalidFeature
-	}
-	return profile, nil
-}
-
 func (service *ProductionService) workProfile(feature organization.FeatureRequest, task organization.PlannedTask, lifecycleEpoch, scopeRevision uint64, evidenceID kernel.UUIDv7, deadline time.Time) kernel.WorkRiskProfile {
 	ambiguity, novelty, blast, security := kernel.AmbiguityLow, kernel.NoveltyRoutine, kernel.BlastLocal, kernel.SecurityOrdinary
 	if task.Complexity >= 7 {

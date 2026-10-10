@@ -20,13 +20,13 @@ func TestTaskConsultationIsOneForwardNodeBoundToOriginalQuestion(t *testing.T) {
 	source.ActorFQN = "some-team::decision-owner-1"
 	blocked := source
 	blocked.ID = "00000000-0000-7000-8000-000000000315"
-	consult := consultationTask(feature, task, source, blocked, "The constructor input is unavailable in my write scope.")
+	consult := consultationTask(feature, task, source, blocked, "The constructor input is unavailable in my write scope.", kernel.RouteComplexReasoning)
 	if consult.ID == task.ID || consult.ID == source.TaskID || consult.Owner != source.ActorFQN || consult.AttemptLimit != 1 || consult.Purpose != kernel.PurposeHandoff || len(consult.DependsOn) != 1 || consult.DependsOn[0] != source.TaskID || len(consult.WriteScope) != 0 {
 		t.Fatalf("advisory node changed authority or reopened work: %+v", consult)
 	}
 	other := blocked
 	other.ID = "00000000-0000-7000-8000-000000000316"
-	next := consultationTask(feature, task, source, other, "Different question")
+	next := consultationTask(feature, task, source, other, "Different question", kernel.RouteComplexReasoning)
 	if next.ID != consult.ID || next.Description == consult.Description {
 		t.Fatal("later attempts can create new consultation cycles or reuse the original answer")
 	}

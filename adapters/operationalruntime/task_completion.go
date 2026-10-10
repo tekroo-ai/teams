@@ -1465,7 +1465,7 @@ func reviewFindings(feature organization.FeatureRequest, targetID kernel.UUIDv7,
 	if result.Outcome == "PASS" {
 		return []completionReviewFindingPayload{}
 	}
-	// The catalogue permits a finding summary of at most 4 KiB. Each structured
+	// The catalogue permits a finding summary of at most 4096 characters. Each structured
 	// review reason already has that bound, but joining every reason into one
 	// finding did not. Preserve every distinct reason as its own stable finding.
 	findings := make([]completionReviewFindingPayload, 0, len(result.Reasons))

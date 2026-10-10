@@ -36,14 +36,18 @@ import (
 // retained journals are produced by normal kernel admission and native workers.
 // No terminal invocation, approval or publication projection is inserted.
 func TestAmendmentForwardCoordinatorNativeAssessmentAndPublicationAcrossRestart(t *testing.T) {
-	amendmentForwardRoundTrip(t, false)
+	amendmentForwardRoundTrip(t, false, kernel.RouteComplexReasoning)
 }
 
 func TestAmendmentInScopeConsultationContinuesWithoutPMAssessment(t *testing.T) {
-	amendmentForwardRoundTrip(t, true)
+	amendmentForwardRoundTrip(t, true, kernel.RouteComplexReasoning)
 }
 
-func amendmentForwardRoundTrip(t *testing.T, inScope bool) {
+func TestAmendmentForwardCoordinatorWithBoundedArchitect(t *testing.T) {
+	amendmentForwardRoundTrip(t, false, kernel.RouteBoundedExecution)
+}
+
+func amendmentForwardRoundTrip(t *testing.T, inScope bool, architectRoute kernel.DecisionRoute) {
 	process, uri := startRuntimeMongod(t)
 	defer stopRuntimeMongod(process)
 	ctx, cancel := context.WithTimeout(t.Context(), 6*time.Minute)
@@ -51,7 +55,7 @@ func amendmentForwardRoundTrip(t *testing.T, inScope bool) {
 	model := &amendmentForwardModel{t: t, calls: make(map[string]int), inScope: inScope}
 	server := httptest.NewServer(http.HandlerFunc(model.serve))
 	defer server.Close()
-	path, config := amendmentForwardConfig(t, uri, server.URL+"/v1")
+	path, config := amendmentForwardConfig(t, uri, server.URL+"/v1", architectRoute)
 	loaded, err := LoadProductionConfig(path)
 	if err != nil {
 		t.Fatal(err)
@@ -121,7 +125,7 @@ func amendmentForwardRoundTrip(t *testing.T, inScope bool) {
 	}
 	architect, pm, coder := owner("architect"), owner("project-manager"), owner("coder")
 	makeTask := func(taskID kernel.UUIDv7, actor organization.RoleInstanceState, purpose kernel.WorkPurpose, title, description string) organization.PlannedTask {
-		return organization.PlannedTask{ID: taskID, StoryID: storyID, Title: title, Description: description, AcceptanceCriteria: []string{"verified"}, Owner: actor.ActorFQN, ModelProfile: actor.ModelProfile, Purpose: purpose, DecisionRoute: kernel.RouteComplexReasoning, Complexity: 4, Risk: organization.RiskModerate, AttemptLimit: 2, ReviewRoundLimit: 1}
+		return organization.PlannedTask{ID: taskID, StoryID: storyID, Title: title, Description: description, AcceptanceCriteria: []string{"verified"}, Owner: actor.ActorFQN, ModelProfile: actor.ModelProfile, Purpose: purpose, DecisionRoute: service.profilesByModel[actor.ModelProfile].DecisionRoute, Complexity: 4, Risk: organization.RiskModerate, AttemptLimit: 2, ReviewRoundLimit: 1}
 	}
 	sourceDescription := func(stage, output string) string {
 		return fmt.Sprintf("Perform workflow stage %q using the immutable role bundle. Input schema: request/v1. Output schema: %s. Completion contract: retain-source", stage, output)
@@ -334,6 +338,7 @@ func amendmentForwardRoundTrip(t *testing.T, inScope bool) {
 	}
 	var consultationBrief application.ExecutionBrief
 	var consultationDigest kernel.Digest
+	checkedPreflight := false
 	for pass := 0; pass < 4; pass++ {
 		states := map[kernel.UUIDv7]kernel.AggregateState{}
 		for _, task := range plan.Tasks {
@@ -342,6 +347,28 @@ func amendmentForwardRoundTrip(t *testing.T, inScope bool) {
 				t.Fatal(err)
 			}
 			states[task.ID] = s
+		}
+		if pass == 2 && !inScope {
+			// Exercise the real reservation path with a unavailable PM package.
+			// A rejected preflight must not consume the one amendment allowance
+			// or change completed work/budget; restore only this test's profile.
+			original := service.profilesByModel[pm.ModelProfile]
+			unavailable := original
+			unavailable.Qualification = nil
+			service.profilesByModel[pm.ModelProfile] = unavailable
+			before := amendmentForwardBudget(t, ctx, service, budget.Ref())
+			changed, preflightErr := service.reconcileTaskConsultations(ctx, load(), plan, states, map[kernel.UUIDv7]kernel.WorkInvocation{blocked.ID: blockedInv})
+			service.profilesByModel[pm.ModelProfile] = original
+			if changed || !errors.Is(preflightErr, organization.ErrInvalidFeature) || !strings.Contains(preflightErr.Error(), "qualification package") || load().PlanAmendment != nil {
+				t.Fatal("failed preflight consumed reservation", changed, preflightErr)
+			}
+			if after := amendmentForwardBudget(t, ctx, service, budget.Ref()); !reflect.DeepEqual(before, after) {
+				t.Fatal("failed preflight changed budget")
+			}
+			if _, _, exists, err := service.Store.ReadAggregateHead(ctx, kernel.AggregateRef{Kind: kernel.AggregateTask, ID: planAmendmentAssessmentID(feature.ID)}); err != nil || exists {
+				t.Fatal("failed preflight created assessment work", err)
+			}
+			checkedPreflight = true
 		}
 		if _, err := service.reconcileTaskConsultations(ctx, load(), plan, states, map[kernel.UUIDv7]kernel.WorkInvocation{blocked.ID: blockedInv}); err != nil {
 			t.Fatal("consultation", err)
@@ -360,6 +387,9 @@ func amendmentForwardRoundTrip(t *testing.T, inScope bool) {
 			t.Fatal(err)
 		}
 		if inv, found := latestTaskInvocation(cs.WorkInvocations, consultID); found && !inv.State.Terminal() {
+			if got := cs.WorkProfiles[kernel.AggregateRef{Kind: kernel.AggregateTask, ID: consultID}].Profile.MinimumDecisionRoute; got != architectRoute {
+				t.Fatalf("consultation route=%s, source route=%s", got, architectRoute)
+			}
 			consultationBrief, consultationDigest = captureBrief(inv)
 			execute(inv)
 		}
@@ -391,6 +421,9 @@ func amendmentForwardRoundTrip(t *testing.T, inScope bool) {
 	if reserved.PlanAmendment == nil || reserved.PlanAmendment.State != organization.AmendmentAssessing {
 		t.Fatal("no automatic reservation", reserved.PlanAmendment)
 	}
+	if !checkedPreflight {
+		t.Fatal("reservation preflight counterexample was not exercised")
+	}
 	model.feature = reserved
 	reopen("reservation")
 	if handled, err := service.reconcilePlanAmendment(ctx, load()); !handled || err != nil {
@@ -404,6 +437,9 @@ func amendmentForwardRoundTrip(t *testing.T, inScope bool) {
 	assessment, found := latestTaskInvocation(snapshot.WorkInvocations, assessmentID)
 	if !found || assessment.State != kernel.InvocationAuthorized || assessment.AttemptOrdinal != 1 {
 		t.Fatal("assessment not admitted once", assessment)
+	}
+	if got := snapshot.WorkProfiles[kernel.AggregateRef{Kind: kernel.AggregateTask, ID: assessmentID}].Profile.MinimumDecisionRoute; got != kernel.RouteBoundedExecution {
+		t.Fatalf("PM assessment route=%s, want bounded source route", got)
 	}
 	reopen("assessment admission")
 	assessmentBrief, assessmentDigest := captureBrief(assessment)
@@ -667,7 +703,7 @@ func (model *amendmentForwardModel) serve(w http.ResponseWriter, r *http.Request
 	_ = json.NewEncoder(w).Encode(map[string]any{"id": fmt.Sprintf("fixture-%s-%d", request.Model, ordinal), "choices": []any{map[string]any{"finish_reason": "stop", "message": map[string]any{"content": content}}}})
 }
 
-func amendmentForwardConfig(t *testing.T, uri, url string) (string, ProductionConfig) {
+func amendmentForwardConfig(t *testing.T, uri, url string, architectRoute kernel.DecisionRoute) (string, ProductionConfig) {
 	t.Helper()
 	path, config := writeNativeProductionFixture(t)
 	dir := filepath.Dir(path)
@@ -729,8 +765,17 @@ func amendmentForwardConfig(t *testing.T, uri, url string) (string, ProductionCo
 		if err != nil {
 			t.Fatal(err)
 		}
-		profile := ProductionProfile{RoleFQRN: kernel.RoleFQRN(role), RoleBundleDigest: sha, ModelProfileDigest: model, RuntimeIdentityDigest: repeatedDigest('3'), ToolPolicyDigest: surface, EffectPolicyDigest: repeatedDigest('5'), NativeSettings: &settings, DecisionRoute: kernel.RouteComplexReasoning}
-		profile.QualificationCorpus, profile.Qualification = testQualificationBundle(t, model, kernel.RoleFQRN(role), profile.DecisionRoute, surface, allTestWorkKinds(), time.Now().UTC().Add(-time.Minute))
+		route, kinds := kernel.RouteBoundedExecution, []kernel.WorkKind{kernel.WorkDesign}
+		if role == "architect" {
+			route = architectRoute
+		}
+		if role == "coder" {
+			// This fixture's second coder is an independent validator. Neither
+			// actor is qualified for unrelated design, debugging or release work.
+			kinds = []kernel.WorkKind{kernel.WorkImplementation, kernel.WorkValidation}
+		}
+		profile := ProductionProfile{RoleFQRN: kernel.RoleFQRN(role), RoleBundleDigest: sha, ModelProfileDigest: model, RuntimeIdentityDigest: repeatedDigest('3'), ToolPolicyDigest: surface, EffectPolicyDigest: repeatedDigest('5'), NativeSettings: &settings, DecisionRoute: route}
+		profile.QualificationCorpus, profile.Qualification = testQualificationBundle(t, model, kernel.RoleFQRN(role), profile.DecisionRoute, surface, kinds, time.Now().UTC().Add(-time.Minute))
 		config.Profiles = append(config.Profiles, profile)
 		workspaceIDs := []string{role + "-1"}
 		instances := uint32(1)

@@ -121,6 +121,15 @@ func (service *ProductionService) reservePlanAmendment(ctx context.Context, feat
 	if err != nil {
 		return false, err
 	}
+	route, err := service.retainedDecisionRoute(ctx, source)
+	if err != nil {
+		return false, err
+	}
+	// Check the generated requirement before reserving the feature-wide allowance.
+	// An unavailable profile must not leave a durable ASSESSING reservation.
+	if _, _, err := service.qualifiedDecisionOwner(owner, amendmentAssessmentTask(next, source, owner.ModelProfile, route), source); err != nil {
+		return false, err
+	}
 	input, err := service.registerAmendmentInput(ctx, next, owner, w)
 	if err != nil {
 		return false, err
@@ -161,9 +170,9 @@ func (service *ProductionService) amendmentPMSource(ctx context.Context, feature
 	return source, nil
 }
 
-func amendmentAssessmentTask(feature organization.FeatureRequest, source kernel.WorkInvocation, model kernel.Digest) organization.PlannedTask {
+func amendmentAssessmentTask(feature organization.FeatureRequest, source kernel.WorkInvocation, model kernel.Digest, route kernel.DecisionRoute) organization.PlannedTask {
 	a := feature.PlanAmendment
-	return organization.PlannedTask{ID: a.AssessmentID, StoryID: a.PriorPlan.Tasks[0].StoryID, Title: "Assess bounded execution-plan amendment", Description: "Read the admitted amendment input record, accepted PM plan and architect answer. Propose the smallest execution ownership/dependency/scope repair within the unchanged product specification and technical design. Preserve retained task definitions and completed work exactly. Use fresh IDs only for affected successor tasks; remaining attempt allowances are supplied in input. Do not implement, edit the repository, broaden product behavior, ask another agent, or approve your own proposal. Return a raw structured amendment proposal under the supplied JSON Schema. A rejection or failure is terminal and requires the operator; there is no second assessment.", AcceptanceCriteria: []string{"The proposal binds the original reservation, accepted specification, exact blocked invocation and architect answer, with narrow impact ownership, closed DAG handoffs and independent validation."}, DependsOn: []kernel.UUIDv7{source.TaskID, a.ConsultationID}, Owner: a.PriorPlan.PreparedBy, ModelProfile: model, Purpose: kernel.PurposeHandoff, DecisionRoute: kernel.RouteComplexReasoning, Complexity: 4, Risk: organization.RiskModerate, AttemptLimit: 1, ReviewRoundLimit: 1}
+	return organization.PlannedTask{ID: a.AssessmentID, StoryID: a.PriorPlan.Tasks[0].StoryID, Title: "Assess bounded execution-plan amendment", Description: "Read the admitted amendment input record, accepted PM plan and architect answer. Propose the smallest execution ownership/dependency/scope repair within the unchanged product specification and technical design. Preserve retained task definitions and completed work exactly. Use fresh IDs only for affected successor tasks; remaining attempt allowances are supplied in input. Do not implement, edit the repository, broaden product behavior, ask another agent, or approve your own proposal. Return a raw structured amendment proposal under the supplied JSON Schema. A rejection or failure is terminal and requires the operator; there is no second assessment.", AcceptanceCriteria: []string{"The proposal binds the original reservation, accepted specification, exact blocked invocation and architect answer, with narrow impact ownership, closed DAG handoffs and independent validation."}, DependsOn: []kernel.UUIDv7{source.TaskID, a.ConsultationID}, Owner: a.PriorPlan.PreparedBy, ModelProfile: model, Purpose: kernel.PurposeHandoff, DecisionRoute: route, Complexity: 4, Risk: organization.RiskModerate, AttemptLimit: 1, ReviewRoundLimit: 1}
 }
 
 // Reconciliation is durable and forward-only. Reserving freezes new plan work
@@ -251,14 +260,14 @@ func (service *ProductionService) reconcilePlanAmendment(ctx context.Context, fe
 	if owner.Status != organization.RoleIdle || actorHasActiveInvocation(snapshot.WorkInvocations, owner.ActorFQN, owner.Execution) {
 		return true, nil
 	}
-	task := amendmentAssessmentTask(feature, source, owner.ModelProfile)
-	profile, err := service.qualifiedTaskOwnerProfile(owner, task)
+	route, err := service.retainedDecisionRoute(ctx, source)
 	if err != nil {
 		return true, err
 	}
-	workspace, exists := service.workspacesByID[owner.WorkspaceID]
-	if !exists || source.WorkspaceID != workspace.WorkspaceID {
-		return true, nativeagent.ErrInvalidBinding
+	task := amendmentAssessmentTask(feature, source, owner.ModelProfile, route)
+	profile, workspace, err := service.qualifiedDecisionOwner(owner, task, source)
+	if err != nil {
+		return true, err
 	}
 	refs, err := evidenceForInvocations(snapshot, w.Invocations[kernel.AggregateRef{Kind: kernel.AggregateWorkInvocation, ID: a.BlockedInvocationID}], w.Consultation, source)
 	if err != nil {
@@ -336,7 +345,13 @@ func (service *ProductionService) completeAmendmentAssessment(ctx context.Contex
 	if err != nil {
 		return err
 	}
-	task := amendmentAssessmentTask(feature, source, inv.ModelProfileDigest)
+	bound, found := snapshot.WorkProfiles[ref]
+	if !found || !bound.Valid() || bound.Profile.Binding() != inv.WorkProfile {
+		return nativeagent.ErrInvalidBinding
+	}
+	// Completion uses this assessment's immutable classification, even if the
+	// source policy or selected model has changed since admission.
+	task := amendmentAssessmentTask(feature, source, inv.ModelProfileDigest, bound.Profile.MinimumDecisionRoute)
 	return service.completeEvidenceTask(ctx, feature, task, state, head, inv, snapshot)
 }
 
