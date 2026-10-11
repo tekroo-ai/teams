@@ -102,11 +102,7 @@ func (service *ProductionService) reconcileCandidateLineage(ctx context.Context,
 				if component.InvocationID == "" {
 					continue
 				}
-				commit, err := service.taskWorkspaces.gitText(ctx, component.WorkingDirectory, "rev-parse", "HEAD")
-				if err != nil {
-					return false, err
-				}
-				tree, err := service.taskWorkspaces.gitText(ctx, component.WorkingDirectory, "rev-parse", "HEAD^{tree}")
+				commit, tree, err := service.taskWorkspaces.observeGitIdentity(ctx, component.WorkingDirectory)
 				if err != nil {
 					return false, err
 				}

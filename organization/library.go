@@ -3,8 +3,6 @@ package organization
 import (
 	"errors"
 	"sort"
-	"strconv"
-	"strings"
 	"sync"
 
 	"github.com/tekroo-ai/teams/kernel"
@@ -86,20 +84,4 @@ func (library *RoleLibrary) List() []RoleLibraryEntry {
 func cloneLibraryEntry(entry RoleLibraryEntry) RoleLibraryEntry {
 	entry.Roles = append([]string(nil), entry.Roles...)
 	return entry
-}
-
-func compareSemanticVersions(left, right string) int {
-	leftParts := strings.Split(left, ".")
-	rightParts := strings.Split(right, ".")
-	for index := range 3 {
-		leftValue, _ := strconv.ParseUint(leftParts[index], 10, 64)
-		rightValue, _ := strconv.ParseUint(rightParts[index], 10, 64)
-		if leftValue < rightValue {
-			return -1
-		}
-		if leftValue > rightValue {
-			return 1
-		}
-	}
-	return 0
 }

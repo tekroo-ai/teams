@@ -51,3 +51,18 @@ uses signed configuration; it does not add a role-name branch to the runtime.
 `../editorial-team/` is the non-software example. It adds an `editor` FQRN and
 the `tekroo.message.content.requested` handler entirely through a separately
 signed team manifest and role package.
+
+## Current runtime test fixtures versus historical examples
+
+`team.v4.runtime-test.json` pins the signed role set used by the current runtime
+adapter tests. `internal/rolefixtures` loads it through the production manifest,
+signature and resource verification path, and supplies the same handlers to
+native-agent and runtime tests. Its model-profile identities are deliberately
+synthetic for fake providers: this is not a model qualification or deployment
+manifest. Updating its role set requires updating its explicitly pinned digest.
+
+The older example manifests, signed packages and historical compatibility
+tests remain unchanged. Tests for a historical contract must select that exact
+contract, not silently follow the current bundle. Current plan adapters also
+run against the retained PM 2.2.1 schema. Schema field sets, allowed outcomes,
+authority and tool permissions are never relaxed to accommodate a fixture.

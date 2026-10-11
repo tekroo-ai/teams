@@ -315,6 +315,9 @@ func (service *ProductionService) reconcileFeaturePlan(ctx context.Context, feat
 		} else if len(item.Validates) > 0 || item.Purpose == kernel.PurposePromotion {
 			workspace, taskEvidence, err = service.prepareCandidateConsumerWorkspace(ctx, feature, item, owner, plan, invocations, evidence)
 			if err != nil {
+				if errors.Is(err, errCandidatePreflightPending) {
+					continue
+				}
 				var failure *candidateGateFailure
 				if errors.As(err, &failure) {
 					if err := service.blockCandidateGate(ctx, feature, plan, tracked, failure, invocations); err != nil {

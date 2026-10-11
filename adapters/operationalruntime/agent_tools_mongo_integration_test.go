@@ -248,10 +248,23 @@ func TestPersistedInvocationBindsReadOnlyOpenHandsToolSession(t *testing.T) {
 	}
 	defer clientSession.Close()
 	listed, err := clientSession.ListTools(ctx, nil)
-	if err != nil || len(listed.Tools) != 4 {
+	if err != nil || listed == nil {
 		t.Fatalf("persisted invocation MCP tools: %+v, %v", listed, err)
 	}
-	result, err := clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "teams_read_file", Arguments: map[string]any{"path": "note.txt"}})
+	expected := map[string]bool{"read_file": true, "read_file_from_commit": true, "check_go_format": true, "list_files": true, "find_files": true, "search_text": true, "search_regex": true, "git_status": true, "git_diff": true, "git_log": true, "git_show": true, "git_check_ignore": true}
+	for _, tool := range listed.Tools {
+		if !expected[tool.Name] {
+			t.Fatalf("unexpected or duplicate read-only tool: %s", tool.Name)
+		}
+		if tool.Annotations == nil || !tool.Annotations.ReadOnlyHint || !tool.Annotations.IdempotentHint {
+			t.Fatalf("tool %s lacks read-only annotations", tool.Name)
+		}
+		delete(expected, tool.Name)
+	}
+	if len(expected) != 0 {
+		t.Fatalf("missing authorized read-only tools: %v", expected)
+	}
+	result, err := clientSession.CallTool(ctx, &mcp.CallToolParams{Name: "read_file", Arguments: map[string]any{"path": "note.txt"}})
 	if err != nil || result == nil {
 		t.Fatalf("persisted invocation read failed: %v", err)
 	}
@@ -335,7 +348,7 @@ for llm in (settings["llm"], settings["condenser"]["llm"]):
     llm["timeout"] = 120
     llm["litellm_extra_body"] = {"enable_mtp": False, "chat_template_kwargs": {"enable_thinking": False}}
 settings["tools"] = []
-settings["system_prompt"] = "This is a single diagnostic tool-connectivity conversation. Use the available teams_read_file tool to read the requested file, then finish with its exact content. Do not modify files."
+settings["system_prompt"] = "This is a single diagnostic tool-connectivity conversation. Use the available read_file tool to read the requested file, then finish with its exact content. Do not modify files."
 created = request("POST", "/api/conversations", {
     "agent_settings": settings,
     "secrets_encrypted": True,
@@ -349,7 +362,7 @@ conversation_id = created["id"]
 request("PATCH", "/api/conversations/" + conversation_id, {"title": "Tekroo isolated native-tool round trip"})
 request("POST", "/api/conversations/" + conversation_id + "/events", {
     "role": "user", "run": True,
-    "content": [{"type": "text", "text": "Call teams_read_file exactly once with path note.txt. Then finish with the exact file content, without other text or tools."}],
+    "content": [{"type": "text", "text": "Call read_file exactly once with path note.txt. Then finish with the exact file content, without other text or tools."}],
 })
 deadline = time.monotonic() + 120
 events = []
@@ -359,7 +372,7 @@ while time.monotonic() < deadline:
     if finishes:
         break
     time.sleep(0.5)
-calls = [event for event in events if event.get("kind") == "ActionEvent" and event.get("tool_name") == "teams_read_file"]
+calls = [event for event in events if event.get("kind") == "ActionEvent" and event.get("tool_name") == "read_file"]
 finishes = [event for event in events if event.get("kind") == "ActionEvent" and event.get("tool_name") == "finish"]
 answer = finishes[-1].get("action", {}).get("message", "") if finishes else ""
 print(json.dumps({"conversation_id": conversation_id, "tool_calls": len(calls), "finished": len(finishes) > 0, "answer": answer[-2000:]}))
@@ -414,10 +427,10 @@ llm = LLM(
 )
 agent = Agent(llm=llm, tools=[], mcp_config={"tekroo_agent_tools": config})
 conversation = Conversation(agent=agent, workspace=sys.argv[2], max_iteration_per_run=5)
-conversation.send_message("This is a tool-connectivity test. Call teams_read_file exactly once with path note.txt. Then finish with the exact file content, without other text or tools.")
+conversation.send_message("This is a tool-connectivity test. Call read_file exactly once with path note.txt. Then finish with the exact file content, without other text or tools.")
 conversation.run()
 events = [event.model_dump(mode="json") for event in conversation.state.events]
-calls = [event for event in events if event.get("kind") == "ActionEvent" and event.get("tool_name") == "teams_read_file"]
+calls = [event for event in events if event.get("kind") == "ActionEvent" and event.get("tool_name") == "read_file"]
 finishes = [event for event in events if event.get("kind") == "ActionEvent" and event.get("tool_name") == "finish"]
 answer = finishes[-1].get("action", {}).get("message", "") if finishes else ""
 print(json.dumps({"tool_calls": len(calls), "finished": len(finishes) > 0, "answer": answer[-2000:]}))
@@ -456,7 +469,7 @@ from openhands.sdk.mcp.utils import create_mcp_tools
 config = {"teams": MCPServer.model_validate(json.loads(sys.argv[1]))}
 client = create_mcp_tools(config, timeout=15.0)
 try:
-    tool = next(tool for tool in client.tools if tool.name == "teams_read_file")
+    tool = next(tool for tool in client.tools if tool.name == "read_file")
     observation = tool(tool.action_from_arguments({"path": "note.txt"}))
     print(json.dumps({"is_error": observation.is_error, "texts": [block.text for block in observation.content if hasattr(block, "text")]}))
 finally:

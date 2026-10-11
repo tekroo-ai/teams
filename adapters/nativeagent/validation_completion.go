@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -107,7 +108,13 @@ func validationCompletionCheck(brief application.ExecutionBrief, digest kernel.D
 				if json.Unmarshal(call.Arguments, &args) != nil || args.Package == "" {
 					return ErrInvalidBinding
 				}
-				latest[args.Package] = recorded
+				var selector struct {
+					Tags []string `json:"tags"`
+				}
+				if json.Unmarshal(call.Arguments, &selector) != nil {
+					return ErrInvalidBinding
+				}
+				latest[args.Package+" tags="+strings.Join(selector.Tags, ",")] = recorded
 				delete(calls, call.ID)
 			}
 		}
@@ -130,10 +137,56 @@ func validationCompletionCheck(brief application.ExecutionBrief, digest kernel.D
 		slices.Sort(packages)
 		for _, pkg := range packages {
 			result := latest[pkg]
+			if result.TestEvidence != nil && !result.TestEvidence.Complete {
+				return fmt.Errorf("validation PASS has incomplete test-event evidence for %s; report INCONCLUSIVE", pkg)
+			}
 			if result.CommitSHA != brief.Scope.BaselineSHA || result.ExitCode != 0 || result.ExecutionError != "" || result.PermissionDenial || !strings.HasPrefix(result.Output, "ok") && !strings.Contains(result.Output, "\nok") {
 				return fmt.Errorf("validation PASS lacks a passing test receipt on candidate %s for %s (call result commit %s, exit %d, error %q)", brief.Scope.BaselineSHA, pkg, result.CommitSHA, result.ExitCode, result.ExecutionError)
 			}
 		}
-		return nil
+		return checkClaimedTestEvidence(raw, latest)
 	}
+}
+
+var claimedGoTestName = regexp.MustCompile(`\bTest[A-Za-z0-9_]+\b`)
+
+// No prose claim can manufacture execution. A named test cited in a PASS must
+// have a complete Go event receipt showing it ran and passed on this candidate.
+// This minimum check does not pretend to prove unstructured acceptance prose.
+func checkClaimedTestEvidence(verdict string, results map[string]agenttools.Result) error {
+	passed := map[string]bool{}
+	observedNames := map[string]map[string]bool{}
+	note := func(test agenttools.GoTestCase) {
+		if observedNames[test.Name] == nil {
+			observedNames[test.Name] = map[string]bool{}
+		}
+		observedNames[test.Name][test.Package+"\x00"+test.Name] = true
+	}
+	for _, r := range results {
+		if r.TestEvidence == nil || !r.TestEvidence.Complete {
+			continue
+		}
+		for _, test := range r.TestEvidence.Tests {
+			note(test)
+			if test.Status == "PASS" {
+				passed[test.Package+"\x00"+test.Name] = true
+			}
+		}
+		for _, test := range r.TestEvidence.Excluded {
+			note(test)
+		}
+	}
+	for _, name := range claimedGoTestName.FindAllString(verdict, -1) {
+		if name == "TestMain" {
+			continue
+		}
+		proven := len(observedNames[name]) > 0
+		for key := range observedNames[name] {
+			proven = proven && passed[key]
+		}
+		if !proven {
+			return fmt.Errorf("validation PASS cites %s without an observed passing test event; enable its qualified build tag and execute it, or report INCONCLUSIVE", name)
+		}
+	}
+	return nil
 }

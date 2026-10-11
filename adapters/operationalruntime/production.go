@@ -26,7 +26,6 @@ import (
 	"github.com/tekroo-ai/teams/adapters/nativeagent"
 	"github.com/tekroo-ai/teams/adapters/openhands"
 	"github.com/tekroo-ai/teams/adapters/protocol"
-	"github.com/tekroo-ai/teams/agenttools"
 	"github.com/tekroo-ai/teams/application"
 	"github.com/tekroo-ai/teams/contract"
 	"github.com/tekroo-ai/teams/kernel"
@@ -386,6 +385,9 @@ type ProductionContinuity struct {
 type ProductionOrganization struct {
 	ManifestFile            string                     `json:"manifest_file"`
 	ManifestDigest          kernel.Digest              `json:"manifest_digest"`
+	RoleLockFile            string                     `json:"role_lock_file,omitempty"`
+	RoleLockDigest          kernel.Digest              `json:"role_lock_digest,omitempty"`
+	RoleLockRunID           string                     `json:"role_lock_run_id,omitempty"`
 	LibraryManifests        []ProductionTeamSource     `json:"library_manifests,omitempty"`
 	WorkflowDefinitions     []ProductionWorkflowSource `json:"workflow_definitions,omitempty"`
 	Publishers              []ProductionPublisher      `json:"trusted_publishers"`
@@ -466,6 +468,22 @@ func LoadProductionConfig(path string) (ProductionConfig, error) {
 	if len(raw) == 0 || len(raw) > maximumConfigBytes {
 		return ProductionConfig{}, invalidConfig("configuration file size is invalid")
 	}
+	config, err := decodeProductionConfigBytes(raw, path)
+	if err != nil {
+		return ProductionConfig{}, err
+	}
+	if _, err := resolveProductionConfig(config); err != nil {
+		return ProductionConfig{}, err
+	}
+	return config, nil
+}
+
+// Shared strict decoding/path resolution for runtime loading and the offline
+// preparation catalog. Catalog bytes are digest-checked before this is called.
+func decodeProductionConfigBytes(raw []byte, path string) (ProductionConfig, error) {
+	if !filepath.IsAbs(path) || len(raw) == 0 || len(raw) > maximumConfigBytes {
+		return ProductionConfig{}, invalidConfig("configuration file size or path is invalid")
+	}
 	var config ProductionConfig
 	if err := decodeStrict(raw, &config); err != nil {
 		return ProductionConfig{}, fmt.Errorf("%w: decode configuration: %v", ErrInvalidProductionConfiguration, err)
@@ -487,6 +505,9 @@ func LoadProductionConfig(path string) (ProductionConfig, error) {
 	config.ProvenanceFile = absoluteFrom(base, config.ProvenanceFile)
 	config.EvidenceRoot = absoluteFrom(base, config.EvidenceRoot)
 	config.Organization.ManifestFile = absoluteFrom(base, config.Organization.ManifestFile)
+	if config.Organization.RoleLockFile != "" {
+		config.Organization.RoleLockFile = absoluteFrom(base, config.Organization.RoleLockFile)
+	}
 	for index := range config.Organization.LibraryManifests {
 		config.Organization.LibraryManifests[index].ManifestFile = absoluteFrom(base, config.Organization.LibraryManifests[index].ManifestFile)
 	}
@@ -504,9 +525,6 @@ func LoadProductionConfig(path string) (ProductionConfig, error) {
 	}
 	if config.Federation != nil {
 		config.Federation.PrivateKeyFile = absoluteFrom(base, config.Federation.PrivateKeyFile)
-	}
-	if _, err := resolveProductionConfig(config); err != nil {
-		return ProductionConfig{}, err
 	}
 	return config, nil
 }
@@ -765,23 +783,12 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 	}
 	profiles := make([]openhands.ExecutionProfile, 0, len(config.Profiles))
 	for _, profile := range config.Profiles {
-		if nativeSelected {
-			if profile.NativeSettings == nil || len(profile.AgentSettings) != 0 || profile.MaximumIterations != 0 || !profile.RuntimeIdentityDigest.Valid() || !profile.ToolPolicyDigest.Valid() || !profile.EffectPolicyDigest.Valid() {
-				return resolvedProductionConfig{}, invalidConfig("native execution profile is invalid")
-			}
-			digest, digestErr := nativeagent.ModelProfileDigest(profile.RoleFQRN, profile.RoleBundleDigest, *profile.NativeSettings)
-			if digestErr != nil || digest != profile.ModelProfileDigest || !profile.DecisionRoute.ModelExecutable() {
-				return resolvedProductionConfig{}, invalidConfig("native execution profile digest is invalid")
-			}
-		} else {
-			resolved, profileErr := openhands.NewBoundExecutionProfile(profile.ModelProfileDigest, profile.RoleFQRN, profile.RoleBundleDigest, profile.RuntimeIdentityDigest, profile.ToolPolicyDigest, profile.EffectPolicyDigest, profile.AgentSettings, profile.MaximumIterations, config.TeamsDatabaseIdentity, config.SMADatabaseIdentity)
-			if profile.NativeSettings != nil || profileErr != nil || !profile.DecisionRoute.ModelExecutable() {
-				return resolvedProductionConfig{}, invalidConfig("execution profile is invalid")
-			}
-			profiles = append(profiles, resolved)
+		resolved, profileErr := validateConfiguredExecutionProfile(config, profile)
+		if profileErr != nil {
+			return resolvedProductionConfig{}, profileErr
 		}
-		if (profile.Qualification == nil) != (profile.QualificationCorpus == nil) || profile.Qualification != nil && !profile.qualificationDefinitionValid() {
-			return resolvedProductionConfig{}, invalidConfig("execution profile is invalid")
+		if !nativeSelected {
+			profiles = append(profiles, resolved)
 		}
 	}
 	if !nativeSelected {
@@ -789,20 +796,9 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 			return resolvedProductionConfig{}, invalidConfig("execution profiles are not unique and exact")
 		}
 	}
-	trustedKeys := make(map[string]ed25519.PublicKey, len(config.Organization.Publishers))
-	for _, publisher := range config.Organization.Publishers {
-		if publisher.KeyID == "" || publisher.PublicKeyFile == "" || trustedKeys[publisher.KeyID] != nil {
-			return resolvedProductionConfig{}, invalidConfig("trusted role publishers are invalid or duplicated")
-		}
-		raw, readErr := os.ReadFile(publisher.PublicKeyFile)
-		if readErr != nil {
-			return resolvedProductionConfig{}, invalidConfig("trusted role publisher key is missing")
-		}
-		decoded, decodeErr := base64.StdEncoding.Strict().DecodeString(strings.TrimSpace(string(raw)))
-		if decodeErr != nil || len(decoded) != ed25519.PublicKeySize {
-			return resolvedProductionConfig{}, invalidConfig("trusted role publisher key is invalid")
-		}
-		trustedKeys[publisher.KeyID] = ed25519.PublicKey(decoded)
+	trustedKeys, err := loadRolePublisherKeys(config.Organization.Publishers)
+	if err != nil {
+		return resolvedProductionConfig{}, err
 	}
 	team, err := organization.LoadTeamManifest(config.Organization.ManifestFile, config.Organization.ManifestDigest, trustedKeys)
 	if err != nil {
@@ -821,15 +817,15 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 	for _, loaded := range team.Roles {
 		role, roleErr := kernel.ParseRoleFQRN(loaded.Binding.Role)
 		profile, found := profilesByRole[role]
-		if roleErr != nil || !found || profile.ModelProfileDigest != loaded.Binding.ModelProfileDigest || profile.RoleBundleDigest != loaded.Binding.BundleDigest {
+		if roleErr != nil || !found {
 			return resolvedProductionConfig{}, invalidConfig("execution profile does not bind the signed team role")
 		}
-		if nativeSelected {
-			surface, surfaceErr := agenttools.NativeToolSurfaceDigest(loaded.Bundle.Permissions)
-			if surfaceErr != nil || surface != profile.ToolPolicyDigest {
-				return resolvedProductionConfig{}, invalidConfig("native execution profile does not bind the signed role tool surface")
-			}
+		if err := validateSignedProfileBinding(config.ExecutionBackend, profile, loaded); err != nil {
+			return resolvedProductionConfig{}, err
 		}
+	}
+	if err := validateProductionRoleLock(config, team); err != nil {
+		return resolvedProductionConfig{}, err
 	}
 	var nativeGoBinary string
 	if nativeSelected {
@@ -1852,6 +1848,9 @@ func (service *ProductionService) runFeatureRecovery(ctx context.Context) error 
 	if service.roleReconciliation <= 0 || service.planningDeadline <= 0 {
 		return application.ErrInvalidConfiguration
 	}
+	if service.candidates != nil && service.candidates.preflights != nil {
+		defer func() { service.candidates.preflights.cancelAll(); service.candidates.preflights.wait.Wait() }()
+	}
 	for {
 		if continuityErr := service.observeAndReconcileRuntimeContinuity(ctx); continuityErr != nil {
 			service.recordRecoveryFault("runtime-continuity", continuityErr)
@@ -1866,6 +1865,7 @@ func (service *ProductionService) runFeatureRecovery(ctx context.Context) error 
 		stopCancellation()
 		if !service.featureExecutionPaused() {
 			operationContext, cancel := service.featureRecoveryOperationContext(ctx)
+			operationContext = context.WithValue(operationContext, candidateAdmissionContextKey{}, candidateAdmissionContext{lifetime: ctx, wake: service.featureWake, timeout: service.planningDeadline})
 			service.recordFeatureRecoveryOutcome("feature-planning", service.reconcileFeaturePlanning(operationContext))
 			service.recordFeatureRecoveryOutcome("feature-work", service.reconcilePlannedFeatureWork(operationContext))
 			cancel()
@@ -1916,6 +1916,9 @@ func (service *ProductionService) cancelFeatureRecovery() {
 	defer service.featureRecoveryMu.Unlock()
 	if service.featureRecoveryCancel != nil {
 		service.featureRecoveryCancel()
+	}
+	if service.candidates != nil {
+		service.candidates.preflights.cancelAll()
 	}
 }
 

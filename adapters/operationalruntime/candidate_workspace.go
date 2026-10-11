@@ -97,6 +97,7 @@ type candidateReceipt struct {
 }
 
 type candidateWorkspaceManager struct {
+	preflights         *candidatePreflights
 	root               string
 	gitBinary          string
 	timeout            time.Duration
@@ -124,8 +125,9 @@ func newCandidateWorkspaceManagerWithMode(ctx context.Context, evidenceRoot, git
 		return nil, errInvalidCandidateWorkspace
 	}
 	manager := &candidateWorkspaceManager{
-		root:      filepath.Join(filepath.Clean(evidenceRoot), "candidate-workspaces"),
-		gitBinary: gitBinary, timeout: timeout,
+		preflights: &candidatePreflights{},
+		root:       filepath.Join(filepath.Clean(evidenceRoot), "candidate-workspaces"),
+		gitBinary:  gitBinary, timeout: timeout,
 		gates: make(map[string]ProductionCandidateGate, len(gates)), resolver: resolver, requireRuntimeHook: requireRuntimeHook,
 	}
 	for _, gate := range gates {
@@ -217,7 +219,7 @@ func (manager *candidateWorkspaceManager) Prepare(ctx context.Context, feature o
 		}
 		return workspace, prior, priorDigest, nil
 	}
-	gateReceipts, err := manager.runGates(ctx, source.WorkingDirectory, requiredGateIDs)
+	gateReceipts, err := manager.admissionGates(ctx, string(candidateID)+":"+source.WorkingDirectory, source.WorkingDirectory, state, requiredGateIDs)
 	if err != nil {
 		return ProductionWorkspace{}, candidateReceipt{}, "", err
 	}
@@ -568,6 +570,11 @@ func (manager *candidateWorkspaceManager) runGates(ctx context.Context, director
 		if err != nil {
 			return receipts, err
 		}
+		// An asynchronous gate can start after its admission pass. Pin each gate
+		// to that pass's source identity before any cache lookup or execution.
+		if expected, pinned := ctx.Value(candidateGateIdentityContextKey{}).(candidateGateIdentity); pinned && (expected.commit != strings.TrimSpace(string(identity)) || expected.tree != strings.TrimSpace(string(tree))) {
+			return receipts, fmt.Errorf("%w: preflight source identity changed before gate %q", errInvalidCandidateWorkspace, gateID)
+		}
 		timeout, _ := time.ParseDuration(gate.Timeout)
 		gateCtx, cancel := context.WithTimeout(ctx, timeout)
 		command := exec.CommandContext(gateCtx, gate.Command[0], gate.Command[1:]...)
@@ -688,7 +695,7 @@ func (manager *candidateWorkspaceManager) runGates(ctx context.Context, director
 				}
 				return receipts, failure
 			}
-			return receipts, fmt.Errorf("%w: deterministic gate %q failed with exit code %d: %v", errInvalidCandidateWorkspace, gateID, exitCode, runErr)
+			return receipts, errors.Join(gateContextErr, fmt.Errorf("%w: deterministic gate %q failed with exit code %d: %v", errInvalidCandidateWorkspace, gateID, exitCode, runErr))
 		}
 		if err := manager.writeGateCache(cacheKey, receipt); err != nil {
 			return receipts, err

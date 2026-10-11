@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"os"
@@ -64,6 +65,60 @@ func TestInitializeLocalDeploymentProducesValidatedIsolatedInstallation(t *testi
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Run("offline range preparation keeps historical signed packages exact", func(t *testing.T) {
+		var manifest organization.TeamManifest
+		if err := readStrictJSON(config.Organization.ManifestFile, &manifest); err != nil {
+			t.Fatal(err)
+		}
+		digest, err := fileDigest(result.ConfigPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		policy := operationalruntime.RoleVersionPolicy{SchemaVersion: operationalruntime.RoleVersionPolicySchema, DefaultVersionRange: "2.*", Candidates: []operationalruntime.RoleConfigurationSource{{ConfigurationFile: result.ConfigPath, SHA256: digest}}}
+		for _, binding := range manifest.Roles {
+			policy.Roles = append(policy.Roles, operationalruntime.RoleVersionRequirement{Role: binding.Role})
+		}
+		policyPath := filepath.Join(t.TempDir(), "policy.json")
+		if err := writeJSONFile(policyPath, policy, 0600); err != nil {
+			t.Fatal(err)
+		}
+		output := filepath.Join(t.TempDir(), "prepared")
+		var stdout, stderr bytes.Buffer
+		args := []string{"prepare-role-versions", "--config", result.ConfigPath, "--version-policy", policyPath, "--output", output, "--run-id", "fixture-offline-run"}
+		if err := run(args, bytes.NewReader(nil), &stdout, &stderr); err != nil {
+			t.Fatalf("offline CLI: %v %s", err, stderr.String())
+		}
+		var receipt struct {
+			RunID      string        `json:"run_id"`
+			ConfigFile string        `json:"config_file"`
+			LockDigest kernel.Digest `json:"lock_digest"`
+		}
+		if err := json.Unmarshal(stdout.Bytes(), &receipt); err != nil || receipt.RunID != "fixture-offline-run" || !receipt.LockDigest.Valid() {
+			t.Fatalf("receipt: %s %v", stdout.String(), err)
+		}
+		prepared, err := operationalruntime.LoadProductionConfig(receipt.ConfigFile)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if prepared.Organization.RoleLockDigest != receipt.LockDigest || len(prepared.Profiles) != len(config.Profiles) {
+			t.Fatal("prepared CLI identities missing")
+		}
+		for i, profile := range prepared.Profiles {
+			if profile.ModelProfileDigest != config.Profiles[i].ModelProfileDigest || profile.RoleBundleDigest != config.Profiles[i].RoleBundleDigest {
+				t.Fatal("fixture profile changed during range preparation")
+			}
+		}
+		if _, err := os.Stat(filepath.Join(output, "packages", manifest.Roles[0].Role, "ROLE.md")); err != nil {
+			t.Fatal("signed package resources were not retained")
+		}
+		if err := run(args, bytes.NewReader(nil), &stdout, &stderr); err == nil {
+			t.Fatal("CLI overwrote an existing run")
+		}
+		original, err := operationalruntime.LoadProductionConfig(result.ConfigPath)
+		if err != nil || original.Organization.RoleLockFile != "" {
+			t.Fatal("historical bootstrap configuration was altered")
+		}
+	})
 	if config.Mongo.Database != "teams_test_prod" || config.SMADatabaseIdentity != "sma_test" || config.OpenHands.BaseURL != "http://127.0.0.1:18002" || len(config.Workspaces) != 14 || len(config.Profiles) != 8 {
 		t.Fatalf("config = %#v", config)
 	}

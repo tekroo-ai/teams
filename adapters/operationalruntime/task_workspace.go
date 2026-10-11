@@ -66,6 +66,7 @@ type taskWorkspaceReceipt struct {
 }
 
 type taskWorkspaceManager struct {
+	identities         *gitIdentityCache
 	root               string
 	gitBinary          string
 	timeout            time.Duration
@@ -84,7 +85,7 @@ func newTaskWorkspaceManagerWithMode(ctx context.Context, evidenceRoot, gitBinar
 	if err := ctx.Err(); err != nil {
 		return nil, errors.Join(errInvalidTaskWorkspace, err)
 	}
-	manager := &taskWorkspaceManager{root: filepath.Join(filepath.Clean(evidenceRoot), "task-workspaces"), gitBinary: gitBinary, timeout: timeout, resolver: resolver, requireRuntimeHook: requireRuntimeHook}
+	manager := &taskWorkspaceManager{identities: &gitIdentityCache{}, root: filepath.Join(filepath.Clean(evidenceRoot), "task-workspaces"), gitBinary: gitBinary, timeout: timeout, resolver: resolver, requireRuntimeHook: requireRuntimeHook}
 	if err := os.MkdirAll(manager.receiptRoot(), 0o700); err != nil {
 		return nil, err
 	}

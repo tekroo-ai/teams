@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -44,7 +45,7 @@ func (host Host) runIsolatedGoTestsWorktree(ctx context.Context, root, pattern s
 	return host.runIsolatedGoTestsFrom(ctx, root, pattern, true, false)
 }
 
-func (host Host) runIsolatedGoTestsFrom(ctx context.Context, root, pattern string, worktree, compileOnly bool) (result Result, returnedErr error) {
+func (host Host) runIsolatedGoTestsFrom(ctx context.Context, root, pattern string, worktree, compileOnly bool, options ...goTestArguments) (result Result, returnedErr error) {
 	started := time.Now()
 	timings := &VerificationTimings{}
 	result = Result{Name: "run_go_tests", VerificationTimings: timings}
@@ -196,7 +197,17 @@ func (host Host) runIsolatedGoTestsFrom(ctx context.Context, root, pattern strin
 	// Both build checks and executing tests use the same path-sensitive compiler
 	// artifacts. The stable workspace pathname permits reuse without -trimpath;
 	// executed fixtures retain their absolute runtime.Caller source paths.
+	var selected goTestArguments
+	if len(options) > 0 {
+		selected = options[0]
+	}
 	arguments := []string{"test", "-count=1"}
+	if !compileOnly {
+		arguments = append(arguments, "-json")
+	}
+	if len(selected.Tags) > 0 {
+		arguments = append(arguments, "-tags="+strings.Join(selected.Tags, ","))
+	}
 	if compileOnly {
 		// -run '^$' still executes init/TestMain. Compile-only means -c: no
 		// candidate executable or test initializer is run, even with side effects.
@@ -221,9 +232,34 @@ func (host Host) runIsolatedGoTestsFrom(ctx context.Context, root, pattern strin
 	if worktree {
 		sourceIdentity = "snapshot:" + result.SnapshotSHA256
 	}
-	if err := host.seedCompilationCache(operation, workspace, source, goBinary, profile, command.Env, pattern, sourceIdentity, timings); err != nil {
+	if err := host.seedCompilationCache(operation, workspace, source, goBinary, profile, command.Env, pattern, sourceIdentity, timings, selected.Tags); err != nil {
 		return result, err
 	}
+	phaseStarted = time.Now()
+	if !compileOnly {
+		inventoryArgs := []string{"list", "-e", "-json"}
+		if len(selected.Tags) > 0 {
+			inventoryArgs = append(inventoryArgs, "-tags="+strings.Join(selected.Tags, ","))
+		}
+		inventoryArgs = append(inventoryArgs, pattern)
+		inventory := exec.CommandContext(operation, goBinary, inventoryArgs...)
+		inventory.Dir, inventory.Env = source, command.Env
+		inventoryOutput := &boundedOutput{limit: 4 << 20}
+		inventory.Stdout = inventoryOutput
+		if err := inventory.Run(); err != nil {
+			timings.PreparationNS += time.Since(phaseStarted).Nanoseconds()
+			if operation.Err() != nil {
+				return result, operation.Err()
+			}
+			return result, fmt.Errorf("Go test selection inventory: %w", err)
+		}
+		excluded, err := excludedGoTests(inventoryOutput.data)
+		if err != nil {
+			return result, err
+		}
+		result.TestEvidence = &GoTestEvidence{Command: append([]string{goBinary}, arguments...), Tags: slices.Clone(selected.Tags), Tests: []GoTestCase{}, Excluded: excluded}
+	}
+	timings.PreparationNS += time.Since(phaseStarted).Nanoseconds()
 	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	command.Cancel = func() error {
 		if command.Process == nil {
@@ -235,7 +271,12 @@ func (host Host) runIsolatedGoTestsFrom(ctx context.Context, root, pattern strin
 	output := &boundedOutput{limit: 128 << 10}
 	var timeout verification.TimeoutDetector
 	// Use one shared writer, so os/exec serializes stdout/stderr observations.
-	observations := io.MultiWriter(output, &timeout)
+	var observations io.Writer = io.MultiWriter(output, &timeout)
+	var events *goTestObservations
+	if !compileOnly {
+		events = &goTestObservations{output: observations, tests: map[string]GoTestCase{}, complete: true}
+		observations = events
+	}
 	command.Stdout, command.Stderr = observations, observations
 	phaseStarted = time.Now()
 	if err := command.Start(); err != nil {
@@ -265,6 +306,9 @@ func (host Host) runIsolatedGoTestsFrom(ctx context.Context, root, pattern strin
 		}
 	}
 finished:
+	if events != nil {
+		events.finish(result.TestEvidence)
+	}
 	timings.ExecutionNS = time.Since(phaseStarted).Nanoseconds()
 	result.Output = string(output.data)
 	foldedOutput := strings.ToLower(result.Output)

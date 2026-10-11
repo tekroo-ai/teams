@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"os"
 	"testing"
 
 	"github.com/tekroo-ai/teams/agentruntime"
@@ -13,14 +12,18 @@ import (
 )
 
 func TestPlanNonCompletionDeltaPreservesDispositionAgainstSignedSchema(t *testing.T) {
-	signed, err := os.ReadFile("../../config/starter-team/roles-v4/project-manager-2.2.1/handlers/feature.design-proposed/result.schema.json")
-	if err != nil {
-		t.Fatal(err)
+	for _, fixture := range signedPlanFixtures(t) {
+		t.Run(fixture.name, func(t *testing.T) {
+			testPlanNonCompletionDelta(t, fixture.handler)
+		})
 	}
+}
+
+func testPlanNonCompletionDelta(t *testing.T, handler application.MessageHandlerGrounding) {
+	signed := handler.ResultSchema
 	source := []byte(application.OrganizationalResultMarker + `{"work_product":{"result_type":"FEATURE_PLAN","tasks":[{"purpose":"IMPLEMENTATION","depends_on":[]}]}}`)
 	sum := sha256.Sum256(source)
 	plan := &PlanFinalizationBinding{SourceOutput: source, SourceDigest: kernel.Digest(fmt.Sprintf("%x", sum))}
-	handler := application.MessageHandlerGrounding{ResultSchema: signed}
 	model, err := modelFacingHandlerSchema(handler, kernel.PurposeHandoff)
 	if err != nil {
 		t.Fatal(err)

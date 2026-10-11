@@ -16,22 +16,27 @@ import (
 
 	"github.com/tekroo-ai/teams/agenttools"
 	"github.com/tekroo-ai/teams/application"
+	"github.com/tekroo-ai/teams/internal/rolefixtures"
 	"github.com/tekroo-ai/teams/kernel"
 )
 
 // The real PM contract requires complete plan fields in a conditional branch.
 // The model owns only the delta; Teams supplies the immutable design fields.
 func TestPlanDeltaAndAssembledResultAgainstSignedConditionalSchema(t *testing.T) {
-	signed, err := os.ReadFile("../../config/starter-team/roles-v4/project-manager-2.2.1/handlers/feature.design-proposed/result.schema.json")
-	if err != nil {
-		t.Fatal(err)
+	for _, fixture := range signedPlanFixtures(t) {
+		t.Run(fixture.name, func(t *testing.T) {
+			testPlanDeltaAndAssembledResult(t, fixture.handler)
+		})
 	}
+}
+
+func testPlanDeltaAndAssembledResult(t *testing.T, handler application.MessageHandlerGrounding) {
+	signed := handler.ResultSchema
 	originalDigest := sha256.Sum256(signed)
 	source := []byte(application.OrganizationalResultMarker + `
 {"work_product":{"schema_version":"1.0.0","result_type":"FEATURE_PLAN","architecture":"Change greeting behavior without changing its public API.","tasks":[{"story_index":0,"title":"Implement greeting","description":"Update greeting behavior.","acceptance_criteria":["Greeting returns the requested text."],"purpose":"IMPLEMENTATION","complexity":1,"risk":"LOW","attempt_limit":1,"review_round_limit":1,"depends_on":[]}]}}`)
 	digest := sha256.Sum256(source)
 	plan := &PlanFinalizationBinding{SourceOutput: source, SourceDigest: kernel.Digest(fmt.Sprintf("%x", digest[:]))}
-	handler := application.MessageHandlerGrounding{ResultSchema: signed}
 	modelSchema, err := modelFacingHandlerSchema(handler, kernel.PurposeHandoff)
 	if err != nil {
 		t.Fatal(err)
@@ -185,13 +190,10 @@ func TestPlanFinalizationRetainedSubmissionReplay(t *testing.T) {
 	if err := json.Unmarshal(output, &retained); err != nil || len(retained.Submissions) == 0 {
 		t.Fatalf("read retained submissions: %v", err)
 	}
-	signed, err := os.ReadFile("../../config/starter-team/roles-v4/project-manager-2.2.1/handlers/feature.design-proposed/result.schema.json")
-	if err != nil {
-		t.Fatal(err)
-	}
+	handler := rolefixtures.HistoricalPlanHandler(t)
+	signed := handler.ResultSchema
 	sourceHash := sha256.Sum256([]byte(retained.Source))
 	plan := &PlanFinalizationBinding{SourceOutput: []byte(retained.Source), SourceDigest: kernel.Digest(fmt.Sprintf("%x", sourceHash[:]))}
-	handler := application.MessageHandlerGrounding{ResultSchema: signed}
 	for index, raw := range retained.Submissions {
 		bound, err := bindHandlerPlanResult(bindHandlerResultVersion(raw, handler), plan)
 		if err != nil {

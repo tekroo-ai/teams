@@ -29,6 +29,9 @@ func main() {
 }
 
 func run(arguments []string, stdin io.Reader, stdout, stderr io.Writer) error {
+	if len(arguments) > 0 && arguments[0] == "prepare-role-versions" {
+		return runRoleVersionPreparation(arguments[1:], stdout, stderr)
+	}
 	if len(arguments) > 0 && arguments[0] == "init-local" {
 		return runLocalInit(arguments[1:], stdout, stderr)
 	}
@@ -615,5 +618,5 @@ func loadCommand(operands []string, stdin io.Reader, maximum int64) ([]byte, ker
 }
 
 func usageError() error {
-	return errors.New("usage: tekroo init-local [OPTIONS] | tekroo -config CONFIG health|status|diagnostics|federation|federation-alias NAME|federation-send ALIAS FILE|-|pause|resume|stop|feature FILE|-|feature-status ID|feature-clarify ID FILE|-|feature-plan ID FILE|-|feature-replan ID FILE|-|feature-correct-specification ID FILE|-|feature-accept ID REVISION NO_RELEASE_REASON|feature-release ID FILE|-|human-register FILE|-|human-ask FILE|-|human-notifications [open|all]|human-respond FILE|-|human-interaction ID|roles|libraries|library-sync|role ACTOR start|stop|restart|pause|resume|inbox ACTOR|message FILE|-|message-status ID|message-trace THREAD_ID|deadletters [ACTOR]|deadletter-repair ID FILE|-|task ID|story ID|invocation ID|wait KIND ID --timeout DURATION [--after-revision REVISION] [--event-type TYPE]...|submit FILE|-|cancel INVOCATION_ID FILE|-|retry-planning INVOCATION_ID FILE|-|retry-task INVOCATION_ID FILE|-")
+	return errors.New("usage: tekroo prepare-role-versions --config CONFIG --version-policy POLICY --output NEW_DIRECTORY --run-id ID | tekroo init-local [OPTIONS] | tekroo -config CONFIG health|status|diagnostics|federation|federation-alias NAME|federation-send ALIAS FILE|-|pause|resume|stop|feature FILE|-|feature-status ID|feature-clarify ID FILE|-|feature-plan ID FILE|-|feature-replan ID FILE|-|feature-correct-specification ID FILE|-|feature-accept ID REVISION NO_RELEASE_REASON|feature-release ID FILE|-|human-register FILE|-|human-ask FILE|-|human-notifications [open|all]|human-respond FILE|-|human-interaction ID|roles|libraries|library-sync|role ACTOR start|stop|restart|pause|resume|inbox ACTOR|message FILE|-|message-status ID|message-trace THREAD_ID|deadletters [ACTOR]|deadletter-repair ID FILE|-|task ID|story ID|invocation ID|wait KIND ID --timeout DURATION [--after-revision REVISION] [--event-type TYPE]...|submit FILE|-|cancel INVOCATION_ID FILE|-|retry-planning INVOCATION_ID FILE|-|retry-task INVOCATION_ID FILE|-")
 }

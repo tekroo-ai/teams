@@ -418,6 +418,7 @@ var readOnlyExecutionGuidance = []string{
 }
 
 var validationExecutionGuidance = []string{
+	"Use the tool's test_evidence: only observed PASS test events establish named test execution. Excluded tests are NOT_RUN and skipped tests are SKIP, even when the package reports ok. Explicitly enable a qualified build tag with tags for tests on which a criterion depends; unexecuted tests cannot support PASS. Correct a missing selection by executing the test, or report INCONCLUSIVE. Never infer enabled tags from timing, tool profiles, compilation or package-level ok.",
 	"Act as an independent engineering validator, not only as a test runner. Candidate-authored tests, builds, vet, and race checks are necessary evidence but do not by themselves prove that the implementation matches an acceptance criterion.",
 	"For every acceptance criterion, trace the relevant production control or data path and test a concrete plausible near-miss against that path. A cited test supports a criterion only when its assertions distinguish the required behavior from that near-miss.",
 	"Trace any new capability from the actual application entry point through its configured concrete implementation. An optional interface or test double is not evidence of production wiring. Distinguish a task-local dependency left to an identified later task from a feature-level integration gap with no owner.",

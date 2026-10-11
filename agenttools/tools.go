@@ -70,13 +70,13 @@ var specs = []Spec{
 	{"edit_file", "Atomically apply an ordered edits array to ONE existing file against ONE full-file SHA-256 from read_file. Each edit replaces exactly one occurrence of old_text with new_text in the preceding edit's result; new_text may be empty for deletion. Put all replacements for this file in this one call, not separate same-file calls with the same hash. Whole-file replacement/deletion is forbidden. Successful mutations return change_id; undo_file_change restores their exact pre-edit bytes without reconstruction. Every edit must match before anything is written; missing or ambiguous text and stale hashes leave the entire file unchanged.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["path","edits","expected_sha256"],"properties":{"path":{"type":"string","minLength":1},"edits":{"type":"array","minItems":1,"maxItems":32,"items":{"type":"object","additionalProperties":false,"required":["old_text","new_text"],"properties":{"old_text":{"type":"string","minLength":1,"maxLength":1048576},"new_text":{"type":"string","maxLength":1048576}}}},"expected_sha256":{"type":"string","pattern":"^[0-9a-f]{64}$","minLength":64,"maxLength":64}}}`), "repository.edit"},
 	{"git_stage_files", "Stage only the named workspace paths when HEAD still matches the expected commit. Never stages the injected .openhands runtime files.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["paths","expected_head"],"properties":{"paths":{"type":"array","minItems":1,"maxItems":32,"uniqueItems":true,"items":{"type":"string","minLength":1}},"expected_head":{"type":"string","pattern":"^[0-9a-f]{40}$"}}}`), "repository.edit"},
 	{"git_commit", "Commit the exact staged tree against an expected HEAD. A retry after a completed identical commit returns that commit instead of creating another.", json.RawMessage(`{"type":"object","additionalProperties":false,"required":["expected_head","expected_index_tree","subject"],"properties":{"expected_head":{"type":"string","pattern":"^[0-9a-f]{40}$"},"expected_index_tree":{"type":"string","pattern":"^[0-9a-f]{40}$"},"subject":{"type":"string","minLength":1,"maxLength":200},"body":{"type":"string","maxLength":5000}}}`), "repository.edit"},
-	{"run_go_tests", "Run Go tests from committed HEAD in a disposable macOS filesystem sandbox. package may be ., ./, ./..., a local package such as ./adapters/mongo, or a subtree such as ./adapters/mongo/...; this workspace's declared module paths also work. Local Git subprocesses and localhost networking are supported for fixtures; use temporary test data, not live databases. Non-loopback networking, external modules, traversal, shell expansion, host writes and CGO are forbidden. permission_denial reports observed OS permission-denial output; it does not prove a candidate defect.", goTestInputSchema, "test.execute"},
-	{"run_go_tests_worktree", "Run Go tests against a tracked-and-untracked workspace snapshot in a disposable macOS filesystem sandbox before committing. package may be ., ./, ./..., a local package such as ./adapters/mongo, or a subtree such as ./adapters/mongo/...; this workspace's declared module paths also work. Local Git subprocesses and localhost networking are supported for fixtures; use temporary test data, not live databases. Non-loopback networking, external modules and traversal are forbidden. Returns snapshot_sha256; independent validation uses run_go_tests on committed HEAD. permission_denial reports observed OS permission-denial output, not proof of a candidate defect.", goTestInputSchema, "test.execute"},
+	{"run_go_tests", "Run Go tests from committed HEAD in a disposable macOS filesystem sandbox. package may be ., ./, ./..., a local package such as ./adapters/mongo, or a subtree such as ./adapters/mongo/...; this workspace's declared module paths also work. Local Git subprocesses and localhost networking are supported for fixtures; use temporary test data, not live databases. Non-loopback networking, external modules, traversal, shell expansion, host writes and CGO are forbidden. permission_denial reports observed OS permission-denial output; it does not prove a candidate defect." + goTestEvidenceToolGuidance, goTestInputSchema, "test.execute"},
+	{"run_go_tests_worktree", "Run Go tests against a tracked-and-untracked workspace snapshot in a disposable macOS filesystem sandbox before committing. package may be ., ./, ./..., a local package such as ./adapters/mongo, or a subtree such as ./adapters/mongo/...; this workspace's declared module paths also work. Local Git subprocesses and localhost networking are supported for fixtures; use temporary test data, not live databases. Non-loopback networking, external modules and traversal are forbidden. Returns snapshot_sha256; independent validation uses run_go_tests on committed HEAD. permission_denial reports observed OS permission-denial output, not proof of a candidate defect." + goTestEvidenceToolGuidance, goTestInputSchema, "test.execute"},
 }
 
 // Both test tools expose the same syntax. Module ownership and recursive
 // subtree containment remain host checks, not model-supplied authority.
-var goTestInputSchema = json.RawMessage(`{"type":"object","additionalProperties":false,"required":["package"],"properties":{"package":{"type":"string","pattern":"^(?:\\.|\\./(?:\\.\\.\\.|[A-Za-z0-9_-][A-Za-z0-9_.-]*(?:/[A-Za-z0-9_-][A-Za-z0-9_.-]*)*(?:/\\.\\.\\.)?)?|[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)+(?:/\\.\\.\\.)?)$"}}}`)
+var goTestInputSchema = json.RawMessage(`{"type":"object","additionalProperties":false,"required":["package"],"properties":{"package":{"type":"string","pattern":"^(?:\\.|\\./(?:\\.\\.\\.|[A-Za-z0-9_-][A-Za-z0-9_.-]*(?:/[A-Za-z0-9_-][A-Za-z0-9_.-]*)*(?:/\\.\\.\\.)?)?|[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)+(?:/\\.\\.\\.)?)$"},"tags":{"type":"array","maxItems":1,"uniqueItems":true,"items":{"type":"string","enum":["mongo_integration"]}}}}`)
 
 type Authority struct {
 	WorkspaceRoot      string
@@ -91,6 +91,7 @@ type Call struct {
 }
 
 type Result struct {
+	TestEvidence    *GoTestEvidence     `json:"test_evidence,omitempty"`
 	Changes         []FileChangeSummary `json:"changes,omitempty"`
 	Definitions     []SymbolLocation    `json:"definitions,omitempty"`
 	References      []SymbolLocation    `json:"references,omitempty"`
@@ -524,24 +525,20 @@ func (host Host) execute(ctx context.Context, authority Authority, call Call) (R
 		}
 		result, err = host.gitCommit(ctx, root, args.ExpectedHead, args.ExpectedIndexTree, args.Subject, args.Body)
 	case "run_go_tests":
-		var args struct {
-			Package string `json:"package"`
-		}
-		if decode(call.Arguments, &args) != nil || !validGoPackageInModule(root, args.Package) {
+		var args goTestArguments
+		if decode(call.Arguments, &args) != nil || !args.valid() || !validGoPackageInModule(root, args.Package) {
 			return Result{}, ErrInvalidCall
 		}
-		result, err = host.runIsolatedGoTests(ctx, root, args.Package)
+		result, err = host.runIsolatedGoTestsFrom(ctx, root, args.Package, false, false, args)
 	case "run_go_tests_worktree":
-		var args struct {
-			Package string `json:"package"`
-		}
-		if decode(call.Arguments, &args) != nil || !validGoPackageInModule(root, args.Package) {
+		var args goTestArguments
+		if decode(call.Arguments, &args) != nil || !args.valid() || !validGoPackageInModule(root, args.Package) {
 			return Result{}, ErrInvalidCall
 		}
 		if authority.Purpose != kernel.PurposeImplementation && authority.Purpose != kernel.PurposeRepair {
 			return Result{}, ErrForbidden
 		}
-		result, err = host.runIsolatedGoTestsWorktree(ctx, root, args.Package)
+		result, err = host.runIsolatedGoTestsFrom(ctx, root, args.Package, true, false, args)
 	case "create_file":
 		var args createFileArgs
 		if decode(call.Arguments, &args) != nil || args.Path == "" || len(args.Content) > 1<<20 || !utf8.ValidString(args.Content) {

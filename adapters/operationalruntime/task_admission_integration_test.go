@@ -4,10 +4,6 @@ package operationalruntime
 
 import (
 	"context"
-	"crypto/ed25519"
-	"crypto/sha256"
-	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -25,6 +21,7 @@ import (
 	"github.com/tekroo-ai/teams/adapters/protocol"
 	"github.com/tekroo-ai/teams/application"
 	"github.com/tekroo-ai/teams/contract"
+	"github.com/tekroo-ai/teams/internal/rolefixtures"
 	"github.com/tekroo-ai/teams/kernel"
 	"github.com/tekroo-ai/teams/organization"
 )
@@ -33,7 +30,7 @@ func TestMaterializeFeaturePlanCreatesExecutableRootTask(t *testing.T) {
 	runTaskAdmissionFixture(t, false)
 }
 
-// Keep the worker-overlap qualification independent of the legacy fixture's
+// Keep the worker-overlap qualification independent of the fixture's
 // planning/recovery scenarios, which have separate protocol expectations.
 func TestIndependentDAGRootsActuallyOverlap(t *testing.T) {
 	runTaskAdmissionFixture(t, true)
@@ -105,7 +102,7 @@ func runTaskAdmissionFixture(t *testing.T, parallelOnly bool) {
 	runtimeDigest := digestByte('3')
 	toolDigest := digestByte('4')
 	effectDigest := digestByte('5')
-	team := loadStarterTeam(t)
+	team := rolefixtures.Current(t)
 	roleByModel := make(map[kernel.Digest]organization.LoadedRole, len(team.Roles))
 	for _, role := range team.Roles {
 		roleByModel[role.Binding.ModelProfileDigest] = role
@@ -370,7 +367,7 @@ func runTaskAdmissionFixture(t *testing.T, parallelOnly bool) {
 			purpose = kernel.PurposeReplan
 		}
 		invocationID := deterministicOperationalUUID("work-invocation", string(automated.ID), string(taskID), string(purpose), "1")
-		waitForInvocationState(t, store, invocationID, kernel.InvocationSucceeded)
+		waitForInvocationState(t, store, invocationID, kernel.InvocationSucceeded, runtime)
 		waitForTaskInvocationState(t, store, taskID, purpose, kernel.InvocationSucceeded)
 		if err := service.reconcileFeaturePlanning(contextWithTimeout(t)); err != nil {
 			t.Fatalf("reconcile successful %s output: %v", expected.stage, err)
@@ -1167,6 +1164,21 @@ func waitForInvocationState(t *testing.T, store *mongo.Store, invocationID kerne
 			return
 		}
 		if err == nil && current.Invocation.State.Terminal() {
+			event, found, eventErr := store.ReadEvent(contextWithTimeout(t), current.Invocation.LastEventID)
+			t.Logf("terminal event found=%t payload=%s err=%v", found, event.Payload, eventErr)
+			snapshot, snapshotErr := store.LoadDecision(contextWithTimeout(t), kernel.KernelCommand{Target: kernel.AggregateRef{Kind: kernel.AggregateTask, ID: current.Invocation.TaskID}})
+			for _, runtime := range diagnostics {
+				if current.Invocation.OutputDigest != nil {
+					output, outputErr := runtime.ReadExecutionOutput(contextWithTimeout(t), *current.Invocation.OutputDigest)
+					t.Logf("terminal output digest=%s evidence=%v output=%s err=%v", *current.Invocation.OutputDigest, current.Invocation.TerminalEvidenceIDs, output, outputErr)
+				}
+				for _, evidenceID := range current.Invocation.TerminalEvidenceIDs {
+					if metadata, found := snapshot.Evidence[evidenceID]; snapshotErr == nil && found {
+						raw, readErr := runtime.ReadExecutionOutput(contextWithTimeout(t), metadata.SHA256)
+						t.Logf("terminal evidence id=%s digest=%s raw=%s err=%v", evidenceID, metadata.SHA256, raw, readErr)
+					}
+				}
+			}
 			t.Fatalf("invocation %s reached unexpected terminal state: %#v", invocationID, current.Invocation)
 		}
 		if time.Now().After(deadline) {
@@ -1226,46 +1238,4 @@ func waitForPlanningInvocationState(t *testing.T, service *ProductionService, st
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-}
-
-func loadStarterTeam(t *testing.T) organization.LoadedTeam {
-	t.Helper()
-	manifestPath, err := filepath.Abs(filepath.Join("..", "..", "config", "starter-team", "team.v4.example.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	manifestRaw, err := os.ReadFile(manifestPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	manifestHash := sha256.Sum256(manifestRaw)
-	publicRaw, err := os.ReadFile(filepath.Join(filepath.Dir(manifestPath), "message-handler-publisher.pub"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	publicKey, err := base64.StdEncoding.Strict().DecodeString(strings.TrimSpace(string(publicRaw)))
-	if err != nil {
-		t.Fatal(err)
-	}
-	qualificationRaw, err := os.ReadFile(filepath.Join(filepath.Dir(manifestPath), "message-handler-publisher-qualification.pub"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	qualificationKey, err := base64.StdEncoding.Strict().DecodeString(strings.TrimSpace(string(qualificationRaw)))
-	if err != nil {
-		t.Fatal(err)
-	}
-	amendmentRaw, err := os.ReadFile(filepath.Join(filepath.Dir(manifestPath), "role-amendment-publisher.pub"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	amendmentKey, err := base64.StdEncoding.Strict().DecodeString(strings.TrimSpace(string(amendmentRaw)))
-	if err != nil || len(amendmentKey) != ed25519.PublicKeySize {
-		t.Fatalf("published amendment key: %v", err)
-	}
-	team, err := organization.LoadTeamManifest(manifestPath, kernel.Digest(hex.EncodeToString(manifestHash[:])), map[string]ed25519.PublicKey{"tekroo-message-handlers-20260913": publicKey, "tekroo-message-handlers-qualification-20260913": qualificationKey, "tekroo-teams-amendment-20260917": amendmentKey})
-	if err != nil {
-		t.Fatal(err)
-	}
-	return team
 }

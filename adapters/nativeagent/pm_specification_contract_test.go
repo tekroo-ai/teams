@@ -1,17 +1,14 @@
 package nativeagent
 
 import (
-	"os"
 	"testing"
 
 	"github.com/tekroo-ai/teams/agentruntime"
+	"github.com/tekroo-ai/teams/internal/rolefixtures"
 )
 
-func TestPM222SpecificationKeepsStrictCompletionAndDecisionContracts(t *testing.T) {
-	schema, err := os.ReadFile("../../config/starter-team/roles-v4/project-manager-2.2.2/handlers/feature.refined/result.schema.json")
-	if err != nil {
-		t.Fatal(err)
-	}
+func TestCurrentPMSpecificationKeepsStrictCompletionAndDecisionContracts(t *testing.T) {
+	schema := rolefixtures.Handler(t, rolefixtures.Current(t), "project-manager", "tekroo.message.feature.refined").ResultSchema
 	if _, err := agentruntime.NewStructuredTurnContract([]agentruntime.ToolDefinition{{Name: "submit_result", Parameters: schema}}, "submit_result"); err != nil {
 		t.Fatal("strict generation contract cannot be compiled", err)
 	}

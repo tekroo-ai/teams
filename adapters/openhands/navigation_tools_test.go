@@ -10,6 +10,7 @@ import (
 
 	"github.com/tekroo-ai/teams/adapters/filesystem"
 	"github.com/tekroo-ai/teams/application"
+	"github.com/tekroo-ai/teams/internal/rolefixtures"
 	"github.com/tekroo-ai/teams/kernel"
 )
 
@@ -105,6 +106,7 @@ func TestNavigationProfilesRejectLegacyModernMix(t *testing.T) {
 	}
 }
 
+// Keep the legacy starter surface alongside the authenticated current surface.
 func TestEveryStarterRoleHasCapabilityAppropriateTools(t *testing.T) {
 	teamRoot := filepath.Join("..", "..", "config", "starter-team")
 	teamBytes, err := os.ReadFile(filepath.Join(teamRoot, "team.v4.example.json"))
@@ -120,19 +122,7 @@ func TestEveryStarterRoleHasCapabilityAppropriateTools(t *testing.T) {
 	if err := json.Unmarshal(teamBytes, &team); err != nil {
 		t.Fatal(err)
 	}
-	read := []string{"file_read", "list_files", "find_files", "search_file_contents"}
-	check := append([]string{"command_operations"}, read...)
-	edit := append(append([]string(nil), check...), "file_write_commands", "checklist_operations")
-	want := map[string][]string{
-		"architect":       read,
-		"coder":           edit,
-		"operator":        {},
-		"product-owner":   read,
-		"project-manager": read,
-		"security":        check,
-		"senior-coder":    edit,
-		"tester":          check,
-	}
+	want := capabilityToolExpectations()
 	if len(team.Roles) != len(want) {
 		t.Fatalf("starter roles=%d, audited roles=%d", len(team.Roles), len(want))
 	}
@@ -177,5 +167,42 @@ func TestEditorialExampleDoesNotImplicitlyGainRepositoryTools(t *testing.T) {
 	}
 	if tools := ExecutionToolsForPermissions(bundle.Permissions); len(tools) != 0 {
 		t.Fatalf("editorial artifact authority must not imply repository authority: %v", tools)
+	}
+}
+
+func TestEveryCurrentSignedRoleHasCapabilityAppropriateTools(t *testing.T) {
+	team := rolefixtures.Current(t)
+	want := capabilityToolExpectations()
+	if len(team.Roles) != len(want) {
+		t.Fatalf("current roles=%d, audited roles=%d", len(team.Roles), len(want))
+	}
+	for _, role := range team.Roles {
+		expected, audited := want[role.Binding.Role]
+		if !audited {
+			t.Fatalf("role %q has no tool-coverage audit", role.Binding.Role)
+		}
+		if actual := ExecutionToolsForPermissions(role.Bundle.Permissions); !reflect.DeepEqual(actual, expected) {
+			t.Errorf("role %q: tools=%v, want %v", role.Binding.Role, actual, expected)
+		}
+		delete(want, role.Binding.Role)
+	}
+	if len(want) != 0 {
+		t.Fatalf("missing audited roles: %v", want)
+	}
+}
+
+func capabilityToolExpectations() map[string][]string {
+	read := []string{"file_read", "list_files", "find_files", "search_file_contents"}
+	check := append([]string{"command_operations"}, read...)
+	edit := append(append([]string(nil), check...), "file_write_commands", "checklist_operations")
+	return map[string][]string{
+		"architect":       read,
+		"coder":           edit,
+		"operator":        {},
+		"product-owner":   read,
+		"project-manager": read,
+		"security":        check,
+		"senior-coder":    edit,
+		"tester":          check,
 	}
 }

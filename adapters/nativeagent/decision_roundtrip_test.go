@@ -17,6 +17,7 @@ import (
 	"github.com/tekroo-ai/teams/agentruntime"
 	"github.com/tekroo-ai/teams/agenttools"
 	"github.com/tekroo-ai/teams/application"
+	"github.com/tekroo-ai/teams/internal/rolefixtures"
 	"github.com/tekroo-ai/teams/kernel"
 )
 
@@ -133,15 +134,13 @@ func TestDecisionHandbackRestoresBothOwnersAcrossRestart(t *testing.T) {
 	var sources []kernel.WorkInvocation
 	var outputs [][]byte
 	var originalJournal []byte
+	team := rolefixtures.Current(t)
 	for round := 0; round < 4; round++ {
-		role, schemaPath := "architect", "../../config/starter-team/transport-neutral-20260929/roles-v4/architect-2.1.1/handlers/story.design-requested/result.schema.json"
+		role, message := "architect", "tekroo.message.story.design-requested"
 		if round%2 == 1 {
-			role, schemaPath = "project-manager", "../../config/starter-team/roles-v4/project-manager-2.2.2/handlers/feature.design-proposed/result.schema.json"
+			role, message = "project-manager", "tekroo.message.feature.design-proposed"
 		}
-		schema, err := os.ReadFile(schemaPath)
-		if err != nil {
-			t.Fatal(err)
-		}
+		handler := rolefixtures.Handler(t, team, role, message)
 		brief := template
 		brief.Task.Description = "ORIGINAL_DESIGN_REQUEST: add aliases without changing exact actor addressing"
 		brief.InvocationID = kernel.UUIDv7(fmt.Sprintf("00000000-0000-7000-8000-%012d", 980+round))
@@ -150,7 +149,7 @@ func TestDecisionHandbackRestoresBothOwnersAcrossRestart(t *testing.T) {
 		brief.RoleGrounding.ActorFQN, brief.RoleGrounding.RoleFQRN = brief.ActorFQN, kernel.RoleFQRN(role)
 		brief.Purpose = kernel.PurposeHandoff
 		brief.ResultProtocol = &application.ExecutionResultProtocol{Marker: application.OrganizationalResultMarker, Instruction: "Submit the admitted handler result."}
-		brief.MessageHandler = &application.MessageHandlerGrounding{ResultSchema: schema, ResultSchemaDigest: digest(schema), AllowedResults: []string{"blocked", "completed", "failed", "needs_decision"}}
+		brief.MessageHandler = &handler
 		_, _, profile := testBriefAndProfile()
 		profile.RoleFQRN, profile.Model, profile.BaseURL, profile.MaxOutputTokens = kernel.RoleFQRN(role), role, server.URL+"/v1", 16384
 		binding := &testBinding{root: root}

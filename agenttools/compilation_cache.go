@@ -65,7 +65,7 @@ func rememberCompilationPrimer(namespace string, key [32]byte) {
 // Both consumers preserve source paths at the same stable workspace pathname;
 // a trimmed build cannot seed an untrimmed test. Retention runs under the same lock
 // as compilation and copying; Go treats evicted index/data files as misses.
-func (host Host) seedCompilationCache(ctx context.Context, workspace, source, goBinary, profile string, environment []string, pattern, sourceIdentity string, timings *VerificationTimings) error {
+func (host Host) seedCompilationCache(ctx context.Context, workspace, source, goBinary, profile string, environment []string, pattern, sourceIdentity string, timings *VerificationTimings, tags ...[]string) error {
 	if host.CompilationCache == "" {
 		return nil
 	}
@@ -109,7 +109,11 @@ func (host Host) seedCompilationCache(ctx context.Context, workspace, source, go
 	if err != nil {
 		return fmt.Errorf("compilation cache retention: %w", err)
 	}
-	key := sha256.Sum256([]byte(strings.Join(append([]string{sourceIdentity, source, pattern, profile}, environment...), "\x00")))
+	var selectedTags []string
+	if len(tags) > 0 {
+		selectedTags = tags[0]
+	}
+	key := sha256.Sum256([]byte(strings.Join(append([]string{sourceIdentity, source, pattern, profile, strings.Join(selectedTags, ",")}, environment...), "\x00")))
 	entries, err := os.ReadDir(cache)
 	if err != nil {
 		return err
@@ -138,6 +142,9 @@ func (host Host) seedCompilationCache(ctx context.Context, workspace, source, go
 		}
 	}
 	args := compilationPrimerArguments(goBinary, pattern)
+	if len(selectedTags) > 0 {
+		args = append(args[:len(args)-1], "-tags="+strings.Join(selectedTags, ","), pattern)
+	}
 	command := exec.CommandContext(ctx, "/usr/bin/sandbox-exec", append([]string{"-p", compilerProfile}, args...)...)
 	command.Dir = source
 	command.Env = replaceEnvironment(environment, "GOCACHE", cache)

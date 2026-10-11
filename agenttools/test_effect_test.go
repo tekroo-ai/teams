@@ -194,7 +194,7 @@ func TestTestGatewayRetainsTimeoutAndCancellation(t *testing.T) {
 			// A real executable exercises the sandbox/process path without
 			// granting a shell interpreter any extra execution permission.
 			stubSource := stub + ".go"
-			stubCode := fmt.Sprintf("package main\nimport (\"fmt\"; \"net\"; \"time\")\nfunc main() { fmt.Println(\"fixture-started\"); c, err := net.Dial(\"tcp\", %q); if err != nil { panic(err) }; c.Close(); time.Sleep(30*time.Second) }\n", listener.Addr().String())
+			stubCode := fmt.Sprintf("package main\nimport (\"fmt\"; \"net\"; \"time\"; \"os\")\nfunc main() { if len(os.Args)>1 && os.Args[1]==\"list\" { fmt.Println(`{\"ImportPath\":\"example.test/bounded\"}`); return }; fmt.Println(\"fixture-started\"); c, err := net.Dial(\"tcp\", %q); if err != nil { panic(err) }; c.Close(); time.Sleep(30*time.Second) }\n", listener.Addr().String())
 			if err := os.WriteFile(stubSource, []byte(stubCode), 0600); err != nil {
 				t.Fatal(err)
 			}

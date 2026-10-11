@@ -154,10 +154,8 @@ func decodeGoTestArguments(call Call, pattern *string) bool {
 		*pattern = "./..."
 		return decode(call.Arguments, &empty) == nil
 	}
-	var args struct {
-		Package string `json:"package"`
-	}
-	if decode(call.Arguments, &args) != nil {
+	var args goTestArguments
+	if decode(call.Arguments, &args) != nil || !args.valid() {
 		return false
 	}
 	*pattern = args.Package
