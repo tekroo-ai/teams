@@ -238,7 +238,7 @@ func TestR63RawDraftFindingsExposeGraphAndAllManifestErrorsTogether(t *testing.T
 				}
 			}
 		}
-		if index == 0 && !strings.Contains(err.Error(), "non-prior dependency or validation index 1") {
+		if index == 0 && !strings.Contains(err.Error(), "validates references non-prior task index 1") {
 			t.Fatal(err)
 		}
 		if index == 2 && !strings.Contains(err.Error(), "without annotations") {
@@ -278,7 +278,7 @@ func TestR63AggregatedCorrectionRetainsEveryRawDraftAndPriorEvidence(t *testing.
 		t.Fatalf("unexpected model calls: %d", len(model.seen))
 	}
 	history, _ := json.Marshal(model.seen[3])
-	for _, want := range []string{"original pinned instructions", "original decision context", "RouteID", "non-prior dependency", "adapters/memory/role_alias_store.go", "bodyless function signatures"} {
+	for _, want := range []string{"original pinned instructions", "original decision context", "RouteID", "validates references non-prior task index", "adapters/memory/role_alias_store.go", "bodyless function signatures"} {
 		if !strings.Contains(string(history), want) {
 			t.Fatalf("lost %q", want)
 		}
@@ -324,7 +324,7 @@ func TestPlanFinalizationDeclarationFindingsPreserveStructuralRejection(t *testi
 	output = []byte(strings.Replace(string(output), `"result_type":"FEATURE_PLAN"`, `"result_type":"FEATURE_EXECUTION_PLAN","source_design_digest":"`+strings.Repeat("a", 64)+`","handoffs":[]`, 1))
 	_, structuralErr := parsePlanFinalizationStageResult(output, nil)
 	err := planningDeclarationFindings(t.Context(), r63DeclarationFixtureRoot(t), stagePlanFinalization, output, structuralErr)
-	if !errors.Is(err, organization.ErrInvalidFeature) || !strings.Contains(err.Error(), "non-prior dependency") || !strings.Contains(err.Error(), "bodyless function signatures") {
+	if !errors.Is(err, organization.ErrInvalidFeature) || !strings.Contains(err.Error(), "validates references non-prior task index") || !strings.Contains(err.Error(), "bodyless function signatures") {
 		t.Fatalf("independent findings hid finalization rejection: %v", err)
 	}
 	broken := []byte(strings.Replace(string(output), `"handoffs":[]`, `"handoffs":null`, 1))

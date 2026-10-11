@@ -52,6 +52,23 @@ func TestResultArrayLimitsNarrowWithoutEditingSignedContract(t *testing.T) {
 	}
 }
 
+func TestNestedArrayLimitForbidsAuthoredLinksWithoutChangingSignedSchema(t *testing.T) {
+	raw := json.RawMessage(`{"type":"object","required":["tasks"],"properties":{"tasks":{"type":"array","minItems":1,"items":{"type":"object","required":["validates"],"properties":{"validates":{"type":"array","items":{"type":"integer","minimum":0}}}}}}}`)
+	before := string(raw)
+	narrowed, err := narrowResultArrays(raw, []ResultArrayLimit{{PropertyPath: []string{"tasks", "*", "validates"}, MaxItems: 0}})
+	if err != nil || !schemaAccepts(t, narrowed, []byte(`{"tasks":[{"validates":[]}]}`)) || schemaAccepts(t, narrowed, []byte(`{"tasks":[{"validates":[0]}]}`)) {
+		t.Fatalf("nested policy not enforced: %s %v", narrowed, err)
+	}
+	if string(raw) != before || !schemaAccepts(t, raw, []byte(`{"tasks":[{"validates":[0]}]}`)) || schemaAccepts(t, narrowed, []byte(`{"tasks":[]}`)) {
+		t.Fatal("source schema changed or unrelated minimum weakened")
+	}
+	for _, path := range [][]string{{"*", "validates"}, {"tasks", "validates"}, {"tasks", "*", "missing"}} {
+		if _, err := narrowResultArrays(raw, []ResultArrayLimit{{PropertyPath: path, MaxItems: 0}}); err == nil {
+			t.Fatalf("invalid wildcard path accepted: %v", path)
+		}
+	}
+}
+
 func TestResultArrayLimitsFailClosedOnInvalidBindings(t *testing.T) {
 	for _, limit := range []ResultArrayLimit{
 		{PropertyPath: nil, MaxItems: 7},

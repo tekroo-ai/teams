@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -18,9 +19,9 @@ import (
 var ErrContextBudget = errors.New("model request exceeds admitted context delivery budget")
 
 // ContextDeliveryPolicy is one host-owned policy shared by every native role.
-// Request admission is a conservative byte bound, NOT an exact token count.
-// It is qualified for byte-BPE models whose chat-template overhead fits ReserveTokens.
-// Other tokenizers/templates require qualification of an explicit policy.
+// Historical admission is a conservative byte bound, NOT a token count.
+// Rendered admission uses the provider's own chat template/tokenizer and keeps
+// transport, output and correction budgets separate. Neither drops authority.
 type ContextDeliveryPolicy struct {
 	ContextTokens int `json:"context_tokens"`
 	ReserveTokens int `json:"reserve_tokens"`
@@ -28,6 +29,10 @@ type ContextDeliveryPolicy struct {
 	ResultBytes   int `json:"result_bytes"`
 	HistoryBytes  int `json:"history_bytes"`
 	PageBytes     int `json:"page_bytes"`
+	// Empty preserves historical byte admission. Rendered admission requires
+	// the provider's exact chat template/tokenizer count, never an estimate.
+	Admission           string `json:"admission,omitempty"`
+	RepairReserveTokens int    `json:"repair_reserve_tokens,omitempty"`
 }
 
 func DefaultContextDeliveryPolicy() ContextDeliveryPolicy {
@@ -36,19 +41,35 @@ func DefaultContextDeliveryPolicy() ContextDeliveryPolicy {
 }
 
 func (p ContextDeliveryPolicy) Valid() bool {
+	byteLimit := p.ContextTokens - p.ReserveTokens
+	if p.Admission == "rendered_tokens" {
+		byteLimit = 2 << 20
+	}
 	return p.ContextTokens > 0 && p.ContextTokens <= 1<<24 && p.ReserveTokens > 0 && p.ReserveTokens < p.ContextTokens &&
-		p.RequestBytes >= 1024 && p.RequestBytes <= p.ContextTokens-p.ReserveTokens &&
+		(p.Admission == "" && p.RepairReserveTokens == 0 || p.Admission == "rendered_tokens" && p.RepairReserveTokens > 0) && p.RepairReserveTokens < p.ContextTokens-p.ReserveTokens &&
+		p.RequestBytes >= 1024 && p.RequestBytes <= byteLimit &&
 		p.ResultBytes >= 1024 && p.ResultBytes <= p.HistoryBytes && p.HistoryBytes <= p.RequestBytes &&
 		p.PageBytes > 0 && p.PageBytes <= 4096
 }
 
 func (p ContextDeliveryPolicy) Admit(requestBytes, outputTokens int) error {
-	if !p.Valid() || requestBytes < 0 || outputTokens <= 0 {
+	if !p.Valid() || p.Admission != "" || requestBytes < 0 || outputTokens <= 0 {
 		return ErrInvalidTurn
 	}
 	limit := min(p.RequestBytes, p.ContextTokens-p.ReserveTokens-outputTokens)
 	if requestBytes > limit {
 		return fmt.Errorf("%w: serialized request %d bytes, limit %d, output reserve %d tokens; original journal retained", ErrContextBudget, requestBytes, limit, outputTokens)
+	}
+	return nil
+}
+
+func (p ContextDeliveryPolicy) AdmitTokens(requestBytes, promptTokens, providerContext, outputTokens int) error {
+	if !p.Valid() || p.Admission != "rendered_tokens" || requestBytes < 0 || promptTokens < 0 || providerContext <= 0 || providerContext > 1<<24 || outputTokens <= 0 || outputTokens > 1<<24 {
+		return ErrInvalidTurn
+	}
+	limit := min(p.ContextTokens, providerContext) - p.ReserveTokens - outputTokens - p.RepairReserveTokens
+	if requestBytes > p.RequestBytes || promptTokens > limit {
+		return fmt.Errorf("%w: serialized request %d/%d bytes, rendered prompt %d/%d tokens, output reserve %d, correction reserve %d tokens; original journal retained", ErrContextBudget, requestBytes, p.RequestBytes, promptTokens, limit, outputTokens, p.RepairReserveTokens)
 	}
 	return nil
 }
@@ -193,7 +214,9 @@ type receiptPresentation struct {
 	Tool      string            `json:"tool"`
 	CallID    string            `json:"call_id"`
 	Summary   map[string]any    `json:"summary,omitempty"`
-	Read      string            `json:"read"`
+	Read      string            `json:"read,omitempty"` // Decode legacy checkpoints only.
+	Access    string            `json:"access_instructions,omitempty"`
+	Pointers  []string          `json:"source_json_pointers,omitempty"`
 }
 
 func receiptView(m Message, summary bool) (string, error) {
@@ -212,7 +235,30 @@ func receiptView(m Message, summary bool) (string, error) {
 		}
 	}
 	v := receiptPresentation{Delivery: "RECORDED_RESULT_REFERENCE", Reference: *ref, Tool: m.Name, CallID: m.CallID,
-		Read: "read_recorded_result with reference invocation_id, sequence and sha256; json_pointer selects an exact field; match_field/match_value select exact array records. This view is not complete evidence."}
+		Access: "Read ORIGINAL result via read_recorded_result with exact reference; json_pointer is not presentation metadata. read_file source: /output; omit pointer for whole JSON. match_field/match_value require an ARRAY: for Go test records use /test_evidence/tests or /test_evidence/excluded, not the /test_evidence object. This view is not complete evidence."}
+	var source map[string]json.RawMessage
+	if resultDigest(m.Content) == ref.SHA256 && json.Unmarshal([]byte(m.Content), &source) == nil {
+		keys := boundedObjectKeys(source)
+		if _, present := source["output"]; present {
+			keys = append([]string{"output"}, keys...)
+		}
+		// Metadata itself must fit the smallest qualified presentation budget.
+		pointerBytes := 0
+		for _, key := range keys {
+			pointer := "/" + strings.ReplaceAll(strings.ReplaceAll(key, "~", "~0"), "/", "~1")
+			encoded, _ := json.Marshal(pointer)
+			if len(v.Pointers) > 0 && pointer == "/output" || pointerBytes+len(encoded)+1 > 128 {
+				continue
+			}
+			v.Pointers = append(v.Pointers, pointer)
+			pointerBytes += len(encoded) + 1
+		}
+	} else {
+		var prior receiptPresentation
+		if json.Unmarshal([]byte(m.Content), &prior) == nil {
+			v.Pointers = prior.Pointers
+		}
+	}
 	if summary && resultDigest(m.Content) == ref.SHA256 {
 		var object map[string]json.RawMessage
 		if json.Unmarshal([]byte(m.Content), &object) == nil {
@@ -274,8 +320,8 @@ func (r RecordedResultReader) Definition() ToolDefinition {
 		"required": []string{"invocation_id", "sequence", "sha256"}, "properties": map[string]any{
 			"invocation_id": map[string]any{"type": "string", "enum": ids}, "sequence": map[string]any{"type": "integer", "minimum": 1},
 			"sha256":       map[string]any{"type": "string", "minLength": 64, "maxLength": 64},
-			"json_pointer": map[string]any{"type": "string", "maxLength": 1024},
-			"match_field":  map[string]any{"type": "string", "maxLength": 128}, "match_value": map[string]any{"type": "string", "maxLength": 1024},
+			"json_pointer": map[string]any{"type": "string", "maxLength": 1024, "description": "Exact pointer into ORIGINAL tool-result JSON, not reference presentation metadata. read_file source is /output. Omit to page the whole original result."},
+			"match_field":  map[string]any{"type": "string", "maxLength": 128, "description": "Requires json_pointer to select an ARRAY of records, not its containing object. Go test records: /test_evidence/tests or /test_evidence/excluded, not /test_evidence."}, "match_value": map[string]any{"type": "string", "maxLength": 1024},
 			"byte_offset": map[string]any{"type": "integer", "minimum": 0, "default": 0, "description": "Starting BYTE offset in the selected JSON, not an array index. Omit for the first page."},
 			"byte_limit":  map[string]any{"type": "integer", "minimum": 1, "maximum": r.Policy.PageBytes, "default": r.Policy.PageBytes, "description": "Maximum BYTES per page, NOT the number of records. Omit to return the full bounded page, including after an exact record match. A value of 1 returns only one byte."}}})
 	return ToolDefinition{Name: "read_recorded_result", Description: "Read an exact durable tool result for this invocation or its authorized ancestors. Read-only, never reruns a tool. Supply its displayed reference. Optional JSON pointer and exact array-record match avoid scanning a full suite. Omit byte_limit/byte_offset for an exact named-record lookup. Byte pagination includes digest, total_bytes and next_byte_offset; page_complete is not test completeness.", Parameters: parameters, Strict: true}
@@ -435,14 +481,16 @@ func selectRecordedJSON(raw []byte, pointer, field string, value *string) ([]byt
 				node = array[i]
 			}
 			if len(node) == 0 {
-				return nil, ErrInvalidTurn
+				return nil, fmt.Errorf("%w: recorded-result JSON pointer %q not found; available object keys: %v. Select original result fields, not presentation metadata", ErrInvalidTurn, pointer, boundedObjectKeys(object))
 			}
 		}
 	}
 	if field != "" {
 		var array []json.RawMessage
 		if json.Unmarshal(node, &array) != nil || array == nil {
-			return nil, ErrInvalidTurn
+			var object map[string]json.RawMessage
+			_ = json.Unmarshal(node, &object)
+			return nil, fmt.Errorf("%w: match_field requires json_pointer %q to select an array of records, not a containing object or scalar; available object keys: %v", ErrInvalidTurn, pointer, boundedObjectKeys(object))
 		}
 		matched := make([]json.RawMessage, 0)
 		for _, item := range array {
@@ -455,4 +503,18 @@ func selectRecordedJSON(raw []byte, pointer, field string, value *string) ([]byt
 		return json.Marshal(matched)
 	}
 	return node, nil
+}
+
+func boundedObjectKeys(object map[string]json.RawMessage) []string {
+	keys := make([]string, 0, len(object))
+	for key := range object {
+		if len(key) <= 128 {
+			keys = append(keys, key)
+		}
+	}
+	sort.Strings(keys)
+	if len(keys) > 16 {
+		keys = keys[:16]
+	}
+	return keys
 }

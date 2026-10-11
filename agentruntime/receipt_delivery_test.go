@@ -110,6 +110,46 @@ func TestReceiptHistoryBudgetAndMissingReferenceFailClosed(t *testing.T) {
 	}
 }
 
+func TestSourcePointerMetadataFitsMinimumPresentationBudget(t *testing.T) {
+	value := map[string]any{"output": strings.Repeat("exact source ", 1000)}
+	for i := 0; i < 30; i++ {
+		value[fmt.Sprintf("%02d-%s", i, strings.Repeat("long-key", 15))] = "x"
+	}
+	raw, _ := json.Marshal(value)
+	_, message, _ := recordedFixture(t, raw)
+	policy := DefaultContextDeliveryPolicy()
+	policy.ResultBytes = 1024
+	projected, err := (ReceiptCondenser{Policy: policy}).Condense(context.Background(), []Message{message})
+	if err != nil || len(projected[0].Content) > policy.ResultBytes || !strings.Contains(projected[0].Content, `"/output"`) {
+		t.Fatalf("oversized pointer metadata: %v", err)
+	}
+}
+
+func TestRecordedArrayMatchGuidanceAndWrongContainerReceipt(t *testing.T) {
+	_, message, reader := recordedFixture(t, largeReceipt(t))
+	view, err := receiptView(message, true)
+	if err != nil || !strings.Contains(view, "/test_evidence/tests") || !strings.Contains(view, "/test_evidence/excluded") || !strings.Contains(view, "ARRAY") {
+		t.Fatalf("array selection guidance missing: %s %v", view, err)
+	}
+	definition, _ := json.Marshal(reader.Definition())
+	if !strings.Contains(string(definition), "ARRAY") {
+		t.Fatal("reader schema does not explain matching container")
+	}
+	name := "TestCase3"
+	if _, err := selectRecordedJSON([]byte(message.Content), "/test_evidence", "name", &name); !errors.Is(err, ErrInvalidTurn) || !strings.Contains(err.Error(), "/test_evidence") || !strings.Contains(err.Error(), "array") || !strings.Contains(err.Error(), "excluded") || !strings.Contains(err.Error(), "tests") {
+		t.Fatalf("wrong-container error is not actionable: %v", err)
+	}
+	got, err := selectRecordedJSON([]byte(message.Content), "/test_evidence/tests", "name", &name)
+	if err != nil || !bytes.Contains(got, []byte(`"status":"SKIP"`)) {
+		t.Fatalf("array correction lost exact status: %s %v", got, err)
+	}
+	missing := "NoSuchTest"
+	got, err = selectRecordedJSON([]byte(message.Content), "/test_evidence/tests", "name", &missing)
+	if err != nil || string(got) != "[]" {
+		t.Fatalf("legitimate empty match became an error: %s %v", got, err)
+	}
+}
+
 func readReceipt(t *testing.T, reader RecordedResultReader, m Message, extra map[string]any) json.RawMessage {
 	t.Helper()
 	args := map[string]any{"invocation_id": m.Receipt.InvocationID, "sequence": m.Receipt.Sequence, "sha256": m.Receipt.SHA256}
@@ -352,6 +392,37 @@ func TestContextAdmissionAlsoGuardsContinuationAndFinalRepair(t *testing.T) {
 	}
 	if posts != 1 {
 		t.Fatalf("overflow reached server: posts=%d", posts)
+	}
+}
+
+func TestRenderedAdmissionReservesCorrectionAndFailsClosed(t *testing.T) {
+	p := DefaultContextDeliveryPolicy()
+	p.Admission = "rendered_tokens"
+	p.RequestBytes = 2 << 20
+	p.RepairReserveTokens = 32768
+	if err := p.AdmitTokens(208616, 53701, 262144, 32768); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range [][4]int{{208616, 220000, 262144, 32768}, {208616, 53701, 65536, 32768}, {208616, -1, 262144, 32768}, {3 << 20, 1, 262144, 32768}} {
+		if err := p.AdmitTokens(tc[0], tc[1], tc[2], tc[3]); err == nil {
+			t.Fatalf("invalid/overflow admission: %v", tc)
+		}
+	}
+}
+
+func TestRecordedFilePointerContractDoesNotAliasPresentation(t *testing.T) {
+	_, m, reader := recordedFixture(t, json.RawMessage(`{"name":"read_file","output":"exact source\n","padding":"`+strings.Repeat("x", 9000)+`"}`))
+	got, err := (ReceiptCondenser{Policy: reader.Policy}).Condense(context.Background(), []Message{m})
+	if err != nil || !strings.Contains(got[0].Content, `"/output"`) || strings.Contains(got[0].Content, `"read":`) {
+		t.Fatalf("ambiguous projection: %v %s", err, got[0].Content)
+	}
+	args, _ := json.Marshal(map[string]any{"invocation_id": "own", "sequence": 1, "sha256": m.Receipt.SHA256, "json_pointer": "/read"})
+	if _, err := reader.Read(context.Background(), args); !errors.Is(err, ErrInvalidTurn) || !strings.Contains(err.Error(), "not found") || !strings.Contains(err.Error(), "output") {
+		t.Fatalf("missing actionable pointer error: %v", err)
+	}
+	page := readReceipt(t, reader, m, map[string]any{"json_pointer": "/output"})
+	if !strings.Contains(string(page), "exact source") {
+		t.Fatal(string(page))
 	}
 }
 

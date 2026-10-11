@@ -66,3 +66,28 @@ func TestSuccessfulModelDiagnosticsSurviveJournalReplay(t *testing.T) {
 		t.Fatalf("replay regenerated: %q %v calls=%d", result, err, requests)
 	}
 }
+
+func TestProviderRepetitionTerminationIsNeverContinuedOrAccepted(t *testing.T) {
+	for _, reason := range []string{"stop", "length"} {
+		t.Run(reason, func(t *testing.T) {
+			requests := 0
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				requests++
+				_ = json.NewEncoder(w).Encode(map[string]any{"id": "loop-1", "choices": []any{map[string]any{"finish_reason": reason, "finish_details": map[string]any{"type": "repetition_loop"}, "message": map[string]any{"content": `{"submit_result":`}}}})
+			}))
+			defer server.Close()
+			journal := &memoryJournal{}
+			model := OpenAIModel{Client: server.Client(), BaseURL: server.URL + "/v1", Model: "fixture", MaxTokens: 512, TurnContract: structuredTestContract(t)}
+			runner := Runner{Journal: journal, Model: model, Tools: &countingTool{}, MaxTurns: 3, FinalTool: "submit_result", Finalize: func(raw json.RawMessage) (string, error) { return string(raw), nil }}
+			ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+			defer cancel()
+			_, err := runner.Run(ctx, "loop", testRequestDigest, "do work")
+			if !errors.Is(err, ErrInvalidTurn) || !strings.Contains(err.Error(), "repetition_loop") || requests != 1 {
+				t.Fatalf("loop accepted, continued or misclassified: requests=%d error=%v", requests, err)
+			}
+			if len(journal.entries) != 2 || journal.entries[1].Kind != ModelResponse || !strings.Contains(string(journal.entries[1].Payload), `"finish_details":{"type":"repetition_loop"}`) {
+				t.Fatalf("provider termination receipt not retained: %+v", journal.entries)
+			}
+		})
+	}
+}

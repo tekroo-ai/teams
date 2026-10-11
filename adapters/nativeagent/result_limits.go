@@ -26,6 +26,14 @@ func narrowResultArrays(raw json.RawMessage, limits []ResultArrayLimit) (json.Ra
 		}
 		node := schema
 		for _, name := range limit.PropertyPath {
+			if name == "*" && node["type"] == "array" {
+				next, ok := node["items"].(map[string]any)
+				if !ok {
+					return nil, ErrInvalidBinding
+				}
+				node = next
+				continue
+			}
 			properties, ok := node["properties"].(map[string]any)
 			if !ok || name == "" {
 				return nil, fmt.Errorf("%w: result-array path %v is not declared", ErrInvalidBinding, limit.PropertyPath)

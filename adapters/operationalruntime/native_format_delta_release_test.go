@@ -208,11 +208,18 @@ func priorFormatSurface(t *testing.T, permissions []string) kernel.Digest {
 }
 
 func TestPriorFormatSurfaceFrozen(t *testing.T) {
-	if got := priorFormatSurface(t, []string{"repository.read"}); got != "064c49fc944e1523ecec273c3c83f2152e756cb4f16e21287818a45dcad435b3" {
+	// Archived from 7feef632acbab26d2f7c92db3bd9ccfe65669fb4 with only
+	// check_go_format restored; later catalogue additions are not historical input.
+	raw, err := os.ReadFile(filepath.Join("testdata", "native-format-prior-read-surface.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	frozen := digestBytes([]byte(strings.TrimSpace(string(raw))))
+	if got := frozen; got != "064c49fc944e1523ecec273c3c83f2152e756cb4f16e21287818a45dcad435b3" {
 		t.Fatal("frozen pre-change surface mismatch", got)
 	}
 	current, err := agenttools.NativeToolSurfaceDigest([]string{"repository.read"})
-	if err != nil || current == priorFormatSurface(t, []string{"repository.read"}) {
+	if err != nil || current == frozen {
 		t.Fatal("format delta not bound", err)
 	}
 }

@@ -193,7 +193,21 @@ func (model OpenAIModel) complete(ctx context.Context, transcript []Message, par
 		return Completion{}, err
 	}
 	if model.ContextPolicy != nil {
-		if err := model.ContextPolicy.Admit(len(body), model.MaxTokens); err != nil {
+		if model.ContextPolicy.Admission == "rendered_tokens" {
+			admission, err := model.admitRendered(ctx, body)
+			if err != nil {
+				return Completion{}, err
+			}
+			defer func() {
+				if completion.Diagnostics != nil {
+					completion.Diagnostics.Admission = admission
+				}
+				var observed *ModelCompletionError
+				if errors.As(completionErr, &observed) {
+					observed.Diagnostics.Admission = admission
+				}
+			}()
+		} else if err := model.ContextPolicy.Admit(len(body), model.MaxTokens); err != nil {
 			return Completion{}, err
 		}
 	}
@@ -230,8 +244,9 @@ func (model OpenAIModel) complete(ctx context.Context, transcript []Message, par
 		ID      string          `json:"id"`
 		Usage   json.RawMessage `json:"usage"`
 		Choices []struct {
-			FinishReason string `json:"finish_reason"`
-			Message      struct {
+			FinishReason  string          `json:"finish_reason"`
+			FinishDetails json.RawMessage `json:"finish_details"`
+			Message       struct {
 				Content          string `json:"content"`
 				ReasoningContent string `json:"reasoning_content"`
 				ToolCalls        []struct {
@@ -248,7 +263,7 @@ func (model OpenAIModel) complete(ctx context.Context, transcript []Message, par
 		return Completion{}, fmt.Errorf("%w: malformed model completion", ErrInvalidTurn)
 	}
 	message := decoded.Choices[0].Message
-	diagnostics := ModelDiagnostics{ResponseID: decoded.ID, ResponseSHA256: fmt.Sprintf("%x", sha256.Sum256(encoded)), FinishReason: decoded.Choices[0].FinishReason,
+	diagnostics := ModelDiagnostics{ResponseID: decoded.ID, ResponseSHA256: fmt.Sprintf("%x", sha256.Sum256(encoded)), FinishReason: decoded.Choices[0].FinishReason, FinishDetails: decoded.Choices[0].FinishDetails,
 		ContentBytes: len(message.Content), ReasoningBytes: len(message.ReasoningContent), Usage: decoded.Usage, Continuation: partial != nil, MaxOutputTokens: model.MaxTokens}
 	defer func() {
 		if completionErr != nil {
@@ -257,6 +272,15 @@ func (model OpenAIModel) complete(ctx context.Context, transcript []Message, par
 			completion.Diagnostics = &diagnostics
 		}
 	}()
+	var finish struct {
+		Type string `json:"type"`
+	}
+	_ = json.Unmarshal(decoded.Choices[0].FinishDetails, &finish)
+	// A provider repetition cutoff is terminal, not output-budget exhaustion.
+	// Continuing its prefix feeds the same loop back into the model.
+	if finish.Type == "repetition_loop" {
+		return Completion{}, fmt.Errorf("%w: provider terminated response: repetition_loop; no continuation dispatched", ErrInvalidTurn)
+	}
 	if constrained {
 		if len(message.ToolCalls) != 0 || decoded.ID == "" && (model.TurnContract != nil || decoded.Choices[0].FinishReason == "length") {
 			return Completion{}, fmt.Errorf("%w: native tools or missing response identity on structured channel", ErrInvalidTurn)

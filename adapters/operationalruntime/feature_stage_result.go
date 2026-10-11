@@ -521,9 +521,14 @@ func validateArchitectureStageResult(result architectureStageResult, allowedMark
 		if invalid != "" {
 			return architectureStageResult{}, fmt.Errorf("%w: task %d has invalid %s", organization.ErrInvalidFeature, index, invalid)
 		}
-		for _, dependency := range append(append([]uint32(nil), task.DependsOn...), task.Validates...) {
-			if dependency >= uint32(index) {
-				return architectureStageResult{}, fmt.Errorf("%w: task %d references non-prior dependency or validation index %d", organization.ErrInvalidFeature, index, dependency)
+		for _, relation := range []struct {
+			name  string
+			links []uint32
+		}{{"depends_on", task.DependsOn}, {"validates", task.Validates}} {
+			for _, dependency := range relation.links {
+				if dependency >= uint32(index) {
+					return architectureStageResult{}, fmt.Errorf("%w: task %d %s references non-prior task index %d; only indexes smaller than %d are allowed", organization.ErrInvalidFeature, index, relation.name, dependency, index)
+				}
 			}
 		}
 	}

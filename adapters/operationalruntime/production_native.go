@@ -219,6 +219,7 @@ func configuredNativeSession(ctx context.Context, service *ProductionService, pr
 			for _, route := range routing.PurposeRoutes {
 				allowed = append(allowed, string(route.Purpose))
 			}
+			result.ResultArrayLimits = append(result.ResultArrayLimits, authoredValidationLinkLimits(routing)...)
 			result.ResultEnumLimits = []nativeagent.ResultEnumLimit{{PropertyPath: []string{"work_product", "tasks", "*", "purpose"}, Values: allowed}}
 		}
 	}
@@ -311,4 +312,18 @@ func featureStageResultArrayLimits(stage featurePlanningStage, maximumTasks uint
 		PropertyPath: []string{"work_product", "tasks"},
 		MaxItems:     int(maximumBudgetedImplementationTasks(maximumTasks)),
 	}}
+}
+
+// Mixed purpose policies need per-task semantic checks; narrowing a shared
+// item schema to zero would forbid links that some admitted purposes allow.
+func authoredValidationLinkLimits(routing workflowTaskRoutingPolicy) []nativeagent.ResultArrayLimit {
+	if len(routing.PurposeRoutes) == 0 {
+		return nil
+	}
+	for _, route := range routing.PurposeRoutes {
+		if route.MayAuthorValidationLinks {
+			return nil
+		}
+	}
+	return []nativeagent.ResultArrayLimit{{PropertyPath: []string{"work_product", "tasks", "*", "validates"}, MaxItems: 0}}
 }
