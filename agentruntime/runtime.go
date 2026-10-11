@@ -72,11 +72,12 @@ type ToolResult struct {
 
 // Message is the model-facing transcript reconstructed from the journal.
 type Message struct {
-	Role      string     `json:"role"`
-	Content   string     `json:"content,omitempty"`
-	ToolCalls []ToolCall `json:"tool_calls,omitempty"`
-	CallID    string     `json:"tool_call_id,omitempty"`
-	Name      string     `json:"name,omitempty"`
+	Role      string             `json:"role"`
+	Content   string             `json:"content,omitempty"`
+	ToolCalls []ToolCall         `json:"tool_calls,omitempty"`
+	CallID    string             `json:"tool_call_id,omitempty"`
+	Name      string             `json:"name,omitempty"`
+	Receipt   *RecordedResultRef `json:"recorded_result,omitempty"`
 }
 
 type Model interface {
@@ -203,7 +204,10 @@ func (runner Runner) Run(ctx context.Context, invocationID, requestDigest, promp
 				return "", err
 			}
 			if !reflect.DeepEqual(prepared, runner.ContextFork) {
-				return "", ErrInvalidTurn
+				if !legacyReceiptForkEquivalent(runner.ContextFork, prepared) {
+					return "", ErrInvalidTurn
+				}
+				runner.ContextFork = prepared
 			}
 		}
 		if err := runner.checkOwnership(ctx); err != nil {
@@ -231,7 +235,7 @@ func (runner Runner) Run(ctx context.Context, invocationID, requestDigest, promp
 	// A restart must retain the same authorized ancestor. A caller cannot
 	// replace or silently remove the inherited history of an existing child.
 	var recordedStart startRecord
-	if json.Unmarshal(entries[0].Payload, &recordedStart) != nil || !reflect.DeepEqual(recordedStart.ContextFork, runner.ContextFork) {
+	if json.Unmarshal(entries[0].Payload, &recordedStart) != nil || !reflect.DeepEqual(recordedStart.ContextFork, runner.ContextFork) && !legacyReceiptForkEquivalent(recordedStart.ContextFork, runner.ContextFork) {
 		return "", ErrInvalidTurn
 	}
 	for {
@@ -620,14 +624,25 @@ func replay(id, requestDigest, prompt, systemPrompt, finalTool string, finalize 
 			}
 		case Compacted:
 			var checkpoint historyCheckpoint
-			if len(outstanding) != 0 || finalText != nil || partial != nil || json.Unmarshal(entry.Payload, &checkpoint) != nil || checkpoint.SourceDigest != historyDigest(messages) || !validWorkingHistory(checkpoint.History) {
+			if len(outstanding) != 0 || finalText != nil || partial != nil || json.Unmarshal(entry.Payload, &checkpoint) != nil || !validWorkingHistory(checkpoint.History) {
 				return nil, nil, nil, 0, ErrInvalidTurn
+			}
+			if checkpoint.SourceDigest != historyDigest(messages) {
+				for _, m := range checkpoint.History {
+					if m.Receipt != nil {
+						return nil, nil, nil, 0, ErrInvalidTurn
+					}
+				}
+				if checkpoint.SourceDigest != legacyReceiptHistoryDigest(messages) {
+					return nil, nil, nil, 0, ErrInvalidTurn
+				}
 			}
 			pinned := 1
 			if systemPrompt != "" {
 				pinned = 2
 			}
-			messages = append(messages[:pinned:pinned], checkpoint.History...)
+			history := restoreRecordedReferences(checkpoint.History, messages[pinned:])
+			messages = append(messages[:pinned:pinned], history...)
 		case ModelPartial:
 			var next PartialTurnError
 			if len(outstanding) != 0 || finalText != nil || json.Unmarshal(entry.Payload, &next) != nil || !next.valid() {
@@ -692,7 +707,8 @@ func replay(id, requestDigest, prompt, systemPrompt, finalTool string, finalize 
 			if result.Error != "" {
 				content = strJSON(result.Error)
 			}
-			messages = append(messages, Message{Role: "tool", Content: content, CallID: result.CallID, Name: result.Name})
+			messages = append(messages, Message{Role: "tool", Content: content, CallID: result.CallID, Name: result.Name,
+				Receipt: &RecordedResultRef{InvocationID: id, Sequence: entry.Sequence, SHA256: resultDigest(content)}})
 			outstanding = outstanding[1:]
 		case Finished:
 			if partial != nil {

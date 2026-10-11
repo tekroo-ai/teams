@@ -185,6 +185,44 @@ func PrepareContextFork(ctx context.Context, journal Journal, childID string, so
 	if !validWorkingHistory(messages) {
 		return nil, ErrInvalidTurn
 	}
+	// Legacy nested checkpoints predate receipt references. Bind their exact
+	// unchanged tool bytes to verified ancestry; do not rewrite decisions or
+	// manufacture references for synthetic/unrecorded observations.
+	sources, err := ReceiptSources(ctx, journal, &source)
+	if err != nil {
+		return nil, err
+	}
+	missing := false
+	for _, m := range messages {
+		missing = missing || m.Role == "tool" && m.Receipt == nil
+	}
+	var originals []Message
+	for _, ancestor := range sources {
+		if !missing {
+			break
+		}
+		original, err := LoadForkEntries(ctx, journal, ancestor)
+		if err != nil {
+			return nil, err
+		}
+		for _, entry := range original {
+			if entry.Kind != ToolDone {
+				continue
+			}
+			var result ToolResult
+			if json.Unmarshal(entry.Payload, &result) != nil {
+				return nil, ErrInvalidTurn
+			}
+			content := string(result.Output)
+			if result.Error != "" {
+				content = strJSON(result.Error)
+			}
+			originals = append(originals, Message{Role: "tool", Name: result.Name, CallID: result.CallID, Content: content, Receipt: &RecordedResultRef{InvocationID: ancestor.InvocationID, Sequence: entry.Sequence, SHA256: resultDigest(content)}})
+		}
+	}
+	if missing {
+		messages = restoreRecordedReferences(messages, originals)
+	}
 	fork := &ContextFork{Source: source, WorkingHistory: messages, HistorySHA256: historyDigest(messages)}
 	encoded, err := json.Marshal(fork)
 	if err != nil || len(encoded) > MaxJournalPayloadBytes/2 {

@@ -26,6 +26,7 @@ import (
 	"github.com/tekroo-ai/teams/adapters/nativeagent"
 	"github.com/tekroo-ai/teams/adapters/openhands"
 	"github.com/tekroo-ai/teams/adapters/protocol"
+	"github.com/tekroo-ai/teams/agentruntime"
 	"github.com/tekroo-ai/teams/application"
 	"github.com/tekroo-ai/teams/contract"
 	"github.com/tekroo-ai/teams/kernel"
@@ -114,6 +115,8 @@ type ProductionOpenHandsConfig struct {
 // ProductionNativeConfig is an explicit file-backed opt-in. Omitting
 // execution_backend retains the established OpenHands path.
 type ProductionNativeConfig struct {
+	// One host delivery policy for all roles, not per-agent constants.
+	ContextDelivery *agentruntime.ContextDeliveryPolicy `json:"context_delivery,omitempty"`
 	// Pin the executable independently of launchd/login-shell PATH. If omitted,
 	// Go-capable teams resolve it once at startup, not during an agent turn.
 	GoBinary           string                         `json:"go_binary,omitempty"`
@@ -583,6 +586,9 @@ func resolveProductionConfig(config ProductionConfig) (resolvedProductionConfig,
 	var requestTimeout, pollInterval, nativeLease, nativeHeartbeat time.Duration
 	var nativeResultSchemas map[string]NativeResultSchema
 	if nativeSelected {
+		if config.Native.ContextDelivery != nil && !config.Native.ContextDelivery.Valid() {
+			return resolvedProductionConfig{}, invalidConfig("native context delivery policy is invalid")
+		}
 		if config.Native.Owner == "" || len(config.Native.Owner) > 256 {
 			return resolvedProductionConfig{}, invalidConfig("native run owner is invalid")
 		}
@@ -1086,7 +1092,9 @@ func NewProductionService(ctx context.Context, config ProductionConfig) (*Produc
 	if nativeSelected {
 		nativeBoundary := &nativeagent.Boundary{Control: store, Journal: store, Owner: config.Native.Owner, LeaseTTL: resolved.nativeLease, Heartbeat: resolved.nativeHeartbeat}
 		nativeBoundary.Configure = func(configureCtx context.Context, brief application.ExecutionBrief) (nativeagent.Config, error) {
-			return configuredNativeSession(configureCtx, liveService, profilesByModel, resolved.nativeWorkflows, resolved.nativeResultSchemas, resolved.requestTimeout, brief)
+			session, err := configuredNativeSession(configureCtx, liveService, profilesByModel, resolved.nativeWorkflows, resolved.nativeResultSchemas, resolved.requestTimeout, brief)
+			session.ContextDelivery = config.Native.ContextDelivery
+			return session, err
 		}
 		boundary = nativeBoundary
 	}

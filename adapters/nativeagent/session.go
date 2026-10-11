@@ -45,6 +45,7 @@ type Profile struct {
 }
 
 type Config struct {
+	ContextDelivery *agentruntime.ContextDeliveryPolicy
 	// ContextSource is supplied by the coordinator through BindContextFork.
 	ContextSource     *agentruntime.ForkSource
 	ContextInvocation *kernel.WorkInvocation
@@ -195,6 +196,13 @@ func prepare(ctx context.Context, brief application.ExecutionBrief, requestDiges
 		return Session{}, errors.Join(ErrInvalidBinding, ErrRequiredTestToolUnavailable)
 	}
 	stable := stableBinding{source: config.Bindings, initial: initial}
+	contextPolicy := agentruntime.DefaultContextDeliveryPolicy()
+	if config.ContextDelivery != nil {
+		contextPolicy = *config.ContextDelivery
+	}
+	if !contextPolicy.Valid() {
+		return Session{}, ErrInvalidBinding
+	}
 	// Both model turns and tool calls pass through the same stability check.
 	// The gateway still reconstructs actual authority at the moment of a call.
 	config.Gateway.Bindings = stable
@@ -248,6 +256,12 @@ func prepare(ctx context.Context, brief application.ExecutionBrief, requestDiges
 		}}
 		definitions = append(definitions, priorTool.definition())
 	}
+	sources, err := agentruntime.ReceiptSources(ctx, config.Journal, config.ContextSource)
+	if err != nil {
+		return Session{}, errors.Join(ErrInvalidBinding, err)
+	}
+	resultReader := agentruntime.RecordedResultReader{Journal: config.Journal, InvocationID: string(brief.InvocationID), Sources: sources, Policy: contextPolicy}
+	definitions = append(definitions, resultReader.Definition())
 	readDefinitionCount := len(definitions)
 	var effects agentruntime.Effects
 	var effectAuthority *agentruntime.EffectAuthority
@@ -377,8 +391,9 @@ func prepare(ctx context.Context, brief application.ExecutionBrief, requestDiges
 	model := agentruntime.OpenAIModel{
 		Client: config.HTTP, BaseURL: profile.BaseURL, Model: profile.Model,
 		APIKey: profile.APIKey, MaxTokens: profile.MaxOutputTokens,
-		Tools:     definitions,
-		Reasoning: profile.Reasoning,
+		Tools:         definitions,
+		Reasoning:     profile.Reasoning,
+		ContextPolicy: &contextPolicy,
 	}
 	if finalTool != "" {
 		model.FinalTool = finalTool
@@ -409,9 +424,14 @@ func prepare(ctx context.Context, brief application.ExecutionBrief, requestDiges
 	if brief.Purpose == kernel.PurposeValidation && slices.Contains(brief.WorkProfile.RequiredDeterministicGateIDs, "go-test") {
 		config.ValidateFinalResult = validationCompletionCheck(brief, requestDigest, config.Gateway, config.Journal, config.Effects, config.ValidateFinalResult)
 	}
+	condenser := agentruntime.ReceiptCondenser{Policy: contextPolicy}
+	if inherited != nil {
+		condenser.InheritedHistory = inherited.WorkingHistory
+	}
 	return Session{
 		Runner: agentruntime.Runner{
 			Journal:         config.Journal,
+			Condenser:       condenser,
 			ContextFork:     inherited,
 			Model:           boundModel{bindings: stable, id: brief.InvocationID, digest: requestDigest, model: model},
 			Effects:         effects,
@@ -423,6 +443,11 @@ func prepare(ctx context.Context, brief application.ExecutionBrief, requestDiges
 				allowed:  allowed,
 				evidence: evidenceTool,
 				prior:    priorTool,
+				results:  &resultReader,
+				checkAuthority: func(operation context.Context) error {
+					_, err := stable.BindToolInvocation(operation, brief.InvocationID, requestDigest)
+					return err
+				},
 			},
 			SystemPrompt:        systemPrompt,
 			FinalTool:           finalTool,
@@ -438,10 +463,12 @@ func prepare(ctx context.Context, brief application.ExecutionBrief, requestDiges
 }
 
 type allowedReadTools struct {
-	prior    *priorTurnsTool
-	inner    agentruntime.ReadOnlyTools
-	allowed  map[string]struct{}
-	evidence *admittedEvidenceTool
+	results        *agentruntime.RecordedResultReader
+	checkAuthority func(context.Context) error
+	prior          *priorTurnsTool
+	inner          agentruntime.ReadOnlyTools
+	allowed        map[string]struct{}
+	evidence       *admittedEvidenceTool
 }
 
 func (tools allowedReadTools) ParallelSafe(name string) bool {
@@ -492,6 +519,15 @@ func (effects allowedEffects) ReconcileEffect(ctx context.Context, call agentrun
 }
 
 func (tools allowedReadTools) ExecuteReadOnly(ctx context.Context, call agentruntime.ToolCall) (json.RawMessage, error) {
+	if call.Name == "read_recorded_result" && tools.results != nil {
+		if tools.checkAuthority == nil {
+			return nil, ErrInvalidBinding
+		}
+		if err := tools.checkAuthority(ctx); err != nil {
+			return nil, err
+		}
+		return tools.results.Read(ctx, call.Arguments)
+	}
 	if call.Name == "read_prior_turns" && tools.prior != nil {
 		return tools.prior.read(ctx, call.Arguments)
 	}

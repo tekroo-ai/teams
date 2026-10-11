@@ -30,6 +30,8 @@ func ClassifyFailure(err error) Failure {
 		}
 	}
 	switch {
+	case errors.Is(err, ErrContextBudget):
+		f.Class = "CONTEXT_DELIVERY_BUDGET"
 	case errors.Is(err, ErrReasoningBudgetExhausted):
 		f.Class = "REASONING_BUDGET_EXHAUSTED"
 	case errors.Is(err, ErrInvalidTurn), errors.Is(err, ErrTurnLimit), errors.Is(err, ErrInvalidContextConfiguration):
@@ -67,7 +69,7 @@ func DecodeFailure(raw json.RawMessage) (Failure, error) {
 		return Failure{}, ErrInvalidTurn
 	}
 	switch f.Class {
-	case "EXECUTION_FAILURE", "INVALID_MODEL_TURN", "REASONING_BUDGET_EXHAUSTED":
+	case "EXECUTION_FAILURE", "INVALID_MODEL_TURN", "REASONING_BUDGET_EXHAUSTED", "CONTEXT_DELIVERY_BUDGET":
 		if f.Retryable {
 			return Failure{}, ErrInvalidTurn
 		}

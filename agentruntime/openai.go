@@ -51,6 +51,9 @@ type OpenAIModel struct {
 	TurnContract *StructuredTurnContract
 	// ResponseSchema is a tool-free structured completion (e.g. compaction).
 	ResponseSchema json.RawMessage
+	// Shared host policy bounds the fully serialized request, including schemas,
+	// inherited history and continuation prefixes. It never trims instructions.
+	ContextPolicy *ContextDeliveryPolicy
 }
 
 func (model OpenAIModel) Complete(ctx context.Context, transcript []Message) (Completion, error) {
@@ -163,6 +166,9 @@ func (model OpenAIModel) complete(ctx context.Context, transcript []Message, par
 			}
 		}
 		bound["endpoint"] = strings.TrimRight(model.BaseURL, "/")
+		if model.ContextPolicy != nil {
+			bound["context_delivery_policy"] = *model.ContextPolicy
+		}
 		encoded, err := json.Marshal(bound)
 		if err != nil {
 			return Completion{}, err
@@ -185,6 +191,11 @@ func (model OpenAIModel) complete(ctx context.Context, transcript []Message, par
 	body, err := json.Marshal(request)
 	if err != nil {
 		return Completion{}, err
+	}
+	if model.ContextPolicy != nil {
+		if err := model.ContextPolicy.Admit(len(body), model.MaxTokens); err != nil {
+			return Completion{}, err
+		}
 	}
 	endpoint := strings.TrimRight(model.BaseURL, "/") + "/chat/completions"
 	httpRequest, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))

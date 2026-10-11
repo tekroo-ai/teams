@@ -144,7 +144,7 @@ func TestPreparedSessionBindsModelAndReadToolToInvocation(t *testing.T) {
 				t.Errorf("initial system prompt missing %q", instruction)
 			}
 		}
-		if len(body.Tools) != 1 || body.Tools[0].Function.Name != "read_file" {
+		if len(body.Tools) != 2 || body.Tools[0].Function.Name != "read_file" || body.Tools[1].Function.Name != "read_recorded_result" {
 			t.Errorf("profile tool restriction not honored: %+v", body.Tools)
 		}
 		writer.Header().Set("Content-Type", "application/json")

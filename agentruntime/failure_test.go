@@ -19,6 +19,8 @@ func TestFailureClassificationIsNotRetryableByDefault(t *testing.T) {
 		{errors.Join(ErrInvalidTurn, ErrReasoningBudgetExhausted), "REASONING_BUDGET_EXHAUSTED", false},
 		{ErrInvalidTurn, "INVALID_MODEL_TURN", false},
 		{ErrTurnLimit, "INVALID_MODEL_TURN", false},
+		{ErrContextBudget, "CONTEXT_DELIVERY_BUDGET", false},
+		{errors.Join(ErrContextBudget, ErrTransientModel), "CONTEXT_DELIVERY_BUDGET", false},
 		{ErrTransientModel, "TRANSIENT_MODEL_TRANSPORT", true},
 		{context.Canceled, "EXECUTION_FAILURE", false},
 	} {
@@ -40,6 +42,9 @@ func TestFailureClassificationIsNotRetryableByDefault(t *testing.T) {
 		if _, err := DecodeFailure(json.RawMessage(raw)); err == nil {
 			t.Fatalf("accepted invalid failure: %s", raw)
 		}
+	}
+	if _, err := DecodeFailure(json.RawMessage(`{"reason":"budget","class":"CONTEXT_DELIVERY_BUDGET","retryable":true}`)); err == nil {
+		t.Fatal("budget failure became transient")
 	}
 }
 
