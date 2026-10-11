@@ -35,6 +35,10 @@ type TestTurnAdapter struct {
 
 func (adapter TestTurnAdapter) Handles(name string) bool { return isGoTestTool(name) }
 
+// Only committed-HEAD tests qualify. Working-tree snapshots and mutations keep
+// their ordering; each test still reserves its exact call ID in TestGateway.
+func (adapter TestTurnAdapter) ParallelEffectSafe(name string) bool { return name == "run_go_tests" }
+
 func (adapter TestTurnAdapter) ExecuteEffect(ctx context.Context, call agentruntime.ToolCall) (json.RawMessage, error) {
 	if !adapter.Handles(call.Name) {
 		return nil, ErrForbidden

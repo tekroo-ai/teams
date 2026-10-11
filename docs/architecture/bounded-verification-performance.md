@@ -85,3 +85,73 @@ integration passes were preserved. That failed run is retained as
 OBSERVED: no commit, deployment, run restart, feature acceptance or timer change
 was performed for this implementation request. End-to-end performance under the
 deployed daemon still requires a subsequent authorized deployment and run.
+
+## r65 scheduling follow-up (2026-10-11)
+
+OBSERVED (source: `internal/verification/queue.go`, `selection.go`): a recursive
+local subtree now receives focused scheduling only with a complete inventory
+showing one physical Go package. Unknown, multi-package, module-root, overlay
+and cross-package coverage selections stay broad. Ignored directories and
+nested modules are excluded as Go excludes them. The selected command is not
+rewritten. Committed test tools inventory the pinned Git tree, not dirty files;
+candidate gates use their prepared source. Failed, oversized or cancelled
+inventories fall back to broad scheduling. Root-wide gates do not scan inventory.
+
+OBSERVED (source: `agentruntime/parallel_reads.go`, `runtime.go`,
+`agenttools/turn_adapter.go`, `adapters/nativeagent/session.go`): the common
+bounded worker executor now also handles explicitly qualified durable effects.
+Only adjacent admitted committed-HEAD `run_go_tests` calls qualify, at most two
+at a time; mutations, working-tree snapshots and final submissions remain
+ordered. Journal observations remain in model-call order. Each physical test
+retains TestGateway reservation, completion and uncertainty handling. Workers
+are joined on cancellation, ownership loss and uncertain acknowledgement.
+
+OBSERVED: actual test binaries meet at an HTTP barrier through Runner ->
+TestTurnAdapter -> TestGateway -> Host. Both execute once, including restart
+after an interrupted journal append or lost completion acknowledgements.
+Dedicated fixtures also cover ownership loss before execution, cancellation,
+call-order/context restoration, opt-in/allowlist boundaries, dirty-live versus
+committed-tree selection, recursive multi-package fallback and argument fidelity.
+
+OBSERVED (source: `cmd/tekroo/local_init.go`, `launch_agent_test.go`): generated
+explicit-start launch agents use `ProcessType=Interactive` instead of inheriting
+Background QoS in verification children. CPU/package/queue limits are unchanged.
+The existing Teams service's on-disk plist has the same one-field change, with
+the original saved as `com.tekroo.teams-v4-prod.background-before-r65-scheduling.plist`.
+The loaded Teams service was not reloaded; its new scheduling class takes effect
+only on the next authorized deployment/reload. Its startup, keepalive and
+dispatch configuration were not changed.
+
+OBSERVED: `scripts/qualify_verification_service.mjs` exports baseline `5db8fbd`
+plus only this patch's Go sources/tests. Existing unrelated edits are excluded
+and preserved. A temporary launchd Interactive job executes the full suite with
+`-json -count=1 -p=2 -parallel=2` and `GOMAXPROCS=2` in the current host environment.
+It does not start Teams or model requests. The job was removed after completion;
+raw output, exact overlay hashes, launchd state and receipts remain retained.
+
+OBSERVED: final qualification exited zero in 161.190 seconds, with 2,070 passing
+test/subtest results, zero failures and nine existing opt-in skips. Package
+`agenttools` reported 126.593 seconds. This is not a seconds-long full suite,
+nor a controlled r65 end-to-end speedup measurement. Cold-cache, full eviction,
+timeout/cancellation and actual fresh-execution tests remain. No regression
+coverage was removed to improve the number.
+
+COMPUTED: all 2,056 baseline terminal test/subtest results retain their identities
+and outcomes; 23 new results were added. All qualified Go file hashes still
+match the working sources. Scheduler/runner/native allowlist race checks passed
+ten repetitions (280 passing results); the real gateway overlap/restart tests
+also passed under the race detector.
+
+Raw receipts under `/Users/paul/Documents/Codex/2026-09-01/it-is-stopped-you-can-preceed/`:
+
+- `verification-service-r65-final-2026-10-11T01-28Z/receipt.json`,
+  `regression.jsonl`, `source.json`, `launchctl-start.txt`, `comparison.json`.
+- `verification-r65-scheduling-race-2026-10-11T01-30-07-629Z.receipt.json`
+  and its `.jsonl` raw events.
+- `verification-service-r65-intermediate-2026-10-11T01-25-04Z/receipt.json`
+  retains the earlier passing build before the final ownership/acknowledgement
+  and selector-edge fixtures were completed. It is not the final qualification.
+
+OBSERVED: no commit, binary deployment, Teams restart, model request, feature
+acceptance or timer reactivation was performed for this follow-up. End-to-end
+behavior still requires an authorized deployment and fresh feature test run.

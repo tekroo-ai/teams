@@ -585,12 +585,15 @@ func localProductionProvenance(options localInitOptions, config operationalrunti
 }
 
 func writeLaunchAgent(path, tekrood, config, state string) error {
+	// Explicitly started Teams verification is user work. A Background QoS
+	// clamp is inherited by Go children; concurrency/CPU bounds live in the
+	// verification scheduler, not in an unrelated launchd resource throttle.
 	content := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
 <key>Label</key><string>com.tekroo.tekrood</string>
 <key>ProgramArguments</key><array><string>%s</string><string>-config</string><string>%s</string></array>
-<key>RunAtLoad</key><false/><key>KeepAlive</key><false/><key>ProcessType</key><string>Background</string>
+<key>RunAtLoad</key><false/><key>KeepAlive</key><false/><key>ProcessType</key><string>Interactive</string>
 <key>StandardOutPath</key><string>%s</string><key>StandardErrorPath</key><string>%s</string>
 </dict></plist>
 `, xmlEscape(tekrood), xmlEscape(config), xmlEscape(filepath.Join(state, "tekrood.log")), xmlEscape(filepath.Join(state, "tekrood.log")))

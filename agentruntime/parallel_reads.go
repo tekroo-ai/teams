@@ -3,6 +3,7 @@ package agentruntime
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"sync"
 )
 
@@ -22,11 +23,35 @@ func (runner Runner) parallelReadBatch(calls []ToolCall) bool {
 // Workers write disjoint result slots. Journal writes remain serial and in call
 // order, so existing replay, retained-context and compaction contracts hold.
 // Await every worker before returning; deadlines are inherited, not detached.
-func (runner Runner) executeParallelReads(ctx context.Context, calls []ToolCall) []ToolResult {
+func (runner Runner) executeParallelReads(ctx context.Context, calls []ToolCall) ([]ToolResult, error) {
+	return runner.executeParallelTools(ctx, calls, min(runner.MaxParallelReads, 4), runner.Tools.ExecuteReadOnly)
+}
+
+func (runner Runner) parallelEffectPrefix(calls []ToolCall) int {
+	effects, ok := runner.Effects.(ParallelEffects)
+	if !ok || runner.MaxParallelEffects < 2 {
+		return 0
+	}
+	for i, call := range calls {
+		if call.Name == runner.FinalTool || !effects.Handles(call.Name) || !effects.ParallelEffectSafe(call.Name) {
+			return i
+		}
+	}
+	return len(calls)
+}
+
+// Physical effects retain their own reservation/completion ledger. If a batch
+// loses an acknowledgement, join every worker and stop; replay consults those
+// receipts rather than initiating a second physical execution.
+func (runner Runner) executeParallelTools(ctx context.Context, calls []ToolCall, limit int, execute func(context.Context, ToolCall) (json.RawMessage, error)) ([]ToolResult, error) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	results := make([]ToolResult, len(calls))
 	jobs := make(chan int)
 	var workers sync.WaitGroup
-	for range min(runner.MaxParallelReads, 4, len(calls)) {
+	var fatal error
+	var fatalOnce sync.Once
+	for range min(limit, len(calls)) {
 		workers.Add(1)
 		go func() {
 			defer workers.Done()
@@ -35,8 +60,14 @@ func (runner Runner) executeParallelReads(ctx context.Context, calls []ToolCall)
 				result := ToolResult{CallID: call.ID, Name: call.Name, Output: json.RawMessage("null")}
 				if err := ctx.Err(); err != nil {
 					result.Error = err.Error()
+				} else if err := runner.checkOwnership(ctx); err != nil {
+					fatalOnce.Do(func() { fatal = err; cancel() })
+					result.Error = err.Error()
 				} else {
-					output, err := runner.Tools.ExecuteReadOnly(ctx, call)
+					output, err := execute(ctx, call)
+					if errors.Is(err, ErrEffectUncertain) {
+						fatalOnce.Do(func() { fatal = err; cancel() })
+					}
 					if err != nil {
 						result.Error = err.Error()
 					} else {
@@ -52,5 +83,5 @@ func (runner Runner) executeParallelReads(ctx context.Context, calls []ToolCall)
 	}
 	close(jobs)
 	workers.Wait()
-	return results
+	return results, fatal
 }

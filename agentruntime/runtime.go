@@ -104,6 +104,14 @@ type Effects interface {
 	ReconcileEffect(context.Context, ToolCall) (json.RawMessage, bool, error)
 }
 
+// ParallelEffects opts in only effects with independent physical execution and
+// concurrency-safe, per-call durable receipts. Mutations never qualify merely
+// because they implement Effects.
+type ParallelEffects interface {
+	Effects
+	ParallelEffectSafe(string) bool
+}
+
 type SemanticContext struct {
 	Block   string `json:"block,omitempty"`
 	TraceID string `json:"trace_id,omitempty"`
@@ -121,10 +129,12 @@ type Runner struct {
 	Model       Model
 	Tools       ReadOnlyTools
 	// Zero/one retains sequential dispatch. Only all-qualified-read batches may
-	// overlap; mutations, verification and completion retain their ordering.
+	// overlap; effects use their separate explicit qualification below.
 	MaxParallelReads int
-	Effects          Effects
-	SystemPrompt     string
+	// Independent durable verification only; zero/one retains serial effects.
+	MaxParallelEffects int
+	Effects            Effects
+	SystemPrompt       string
 	// Condenser can reduce only post-start conversation history. The system
 	// instructions and original admitted task are always reattached verbatim.
 	Condenser HistoryCondenser
@@ -236,8 +246,17 @@ func (runner Runner) Run(ctx context.Context, invocationID, requestDigest, promp
 			return "", err
 		}
 		if len(pending) > 0 {
-			if runner.parallelReadBatch(pending) {
-				results := runner.executeParallelReads(ctx, pending)
+			var results []ToolResult
+			var batchErr error
+			if count := runner.parallelEffectPrefix(pending); count >= 2 {
+				results, batchErr = runner.executeParallelTools(ctx, pending[:count], min(runner.MaxParallelEffects, 2), runner.Effects.ExecuteEffect)
+			} else if runner.parallelReadBatch(pending) {
+				results, batchErr = runner.executeParallelReads(ctx, pending)
+			}
+			if batchErr != nil {
+				return "", batchErr
+			}
+			if len(results) > 0 {
 				for _, result := range results {
 					if err := runner.checkOwnership(ctx); err != nil {
 						return "", err

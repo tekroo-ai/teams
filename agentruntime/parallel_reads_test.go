@@ -120,7 +120,11 @@ func TestParallelReadsCancellationWaitsForEveryReader(t *testing.T) {
 	runner := Runner{Tools: tools, MaxParallelReads: 2}
 	done := make(chan []ToolResult, 1)
 	go func() {
-		done <- runner.executeParallelReads(ctx, []ToolCall{{ID: "one", Name: "read_file"}, {ID: "two", Name: "read_file"}})
+		results, err := runner.executeParallelReads(ctx, []ToolCall{{ID: "one", Name: "read_file"}, {ID: "two", Name: "read_file"}})
+		if err != nil {
+			t.Errorf("reader batch: %v", err)
+		}
+		done <- results
 	}()
 	for range 2 {
 		<-tools.entered

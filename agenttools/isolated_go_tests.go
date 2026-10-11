@@ -61,26 +61,6 @@ func (host Host) runIsolatedGoTestsFrom(ctx context.Context, root, pattern strin
 	operation, cancel := context.WithTimeout(ctx, host.Timeout)
 	defer cancel()
 	phaseStarted := time.Now()
-	class := verification.WholeModule
-	if compileOnly || !strings.HasSuffix(pattern, "/...") && pattern != "..." {
-		class = verification.Focused
-	}
-	slot, release, err := verification.AcquireSlot(operation, class)
-	timings.QueueNS = time.Since(phaseStarted).Nanoseconds()
-	if err != nil {
-		return result, fmt.Errorf("verification queue: %w", err)
-	}
-	defer release()
-	phaseStarted = time.Now()
-	preparationStarted := phaseStarted
-	defer func() {
-		if timings.PreparationNS == 0 {
-			timings.PreparationNS = time.Since(preparationStarted).Nanoseconds() - timings.CleanupNS
-		}
-	}()
-	if runtime.GOOS != "darwin" {
-		return result, fmt.Errorf("isolated Go tests require the qualified macOS sandbox")
-	}
 	if err := host.requireGitRoot(operation, root); err != nil {
 		return result, err
 	}
@@ -89,6 +69,41 @@ func (host Host) runIsolatedGoTestsFrom(ctx context.Context, root, pattern strin
 		return result, ErrInvalidCall
 	}
 	result.CommitSHA = strings.TrimSpace(head.Output)
+	argv := []string{host.goBinary(), "test", pattern}
+	class := verification.CommandClass(argv)
+	if compileOnly {
+		class = verification.Focused
+	} else if class == verification.WholeModule && pattern != "./..." && strings.HasPrefix(pattern, "./") && strings.HasSuffix(pattern, "/...") {
+		if worktree {
+			class = verification.CommandClassAt(operation, root, argv)
+		} else {
+			// Classify the pinned commit, not dirty live files. NUL-separated
+			// Git names preserve whitespace; a clipped/failed inventory stays broad.
+			inventory, inventoryErr := host.command(operation, root, "verification_inventory", host.gitBinary(), []string{"ls-tree", "-r", "-z", "--name-only", result.CommitSHA})
+			if inventoryErr == nil && inventory.ExitCode == 0 {
+				class = verification.CommandClassWithInventory(argv, strings.Split(inventory.Output, "\x00"))
+			}
+		}
+	}
+	timings.PreparationNS = time.Since(phaseStarted).Nanoseconds()
+	phaseStarted = time.Now()
+	slot, release, err := verification.AcquireSlot(operation, class)
+	timings.QueueNS = time.Since(phaseStarted).Nanoseconds()
+	if err != nil {
+		return result, fmt.Errorf("verification queue: %w", err)
+	}
+	defer release()
+	phaseStarted = time.Now()
+	preparationStarted := phaseStarted
+	preparationComplete := false
+	defer func() {
+		if !preparationComplete {
+			timings.PreparationNS += time.Since(preparationStarted).Nanoseconds() - timings.CleanupNS
+		}
+	}()
+	if runtime.GOOS != "darwin" {
+		return result, fmt.Errorf("isolated Go tests require the qualified macOS sandbox")
+	}
 	workspace, err := host.newVerificationWorkspaceForSlot(slot)
 	if err != nil {
 		return result, err
@@ -200,7 +215,8 @@ func (host Host) runIsolatedGoTestsFrom(ctx context.Context, root, pattern strin
 	}
 	command.Dir = source
 	command.Env = goTestEnvironment(workspace, gitBinary, modCache)
-	timings.PreparationNS = time.Since(phaseStarted).Nanoseconds()
+	timings.PreparationNS += time.Since(phaseStarted).Nanoseconds()
+	preparationComplete = true
 	sourceIdentity := "commit:" + result.CommitSHA
 	if worktree {
 		sourceIdentity = "snapshot:" + result.SnapshotSHA256

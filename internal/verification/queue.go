@@ -149,6 +149,13 @@ func (queue *verificationQueue) nextLocked() {
 // compile-only or a single local package is prioritized; ambiguous selections
 // and recursive suites remain whole-module. No assertions or flags are removed.
 func CommandClass(argv []string) Class {
+	return CommandClassWithInventory(argv, nil)
+}
+
+// CommandClassWithInventory accepts the complete source inventory, never a
+// verdict or a model's estimate. Recursive local subtrees qualify only when
+// they contain one physical Go package. Root-wide/unknown selections stay broad.
+func CommandClassWithInventory(argv []string, files []string) Class {
 	if len(argv) < 3 || filepath.Base(argv[0]) != "go" {
 		return WholeModule
 	}
@@ -159,10 +166,16 @@ func CommandClass(argv []string) Class {
 		return WholeModule
 	}
 	packages := 0
+	recursive := ""
 	for i := 2; i < len(argv); i++ {
 		arg := argv[i]
 		if arg == "-args" || arg == "--" {
 			break
+		}
+		if arg == "-overlay" || strings.HasPrefix(arg, "-overlay=") || arg == "-coverpkg" || strings.HasPrefix(arg, "-coverpkg=") {
+			// Source overlays and coverage over other packages cannot be
+			// bounded by the selected subtree's physical source inventory.
+			return WholeModule
 		}
 		if goFlagTakesValue(arg) {
 			i++
@@ -175,11 +188,17 @@ func CommandClass(argv []string) Class {
 			continue
 		}
 		if strings.HasSuffix(arg, "/...") || arg == "..." {
-			return WholeModule
+			if !strings.HasPrefix(arg, "./") || arg == "./..." || recursive != "" {
+				return WholeModule
+			}
+			recursive = arg
 		}
 		packages++
 	}
 	if packages == 1 {
+		if recursive != "" && !singleRecursivePackage(recursive, files) {
+			return WholeModule
+		}
 		return Focused
 	}
 	return WholeModule

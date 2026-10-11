@@ -430,6 +430,7 @@ func prepare(ctx context.Context, brief application.ExecutionBrief, requestDiges
 			ValidateFinalResult: config.ValidateFinalResult,
 			MaxFinalSubmissions: 3,
 			MaxParallelReads:    4,
+			MaxParallelEffects:  2,
 			MaxTurns:            profile.MaxTurns,
 		},
 		InvocationID: string(brief.InvocationID), RequestDigest: string(requestDigest), Prompt: prompt,
@@ -460,6 +461,10 @@ type allowedEffects struct {
 	mutation agenttools.MutationTurnAdapter
 	tests    agenttools.TestTurnAdapter
 	allowed  []string
+}
+
+func (effects allowedEffects) ParallelEffectSafe(name string) bool {
+	return effects.Handles(name) && effects.tests.ParallelEffectSafe(name)
 }
 
 func (effects allowedEffects) Handles(name string) bool {

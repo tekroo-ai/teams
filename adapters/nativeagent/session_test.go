@@ -58,6 +58,22 @@ func TestNativeParallelReadAllowlistNeverQualifiesEffectsOrUnboundTools(t *testi
 	}
 }
 
+func TestNativeParallelEffectsOnlyQualifiesAdmittedCommittedTests(t *testing.T) {
+	effects := allowedEffects{allowed: []string{"run_go_tests", "run_go_tests_worktree", "check_go_build_worktree", "edit_file", "git_commit"}}
+	if !effects.ParallelEffectSafe("run_go_tests") {
+		t.Fatal("committed tests not qualified")
+	}
+	for _, name := range []string{"run_go_tests_worktree", "check_go_build_worktree", "edit_file", "git_commit", "unknown"} {
+		if effects.ParallelEffectSafe(name) {
+			t.Fatalf("unsafe effect qualified: %s", name)
+		}
+	}
+	effects.allowed = nil
+	if effects.ParallelEffectSafe("run_go_tests") {
+		t.Fatal("unadmitted test qualified")
+	}
+}
+
 type testJournal struct{ entries []agentruntime.Entry }
 
 func (journal *testJournal) Load(_ context.Context, _ string) ([]agentruntime.Entry, error) {
