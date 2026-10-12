@@ -26,6 +26,9 @@ type AdmissionReceipt struct {
 func (model OpenAIModel) admitRendered(ctx context.Context, body []byte) (*AdmissionReceipt, error) {
 	p := model.ContextPolicy
 	if !p.Valid() || len(body) > p.RequestBytes {
+		if p.Valid() && p.Representation == CatalogHistoryV1 && len(body) > p.RequestBytes {
+			return nil, &CapacityLimitError{Layer: "transport_bytes", Actual: len(body), Limit: p.RequestBytes}
+		}
 		return nil, fmt.Errorf("%w: request byte limit exceeded; journal retained", ErrContextBudget)
 	}
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)

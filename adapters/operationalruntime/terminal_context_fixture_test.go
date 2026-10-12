@@ -66,6 +66,15 @@ func (m *terminalQualificationModel) Complete(context.Context, []agentruntime.Me
 	return agentruntime.Completion{ToolCalls: []agentruntime.ToolCall{c}}, nil
 }
 
+// Explicit synthetic input seeding is NOT provider admission qualification.
+// The real signed successor uses OpenAIModel's exact rendered-token gate.
+func (m *terminalQualificationModel) PrepareTurn(context.Context, []agentruntime.Message) (*agentruntime.PreparedTurn, error) {
+	return &agentruntime.PreparedTurn{}, nil
+}
+func (m *terminalQualificationModel) CompletePrepared(ctx context.Context, h []agentruntime.Message, _ *agentruntime.PreparedTurn) (agentruntime.Completion, error) {
+	return m.Complete(ctx, h)
+}
+
 func terminalQualificationBrief(t testing.TB, team organization.LoadedTeam, p nativeagent.Profile, id kernel.UUIDv7, root, description string) application.ExecutionBrief {
 	t.Helper()
 	i := slices.IndexFunc(team.Roles, func(r organization.LoadedRole) bool { return r.Binding.Role == string(p.RoleFQRN) })
@@ -175,11 +184,13 @@ func assertTerminalQualificationReads(t testing.TB, entries []agentruntime.Entry
 					Sequence     uint64
 					SHA256       string
 					Pointer      string `json:"json_pointer"`
+					Catalog      string `json:"catalog_id"`
+					Handle       string `json:"handle"`
 				}
 				if json.Unmarshal(call.Arguments, &a) != nil {
 					t.Fatal("invalid read")
 				}
-				if a.InvocationID == ref.InvocationID && a.Sequence == ref.Sequence && a.SHA256 == ref.SHA256 {
+				if a.InvocationID == ref.InvocationID && a.Sequence == ref.Sequence && a.SHA256 == ref.SHA256 || a.InvocationID == "" && a.Sequence == 0 && a.SHA256 == "" && a.Catalog != "" && a.Handle != "" {
 					requests[call.ID] = a.Pointer
 				}
 			}
@@ -192,7 +203,7 @@ func assertTerminalQualificationReads(t testing.TB, entries []agentruntime.Entry
 				failures++
 				continue
 			}
-			if pointer, ok := requests[d.CallID]; ok {
+			if pointer, ok := requests[d.CallID]; ok && exactTerminalRead(d.Output, ref, pointer) {
 				observed[pointer] = true
 			}
 		case agentruntime.Finished:
@@ -209,6 +220,22 @@ func assertTerminalQualificationReads(t testing.TB, entries []agentruntime.Entry
 			t.Fatal("exact terminal evidence was not read", p)
 		}
 	}
+}
+
+func exactTerminalRead(raw json.RawMessage, ref *agentruntime.RecordedResultRef, pointer string) bool {
+	var page struct {
+		Reference agentruntime.RecordedResultRef
+		Pointer   string            `json:"json_pointer"`
+		Offset    int               `json:"byte_offset"`
+		Next      int               `json:"next_byte_offset"`
+		Total     int               `json:"total_bytes"`
+		Complete  bool              `json:"page_complete"`
+		Kind      agentruntime.Kind `json:"source_entry_kind"`
+	}
+	// The typed-return fixture needs a marker in the FIRST exact source page,
+	// not all deliberately unused summary padding. Completeness must be honest;
+	// the separate result predicate verifies the exact marker/technical content.
+	return ref != nil && json.Unmarshal(raw, &page) == nil && page.Reference == *ref && page.Pointer == pointer && page.Offset == 0 && page.Next > 0 && page.Next <= page.Total && page.Complete == (page.Next == page.Total) && page.Kind == agentruntime.Finished
 }
 
 func TestArchitectPMDecisionReturnWithLargeFinishedReceipt(t *testing.T) {

@@ -67,13 +67,35 @@ func (model OpenAIModel) Continue(ctx context.Context, partial PartialTurnError)
 	return model.complete(ctx, partial.Messages, &partial)
 }
 
-func (model OpenAIModel) complete(ctx context.Context, transcript []Message, partial *PartialTurnError) (completion Completion, completionErr error) {
+// PreparedTurn is opaque and admission-bound. Counting is not generation;
+// the runner can persist its exact projection before dispatching this body.
+type PreparedTurn struct {
+	admitted                 bool
+	body                     []byte
+	binding                  string
+	constrained, repairFinal bool
+	fingerprint              string
+	admission                *AdmissionReceipt
+}
+type PreparingModel interface {
+	PrepareTurn(context.Context, []Message) (*PreparedTurn, error)
+	CompletePrepared(context.Context, []Message, *PreparedTurn) (Completion, error)
+}
+
+func (model OpenAIModel) preparationFingerprint() string {
+	b, _ := json.Marshal(struct {
+		Endpoint, Key string
+		Policy        *ContextDeliveryPolicy
+	}{model.BaseURL, model.APIKey, model.ContextPolicy})
+	return resultDigest(string(b))
+}
+func (model OpenAIModel) renderTurn(transcript []Message, partial *PartialTurnError) (*PreparedTurn, error) {
 	if model.Reasoning != nil && !model.Reasoning.Valid() {
-		return Completion{}, fmt.Errorf("%w: invalid reasoning configuration", ErrInvalidTurn)
+		return nil, fmt.Errorf("%w: invalid reasoning configuration", ErrInvalidTurn)
 	}
 	base, err := url.Parse(model.BaseURL)
 	if err != nil || (base.Scheme != "http" && base.Scheme != "https") || base.Host == "" || model.Client == nil || model.Model == "" || model.MaxTokens <= 0 || len(transcript) == 0 {
-		return Completion{}, ErrInvalidTurn
+		return nil, ErrInvalidTurn
 	}
 	messages := make([]map[string]any, 0, len(transcript))
 	for _, item := range transcript {
@@ -86,7 +108,12 @@ func (model OpenAIModel) complete(ctx context.Context, transcript []Message, par
 				if model.TurnContract != nil {
 					content, err := structuredAssistantContent(item.ToolCalls, model.TurnContract.final)
 					if err != nil {
-						return Completion{}, err
+						return nil, err
+					}
+					if item.Content != "" && model.ContextPolicy != nil && model.ContextPolicy.Representation == CatalogHistoryV1 {
+						// Native calls have a structured history envelope, but it must
+						// not replace separately recorded assistant text/rationale.
+						content = item.Content + "\n" + content
 					}
 					wire["content"] = content
 					break
@@ -101,17 +128,17 @@ func (model OpenAIModel) complete(ctx context.Context, transcript []Message, par
 			if model.TurnContract != nil {
 				content, err := structuredToolContent(item)
 				if err != nil {
-					return Completion{}, err
+					return nil, err
 				}
 				wire["role"], wire["content"] = "user", content
 				break
 			}
 			if item.CallID == "" {
-				return Completion{}, ErrInvalidTurn
+				return nil, ErrInvalidTurn
 			}
 			wire["tool_call_id"] = item.CallID
 		default:
-			return Completion{}, ErrInvalidTurn
+			return nil, ErrInvalidTurn
 		}
 		messages = append(messages, wire)
 	}
@@ -122,13 +149,13 @@ func (model OpenAIModel) complete(ctx context.Context, transcript []Message, par
 		request["response_format"] = map[string]any{"type": "json_schema", "json_schema": map[string]any{"name": "tekroo_turn", "strict": true, "schema": model.TurnContract.schema}}
 	} else if len(model.ResponseSchema) != 0 {
 		if !json.Valid(model.ResponseSchema) || len(model.Tools) != 0 || model.FinalTool != "" {
-			return Completion{}, ErrInvalidTurn
+			return nil, ErrInvalidTurn
 		}
 		request["tool_choice"] = "none"
 		request["response_format"] = map[string]any{"type": "json_schema", "json_schema": map[string]any{"name": "tekroo_context_checkpoint", "strict": true, "schema": model.ResponseSchema}}
 	} else if repairFinal {
 		if !json.Valid(model.FinalSchema) {
-			return Completion{}, ErrInvalidTurn
+			return nil, ErrInvalidTurn
 		}
 		messages = append(messages, map[string]any{"role": "user", "content": "Return the corrected final-result arguments as one JSON object matching the response schema."})
 		request["messages"] = messages
@@ -137,7 +164,7 @@ func (model OpenAIModel) complete(ctx context.Context, transcript []Message, par
 		tools := make([]map[string]any, 0, len(model.Tools))
 		for _, tool := range model.Tools {
 			if tool.Name == "" || !json.Valid(tool.Parameters) {
-				return Completion{}, ErrInvalidTurn
+				return nil, ErrInvalidTurn
 			}
 			function := map[string]any{"name": tool.Name, "description": tool.Description, "parameters": tool.Parameters}
 			if tool.Strict {
@@ -171,13 +198,13 @@ func (model OpenAIModel) complete(ctx context.Context, transcript []Message, par
 		}
 		encoded, err := json.Marshal(bound)
 		if err != nil {
-			return Completion{}, err
+			return nil, err
 		}
 		binding = fmt.Sprintf("%x", sha256.Sum256(encoded))
 	}
 	if partial != nil {
 		if !constrained || binding != partial.Binding {
-			return Completion{}, fmt.Errorf("%w: continuation model/schema binding changed", ErrInvalidTurn)
+			return nil, fmt.Errorf("%w: continuation model/schema binding changed", ErrInvalidTurn)
 		}
 		messages = append(messages, map[string]any{"role": "assistant", "content": partial.Prefix})
 		request["messages"] = messages
@@ -190,27 +217,60 @@ func (model OpenAIModel) complete(ctx context.Context, transcript []Message, par
 	}
 	body, err := json.Marshal(request)
 	if err != nil {
-		return Completion{}, err
+		return nil, err
+	}
+
+	return &PreparedTurn{body: body, binding: binding, constrained: constrained, repairFinal: repairFinal, fingerprint: model.preparationFingerprint()}, nil
+}
+func (model OpenAIModel) prepareTurn(ctx context.Context, transcript []Message, partial *PartialTurnError) (*PreparedTurn, error) {
+	prepared, err := model.renderTurn(transcript, partial)
+	if err != nil {
+		return nil, err
 	}
 	if model.ContextPolicy != nil {
 		if model.ContextPolicy.Admission == "rendered_tokens" {
-			admission, err := model.admitRendered(ctx, body)
-			if err != nil {
-				return Completion{}, err
-			}
-			defer func() {
-				if completion.Diagnostics != nil {
-					completion.Diagnostics.Admission = admission
-				}
-				var observed *ModelCompletionError
-				if errors.As(completionErr, &observed) {
-					observed.Diagnostics.Admission = admission
-				}
-			}()
-		} else if err := model.ContextPolicy.Admit(len(body), model.MaxTokens); err != nil {
-			return Completion{}, err
+			prepared.admission, err = model.admitRendered(ctx, prepared.body)
+		} else {
+			err = model.ContextPolicy.Admit(len(prepared.body), model.MaxTokens)
+		}
+		if err != nil {
+			return prepared, err
 		}
 	}
+	prepared.admitted = true
+	return prepared, nil
+}
+func (model OpenAIModel) PrepareTurn(ctx context.Context, transcript []Message) (*PreparedTurn, error) {
+	return model.prepareTurn(ctx, transcript, nil)
+}
+func (model OpenAIModel) CompletePrepared(ctx context.Context, transcript []Message, prepared *PreparedTurn) (Completion, error) {
+	current, err := model.renderTurn(transcript, nil)
+	if err != nil {
+		return Completion{}, err
+	}
+	if prepared == nil || !prepared.admitted || prepared.fingerprint != current.fingerprint || !bytes.Equal(prepared.body, current.body) {
+		return Completion{}, fmt.Errorf("%w: prepared generation body or policy changed", ErrConflict)
+	}
+	return model.dispatchTurn(ctx, transcript, nil, prepared)
+}
+func (model OpenAIModel) complete(ctx context.Context, transcript []Message, partial *PartialTurnError) (Completion, error) {
+	prepared, err := model.prepareTurn(ctx, transcript, partial)
+	if err != nil {
+		return Completion{}, err
+	}
+	return model.dispatchTurn(ctx, transcript, partial, prepared)
+}
+func (model OpenAIModel) dispatchTurn(ctx context.Context, transcript []Message, partial *PartialTurnError, prepared *PreparedTurn) (completion Completion, completionErr error) {
+	body, binding, constrained, repairFinal := prepared.body, prepared.binding, prepared.constrained, prepared.repairFinal
+	defer func() {
+		if completion.Diagnostics != nil {
+			completion.Diagnostics.Admission = prepared.admission
+		}
+		var observed *ModelCompletionError
+		if errors.As(completionErr, &observed) {
+			observed.Diagnostics.Admission = prepared.admission
+		}
+	}()
 	endpoint := strings.TrimRight(model.BaseURL, "/") + "/chat/completions"
 	httpRequest, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {

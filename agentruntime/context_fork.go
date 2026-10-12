@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -24,8 +25,29 @@ type ForkSource struct {
 
 type ContextFork struct {
 	Source         ForkSource `json:"source"`
-	WorkingHistory []Message  `json:"working_history"`
+	WorkingHistory []Message  `json:"working_history,omitempty"`
 	HistorySHA256  string     `json:"history_sha256"`
+	Representation string     `json:"representation,omitempty"`
+}
+
+const frozenHistoryV1 = "frozen_history_v1"
+
+func storedContextFork(fork *ContextFork, compact bool) *ContextFork {
+	if fork == nil || !compact {
+		return fork
+	}
+	return &ContextFork{Source: fork.Source, HistorySHA256: fork.HistorySHA256, Representation: frozenHistoryV1}
+}
+
+func validStoredContextFork(fork *ContextFork, childID, delivery string) bool {
+	if fork != nil && fork.Representation == frozenHistoryV1 {
+		return delivery != "" && fork.Source.Valid() && fork.Source.InvocationID != childID && len(fork.WorkingHistory) == 0 && validForkDigest(fork.HistorySHA256)
+	}
+	return validContextFork(fork, childID)
+}
+
+func matchesStoredFork(stored, full *ContextFork) bool {
+	return stored != nil && full != nil && stored.Representation == frozenHistoryV1 && len(stored.WorkingHistory) == 0 && stored.Source == full.Source && stored.HistorySHA256 == full.HistorySHA256 && full.Representation == "" && historyDigest(full.WorkingHistory) == stored.HistorySHA256
 }
 
 func journalDigest(entries []Entry) string {
@@ -134,6 +156,22 @@ func LoadForkEntries(ctx context.Context, journal Journal, source ForkSource) ([
 // does not execute tools. The final historical submission receives a synthetic
 // observation so it cannot become a pending tool in the child invocation.
 func PrepareContextFork(ctx context.Context, journal Journal, childID string, source ForkSource) (*ContextFork, error) {
+	return prepareContextFork(ctx, journal, childID, source, false, 0)
+}
+
+// Catalog delivery persists frozen roots rather than copying their transcript.
+// Legacy callers retain their historical storage-size guard.
+func PrepareContextForkWithPolicy(ctx context.Context, journal Journal, childID string, source ForkSource, policy ContextDeliveryPolicy) (*ContextFork, error) {
+	if !policy.Valid() {
+		return nil, ErrInvalidTurn
+	}
+	return prepareContextFork(ctx, journal, childID, source, policy.Representation == CatalogHistoryV1, 0)
+}
+
+func prepareContextFork(ctx context.Context, journal Journal, childID string, source ForkSource, compact bool, depth int) (*ContextFork, error) {
+	if depth >= 64 {
+		return nil, ErrInvalidTurn
+	}
 	if childID == "" || childID == source.InvocationID {
 		return nil, ErrInvalidTurn
 	}
@@ -146,6 +184,18 @@ func PrepareContextFork(ctx context.Context, journal Journal, childID string, so
 	if json.Unmarshal(entries[0].Payload, &start) != nil {
 		return nil, ErrInvalidTurn
 	}
+	// Validate the full bounded chain before recursive restoration. Source
+	// hashes remain over the ORIGINAL stored bytes, never an expanded copy.
+	if _, err := ReceiptSources(ctx, journal, &source); err != nil {
+		return nil, err
+	}
+	var restored *ContextFork
+	if start.ContextFork != nil && start.ContextFork.Representation == frozenHistoryV1 {
+		restored, err = prepareContextFork(ctx, journal, source.InvocationID, start.ContextFork.Source, true, depth+1)
+		if err != nil || !matchesStoredFork(start.ContextFork, restored) {
+			return nil, errors.Join(ErrConflict, err)
+		}
+	}
 	terminal := source.terminal()
 	replayEntries := entries
 	if terminal == Finished {
@@ -155,7 +205,7 @@ func PrepareContextFork(ctx context.Context, journal Journal, childID string, so
 	} else {
 		replayEntries = entries[:len(entries)-1]
 	}
-	messages, pending, completed, _, err := replay(source.InvocationID, source.RequestDigest, start.Prompt, start.SystemPrompt, start.FinalTool, func(json.RawMessage) (string, error) { return result, nil }, start.EffectAuthority, replayEntries)
+	messages, pending, completed, _, err := replay(source.InvocationID, source.RequestDigest, start.Prompt, start.SystemPrompt, start.FinalTool, func(json.RawMessage) (string, error) { return result, nil }, start.EffectAuthority, replayEntries, restored)
 	if err != nil || terminal == Finished && (completed == nil || len(pending) != 0) {
 		return nil, ErrInvalidTurn
 	}
@@ -232,7 +282,7 @@ func PrepareContextFork(ctx context.Context, journal Journal, childID string, so
 		messages = restoreRecordedReferences(messages, originals)
 	}
 	fork := &ContextFork{Source: source, WorkingHistory: messages, HistorySHA256: historyDigest(messages)}
-	encoded, err := json.Marshal(fork)
+	encoded, err := json.Marshal(storedContextFork(fork, compact))
 	if err != nil || len(encoded) > MaxJournalPayloadBytes/2 {
 		return nil, fmt.Errorf("%w: inherited working context is too large; original journal remains retained", ErrInvalidTurn)
 	}
@@ -240,5 +290,5 @@ func PrepareContextFork(ctx context.Context, journal Journal, childID string, so
 }
 
 func validContextFork(fork *ContextFork, childID string) bool {
-	return fork == nil || (fork.Source.Valid() && fork.Source.InvocationID != childID && len(fork.WorkingHistory) > 0 && historyDigest(fork.WorkingHistory) == fork.HistorySHA256 && validWorkingHistory(fork.WorkingHistory))
+	return fork == nil || (fork.Representation == "" && fork.Source.Valid() && fork.Source.InvocationID != childID && len(fork.WorkingHistory) > 0 && historyDigest(fork.WorkingHistory) == fork.HistorySHA256 && validWorkingHistory(fork.WorkingHistory))
 }

@@ -61,6 +61,13 @@ func TestTekroodAndTekrooExecuteNormalTaskThroughSupportedSurface(t *testing.T) 
 	if err := service.Start(); err != nil {
 		t.Fatal(err)
 	}
+	// Cleanup runs after the deferred Wait/Kill, so the buffers are no longer
+	// being written by os/exec. Retain actual daemon evidence on a gate failure.
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Logf("fixture tekrood stdout:\n%s\nfixture tekrood stderr:\n%s", stdout.String(), stderr.String())
+		}
+	})
 	serviceStopped := false
 	defer func() {
 		if serviceStopped {

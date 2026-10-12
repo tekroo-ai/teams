@@ -46,14 +46,20 @@ const (
 	receiptBasic receiptQualificationMode = iota
 	receiptCombined
 	receiptSustained
+	receiptCapacity
 )
 
 func TestQualifyNativeSustainedPagingRecovery(t *testing.T) {
 	qualifyNativeReceiptDelivery(t, receiptSustained)
 }
 
+func TestQualifyNativeHistoryCapacityRecovery(t *testing.T) {
+	qualifyNativeReceiptDelivery(t, receiptCapacity)
+}
+
 func qualifyNativeReceiptDelivery(t *testing.T, mode receiptQualificationMode) {
-	combined, sustained := mode != receiptBasic, mode == receiptSustained
+	capacity := mode == receiptCapacity
+	combined, sustained := mode != receiptBasic, mode == receiptSustained || capacity
 	source, output := os.Getenv("TEKROO_NATIVE_RECEIPT_CONFIG"), os.Getenv("TEKROO_NATIVE_RECEIPT_OUTPUT")
 	if source == "" || output == "" {
 		t.Skip("explicit read-only config and new receipt directory required")
@@ -121,13 +127,31 @@ func qualifyNativeReceiptDelivery(t *testing.T, mode receiptQualificationMode) {
 		t.Fatal("combined qualification requires an explicit rendered-token policy with correction reserve; historical config is not modified")
 	}
 	write("delivery-policy.json", policy)
+	if capacity && policy.Representation != agentruntime.CatalogHistoryV1 {
+		t.Fatal("explicit catalog policy required")
+	}
 	ids, err := NewUUIDv7Source(SystemClock{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	checked := []string{}
+	selected := map[string]bool{}
+	if scope := os.Getenv("TEKROO_NATIVE_RECEIPT_ROLES"); scope != "" {
+		if !capacity {
+			t.Fatal("explicit role-subset scope is only supported by capacity qualification")
+		}
+		for _, role := range strings.Split(scope, ",") {
+			if role == "" || selected[role] {
+				t.Fatal("invalid role scope")
+			}
+			selected[role] = true
+		}
+	}
 	for _, p := range config.Profiles {
 		if p.Qualification == nil {
+			continue
+		}
+		if len(selected) > 0 && !selected[string(p.RoleFQRN)] {
 			continue
 		}
 		i := slices.IndexFunc(team.Roles, func(r organization.LoadedRole) bool { return r.Binding.Role == string(p.RoleFQRN) })
@@ -154,6 +178,13 @@ func qualifyNativeReceiptDelivery(t *testing.T, mode receiptQualificationMode) {
 			value["properties"].(map[string]any)["draft"] = map[string]any{"type": "string"}
 			value["properties"].(map[string]any)["decision"] = map[string]any{"type": "string", "const": "combined-original-decision"}
 			value["properties"].(map[string]any)["validates"] = map[string]any{"type": "array", "items": map[string]any{"type": "integer", "minimum": 0}}
+			if capacity {
+				// Padding is INPUT stress, not an authorized output of this
+				// synthetic task. Keep the entire rejected draft in history,
+				// but express the existing no-echo instruction in its schema.
+				value["properties"].(map[string]any)["draft"] = map[string]any{"type": "string", "enum": []string{""}}
+				value["properties"].(map[string]any)["validates"].(map[string]any)["maxItems"] = 0
+			}
 			schema, _ = json.Marshal(value)
 		}
 		brief := application.ExecutionBrief{ContractManifest: kernel.ContractIdentity, InvocationID: id, ActorFQN: actor, Purpose: kernel.PurposeHandoff,
@@ -174,6 +205,9 @@ func qualifyNativeReceiptDelivery(t *testing.T, mode receiptQualificationMode) {
 			}
 			brief.Task.Description = fmt.Sprintf("Synthetic sustained paging fixture, not feature work or proof that tests ran. The journal retains 113 successful synthetic inspections, overlapping pages, an invalid draft and an invalid page/source pointer. Correct within this original invocation. Page receipt reference and page.source identify DIFFERENT results; use the underlying source selection to read /output at byte_offset %d with byte_limit 4096. Copy its source_marker exactly; it was not in the seeded pages or draft. Keep the original decision combined-original-decision and validates=[]. Read exact named TestQualifiedPassing, TestQualifiedSkipped and TestQualifiedExcluded records using /test_evidence/tests or /test_evidence/excluded and match_field=name; return their actual statuses, never promote SKIP or NOT_RUN to PASS. Do not rerun tools, edit files, echo padding or resubmit the invalid pointer.", markerOffset)
 			brief.Task.AcceptanceCriteria = []string{"Correct source lookup after sustained paging and invalid pointer; exact marker and named PASS/SKIP/NOT_RUN records; preserve prior decision, all raw history and finite budgets."}
+			if capacity {
+				brief.Task.Description += " This larger fixture retains 283 successful synthetic observations over 283 model boundaries, then an invalid draft and invalid pointer. For ALL FOUR original-source/named-evidence reads use the compact handle attached to sustained-source-0 with the catalog_id enumerated in the reader schema. Do not use the later page receipt handle for source data and do not construct invocation_id/sequence/sha256 arguments."
+			}
 		}
 		settings := p.NativeSettings
 		binding := nativeReleaseBinding{authority: agenttools.Authority{WorkspaceRoot: t.TempDir(), Permissions: role.Bundle.Permissions, Purpose: brief.Purpose, EffectPolicyDigest: p.EffectPolicyDigest}}
@@ -216,13 +250,23 @@ func qualifyNativeReceiptDelivery(t *testing.T, mode receiptQualificationMode) {
 			seed.Tools = sustainedReceiptQualificationTools{fixture: fixture, delegate: session.Runner.Tools}
 			seed.MaxTurns = 5
 		}
+		if capacity {
+			seed.Model = &historyCapacityQualificationSeed{}
+			seed.MaxTurns = 285
+		}
+		if policy.Representation == agentruntime.CatalogHistoryV1 {
+			seed.Model = qualificationPreparedSeed{seed.Model}
+		}
 		if _, err := seed.Run(ctx, session.InvocationID, session.RequestDigest, session.Prompt); !errors.Is(err, agentruntime.ErrTurnLimit) {
 			cancel()
 			t.Fatalf("seed: %v", err)
 		}
 		seedEntries := len(journal.entries)
-		if sustained {
+		if sustained && !capacity {
 			verifySustainedReceiptSeed(t, journal.entries)
+		}
+		if capacity {
+			verifyCapacityQualificationSeed(t, journal.entries)
 		}
 		before, _ := json.Marshal(journal.entries)
 		t.Logf("qualifying %s invocation=%s", p.RoleFQRN, id)
@@ -237,6 +281,7 @@ func qualifyNativeReceiptDelivery(t *testing.T, mode receiptQualificationMode) {
 		}
 		observed := map[string]bool{}
 		readsPerformed := 0
+		emptyLookups := 0
 		failures, sourceRead, admittedLarge := 0, false, false
 		for _, e := range journal.entries {
 			if e.Kind == agentruntime.ModelRejected || e.Kind == agentruntime.ModelPartial {
@@ -274,6 +319,9 @@ func qualifyNativeReceiptDelivery(t *testing.T, mode receiptQualificationMode) {
 			if done.Error != "" || done.Name != "read_recorded_result" {
 				t.Fatalf("unexpected qualification tool: %s", e.Payload)
 			}
+			if capacity {
+				assertCapacityHandleRead(t, journal.entries, e, session.InvocationID)
+			}
 			var page struct {
 				Content  string
 				Complete bool   `json:"page_complete"`
@@ -293,14 +341,21 @@ func qualifyNativeReceiptDelivery(t *testing.T, mode receiptQualificationMode) {
 				sourceRead = true
 				continue
 			}
-			readsPerformed++
 			if !page.Complete {
 				t.Fatal("lookup did not return complete exact record")
 			}
 			var records []agenttools.GoTestCase
-			if json.Unmarshal([]byte(page.Content), &records) != nil || len(records) != 1 {
+			if json.Unmarshal([]byte(page.Content), &records) != nil {
 				t.Fatal("missing exact named record")
 			}
+			if capacity && len(records) == 0 {
+				emptyLookups++
+				continue
+			} // No record, no PASS credit; later exact evidence remains required.
+			if len(records) != 1 {
+				t.Fatal("missing exact named record")
+			}
+			readsPerformed++
 			observed[records[0].Name] = true
 		}
 		for _, name := range []string{"TestQualifiedPassing", "TestQualifiedSkipped", "TestQualifiedExcluded"} {
@@ -318,13 +373,16 @@ func qualifyNativeReceiptDelivery(t *testing.T, mode receiptQualificationMode) {
 		if json.Unmarshal([]byte(strings.TrimPrefix(result, application.OrganizationalResultMarker+"\n")), &final) != nil || final.Passing != "PASS" || final.Skipped != "SKIP" || final.Excluded != "NOT_RUN" {
 			t.Fatalf("statuses wrong: %s", result)
 		}
-		write(string(p.RoleFQRN)+"-measurement.json", map[string]any{"label": "OBSERVED", "scope": "synthetic receipt-delivery delta only; not feature/work-kind qualification", "invocation_id": id, "profile": p, "fixture_bytes": len(fixture), "fixture_sha256": digestBytes(fixture), "result": result, "exact_records_read": observed, "sustained_paging": sustained, "journal": journal.entries})
+		write(string(p.RoleFQRN)+"-measurement.json", map[string]any{"label": "OBSERVED", "scope": "synthetic receipt-delivery delta only; not feature/work-kind qualification", "invocation_id": id, "profile": p, "fixture_bytes": len(fixture), "fixture_sha256": digestBytes(fixture), "result": result, "exact_records_read": observed, "legitimate_empty_lookups": emptyLookups, "sustained_paging": sustained, "history_capacity": capacity, "seed_provider_admission": "NOT_RUN: scripted seed; live successor uses exact provider admission", "journal": journal.entries})
 		checked = append(checked, string(p.RoleFQRN))
 	}
 	if len(checked) == 0 {
 		t.Fatal("no qualified roles checked")
 	}
-	write("qualification.json", map[string]any{"label": "OBSERVED", "status": "PASS", "roles": checked, "scope": "bounded presentation and exact recorded-result access only", "combined_failure_and_correction": combined, "sustained_paging": sustained, "production_config_modified": false, "historical_runs_modified": false, "operator_unqualified": "NOT_RUN"})
+	if len(selected) > 0 && len(checked) != len(selected) {
+		t.Fatal("requested signed role unavailable")
+	}
+	write("qualification.json", map[string]any{"label": "OBSERVED", "status": "PASS", "roles": checked, "explicit_role_subset": len(selected) > 0, "scope": "bounded presentation and exact recorded-result access only; PASS covers listed roles only", "combined_failure_and_correction": combined, "sustained_paging": sustained, "history_capacity": capacity, "production_config_modified": false, "historical_runs_modified": false, "operator_unqualified": "NOT_RUN"})
 }
 
 func validateCombinedQualificationResult(output []byte, marker string) error {

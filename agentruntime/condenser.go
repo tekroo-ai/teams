@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"reflect"
 )
 
 // HistoryCondenser may replace old working turns with a checkpoint. It never
@@ -20,8 +21,87 @@ type ContextCondenser interface {
 }
 
 type historyCheckpoint struct {
-	SourceDigest string    `json:"source_digest"`
-	History      []Message `json:"history"`
+	SourceDigest  string        `json:"source_digest"`
+	History       []Message     `json:"history,omitempty"`
+	Delta         *historyDelta `json:"delta,omitempty"`
+	RequestSHA256 string        `json:"request_sha256,omitempty"`
+}
+
+type historyReplacement struct {
+	Index   int                `json:"index"`
+	Content string             `json:"content"`
+	Receipt *RecordedResultRef `json:"recorded_result,omitempty"`
+}
+
+type historyDelta struct {
+	Length       int                  `json:"length"`
+	Replacements []historyReplacement `json:"replacements"`
+	ResultDigest string               `json:"result_digest"`
+}
+
+func makeHistoryDelta(before, after []Message) (*historyDelta, error) {
+	if !equalProtectedContext(before, after) {
+		return nil, ErrInvalidTurn
+	}
+	d := &historyDelta{Length: len(before), ResultDigest: deltaHistoryDigest(after)}
+	for i, m := range before {
+		if reflect.DeepEqual(m, after[i]) {
+			continue
+		}
+		if m.Role != "tool" || m.Receipt != nil && !reflect.DeepEqual(m.Receipt, after[i].Receipt) {
+			return nil, ErrInvalidTurn
+		}
+		change := historyReplacement{Index: i, Content: after[i].Content}
+		if m.Receipt == nil {
+			change.Receipt = after[i].Receipt
+		}
+		d.Replacements = append(d.Replacements, change)
+	}
+	return d, nil
+}
+
+func applyHistoryDelta(before []Message, d *historyDelta) ([]Message, error) {
+	if d == nil || d.Length != len(before) || !validForkDigest(d.ResultDigest) {
+		return nil, ErrInvalidTurn
+	}
+	after := append([]Message(nil), before...)
+	previous := -1
+	for _, change := range d.Replacements {
+		if change.Index <= previous || change.Index < 0 || change.Index >= len(after) || after[change.Index].Role != "tool" || change.Receipt != nil && after[change.Index].Receipt != nil {
+			return nil, ErrInvalidTurn
+		}
+		previous = change.Index
+		after[change.Index].Content = change.Content
+		if change.Receipt != nil {
+			ref := *change.Receipt
+			after[change.Index].Receipt = &ref
+		}
+	}
+	if deltaHistoryDigest(after) != d.ResultDigest || !validWorkingHistory(after) {
+		return nil, ErrConflict
+	}
+	return after, nil
+}
+
+// An empty slice has no visible messages, whether its Go backing slice is nil
+// or allocated. Normalize only the NEW delta format; legacy hashes are frozen.
+func deltaHistoryDigest(history []Message) string {
+	if len(history) == 0 {
+		return historyDigest([]Message{})
+	}
+	return historyDigest(history)
+}
+
+type capacityCondenser interface {
+	CondenseForCapacity(context.Context, []Message) ([]Message, error)
+	BindingDigest() string
+}
+
+func deliveryDigest(condenser HistoryCondenser) string {
+	if c, ok := condenser.(capacityCondenser); ok {
+		return c.BindingDigest()
+	}
+	return ""
 }
 
 func historyDigest(messages []Message) string {

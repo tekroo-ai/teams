@@ -19,6 +19,30 @@ import (
 
 var ErrContextBudget = errors.New("model request exceeds admitted context delivery budget")
 
+// Only a measured hard capacity limit may trigger a smaller projection. A
+// failed/unbound count endpoint is not evidence that a request is too large.
+type CapacityLimitError struct {
+	Layer                         string
+	Actual, Limit                 int
+	ProjectionAttempts            int
+	SnapshotSHA256, RequestSHA256 string
+}
+
+func (e *CapacityLimitError) Error() string {
+	details, _ := json.Marshal(struct {
+		Version    string `json:"version"`
+		Layer      string `json:"layer"`
+		Actual     int    `json:"actual"`
+		Limit      int    `json:"limit"`
+		Attempts   int    `json:"projection_attempts"`
+		Snapshot   string `json:"snapshot_sha256,omitempty"`
+		Request    string `json:"request_sha256,omitempty"`
+		Generation bool   `json:"generation_dispatched"`
+	}{CatalogHistoryV1, e.Layer, e.Actual, e.Limit, e.ProjectionAttempts, e.SnapshotSHA256, e.RequestSHA256, false})
+	return fmt.Sprintf("%s: %s %d exceeds %d; original journal retained; capacity_details=%s", ErrContextBudget, e.Layer, e.Actual, e.Limit, details)
+}
+func (e *CapacityLimitError) Unwrap() error { return ErrContextBudget }
+
 // Shared in the tool definition, not copied into every historical receipt.
 const recordedResultAccessInstructions = "References identify the ORIGINAL result of the named tool, not presentation metadata. For read_file use /output; omit json_pointer for whole JSON. A condensed reader PAGE has two identities: reference is its own journal receipt; page.source is the underlying source selection. To continue source paging, copy page.source and use page.next_byte_offset. Never use a page receipt as if it were a read_file result. match_field/match_value require an ARRAY: Go test records use /test_evidence/tests or /test_evidence/excluded, not /test_evidence. page_complete is not test completeness. Summaries and references are not complete evidence. Prefer focused line-range source reads to re-paging large source files."
 
@@ -37,7 +61,12 @@ type ContextDeliveryPolicy struct {
 	// the provider's exact chat template/tokenizer count, never an estimate.
 	Admission           string `json:"admission,omitempty"`
 	RepairReserveTokens int    `json:"repair_reserve_tokens,omitempty"`
+	// Empty preserves historical delivery. Catalog delivery is an explicit,
+	// run-locked policy, never inferred from a role or changed during a retry.
+	Representation string `json:"representation,omitempty"`
 }
+
+const CatalogHistoryV1 = "catalog_v1"
 
 func DefaultContextDeliveryPolicy() ContextDeliveryPolicy {
 	return ContextDeliveryPolicy{ContextTokens: 262144, ReserveTokens: 8192, RequestBytes: 196608,
@@ -49,7 +78,7 @@ func (p ContextDeliveryPolicy) Valid() bool {
 	if p.Admission == "rendered_tokens" {
 		byteLimit = 2 << 20
 	}
-	return p.ContextTokens > 0 && p.ContextTokens <= 1<<24 && p.ReserveTokens > 0 && p.ReserveTokens < p.ContextTokens &&
+	return (p.Representation == "" || p.Representation == CatalogHistoryV1 && p.Admission == "rendered_tokens") && p.ContextTokens > 0 && p.ContextTokens <= 1<<24 && p.ReserveTokens > 0 && p.ReserveTokens < p.ContextTokens &&
 		(p.Admission == "" && p.RepairReserveTokens == 0 || p.Admission == "rendered_tokens" && p.RepairReserveTokens > 0) && p.RepairReserveTokens < p.ContextTokens-p.ReserveTokens &&
 		p.RequestBytes >= 1024 && p.RequestBytes <= byteLimit &&
 		p.ResultBytes >= 1024 && p.ResultBytes <= p.HistoryBytes && p.HistoryBytes <= p.RequestBytes &&
@@ -73,6 +102,12 @@ func (p ContextDeliveryPolicy) AdmitTokens(requestBytes, promptTokens, providerC
 	}
 	limit := min(p.ContextTokens, providerContext) - p.ReserveTokens - outputTokens - p.RepairReserveTokens
 	if requestBytes > p.RequestBytes || promptTokens > limit {
+		if p.Representation == CatalogHistoryV1 {
+			if requestBytes > p.RequestBytes {
+				return &CapacityLimitError{Layer: "transport_bytes", Actual: requestBytes, Limit: p.RequestBytes}
+			}
+			return &CapacityLimitError{Layer: "rendered_prompt_tokens", Actual: promptTokens, Limit: limit}
+		}
 		return fmt.Errorf("%w: serialized request %d/%d bytes, rendered prompt %d/%d tokens, output reserve %d, correction reserve %d tokens; original journal retained", ErrContextBudget, requestBytes, p.RequestBytes, promptTokens, limit, outputTokens, p.RepairReserveTokens)
 	}
 	return nil
@@ -151,7 +186,8 @@ func legacyReceiptForkEquivalent(recorded, current *ContextFork) bool {
 // ReceiptCondenser changes only tool presentation. Instructions, decisions,
 // arguments and raw journal records are untouched; there is no generated summary.
 type ReceiptCondenser struct {
-	Policy ContextDeliveryPolicy
+	Policy  ContextDeliveryPolicy
+	Catalog *ReceiptCatalog
 	// Supplied only from the coordinator's verified frozen context fork. It
 	// backfills derived addresses in legacy children, not evidence or decisions.
 	InheritedHistory []Message
@@ -164,6 +200,9 @@ func (c ReceiptCondenser) Condense(ctx context.Context, history []Message) ([]Me
 func (c ReceiptCondenser) CondenseContext(ctx context.Context, _ []Message, history []Message) ([]Message, error) {
 	if !c.Policy.Valid() {
 		return nil, ErrInvalidTurn
+	}
+	if c.Policy.Representation == CatalogHistoryV1 {
+		return c.condenseCatalog(ctx, history, false)
 	}
 	result := restoreRecordedReferences(history, c.InheritedHistory)
 	// Identical pages can refer to a later, exact visible page, without removing
@@ -468,6 +507,7 @@ type RecordedResultReader struct {
 	InvocationID string
 	Sources      []ForkSource
 	Policy       ContextDeliveryPolicy
+	Catalog      *ReceiptCatalog
 }
 
 func (r RecordedResultReader) Definition() ToolDefinition {
@@ -475,15 +515,42 @@ func (r RecordedResultReader) Definition() ToolDefinition {
 	for _, source := range r.Sources {
 		ids = append(ids, source.InvocationID)
 	}
-	parameters, _ := json.Marshal(map[string]any{"type": "object", "additionalProperties": false,
+	parameterValue := map[string]any{"type": "object", "additionalProperties": false,
 		"required": []string{"invocation_id", "sequence", "sha256"}, "properties": map[string]any{
 			"invocation_id": map[string]any{"type": "string", "enum": ids}, "sequence": map[string]any{"type": "integer", "minimum": 1},
 			"sha256":       map[string]any{"type": "string", "minLength": 64, "maxLength": 64},
 			"json_pointer": map[string]any{"type": "string", "maxLength": 1024, "description": "Exact pointer into ORIGINAL tool-result JSON, not reference presentation metadata. read_file source is /output. Omit to page the whole original result."},
 			"match_field":  map[string]any{"type": "string", "maxLength": 128, "description": "Requires json_pointer to select an ARRAY of records, not its containing object. Go test records: /test_evidence/tests or /test_evidence/excluded, not /test_evidence."}, "match_value": map[string]any{"type": "string", "maxLength": 1024},
 			"byte_offset": map[string]any{"type": "integer", "minimum": 0, "default": 0, "description": "Starting BYTE offset in the selected JSON, not an array index. Omit for the first page."},
-			"byte_limit":  map[string]any{"type": "integer", "minimum": 1, "maximum": r.Policy.PageBytes, "default": r.Policy.PageBytes, "description": "Maximum BYTES per page, NOT the number of records. Omit to return the full bounded page, including after an exact record match. A value of 1 returns only one byte."}}})
-	return ToolDefinition{Name: "read_recorded_result", Description: "Read an exact journal-backed observation for this invocation or its authorized frozen ancestors. Ordinary tool results come from tool_done; historical successful submissions come from the frozen finished entry and expose /historical_result. They are not new tool executions or feature acceptance. Read-only, never reruns a tool. Omit byte_limit/byte_offset for an exact named-record lookup. " + recordedResultAccessInstructions, Parameters: parameters, Strict: true}
+			"byte_limit":  map[string]any{"type": "integer", "minimum": 1, "maximum": r.Policy.PageBytes, "default": r.Policy.PageBytes, "description": "Maximum BYTES per page, NOT the number of records. Omit to return the full bounded page, including after an exact record match. A value of 1 returns only one byte."}}}
+	description := "Read an exact journal-backed observation for this invocation or its authorized frozen ancestors. Ordinary tool results come from tool_done; historical successful submissions come from the frozen finished entry and expose /historical_result. They are not new tool executions or feature acceptance. Read-only, never reruns a tool. Omit byte_limit/byte_offset for an exact named-record lookup. " + recordedResultAccessInstructions
+	if r.Policy.Representation == CatalogHistoryV1 && r.Catalog != nil {
+		props := parameterValue["properties"].(map[string]any)
+		props["catalog_id"] = map[string]any{"type": "string", "enum": []string{r.Catalog.ID}}
+		props["handle"] = map[string]any{"type": "string", "pattern": "^r[A-Za-z0-9_-]{22}$"}
+		props["describe"] = map[string]any{"type": "boolean", "description": "Return original source pointers and page/source descriptor, not source bytes. Omit or false to read exact source bytes."}
+		delete(parameterValue, "required")
+		// Grammar backends may choose a union branch without intersecting its
+		// siblings. Each branch must therefore carry ALL object constraints.
+		// Closed disjoint property sets preserve the same exclusive address rule
+		// without relying on a backend's interpretation of negated required lists.
+		handles, legacy := map[string]any{}, map[string]any{}
+		for key, value := range props {
+			if key != "invocation_id" && key != "sequence" && key != "sha256" {
+				handles[key] = value
+			}
+			if key != "catalog_id" && key != "handle" && key != "describe" {
+				legacy[key] = value
+			}
+		}
+		parameterValue["oneOf"] = []any{
+			map[string]any{"type": "object", "additionalProperties": false, "properties": handles, "required": []string{"catalog_id", "handle"}},
+			map[string]any{"type": "object", "additionalProperties": false, "properties": legacy, "required": []string{"invocation_id", "sequence", "sha256"}},
+		}
+		description += " RECORDED_RESULT_HANDLE is a compact locator. Use its handle with the catalog_id enumerated in this tool schema. Omit json_pointer to read the WHOLE original result, or use describe=true for its exact source descriptor and pointers. Do not guess /output for search results. Handles never refer to presentation JSON."
+	}
+	parameters, _ := json.Marshal(parameterValue)
+	return ToolDefinition{Name: "read_recorded_result", Description: description, Parameters: parameters, Strict: true}
 }
 
 func (r RecordedResultReader) Read(ctx context.Context, raw json.RawMessage) (json.RawMessage, error) {
@@ -496,10 +563,29 @@ func (r RecordedResultReader) Read(ctx context.Context, raw json.RawMessage) (js
 		Value        *string `json:"match_value"`
 		Offset       int     `json:"byte_offset"`
 		Limit        *int    `json:"byte_limit"`
+		CatalogID    string  `json:"catalog_id"`
+		Handle       string  `json:"handle"`
+		Describe     bool    `json:"describe"`
 	}
 	d := json.NewDecoder(bytes.NewReader(raw))
 	d.DisallowUnknownFields()
-	if d.Decode(&args) != nil || d.Decode(new(any)) != io.EOF || !r.Policy.Valid() || r.Journal == nil || args.Sequence == 0 || !validForkDigest(args.SHA256) || args.Offset < 0 || args.Limit != nil && (*args.Limit <= 0 || *args.Limit > r.Policy.PageBytes) || len(args.Pointer) > 1024 || len(args.Field) > 128 || (args.Field == "") != (args.Value == nil) || args.Value != nil && len(*args.Value) > 1024 {
+	if d.Decode(&args) != nil || d.Decode(new(any)) != io.EOF || !r.Policy.Valid() || r.Journal == nil || args.Offset < 0 || args.Limit != nil && (*args.Limit <= 0 || *args.Limit > r.Policy.PageBytes) || len(args.Pointer) > 1024 || len(args.Field) > 128 || (args.Field == "") != (args.Value == nil) || args.Value != nil && len(*args.Value) > 1024 {
+		return nil, ErrInvalidTurn
+	}
+	var supplied map[string]json.RawMessage
+	if json.Unmarshal(raw, &supplied) != nil {
+		return nil, ErrInvalidTurn
+	}
+	if supplied["handle"] != nil || supplied["catalog_id"] != nil || supplied["describe"] != nil {
+		if r.Policy.Representation != CatalogHistoryV1 || r.Catalog == nil || args.Handle == "" || args.CatalogID == "" || supplied["invocation_id"] != nil || supplied["sequence"] != nil || supplied["sha256"] != nil {
+			return nil, ErrInvalidTurn
+		}
+		ref, err := r.Catalog.Resolve(ctx, args.CatalogID, args.Handle)
+		if err != nil {
+			return nil, err
+		}
+		args.InvocationID, args.Sequence, args.SHA256 = ref.InvocationID, ref.Sequence, ref.SHA256
+	} else if args.Sequence == 0 || !validForkDigest(args.SHA256) {
 		return nil, ErrInvalidTurn
 	}
 	var entries []Entry
@@ -539,6 +625,19 @@ func (r RecordedResultReader) Read(ctx context.Context, raw json.RawMessage) (js
 	if resultDigest(content) != args.SHA256 {
 		return nil, ErrConflict
 	}
+	if args.Describe {
+		if args.Pointer != "" || args.Field != "" || args.Offset != 0 || args.Limit != nil {
+			return nil, ErrInvalidTurn
+		}
+		view, err := receiptView(observation, false)
+		if err != nil {
+			return nil, err
+		}
+		if len(view) > r.Policy.ResultBytes {
+			return nil, ErrContextBudget
+		}
+		return json.RawMessage(view), nil
+	}
 	selected, err := selectRecordedJSON([]byte(content), args.Pointer, args.Field, args.Value)
 	if err != nil {
 		return nil, err
@@ -550,7 +649,6 @@ func (r RecordedResultReader) Read(ctx context.Context, raw json.RawMessage) (js
 	if args.Limit != nil {
 		limit = *args.Limit
 	}
-	end := args.Offset + min(limit, len(selected)-args.Offset)
 	// Ordinary JSON is readable; a page splitting a UTF-8 codepoint uses base64
 	// so byte pagination always round-trips exactly.
 	pageValue := map[string]any{"reference": RecordedResultRef{args.InvocationID, args.Sequence, args.SHA256}, "tool": observation.Name, "call_id": observation.CallID,
@@ -561,10 +659,21 @@ func (r RecordedResultReader) Read(ctx context.Context, raw json.RawMessage) (js
 	if args.Field != "" {
 		pageValue["match_field"], pageValue["match_value"] = args.Field, args.Value
 	}
+	return ExactBytePage(selected, args.Offset, limit, r.Policy.ResultBytes, pageValue)
+}
+
+// ExactBytePage bounds the encoded envelope, not only the selected bytes.
+// Caller metadata must identify and authenticate the ORIGINAL source.
+func ExactBytePage(selected []byte, offset, limit, envelope int, pageValue map[string]any) (json.RawMessage, error) {
+	if offset < 0 || offset > len(selected) || limit <= 0 || envelope <= 0 {
+		return nil, ErrInvalidTurn
+	}
+	end := offset + min(limit, len(selected)-offset)
+	pageValue["total_bytes"], pageValue["byte_offset"] = len(selected), offset
 	// Bound the encoded envelope too: escaping control bytes can expand a page.
 	// Shrink only the returned page, never its source or its exact byte offsets.
 	for {
-		chunk := selected[args.Offset:end]
+		chunk := selected[offset:end]
 		pageValue["next_byte_offset"], pageValue["page_complete"] = end, end == len(selected)
 		if utf8.Valid(chunk) {
 			pageValue["encoding"], pageValue["content"] = "utf8", string(chunk)
@@ -575,13 +684,13 @@ func (r RecordedResultReader) Read(ctx context.Context, raw json.RawMessage) (js
 		if err != nil {
 			return nil, err
 		}
-		if len(page) <= r.Policy.ResultBytes {
+		if len(page) <= envelope {
 			return page, nil
 		}
-		if end-args.Offset <= 1 {
+		if end-offset <= 1 {
 			return nil, ErrContextBudget
 		}
-		end = args.Offset + (end-args.Offset)/2
+		end = offset + (end-offset)/2
 	}
 }
 
@@ -607,7 +716,7 @@ func ReceiptSources(ctx context.Context, journal Journal, source *ForkSource) ([
 		}
 		source = nil
 		if start.ContextFork != nil {
-			if !validContextFork(start.ContextFork, entries[0].InvocationID) {
+			if !validStoredContextFork(start.ContextFork, entries[0].InvocationID, start.DeliveryDigest) {
 				return nil, ErrInvalidTurn
 			}
 			source = &start.ContextFork.Source

@@ -246,11 +246,11 @@ func prepare(ctx context.Context, brief application.ExecutionBrief, requestDiges
 			return Session{}, errors.Join(ErrInvalidBinding, err)
 		}
 		var forkErr error
-		inherited, forkErr = agentruntime.PrepareContextFork(ctx, config.Journal, string(brief.InvocationID), *config.ContextSource)
+		inherited, forkErr = agentruntime.PrepareContextForkWithPolicy(ctx, config.Journal, string(brief.InvocationID), *config.ContextSource, contextPolicy)
 		if forkErr != nil {
 			return Session{}, errors.Join(ErrInvalidBinding, forkErr)
 		}
-		priorTool = &priorTurnsTool{journal: config.Journal, source: *config.ContextSource, checkAuthority: func(operation context.Context) error {
+		priorTool = &priorTurnsTool{journal: config.Journal, source: *config.ContextSource, policy: contextPolicy, checkAuthority: func(operation context.Context) error {
 			_, err := stable.BindToolInvocation(operation, brief.InvocationID, requestDigest)
 			return err
 		}}
@@ -261,6 +261,14 @@ func prepare(ctx context.Context, brief application.ExecutionBrief, requestDiges
 		return Session{}, errors.Join(ErrInvalidBinding, err)
 	}
 	resultReader := agentruntime.RecordedResultReader{Journal: config.Journal, InvocationID: string(brief.InvocationID), Sources: sources, Policy: contextPolicy}
+	var catalog *agentruntime.ReceiptCatalog
+	if contextPolicy.Representation == agentruntime.CatalogHistoryV1 {
+		catalog, err = agentruntime.NewReceiptCatalog(config.Journal, string(brief.InvocationID), string(requestDigest), sources)
+		if err != nil {
+			return Session{}, errors.Join(ErrInvalidBinding, err)
+		}
+		resultReader.Catalog = catalog
+	}
 	definitions = append(definitions, resultReader.Definition())
 	readDefinitionCount := len(definitions)
 	var effects agentruntime.Effects
@@ -424,7 +432,7 @@ func prepare(ctx context.Context, brief application.ExecutionBrief, requestDiges
 	if brief.Purpose == kernel.PurposeValidation && slices.Contains(brief.WorkProfile.RequiredDeterministicGateIDs, "go-test") {
 		config.ValidateFinalResult = validationCompletionCheck(brief, requestDigest, config.Gateway, config.Journal, config.Effects, config.ValidateFinalResult)
 	}
-	condenser := agentruntime.ReceiptCondenser{Policy: contextPolicy}
+	condenser := agentruntime.ReceiptCondenser{Policy: contextPolicy, Catalog: catalog}
 	if inherited != nil {
 		condenser.InheritedHistory = inherited.WorkingHistory
 	}
@@ -568,6 +576,28 @@ func (bound boundModel) Complete(ctx context.Context, messages []agentruntime.Me
 		return agentruntime.Completion{}, err
 	}
 	return bound.model.Complete(ctx, messages)
+}
+
+func (bound boundModel) PrepareTurn(ctx context.Context, messages []agentruntime.Message) (*agentruntime.PreparedTurn, error) {
+	if _, err := bound.bindings.BindToolInvocation(ctx, bound.id, bound.digest); err != nil {
+		return nil, err
+	}
+	model, ok := bound.model.(agentruntime.PreparingModel)
+	if !ok {
+		return nil, agentruntime.ErrInvalidTurn
+	}
+	return model.PrepareTurn(ctx, messages)
+}
+
+func (bound boundModel) CompletePrepared(ctx context.Context, messages []agentruntime.Message, prepared *agentruntime.PreparedTurn) (agentruntime.Completion, error) {
+	if _, err := bound.bindings.BindToolInvocation(ctx, bound.id, bound.digest); err != nil {
+		return agentruntime.Completion{}, err
+	}
+	model, ok := bound.model.(agentruntime.PreparingModel)
+	if !ok {
+		return agentruntime.Completion{}, agentruntime.ErrInvalidTurn
+	}
+	return model.CompletePrepared(ctx, messages, prepared)
 }
 
 func (bound boundModel) Continue(ctx context.Context, partial agentruntime.PartialTurnError) (agentruntime.Completion, error) {

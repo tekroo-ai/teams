@@ -227,3 +227,47 @@ read-only `TEKROO_NATIVE_DEPENDENCY_CONFIG`, and a new absolute
 existing model server must be idle before starting. Missing authorization paths
 produce SKIP, not PASS. This is a scoped boundary qualification, not a claim
 that a feature was implemented, tested or accepted.
+
+## Explicit catalog history-capacity policy
+
+`context_delivery.representation = "catalog_v1"` is an opt-in, invocation-locked
+host delivery policy. An empty representation preserves historical behavior.
+It requires provider-exact `rendered_tokens` admission; it does not change the
+model/profile, output or correction reserves, transport ceiling, tool/page
+limits, validation semantics, task allowance or invocation retry policy.
+
+Under this policy `history_bytes` is a tool-presentation compaction watermark,
+not an independent context window. Original instructions, assistant text,
+decisions, drafts and tool-call arguments remain verbatim. Actual tool-error
+feedback stays inline. Successful tool evidence may use a short catalog handle;
+the catalog is not embedded as an ever-growing index in the model request.
+
+A handle is a locator, not authority. Its invocation/request/frozen-source root
+is deterministic. Every read resolves the full original observation reference
+and verifies the original journal, frozen ancestry and full content digest.
+Legacy full references remain readable. `describe=true` returns original-source
+selection/page metadata; it is not evidence that an individual test executed.
+`read_prior_turns` additionally permits bounded original payload-byte paging of
+one authorized parent entry. Whole-entry limits and the 64-ancestor bound remain.
+
+The renderer prepares and counts the complete final request before generation.
+Only a measured transport/token capacity error permits one strictly smaller,
+deterministic tool-only projection and recount. Count unavailability or invalid
+binding does not initiate another count/generation. Genuine irreducible overflow
+fails closed with layer, actual/limit, preparation-attempt and snapshot/request
+diagnostics. No invocation retry, tool replay, semantic summary or budget increase
+is manufactured to avoid exhaustion.
+
+An admitted projection is journaled as a source/result-digest-bound tool-content
+delta before generation; its request digest identifies the exact counted wire
+body. Generation rejects a changed body, policy or model binding. Frozen child
+starts store an exact parent source/history root rather than duplicating its
+transcript. Restart and nested handback reconstruct the prior view from immutable
+original journals and validated deltas; no historical tool is executed. Bound
+partial response continuations keep their original prefix and messages unchanged.
+
+Authoritative validation still consumes raw original journals and durable effect
+receipts on the immutable candidate. Handles, summaries, retrieved records and
+page completeness cannot convert SKIP, NOT_RUN, missing or failed evidence into
+PASS. Live delivery qualification is synthetic boundary evidence, not feature
+completion or operator qualification.

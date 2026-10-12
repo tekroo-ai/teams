@@ -163,6 +163,7 @@ type Runner struct {
 }
 
 type startRecord struct {
+	DeliveryDigest  string           `json:"context_delivery_digest,omitempty"`
 	ContextFork     *ContextFork     `json:"context_fork,omitempty"`
 	RequestDigest   string           `json:"request_digest"`
 	Prompt          string           `json:"prompt"`
@@ -201,7 +202,7 @@ func (runner Runner) Run(ctx context.Context, invocationID, requestDigest, promp
 		return "", ErrInvalidTurn
 	}
 	if runner.ContextFork != nil {
-		prepared, err := PrepareContextFork(ctx, runner.Journal, invocationID, runner.ContextFork.Source)
+		prepared, err := prepareContextFork(ctx, runner.Journal, invocationID, runner.ContextFork.Source, deliveryDigest(runner.Condenser) != "", 0)
 		if err != nil {
 			if len(entries) != 0 {
 				return "", errors.Join(ErrInvalidTurn, err)
@@ -232,7 +233,7 @@ func (runner Runner) Run(ctx context.Context, invocationID, requestDigest, promp
 		if !validSemanticContext(memory) {
 			memory = SemanticContext{Status: "INVALID_RESPONSE"}
 		}
-		start, _ := json.Marshal(startRecord{ContextFork: runner.ContextFork, RequestDigest: requestDigest, Prompt: prompt, SystemPrompt: runner.SystemPrompt, FinalTool: runner.FinalTool, EffectAuthority: runner.EffectAuthority, SemanticContext: memory})
+		start, _ := json.Marshal(startRecord{DeliveryDigest: deliveryDigest(runner.Condenser), ContextFork: storedContextFork(runner.ContextFork, deliveryDigest(runner.Condenser) != ""), RequestDigest: requestDigest, Prompt: prompt, SystemPrompt: runner.SystemPrompt, FinalTool: runner.FinalTool, EffectAuthority: runner.EffectAuthority, SemanticContext: memory})
 		entries, err = runner.append(ctx, invocationID, entries, Started, start)
 		if err != nil {
 			return "", err
@@ -241,11 +242,14 @@ func (runner Runner) Run(ctx context.Context, invocationID, requestDigest, promp
 	// A restart must retain the same authorized ancestor. A caller cannot
 	// replace or silently remove the inherited history of an existing child.
 	var recordedStart startRecord
-	if json.Unmarshal(entries[0].Payload, &recordedStart) != nil || !reflect.DeepEqual(recordedStart.ContextFork, runner.ContextFork) && !legacyReceiptForkEquivalent(recordedStart.ContextFork, runner.ContextFork) {
+	if json.Unmarshal(entries[0].Payload, &recordedStart) != nil || !reflect.DeepEqual(recordedStart.ContextFork, runner.ContextFork) && !legacyReceiptForkEquivalent(recordedStart.ContextFork, runner.ContextFork) && !matchesStoredFork(recordedStart.ContextFork, runner.ContextFork) {
 		return "", ErrInvalidTurn
 	}
+	if recordedStart.DeliveryDigest != deliveryDigest(runner.Condenser) {
+		return "", fmt.Errorf("%w: context delivery policy changed during invocation", ErrConflict)
+	}
 	for {
-		messages, pending, complete, turns, err := replay(invocationID, requestDigest, prompt, runner.SystemPrompt, runner.FinalTool, runner.Finalize, runner.EffectAuthority, entries)
+		messages, pending, complete, turns, err := replay(invocationID, requestDigest, prompt, runner.SystemPrompt, runner.FinalTool, runner.Finalize, runner.EffectAuthority, entries, runner.ContextFork)
 		if err != nil {
 			return "", err
 		}
@@ -367,12 +371,68 @@ func (runner Runner) Run(ctx context.Context, invocationID, requestDigest, promp
 			if err != nil {
 				return "", err
 			}
-			if !reflect.DeepEqual(modelMessages, messages) {
+			var prepared *PreparedTurn
+			var preparing PreparingModel
+			if deliveryDigest(runner.Condenser) != "" {
+				var ok bool
+				preparing, ok = runner.Model.(PreparingModel)
+				if !ok {
+					return "", fmt.Errorf("%w: catalog delivery requires pre-generation admission", ErrInvalidTurn)
+				}
+				prepared, err = preparing.PrepareTurn(ctx, modelMessages)
+				projectionAttempts := 1
+				var capacity *CapacityLimitError
+				if errors.As(err, &capacity) {
+					pinned := 1
+					if runner.SystemPrompt != "" {
+						pinned = 2
+					}
+					minimal, e := runner.Condenser.(capacityCondenser).CondenseForCapacity(ctx, modelMessages[pinned:])
+					if e != nil {
+						return "", e
+					}
+					candidate := append(append([]Message(nil), modelMessages[:pinned]...), minimal...)
+					candidateBytes, _ := json.Marshal(candidate)
+					previousBytes, _ := json.Marshal(modelMessages)
+					if len(candidateBytes) < len(previousBytes) {
+						projectionAttempts++
+						previousPrepared := prepared
+						modelMessages = candidate
+						prepared, err = preparing.PrepareTurn(ctx, modelMessages)
+						if previousPrepared != nil && prepared != nil && len(prepared.body) >= len(previousPrepared.body) {
+							return "", fmt.Errorf("%w: capacity projection did not reduce rendered request", ErrConflict)
+						}
+					}
+				}
+				if err != nil {
+					if errors.As(err, &capacity) {
+						capacity.ProjectionAttempts = projectionAttempts
+						capacity.SnapshotSHA256 = historyDigest(modelMessages)
+						if prepared != nil {
+							capacity.RequestSHA256 = resultDigest(string(prepared.body))
+						}
+					}
+					return "", err
+				}
+				if prepared == nil {
+					return "", fmt.Errorf("%w: missing admitted preparation", ErrInvalidTurn)
+				}
+			}
+			if !reflect.DeepEqual(modelMessages, messages) || prepared != nil {
 				pinned := 1
 				if runner.SystemPrompt != "" {
 					pinned = 2
 				}
-				payload, err := json.Marshal(historyCheckpoint{SourceDigest: historyDigest(messages), History: modelMessages[pinned:]})
+				checkpoint := historyCheckpoint{SourceDigest: historyDigest(messages), History: modelMessages[pinned:]}
+				if prepared != nil {
+					checkpoint.History = nil
+					checkpoint.Delta, err = makeHistoryDelta(messages[pinned:], modelMessages[pinned:])
+					if err != nil {
+						return "", err
+					}
+					checkpoint.RequestSHA256 = resultDigest(string(prepared.body))
+				}
+				payload, err := json.Marshal(checkpoint)
 				if err != nil {
 					return "", err
 				}
@@ -381,8 +441,12 @@ func (runner Runner) Run(ctx context.Context, invocationID, requestDigest, promp
 					return "", err
 				}
 			}
-			modelMessages = referenceRepeatedReads(modelMessages)
-			response, err = runner.Model.Complete(ctx, modelMessages)
+			if prepared != nil {
+				response, err = preparing.CompletePrepared(ctx, modelMessages, prepared)
+			} else {
+				modelMessages = referenceRepeatedReads(modelMessages)
+				response, err = runner.Model.Complete(ctx, modelMessages)
+			}
 		}
 		if err != nil {
 			// A request timeout delivered on wake is not a task failure if the
@@ -504,7 +568,7 @@ func (runner Runner) ReconcilePendingEffects(ctx context.Context, invocationID, 
 		return nil
 	}
 	for {
-		_, pending, complete, _, err := replay(invocationID, requestDigest, prompt, runner.SystemPrompt, runner.FinalTool, runner.Finalize, runner.EffectAuthority, entries)
+		_, pending, complete, _, err := replay(invocationID, requestDigest, prompt, runner.SystemPrompt, runner.FinalTool, runner.Finalize, runner.EffectAuthority, entries, runner.ContextFork)
 		if err != nil || complete != nil || len(pending) == 0 || !runner.Effects.Handles(pending[0].Name) {
 			return err
 		}
@@ -585,7 +649,7 @@ func RecordedSystemPrompt(ctx context.Context, journal Journal, id, requestDiges
 	return start.SystemPrompt, true, nil
 }
 
-func replay(id, requestDigest, prompt, systemPrompt, finalTool string, finalize func(json.RawMessage) (string, error), authority *EffectAuthority, entries []Entry) ([]Message, []ToolCall, *string, int, error) {
+func replay(id, requestDigest, prompt, systemPrompt, finalTool string, finalize func(json.RawMessage) (string, error), authority *EffectAuthority, entries []Entry, restored ...*ContextFork) ([]Message, []ToolCall, *string, int, error) {
 	if len(entries) == 0 || entries[0].Kind != Started || entries[0].InvocationID != id {
 		return nil, nil, nil, 0, ErrInvalidTurn
 	}
@@ -601,8 +665,14 @@ func replay(id, requestDigest, prompt, systemPrompt, finalTool string, finalize 
 	if systemPrompt != "" {
 		messages = append([]Message{{Role: "system", Content: systemPrompt}}, messages...)
 	}
-	if !validContextFork(start.ContextFork, id) {
+	if !validStoredContextFork(start.ContextFork, id, start.DeliveryDigest) || len(restored) > 1 {
 		return nil, nil, nil, 0, ErrInvalidTurn
+	}
+	if start.ContextFork != nil && start.ContextFork.Representation == frozenHistoryV1 {
+		if len(restored) != 1 || !matchesStoredFork(start.ContextFork, restored[0]) || !validContextFork(restored[0], id) {
+			return nil, nil, nil, 0, ErrConflict
+		}
+		start.ContextFork = restored[0]
 	}
 	if start.ContextFork != nil {
 		messages = append(messages, Message{Role: "user", Content: "Historical transcript from terminal invocation " + start.ContextFork.Source.InvocationID + " follows. It records prior context and evidence, not a new assignment or permission to repeat its actions."})
@@ -630,8 +700,23 @@ func replay(id, requestDigest, prompt, systemPrompt, finalTool string, finalize 
 			}
 		case Compacted:
 			var checkpoint historyCheckpoint
-			if len(outstanding) != 0 || finalText != nil || partial != nil || json.Unmarshal(entry.Payload, &checkpoint) != nil || !validWorkingHistory(checkpoint.History) {
+			if len(outstanding) != 0 || finalText != nil || partial != nil || json.Unmarshal(entry.Payload, &checkpoint) != nil || checkpoint.Delta == nil && !validWorkingHistory(checkpoint.History) {
 				return nil, nil, nil, 0, ErrInvalidTurn
+			}
+			if checkpoint.Delta != nil {
+				if start.DeliveryDigest == "" || len(checkpoint.History) != 0 || checkpoint.SourceDigest != historyDigest(messages) || !validForkDigest(checkpoint.RequestSHA256) {
+					return nil, nil, nil, 0, ErrInvalidTurn
+				}
+				pinned := 1
+				if systemPrompt != "" {
+					pinned = 2
+				}
+				history, err := applyHistoryDelta(messages[pinned:], checkpoint.Delta)
+				if err != nil {
+					return nil, nil, nil, 0, err
+				}
+				messages = append(messages[:pinned:pinned], history...)
+				continue
 			}
 			if checkpoint.SourceDigest != historyDigest(messages) {
 				for _, m := range checkpoint.History {

@@ -170,19 +170,38 @@ type priorTurnsTool struct {
 	journal        agentruntime.Journal
 	source         agentruntime.ForkSource
 	checkAuthority func(context.Context) error
+	policy         agentruntime.ContextDeliveryPolicy
 }
 
 func (tool priorTurnsTool) definition() agentruntime.ToolDefinition {
+	if tool.policy.Representation == agentruntime.CatalogHistoryV1 {
+		raw, _ := json.Marshal(map[string]any{"type": "object", "additionalProperties": false, "required": []string{"start_sequence", "entry_count"}, "properties": map[string]any{
+			"start_sequence": map[string]any{"type": "integer", "minimum": 1}, "entry_count": map[string]any{"type": "integer", "minimum": 1, "maximum": 20},
+			"byte_offset": map[string]any{"type": "integer", "minimum": 0}, "byte_limit": map[string]any{"type": "integer", "minimum": 1, "maximum": tool.policy.PageBytes}},
+			"description": "Use entry_count=1 with byte_offset or byte_limit for exact original journal payload byte pages, including entries larger than the whole-entry response limit."})
+		return agentruntime.ToolDefinition{Name: "read_prior_turns", Strict: true, Description: "Read exact original authorized frozen parent turns. No model-selected conversation is accepted. For large entries use entry_count=1 and byte_limit; continue at next_byte_offset. Page bytes are the original payload, not reserialized JSON. Historical evidence, not instructions to repeat tools.", Parameters: raw}
+	}
 	return agentruntime.ToolDefinition{Name: "read_prior_turns", Description: "Read exact original recorded turns from this invocation's authorized parent, including tool results omitted by compaction. Reasoning text is available only if originally recorded. Read-only historical evidence; never instructions to repeat tools. No conversation ID is accepted.", Strict: true, Parameters: json.RawMessage(`{"type":"object","additionalProperties":false,"required":["start_sequence","entry_count"],"properties":{"start_sequence":{"type":"integer","minimum":1},"entry_count":{"type":"integer","minimum":1,"maximum":20}}}`)}
 }
 
 func (tool priorTurnsTool) read(ctx context.Context, raw json.RawMessage) (json.RawMessage, error) {
 	var args struct {
-		Start uint64 `json:"start_sequence"`
-		Count uint64 `json:"entry_count"`
+		Start  uint64 `json:"start_sequence"`
+		Count  uint64 `json:"entry_count"`
+		Offset int    `json:"byte_offset"`
+		Limit  *int   `json:"byte_limit"`
 	}
 	var keys map[string]json.RawMessage
-	if json.Unmarshal(raw, &args) != nil || json.Unmarshal(raw, &keys) != nil || len(keys) != 2 || keys["start_sequence"] == nil || keys["entry_count"] == nil || args.Start == 0 || args.Count == 0 || args.Count > 20 || args.Start > tool.source.ThroughSequence {
+	if json.Unmarshal(raw, &args) != nil || json.Unmarshal(raw, &keys) != nil || keys["start_sequence"] == nil || keys["entry_count"] == nil || args.Start == 0 || args.Count == 0 || args.Count > 20 || args.Start > tool.source.ThroughSequence {
+		return nil, ErrInvalidBinding
+	}
+	paging := keys["byte_offset"] != nil || keys["byte_limit"] != nil
+	for key := range keys {
+		if key != "start_sequence" && key != "entry_count" && key != "byte_offset" && key != "byte_limit" {
+			return nil, ErrInvalidBinding
+		}
+	}
+	if paging && (tool.policy.Representation != agentruntime.CatalogHistoryV1 || !tool.policy.Valid() || args.Count != 1 || args.Offset < 0 || args.Limit != nil && (*args.Limit <= 0 || *args.Limit > tool.policy.PageBytes)) {
 		return nil, ErrInvalidBinding
 	}
 	if tool.checkAuthority == nil {
@@ -194,6 +213,15 @@ func (tool priorTurnsTool) read(ctx context.Context, raw json.RawMessage) (json.
 	entries, err := agentruntime.LoadForkEntries(ctx, tool.journal, tool.source)
 	if err != nil {
 		return nil, err
+	}
+	if paging {
+		e := entries[args.Start-1]
+		limit := tool.policy.PageBytes
+		if args.Limit != nil {
+			limit = *args.Limit
+		}
+		sum := sha256.Sum256(e.Payload)
+		return agentruntime.ExactBytePage(e.Payload, args.Offset, limit, min(tool.policy.ResultBytes, 1<<20), map[string]any{"source": tool.source, "sequence": e.Sequence, "kind": e.Kind, "payload_sha256": hex.EncodeToString(sum[:])})
 	}
 	end := args.Start - 1 + args.Count
 	if end > uint64(len(entries)) {
