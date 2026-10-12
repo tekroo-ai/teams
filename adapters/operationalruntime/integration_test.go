@@ -431,6 +431,7 @@ type integratedOpenHands struct {
 	mu                                    sync.Mutex
 	conversations                         map[string]*integratedConversation
 	delays                                map[string]time.Duration
+	completionBarriers                    map[string]*integratedCompletionBarrier
 	commitResults                         bool
 	active                                int
 	peakActive                            int
@@ -440,6 +441,47 @@ type integratedOpenHands struct {
 	invalidArchitectureTaskReviews        int
 	failArchitectureIntegrationReviews    int
 	invalidArchitectureIntegrationReviews int
+}
+
+// Fixture completion is released only after BOTH durable Started receipts
+// exist. A fixed delay cannot guarantee overlap when admission takes longer
+// under load. Polls remain nonblocking and the barrier has a finite deadline.
+type integratedCompletionBarrier struct {
+	participants      []string
+	deadline          time.Time
+	released, expired bool
+}
+
+func (server *integratedOpenHands) installCompletionBarrier(deadline time.Time, ids ...string) *integratedCompletionBarrier {
+	server.mu.Lock()
+	defer server.mu.Unlock()
+	b := &integratedCompletionBarrier{participants: append([]string(nil), ids...), deadline: deadline}
+	if server.completionBarriers == nil {
+		server.completionBarriers = make(map[string]*integratedCompletionBarrier)
+	}
+	for _, id := range ids {
+		server.completionBarriers[id] = b
+	}
+	return b
+}
+
+func (server *integratedOpenHands) releaseCompletionBarrier(b *integratedCompletionBarrier, started ...kernel.WorkInvocation) error {
+	server.mu.Lock()
+	defer server.mu.Unlock()
+	if b == nil || b.released || b.expired || !time.Now().Before(b.deadline) || len(started) != len(b.participants) {
+		return errors.New("completion barrier missing, expired or incomplete")
+	}
+	seen := map[string]bool{}
+	for _, invocation := range started {
+		id := string(invocation.ID)
+		conversation := server.conversations[id]
+		if seen[id] || server.completionBarriers[id] != b || invocation.State != kernel.InvocationStarted || invocation.StartedAt == nil || conversation == nil || !conversation.submitted || conversation.finished || conversation.interrupted {
+			return errors.New("completion barrier lacks distinct durable active-worker starts")
+		}
+		seen[id] = true
+	}
+	b.released = true
+	return nil
 }
 
 func (server *integratedOpenHands) serveHTTP(writer http.ResponseWriter, request *http.Request) {
@@ -865,6 +907,15 @@ func integratedSubmittedCriteria(description string) []string {
 
 func (server *integratedOpenHands) refresh(conversation *integratedConversation) {
 	if conversation.submitted && !conversation.finished && !conversation.interrupted && !time.Now().Before(conversation.readyAt) {
+		if barrier := server.completionBarriers[conversationIDFromPrompt(conversation.prompt)]; barrier != nil && !barrier.released {
+			if time.Now().Before(barrier.deadline) {
+				return
+			}
+			barrier.expired = true
+			conversation.interrupted = true
+			server.active--
+			return
+		}
 		if server.commitResults {
 			if err := commitIntegratedResult(conversation.workspace, conversationIDFromPrompt(conversation.prompt)); err != nil {
 				server.t.Errorf("commit integrated OpenHands result: %v", err)

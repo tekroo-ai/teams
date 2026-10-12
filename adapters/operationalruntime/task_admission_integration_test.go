@@ -903,15 +903,14 @@ func exerciseParallelDAGAdmission(t *testing.T, service *ProductionService, stor
 		},
 	}
 	feature.Plan = &plan
+	firstInvocationID := deterministicOperationalUUID("work-invocation", string(feature.ID), string(firstID), string(kernel.PurposeImplementation), "1")
+	secondInvocationID := deterministicOperationalUUID("work-invocation", string(feature.ID), string(secondID), string(kernel.PurposeImplementation), "1")
+	barrier := server.installCompletionBarrier(time.Now().Add(30*time.Second), string(firstInvocationID), string(secondInvocationID))
 	if err := service.MaterializeFeaturePlan(contextWithTimeout(t), feature, plan); err != nil {
 		t.Fatal(err)
 	}
-	firstInvocationID := deterministicOperationalUUID("work-invocation", string(feature.ID), string(firstID), string(kernel.PurposeImplementation), "1")
-	secondInvocationID := deterministicOperationalUUID("work-invocation", string(feature.ID), string(secondID), string(kernel.PurposeImplementation), "1")
 	server.mu.Lock()
 	server.commitResults = true
-	server.delays[string(firstInvocationID)] = 750 * time.Millisecond
-	server.delays[string(secondInvocationID)] = 750 * time.Millisecond
 	server.mu.Unlock()
 	if err := service.reconcileFeaturePlan(contextWithTimeout(t), feature, plan); err != nil {
 		t.Fatal(err)
@@ -920,6 +919,16 @@ func exerciseParallelDAGAdmission(t *testing.T, service *ProductionService, stor
 	secondAuthorized, secondErr := store.LoadOperationalExecution(contextWithTimeout(t), secondInvocationID)
 	if firstErr != nil || secondErr != nil || firstAuthorized.Invocation.State.Terminal() || secondAuthorized.Invocation.State.Terminal() {
 		t.Fatalf("independent DAG roots were not admitted together: first=%#v second=%#v first_err=%v second_err=%v", firstAuthorized.Invocation, secondAuthorized.Invocation, firstErr, secondErr)
+	}
+	waitForInvocationState(t, store, firstInvocationID, kernel.InvocationStarted)
+	waitForInvocationState(t, store, secondInvocationID, kernel.InvocationStarted)
+	firstStarted, firstErr := store.LoadOperationalExecution(contextWithTimeout(t), firstInvocationID)
+	secondStarted, secondErr := store.LoadOperationalExecution(contextWithTimeout(t), secondInvocationID)
+	if firstErr != nil || secondErr != nil {
+		t.Fatalf("load raw worker starts: %v / %v", firstErr, secondErr)
+	}
+	if err := server.releaseCompletionBarrier(barrier, firstStarted.Invocation, secondStarted.Invocation); err != nil {
+		t.Fatal(err)
 	}
 	waitForInvocationState(t, store, firstInvocationID, kernel.InvocationSucceeded)
 	waitForInvocationState(t, store, secondInvocationID, kernel.InvocationSucceeded)

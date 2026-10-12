@@ -79,7 +79,8 @@ func (p ContextDeliveryPolicy) AdmitTokens(requestBytes, promptTokens, providerC
 }
 
 // RecordedResultRef addresses the exact displayed result, including an error.
-// It is made only while replaying a durable ToolDone, never by the model.
+// It is made only from a durable ToolDone or the deterministic protocol closure
+// of a verified frozen Finished submission, never from model-supplied metadata.
 type RecordedResultRef struct {
 	InvocationID string `json:"invocation_id"`
 	Sequence     uint64 `json:"sequence"`
@@ -129,14 +130,20 @@ func legacyReceiptForkEquivalent(recorded, current *ContextFork) bool {
 	if recorded == nil || current == nil || recorded.Source != current.Source || historyDigest(recorded.WorkingHistory) != recorded.HistorySHA256 || historyDigest(current.WorkingHistory) != current.HistorySHA256 {
 		return false
 	}
-	for _, m := range recorded.WorkingHistory {
-		if m.Receipt != nil {
-			return false
-		}
+	if len(recorded.WorkingHistory) != len(current.WorkingHistory) {
+		return false
 	}
 	plain := append([]Message(nil), current.WorkingHistory...)
 	for i := range plain {
-		plain[i].Receipt = nil
+		old := recorded.WorkingHistory[i].Receipt
+		if old == nil {
+			// Current is freshly reconstructed from the exact frozen journal by
+			// Runner. Only missing derived metadata can be added; old references,
+			// authority, content and call identities are never replaced or removed.
+			plain[i].Receipt = nil
+		} else if !reflect.DeepEqual(old, plain[i].Receipt) {
+			return false
+		}
 	}
 	return reflect.DeepEqual(recorded.WorkingHistory, plain)
 }
@@ -415,7 +422,7 @@ func receiptView(m Message, summary bool) (string, error) {
 		var object map[string]json.RawMessage
 		if json.Unmarshal([]byte(m.Content), &object) == nil {
 			v.Summary = make(map[string]any)
-			for _, key := range []string{"name", "path", "status", "truncated", "line_count", "start_line", "end_line", "next_start_line", "match_count", "next_after", "commit_sha", "snapshot_sha256", "sha256", "exit_code", "execution_error", "permission_denial", "head", "clean"} {
+			for _, key := range []string{"name", "path", "status", "truncated", "line_count", "start_line", "end_line", "next_start_line", "match_count", "next_after", "commit_sha", "snapshot_sha256", "sha256", "exit_code", "execution_error", "permission_denial", "head", "clean", "accepted", "executed_in_child"} {
 				if raw := object[key]; len(raw) > 0 && len(raw) <= 512 {
 					v.Summary[key] = raw
 				}
@@ -476,7 +483,7 @@ func (r RecordedResultReader) Definition() ToolDefinition {
 			"match_field":  map[string]any{"type": "string", "maxLength": 128, "description": "Requires json_pointer to select an ARRAY of records, not its containing object. Go test records: /test_evidence/tests or /test_evidence/excluded, not /test_evidence."}, "match_value": map[string]any{"type": "string", "maxLength": 1024},
 			"byte_offset": map[string]any{"type": "integer", "minimum": 0, "default": 0, "description": "Starting BYTE offset in the selected JSON, not an array index. Omit for the first page."},
 			"byte_limit":  map[string]any{"type": "integer", "minimum": 1, "maximum": r.Policy.PageBytes, "default": r.Policy.PageBytes, "description": "Maximum BYTES per page, NOT the number of records. Omit to return the full bounded page, including after an exact record match. A value of 1 returns only one byte."}}})
-	return ToolDefinition{Name: "read_recorded_result", Description: "Read an exact durable tool result for this invocation or its authorized ancestors. Read-only, never reruns a tool. Omit byte_limit/byte_offset for an exact named-record lookup. " + recordedResultAccessInstructions, Parameters: parameters, Strict: true}
+	return ToolDefinition{Name: "read_recorded_result", Description: "Read an exact journal-backed observation for this invocation or its authorized frozen ancestors. Ordinary tool results come from tool_done; historical successful submissions come from the frozen finished entry and expose /historical_result. They are not new tool executions or feature acceptance. Read-only, never reruns a tool. Omit byte_limit/byte_offset for an exact named-record lookup. " + recordedResultAccessInstructions, Parameters: parameters, Strict: true}
 }
 
 func (r RecordedResultReader) Read(ctx context.Context, raw json.RawMessage) (json.RawMessage, error) {
@@ -497,6 +504,7 @@ func (r RecordedResultReader) Read(ctx context.Context, raw json.RawMessage) (js
 	}
 	var entries []Entry
 	var err error
+	var frozen *ForkSource
 	if args.InvocationID == r.InvocationID {
 		entries, err = r.Journal.Load(ctx, r.InvocationID)
 	} else {
@@ -504,6 +512,7 @@ func (r RecordedResultReader) Read(ctx context.Context, raw json.RawMessage) (js
 		for _, source := range r.Sources {
 			if source.InvocationID == args.InvocationID {
 				entries, err = LoadForkEntries(ctx, r.Journal, source)
+				frozen = &source
 				found = true
 				break
 			}
@@ -519,14 +528,14 @@ func (r RecordedResultReader) Read(ctx context.Context, raw json.RawMessage) (js
 		return nil, ErrInvalidTurn
 	}
 	e := entries[args.Sequence-1]
-	var result ToolResult
-	if e.InvocationID != args.InvocationID || e.Sequence != args.Sequence || e.Kind != ToolDone || json.Unmarshal(e.Payload, &result) != nil || !json.Valid(result.Output) {
+	if e.InvocationID != args.InvocationID || e.Sequence != args.Sequence {
 		return nil, ErrInvalidTurn
 	}
-	content := string(result.Output)
-	if result.Error != "" {
-		content = strJSON(result.Error)
+	observation, err := recordedObservation(entries, frozen, args.Sequence)
+	if err != nil {
+		return nil, err
 	}
+	content := observation.Content
 	if resultDigest(content) != args.SHA256 {
 		return nil, ErrConflict
 	}
@@ -544,8 +553,11 @@ func (r RecordedResultReader) Read(ctx context.Context, raw json.RawMessage) (js
 	end := args.Offset + min(limit, len(selected)-args.Offset)
 	// Ordinary JSON is readable; a page splitting a UTF-8 codepoint uses base64
 	// so byte pagination always round-trips exactly.
-	pageValue := map[string]any{"reference": RecordedResultRef{args.InvocationID, args.Sequence, args.SHA256}, "tool": result.Name, "call_id": result.CallID,
+	pageValue := map[string]any{"reference": RecordedResultRef{args.InvocationID, args.Sequence, args.SHA256}, "tool": observation.Name, "call_id": observation.CallID,
 		"json_pointer": args.Pointer, "total_bytes": len(selected), "byte_offset": args.Offset}
+	if e.Kind == Finished {
+		pageValue["source_entry_kind"] = Finished
+	}
 	if args.Field != "" {
 		pageValue["match_field"], pageValue["match_value"] = args.Field, args.Value
 	}

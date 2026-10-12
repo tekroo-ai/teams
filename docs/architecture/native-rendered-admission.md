@@ -137,6 +137,60 @@ not start/stop a service or send load/unload requests; normal model resolution
 still applies, and it does make qualification generation requests.
 Both real-model gates must pass before enabling this policy for a fresh run.
 
+## Completed-submission history delivery
+
+A successful structured submission terminates at `Finished`, not `ToolDone`.
+Restoration closes its historical tool syntax with the existing exact object
+`{accepted:true,executed_in_child:false,historical_result:<original arguments>}`.
+That acknowledgement now has a derived reference to the **actual frozen
+Finished sequence** and a digest of those exact acknowledgement bytes. It is
+not a new tool execution, a fabricated journal entry, or feature acceptance.
+
+Replay, restoration and `read_recorded_result` use one observation decoder.
+Finished-backed reads require an authenticated frozen ancestor, its exact
+terminal sequence and unchanged journal digest, and a valid replayed final
+submission/result chain. The current invocation, arbitrary terminal entries,
+failed/cancelled/timed-out attempts and unrecorded effects cannot masquerade as
+successful completion. Exact `/historical_result` selections and byte pages
+use the existing pointer, hash and paging checks; terminal pages explicitly
+identify `source_entry_kind=finished`.
+
+This repair is shared by all native roles. Existing result/history/page,
+transport, token and correction limits are unchanged. Only duplicate tool
+presentation is bounded; original assistant text, arguments, authority and raw
+journals are retained. No historical source journal or stored checkpoint is
+rewritten. For older mixed-reference checkpoints, the runtime reconstructs the
+frozen source on both first entry and restart. Compatibility permits adding
+missing derived receipt metadata only; existing metadata, source identity,
+message content and call identity must remain identical.
+
+`TestCompletedSubmissionReceiptHandbackBoundaries` covers the unchanged result
+limit minus one, equal, plus one, and the 17992-byte failed-boundary fixture.
+Additional tests cover legacy mixed checkpoints, same-invocation pointer
+failure/correction across restart, nested frozen ancestry, Unicode exact pages,
+unauthorized/hash/pointer/source rejection and truthful closure of unrecorded
+effects from unsuccessful attempts. Unbacked oversized results still fail.
+
+`TestArchitectPMDecisionReturnWithLargeFinishedReceipt` exercises real signed
+handler validation, PM `needs_decision` disposition, workflow revision
+selection, structured feedback and native same-owner history binding, using
+explicitly scripted model fixtures. The opt-in
+`TestQualifyNativeArchitectPMCompletedDecisionReturn` instead runs the real
+configured PM and returning architect against that synthetic completed parent.
+`TestQualifyNativeCompletedSubmissionHandback` checks each currently qualified
+signed role with a synthetic completed parent, a deliberately rejected pointer,
+and live correction within the same finite child invocation. Exact original
+decision/marker reads, unchanged parent/error history and completed-child
+restart are mandatory. Neither gate dispatches a feature, modifies a historical
+run, or qualifies an unqualified operator profile.
+
+Run each live gate separately with `mongo_integration,native_qualification`, an
+explicit read-only `TEKROO_NATIVE_TERMINAL_CONFIG`, and a different new
+`TEKROO_NATIVE_TERMINAL_OUTPUT` directory. Teams must be stopped and the existing
+model idle before entry. HTTP bodies and invocation-bound raw journals are
+retained; unset configuration is SKIP, never qualification PASS. The seven-role
+gate needs an outer test timeout exceeding its per-role ten-minute bounds.
+
 ## Architect-to-PM dependency boundary
 
 An accepted architectural task may omit `depends_on`: its signed schema makes

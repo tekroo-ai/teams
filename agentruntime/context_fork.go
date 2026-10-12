@@ -169,9 +169,11 @@ func PrepareContextFork(ctx context.Context, journal Journal, childID string, so
 		if len(last.ToolCalls) != 1 || last.ToolCalls[0].Name != start.FinalTool {
 			return nil, ErrInvalidTurn
 		}
-		call := last.ToolCalls[0]
-		observation, _ := json.Marshal(map[string]any{"historical_result": json.RawMessage(call.Arguments), "accepted": true, "executed_in_child": false})
-		messages = append(messages, Message{Role: "tool", Name: call.Name, CallID: call.ID, Content: string(observation)})
+		observation, err := completedSubmissionObservation(entries[len(entries)-1], last.ToolCalls[0])
+		if err != nil {
+			return nil, err
+		}
+		messages = append(messages, observation)
 	}
 	if terminal != Finished {
 		// A missing journal observation is not proof that an effect did or did
@@ -187,7 +189,8 @@ func PrepareContextFork(ctx context.Context, journal Journal, childID string, so
 	}
 	// Legacy nested checkpoints predate receipt references. Bind their exact
 	// unchanged tool bytes to verified ancestry; do not rewrite decisions or
-	// manufacture references for synthetic/unrecorded observations.
+	// manufacture references for unrecorded observations. Successful protocol
+	// closure is derivable from its frozen Finished entry, not a fake ToolDone.
 	sources, err := ReceiptSources(ctx, journal, &source)
 	if err != nil {
 		return nil, err
@@ -206,18 +209,23 @@ func PrepareContextFork(ctx context.Context, journal Journal, childID string, so
 			return nil, err
 		}
 		for _, entry := range original {
-			if entry.Kind != ToolDone {
+			if entry.Kind != ToolDone && entry.Kind != Finished {
 				continue
 			}
-			var result ToolResult
-			if json.Unmarshal(entry.Payload, &result) != nil {
-				return nil, ErrInvalidTurn
+			if entry.Kind == Finished {
+				var start startRecord
+				if json.Unmarshal(original[0].Payload, &start) != nil {
+					return nil, ErrInvalidTurn
+				}
+				if start.FinalTool == "" { // Text completion needs no tool closure.
+					continue
+				}
 			}
-			content := string(result.Output)
-			if result.Error != "" {
-				content = strJSON(result.Error)
+			observation, err := recordedObservation(original, &ancestor, entry.Sequence)
+			if err != nil {
+				return nil, err
 			}
-			originals = append(originals, Message{Role: "tool", Name: result.Name, CallID: result.CallID, Content: content, Receipt: &RecordedResultRef{InvocationID: ancestor.InvocationID, Sequence: entry.Sequence, SHA256: resultDigest(content)}})
+			originals = append(originals, observation)
 		}
 	}
 	if missing {

@@ -194,22 +194,28 @@ func (runner Runner) Run(ctx context.Context, invocationID, requestDigest, promp
 	if err != nil {
 		return "", err
 	}
+	// Metadata compatibility is not authorization. Reconstruct the frozen
+	// ancestor on both fresh starts and restarts before allowing a missing
+	// receipt address to be derived; stored history bytes remain untouched.
+	if !validContextFork(runner.ContextFork, invocationID) {
+		return "", ErrInvalidTurn
+	}
+	if runner.ContextFork != nil {
+		prepared, err := PrepareContextFork(ctx, runner.Journal, invocationID, runner.ContextFork.Source)
+		if err != nil {
+			if len(entries) != 0 {
+				return "", errors.Join(ErrInvalidTurn, err)
+			}
+			return "", err
+		}
+		if !reflect.DeepEqual(prepared, runner.ContextFork) {
+			if !legacyReceiptForkEquivalent(runner.ContextFork, prepared) {
+				return "", ErrInvalidTurn
+			}
+			runner.ContextFork = prepared
+		}
+	}
 	if len(entries) == 0 {
-		if !validContextFork(runner.ContextFork, invocationID) {
-			return "", ErrInvalidTurn
-		}
-		if runner.ContextFork != nil {
-			prepared, err := PrepareContextFork(ctx, runner.Journal, invocationID, runner.ContextFork.Source)
-			if err != nil {
-				return "", err
-			}
-			if !reflect.DeepEqual(prepared, runner.ContextFork) {
-				if !legacyReceiptForkEquivalent(runner.ContextFork, prepared) {
-					return "", ErrInvalidTurn
-				}
-				runner.ContextFork = prepared
-			}
-		}
 		if err := runner.checkOwnership(ctx); err != nil {
 			return "", err
 		}
@@ -703,12 +709,11 @@ func replay(id, requestDigest, prompt, systemPrompt, finalTool string, finalize 
 			if json.Unmarshal(entry.Payload, &result) != nil || len(outstanding) == 0 || result.CallID != outstanding[0].ID || result.Name != outstanding[0].Name || !json.Valid(result.Output) {
 				return nil, nil, nil, 0, ErrInvalidTurn
 			}
-			content := string(result.Output)
-			if result.Error != "" {
-				content = strJSON(result.Error)
+			observation, err := toolObservation(entry)
+			if err != nil {
+				return nil, nil, nil, 0, err
 			}
-			messages = append(messages, Message{Role: "tool", Content: content, CallID: result.CallID, Name: result.Name,
-				Receipt: &RecordedResultRef{InvocationID: id, Sequence: entry.Sequence, SHA256: resultDigest(content)}})
+			messages = append(messages, observation)
 			outstanding = outstanding[1:]
 		case Finished:
 			if partial != nil {
