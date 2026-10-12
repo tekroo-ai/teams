@@ -204,13 +204,27 @@ type operationalExecutionReader struct {
 	application.OperationalExecutionReader
 }
 
+func (reader operationalExecutionReader) ReadCommittedTerminalDecision(ctx context.Context, id kernel.UUIDv7) (application.CommittedTerminalDecision, bool, error) {
+	if terminal, ok := reader.OperationalExecutionReader.(application.OperationalTerminalDecisionReader); ok {
+		return terminal.ReadCommittedTerminalDecision(ctx, id)
+	}
+	return application.CommittedTerminalDecision{}, false, nil
+}
+
+func (reader operationalExecutionReader) ReadInvocationIDForAuthorization(ctx context.Context, id kernel.UUIDv7) (kernel.UUIDv7, bool, error) {
+	if identity, ok := reader.OperationalExecutionReader.(application.OperationalAuthorizationIdentityReader); ok {
+		return identity.ReadInvocationIDForAuthorization(ctx, id)
+	}
+	return "", false, nil
+}
+
 // operationalExecutionReaderWithDeadline makes host-suspension deadline
 // extension an explicitly assembled production capability. A bare Runtime is
 // also used by tests and embedders that do not own a runtime-continuity
 // session; those callers receive the immutable invocation deadline instead of
 // accidentally activating a Mongo capability they did not initialize.
 type operationalExecutionReaderWithDeadline struct {
-	application.OperationalExecutionReader
+	operationalExecutionReader
 	application.OperationalDeadlineExtensionReader
 }
 
@@ -220,7 +234,7 @@ func assembleOperationalExecutionReader(base application.OperationalExecutionRea
 		return reader
 	}
 	return operationalExecutionReaderWithDeadline{
-		OperationalExecutionReader:         reader,
+		operationalExecutionReader:         reader,
 		OperationalDeadlineExtensionReader: deadline,
 	}
 }

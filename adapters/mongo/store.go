@@ -24,7 +24,7 @@ var (
 	ErrDeadlineRequired    = errors.New("mongo operation requires a context deadline")
 	ErrUnsupportedTopology = errors.New("mongo topology does not support transactions and change streams")
 	ErrMetadataMismatch    = errors.New("mongo kernel metadata mismatch")
-	ErrConflict            = errors.New("mongo decision precondition conflict")
+	ErrConflict            = fmt.Errorf("mongo %w", kernel.ErrDecisionPreconditionConflict)
 	ErrInvalidDecision     = errors.New("invalid mongo decision")
 	ErrCorruptAggregate    = errors.New("mongo aggregate snapshot contradicts event fold")
 	ErrInjectedFault       = errors.New("injected mongo transaction fault")
@@ -751,7 +751,10 @@ func (s *Store) Commit(ctx context.Context, expected kernel.Snapshot, decision k
 		return nil, nil
 	}, options.Transaction().SetReadConcern(readconcern.Snapshot()).SetWriteConcern(writeconcern.Majority()).SetReadPreference(readpref.Primary()))
 	if err != nil {
-		if driver.IsDuplicateKeyError(err) || errors.Is(err, ErrConflict) {
+		if errors.Is(err, ErrConflict) {
+			return err
+		}
+		if driver.IsDuplicateKeyError(err) {
 			return ErrConflict
 		}
 		if errors.Is(err, kernel.ErrDecisionAlreadyCommitted) || errors.Is(err, kernel.ErrIdempotencyKeyConflict) {

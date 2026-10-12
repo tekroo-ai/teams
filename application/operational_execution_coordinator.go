@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/tekroo-ai/teams/kernel"
@@ -45,6 +46,8 @@ type OperationalExecutionCoordinator struct {
 	roles    RoleGroundingResolver
 	clock    kernel.Clock
 	policy   OperationalExecutionPolicy
+	gateMu   sync.Mutex
+	gates    map[kernel.UUIDv7]*invocationReconciliationGate
 }
 
 func NewOperationalExecutionCoordinator(reader OperationalExecutionReader, commands ExecutionCommandService, boundary AgentExecutionBoundary, evidence ExecutionEvidenceRecorder, roles RoleGroundingResolver, clock kernel.Clock, policy OperationalExecutionPolicy) (*OperationalExecutionCoordinator, error) {
@@ -82,11 +85,43 @@ func (coordinator *OperationalExecutionCoordinator) Process(ctx context.Context,
 	if !intent.IntentID.Valid() || !intent.EventID.Valid() || intent.Kind != workInvocationOutboxKind {
 		return OperationalExecutionResult{}, ErrInvalidOperationalExecution
 	}
-	current, err := coordinator.reader.LoadOperationalExecutionByAuthorizationEvent(ctx, intent.EventID)
+	var id kernel.UUIDv7
+	if identity, ok := coordinator.reader.(OperationalAuthorizationIdentityReader); ok {
+		lookedUp, found, err := identity.ReadInvocationIDForAuthorization(ctx, intent.EventID)
+		if err != nil {
+			return OperationalExecutionResult{}, err
+		}
+		if found {
+			if !lookedUp.Valid() {
+				return OperationalExecutionResult{}, ErrInvalidOperationalExecution
+			}
+			id = lookedUp
+		} else if lookedUp != "" {
+			return OperationalExecutionResult{}, ErrInvalidOperationalExecution
+		}
+	}
+	if id == "" {
+		current, err := coordinator.reader.LoadOperationalExecutionByAuthorizationEvent(ctx, intent.EventID)
+		if err != nil {
+			return OperationalExecutionResult{}, err
+		}
+		if current.Invocation.AuthorizationEventID != intent.EventID {
+			return OperationalExecutionResult{}, ErrInvalidOperationalExecution
+		}
+		id = current.Invocation.ID
+	}
+	release, err := coordinator.acquireInvocation(ctx, id)
 	if err != nil {
 		return OperationalExecutionResult{}, err
 	}
-	if current.Invocation.AuthorizationEventID != intent.EventID {
+	defer release()
+	// The preliminary authorization lookup identifies the gate only. A waiter
+	// must reload after acquisition; its predecessor may have settled the work.
+	current, err := coordinator.reader.LoadOperationalExecution(ctx, id)
+	if err != nil {
+		return OperationalExecutionResult{}, err
+	}
+	if current.Invocation.ID != id || current.Invocation.AuthorizationEventID != intent.EventID {
 		return OperationalExecutionResult{}, ErrInvalidOperationalExecution
 	}
 	return coordinator.processCurrent(ctx, current, intent)
@@ -241,6 +276,11 @@ func (coordinator *OperationalExecutionCoordinator) ReconcileRequestedCancellati
 	if err := ctx.Err(); err != nil {
 		return OperationalExecutionResult{}, err
 	}
+	release, err := coordinator.acquireInvocation(ctx, id)
+	if err != nil {
+		return OperationalExecutionResult{}, err
+	}
+	defer release()
 	current, err := coordinator.reader.LoadOperationalExecution(ctx, id)
 	if err != nil {
 		return OperationalExecutionResult{}, err
@@ -431,20 +471,21 @@ func (coordinator *OperationalExecutionCoordinator) recordTerminalObservation(ct
 	for index, reference := range references {
 		evidenceIDs[index] = reference.EvidenceID
 	}
-	payload, _ := json.Marshal(struct {
-		InvocationID     kernel.UUIDv7              `json:"invocation_id"`
-		ExpectedRevision uint64                     `json:"expected_invocation_revision"`
-		ClaimID          kernel.UUIDv7              `json:"claim_id"`
-		Outcome          kernel.WorkInvocationState `json:"outcome"`
-		Retryable        bool                       `json:"retryable"`
-		EvidenceIDs      []kernel.UUIDv7            `json:"evidence_ids"`
-		OutputDigest     kernel.Digest              `json:"output_digest"`
-		FinishedAt       time.Time                  `json:"finished_at"`
-	}{invocation.ID, invocation.Revision, *invocation.ClaimID, outcome, observation.Retryable, evidenceIDs, outputDigest, coordinator.clock.Now()})
+	terminal := operationalTerminalPayload{invocation.ID, invocation.Revision, *invocation.ClaimID, outcome, observation.Retryable, evidenceIDs, outputDigest, coordinator.clock.Now()}
+	payload, _ := json.Marshal(terminal)
 	command := coordinator.command(invocation, "tekroo.command.work-invocation.record-terminal", payload, references, coordinator.policy.ServiceAuthority)
 	receipt, err := coordinator.apply(ctx, command)
 	result.Receipt = &receipt
 	if err != nil {
+		if errors.Is(err, kernel.ErrDecisionPreconditionConflict) || errors.Is(err, ErrStaleWorkInvocation) {
+			if winner, matched, readErr := coordinator.matchCommittedTerminal(ctx, invocation, terminal, references); readErr != nil {
+				return result, errors.Join(err, readErr)
+			} else if matched {
+				result.State = winner.Invocation.State
+				result.Receipt = &winner.Receipt
+				return result, nil
+			}
+		}
 		return result, err
 	}
 	result.State = outcome

@@ -7,11 +7,12 @@ import (
 )
 
 var (
-	ErrDecisionAlreadyCommitted = errors.New("decision already committed")
-	ErrCommitUncertain          = errors.New("decision commit acknowledgement uncertain")
-	ErrCommandIdentityConflict  = errors.New("command identity conflict")
-	ErrIdempotencyKeyConflict   = errors.New("idempotency key reuse conflict")
-	ErrReceiptAccessDenied      = errors.New("receipt read access denied")
+	ErrDecisionAlreadyCommitted     = errors.New("decision already committed")
+	ErrDecisionPreconditionConflict = errors.New("decision precondition conflict")
+	ErrCommitUncertain              = errors.New("decision commit acknowledgement uncertain")
+	ErrCommandIdentityConflict      = errors.New("command identity conflict")
+	ErrIdempotencyKeyConflict       = errors.New("idempotency key reuse conflict")
+	ErrReceiptAccessDenied          = errors.New("receipt read access denied")
 )
 
 type KernelDecisionStore interface {

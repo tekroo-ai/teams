@@ -14,21 +14,32 @@ import (
 )
 
 func (s *Store) LoadOperationalExecutionByAuthorizationEvent(ctx context.Context, eventID kernel.UUIDv7) (application.OperationalExecutionContext, error) {
-	if err := requireDeadline(ctx); err != nil {
+	id, found, err := s.ReadInvocationIDForAuthorization(ctx, eventID)
+	if err != nil {
 		return application.OperationalExecutionContext{}, err
+	}
+	if !found {
+		return application.OperationalExecutionContext{}, application.ErrInvalidOperationalExecution
+	}
+	return s.LoadOperationalExecution(ctx, id)
+}
+
+func (s *Store) ReadInvocationIDForAuthorization(ctx context.Context, eventID kernel.UUIDv7) (kernel.UUIDv7, bool, error) {
+	if err := requireDeadline(ctx); err != nil {
+		return "", false, err
 	}
 	var document eventDocument
 	if err := s.db.Collection("events").FindOne(ctx, bson.D{{Key: "_id", Value: string(eventID)}}).Decode(&document); err != nil {
 		if errors.Is(err, driver.ErrNoDocuments) {
-			return application.OperationalExecutionContext{}, application.ErrInvalidOperationalExecution
+			return "", false, application.ErrInvalidOperationalExecution
 		}
-		return application.OperationalExecutionContext{}, err
+		return "", false, err
 	}
 	var event kernel.DomainEvent
-	if decode(document.Data, &event) != nil || event.EventID != eventID || event.EventType != "tekroo.event.work-invocation.authorized" || event.Aggregate.Kind != kernel.AggregateWorkInvocation {
-		return application.OperationalExecutionContext{}, application.ErrInvalidOperationalExecution
+	if decode(document.Data, &event) != nil || event.EventID != eventID || event.EventType != "tekroo.event.work-invocation.authorized" || event.Aggregate.Kind != kernel.AggregateWorkInvocation || !event.Aggregate.ID.Valid() {
+		return "", false, application.ErrInvalidOperationalExecution
 	}
-	return s.LoadOperationalExecution(ctx, event.Aggregate.ID)
+	return event.Aggregate.ID, true, nil
 }
 
 func (s *Store) LoadOperationalExecution(ctx context.Context, invocationID kernel.UUIDv7) (application.OperationalExecutionContext, error) {
