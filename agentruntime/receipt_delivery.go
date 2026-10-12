@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -17,6 +18,9 @@ import (
 )
 
 var ErrContextBudget = errors.New("model request exceeds admitted context delivery budget")
+
+// Shared in the tool definition, not copied into every historical receipt.
+const recordedResultAccessInstructions = "References identify the ORIGINAL result of the named tool, not presentation metadata. For read_file use /output; omit json_pointer for whole JSON. A condensed reader PAGE has two identities: reference is its own journal receipt; page.source is the underlying source selection. To continue source paging, copy page.source and use page.next_byte_offset. Never use a page receipt as if it were a read_file result. match_field/match_value require an ARRAY: Go test records use /test_evidence/tests or /test_evidence/excluded, not /test_evidence. page_complete is not test completeness. Summaries and references are not complete evidence. Prefer focused line-range source reads to re-paging large source files."
 
 // ContextDeliveryPolicy is one host-owned policy shared by every native role.
 // Historical admission is a conservative byte bound, NOT a token count.
@@ -155,6 +159,12 @@ func (c ReceiptCondenser) CondenseContext(ctx context.Context, _ []Message, hist
 		return nil, ErrInvalidTurn
 	}
 	result := restoreRecordedReferences(history, c.InheritedHistory)
+	// Identical pages can refer to a later, exact visible page, without removing
+	// any call or journal entry. Rebuild the index after every checkpoint.
+	result, err := compactRepeatedPages(result)
+	if err != nil {
+		return nil, err
+	}
 	total := 0
 	for i, m := range result {
 		if err := ctx.Err(); err != nil {
@@ -205,6 +215,9 @@ func (c ReceiptCondenser) CondenseContext(ctx context.Context, _ []Message, hist
 	if total > c.Policy.HistoryBytes {
 		return nil, fmt.Errorf("%w: tool-reference history exceeds %d bytes; journal retained", ErrContextBudget, c.Policy.HistoryBytes)
 	}
+	// A byte-budget projection may have replaced the later page too. Never
+	// leave a delivery-only link claiming those bytes are still in context.
+	result = clearUnavailablePageLinks(result)
 	return result, nil
 }
 
@@ -217,6 +230,139 @@ type receiptPresentation struct {
 	Read      string            `json:"read,omitempty"` // Decode legacy checkpoints only.
 	Access    string            `json:"access_instructions,omitempty"`
 	Pointers  []string          `json:"source_json_pointers,omitempty"`
+	Page      *recordedPageView `json:"page,omitempty"`
+}
+
+// Source is directly reusable as reader arguments; the outer receipt still
+// authenticates this page response. Selection, byte range and content digest
+// remain distinct, including exact named-record filters.
+type recordedSelection struct {
+	RecordedResultRef
+	Pointer string  `json:"json_pointer,omitempty"`
+	Field   string  `json:"match_field,omitempty"`
+	Value   *string `json:"match_value,omitempty"`
+}
+
+type recordedPageView struct {
+	Source          recordedSelection `json:"source"`
+	Offset          int               `json:"byte_offset"`
+	Next            int               `json:"next_byte_offset"`
+	Total           int               `json:"total_bytes"`
+	Complete        bool              `json:"page_complete"`
+	ContentSHA256   string            `json:"content_sha256"`
+	InContextCallID string            `json:"content_in_call,omitempty"`
+}
+
+func recordedPage(m Message) (*recordedPageView, bool, error) {
+	if m.Role != "tool" || m.Name != "read_recorded_result" {
+		return nil, false, nil
+	}
+	var projected receiptPresentation
+	if json.Unmarshal([]byte(m.Content), &projected) == nil && projected.Delivery == "RECORDED_RESULT_REFERENCE" {
+		return projected.Page, false, nil // Legacy checkpoints may lack page provenance.
+	}
+	var p struct {
+		Reference         RecordedResultRef `json:"reference"`
+		Pointer           string            `json:"json_pointer"`
+		Field             string            `json:"match_field"`
+		Value             *string           `json:"match_value"`
+		Offset            int               `json:"byte_offset"`
+		Next              int               `json:"next_byte_offset"`
+		Total             int               `json:"total_bytes"`
+		Complete          bool              `json:"page_complete"`
+		Encoding, Content string
+	}
+	if json.Unmarshal([]byte(m.Content), &p) != nil {
+		return nil, false, nil
+	} // Error result, not a page.
+	chunk := []byte(p.Content)
+	if p.Encoding == "base64" {
+		var err error
+		chunk, err = base64.StdEncoding.Strict().DecodeString(p.Content)
+		if err != nil {
+			return nil, false, ErrInvalidTurn
+		}
+	} else if p.Encoding != "utf8" {
+		return nil, false, ErrInvalidTurn
+	}
+	if p.Reference.InvocationID == "" || p.Reference.Sequence == 0 || !validForkDigest(p.Reference.SHA256) ||
+		p.Offset < 0 || p.Next < p.Offset || p.Next > p.Total || p.Complete != (p.Next == p.Total) || len(chunk) != p.Next-p.Offset ||
+		(p.Field == "") != (p.Value == nil) {
+		return nil, false, ErrInvalidTurn
+	}
+	return &recordedPageView{Source: recordedSelection{p.Reference, p.Pointer, p.Field, p.Value}, Offset: p.Offset,
+		Next: p.Next, Total: p.Total, Complete: p.Complete, ContentSHA256: resultDigest(string(chunk))}, true, nil
+}
+
+func pageKey(p *recordedPageView) string {
+	if p == nil {
+		return ""
+	}
+	copy := *p
+	copy.InContextCallID = ""
+	raw, _ := json.Marshal(copy)
+	return string(raw)
+}
+
+func compactRepeatedPages(history []Message) ([]Message, error) {
+	result := append([]Message(nil), history...)
+	visible := map[string]string{}
+	for i := len(result) - 1; i >= 0; i-- {
+		m := result[i]
+		p, raw, err := recordedPage(m)
+		if err != nil {
+			return nil, err
+		}
+		if p == nil {
+			continue
+		}
+		key := pageKey(p)
+		if later := visible[key]; later != "" {
+			content, err := receiptView(m, false)
+			if err != nil {
+				return nil, err
+			}
+			var v receiptPresentation
+			if json.Unmarshal([]byte(content), &v) != nil {
+				return nil, ErrInvalidTurn
+			}
+			pCopy := *p
+			pCopy.InContextCallID = later
+			v.Page = &pCopy
+			encoded, _ := json.Marshal(v)
+			if len(encoded) < len(m.Content) || !raw {
+				result[i].Content = string(encoded)
+			}
+		} else if raw {
+			visible[key] = m.CallID
+		}
+	}
+	return result, nil
+}
+
+func clearUnavailablePageLinks(history []Message) []Message {
+	visible := map[string]string{}
+	for _, m := range history {
+		p, raw, _ := recordedPage(m)
+		if p != nil && raw {
+			visible[m.CallID] = pageKey(p)
+		}
+	}
+	for i, m := range history {
+		if m.Role != "tool" || m.Name != "read_recorded_result" {
+			continue
+		}
+		var v receiptPresentation
+		if json.Unmarshal([]byte(m.Content), &v) != nil || v.Delivery != "RECORDED_RESULT_REFERENCE" || v.Page == nil || v.Page.InContextCallID == "" {
+			continue
+		}
+		if visible[v.Page.InContextCallID] != pageKey(v.Page) {
+			v.Page.InContextCallID = ""
+			encoded, _ := json.Marshal(v)
+			history[i].Content = string(encoded)
+		}
+	}
+	return history
 }
 
 func receiptView(m Message, summary bool) (string, error) {
@@ -230,12 +376,15 @@ func receiptView(m Message, summary bool) (string, error) {
 		if json.Unmarshal([]byte(m.Content), &prior) != nil || prior.Delivery != "RECORDED_RESULT_REFERENCE" || prior.Reference != *ref || prior.Tool != m.Name || prior.CallID != m.CallID {
 			return "", ErrInvalidTurn
 		}
-		if summary {
-			return m.Content, nil
-		}
+		// Re-render old projections too: historical per-receipt prose is decode
+		// compatible, but must not reintroduce its fixed overhead on restart.
 	}
-	v := receiptPresentation{Delivery: "RECORDED_RESULT_REFERENCE", Reference: *ref, Tool: m.Name, CallID: m.CallID,
-		Access: "Read ORIGINAL result via read_recorded_result with exact reference; json_pointer is not presentation metadata. read_file source: /output; omit pointer for whole JSON. match_field/match_value require an ARRAY: for Go test records use /test_evidence/tests or /test_evidence/excluded, not the /test_evidence object. This view is not complete evidence."}
+	v := receiptPresentation{Delivery: "RECORDED_RESULT_REFERENCE", Reference: *ref, Tool: m.Name, CallID: m.CallID}
+	page, _, err := recordedPage(m)
+	if err != nil {
+		return "", err
+	}
+	v.Page = page
 	var source map[string]json.RawMessage
 	if resultDigest(m.Content) == ref.SHA256 && json.Unmarshal([]byte(m.Content), &source) == nil {
 		keys := boundedObjectKeys(source)
@@ -257,6 +406,9 @@ func receiptView(m Message, summary bool) (string, error) {
 		var prior receiptPresentation
 		if json.Unmarshal([]byte(m.Content), &prior) == nil {
 			v.Pointers = prior.Pointers
+			if summary {
+				v.Summary = prior.Summary
+			}
 		}
 	}
 	if summary && resultDigest(m.Content) == ref.SHA256 {
@@ -324,7 +476,7 @@ func (r RecordedResultReader) Definition() ToolDefinition {
 			"match_field":  map[string]any{"type": "string", "maxLength": 128, "description": "Requires json_pointer to select an ARRAY of records, not its containing object. Go test records: /test_evidence/tests or /test_evidence/excluded, not /test_evidence."}, "match_value": map[string]any{"type": "string", "maxLength": 1024},
 			"byte_offset": map[string]any{"type": "integer", "minimum": 0, "default": 0, "description": "Starting BYTE offset in the selected JSON, not an array index. Omit for the first page."},
 			"byte_limit":  map[string]any{"type": "integer", "minimum": 1, "maximum": r.Policy.PageBytes, "default": r.Policy.PageBytes, "description": "Maximum BYTES per page, NOT the number of records. Omit to return the full bounded page, including after an exact record match. A value of 1 returns only one byte."}}})
-	return ToolDefinition{Name: "read_recorded_result", Description: "Read an exact durable tool result for this invocation or its authorized ancestors. Read-only, never reruns a tool. Supply its displayed reference. Optional JSON pointer and exact array-record match avoid scanning a full suite. Omit byte_limit/byte_offset for an exact named-record lookup. Byte pagination includes digest, total_bytes and next_byte_offset; page_complete is not test completeness.", Parameters: parameters, Strict: true}
+	return ToolDefinition{Name: "read_recorded_result", Description: "Read an exact durable tool result for this invocation or its authorized ancestors. Read-only, never reruns a tool. Omit byte_limit/byte_offset for an exact named-record lookup. " + recordedResultAccessInstructions, Parameters: parameters, Strict: true}
 }
 
 func (r RecordedResultReader) Read(ctx context.Context, raw json.RawMessage) (json.RawMessage, error) {
@@ -394,6 +546,9 @@ func (r RecordedResultReader) Read(ctx context.Context, raw json.RawMessage) (js
 	// so byte pagination always round-trips exactly.
 	pageValue := map[string]any{"reference": RecordedResultRef{args.InvocationID, args.Sequence, args.SHA256}, "tool": result.Name, "call_id": result.CallID,
 		"json_pointer": args.Pointer, "total_bytes": len(selected), "byte_offset": args.Offset}
+	if args.Field != "" {
+		pageValue["match_field"], pageValue["match_value"] = args.Field, args.Value
+	}
 	// Bound the encoded envelope too: escaping control bytes can expand a page.
 	// Shrink only the returned page, never its source or its exact byte offsets.
 	for {

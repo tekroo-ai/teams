@@ -128,11 +128,11 @@ func TestSourcePointerMetadataFitsMinimumPresentationBudget(t *testing.T) {
 func TestRecordedArrayMatchGuidanceAndWrongContainerReceipt(t *testing.T) {
 	_, message, reader := recordedFixture(t, largeReceipt(t))
 	view, err := receiptView(message, true)
-	if err != nil || !strings.Contains(view, "/test_evidence/tests") || !strings.Contains(view, "/test_evidence/excluded") || !strings.Contains(view, "ARRAY") {
-		t.Fatalf("array selection guidance missing: %s %v", view, err)
+	if err != nil || strings.Contains(view, "access_instructions") {
+		t.Fatalf("receipt repeats shared access instructions: %s %v", view, err)
 	}
 	definition, _ := json.Marshal(reader.Definition())
-	if !strings.Contains(string(definition), "ARRAY") {
+	if !strings.Contains(string(definition), "ARRAY") || !strings.Contains(string(definition), "/test_evidence/tests") || !strings.Contains(string(definition), "/test_evidence/excluded") {
 		t.Fatal("reader schema does not explain matching container")
 	}
 	name := "TestCase3"

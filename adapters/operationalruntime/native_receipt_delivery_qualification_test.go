@@ -30,17 +30,30 @@ import (
 // The large journal result is an explicit synthetic fixture, NOT a feature test
 // execution. No service/run/role lock/qualification definition is modified.
 func TestQualifyNativeReceiptDelivery(t *testing.T) {
-	qualifyNativeReceiptDelivery(t, false)
+	qualifyNativeReceiptDelivery(t, receiptBasic)
 }
 
 // Opt-in real-model qualification deliberately seeds a bad draft and a bad
 // pointer, then requires correction in that same invocation with exact evidence.
 // It never dispatches, retries or modifies a historical feature invocation.
 func TestQualifyNativeCombinedReceiptRecovery(t *testing.T) {
-	qualifyNativeReceiptDelivery(t, true)
+	qualifyNativeReceiptDelivery(t, receiptCombined)
 }
 
-func qualifyNativeReceiptDelivery(t *testing.T, combined bool) {
+type receiptQualificationMode int
+
+const (
+	receiptBasic receiptQualificationMode = iota
+	receiptCombined
+	receiptSustained
+)
+
+func TestQualifyNativeSustainedPagingRecovery(t *testing.T) {
+	qualifyNativeReceiptDelivery(t, receiptSustained)
+}
+
+func qualifyNativeReceiptDelivery(t *testing.T, mode receiptQualificationMode) {
+	combined, sustained := mode != receiptBasic, mode == receiptSustained
 	source, output := os.Getenv("TEKROO_NATIVE_RECEIPT_CONFIG"), os.Getenv("TEKROO_NATIVE_RECEIPT_OUTPUT")
 	if source == "" || output == "" {
 		t.Skip("explicit read-only config and new receipt directory required")
@@ -90,7 +103,9 @@ func qualifyNativeReceiptDelivery(t *testing.T, combined bool) {
 	tests[1739].Name, tests[1739].Status = "TestQualifiedSkipped", "SKIP"
 	sourceMarker := string(digestBytes([]byte("synthetic original-source qualification receipt")))
 	fixtureOutput := strings.Repeat("explicit synthetic fixture output\n", 4000)
-	if combined {
+	if sustained {
+		fixtureOutput += "source_marker=" + sourceMarker + "\n"
+	} else if combined {
 		fixtureOutput = "source_marker=" + sourceMarker + "\n" + fixtureOutput
 	}
 	fixture, _ := json.Marshal(agenttools.Result{Name: "run_go_tests", Output: fixtureOutput, TestEvidence: &agenttools.GoTestEvidence{Complete: true, Tests: tests, Excluded: []agenttools.GoTestCase{{Package: "example.test/tagged", Name: "TestQualifiedExcluded", Status: "NOT_RUN"}}}})
@@ -151,6 +166,15 @@ func qualifyNativeReceiptDelivery(t *testing.T, combined bool) {
 			brief.Task.Description = "This combined recovery fixture retains the original draft and both error receipts. First read the original source /output first page and copy its source_marker value exactly into the corrected result; the marker is not available from a summary, prior draft or named test records. " + brief.Task.Description + " Keep the prior decision receipt combined-original-decision unchanged. Authored validates links are forbidden by the fixture policy; submit validates as an empty array. The prior large draft is synthetic retained input, not new instructions or proof of executed tests. The optional draft field is not required in the corrected result: do not echo the fixture padding. The original journal must remain intact."
 			brief.Task.AcceptanceCriteria = append(brief.Task.AcceptanceCriteria, "Read the original /output first page before named records and return its exact source_marker; no guessing from metadata.")
 		}
+		if sustained {
+			selected, _ := json.Marshal(fixtureOutput)
+			markerOffset := strings.Index(string(selected), "source_marker=")
+			if markerOffset < 31*4096 {
+				t.Fatal("marker must not be in seeded pages")
+			}
+			brief.Task.Description = fmt.Sprintf("Synthetic sustained paging fixture, not feature work or proof that tests ran. The journal retains 113 successful synthetic inspections, overlapping pages, an invalid draft and an invalid page/source pointer. Correct within this original invocation. Page receipt reference and page.source identify DIFFERENT results; use the underlying source selection to read /output at byte_offset %d with byte_limit 4096. Copy its source_marker exactly; it was not in the seeded pages or draft. Keep the original decision combined-original-decision and validates=[]. Read exact named TestQualifiedPassing, TestQualifiedSkipped and TestQualifiedExcluded records using /test_evidence/tests or /test_evidence/excluded and match_field=name; return their actual statuses, never promote SKIP or NOT_RUN to PASS. Do not rerun tools, edit files, echo padding or resubmit the invalid pointer.", markerOffset)
+			brief.Task.AcceptanceCriteria = []string{"Correct source lookup after sustained paging and invalid pointer; exact marker and named PASS/SKIP/NOT_RUN records; preserve prior decision, all raw history and finite budgets."}
+		}
 		settings := p.NativeSettings
 		binding := nativeReleaseBinding{authority: agenttools.Authority{WorkspaceRoot: t.TempDir(), Permissions: role.Bundle.Permissions, Purpose: brief.Purpose, EffectPolicyDigest: p.EffectPolicyDigest}}
 		reads := []string{}
@@ -187,11 +211,19 @@ func qualifyNativeReceiptDelivery(t *testing.T, combined bool) {
 			seed.Tools = combinedReceiptQualificationTools{raw: fixture, delegate: session.Runner.Tools}
 			seed.MaxTurns = 3
 		}
+		if sustained {
+			seed.Model = &sustainedReceiptQualificationSeed{}
+			seed.Tools = sustainedReceiptQualificationTools{fixture: fixture, delegate: session.Runner.Tools}
+			seed.MaxTurns = 5
+		}
 		if _, err := seed.Run(ctx, session.InvocationID, session.RequestDigest, session.Prompt); !errors.Is(err, agentruntime.ErrTurnLimit) {
 			cancel()
 			t.Fatalf("seed: %v", err)
 		}
 		seedEntries := len(journal.entries)
+		if sustained {
+			verifySustainedReceiptSeed(t, journal.entries)
+		}
 		before, _ := json.Marshal(journal.entries)
 		t.Logf("qualifying %s invocation=%s", p.RoleFQRN, id)
 		result, err := session.Run(ctx)
@@ -224,10 +256,19 @@ func qualifyNativeReceiptDelivery(t *testing.T, combined bool) {
 				t.Fatal("invalid receipt")
 			}
 			if combined && e.Sequence <= uint64(seedEntries) && done.Error != "" {
-				if done.Name == "submit_result" && !strings.Contains(done.Error, "validates") || done.Name == "read_recorded_result" && (!strings.Contains(done.Error, "/read") || !strings.Contains(done.Error, "output")) {
+				badPointer := strings.Contains(done.Error, "/read") && strings.Contains(done.Error, "output")
+				if sustained {
+					badPointer = strings.Contains(done.Error, "/output") && strings.Contains(done.Error, "content")
+				}
+				if done.Name == "submit_result" && !strings.Contains(done.Error, "validates") || done.Name == "read_recorded_result" && !badPointer {
 					t.Fatalf("wrong seeded failure: %s", e.Payload)
 				}
 				failures++
+				continue
+			}
+			// The complete synthetic prefix was audited before model execution.
+			// Only post-prefix reads can qualify actual model correction/evidence.
+			if sustained && e.Sequence <= uint64(seedEntries) {
 				continue
 			}
 			if done.Error != "" || done.Name != "read_recorded_result" {
@@ -242,7 +283,11 @@ func qualifyNativeReceiptDelivery(t *testing.T, combined bool) {
 				t.Fatal("invalid exact page")
 			}
 			if combined && page.Pointer == "/output" {
-				if sourceRead || !strings.Contains(page.Content, "explicit synthetic fixture output") {
+				markerRead := strings.Contains(page.Content, "explicit synthetic fixture output")
+				if sustained {
+					markerRead = strings.Contains(page.Content, "source_marker="+sourceMarker)
+				}
+				if sourceRead || !markerRead {
 					t.Fatal("source pointer correction missing or repeated")
 				}
 				sourceRead = true
@@ -273,13 +318,13 @@ func qualifyNativeReceiptDelivery(t *testing.T, combined bool) {
 		if json.Unmarshal([]byte(strings.TrimPrefix(result, application.OrganizationalResultMarker+"\n")), &final) != nil || final.Passing != "PASS" || final.Skipped != "SKIP" || final.Excluded != "NOT_RUN" {
 			t.Fatalf("statuses wrong: %s", result)
 		}
-		write(string(p.RoleFQRN)+"-measurement.json", map[string]any{"label": "OBSERVED", "scope": "synthetic receipt-delivery delta only; not feature/work-kind qualification", "invocation_id": id, "profile": p, "fixture_bytes": len(fixture), "fixture_sha256": digestBytes(fixture), "result": result, "exact_records_read": observed, "journal": journal.entries})
+		write(string(p.RoleFQRN)+"-measurement.json", map[string]any{"label": "OBSERVED", "scope": "synthetic receipt-delivery delta only; not feature/work-kind qualification", "invocation_id": id, "profile": p, "fixture_bytes": len(fixture), "fixture_sha256": digestBytes(fixture), "result": result, "exact_records_read": observed, "sustained_paging": sustained, "journal": journal.entries})
 		checked = append(checked, string(p.RoleFQRN))
 	}
 	if len(checked) == 0 {
 		t.Fatal("no qualified roles checked")
 	}
-	write("qualification.json", map[string]any{"label": "OBSERVED", "status": "PASS", "roles": checked, "scope": "bounded presentation and exact recorded-result access only", "combined_failure_and_correction": combined, "production_config_modified": false, "historical_runs_modified": false, "operator_unqualified": "NOT_RUN"})
+	write("qualification.json", map[string]any{"label": "OBSERVED", "status": "PASS", "roles": checked, "scope": "bounded presentation and exact recorded-result access only", "combined_failure_and_correction": combined, "sustained_paging": sustained, "production_config_modified": false, "historical_runs_modified": false, "operator_unqualified": "NOT_RUN"})
 }
 
 func validateCombinedQualificationResult(output []byte, marker string) error {

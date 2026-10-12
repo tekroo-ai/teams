@@ -40,16 +40,37 @@ Provider `finish_details` are retained too. A `repetition_loop` cutoff is a
 terminal invalid response regardless of `finish_reason`; it is never mistaken
 for output-budget exhaustion or continued automatically.
 
-Receipt presentations contain `access_instructions` and bounded
-`source_json_pointers`, not a synthetic source field named `read`.
+Receipt presentations contain compact identity and bounded
+`source_json_pointers`, not a synthetic source field named `read`. Shared access
+instructions live once in the reader definition, not in each receipt. Historical
+`access_instructions`/`read` fields remain decode-compatible but are not emitted
+by new projections. No historical journal is rewritten.
 `read_recorded_result` addresses the original result: source text is `/output`
 when that field is present. A nonexistent `/read` is rejected with available
 source keys; it is never silently aliased. Exact named records retain
 PASS/SKIP/NOT_RUN distinctions. Summaries remain insufficient validation evidence.
 Exact matching selects an array, not its containing object; both the tool schema
-and receipt view explain that distinction. Wrong-container errors retain the
+explain that distinction. Wrong-container errors retain the
 selected pointer and bounded original object keys. Missing matches in a valid
 array remain legitimate empty results, never errors or fabricated evidence.
+
+Condensed reader responses retain two identities: outer `reference` addresses
+the page-response journal entry; `page.source` addresses the underlying result
+and exact JSON-pointer/record selection. `page` also records the byte range,
+completion flag and exact decoded-page digest. To continue source paging, use
+`page.source` with `page.next_byte_offset`, not the outer page receipt plus a
+guessed pointer. Reader responses retain record-match fields so compaction does
+not lose the selected named record. Legacy pages without those fields are never
+given an invented filter.
+
+Duplicate presentation is indexed by source identity, selection, byte range and
+content digest. Older identical pages may link to a later exact page still in
+the visible history; calls and raw outputs stay in the journal. Changed sources,
+filters, ranges or bytes are distinct. If budgeting replaces the later content,
+the in-context link is removed; durable source/receipt references remain. This
+reduces presentation only: no tool is silently skipped, result accepted, pointer
+aliased, context authority removed, or invocation continued after a true limit.
+The configured history/result/page/transport/token reserves are unchanged.
 
 Generation schemas forbid authored `validates` arrays only when **all** admitted
 purpose routes forbid them. Mixed policies retain per-task semantic checks.
@@ -81,12 +102,33 @@ draft contains a wrong marker. This ties the required source read to an answer
 that actually depends on that read. Both the actual read receipt and exact value
 remain required, and no extra tool errors or corrections are allowed.
 
+`TestSustainedPagingPreservesHistoryUnderUnchangedBudget` covers a synthetic
+113-observation mix with overlapping pages and immutable decisions, checkpoint
+idempotency, unchanged raw journal and exact PASS/SKIP/NOT_RUN lookup. Separate
+regressions cover page/source pointer rejection and correction, named-selection
+provenance, legacy receipt identities, and removal of dangling delivery links.
+Existing true-overflow, malformed/unauthorized access and frozen-ancestor tests
+remain mandatory.
+
+The opt-in `TestQualifyNativeSustainedPagingRecovery` seeds 113 successful
+synthetic observations, an invalid draft and an invalid page/source pointer in a
+single finite invocation. The real signed role must then read a source marker
+outside the seeded page ranges, preserve its original decision, correct the
+draft, and read all three exact named statuses. The large retained draft keeps
+the rendered-admission challenge. Seeding is not live model behavior or evidence
+that tests actually executed. Its original journal prefix and both error receipts
+are preserved, and qualification does not dispatch or alter a historical run.
+
 Run these qualification tests individually with build tags
 `mongo_integration,native_qualification`, an explicit read-only
 `TEKROO_NATIVE_RECEIPT_CONFIG` and a **different new**
 `TEKROO_NATIVE_RECEIPT_OUTPUT` directory for each scenario. They do not modify
 production configuration, role locks, feature state or historical journals.
 An unset configuration produces SKIP, **not qualification PASS**.
+The seven-role sustained batch needs an explicit outer Go test timeout (for
+example `-timeout=80m`); Go's default aggregate ten-minute limit is not the
+per-role qualification deadline. Each role retains its existing ten-minute
+context/HTTP bound and unchanged finite model-turn/submission allowances.
 
 The model-server gate is `tests/test_chat_token_count.py`, pointed explicitly at
 an already-loaded candidate server/model. It compares counts with generation
