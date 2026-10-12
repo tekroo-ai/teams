@@ -157,8 +157,11 @@ func bindHandlerPlanResult(arguments json.RawMessage, plan *PlanFinalizationBind
 		}
 		seen[change.TaskIndex] = true
 		task := tasks[change.TaskIndex]
-		var existing []uint32
-		if json.Unmarshal(task["depends_on"], &existing) != nil {
+		existing := []uint32{}
+		// Accepted architecture permits omitted dependencies. Missing means no
+		// prerequisites, not invalid JSON; present values still decode strictly.
+		// This does not default the model-authored delta's required array above.
+		if raw, present := task["depends_on"]; present && json.Unmarshal(raw, &existing) != nil {
 			return nil, fmt.Errorf("%w: accepted task %d depends_on cannot be decoded", ErrInvalidBinding, change.TaskIndex)
 		}
 		seenDependencies := make(map[uint32]bool, len(change.DependsOn))

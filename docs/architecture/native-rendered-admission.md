@@ -94,3 +94,40 @@ usage for template, tools, schema, large text and continuation cases. It does
 not start/stop a service or send load/unload requests; normal model resolution
 still applies, and it does make qualification generation requests.
 Both real-model gates must pass before enabling this policy for a fresh run.
+
+## Architect-to-PM dependency boundary
+
+An accepted architectural task may omit `depends_on`: its signed schema makes
+the field optional. The native finalization binder treats absence as an empty
+prerequisite set when applying a PM addition or empty confirmation. The latter
+serializes as `[]`, never `null`. Present source values retain their existing
+typed decoder behavior; signed source-schema validation remains authoritative.
+The PM delta's own `depends_on` array remains
+required; missing/null arrays, duplicate/self/out-of-range edges and invalid
+handoff paths are not repaired or accepted. The source output and digest are
+never rewritten. Existing prerequisites and immutable technical content remain
+protected by the same production admission predicate.
+
+`TestArchitectToPMDependencyFailureAndCorrection` carries an accepted three-task
+architect output with omitted dependencies on two tasks and an existing edge
+on the third into the real native PM binder. It deliberately rejects a self
+edge, then a handoff missing its prerequisite, and accepts a valid correction
+within the original three-submission invocation. It asserts retained drafts
+and errors, preserved technical content and original edges, and finite budgets.
+Separate negative controls retain rejection of changed technical work, removed
+accepted edges, incorrect source identity, cycles and incomplete handoffs.
+
+The opt-in `TestQualifyNativeArchitectToPMDependencyRecovery` runs the configured
+signed architect and PM on a synthetic provider/consumer fixture, not a historical
+feature. The architect must actually return the omitted-field source case. Two
+deliberately invalid PM drafts are then seeded through the real runner and local
+validators; the real PM must correct them in that same invocation using the
+remaining submission allowance. Journals and exact HTTP bodies are retained;
+no role qualifications, configuration, role locks or historical runs are changed.
+
+Run it with build tags `mongo_integration,native_qualification`, an explicit
+read-only `TEKROO_NATIVE_DEPENDENCY_CONFIG`, and a new absolute
+`TEKROO_NATIVE_DEPENDENCY_OUTPUT` directory. Teams must remain stopped and the
+existing model server must be idle before starting. Missing authorization paths
+produce SKIP, not PASS. This is a scoped boundary qualification, not a claim
+that a feature was implemented, tested or accepted.

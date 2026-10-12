@@ -1,0 +1,19 @@
+{
+  "schema_version": "1.0.0",
+  "outcome": "completed",
+  "summary": "A bounded provider and two independently scoped consumers.",
+  "evidence": [],
+  "message_proposals": [],
+  "work_product": {
+    "schema_version": "1.0.0",
+    "result_type": "FEATURE_PLAN",
+    "architecture": "Extend the existing Payload value in provider.go with a Value string field. Existing consumers use that public field; unrelated behavior is unchanged.",
+    "design_decisions": ["Provider defines the public field once; consumers do not edit provider files."],
+    "assumptions": ["provider.go, consumer.go and observer.go already exist."],
+    "tasks": [
+      {"story_index":0,"title":"Provider value","description":"Extend the existing Payload struct in provider.go with Value string. Add provider tests; do not edit consumers. This is an existing-file modification, not a new declaration manifest.","acceptance_criteria":["Payload exposes Value string and provider tests pass."],"purpose":"IMPLEMENTATION","complexity":2,"risk":"LOW","attempt_limit":2,"review_round_limit":1,"write_scope":["provider.go","provider_test.go"]},
+      {"story_index":0,"title":"Primary consumer","description":"Update existing Consume(Payload) string in consumer.go to return the provider's Value field; add consumer tests. This needs the provider's source field. Do not edit provider.go.","acceptance_criteria":["Consume returns Payload.Value and consumer tests pass."],"purpose":"IMPLEMENTATION","complexity":2,"risk":"LOW","attempt_limit":2,"review_round_limit":1,"write_scope":["consumer.go","consumer_test.go"]},
+      {"story_index":0,"title":"Independent observer","description":"Update existing Observe(Payload) string in observer.go to return the provider's Value field; add observer tests. Preserve its existing dependency on task 0. Do not edit provider.go or consumer.go.","acceptance_criteria":["Observe returns Payload.Value and observer tests pass."],"purpose":"IMPLEMENTATION","complexity":2,"risk":"LOW","attempt_limit":2,"review_round_limit":1,"depends_on":[0],"write_scope":["observer.go","observer_test.go"]}
+    ]
+  }
+}

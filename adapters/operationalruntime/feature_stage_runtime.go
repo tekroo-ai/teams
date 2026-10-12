@@ -1788,6 +1788,12 @@ func (service *ProductionService) validateFeatureStageOutputWithEvidence(ctx con
 	if finalized.SourceDesignDigest != feature.Design.OutputDigest {
 		return fmt.Errorf("%w: finalized plan does not reference the accepted architecture", organization.ErrInvalidFeature)
 	}
+	return validateFinalizedDesign(proposed, finalized)
+}
+
+// Compare immutable technical content independently of evidence retrieval, so
+// production admission and boundary qualification exercise the same predicate.
+func validateFinalizedDesign(proposed, finalized architectureStageResult) error {
 	if !reflect.DeepEqual(finalized.Architecture, proposed.Architecture) || !reflect.DeepEqual(finalized.DesignDecisions, proposed.DesignDecisions) || !reflect.DeepEqual(finalized.Assumptions, proposed.Assumptions) {
 		return fmt.Errorf("%w: finalized plan changed accepted architecture, decisions, or assumptions", organization.ErrInvalidFeature)
 	}
