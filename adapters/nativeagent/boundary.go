@@ -360,13 +360,19 @@ func (boundary *Boundary) reconcileBeforeTerminal(brief application.ExecutionBri
 	if err != nil || len(entries) == 0 || entries[len(entries)-1].Kind == agentruntime.Started {
 		return err
 	}
+	// Inspection and terminal drain share the exact server-resolved prompt
+	// check. Structured workflow/validation prompts are not legacy briefs;
+	// rejecting them here strands an already exhausted invocation. This only
+	// validates retained entries and cannot initiate model calls or effects.
+	if _, _, err := boundary.observeJournal(ctx, brief, digest, entries); err != nil {
+		return err
+	}
 	var start struct {
 		RequestDigest   string                        `json:"request_digest"`
 		Prompt          string                        `json:"prompt"`
 		EffectAuthority *agentruntime.EffectAuthority `json:"effect_authority"`
 	}
-	encoded, err := json.Marshal(brief)
-	if err != nil || json.Unmarshal(entries[0].Payload, &start) != nil || start.RequestDigest != string(digest) || !nativePromptMatchesBrief(brief, digest, encoded, start.Prompt) {
+	if json.Unmarshal(entries[0].Payload, &start) != nil {
 		return ErrInvalidBinding
 	}
 	if start.EffectAuthority == nil {
