@@ -214,9 +214,25 @@ func (c ReceiptCondenser) condenseCatalog(ctx context.Context, history []Message
 	result := restoreRecordedReferences(history, c.InheritedHistory)
 	total := 0
 	protected := map[int]bool{}
+	// Only the trailing current-invocation tool batch is awaiting consumption.
+	// A child assignment's user boundary excludes frozen ancestor responses.
+	// Derive this from retained call identity, not a mutable delivery flag, so
+	// retrying preparation or replaying a checkpoint gives the same projection.
+	fresh := map[string]string{}
+	batchStart := len(result)
+	for batchStart > 0 && result[batchStart-1].Role == "tool" {
+		batchStart--
+	}
+	if batchStart > 0 && result[batchStart-1].Role == "assistant" {
+		for _, call := range result[batchStart-1].ToolCalls {
+			fresh[call.ID] = call.Name
+		}
+	}
 	duplicates := map[string]bool{}
-	compact := map[int]bool{}
-	for i, m := range result {
+	// Newest-first deduplication never treats an evicted older copy as a
+	// visible witness for hiding evidence the model has just requested again.
+	for i := len(result) - 1; i >= 0; i-- {
+		m := result[i]
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
@@ -256,13 +272,26 @@ func (c ReceiptCondenser) condenseCatalog(ctx context.Context, history []Message
 			result[i].Content = original.Content
 			protected[i] = true
 		}
+		if i >= batchStart && m.Receipt.InvocationID == c.Catalog.InvocationID && fresh[m.CallID] == m.Name && len(original.Content) <= c.Policy.ResultBytes {
+			// Include exact bounded fresh evidence in the next provider request,
+			// even if a prior preparation checkpoint already turned it into a
+			// handle. Hard request admission may still fail closed; capacity
+			// projection must not obtain a fit by hiding an unconsumed page.
+			result[i].Content = original.Content
+			protected[i] = true
+		}
 		key := m.Name + "\x00" + resultDigest(original.Content)
-		compact[i] = duplicates[key] || all || len(result[i].Content) > c.Policy.ResultBytes
+		compact := duplicates[key] || all || len(result[i].Content) > c.Policy.ResultBytes
 		duplicates[key] = true
-		if compact[i] && !protected[i] {
-			result[i].Content, err = catalogView(m)
+		if compact && !protected[i] {
+			view, err := catalogView(m)
 			if err != nil {
 				return nil, err
+			}
+			// Empty/small results often cost fewer bytes than their locator.
+			// Never inflate them or remove their meaning just to deduplicate.
+			if len(view) < len(result[i].Content) {
+				result[i].Content = view
 			}
 		}
 		if len(result[i].Content) > c.Policy.ResultBytes {

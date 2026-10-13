@@ -18,9 +18,9 @@ func TestCatalogRunnerBoundedProjectionBeforeGeneration(t *testing.T) {
 		t.Run(mode, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 			defer cancel()
-			j, h, c := catalogFixture(t, 1)
-			// Small evidence is initially retained: force a genuine provider capacity
-			// response to prove the separate preparation loop, not an invocation retry.
+			j, h, c := catalogFixture(t, 2)
+			// The first batch has already had a successor model turn; the second
+			// remains fresh. Only consumed evidence may satisfy capacity reduction.
 			p := catalogPolicy()
 			counts, posts := 0, 0
 			var counted []byte
@@ -61,17 +61,18 @@ func TestCatalogRunnerBoundedProjectionBeforeGeneration(t *testing.T) {
 			j.entries[0].Payload = start
 			r := Runner{Journal: j, Model: m, Tools: &countingTool{}, Condenser: ReceiptCondenser{Policy: p, Catalog: c}}
 			before, _ := json.Marshal(j.entries)
+			prefixCount := len(j.entries)
 			result, err := r.Run(ctx, "catalog", testRequestDigest, "original task")
 			if mode == "reduce" {
 				if err != nil || result != "done" || counts != 2 || posts != 1 {
 					t.Fatal(result, err, counts, posts)
 				}
 				var cp historyCheckpoint
-				json.Unmarshal(j.entries[3].Payload, &cp)
+				json.Unmarshal(j.entries[prefixCount].Payload, &cp)
 				if cp.RequestSHA256 != resultDigest(string(counted)) {
 					t.Fatal("checkpoint not bound to admitted wire")
 				}
-				prefix, _ := json.Marshal(j.entries[:3])
+				prefix, _ := json.Marshal(j.entries[:prefixCount])
 				if !bytes.Equal(prefix, before) {
 					t.Fatal("original prefix changed")
 				}
