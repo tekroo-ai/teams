@@ -2,6 +2,7 @@ package agenttools
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -48,14 +49,39 @@ func TestCanonicalPath(t *testing.T) {
 }
 
 func TestSandboxRunsRepositoryOrganizationRolePackageChecks(t *testing.T) {
-	root, err := filepath.Abs("..")
-	if err != nil {
-		t.Fatal(err)
-	}
+	root := cleanRepositoryFixture(t)
 	host := cachedFixtureHost(t, Host{Timeout: 2 * time.Minute})
 	authority := Authority{WorkspaceRoot: root, Permissions: []string{"repository.read", "test.execute"}, Purpose: kernel.PurposeImplementation}
 	result, err := host.execute(t.Context(), authority, call("run_go_tests_worktree", `{"package":"./organization"}`))
 	if err != nil || result.ExitCode != 0 || !strings.Contains(result.Output, "ok") {
 		t.Fatalf("real repository role-package checks: %+v %v", result, err)
 	}
+}
+
+func TestSandboxLoadsFrozenKernelFixturesWithTrimpath(t *testing.T) {
+	// r55's deployed -trimpath runner failed the accepted catalogue tests even
+	// though the archived CONTRACTS files were present. Exercise the real corpus
+	// through the unchanged sandbox, not just a mocked path resolver.
+	root := cleanRepositoryFixture(t)
+	host := cachedFixtureHost(t, Host{Timeout: 2 * time.Minute})
+	authority := Authority{WorkspaceRoot: root, Permissions: []string{"repository.read", "test.execute"}, Purpose: kernel.PurposeImplementation}
+	result, err := host.execute(t.Context(), authority, call("run_go_tests_worktree", `{"package":"./kernel"}`))
+	if err != nil || result.ExitCode != 0 || result.PermissionDenial || !strings.Contains(result.Output, "ok") {
+		t.Fatalf("frozen kernel fixtures in trimmed snapshot: %+v %v", result, err)
+	}
+}
+
+// Keep real-corpus checks independent of private runtime and scratch files.
+func cleanRepositoryFixture(t *testing.T) string {
+	t.Helper()
+	source, err := filepath.Abs("..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := filepath.Join(t.TempDir(), "source")
+	command := exec.CommandContext(t.Context(), "git", "clone", "--no-hardlinks", "--no-local", source, root)
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("clone tracked test corpus: %v %s", err, output)
+	}
+	return root
 }
