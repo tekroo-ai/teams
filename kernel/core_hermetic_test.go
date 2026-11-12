@@ -6,12 +6,12 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"runtime"
 	"sort"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/tekroo-ai/teams/internal/testpaths"
 	"github.com/tekroo-ai/teams/kernel"
 )
 
@@ -1087,11 +1087,7 @@ func stateForCommand(commandType string, target kernel.AggregateRef) *kernel.Agg
 
 func testRepositoryRoot(t *testing.T) string {
 	t.Helper()
-	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("locate test source")
-	}
-	return filepath.Clean(filepath.Join(filepath.Dir(file), ".."))
+	return testpaths.Root(t)
 }
 
 func storyAuthorizeCommand(t *testing.T) kernel.KernelCommand {

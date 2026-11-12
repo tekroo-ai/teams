@@ -12,7 +12,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -23,6 +22,7 @@ import (
 	"github.com/tekroo-ai/teams/adapters/protocol"
 	"github.com/tekroo-ai/teams/application"
 	"github.com/tekroo-ai/teams/contract"
+	"github.com/tekroo-ai/teams/internal/testpaths"
 	"github.com/tekroo-ai/teams/kernel"
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
@@ -374,11 +374,7 @@ func runCapstoneGit(t *testing.T, arguments ...string) string {
 
 func loadCapstoneCatalogue(t *testing.T) kernel.CatalogueSnapshot {
 	t.Helper()
-	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("locate capstone test")
-	}
-	root := filepath.Clean(filepath.Join(filepath.Dir(file), "../.."))
+	root := testpaths.Root(t)
 	catalogue, err := contract.Load(os.DirFS(root), "CONTRACTS/tekroo.kernel.contracts/0.12.0")
 	if err != nil {
 		t.Fatal(err)

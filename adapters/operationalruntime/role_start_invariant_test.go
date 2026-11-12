@@ -6,9 +6,10 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/tekroo-ai/teams/internal/testpaths"
 )
 
 // Every exported ProductionService start/restart variant must finish through
@@ -16,11 +17,7 @@ import (
 // variant must not be able to make durable execution registration optional by
 // copying only part of the lifecycle sequence.
 func TestProductionRoleStartMethodsUseMandatoryCompletionPath(t *testing.T) {
-	_, testFile, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("resolve test source path")
-	}
-	directory := filepath.Dir(testFile)
+	directory := filepath.Join(testpaths.Root(t), "adapters", "operationalruntime")
 	packages, err := parser.ParseDir(token.NewFileSet(), directory, func(info os.FileInfo) bool {
 		return !strings.HasSuffix(info.Name(), "_test.go")
 	}, 0)

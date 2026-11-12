@@ -3,18 +3,15 @@ package protocol_test
 import (
 	"go/build"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/tekroo-ai/teams/internal/testpaths"
 )
 
 func TestThinAdapterProductionImportsRemainWithinBoundary(t *testing.T) {
-	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("locate boundary test")
-	}
-	adaptersRoot := filepath.Clean(filepath.Join(filepath.Dir(file), ".."))
+	adaptersRoot := filepath.Join(testpaths.Root(t), "adapters")
 	allowed := map[string]map[string]bool{
 		"protocol": {"github.com/tekroo-ai/teams/kernel": true},
 		"channel": {

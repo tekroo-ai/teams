@@ -11,7 +11,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -19,6 +18,7 @@ import (
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/tekroo-ai/teams/application"
+	"github.com/tekroo-ai/teams/internal/testpaths"
 	"github.com/tekroo-ai/teams/kernel"
 )
 
@@ -752,11 +752,7 @@ func TestEveryTransportNeutralHandlerUsesItsResultSchemaAsToolContract(t *testin
 }
 
 func TestEveryConfiguredHandlerSchemaMatchesSubmissionBoundary(t *testing.T) {
-	_, source, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("resolve test source")
-	}
-	root := filepath.Join(filepath.Dir(source), "..", "..")
+	root := testpaths.Root(t)
 	results, err := filepath.Glob(filepath.Join(root, "config", "starter-team", "roles-v4", "*", "handlers", "*", "result.schema.json"))
 	if err != nil || len(results) == 0 {
 		t.Fatalf("discover handler result schemas: count=%d err=%v", len(results), err)

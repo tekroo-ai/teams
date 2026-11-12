@@ -6,11 +6,11 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"runtime"
 	"testing"
 	"time"
 
 	"github.com/tekroo-ai/teams/contract"
+	"github.com/tekroo-ai/teams/internal/testpaths"
 	"github.com/tekroo-ai/teams/kernel"
 )
 
@@ -580,11 +580,7 @@ func loadFixtures(t *testing.T, path string) []fixture {
 
 func locateRepositoryRoot(t *testing.T) string {
 	t.Helper()
-	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("locate conformance test source")
-	}
-	return filepath.Clean(filepath.Join(filepath.Dir(file), "../.."))
+	return testpaths.Root(t)
 }
 
 func decode(t *testing.T, data []byte, target any) {

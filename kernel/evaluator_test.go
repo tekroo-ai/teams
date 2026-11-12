@@ -4,13 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
-	"path/filepath"
 	"reflect"
-	"runtime"
 	"testing"
 	"time"
 
 	"github.com/tekroo-ai/teams/contract"
+	"github.com/tekroo-ai/teams/internal/testpaths"
 	"github.com/tekroo-ai/teams/kernel"
 )
 
@@ -311,11 +310,7 @@ func validProvenanceBasis(t *testing.T) kernel.ProvenanceBasis {
 
 func loadCatalogue(t *testing.T) *contract.Catalogue {
 	t.Helper()
-	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("locate evaluator test")
-	}
-	repositoryRoot := filepath.Clean(filepath.Join(filepath.Dir(file), ".."))
+	repositoryRoot := testpaths.Root(t)
 	catalogue, err := contract.Load(os.DirFS(repositoryRoot), "CONTRACTS/tekroo.kernel.contracts/0.12.0")
 	if err != nil {
 		t.Fatalf("load catalogue: %v", err)

@@ -3,17 +3,14 @@ package application_test
 import (
 	"go/build"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/tekroo-ai/teams/internal/testpaths"
 )
 
 func TestApplicationProductionImportsRemainKernelOnly(t *testing.T) {
-	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("locate boundary test")
-	}
-	definition, err := build.Default.ImportDir(filepath.Dir(file), build.ImportComment)
+	definition, err := build.Default.ImportDir(filepath.Join(testpaths.Root(t), "application"), build.ImportComment)
 	if err != nil {
 		t.Fatal(err)
 	}

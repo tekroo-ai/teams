@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"os"
-	"path/filepath"
-	"runtime"
 	"testing"
 	"time"
 
@@ -14,15 +12,12 @@ import (
 	"github.com/tekroo-ai/teams/adapters/protocol"
 	"github.com/tekroo-ai/teams/application"
 	"github.com/tekroo-ai/teams/contract"
+	"github.com/tekroo-ai/teams/internal/testpaths"
 	"github.com/tekroo-ai/teams/kernel"
 )
 
 func TestGatewayInvokesApplicationHandlerAndPreservesIdempotentReceipt(t *testing.T) {
-	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("locate integration test")
-	}
-	repositoryRoot := filepath.Clean(filepath.Join(filepath.Dir(file), "../.."))
+	repositoryRoot := testpaths.Root(t)
 	catalogue, err := contract.Load(os.DirFS(repositoryRoot), "CONTRACTS/tekroo.kernel.contracts/0.12.0")
 	if err != nil {
 		t.Fatal(err)
